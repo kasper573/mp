@@ -13,4 +13,3 @@ export const NpcTag = object({
 });
 
 export const identityComponents = [CharacterTag, NpcTag] as const;
-export const identityEvents = [] as const;

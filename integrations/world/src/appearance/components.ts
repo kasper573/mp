@@ -9,4 +9,3 @@ export const Appearance = object({
 });
 
 export const appearanceComponents = [Appearance] as const;
-export const appearanceEvents = [] as const;

@@ -15,10 +15,7 @@ import { Movement } from "../movement/components";
 
 const PACIFIST_WANDER_CHANCE = 0.4;
 const EMPTY_PATH: ReadonlyArray<Vector<Tile>> = [];
-// While chasing an aggro target, NPCs move faster than their idle speed so
-// that the actor sprite plays its run animation (which kicks in at
-// speed >= 2 in actor-controller.ts). Restored to NpcAi.idleSpeed when the
-// target is lost. Replaces the pre-migration ai-tasks/hunt.ts speed toggle.
+// Speed >= 2 triggers the run animation in actor-controller.ts.
 const CHASE_SPEED_MULTIPLIER = 2;
 
 export interface NpcAiOptions {
@@ -26,10 +23,6 @@ export interface NpcAiOptions {
   readonly rng?: Rng;
 }
 
-/**
- * Records combat events between actors that an observer NPC has witnessed,
- * used by defensive/protective AI to decide whether to retaliate.
- */
 class CombatMemory {
   readonly #combats = new Map<EntityId, Array<[EntityId, EntityId]>>();
 
@@ -166,7 +159,6 @@ export class NpcAiModule extends RiftServerModule {
 
     const refreshedCombat = world.get(id, Combat);
     if (refreshedCombat?.attackTargetId !== undefined) {
-      // Already engaged; CombatModule handles attack + chase.
       return;
     }
     if (refreshedCombat) {
@@ -254,8 +246,6 @@ export class NpcAiModule extends RiftServerModule {
       case "aggressive":
       case "defensive":
       case "protective":
-        // No target in sight — wander to a random walkable tile in hope of
-        // running into one.
         this.server.world.set(id, Movement, {
           ...mv,
           moveTarget: this.#pickRandomWalkable(area),

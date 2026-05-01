@@ -18,9 +18,6 @@ function CharacterPage() {
   const myCharacter = useComputed(() => characters.characters.value[0]).value;
   const savedAt = useSignal<number | undefined>(undefined);
 
-  // Show the "Changes saved" indicator when the server acknowledges a
-  // rename specifically — listening on the rename response avoids false
-  // positives from any other character-list update.
   useMount(() =>
     client.on(CharacterRenamedResponse, () => {
       savedAt.value = Date.now();

@@ -100,7 +100,7 @@ export class CharacterDirectoryModule extends RiftServerModule {
       : [];
     this.server.emit({
       type: CharacterListResponse,
-      data: { characters },
+      data: characters,
       source: { type: "local" },
       target: { type: "wire", strategy: { type: "list", ids: [clientId] } },
     });

@@ -4,8 +4,7 @@ import swc from "unplugin-swc";
 
 export default defineConfig({
   plugins: [
-    // Rift uses TC39 stage 3 decorators (`@inject` accessor); esbuild can't
-    // transpile those down to runtime-compatible code, but SWC can.
+    // SWC because esbuild can't transpile TC39 stage 3 decorators.
     swc.vite({
       jsc: {
         parser: { syntax: "typescript", decorators: true, tsx: true },

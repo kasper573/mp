@@ -68,7 +68,7 @@ export class ActorController extends Container {
         }
       }),
       client.on(Died, (ev) => {
-        if (ev.data.entityId === actor.entityId) {
+        if (ev.data === actor.entityId) {
           void this.#sprite.playToEndAndStop("death-spear");
         }
       }),

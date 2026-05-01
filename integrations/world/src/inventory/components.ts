@@ -11,4 +11,3 @@ export const OwnedBy = object({
 });
 
 export const inventoryComponents = [InventoryRef, OwnedBy] as const;
-export const inventoryEvents = [] as const;

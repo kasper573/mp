@@ -2,9 +2,6 @@ import { array, enumOf, f32, object, optional, transform } from "@rift/types";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 
-// Transforms an `{x, y}` wire object into a `Vector<Tile>` so consumers
-// get the full Vector ergonomics (`distance`, `add`, `equals`, …) rather
-// than a structural blob with bare components.
 export const TileVector = transform(
   object({
     x: f32<Tile>(),

@@ -3,9 +3,6 @@ import type { EntityId } from "@rift/core";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rect } from "@mp/math";
 
-// Transforms an `{x, y, width, height}` wire object into a `Rect<Tile>`
-// so consumers can use Rect methods (`offset`, `contains`, `overlap`)
-// directly.
 export const HitBox = transform(
   object({
     x: f32<Tile>(),

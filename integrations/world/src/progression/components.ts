@@ -5,4 +5,3 @@ export const Progression = object({
 });
 
 export const progressionComponents = [Progression] as const;
-export const progressionEvents = [] as const;

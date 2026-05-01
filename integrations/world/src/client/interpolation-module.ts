@@ -6,26 +6,12 @@ import { Movement } from "../movement/components";
 import { moveAlongPath } from "../movement/path";
 
 export interface InterpolationOptions {
-  /**
-   * Provides delta time per frame in seconds. Wire this up to your renderer's
-   * frame ticker (e.g. PIXI ticker) so movement can advance smoothly between
-   * server tick updates.
-   */
   readonly subscribeToFrames: (
     onFrame: (deltaSeconds: number) => void,
   ) => () => void;
-
-  /**
-   * When false, the module is a no-op. Useful for toggling interpolation
-   * without unmounting the module.
-   */
   readonly enabled: () => boolean;
 }
 
-/**
- * Advances actor positions along their server-provided paths between deltas
- * to give a smooth, interpolated motion on the client.
- */
 export class InterpolationModule extends RiftClientModule {
   readonly #opts: InterpolationOptions;
 

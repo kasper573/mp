@@ -32,9 +32,7 @@ export default defineConfig({
       devToolsEnabled: false,
       babel: {
         plugins: [
-          // 2023-11 is the most recent stage 3 spec implementation that
-          // matches what tsc/SWC emit, including class-level metadata that
-          // rift's `@inject` reads via `context.metadata`.
+          // 2023-11 emits class-level metadata that rift's `@inject` reads.
           ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
         ],
       },

@@ -1,14 +1,15 @@
-import { array, object, string } from "@rift/types";
+import { array, copy, object, string } from "@rift/types";
 import type { CharacterId, InventoryId } from "../identity/ids";
 import { TileVector } from "../movement/components";
 
-export const JoinAsPlayer = object({
-  characterId: string<CharacterId>(),
+export const CharacterSummary = object({
+  id: string<CharacterId>(),
+  name: string(),
 });
 
-export const JoinAsSpectator = object({
-  characterId: string<CharacterId>(),
-});
+export const JoinAsPlayer = string<CharacterId>();
+
+export const JoinAsSpectator = string<CharacterId>();
 
 export const Leave = object({});
 
@@ -20,30 +21,15 @@ export const RequestFullState = object({});
 
 export const ListCharactersRequest = object({});
 
-export const CharacterSummary = object({
-  id: string<CharacterId>(),
-  name: string(),
-});
+export const CharacterListResponse = array(CharacterSummary);
 
-export const CharacterListResponse = object({
-  characters: array(CharacterSummary),
-});
+export const CreateCharacterRequest = string();
 
-export const CreateCharacterRequest = object({
-  name: string(),
-});
+export const CharacterCreatedResponse = copy(CharacterSummary);
 
-export const CharacterCreatedResponse = object({
-  character: CharacterSummary,
-});
+export const DeleteCharacterRequest = string<CharacterId>();
 
-export const DeleteCharacterRequest = object({
-  characterId: string<CharacterId>(),
-});
-
-export const CharacterDeletedResponse = object({
-  characterId: string<CharacterId>(),
-});
+export const CharacterDeletedResponse = string<CharacterId>();
 
 export const RenameCharacterRequest = object({
   characterId: string<CharacterId>(),
@@ -76,4 +62,5 @@ export const characterEvents = [
   CharacterDeletedResponse,
   RenameCharacterRequest,
   CharacterRenamedResponse,
+  CharacterSpawn,
 ] as const;

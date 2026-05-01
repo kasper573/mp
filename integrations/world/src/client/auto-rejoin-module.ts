@@ -10,19 +10,9 @@ export interface AutoRejoinIntent {
 }
 
 export interface AutoRejoinOptions {
-  /**
-   * Returns the character (and mode) the client should try to (re)join as
-   * whenever the connection becomes open. Returning undefined disables the
-   * auto-rejoin for the current connection.
-   */
   readonly intent: () => AutoRejoinIntent | undefined;
 }
 
-/**
- * Re-emits a JoinAsPlayer / JoinAsSpectator event each time the connection
- * transitions to "open" so that brief disconnects don't drop the player out
- * of the world.
- */
 export class AutoRejoinModule extends RiftClientModule {
   readonly #opts: AutoRejoinOptions;
   #wasOpen = false;

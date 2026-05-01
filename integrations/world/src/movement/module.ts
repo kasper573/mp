@@ -35,7 +35,7 @@ export class MovementModule extends RiftServerModule {
     };
   }
 
-  #onMoveRequest = (event: RiftServerEvent<{ target: Vector<Tile> }>): void => {
+  #onMoveRequest = (event: RiftServerEvent<Vector<Tile>>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -57,11 +57,11 @@ export class MovementModule extends RiftServerModule {
     if (!area) {
       return;
     }
-    const path = findPath(area, movement.coords, event.data.target);
+    const path = findPath(area, movement.coords, event.data);
     this.server.world.set(characterEnt, Movement, {
       ...movement,
       path: path ?? [],
-      moveTarget: event.data.target,
+      moveTarget: event.data,
     });
   };
 
@@ -87,9 +87,6 @@ export class MovementModule extends RiftServerModule {
         continue;
       }
 
-      // If something has set `moveTarget` (AI, combat chase, etc.) but no
-      // path is in flight yet, plan a path now. This unifies pathfinding
-      // for player MoveRequest, NPC AI moveTarget, and combat chase.
       let working = mv;
       if (working.path.length === 0 && working.moveTarget) {
         const path = findPath(area, working.coords, working.moveTarget);
@@ -107,14 +104,10 @@ export class MovementModule extends RiftServerModule {
       }
 
       const next = stepAlongPath(working, dt);
-      // Once the path is fully consumed, clear `moveTarget` so AI sees the
-      // entity as idle and can pick a fresh destination.
       const settled =
         next.path.length === 0 ? { ...next, moveTarget: undefined } : next;
       this.server.world.set(id, Movement, settled);
 
-      // Warp the entity if their step crossed onto a portal tile, regardless
-      // of whether the path is fully consumed yet.
       const destination = portalDestinationAt(area, settled.coords);
       if (destination && this.#areas.has(destination.areaId)) {
         this.server.world.set(id, AreaTag, { areaId: destination.areaId });

@@ -16,6 +16,7 @@ import {
   Leave,
   Movement,
   Progression,
+  Respawn,
   spawnCharacter,
 } from "@mp/world";
 import type {
@@ -72,6 +73,7 @@ export class PersistenceModule extends RiftServerModule {
     );
     const offJoin = this.server.on(JoinAsPlayer, this.#onJoinAsPlayer);
     const offLeave = this.server.on(Leave, this.#onLeave);
+    const offRespawn = this.server.on(Respawn, this.#onRespawn);
     this.#timer = setInterval(
       () => void this.#flushDirty(),
       this.#opts.syncIntervalMs,
@@ -82,6 +84,7 @@ export class PersistenceModule extends RiftServerModule {
       offDisconnect();
       offJoin();
       offLeave();
+      offRespawn();
       if (this.#timer) {
         clearInterval(this.#timer);
         this.#timer = undefined;
@@ -96,7 +99,7 @@ export class PersistenceModule extends RiftServerModule {
   };
 
   #onJoinAsPlayer = async (
-    event: RiftServerEvent<{ characterId: CharacterId }>,
+    event: RiftServerEvent<CharacterId>,
   ): Promise<void> => {
     if (event.source.type !== "wire") {
       return;
@@ -108,7 +111,7 @@ export class PersistenceModule extends RiftServerModule {
     }
     const access = await this.#opts.repo.mayAccessCharacter({
       userId,
-      characterId: event.data.characterId,
+      characterId: event.data,
     });
     if (access.isErr() || !access.value) {
       return;
@@ -117,14 +120,45 @@ export class PersistenceModule extends RiftServerModule {
     if (existing !== undefined) {
       return;
     }
-    const entityId = await this.hydrateCharacter(
-      this.server.world,
-      event.data.characterId,
-    );
+    const entityId = await this.hydrateCharacter(this.server.world, event.data);
     if (entityId === undefined) {
       return;
     }
     this.registry.setCharacterEntity(clientId, entityId);
+  };
+
+  #onRespawn = (event: RiftServerEvent): void => {
+    if (event.source.type !== "wire") {
+      return;
+    }
+    const characterEnt = this.registry.getCharacterEntity(
+      event.source.clientId,
+    );
+    if (characterEnt === undefined) {
+      return;
+    }
+    const combat = this.server.world.get(characterEnt, Combat);
+    const area = this.server.world.get(characterEnt, AreaTag);
+    if (!combat || !area) return;
+    if (combat.alive) return;
+    const spawn = this.#opts.spawnPointForArea(area.areaId);
+    if (!spawn) return;
+    this.server.world.set(characterEnt, Combat, {
+      ...combat,
+      health: combat.maxHealth,
+      alive: true,
+      attackTargetId: undefined,
+      lastAttackMs: undefined,
+    });
+    const movement = this.server.world.get(characterEnt, Movement);
+    if (movement) {
+      this.server.world.set(characterEnt, Movement, {
+        ...movement,
+        coords: spawn,
+        path: [],
+        moveTarget: undefined,
+      });
+    }
   };
 
   #onLeave = async (event: RiftServerEvent): Promise<void> => {

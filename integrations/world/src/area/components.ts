@@ -6,4 +6,3 @@ export const AreaTag = object({
 });
 
 export const areaComponents = [AreaTag] as const;
-export const areaEvents = [] as const;

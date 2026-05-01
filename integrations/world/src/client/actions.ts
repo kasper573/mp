@@ -18,7 +18,7 @@ import type { CharacterId } from "../identity/ids";
 export function moveCharacter(client: RiftClient, to: Vector<Tile>): void {
   client.emit({
     type: MoveRequest,
-    data: { target: to },
+    data: to,
     source: "local",
     target: "wire",
   });
@@ -27,7 +27,7 @@ export function moveCharacter(client: RiftClient, to: Vector<Tile>): void {
 export function attackTarget(client: RiftClient, targetId: EntityId): void {
   client.emit({
     type: AttackRequest,
-    data: { targetId },
+    data: targetId,
     source: "local",
     target: "wire",
   });
@@ -57,7 +57,7 @@ export function joinAsPlayer(
 ): void {
   client.emit({
     type: JoinAsPlayer,
-    data: { characterId },
+    data: characterId,
     source: "local",
     target: "wire",
   });
@@ -69,7 +69,7 @@ export function joinAsSpectator(
 ): void {
   client.emit({
     type: JoinAsSpectator,
-    data: { characterId },
+    data: characterId,
     source: "local",
     target: "wire",
   });

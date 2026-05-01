@@ -13,11 +13,6 @@ export interface KnownCharacter {
   readonly name: string;
 }
 
-/**
- * Tracks the locally-known set of characters belonging to the signed-in user.
- * Requests the list whenever the connection opens and updates the local
- * snapshot in response to rename responses.
- */
 export class CharacterListModule extends RiftClientModule {
   readonly #characters: Signal<readonly KnownCharacter[]> = signal([]);
 
@@ -27,7 +22,7 @@ export class CharacterListModule extends RiftClientModule {
 
   init(): Cleanup {
     const offList = this.client.on(CharacterListResponse, (event) => {
-      this.#characters.value = event.data.characters.map((c) => ({
+      this.#characters.value = event.data.map((c) => ({
         id: c.id,
         name: c.name,
       }));

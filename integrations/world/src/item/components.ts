@@ -19,4 +19,3 @@ export const EquipmentInstance = object({
 });
 
 export const itemComponents = [ConsumableInstance, EquipmentInstance] as const;
-export const itemEvents = [] as const;

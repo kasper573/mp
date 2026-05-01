@@ -2,11 +2,7 @@ import { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { ActorModel, ActorModelId } from "@mp/world";
 
-// Model-space hitbox for the adventurer sprite. The sprite is drawn with
-// its horizontal centre and ~2/3 vertical anchor at the actor's tile
-// coords (its feet), so the hitbox extends one tile up from the feet and
-// half a tile below to cover the foot/shadow area. Combined with
-// `Movement.coords` at hit-test time via `hitBox.offset(coords)`.
+// Sprite anchor is (0.5, 2/3) at the actor's tile coords (its feet).
 const adventurerHitBox = new Rect(
   -0.5 as Tile,
   -1.5 as Tile,

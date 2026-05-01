@@ -11,9 +11,6 @@ import { Attacked, AttackRequest, Died, Kill } from "./events";
 const HP_REGEN_INTERVAL_MS = 10_000;
 const HP_REGEN_AMOUNT = 5;
 const TILE_DIAGONAL_MARGIN = Math.sqrt(2) - 1;
-// How far the chase moveTarget can lag behind the actual target before we
-// repath. Keeps us from clearing the path every single tick on a moving
-// target while still tracking targets that move appreciably.
 const CHASE_RETARGET_THRESHOLD = 1.5;
 
 export class CombatModule extends RiftServerModule {
@@ -31,7 +28,7 @@ export class CombatModule extends RiftServerModule {
     };
   }
 
-  #onAttackRequest = (event: RiftServerEvent<{ targetId: EntityId }>): void => {
+  #onAttackRequest = (event: RiftServerEvent<EntityId>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -45,7 +42,7 @@ export class CombatModule extends RiftServerModule {
     }
     this.server.world.set(attacker, Combat, {
       ...combat,
-      attackTargetId: event.data.targetId,
+      attackTargetId: event.data,
     });
   };
 
@@ -85,9 +82,6 @@ export class CombatModule extends RiftServerModule {
       }
       const distance = mv.coords.distance(targetMv.coords);
       if (distance > combat.attackRange + TILE_DIAGONAL_MARGIN) {
-        // Begin or refresh chase. Avoid clearing the path every tick on a
-        // moving target — only repath if the existing chase intent has
-        // drifted past the retarget threshold.
         const movingTowardTarget =
           mv.moveTarget?.isWithinDistance(
             targetMv.coords,
@@ -145,7 +139,7 @@ export class CombatModule extends RiftServerModule {
         });
         this.server.emit({
           type: Died,
-          data: { entityId: target },
+          data: target,
           source: { type: "local" },
           target: { type: "wire", strategy: { type: "broadcast" } },
         });

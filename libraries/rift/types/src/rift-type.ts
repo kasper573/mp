@@ -37,3 +37,13 @@ export interface RiftType<T = unknown> {
 }
 
 export type InferValue<R> = R extends RiftType<infer T> ? T : never;
+
+export function isRiftType(value: unknown): value is RiftType {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    // oxlint-disable-next-line typescript/no-explicit-any
+    RiftTypeKind[value.kind as any] !== undefined
+  );
+}

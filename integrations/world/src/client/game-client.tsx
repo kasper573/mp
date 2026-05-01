@@ -18,10 +18,6 @@ export interface GameClientProps {
   viewDistance: ViewDistanceSettings;
 }
 
-/**
- * Composes connection-state gating around `GameRenderer` so it can focus on
- * rendering once a character is available in a known area.
- */
 export function GameClient(props: GameClientProps) {
   const isConnected = isConnectedSignal(props.client);
 
