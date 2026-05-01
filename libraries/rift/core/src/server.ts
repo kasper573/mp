@@ -4,7 +4,7 @@ import { EventBus } from "@rift/event";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
 import { internal } from "./internal";
 import { Reader } from "@rift/types";
-import type { RiftType } from "@rift/types";
+import type { InferValue, RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
 import type { ServerTransportEvent, ServerTransport } from "./transport";
 import {
@@ -47,6 +47,10 @@ export type RiftServerEvent<Data = unknown> = RiftEvent<
   Data,
   RiftServerEventSource,
   RiftServerEventTarget
+>;
+
+export type inferServerEvent<Type extends RiftType> = RiftServerEvent<
+  InferValue<Type>
 >;
 
 export type RiftServerEventSource =

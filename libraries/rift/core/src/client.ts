@@ -2,6 +2,7 @@ import { signal, type ReadonlySignal } from "@preact/signals-core";
 import type { ClientId, EntityId } from "./protocol";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
 import { EventBus } from "@rift/event";
+import type { InferValue, RiftType } from "@rift/types";
 import { Reader } from "@rift/types";
 import type { RiftSchema } from "./schema";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
@@ -36,6 +37,10 @@ export type RiftClientEvent<Data = unknown> = RiftEvent<
   Data,
   RiftClientEventOrigin,
   RiftClientEventOrigin
+>;
+
+export type inferClientEvent<Type extends RiftType> = RiftClientEvent<
+  InferValue<Type>
 >;
 
 export class RiftClient extends EventBus<
