@@ -13,13 +13,13 @@ import {
   type CharacterId,
 } from "@mp/world";
 import type { Tile } from "@mp/std";
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";
 
 export interface CharacterDirectoryOptions {
   readonly repo: DbRepository;
   readonly defaultModelId: ActorModelId;
-  readonly defaultSpawn: { areaId: AreaId; coords: { x: Tile; y: Tile } };
+  readonly defaultSpawn: { areaId: AreaId; coords: Vector<Tile> };
 }
 
 export class CharacterDirectoryModule extends RiftServerModule {
@@ -86,13 +86,7 @@ export class CharacterDirectoryModule extends RiftServerModule {
     const ensureResult = await this.#opts.repo.selectOrCreateCharacterIdForUser(
       {
         user,
-        spawnPoint: {
-          areaId: this.#opts.defaultSpawn.areaId,
-          coords: new Vector(
-            this.#opts.defaultSpawn.coords.x,
-            this.#opts.defaultSpawn.coords.y,
-          ),
-        },
+        spawnPoint: this.#opts.defaultSpawn,
         defaultModelId: this.#opts.defaultModelId,
       },
     );

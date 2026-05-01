@@ -18,14 +18,20 @@ import {
   Progression,
   spawnCharacter,
 } from "@mp/world";
-import type { ActorModelId, AreaId, CharacterId, InventoryId } from "@mp/world";
+import type {
+  ActorModelId,
+  ActorModelLookup,
+  AreaId,
+  CharacterId,
+  InventoryId,
+} from "@mp/world";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";
 
 interface CharacterSnapshot {
   readonly areaId: AreaId;
-  readonly coords: { readonly x: Tile; readonly y: Tile };
+  readonly coords: Vector<Tile>;
   readonly health: number;
   readonly xp: number;
   readonly speed: Tile;
@@ -42,9 +48,8 @@ export interface PersistenceModuleOptions {
   readonly repo: DbRepository;
   readonly syncIntervalMs: number;
   readonly defaultModelId: ActorModelId;
-  readonly spawnPointForArea: (
-    areaId: AreaId,
-  ) => { x: Tile; y: Tile } | undefined;
+  readonly actorModels: ActorModelLookup;
+  readonly spawnPointForArea: (areaId: AreaId) => Vector<Tile> | undefined;
 }
 
 export class PersistenceModule extends RiftServerModule {
@@ -195,7 +200,7 @@ export class PersistenceModule extends RiftServerModule {
       characterId: tag.characterId,
       fields: {
         areaId: next.areaId,
-        coords: new Vector(next.coords.x, next.coords.y),
+        coords: next.coords,
         speed: next.speed,
         health: next.health,
         maxHealth: next.maxHealth,
@@ -228,7 +233,7 @@ export class PersistenceModule extends RiftServerModule {
       name: row.name,
       modelId: row.modelId,
       areaId: row.areaId,
-      coords: { x: row.coords.x, y: row.coords.y },
+      coords: row.coords,
       inventoryId: row.inventoryId,
       speed: row.speed,
       health: row.health,
@@ -237,6 +242,7 @@ export class PersistenceModule extends RiftServerModule {
       attackSpeed: row.attackSpeed,
       attackRange: row.attackRange,
       xp: row.xp,
+      actorModels: this.#opts.actorModels,
     });
     return id;
   }

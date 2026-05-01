@@ -35,9 +35,7 @@ export class MovementModule extends RiftServerModule {
     };
   }
 
-  #onMoveRequest = (
-    event: RiftServerEvent<{ target: { x: Tile; y: Tile } }>,
-  ): void => {
+  #onMoveRequest = (event: RiftServerEvent<{ target: Vector<Tile> }>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -122,7 +120,7 @@ export class MovementModule extends RiftServerModule {
         this.server.world.set(id, AreaTag, { areaId: destination.areaId });
         this.server.world.set(id, Movement, {
           ...settled,
-          coords: { x: destination.coords.x, y: destination.coords.y },
+          coords: destination.coords,
           path: [],
           moveTarget: undefined,
         });
@@ -131,8 +129,8 @@ export class MovementModule extends RiftServerModule {
   };
 }
 
-function portalDestinationAt(area: AreaResource, coords: { x: Tile; y: Tile }) {
-  const worldPos = area.tiled.tileCoordToWorld(new Vector(coords.x, coords.y));
+function portalDestinationAt(area: AreaResource, coords: Vector<Tile>) {
+  const worldPos = area.tiled.tileCoordToWorld(coords);
   for (const portal of area.portals) {
     if (hitTestTiledObject(portal.object, worldPos)) {
       return portal.destination;
@@ -141,21 +139,20 @@ function portalDestinationAt(area: AreaResource, coords: { x: Tile; y: Tile }) {
   return undefined;
 }
 
-function stepAlongPath(
-  mv: {
-    coords: { x: Tile; y: Tile };
-    speed: Tile;
-    direction: CardinalDirection;
-    path: ReadonlyArray<{ x: Tile; y: Tile }>;
-    moveTarget: { x: Tile; y: Tile } | undefined;
-  },
-  dt: number,
-): typeof mv {
+interface MovementStep {
+  coords: Vector<Tile>;
+  speed: Tile;
+  direction: CardinalDirection;
+  path: ReadonlyArray<Vector<Tile>>;
+  moveTarget: Vector<Tile> | undefined;
+}
+
+function stepAlongPath<T extends MovementStep>(mv: T, dt: number): T {
   let distanceToMove = mv.speed * dt;
   if (!distanceToMove || mv.path.length === 0) {
     return mv;
   }
-  let coords = { x: mv.coords.x, y: mv.coords.y };
+  let coords = mv.coords;
   let direction: CardinalDirection = mv.direction;
   let pathIndex = 0;
   const lastIndex = mv.path.length - 1;
@@ -167,14 +164,14 @@ function stepAlongPath(
     direction = dirFromDelta(dx, dy);
     if (distanceToMove > distanceToDest) {
       distanceToMove -= distanceToDest;
-      coords = { x: dest.x, y: dest.y };
+      coords = dest;
       pathIndex++;
     } else {
       const pct = distanceToMove / distanceToDest;
-      coords = {
-        x: (coords.x + dx * pct) as Tile,
-        y: (coords.y + dy * pct) as Tile,
-      };
+      coords = new Vector(
+        (coords.x + dx * pct) as Tile,
+        (coords.y + dy * pct) as Tile,
+      );
       break;
     }
   }
@@ -197,13 +194,11 @@ function dirFromDelta(dx: number, dy: number): CardinalDirection {
 
 export function findPath(
   area: AreaResource,
-  from: { x: Tile; y: Tile },
-  to: { x: Tile; y: Tile },
-): ReadonlyArray<{ x: Tile; y: Tile }> | undefined {
-  const fromVec = new Vector(from.x, from.y);
-  const toVec = new Vector(to.x, to.y);
-  const fromNode = area.graph.getProximityNode(fromVec);
-  const toNode = area.graph.getProximityNode(toVec);
+  from: Vector<Tile>,
+  to: Vector<Tile>,
+): ReadonlyArray<Vector<Tile>> | undefined {
+  const fromNode = area.graph.getProximityNode(from);
+  const toNode = area.graph.getProximityNode(to);
   if (!fromNode || !toNode) {
     return;
   }
@@ -211,5 +206,5 @@ export function findPath(
   if (!path) {
     return;
   }
-  return path.map((v) => ({ x: v.x, y: v.y }));
+  return path;
 }

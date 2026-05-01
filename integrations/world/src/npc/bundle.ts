@@ -1,7 +1,9 @@
 import type { World, EntityId } from "@rift/core";
+import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { AreaTag } from "../area/components";
 import { Appearance } from "../appearance/components";
+import type { ActorModelLookup } from "../appearance/actor-model";
 import { Movement } from "../movement/components";
 import { Combat } from "../combat/components";
 import { NpcTag } from "../identity/components";
@@ -11,12 +13,19 @@ import type { NpcDefinition, NpcSpawn, NpcType } from "./definitions";
 export interface SpawnNpcInit {
   readonly definition: NpcDefinition;
   readonly spawn: NpcSpawn;
-  readonly coords: { readonly x: Tile; readonly y: Tile };
+  readonly coords: Vector<Tile>;
+  readonly actorModels: ActorModelLookup;
   readonly npcType?: NpcType;
 }
 
 export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
   const npcType = init.npcType ?? init.spawn.npcType ?? init.definition.npcType;
+  const model = init.actorModels.get(init.definition.modelId);
+  if (!model) {
+    throw new Error(
+      `No actor model registered for id "${init.definition.modelId}"`,
+    );
+  }
   const id = world.create();
   world.add(id, NpcTag, {
     definitionId: init.definition.id,
@@ -37,12 +46,7 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
     moveTarget: undefined,
   });
   world.add(id, Combat, {
-    hitBox: {
-      x: init.coords.x,
-      y: init.coords.y,
-      width: 1 as Tile,
-      height: 1 as Tile,
-    },
+    hitBox: model.hitBox,
     health: init.definition.maxHealth,
     maxHealth: init.definition.maxHealth,
     alive: true,
@@ -55,7 +59,8 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
   world.add(id, NpcAi, {
     npcType,
     aggroRange: init.definition.aggroRange,
-    patrol: init.spawn.patrol?.map((v) => ({ x: v.x, y: v.y })),
+    idleSpeed: init.definition.speed,
+    patrol: init.spawn.patrol,
   });
   return id;
 }

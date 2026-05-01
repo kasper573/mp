@@ -1,9 +1,10 @@
+import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 
 interface MovementValue {
-  readonly coords: { readonly x: Tile; readonly y: Tile };
+  readonly coords: Vector<Tile>;
   readonly speed: Tile;
-  readonly path: ReadonlyArray<{ readonly x: Tile; readonly y: Tile }>;
+  readonly path: ReadonlyArray<Vector<Tile>>;
 }
 
 export function moveAlongPath<T extends MovementValue>(
@@ -15,7 +16,7 @@ export function moveAlongPath<T extends MovementValue>(
     return target;
   }
 
-  const coords = { x: target.coords.x, y: target.coords.y };
+  let coords = target.coords;
 
   let pathIndex = 0;
   const lastIndex = target.path.length - 1;
@@ -27,13 +28,14 @@ export function moveAlongPath<T extends MovementValue>(
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;
-      coords.x = destination.x;
-      coords.y = destination.y;
+      coords = destination;
       pathIndex++;
     } else {
       const percentage = distanceToMove / distanceToDestination;
-      coords.x = (coords.x + dx * percentage) as Tile;
-      coords.y = (coords.y + dy * percentage) as Tile;
+      coords = new Vector(
+        (coords.x + dx * percentage) as Tile,
+        (coords.y + dy * percentage) as Tile,
+      );
       break;
     }
   }

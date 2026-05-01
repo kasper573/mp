@@ -1,8 +1,10 @@
 import type { Cleanup } from "@rift/module";
 import type { EntityId, RiftServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
+import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { createShortId, Rng } from "@mp/std";
+import type { ActorModelLookup } from "../appearance/actor-model";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId, NpcDefinitionId, NpcSpawnId } from "../identity/ids";
 import { NpcTag } from "../identity/components";
@@ -16,6 +18,7 @@ export interface NpcSpawnerOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
   readonly npcs: ReadonlyArray<NpcDefinition>;
   readonly spawns: ReadonlyArray<NpcSpawn>;
+  readonly actorModels: ActorModelLookup;
   readonly rng?: Rng;
 }
 
@@ -23,6 +26,7 @@ export class NpcSpawnerModule extends RiftServerModule {
   readonly #areas: ReadonlyMap<AreaId, AreaResource>;
   readonly #npcsById: ReadonlyMap<NpcDefinitionId, NpcDefinition>;
   readonly #spawns: ReadonlyArray<NpcSpawn>;
+  readonly #actorModels: ActorModelLookup;
   readonly #rng: Rng;
   readonly #pendingRespawns = new Map<
     EntityId,
@@ -36,6 +40,7 @@ export class NpcSpawnerModule extends RiftServerModule {
     this.#areas = opts.areas;
     this.#npcsById = new Map(opts.npcs.map((n) => [n.id, n]));
     this.#spawns = opts.spawns;
+    this.#actorModels = opts.actorModels;
     this.#rng = opts.rng ?? new Rng();
   }
 
@@ -87,6 +92,7 @@ export class NpcSpawnerModule extends RiftServerModule {
         definition: def,
         spawn: { ...spawn, id: createShortId() },
         coords: this.#pickSpawnCoord(spawn, area),
+        actorModels: this.#actorModels,
       });
     }
   }
@@ -101,23 +107,20 @@ export class NpcSpawnerModule extends RiftServerModule {
           definition: def,
           spawn,
           coords: this.#pickSpawnCoord(spawn, area),
+          actorModels: this.#actorModels,
         });
       }
     }
   }
 
-  #pickSpawnCoord(spawn: NpcSpawn, area: AreaResource): { x: Tile; y: Tile } {
+  #pickSpawnCoord(spawn: NpcSpawn, area: AreaResource): Vector<Tile> {
     if (spawn.coords) {
-      return { x: spawn.coords.x, y: spawn.coords.y };
+      return spawn.coords;
     }
     const ids = Array.from(area.graph.nodeIds);
     if (ids.length === 0) {
-      return { x: area.start.x, y: area.start.y };
+      return area.start;
     }
-    const node = area.graph.getNode(this.#rng.oneOf(ids));
-    if (!node) {
-      return { x: area.start.x, y: area.start.y };
-    }
-    return { x: node.data.vector.x, y: node.data.vector.y };
+    return area.graph.getNode(this.#rng.oneOf(ids))?.data.vector ?? area.start;
   }
 }

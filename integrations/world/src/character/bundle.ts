@@ -1,4 +1,5 @@
 import type { World, EntityId } from "@rift/core";
+import type { Vector } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import type { UserId } from "@mp/auth";
 import type {
@@ -10,6 +11,7 @@ import type {
 import { CharacterTag } from "../identity/components";
 import { AreaTag } from "../area/components";
 import { Appearance } from "../appearance/components";
+import type { ActorModelLookup } from "../appearance/actor-model";
 import { Movement } from "../movement/components";
 import { Combat } from "../combat/components";
 import { Progression } from "../progression/components";
@@ -21,7 +23,7 @@ export interface SpawnCharacterInit {
   readonly name: string;
   readonly modelId: ActorModelId;
   readonly areaId: AreaId;
-  readonly coords: { readonly x: Tile; readonly y: Tile };
+  readonly coords: Vector<Tile>;
   readonly inventoryId: InventoryId;
   readonly speed: Tile;
   readonly health: number;
@@ -30,12 +32,17 @@ export interface SpawnCharacterInit {
   readonly attackSpeed: TimesPerSecond;
   readonly attackRange: Tile;
   readonly xp: number;
+  readonly actorModels: ActorModelLookup;
 }
 
 export function spawnCharacter(
   world: World,
   init: SpawnCharacterInit,
 ): EntityId {
+  const model = init.actorModels.get(init.modelId);
+  if (!model) {
+    throw new Error(`No actor model registered for id "${init.modelId}"`);
+  }
   const id = world.create();
   world.add(id, CharacterTag, {
     characterId: init.characterId,
@@ -56,12 +63,7 @@ export function spawnCharacter(
     moveTarget: undefined,
   });
   world.add(id, Combat, {
-    hitBox: {
-      x: init.coords.x,
-      y: init.coords.y,
-      width: 1 as Tile,
-      height: 1 as Tile,
-    },
+    hitBox: model.hitBox,
     health: init.health,
     maxHealth: init.maxHealth,
     alive: init.health > 0,

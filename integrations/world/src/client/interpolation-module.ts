@@ -1,7 +1,7 @@
 import { RiftClientModule } from "@rift/core";
 import type { Cleanup } from "@rift/module";
 import type { CardinalDirection } from "@mp/math";
-import { nearestCardinalDirection, Vector } from "@mp/math";
+import { nearestCardinalDirection } from "@mp/math";
 import { Movement } from "../movement/components";
 import { moveAlongPath } from "../movement/path";
 
@@ -43,22 +43,11 @@ export class InterpolationModule extends RiftClientModule {
     const world = this.client.world;
     for (const [id, mv] of world.query(Movement)) {
       if (mv.path.length === 0) continue;
-      const updated = moveAlongPath(
-        {
-          coords: { x: mv.coords.x, y: mv.coords.y },
-          speed: mv.speed,
-          path: mv.path.map((p) => ({ x: p.x, y: p.y })),
-        },
-        deltaSeconds,
-      );
+      const updated = moveAlongPath(mv, deltaSeconds);
       const target = updated.path[0];
       let direction: CardinalDirection = mv.direction;
       if (target) {
-        direction = nearestCardinalDirection(
-          new Vector(updated.coords.x, updated.coords.y).angle(
-            new Vector(target.x, target.y),
-          ),
-        );
+        direction = nearestCardinalDirection(updated.coords.angle(target));
       }
       world.set(id, Movement, {
         ...mv,

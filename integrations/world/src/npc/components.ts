@@ -6,6 +6,9 @@ import { TileVector } from "../movement/components";
 export const NpcAi = object({
   npcType: enumOf(...npcTypes),
   aggroRange: f32<Tile>(),
+  // Base movement speed; restored when an NPC loses its aggro target.
+  // The AI module bumps Movement.speed to a multiple of this while chasing.
+  idleSpeed: f32<Tile>(),
   patrol: optional(array(TileVector)),
 });
 

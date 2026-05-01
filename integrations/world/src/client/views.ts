@@ -93,10 +93,10 @@ abstract class ActorBase {
       };
     }
     return {
-      coords: new Vector(m.coords.x, m.coords.y),
+      coords: m.coords,
       speed: m.speed,
       dir: m.direction,
-      path: m.path.map((p) => new Vector(p.x, p.y)),
+      path: m.path,
     };
   }
 
@@ -114,7 +114,7 @@ abstract class ActorBase {
       };
     }
     return {
-      hitBox: new Rect(c.hitBox.x, c.hitBox.y, c.hitBox.width, c.hitBox.height),
+      hitBox: c.hitBox,
       health: c.health,
       maxHealth: c.maxHealth,
       alive: c.alive,
@@ -170,11 +170,7 @@ export class NpcInstance extends ActorBase {
   }
 
   get patrol(): Path<Tile> | undefined {
-    const ai = this.world.get(this.entityId, NpcAi);
-    if (!ai?.patrol) {
-      return undefined;
-    }
-    return ai.patrol.map((p) => new Vector(p.x, p.y));
+    return this.world.get(this.entityId, NpcAi)?.patrol;
   }
 }
 

@@ -83,24 +83,21 @@ export class CombatModule extends RiftServerModule {
         });
         continue;
       }
-      const dx = targetMv.coords.x - mv.coords.x;
-      const dy = targetMv.coords.y - mv.coords.y;
-      const distance = Math.hypot(dx, dy);
+      const distance = mv.coords.distance(targetMv.coords);
       if (distance > combat.attackRange + TILE_DIAGONAL_MARGIN) {
         // Begin or refresh chase. Avoid clearing the path every tick on a
         // moving target — only repath if the existing chase intent has
         // drifted past the retarget threshold.
         const movingTowardTarget =
-          mv.moveTarget &&
-          Math.hypot(
-            mv.moveTarget.x - targetMv.coords.x,
-            mv.moveTarget.y - targetMv.coords.y,
-          ) <= CHASE_RETARGET_THRESHOLD;
+          mv.moveTarget?.isWithinDistance(
+            targetMv.coords,
+            CHASE_RETARGET_THRESHOLD,
+          ) ?? false;
         if (!movingTowardTarget) {
           this.server.world.set(id, Movement, {
             ...mv,
             path: [],
-            moveTarget: { x: targetMv.coords.x, y: targetMv.coords.y },
+            moveTarget: targetMv.coords,
           });
         }
         continue;

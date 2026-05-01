@@ -18,7 +18,7 @@ import type { CharacterId } from "../identity/ids";
 export function moveCharacter(client: RiftClient, to: Vector<Tile>): void {
   client.emit({
     type: MoveRequest,
-    data: { target: { x: to.x, y: to.y } },
+    data: { target: to },
     source: "local",
     target: "wire",
   });

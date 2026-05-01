@@ -115,20 +115,15 @@ const server = new RiftServer({
       defaultModelId,
       defaultSpawn: {
         areaId: defaultArea.id,
-        coords: {
-          x: defaultAreaResource.start.x,
-          y: defaultAreaResource.start.y,
-        },
+        coords: defaultAreaResource.start,
       },
     }),
     new PersistenceModule({
       repo,
       syncIntervalMs: opt.syncIntervalMs,
       defaultModelId,
-      spawnPointForArea: (id) => {
-        const area = areas.get(id);
-        return area ? { x: area.start.x, y: area.start.y } : undefined;
-      },
+      actorModels: fixtures.actorModelsById,
+      spawnPointForArea: (id) => areas.get(id)?.start,
     }),
     new MovementModule({ areas }),
     new CombatModule(),
@@ -137,6 +132,7 @@ const server = new RiftServer({
       areas,
       npcs: fixtures.npcs,
       spawns: fixtures.npcSpawns,
+      actorModels: fixtures.actorModelsById,
       rng,
     }),
     new NpcAiModule({ areas, rng }),

@@ -2,6 +2,7 @@ import type { Cleanup } from "@rift/module";
 import type { EntityId, RiftServerEvent, World } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { InferValue } from "@rift/types";
+import type { Vector } from "@mp/math";
 import { Rng, type Tile } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
@@ -13,7 +14,12 @@ import { Attacked } from "../combat/events";
 import { Movement } from "../movement/components";
 
 const PACIFIST_WANDER_CHANCE = 0.4;
-const EMPTY_PATH: ReadonlyArray<{ x: Tile; y: Tile }> = [];
+const EMPTY_PATH: ReadonlyArray<Vector<Tile>> = [];
+// While chasing an aggro target, NPCs move faster than their idle speed so
+// that the actor sprite plays its run animation (which kicks in at
+// speed >= 2 in actor-controller.ts). Restored to NpcAi.idleSpeed when the
+// target is lost. Replaces the pre-migration ai-tasks/hunt.ts speed toggle.
+const CHASE_SPEED_MULTIPLIER = 2;
 
 export interface NpcAiOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
@@ -104,13 +110,12 @@ export class NpcAiModule extends RiftServerModule {
       Movement,
     )) {
       if (observerId === attacker) continue;
-      const aggroRangeSq = ai.aggroRange * ai.aggroRange;
       const seesAttacker =
-        attackerMv &&
-        distanceSq(attackerMv.coords, observerMv.coords) <= aggroRangeSq;
+        attackerMv?.coords.isWithinDistance(observerMv.coords, ai.aggroRange) ??
+        false;
       const seesTarget =
-        targetMv &&
-        distanceSq(targetMv.coords, observerMv.coords) <= aggroRangeSq;
+        targetMv?.coords.isWithinDistance(observerMv.coords, ai.aggroRange) ??
+        false;
       if (seesAttacker || seesTarget) {
         this.#memory.observe(observerId, attacker, targetId);
       }
@@ -154,6 +159,7 @@ export class NpcAiModule extends RiftServerModule {
           ...mv,
           path: EMPTY_PATH,
           moveTarget: undefined,
+          speed: ai.idleSpeed,
         });
       }
     }
@@ -167,6 +173,13 @@ export class NpcAiModule extends RiftServerModule {
       const target = this.#findAggroTarget(id, ai, mv, areaId);
       if (target !== undefined) {
         world.set(id, Combat, { ...refreshedCombat, attackTargetId: target });
+        const refreshedMv = world.get(id, Movement);
+        if (refreshedMv) {
+          world.set(id, Movement, {
+            ...refreshedMv,
+            speed: (ai.idleSpeed * CHASE_SPEED_MULTIPLIER) as Tile,
+          });
+        }
         return;
       }
     }
@@ -176,7 +189,7 @@ export class NpcAiModule extends RiftServerModule {
 
   #stillInRange(
     targetId: EntityId,
-    selfCoords: { x: number; y: number },
+    selfCoords: Vector<Tile>,
     selfArea: AreaId,
     aggroRange: number,
   ): boolean {
@@ -188,7 +201,7 @@ export class NpcAiModule extends RiftServerModule {
       return false;
     }
     if (targetArea.areaId !== selfArea) return false;
-    return distanceSq(targetMv.coords, selfCoords) <= aggroRange * aggroRange;
+    return targetMv.coords.isWithinDistance(selfCoords, aggroRange);
   }
 
   #clearActions(
@@ -320,7 +333,7 @@ export class NpcAiModule extends RiftServerModule {
       if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive)
         continue;
       if (enemyArea.areaId !== selfArea) continue;
-      const distSq = distanceSq(enemyMv.coords, selfMv.coords);
+      const distSq = enemyMv.coords.squaredDistance(selfMv.coords);
       if (distSq <= closestDistSq) {
         closestDistSq = distSq;
         closest = enemyId;
@@ -329,16 +342,13 @@ export class NpcAiModule extends RiftServerModule {
     return closest;
   }
 
-  #pickRandomWalkable(area: AreaResource): { x: Tile; y: Tile } {
+  #pickRandomWalkable(area: AreaResource): Vector<Tile> {
     const ids = Array.from(area.graph.nodeIds);
     if (ids.length === 0) {
-      return { x: area.start.x, y: area.start.y };
+      return area.start;
     }
     const node = area.graph.getNode(this.#rng.oneOf(ids));
-    if (!node) {
-      return { x: area.start.x, y: area.start.y };
-    }
-    return { x: node.data.vector.x, y: node.data.vector.y };
+    return node?.data.vector ?? area.start;
   }
 }
 
@@ -346,7 +356,7 @@ function findClosestCharacter(
   world: World,
   selfId: EntityId,
   selfArea: AreaId,
-  selfCoords: { x: number; y: number },
+  selfCoords: Vector<Tile>,
   aggroRange: number,
   filter?: (candidateId: EntityId) => boolean,
 ): EntityId | undefined {
@@ -362,7 +372,7 @@ function findClosestCharacter(
     const candidateCombat = world.get(candidateId, Combat);
     if (!candidateCombat || !candidateCombat.alive) continue;
     if (filter && !filter(candidateId)) continue;
-    const distSq = distanceSq(candidateMv.coords, selfCoords);
+    const distSq = candidateMv.coords.squaredDistance(selfCoords);
     if (distSq <= closestDistSq) {
       closestDistSq = distSq;
       closest = candidateId;
@@ -372,26 +382,17 @@ function findClosestCharacter(
 }
 
 function pickFarthestPoint(
-  from: { x: number; y: number },
-  candidates: ReadonlyArray<{ x: Tile; y: Tile }>,
-): { x: Tile; y: Tile } {
+  from: Vector<Tile>,
+  candidates: ReadonlyArray<Vector<Tile>>,
+): Vector<Tile> {
   let bestDistSq = -1;
   let best = candidates[0];
   for (const c of candidates) {
-    const ds = distanceSq(c, from);
+    const ds = c.squaredDistance(from);
     if (ds > bestDistSq) {
       bestDistSq = ds;
       best = c;
     }
   }
   return best;
-}
-
-function distanceSq(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy;
 }
