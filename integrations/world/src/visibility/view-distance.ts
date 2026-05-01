@@ -2,8 +2,7 @@ import type { Tile } from "@mp/std";
 import { Rect, type Vector, clamp } from "@mp/math";
 
 export interface ViewDistanceSettings {
-  readonly renderedTileCount: Tile;
-  readonly networkFogOfWarTileCount: Tile;
+  readonly tileCount: Tile;
 }
 
 export function clientViewDistanceRect(

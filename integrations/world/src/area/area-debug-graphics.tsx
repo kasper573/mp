@@ -252,7 +252,7 @@ class DebugNetworkFogOfWar extends Graphics {
     const { width, height, x, y } = clientViewDistanceRect(
       coords,
       tileCount,
-      this.viewDistance().networkFogOfWarTileCount,
+      this.viewDistance().tileCount,
     ).scale(tileSize);
 
     this.rect(0, 0, width, height);

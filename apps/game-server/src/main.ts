@@ -127,7 +127,7 @@ const server = new RiftServer({
     }),
     new MovementModule({ areas }),
     new CombatModule(),
-    new VisibilityModule({ viewDistance: fixtures.viewDistance }),
+    new VisibilityModule({ viewDistance: fixtures.viewDistance, areas }),
     new NpcSpawnerModule({
       areas,
       npcs: fixtures.npcs,

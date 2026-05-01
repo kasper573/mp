@@ -43,6 +43,7 @@ export interface MovementView {
   readonly speed: Tile;
   readonly dir: CardinalDirection;
   readonly path: Path<Tile>;
+  readonly moveTarget: Vector<Tile> | undefined;
 }
 
 export interface CombatView {
@@ -90,6 +91,7 @@ abstract class ActorBase {
         speed: 0 as Tile,
         dir: "s",
         path: [],
+        moveTarget: undefined,
       };
     }
     return {
@@ -97,6 +99,7 @@ abstract class ActorBase {
       speed: m.speed,
       dir: m.direction,
       path: m.path,
+      moveTarget: m.moveTarget,
     };
   }
 

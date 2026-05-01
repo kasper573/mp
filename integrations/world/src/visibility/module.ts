@@ -2,15 +2,20 @@ import type { Cleanup } from "@rift/module";
 import type { ClientId, EntityId, RiftServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
-import type { Tile } from "@mp/std";
 import { ClientCharacterRegistry } from "../identity/client-character-registry";
+import type { AreaResource } from "../area/area-resource";
+import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { Movement } from "../movement/components";
 import { OwnedBy } from "../inventory/components";
-import type { ViewDistanceSettings } from "./view-distance";
+import {
+  clientViewDistanceRect,
+  type ViewDistanceSettings,
+} from "./view-distance";
 
 export interface VisibilityModuleOptions {
   readonly viewDistance: ViewDistanceSettings;
+  readonly areas: ReadonlyMap<AreaId, AreaResource>;
   readonly recomputeEveryNTicks?: number;
 }
 
@@ -18,13 +23,15 @@ export class VisibilityModule extends RiftServerModule {
   @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
 
   readonly #viewDistance: ViewDistanceSettings;
+  readonly #areas: ReadonlyMap<AreaId, AreaResource>;
   readonly #recomputeEvery: number;
   #tickCounter = 0;
 
   constructor(opts: VisibilityModuleOptions) {
     super();
     this.#viewDistance = opts.viewDistance;
-    this.#recomputeEvery = opts.recomputeEveryNTicks ?? 3;
+    this.#areas = opts.areas;
+    this.#recomputeEvery = opts.recomputeEveryNTicks ?? 1;
   }
 
   init(): Cleanup {
@@ -42,7 +49,6 @@ export class VisibilityModule extends RiftServerModule {
   };
 
   #recompute(): void {
-    const radius = this.#viewDistance.networkFogOfWarTileCount / 2;
     for (const clientId of this.registry.clientIds()) {
       const watcherEntity = this.registry.getCharacterEntity(clientId);
       if (watcherEntity === undefined) {
@@ -54,12 +60,24 @@ export class VisibilityModule extends RiftServerModule {
       if (!watcherArea || !watcherMv) {
         continue;
       }
+      const area = this.#areas.get(watcherArea.areaId);
+      if (!area) {
+        continue;
+      }
+      const visibleRect = clientViewDistanceRect(
+        watcherMv.coords,
+        area.tiled.tileCount,
+        this.#viewDistance.tileCount,
+      );
       const visible = new Set<EntityId>();
-      for (const [id, mv, area] of this.server.world.query(Movement, AreaTag)) {
-        if (area.areaId !== watcherArea.areaId) {
+      for (const [id, mv, entArea] of this.server.world.query(
+        Movement,
+        AreaTag,
+      )) {
+        if (entArea.areaId !== watcherArea.areaId) {
           continue;
         }
-        if (withinRadius(mv.coords, watcherMv.coords, radius)) {
+        if (visibleRect.contains(mv.coords)) {
           visible.add(id);
         }
       }
@@ -74,16 +92,6 @@ export class VisibilityModule extends RiftServerModule {
       );
     }
   }
-}
-
-function withinRadius(
-  a: { x: Tile; y: Tile },
-  b: { x: Tile; y: Tile },
-  radius: number,
-): boolean {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return Math.abs(dx) <= radius && Math.abs(dy) <= radius;
 }
 
 export type _AssertClientId = ClientId;

@@ -117,7 +117,7 @@ export class AreaScene extends Container {
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
       this.options.engine.camera.cameraSize.value,
-      this.options.viewDistance.renderedTileCount,
+      this.options.viewDistance.tileCount,
     ),
   );
 

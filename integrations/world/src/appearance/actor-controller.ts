@@ -128,7 +128,7 @@ export class ActorController extends Container {
 
 function actorAnimationState(actor: Actor) {
   return {
-    isMoving: !!actor.movement.path?.length,
+    isMoving: !!actor.movement.path?.length || !!actor.movement.moveTarget,
     isFast: actor.movement.speed >= 2,
     isAlive: actor.combat.alive,
   };
