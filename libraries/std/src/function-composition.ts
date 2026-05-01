@@ -48,3 +48,11 @@ export function dedupe<Args extends unknown[], Output>(
 
   return dedupedFn;
 }
+
+export function combine(...fns: Array<() => void>): () => void {
+  return () => {
+    for (const fn of fns) {
+      fn();
+    }
+  };
+}
