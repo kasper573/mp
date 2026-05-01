@@ -9,7 +9,7 @@ import sharp from "sharp";
  * Scores above 0.7 typically indicate the images show similar content.
  */
 export async function getImageResemblance(
-  imagePath1: string,
+  imagePath1: string | Buffer,
   imagePath2: string | Buffer,
 ): Promise<number> {
   const histogram1 = await getColorHistogram(imagePath1);
