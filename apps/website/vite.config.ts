@@ -28,7 +28,17 @@ export default defineConfig({
     tanstackRouterPlugin(),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    preact({ devToolsEnabled: false }),
+    preact({
+      devToolsEnabled: false,
+      babel: {
+        plugins: [
+          // 2023-11 is the most recent stage 3 spec implementation that
+          // matches what tsc/SWC emit, including class-level metadata that
+          // rift's `@inject` reads via `context.metadata`.
+          ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
+        ],
+      },
+    }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
     // We only have the checker plugin active in dev since we use tsgo for production builds
     // This can likely be replaced once tsgo is fully released and the ecosystem has adapted

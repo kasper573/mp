@@ -24,5 +24,8 @@ export function inject<T extends object>(cls: Class<T>) {
 }
 
 if (!Symbol.metadata) {
-  Object.assign(Symbol, { metadata: Symbol("Symbol.metadata") });
+  // Use the registry-shared symbol so we land on the same key SWC/esbuild emit
+  // when transpiling stage 3 decorators (which fall back to
+  // `Symbol.for("Symbol.metadata")`).
+  Object.assign(Symbol, { metadata: Symbol.for("Symbol.metadata") });
 }

@@ -8,22 +8,28 @@ import {
   ClientCharacterRegistry,
   ListCharactersRequest,
   RenameCharacterRequest,
+  type ActorModelId,
+  type AreaId,
   type CharacterId,
 } from "@mp/world";
+import type { Tile } from "@mp/std";
+import { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";
 
 export interface CharacterDirectoryOptions {
   readonly repo: DbRepository;
+  readonly defaultModelId: ActorModelId;
+  readonly defaultSpawn: { areaId: AreaId; coords: { x: Tile; y: Tile } };
 }
 
 export class CharacterDirectoryModule extends RiftServerModule {
   @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
 
-  readonly #repo: DbRepository;
+  readonly #opts: CharacterDirectoryOptions;
 
   constructor(opts: CharacterDirectoryOptions) {
     super();
-    this.#repo = opts.repo;
+    this.#opts = opts;
   }
 
   init(): Cleanup {
@@ -46,14 +52,14 @@ export class CharacterDirectoryModule extends RiftServerModule {
     if (!userId) {
       return;
     }
-    const access = await this.#repo.mayAccessCharacter({
+    const access = await this.#opts.repo.mayAccessCharacter({
       userId,
       characterId: event.data.characterId,
     });
     if (access.isErr() || !access.value) {
       return;
     }
-    const updated = await this.#repo.updateCharacter({
+    const updated = await this.#opts.repo.updateCharacter({
       characterId: event.data.characterId,
       newName: event.data.name,
     });
@@ -73,22 +79,31 @@ export class CharacterDirectoryModule extends RiftServerModule {
       return;
     }
     const clientId = event.source.clientId;
-    const userId = this.registry.getUserId(clientId);
-    if (!userId) {
+    const user = this.registry.getUser(clientId);
+    if (!user) {
       return;
     }
-    const userCharsResult = await this.#repo.selectCharacterByUser(userId);
-    if (userCharsResult.isErr()) {
+    const ensureResult = await this.#opts.repo.selectOrCreateCharacterIdForUser(
+      {
+        user,
+        spawnPoint: {
+          areaId: this.#opts.defaultSpawn.areaId,
+          coords: new Vector(
+            this.#opts.defaultSpawn.coords.x,
+            this.#opts.defaultSpawn.coords.y,
+          ),
+        },
+        defaultModelId: this.#opts.defaultModelId,
+      },
+    );
+    if (ensureResult.isErr()) {
       return;
     }
-    const own = userCharsResult.value;
-    const charactersByIdResult = own
-      ? await this.#repo.selectCharacterList([own.id as CharacterId])
-      : undefined;
-    const characters =
-      charactersByIdResult && charactersByIdResult.isOk()
-        ? charactersByIdResult.value.map((c) => ({ id: c.id, name: c.name }))
-        : [];
+    const characterId = ensureResult.value;
+    const listResult = await this.#opts.repo.selectCharacterList([characterId]);
+    const characters = listResult.isOk()
+      ? listResult.value.map((c) => ({ id: c.id, name: c.name }))
+      : [];
     this.server.emit({
       type: CharacterListResponse,
       data: { characters },

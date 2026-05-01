@@ -1,10 +1,20 @@
-import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
+import {
+  GameAssetLoaderContext,
+  GameClient,
+  RiftClientContext,
+  characterSignal,
+  joinAsPlayer,
+  type AutoRejoinIntent,
+  type CharacterId,
+} from "@mp/world";
+import * as fixtures from "@mp/fixtures";
 import { LoadingSpinner } from "@mp/ui";
+import { signal } from "@mp/state";
 import { useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense } from "preact/compat";
+import { Suspense, useMemo } from "preact/compat";
 import { gameAssetLoader } from "../../integrations/assets";
-import { useGameStateClient } from "../../integrations/use-game-state-client";
+import { useRiftClient } from "../../integrations/use-rift-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 
@@ -13,27 +23,46 @@ export const Route = createFileRoute("/_layout/play")({
 });
 
 function PlayPage() {
-  const stateClient = useGameStateClient();
+  const characterIdSignal = useMemo(
+    () => signal<CharacterId | undefined>(undefined),
+    [],
+  );
+  const intent = useMemo(
+    () => (): AutoRejoinIntent | undefined => {
+      const id = characterIdSignal.value;
+      return id ? { mode: "player", characterId: id } : undefined;
+    },
+    [characterIdSignal],
+  );
 
-  // Auto-join the first available character once the list arrives.
+  const { client, characters } = useRiftClient(intent);
+
+  const character = useMemo(
+    () => characterSignal(client.world, characterIdSignal),
+    [client, characterIdSignal],
+  );
+
   useSignalEffect(() => {
-    const list = stateClient.characterList.value;
-    const id = list[0]?.id;
-    if (id && stateClient.characterId.value !== id) {
-      stateClient.characterId.value = id;
-      stateClient.joinAs(id);
+    const first = characters.characters.value[0]?.id;
+    if (first && characterIdSignal.value !== first) {
+      characterIdSignal.value = first;
+      joinAsPlayer(client, first);
     }
   });
 
   return (
     <Suspense fallback={<LoadingSpinner debugDescription="~play.tsx" />}>
-      <GameAssetLoaderContext.Provider value={gameAssetLoader}>
-        <GameClient
-          stateClient={stateClient}
-          additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
-          interactive
-        />
-      </GameAssetLoaderContext.Provider>
+      <RiftClientContext.Provider value={client}>
+        <GameAssetLoaderContext.Provider value={gameAssetLoader}>
+          <GameClient
+            client={client}
+            character={character}
+            additionalDebugUi={<MiscDebugUi />}
+            viewDistance={fixtures.viewDistance}
+            interactive
+          />
+        </GameAssetLoaderContext.Provider>
+      </RiftClientContext.Provider>
     </Suspense>
   );
 }

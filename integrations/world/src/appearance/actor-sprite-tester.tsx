@@ -1,6 +1,6 @@
-import type { ActorModelId } from "@mp/world";
+import type { ActorModelId } from "../identity/ids";
 import { Engine } from "@mp/engine";
-import { actorModelStates, type ActorModelState } from "@mp/world";
+import { actorModelStates, type ActorModelState } from "./actor-model";
 import { Container, Text } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import {
@@ -8,14 +8,14 @@ import {
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import type { Signal } from "@mp/state";
+import type { Signal } from "@preact/signals-core";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
-import { useObjectSignal } from "./use-object-signal";
+import { useObjectSignal } from "../client/use-object-signal";
 
 export function ActorSpriteTester({
   modelIds,

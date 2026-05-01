@@ -1,27 +1,28 @@
 import type { World, EntityId } from "@rift/core";
+import { Appearance } from "../appearance/components";
+import { AreaTag } from "../area/components";
+import { CharacterTag, NpcTag } from "../identity/components";
+import { Combat } from "../combat/components";
 import {
-  Appearance,
-  AreaTag,
-  CharacterTag,
-  Combat,
   ConsumableInstance as RiftConsumable,
   EquipmentInstance as RiftEquipment,
-  InventoryRef,
-  Movement,
-  NpcAi,
-  NpcTag,
-  Progression,
-  type ActorModelId,
-  type AreaId,
-  type CharacterId,
-  type ConsumableInstanceId,
-  type ConsumableDefinitionId,
-  type EquipmentInstanceId,
-  type EquipmentDefinitionId,
-  type InventoryId,
-  type NpcDefinitionId,
-  type NpcSpawnId,
-} from "@mp/world";
+} from "../item/components";
+import { InventoryRef } from "../inventory/components";
+import { Movement } from "../movement/components";
+import { NpcAi } from "../npc/components";
+import { Progression } from "../progression/components";
+import type {
+  ActorModelId,
+  AreaId,
+  CharacterId,
+  ConsumableInstanceId,
+  ConsumableDefinitionId,
+  EquipmentInstanceId,
+  EquipmentDefinitionId,
+  InventoryId,
+  NpcDefinitionId,
+  NpcSpawnId,
+} from "../identity/ids";
 import { Rect, Vector } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
@@ -29,19 +30,6 @@ import type { UserId } from "@mp/auth";
 
 export type ActorId = CharacterId | NpcInstanceId;
 export type NpcInstanceId = EntityId & { readonly __npcInstance: true };
-
-export type {
-  ActorModelId,
-  AreaId,
-  CharacterId,
-  ConsumableDefinitionId,
-  ConsumableInstanceId,
-  EquipmentDefinitionId,
-  EquipmentInstanceId,
-  InventoryId,
-  NpcDefinitionId,
-  NpcSpawnId,
-};
 
 export interface AppearanceView {
   readonly modelId: ActorModelId;
@@ -210,11 +198,6 @@ export interface EquipmentInstanceView {
 
 export type ItemInstance = ConsumableInstanceView | EquipmentInstanceView;
 export type ItemInstanceId = ConsumableInstanceId | EquipmentInstanceId;
-
-export interface ItemReference {
-  readonly type: "consumable" | "equipment";
-  readonly definitionId: ConsumableDefinitionId | EquipmentDefinitionId;
-}
 
 export function readItemInstance(
   world: World,

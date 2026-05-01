@@ -1,11 +1,11 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": ["@mp/tsconfig", "pino-pretty", "@prefresh/core"],
-  "ignoreWorkspaces": ["libraries/rift/*"],
-  "workspaces": {
-    "apps/api-service": {
-      "entry": ["server/main.ts"],
-      "project": ["**/*.ts"]
-    }
-  }
+  "ignoreDependencies": [
+    "@mp/tsconfig",
+    "pino-pretty",
+    "@prefresh/core",
+    "vite-node",
+    "@babel/plugin-proposal-decorators"
+  ],
+  "ignoreWorkspaces": ["libraries/rift/*"]
 }

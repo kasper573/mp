@@ -1,40 +1,48 @@
 import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
-import type { GameStateClient } from "./game-state-client";
+import type { ReadonlySignal } from "@preact/signals-core";
+import type { RiftClient } from "@rift/core";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
+import { isConnectedSignal } from "./signals";
+import type { Character } from "./views";
+import type { ViewDistanceSettings } from "../visibility/view-distance";
 
 export interface GameClientProps {
-  stateClient: GameStateClient;
+  client: RiftClient;
+  character: ReadonlySignal<Character | undefined>;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;
   enableUi?: boolean;
+  viewDistance: ViewDistanceSettings;
 }
 
 /**
- * A wrapper of `GameRenderer` that handles all async state loading and state management.
- * This allows the `GameRenderer` to focus on rendering the game, while this component
- * can focus on the data fetching and state management.
+ * Composes connection-state gating around `GameRenderer` so it can focus on
+ * rendering once a character is available in a known area.
  */
 export function GameClient(props: GameClientProps) {
-  if (!props.stateClient.isConnected.value) {
+  const isConnected = isConnectedSignal(props.client);
+
+  if (!isConnected.value) {
     return (
-      <LoadingSpinner debugDescription="GameStateClient not connected">
-        Connecting to gateway
+      <LoadingSpinner debugDescription="rift client not connected">
+        Connecting
       </LoadingSpinner>
     );
   }
 
-  if (!props.stateClient.isGameReady.value) {
+  const character = props.character.value;
+  if (!character) {
     return (
-      <LoadingSpinner debugDescription="isGameReady false">
-        Connecting to game service
+      <LoadingSpinner debugDescription="no character joined">
+        Joining
       </LoadingSpinner>
     );
   }
 
-  const areaId = props.stateClient.areaId.value;
+  const areaId = character.areaId;
   if (!areaId) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">
@@ -52,11 +60,13 @@ export function GameClient(props: GameClientProps) {
       }
     >
       <GameRenderer
+        client={props.client}
+        character={props.character}
         interactive={props.interactive}
-        gameStateClient={props.stateClient}
         additionalDebugUi={props.additionalDebugUi}
         areaIdToLoadAssetsFor={areaId}
         enableUi={props.enableUi}
+        viewDistance={props.viewDistance}
       />
     </Suspense>
   );

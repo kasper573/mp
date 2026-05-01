@@ -13,6 +13,12 @@ export function build(
     sourcemap: true,
     format: "esm",
     logLevel: "info",
+    loader: {
+      // Asset imports surface up via the universal @mp/world barrel even when
+      // bundling node-only entrypoints. Tree-shaking removes the eventual
+      // references, but esbuild still needs a loader to parse them.
+      ".png": "file",
+    },
     external: [
       ...builtinModules,
       ...builtinModules.map((m) => `node:${m}`),

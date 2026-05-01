@@ -1,18 +1,18 @@
 import { PropertySignal, StorageSignal } from "@mp/state";
 import { Button, Checkbox } from "@mp/ui";
+import { recallCharacter, useRiftClient } from "@mp/world";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
-import type { GameStateClient } from "@mp/game-client";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
-export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
+export function MiscDebugUi() {
+  const client = useRiftClient();
   return (
     <>
       <div>Client version: {env.version}</div>
       <label>
-        Show ping <Checkbox signal={pingEnabledSignal} />{" "}
-        {pingEnabledSignal.value ? <PingIndicator /> : null}
+        Show ping <Checkbox signal={pingEnabledSignal} />
       </label>
       <br />
       <label>
@@ -22,11 +22,7 @@ export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
         />
       </label>
       <br />
-      <Button onClick={() => stateClient.actions.recall()}>Recall</Button>
+      <Button onClick={() => recallCharacter(client)}>Recall</Button>
     </>
   );
-}
-
-function PingIndicator() {
-  return <>—</>;
 }

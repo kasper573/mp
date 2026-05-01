@@ -7,7 +7,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
 import { playerRoles } from "@mp/keycloak";
-import type { AccessToken, UserId } from "@mp/auth";
+import type { AccessToken, UserIdentity } from "@mp/auth";
 import {
   ClientCharacterRegistry,
   CombatModule,
@@ -55,7 +55,7 @@ const loadedAreas = await Promise.all(
 const areas = new Map<AreaId, AreaResource>(loadedAreas);
 logger.info(`Loaded ${areas.size} area(s)`);
 
-const userIdByWs = new WeakMap<WebSocket, UserId>();
+const userByWs = new WeakMap<WebSocket, UserIdentity>();
 
 const httpServer = createHttpServer((req, res) => {
   if (req.url === "/health") {
@@ -84,7 +84,7 @@ httpServer.on("upgrade", async (req, socket, head) => {
     return;
   }
   wss.handleUpgrade(req, socket, head, (ws) => {
-    userIdByWs.set(ws, result.value.id);
+    userByWs.set(ws, result.value);
     wss.emit("connection", ws, req);
   });
 });
@@ -97,17 +97,27 @@ const itemLookup = createItemDefinitionLookup(
   fixtures.equipment,
 );
 
+const defaultArea = fixtures.areas[0];
+const defaultModelId = fixtures.actorModels[0].id;
+
 const server = new RiftServer({
   schema,
   transport,
   tickRateHz: opt.tickRateHz,
   modules: [
     registry,
-    new CharacterDirectoryModule({ repo }),
+    new CharacterDirectoryModule({
+      repo,
+      defaultModelId,
+      defaultSpawn: {
+        areaId: defaultArea.id,
+        coords: { x: defaultArea.spawnPoint.x, y: defaultArea.spawnPoint.y },
+      },
+    }),
     new PersistenceModule({
       repo,
       syncIntervalMs: opt.syncIntervalMs,
-      defaultModelId: fixtures.actorModels[0].id,
+      defaultModelId,
       spawnPointForArea: (id) => {
         const meta = fixtures.areasById.get(id);
         return meta
@@ -136,21 +146,18 @@ transport.on((event) => {
   if (event.type !== "open") return;
   const ws = event.ws as WebSocket | undefined;
   if (!ws) return;
-  const userId = userIdByWs.get(ws);
-  if (userId !== undefined) {
-    registry.recordConnection(event.clientId, userId);
+  const user = userByWs.get(ws);
+  if (user !== undefined) {
+    registry.recordConnection(event.clientId, user);
   }
 });
 
 await server.start();
 
-httpServer.listen(opt.port, opt.hostname, () => {
-  logger.info(`Game server listening on ${opt.hostname}:${opt.port}`);
-});
+httpServer.listen(opt.port, opt.hostname);
+logger.info(`game service connected on ${opt.hostname}:${opt.port}`);
 
 shutdownCleanups.push(async () => {
   await server.stop();
   await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 });
-
-logger.info(`Game server started successfully`);

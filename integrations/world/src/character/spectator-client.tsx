@@ -1,30 +1,28 @@
-import type { CharacterId } from "@mp/world";
+import type { CharacterId } from "../identity/ids";
 import type { SelectOption } from "@mp/ui";
 import { Dock, LoadingSpinner, Select } from "@mp/ui";
+import type { Signal } from "@preact/signals-core";
 import { Suspense } from "preact/compat";
-import type { GameClientProps } from "./game-client";
-import { GameClient } from "./game-client";
+import type { GameClientProps } from "../client/game-client";
+import { GameClient } from "../client/game-client";
 
 export interface SpectatorClientProps extends GameClientProps {
-  characterOptions: SelectOption<CharacterId>[];
+  characterOptions: SelectOption<CharacterId | undefined>[];
+  spectatedId: Signal<CharacterId | undefined>;
 }
 
-/**
- * A `GameClient` that doesn't join the game, but instead spectates the selected player.
- * Also has additional UI for selecting spectator options.
- */
 export function SpectatorClient(props: SpectatorClientProps) {
   return (
     <>
       <Select<CharacterId | undefined>
         options={props.characterOptions}
-        signal={props.stateClient.characterId}
+        signal={props.spectatedId}
       />
 
       <Suspense
         fallback={<LoadingSpinner debugDescription="SpectatorClient" />}
       >
-        {props.stateClient.characterId.value ? (
+        {props.spectatedId.value ? (
           <GameClient enableUi={false} {...props} />
         ) : (
           <Dock position="center">No character selected</Dock>

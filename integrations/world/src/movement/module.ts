@@ -4,7 +4,7 @@ import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
-import type { AreaResource } from "../area";
+import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { Movement, type CardinalDirection } from "./components";

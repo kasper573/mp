@@ -4,7 +4,7 @@ import { RiftServerModule, Tick } from "@rift/core";
 import type { Tile } from "@mp/std";
 import type { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
-import type { AreaResource } from "../area";
+import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { NpcTag } from "../identity/components";
 import { Combat } from "../combat/components";

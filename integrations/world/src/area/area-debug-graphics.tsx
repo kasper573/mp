@@ -1,14 +1,18 @@
 import type { Engine } from "@mp/engine";
-import type { AreaResource, TiledResource } from "@mp/world";
-import { clientViewDistanceRect, WalkableChecker } from "@mp/world";
-import type { Actor, NpcInstance } from "./types";
-import { viewDistance as clientViewDistance } from "@mp/fixtures";
+import type { AreaResource } from "./area-resource";
+import type { TiledResource } from "./tiled-resource";
+import { WalkableChecker } from "./walkable-checker";
+import {
+  clientViewDistanceRect,
+  type ViewDistanceSettings,
+} from "../visibility/view-distance";
+import type { Actor, NpcInstance } from "../client/views";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
-import { computed, effect, type ReadonlySignal } from "@mp/state";
+import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";
 import type {
@@ -28,6 +32,7 @@ export class AreaDebugGraphics extends Container {
     actors: ReadonlySignal<readonly Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
+    private viewDistance: ViewDistanceSettings,
   ) {
     super();
 
@@ -74,6 +79,7 @@ export class AreaDebugGraphics extends Container {
     this.fogOfWar = new DebugNetworkFogOfWar(
       () => playerCoords() ?? Vector.zero(),
       () => area.tiled,
+      () => this.viewDistance,
     );
 
     this.addChild(this.actorPaths);
@@ -233,6 +239,7 @@ class DebugNetworkFogOfWar extends Graphics {
   constructor(
     private playerCoords: () => Vector<Tile>,
     private tiled: () => TiledResource,
+    private viewDistance: () => ViewDistanceSettings,
   ) {
     super();
     this.onRender = this.#onRender;
@@ -245,7 +252,7 @@ class DebugNetworkFogOfWar extends Graphics {
     const { width, height, x, y } = clientViewDistanceRect(
       coords,
       tileCount,
-      clientViewDistance.networkFogOfWarTileCount,
+      this.viewDistance().networkFogOfWarTileCount,
     ).scale(tileSize);
 
     this.rect(0, 0, width, height);

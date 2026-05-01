@@ -12,6 +12,8 @@ import {
   ClientCharacterRegistry,
   Combat,
   InventoryRef,
+  JoinAsPlayer,
+  Leave,
   Movement,
   Progression,
   spawnCharacter,
@@ -63,6 +65,8 @@ export class PersistenceModule extends RiftServerModule {
       ClientDisconnected,
       this.#onDisconnect,
     );
+    const offJoin = this.server.on(JoinAsPlayer, this.#onJoinAsPlayer);
+    const offLeave = this.server.on(Leave, this.#onLeave);
     this.#timer = setInterval(
       () => void this.#flushDirty(),
       this.#opts.syncIntervalMs,
@@ -71,6 +75,8 @@ export class PersistenceModule extends RiftServerModule {
     return async () => {
       offConnect();
       offDisconnect();
+      offJoin();
+      offLeave();
       if (this.#timer) {
         clearInterval(this.#timer);
         this.#timer = undefined;
@@ -81,12 +87,54 @@ export class PersistenceModule extends RiftServerModule {
   }
 
   #onConnect = (event: RiftServerEvent<{ clientId: ClientId }>): void => {
-    const { clientId } = event.data;
-    const userId = this.registry.getUserId(clientId);
-    if (!userId) return;
-    void clientId;
-    void this.#opts;
     void event;
+  };
+
+  #onJoinAsPlayer = async (
+    event: RiftServerEvent<{ characterId: CharacterId }>,
+  ): Promise<void> => {
+    if (event.source.type !== "wire") {
+      return;
+    }
+    const clientId = event.source.clientId;
+    const userId = this.registry.getUserId(clientId);
+    if (!userId) {
+      return;
+    }
+    const access = await this.#opts.repo.mayAccessCharacter({
+      userId,
+      characterId: event.data.characterId,
+    });
+    if (access.isErr() || !access.value) {
+      return;
+    }
+    const existing = this.registry.getCharacterEntity(clientId);
+    if (existing !== undefined) {
+      return;
+    }
+    const entityId = await this.hydrateCharacter(
+      this.server.world,
+      event.data.characterId,
+    );
+    if (entityId === undefined) {
+      return;
+    }
+    this.registry.setCharacterEntity(clientId, entityId);
+  };
+
+  #onLeave = async (event: RiftServerEvent): Promise<void> => {
+    if (event.source.type !== "wire") {
+      return;
+    }
+    const clientId = event.source.clientId;
+    const characterEnt = this.registry.getCharacterEntity(clientId);
+    if (characterEnt === undefined) {
+      return;
+    }
+    await this.#flushEntity(characterEnt, this.server.world);
+    this.#snapshots.delete(characterEnt);
+    this.server.world.destroy(characterEnt);
+    this.registry.clearCharacterEntity(clientId);
   };
 
   #onDisconnect = async (
@@ -96,6 +144,8 @@ export class PersistenceModule extends RiftServerModule {
     if (characterEnt === undefined) return;
     await this.#flushEntity(characterEnt, this.server.world);
     this.#snapshots.delete(characterEnt);
+    this.server.world.destroy(characterEnt);
+    this.registry.clearCharacterEntity(event.data.clientId);
   };
 
   async #flushDirty(): Promise<void> {
@@ -163,7 +213,6 @@ export class PersistenceModule extends RiftServerModule {
   async hydrateCharacter(
     world: World,
     characterId: CharacterId,
-    userId: string,
   ): Promise<EntityId | undefined> {
     const result = await this.#opts.repo.selectCharacterRow(characterId);
     if (result.isErr()) {
@@ -189,7 +238,6 @@ export class PersistenceModule extends RiftServerModule {
       attackRange: row.attackRange,
       xp: row.xp,
     });
-    void userId;
     return id;
   }
 }

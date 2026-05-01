@@ -1,7 +1,6 @@
 import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
-import type { AreaResource } from "@mp/world";
-import { viewDistance as clientViewDistance } from "@mp/fixtures";
+import type { ViewDistanceSettings } from "../visibility/view-distance";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   Container,
@@ -10,33 +9,42 @@ import {
   Ticker,
 } from "@mp/graphics";
 import { Rect, Vector } from "@mp/math";
-import { computed } from "@mp/state";
+import { computed, type ReadonlySignal } from "@preact/signals-core";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
-import { ActorController } from "./actor-controller";
-import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { RiftClient } from "@rift/core";
+import { ActorController } from "../appearance/actor-controller";
+import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
+import { actorListSignal } from "../client/signals";
+import type { Actor, Character } from "../client/views";
+import { attackTarget, moveCharacter } from "../client/actions";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
-import type { GameStateClient } from "./game-state-client";
+import type { AreaResource } from "./area-resource";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 
 export interface AreaSceneOptions {
   area: AreaResource;
   engine: Engine;
-  state: GameStateClient;
+  client: RiftClient;
+  character: ReadonlySignal<Character | undefined>;
   actorTextures: ActorTextureLookup;
   areaSpritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
+  viewDistance: ViewDistanceSettings;
 }
 
 export class AreaScene extends Container {
   private cleanupFns: Array<() => void>;
+  private actorList: ReadonlySignal<readonly Actor[]>;
 
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
+
+    this.actorList = actorListSignal(options.client.world);
 
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
@@ -47,9 +55,10 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.engine,
       options.area,
-      options.state.actorList,
-      () => options.state.character.value?.movement.coords,
+      this.actorList,
+      () => options.character.value?.movement.coords,
       options.debugSettings,
+      options.viewDistance,
     );
 
     this.addChild(tiledRenderer);
@@ -66,11 +75,11 @@ export class AreaScene extends Container {
     this.cleanupFns = [
       reactiveCollectionBinding(
         tiledRenderer.dynamicLayer,
-        options.state.actorList,
+        this.actorList,
         (actor) =>
           new ActorController({
             actor,
-            eventBus: options.state.eventBus,
+            client: options.client,
             actorTextures: options.actorTextures,
             tiled: options.area.tiled,
           }),
@@ -83,7 +92,7 @@ export class AreaScene extends Container {
     this.cameraPos = new VectorSpring(
       computed(() =>
         options.area.tiled.tileCoordToWorld(
-          options.state.character.value?.movement.coords ?? Vector.zero(),
+          options.character.value?.movement.coords ?? Vector.zero(),
         ),
       ),
       () => ({
@@ -108,7 +117,7 @@ export class AreaScene extends Container {
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
       this.options.engine.camera.cameraSize.value,
-      clientViewDistance.renderedTileCount,
+      this.options.viewDistance.renderedTileCount,
     ),
   );
 
@@ -119,7 +128,7 @@ export class AreaScene extends Container {
   );
 
   actorAtPointer = computed(() => {
-    return this.options.state.actorList.value.find(
+    return this.actorList.value.find(
       (actor) =>
         actor.combat.health > 0 &&
         actor.combat.hitBox
@@ -130,11 +139,8 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    if (
-      actor &&
-      (actor.type === "npc" ||
-        actor.identity.id !== this.options.state.characterId.value)
-    ) {
+    const ownId = this.options.character.value?.identity.id;
+    if (actor && (actor.type === "npc" || actor.identity.id !== ownId)) {
       return {
         actor,
         type: "attack",
@@ -154,12 +160,12 @@ export class AreaScene extends Container {
   private onPointerClick = () => {
     const target = this.highlightTarget.value;
     if (target?.type === "attack") {
-      this.options.state.actions.attack(target.actor.entityId);
+      attackTarget(this.options.client, target.actor.entityId);
     }
   };
 
   moveThrottled = dedupe(
-    throttle((to: Vector<Tile>) => this.options.state.actions.move(to), 100),
+    throttle((to: Vector<Tile>) => moveCharacter(this.options.client, to), 100),
     ([aVector], [bVector]) => aVector.equals(bVector),
   );
 
@@ -190,7 +196,6 @@ function createZoomLevelForViewDistance(
   cameraSize: Vector<Pixel>,
   tileViewDistance: Tile,
 ): number {
-  // Never show more tiles than the view distance on any axis
   const numTilesFitInCamera =
     cameraSize.x > cameraSize.y
       ? cameraSize.x / tileSize.x

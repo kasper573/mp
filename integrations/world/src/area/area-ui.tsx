@@ -1,29 +1,41 @@
-import { useContext } from "preact/hooks";
+import { useMemo } from "preact/hooks";
 import * as styles from "./area-ui.css";
-import { GameStateClientContext, useItemDefinition } from "./context";
-import { RespawnDialog } from "./respawn-dialog";
-import type { ConsumableInstanceView, EquipmentInstanceView } from "./types";
+import { useItemDefinition, useRiftClient } from "../client/context";
+import { RespawnDialog } from "../character/respawn-dialog";
+import type {
+  Character,
+  ConsumableInstanceView,
+  EquipmentInstanceView,
+} from "../client/views";
+import type { ReadonlySignal } from "@preact/signals-core";
+import { inventorySignal } from "../client/signals";
 import { Suspense, type ReactElement } from "preact/compat";
 
-export function AreaUi() {
-  const state = useContext(GameStateClientContext);
-  const health = state.character.value?.combat.health ?? 0;
+export interface AreaUiProps {
+  character: ReadonlySignal<Character | undefined>;
+}
 
+export function AreaUi({ character }: AreaUiProps) {
+  const health = character.value?.combat.health ?? 0;
   return (
     <>
-      <Inventory />
+      <Inventory character={character} />
       <RespawnDialog open={health <= 0} />
     </>
   );
 }
 
-function Inventory() {
-  const state = useContext(GameStateClientContext);
+function Inventory({ character }: AreaUiProps) {
+  const client = useRiftClient();
+  const inventory = useMemo(
+    () => inventorySignal(client.world, character),
+    [client, character],
+  );
 
   return (
     <div className={styles.inventory}>
       <div className={styles.itemGrid}>
-        {state.inventory.value.map((item): ReactElement => {
+        {inventory.value.map((item): ReactElement => {
           switch (item.type) {
             case "equipment":
               return (

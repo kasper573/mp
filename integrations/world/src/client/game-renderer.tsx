@@ -1,49 +1,47 @@
-import type { AreaId } from "@mp/world";
+import type { AreaId } from "../identity/ids";
+import type { ViewDistanceSettings } from "../visibility/view-distance";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
-import type { Signal } from "@mp/state";
+import type { ReadonlySignal, Signal } from "@preact/signals-core";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
+import type { RiftClient } from "@rift/core";
 import { useState } from "preact/hooks";
-import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
-} from "./area-debug-settings-form";
-import { AreaScene } from "./area-scene";
-import { AreaUi } from "./area-ui";
-import {
-  GameStateClientContext,
-  useActorTextures,
-  useAreaAssets,
-} from "./context";
+} from "../area/area-debug-settings-form";
+import { AreaScene } from "../area/area-scene";
+import { AreaUi } from "../area/area-ui";
+import { useActorTextures, useAreaAssets } from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
-import type { GameStateClient } from "./game-state-client";
+import type { Character } from "./views";
 import { useObjectSignal } from "./use-object-signal";
 import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
-import { TimeSpan } from "@mp/time";
 
 interface GameRendererProps {
   interactive: boolean;
-  gameStateClient: GameStateClient;
+  client: RiftClient;
+  character: ReadonlySignal<Character | undefined>;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
   enableUi?: boolean;
+  viewDistance: ViewDistanceSettings;
 }
 
-/**
- * Composes all game graphics and UI into a single component that renders the actual game.
- */
 export function GameRenderer({
   interactive,
-  gameStateClient,
+  client,
+  character,
   areaIdToLoadAssetsFor,
   additionalDebugUi,
   enableUi = true,
+  viewDistance,
 }: GameRendererProps) {
   const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
@@ -52,10 +50,12 @@ export function GameRenderer({
   const appSignal = useGraphics(container);
   const optionsSignal = useObjectSignal({
     interactive,
-    gameStateClient,
+    client,
+    character,
     areaAssets,
     actorTextures,
     showDebugUi,
+    viewDistance,
   });
 
   useSignalEffect(() => {
@@ -70,40 +70,28 @@ export function GameRenderer({
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
-        <GameStateClientContext.Provider value={gameStateClient}>
-          <Suspense fallback={<UILoadingFallback />}>
-            <AreaUi />
-            {showDebugUi.value && (
-              <GameDebugUi>
-                {additionalDebugUi}
-                <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
-              </GameDebugUi>
-            )}
-          </Suspense>
-        </GameStateClientContext.Provider>
+        <Suspense fallback={<UILoadingFallback />}>
+          <AreaUi character={character} />
+          {showDebugUi.value && (
+            <GameDebugUi>
+              {additionalDebugUi}
+              <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
+            </GameDebugUi>
+          )}
+        </Suspense>
       )}
     </>
   );
 }
 
-/**
- * This suspense fallback is not expected to ever be shown.
- * It's a fallback to avoid a crash if a part of the game ui has forgotten to add its own suspense boundary.
- * It's important that every piece of ui in the game ui has its own fine grained suspense boundary,
- * because ie. we don't want the inventory triggering some async load to cause the HUD to show a loading state.
- */
 function UILoadingFallback() {
   if (import.meta.env.DEV) {
-    // In dev cause as much noise as possible to help catch missing suspense boundaries.
     return (
       <Dock position="center">
         <ErrorFallback error="A part of the game UI is missing a suspense boundary, showing fallback." />
       </Dock>
     );
   }
-
-  // In production the most graceful thing we can do is to just show nothing.
-  // Showing a generic loading spinner would just look bad, instead it's best to just show the game as-is.
   return null;
 }
 
@@ -111,21 +99,16 @@ function buildStage(
   app: Application,
   opt: {
     interactive: boolean;
-    gameStateClient: GameStateClient;
+    client: RiftClient;
+    character: ReadonlySignal<Character | undefined>;
     areaAssets: AreaAssets;
     actorTextures: ActorTextureLookup;
     showDebugUi: Signal<boolean>;
+    viewDistance: ViewDistanceSettings;
   },
 ) {
   const engine = new Engine(app.canvas);
 
-  function emitTickToGameState() {
-    opt.gameStateClient.gameState.frameCallback(
-      TimeSpan.fromMilliseconds(app.ticker.deltaMS),
-    );
-  }
-
-  app.ticker.add(emitTickToGameState);
   const subscriptions = [
     engine.start(opt.interactive),
     engine.keyboard.on(
@@ -137,14 +120,15 @@ function buildStage(
   const areaScene = new AreaScene({
     engine,
     debugSettings: () => areaDebugSettingsStorage.value,
-    state: opt.gameStateClient,
+    client: opt.client,
+    character: opt.character,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,
     areaSpritesheets: opt.areaAssets.spritesheets,
+    viewDistance: opt.viewDistance,
   });
   app.stage.addChild(areaScene);
   return function cleanup() {
-    app.ticker.remove(emitTickToGameState);
     app.stage.removeChildren();
     areaScene.destroy({ children: true });
     for (const unsubscribe of subscriptions) {

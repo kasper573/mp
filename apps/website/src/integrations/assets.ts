@@ -1,15 +1,13 @@
 import * as fixtures from "@mp/fixtures";
-import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
-import {
-  browserLoadAreaResource,
-  loadActorTextureLookup,
-  type GameAssetLoader,
-} from "@mp/game-client";
 import type {
+  ActorTextureLookup,
+  AreaAssetsLookup,
+  GameAssetLoader,
   ItemDefinition,
   ItemDefinitionLookup,
   ItemReference,
 } from "@mp/world";
+import { browserLoadAreaResource, loadActorTextureLookup } from "@mp/world";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { env } from "../env";
@@ -40,7 +38,7 @@ export function useActorTextures(): ActorTextureLookup {
     queryFn: () =>
       loadActorTextureLookup(
         modelIds,
-        `${env.fileServerBaseUrl}/actor-spritesheets/multipack-0.json`,
+        `${env.fileServerBaseUrl}/actors/actors-0.json`,
       ),
   });
   return lookup;

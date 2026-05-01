@@ -2,7 +2,7 @@ import type { Cleanup } from "@rift/module";
 import type { RiftServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { Tile } from "@mp/std";
-import type { AreaResource } from "../area";
+import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { NpcAi } from "./components";

@@ -1,4 +1,4 @@
-import type { ActorModelState } from "@mp/world";
+import type { ActorModelState } from "./actor-model";
 import type { Animation } from "@mp/graphics";
 import { AnimationController } from "@mp/graphics";
 import type { TimesPerSecond } from "@mp/std";

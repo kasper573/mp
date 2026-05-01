@@ -10,12 +10,13 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
-    "@mp/game-client": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
+    "@mp/world": "workspace:*",
+    "@preact/signals-core": "catalog:",
+    "@rift/core": "workspace:*",
     "@rift/ws": "workspace:*",
     "ws": "8.20.0"
   },

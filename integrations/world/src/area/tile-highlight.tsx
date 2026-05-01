@@ -1,5 +1,5 @@
-import type { AreaResource } from "@mp/world";
-import type { Actor } from "./types";
+import type { AreaResource } from "./area-resource";
+import type { Actor } from "../client/views";
 import type { FillStyle } from "@mp/graphics";
 import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";

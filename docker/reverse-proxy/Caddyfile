@@ -60,6 +60,6 @@ faro.{$MP_DOMAIN} {
     tracing {
         span mp_game_server
     }
-    reverse_proxy mp-game-server:{$MP_GAME_SERVER_PORT}
+    reverse_proxy {$MP_GAME_SERVER_PROXY_HOST}
     import common_cors
 }

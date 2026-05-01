@@ -1,10 +1,10 @@
 import type { Cleanup } from "@rift/module";
 import type { ClientId, EntityId } from "@rift/core";
 import { ClientDisconnected, RiftServerModule } from "@rift/core";
-import type { UserId } from "@mp/auth";
+import type { UserId, UserIdentity } from "@mp/auth";
 
 export class ClientCharacterRegistry extends RiftServerModule {
-  readonly #userIdByClient = new Map<ClientId, UserId>();
+  readonly #userByClient = new Map<ClientId, UserIdentity>();
   readonly #characterEntityByClient = new Map<ClientId, EntityId>();
   readonly #clientByCharacterEntity = new Map<EntityId, ClientId>();
 
@@ -15,18 +15,22 @@ export class ClientCharacterRegistry extends RiftServerModule {
     );
     return () => {
       offDisconnect();
-      this.#userIdByClient.clear();
+      this.#userByClient.clear();
       this.#characterEntityByClient.clear();
       this.#clientByCharacterEntity.clear();
     };
   }
 
-  recordConnection(clientId: ClientId, userId: UserId): void {
-    this.#userIdByClient.set(clientId, userId);
+  recordConnection(clientId: ClientId, user: UserIdentity): void {
+    this.#userByClient.set(clientId, user);
+  }
+
+  getUser(clientId: ClientId): UserIdentity | undefined {
+    return this.#userByClient.get(clientId);
   }
 
   getUserId(clientId: ClientId): UserId | undefined {
-    return this.#userIdByClient.get(clientId);
+    return this.#userByClient.get(clientId)?.id;
   }
 
   getCharacterEntity(clientId: ClientId): EntityId | undefined {
@@ -55,14 +59,14 @@ export class ClientCharacterRegistry extends RiftServerModule {
   }
 
   clientIds(): IterableIterator<ClientId> {
-    return this.#userIdByClient.keys();
+    return this.#userByClient.keys();
   }
 
   #onDisconnect = (event: {
     readonly data: { readonly clientId: ClientId };
   }) => {
     const { clientId } = event.data;
-    this.#userIdByClient.delete(clientId);
+    this.#userByClient.delete(clientId);
     this.clearCharacterEntity(clientId);
   };
 }

@@ -1,8 +1,21 @@
-import { GameStateClient } from "@mp/game-client";
+import { RiftClient } from "@rift/core";
+import {
+  AutoRejoinModule,
+  CharacterListModule,
+  actorListSignal,
+  characterSignal,
+  isGameReadySignal,
+  joinAsPlayer,
+  moveCharacter,
+  respawnCharacter,
+  schema,
+  type AutoRejoinIntent,
+  type CharacterId,
+} from "@mp/world";
 import { wsTransport, type WebSocketLike } from "@rift/ws";
+import { signal, type ReadonlySignal } from "@preact/signals-core";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/auth";
-import type { ReadonlySignal } from "@mp/state";
 import { Rng } from "@mp/std";
 import { WebSocket } from "ws";
 import type { Vector } from "@mp/math";
@@ -59,11 +72,11 @@ async function testAllGameClients(): Promise<boolean> {
 
 function testOneGameClient(n: number, rng: Rng): Promise<void> {
   let socket: WebSocket | undefined;
-  let stopClient = () => {};
-  let running = true;
+  let stopped = false;
+  let stopClient: () => void = () => {};
   return new Promise<void>((resolve, reject) => {
     function failTest(error: unknown) {
-      running = false;
+      stopped = true;
       reject(error instanceof Error ? error : new Error(String(error)));
     }
 
@@ -83,53 +96,63 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} connected`);
       }
 
-      const stateClient = new GameStateClient({
-        // ws package's WebSocket is shape-compatible with the browser API
-        // expected by wsTransport at runtime; types differ slightly.
+      const characterIdSignal = signal<CharacterId | undefined>(undefined);
+      const intent = (): AutoRejoinIntent | undefined => {
+        const id = characterIdSignal.value;
+        return id ? { mode: "player", characterId: id } : undefined;
+      };
+
+      const characters = new CharacterListModule();
+      const autoRejoin = new AutoRejoinModule({ intent });
+
+      const client = new RiftClient({
+        schema,
         transport: wsTransport(socket as unknown as WebSocketLike),
-        logger,
-        settings: () => ({ useInterpolator: false }),
+        modules: [characters, autoRejoin],
       });
 
-      stopClient = stateClient.start();
+      stopClient = () => void client.disconnect();
+
+      await client.connect();
+
+      const character = characterSignal(client.world, characterIdSignal);
+      const ready = isGameReadySignal(character);
 
       if (verbose) {
         logger.info(`Socket ${n} waiting for character list...`);
       }
       const characterId = await waitUntil(
-        stateClient.characterList,
+        characters.characters,
         (list) => list.length > 0,
         15_000,
       ).then((list) => list[0].id);
 
-      stateClient.characterId.value = characterId;
-      stateClient.joinAs(characterId);
+      characterIdSignal.value = characterId;
+      joinAsPlayer(client, characterId);
 
       if (verbose) {
-        logger.info(`Socket ${n} waiting on area id...`);
+        logger.info(`Socket ${n} waiting on game ready...`);
       }
-      await waitUntil(stateClient.isGameReady, (v) => v, 15_000);
+      await waitUntil(ready, (v) => v, 15_000);
 
+      const actors = actorListSignal(client.world);
       const endTime = Date.now() + timeout.totalMilliseconds;
       await runUntil(
         endTime,
-        () => running,
+        () => !stopped,
         () => {
-          if (
-            stateClient.character.value &&
-            !stateClient.character.value.combat.health
-          ) {
+          const ch = character.value;
+          if (ch && !ch.combat.health) {
             logger.info(`Character for socket ${n} will respawn`);
-            stateClient.actions.respawn();
+            respawnCharacter(client);
           }
-          const character = stateClient.character.value;
-          if (character) {
-            const areaWalkable: Vector<Tile>[] = stateClient.actorList.value
+          if (ch) {
+            const walkable: Vector<Tile>[] = actors.value
               .map((a) => a.movement.coords)
               .filter((v): v is Vector<Tile> => Boolean(v));
-            if (areaWalkable.length > 0) {
-              const to = rng.oneOf(areaWalkable);
-              stateClient.actions.move(to);
+            if (walkable.length > 0) {
+              const to = rng.oneOf(walkable);
+              moveCharacter(client, to);
             }
           }
           return 1000 + rng.next() * 6000;
@@ -188,20 +211,20 @@ function runUntil(
 }
 
 function waitUntil<T>(
-  signal: ReadonlySignal<T>,
+  signalToWatch: ReadonlySignal<T>,
   isReady: (value: T) => boolean,
   timeout: number,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    if (isReady(signal.value)) {
-      resolve(signal.value);
+    if (isReady(signalToWatch.value)) {
+      resolve(signalToWatch.value);
       return;
     }
     const timeoutId = setTimeout(
       () => reject(new Error("Timeout waiting for signal")),
       timeout,
     );
-    const unsubscribe = signal.subscribe((value) => {
+    const unsubscribe = signalToWatch.subscribe((value) => {
       if (isReady(value)) {
         clearTimeout(timeoutId);
         unsubscribe();

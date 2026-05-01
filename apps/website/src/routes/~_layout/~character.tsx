@@ -1,12 +1,12 @@
 import { Button, Card } from "@mp/ui";
-import { useComputed } from "@mp/state/react";
-import { CharacterRenamedResponse, RenameCharacterRequest } from "@mp/world";
+import { renameCharacter } from "@mp/world";
+import { useComputed, useSignal } from "@mp/state/react";
+import { useEffect } from "preact/hooks";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "preact/hooks";
-import { AuthBoundary } from "../../ui/auth-boundary";
 import { atoms } from "@mp/style";
 import { NavLink } from "../../integrations/router/nav-link";
-import { useGameStateClient } from "../../integrations/use-game-state-client";
+import { useRiftClient } from "../../integrations/use-rift-client";
+import { AuthBoundary } from "../../ui/auth-boundary";
 import type { ReactNode } from "preact/compat";
 
 export const Route = createFileRoute("/_layout/character")({
@@ -14,18 +14,15 @@ export const Route = createFileRoute("/_layout/character")({
 });
 
 function CharacterPage() {
-  const stateClient = useGameStateClient();
-  const myCharacter = useComputed(
-    () => stateClient.characterList.value[0],
-  ).value;
-  const [savedName, setSavedName] = useState<string | undefined>(undefined);
+  const { client, characters } = useRiftClient(() => undefined);
+  const myCharacter = useComputed(() => characters.characters.value[0]).value;
+  const savedAt = useSignal<number | undefined>(undefined);
 
   useEffect(() => {
-    const off = stateClient.client.on(CharacterRenamedResponse, (ev) => {
-      setSavedName(ev.data.name);
+    return characters.characters.subscribe(() => {
+      savedAt.value = Date.now();
     });
-    return off;
-  }, [stateClient]);
+  }, [characters, savedAt]);
 
   if (!myCharacter) {
     return (
@@ -44,28 +41,20 @@ function CharacterPage() {
             e.preventDefault();
             const newName = new FormData(e.currentTarget).get("name");
             if (typeof newName === "string" && newName) {
-              stateClient.client.emit({
-                type: RenameCharacterRequest,
-                data: {
-                  characterId: myCharacter.id,
-                  name: newName,
-                },
-                source: "local",
-                target: "wire",
-              });
+              renameCharacter(client, myCharacter.id, newName);
             }
           }}
         >
           <div>
             <label htmlFor="name">Name</label>
-            <input name="name" defaultValue={savedName ?? myCharacter.name} />
+            <input name="name" defaultValue={myCharacter.name} />
           </div>
 
           <Button type="submit">Save</Button>
         </form>
       </Card>
 
-      {savedName !== undefined && (
+      {savedAt.value !== undefined && (
         <Card intent="success">Changes have been saved</Card>
       )}
     </Container>

@@ -1,6 +1,8 @@
-import type { AreaId, AreaResource, ItemDefinitionLookup } from "@mp/world";
+import type { AreaId } from "../identity/ids";
+import type { AreaResource } from "../area/area-resource";
+import type { ItemDefinitionLookup } from "../item/definition-lookup";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 
 export interface AreaAssets {
   spritesheets: TiledSpritesheetRecord;
