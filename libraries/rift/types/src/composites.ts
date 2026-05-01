@@ -282,3 +282,7 @@ export function transform<Inner, Outer>(
       ),
   };
 }
+
+export function copy<T>(ty: RiftType<T>): RiftType<T> {
+  return { ...ty };
+}
