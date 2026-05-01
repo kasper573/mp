@@ -1,3 +1,4 @@
+export * from "./ids";
 export * from "./actor-models";
 export * from "./areas";
 export * from "./npcs";

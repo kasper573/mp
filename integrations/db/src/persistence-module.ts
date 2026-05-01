@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { ClientId, EntityId, RiftServerEvent, World } from "@rift/core";
+import type { ClientId, EntityId, inferServerEvent, World } from "@rift/core";
 import {
   ClientConnected,
   ClientDisconnected,
@@ -26,7 +26,7 @@ import type {
   CharacterId,
   InventoryId,
 } from "@mp/world";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import { combine, type Tile, type TimesPerSecond } from "@mp/std";
 import type { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";
 
@@ -58,6 +58,7 @@ export class PersistenceModule extends RiftServerModule {
 
   readonly #opts: PersistenceModuleOptions;
   readonly #snapshots = new Map<EntityId, CharacterSnapshot>();
+  readonly #entityByClient = new Map<ClientId, EntityId>();
   #timer?: ReturnType<typeof setInterval>;
 
   constructor(opts: PersistenceModuleOptions) {
@@ -66,25 +67,19 @@ export class PersistenceModule extends RiftServerModule {
   }
 
   init(): Cleanup {
-    const offConnect = this.server.on(ClientConnected, this.#onConnect);
-    const offDisconnect = this.server.on(
-      ClientDisconnected,
-      this.#onDisconnect,
-    );
-    const offJoin = this.server.on(JoinAsPlayer, this.#onJoinAsPlayer);
-    const offLeave = this.server.on(Leave, this.#onLeave);
-    const offRespawn = this.server.on(Respawn, this.#onRespawn);
     this.#timer = setInterval(
       () => void this.#flushDirty(),
       this.#opts.syncIntervalMs,
     );
-
+    const offEvents = combine(
+      this.server.on(ClientConnected, this.#onConnect),
+      this.server.on(ClientDisconnected, this.#onDisconnect),
+      this.server.on(JoinAsPlayer, this.#onJoinAsPlayer),
+      this.server.on(Leave, this.#onLeave),
+      this.server.on(Respawn, this.#onRespawn),
+    );
     return async () => {
-      offConnect();
-      offDisconnect();
-      offJoin();
-      offLeave();
-      offRespawn();
+      offEvents();
       if (this.#timer) {
         clearInterval(this.#timer);
         this.#timer = undefined;
@@ -94,12 +89,12 @@ export class PersistenceModule extends RiftServerModule {
     };
   }
 
-  #onConnect = (event: RiftServerEvent<{ clientId: ClientId }>): void => {
+  #onConnect = (event: inferServerEvent<typeof ClientConnected>): void => {
     void event;
   };
 
   #onJoinAsPlayer = async (
-    event: RiftServerEvent<CharacterId>,
+    event: inferServerEvent<typeof JoinAsPlayer>,
   ): Promise<void> => {
     if (event.source.type !== "wire") {
       return;
@@ -120,14 +115,29 @@ export class PersistenceModule extends RiftServerModule {
     if (existing !== undefined) {
       return;
     }
+    this.#destroyStaleCharacterEntities(event.data);
     const entityId = await this.hydrateCharacter(this.server.world, event.data);
     if (entityId === undefined) {
       return;
     }
+    this.#entityByClient.set(clientId, entityId);
     this.registry.setCharacterEntity(clientId, entityId);
   };
 
-  #onRespawn = (event: RiftServerEvent): void => {
+  #destroyStaleCharacterEntities(characterId: CharacterId): void {
+    const stale: EntityId[] = [];
+    for (const [id, tag] of this.server.world.query(CharacterTag)) {
+      if (tag.characterId === characterId) {
+        stale.push(id);
+      }
+    }
+    for (const id of stale) {
+      this.#snapshots.delete(id);
+      this.server.world.destroy(id);
+    }
+  }
+
+  #onRespawn = (event: inferServerEvent<typeof Respawn>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -161,31 +171,28 @@ export class PersistenceModule extends RiftServerModule {
     }
   };
 
-  #onLeave = async (event: RiftServerEvent): Promise<void> => {
+  #onLeave = (event: inferServerEvent<typeof Leave>): void => {
     if (event.source.type !== "wire") {
       return;
     }
-    const clientId = event.source.clientId;
-    const characterEnt = this.registry.getCharacterEntity(clientId);
-    if (characterEnt === undefined) {
-      return;
-    }
-    await this.#flushEntity(characterEnt, this.server.world);
+    this.#cleanupClient(event.source.clientId);
+  };
+
+  #onDisconnect = (
+    event: inferServerEvent<typeof ClientDisconnected>,
+  ): void => {
+    this.#cleanupClient(event.data.clientId);
+  };
+
+  #cleanupClient(clientId: ClientId): void {
+    const characterEnt = this.#entityByClient.get(clientId);
+    if (characterEnt === undefined) return;
+    this.#entityByClient.delete(clientId);
+    void this.#flushEntity(characterEnt, this.server.world);
     this.#snapshots.delete(characterEnt);
     this.server.world.destroy(characterEnt);
     this.registry.clearCharacterEntity(clientId);
-  };
-
-  #onDisconnect = async (
-    event: RiftServerEvent<{ clientId: ClientId }>,
-  ): Promise<void> => {
-    const characterEnt = this.registry.getCharacterEntity(event.data.clientId);
-    if (characterEnt === undefined) return;
-    await this.#flushEntity(characterEnt, this.server.world);
-    this.#snapshots.delete(characterEnt);
-    this.server.world.destroy(characterEnt);
-    this.registry.clearCharacterEntity(event.data.clientId);
-  };
+  }
 
   async #flushDirty(): Promise<void> {
     const entityIds: EntityId[] = [];

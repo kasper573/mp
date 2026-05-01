@@ -1,9 +1,9 @@
 import type { Cleanup } from "@rift/module";
-import type { EntityId, RiftServerEvent } from "@rift/core";
+import type { EntityId, inferServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { createShortId, Rng } from "@mp/std";
+import { combine, createShortId, Rng } from "@mp/std";
 import type { ActorModelLookup } from "../appearance/actor-model";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId, NpcDefinitionId, NpcSpawnId } from "../identity/ids";
@@ -45,16 +45,14 @@ export class NpcSpawnerModule extends RiftServerModule {
   }
 
   init(): Cleanup {
-    const offTick = this.server.on(Tick, this.#onTick);
-    return () => {
-      offTick();
+    return combine(this.server.on(Tick, this.#onTick), () => {
       this.#pendingRespawns.clear();
       this.#elapsedMs = 0;
       this.#initialized = false;
-    };
+    });
   }
 
-  #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+  #onTick = (event: inferServerEvent<typeof Tick>): void => {
     this.#elapsedMs += event.data.dt * 1000;
 
     if (!this.#initialized) {

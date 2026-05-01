@@ -1,9 +1,7 @@
 import type { Tile } from "@mp/std";
 import { Rect, type Vector, clamp } from "@mp/math";
 
-export interface ViewDistanceSettings {
-  readonly tileCount: Tile;
-}
+export type { ViewDistanceSettings } from "@mp/fixtures";
 
 export function clientViewDistanceRect(
   coords: Vector<Tile>,

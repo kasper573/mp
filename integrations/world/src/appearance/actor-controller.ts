@@ -9,7 +9,7 @@ import {
 import { effect } from "@preact/signals-core";
 import { TimeSpan } from "@mp/time";
 import type { RiftClient } from "@rift/core";
-import { Attacked, Died } from "../combat/events";
+import { Attacked } from "../combat/events";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import type { Actor } from "../client/views";
@@ -27,15 +27,18 @@ export class ActorController extends Container {
   #text: Text;
   #tintFilter = new ColorMatrixFilter();
   #options: ActorControllerOptions;
+  #wasAlive: boolean;
 
   constructor(options: ActorControllerOptions) {
     super();
     this.#options = options;
 
     const { actor, client } = options;
+    const initial = actorAnimationState(actor);
+    this.#wasAlive = initial.isAlive;
 
     this.#sprite = new ActorSprite(
-      actorAnimationState(actor).isAlive
+      initial.isAlive
         ? {
             name: "idle-spear",
             type: "smooth-switch",
@@ -59,18 +62,12 @@ export class ActorController extends Container {
     this.addChild(this.#text);
 
     this.#subscriptions = [
-      effect(this.#switchAnimationToMovingOrIdle),
+      effect(this.#updateBaseAnimation),
       client.on(Attacked, (ev) => {
-        if (ev.data.entityId === actor.entityId) {
-          void this.#sprite
-            .playToEndAndStop("attack-spear")
-            .then(this.#switchAnimationToMovingOrIdle);
-        }
-      }),
-      client.on(Died, (ev) => {
-        if (ev.data === actor.entityId) {
-          void this.#sprite.playToEndAndStop("death-spear");
-        }
+        if (ev.data.entityId !== actor.entityId) return;
+        void this.#sprite
+          .playToEndAndStop("attack-spear")
+          .then(this.#resumeBaseAnimation);
       }),
     ];
 
@@ -84,19 +81,31 @@ export class ActorController extends Container {
     }
   }
 
-  #switchAnimationToMovingOrIdle = () => {
+  #updateBaseAnimation = () => {
     const { isMoving, isFast, isAlive } = actorAnimationState(
       this.#options.actor,
     );
-    if (isAlive) {
-      if (isMoving) {
-        this.#sprite.switchAnimationSmoothly(
-          isFast ? "run-spear" : "walk-spear",
-        );
-      } else {
-        this.#sprite.switchAnimationSmoothly("idle-spear");
-      }
+    if (this.#wasAlive && !isAlive) {
+      void this.#sprite.playToEndAndStop("death-spear");
+    } else if (isAlive) {
+      this.#sprite.switchAnimationSmoothly(
+        isMoving ? (isFast ? "run-spear" : "walk-spear") : "idle-spear",
+      );
     }
+    this.#wasAlive = isAlive;
+  };
+
+  #resumeBaseAnimation = () => {
+    const { isMoving, isFast, isAlive } = actorAnimationState(
+      this.#options.actor,
+    );
+    if (!isAlive) {
+      void this.#sprite.playToEndAndStop("death-spear");
+      return;
+    }
+    this.#sprite.switchAnimationSmoothly(
+      isMoving ? (isFast ? "run-spear" : "walk-spear") : "idle-spear",
+    );
   };
 
   #onRender = () => {

@@ -1,4 +1,11 @@
-import type { ConsumableDefinition, ConsumableDefinitionId } from "@mp/world";
+import type { ConsumableDefinitionId } from "./ids";
+
+export interface ConsumableDefinition {
+  readonly type: "consumable";
+  readonly id: ConsumableDefinitionId;
+  readonly name: string;
+  readonly maxStackSize: number;
+}
 
 export const consumables: ReadonlyArray<ConsumableDefinition> = [
   {

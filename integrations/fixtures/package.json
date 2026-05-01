@@ -17,7 +17,7 @@
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/world": "workspace:*"
+    "@mp/validate": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

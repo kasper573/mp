@@ -1,10 +1,21 @@
-import type {
-  ItemDefinition,
-  ItemDefinitionId,
-  ItemReference,
-} from "@mp/world";
+import type { ConsumableDefinition } from "./consumables";
+import type { EquipmentDefinition } from "./equipment";
+import type { ConsumableDefinitionId, EquipmentDefinitionId } from "./ids";
 import { consumables } from "./consumables";
 import { equipment } from "./equipment";
+
+export type ItemDefinition = ConsumableDefinition | EquipmentDefinition;
+export type ItemDefinitionId = ItemDefinition["id"];
+
+export type ItemReference =
+  | {
+      readonly type: "consumable";
+      readonly definitionId: ConsumableDefinitionId;
+    }
+  | {
+      readonly type: "equipment";
+      readonly definitionId: EquipmentDefinitionId;
+    };
 
 export const items: ReadonlyArray<ItemDefinition> = [
   ...consumables,

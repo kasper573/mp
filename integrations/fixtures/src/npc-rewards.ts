@@ -2,9 +2,26 @@ import type {
   ConsumableDefinitionId,
   EquipmentDefinitionId,
   NpcDefinitionId,
-  NpcReward,
   NpcRewardId,
-} from "@mp/world";
+} from "./ids";
+import type { ItemReference } from "./items";
+
+interface NpcRewardBase<T extends string> {
+  readonly id: NpcRewardId;
+  readonly type: T;
+  readonly npcId: NpcDefinitionId;
+}
+
+export interface NpcItemReward extends NpcRewardBase<"item"> {
+  readonly reference: ItemReference;
+  readonly amount: number;
+}
+
+export interface NpcXpReward extends NpcRewardBase<"xp"> {
+  readonly xp: number;
+}
+
+export type NpcReward = NpcItemReward | NpcXpReward;
 
 const SOLDIER_ID = "1" as NpcDefinitionId;
 

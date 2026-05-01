@@ -16,11 +16,11 @@ export interface AreaUiProps {
 }
 
 export function AreaUi({ character }: AreaUiProps) {
-  const health = character.value?.combat.health ?? 0;
+  const isDead = !character.value?.combat.alive;
   return (
     <>
       <Inventory character={character} />
-      <RespawnDialog open={health <= 0} />
+      <RespawnDialog open={isDead} />
     </>
   );
 }

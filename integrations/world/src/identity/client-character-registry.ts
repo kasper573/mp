@@ -2,6 +2,7 @@ import type { Cleanup } from "@rift/module";
 import type { ClientId, EntityId } from "@rift/core";
 import { ClientDisconnected, RiftServerModule } from "@rift/core";
 import type { UserId, UserIdentity } from "@mp/auth";
+import { combine } from "@mp/std";
 
 export class ClientCharacterRegistry extends RiftServerModule {
   readonly #userByClient = new Map<ClientId, UserIdentity>();
@@ -9,16 +10,14 @@ export class ClientCharacterRegistry extends RiftServerModule {
   readonly #clientByCharacterEntity = new Map<EntityId, ClientId>();
 
   init(): Cleanup {
-    const offDisconnect = this.server.on(
-      ClientDisconnected,
-      this.#onDisconnect,
+    return combine(
+      this.server.on(ClientDisconnected, this.#onDisconnect),
+      () => {
+        this.#userByClient.clear();
+        this.#characterEntityByClient.clear();
+        this.#clientByCharacterEntity.clear();
+      },
     );
-    return () => {
-      offDisconnect();
-      this.#userByClient.clear();
-      this.#characterEntityByClient.clear();
-      this.#clientByCharacterEntity.clear();
-    };
   }
 
   recordConnection(clientId: ClientId, user: UserIdentity): void {

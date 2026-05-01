@@ -1,8 +1,8 @@
 import type { Cleanup } from "@rift/module";
-import type { RiftServerEvent } from "@rift/core";
+import type { inferServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
-import type { Tile } from "@mp/std";
+import { combine, type Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 import type { AreaResource } from "../area/area-resource";
 import { hitTestTiledObject } from "../area/hit-test";
@@ -27,15 +27,13 @@ export class MovementModule extends RiftServerModule {
   }
 
   init(): Cleanup {
-    const offMove = this.server.on(MoveRequest, this.#onMoveRequest);
-    const offTick = this.server.on(Tick, this.#onTick);
-    return () => {
-      offMove();
-      offTick();
-    };
+    return combine(
+      this.server.on(MoveRequest, this.#onMoveRequest),
+      this.server.on(Tick, this.#onTick),
+    );
   }
 
-  #onMoveRequest = (event: RiftServerEvent<Vector<Tile>>): void => {
+  #onMoveRequest = (event: inferServerEvent<typeof MoveRequest>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -63,9 +61,16 @@ export class MovementModule extends RiftServerModule {
       path: path ?? [],
       moveTarget: event.data,
     });
+    const combat = this.server.world.get(characterEnt, Combat);
+    if (combat?.attackTargetId !== undefined) {
+      this.server.world.set(characterEnt, Combat, {
+        ...combat,
+        attackTargetId: undefined,
+      });
+    }
   };
 
-  #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+  #onTick = (event: inferServerEvent<typeof Tick>): void => {
     const dt = event.data.dt;
     for (const [id, mv, areaTag] of this.server.world.query(
       Movement,
@@ -170,6 +175,13 @@ function stepAlongPath<T extends MovementStep>(mv: T, dt: number): T {
   }
   const remaining = pathIndex > lastIndex ? [] : mv.path.slice(pathIndex);
   return { ...mv, coords, path: remaining, direction };
+}
+
+export function directionBetween(
+  from: Vector<Tile>,
+  to: Vector<Tile>,
+): CardinalDirection {
+  return dirFromDelta(to.x - from.x, to.y - from.y);
 }
 
 function dirFromDelta(dx: number, dy: number): CardinalDirection {

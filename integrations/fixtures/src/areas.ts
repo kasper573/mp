@@ -1,6 +1,12 @@
 import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
-import type { AreaId, AreaMeta } from "@mp/world";
+import type { AreaId } from "./ids";
+
+export interface AreaMeta {
+  readonly id: AreaId;
+  readonly displayName: string;
+  readonly spawnPoint: Vector<Tile>;
+}
 
 export const areas: ReadonlyArray<AreaMeta> = [
   {

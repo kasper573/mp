@@ -130,7 +130,7 @@ export class AreaScene extends Container {
   actorAtPointer = computed(() => {
     return this.actorList.value.find(
       (actor) =>
-        actor.combat.health > 0 &&
+        actor.combat.alive &&
         actor.combat.hitBox
           .offset(actor.movement.coords)
           .contains(this.pointerTile.value),

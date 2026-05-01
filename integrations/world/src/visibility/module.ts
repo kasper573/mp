@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { ClientId, EntityId, RiftServerEvent } from "@rift/core";
+import type { ClientId, EntityId, inferServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
 import { ClientCharacterRegistry } from "../identity/client-character-registry";
@@ -39,7 +39,7 @@ export class VisibilityModule extends RiftServerModule {
     return offTick;
   }
 
-  #onTick = (_event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+  #onTick = (_event: inferServerEvent<typeof Tick>): void => {
     this.#tickCounter++;
     if (this.#tickCounter < this.#recomputeEvery) {
       return;

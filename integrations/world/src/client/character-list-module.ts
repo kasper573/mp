@@ -7,6 +7,7 @@ import {
 } from "../character/events";
 import type { CharacterId } from "../identity/ids";
 import { requestCharacterList } from "./actions";
+import { combine } from "@mp/std";
 
 export interface KnownCharacter {
   readonly id: CharacterId;
@@ -40,10 +41,6 @@ export class CharacterListModule extends RiftClientModule {
       }
       prevOpen = isOpen;
     });
-    return () => {
-      offList();
-      offRenamed();
-      offState();
-    };
+    return combine(offList, offRenamed, offState);
   }
 }

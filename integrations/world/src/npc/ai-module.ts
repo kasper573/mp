@@ -1,9 +1,9 @@
 import type { Cleanup } from "@rift/module";
-import type { EntityId, RiftServerEvent, World } from "@rift/core";
+import type { EntityId, inferServerEvent, World } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { InferValue } from "@rift/types";
 import type { Vector } from "@mp/math";
-import { Rng, type Tile } from "@mp/std";
+import { combine, Rng, type Tile } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
@@ -83,18 +83,14 @@ export class NpcAiModule extends RiftServerModule {
   }
 
   init(): Cleanup {
-    const offTick = this.server.on(Tick, this.#onTick);
-    const offAttacked = this.server.on(Attacked, this.#onAttacked);
-    return () => {
-      offTick();
-      offAttacked();
-      this.#memory.clear();
-    };
+    return combine(
+      this.server.on(Tick, this.#onTick),
+      this.server.on(Attacked, this.#onAttacked),
+      () => this.#memory.clear(),
+    );
   }
 
-  #onAttacked = (
-    event: RiftServerEvent<{ entityId: EntityId; targetId: EntityId }>,
-  ): void => {
+  #onAttacked = (event: inferServerEvent<typeof Attacked>): void => {
     const { entityId: attacker, targetId } = event.data;
     const attackerMv = this.server.world.get(attacker, Movement);
     const targetMv = this.server.world.get(targetId, Movement);

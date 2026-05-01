@@ -1,11 +1,13 @@
 import type { Cleanup } from "@rift/module";
-import type { EntityId, RiftServerEvent } from "@rift/core";
+import type { inferServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
+import { combine } from "@mp/std";
 import { inject } from "@rift/module";
 import { ClientCharacterRegistry } from "../identity/client-character-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement } from "../movement/components";
+import { directionBetween } from "../movement/module";
 import { Attacked, AttackRequest, Died, Kill } from "./events";
 
 const HP_REGEN_INTERVAL_MS = 10_000;
@@ -20,15 +22,13 @@ export class CombatModule extends RiftServerModule {
   #elapsedMs = 0;
 
   init(): Cleanup {
-    const offTick = this.server.on(Tick, this.#onTick);
-    const offAttack = this.server.on(AttackRequest, this.#onAttackRequest);
-    return () => {
-      offTick();
-      offAttack();
-    };
+    return combine(
+      this.server.on(Tick, this.#onTick),
+      this.server.on(AttackRequest, this.#onAttackRequest),
+    );
   }
 
-  #onAttackRequest = (event: RiftServerEvent<EntityId>): void => {
+  #onAttackRequest = (event: inferServerEvent<typeof AttackRequest>): void => {
     if (event.source.type !== "wire") {
       return;
     }
@@ -46,7 +46,7 @@ export class CombatModule extends RiftServerModule {
     });
   };
 
-  #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+  #onTick = (event: inferServerEvent<typeof Tick>): void => {
     this.#elapsedMs += event.data.dt * 1000;
 
     if (this.#elapsedMs - this.#lastRegenMs >= HP_REGEN_INTERVAL_MS) {
@@ -121,6 +121,7 @@ export class CombatModule extends RiftServerModule {
         ...mv,
         path: [],
         moveTarget: undefined,
+        direction: directionBetween(mv.coords, targetMv.coords),
       });
 
       this.server.emit({

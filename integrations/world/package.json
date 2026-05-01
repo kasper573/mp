@@ -17,6 +17,7 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
+    "@mp/fixtures": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",

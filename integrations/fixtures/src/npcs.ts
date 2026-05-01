@@ -1,5 +1,29 @@
 import type { Tile, TimesPerSecond } from "@mp/std";
-import type { ActorModelId, NpcDefinition, NpcDefinitionId } from "@mp/world";
+import type { ActorModelId, NpcDefinitionId } from "./ids";
+
+export const npcTypes = [
+  "static",
+  "patrol",
+  "pacifist",
+  "defensive",
+  "aggressive",
+  "protective",
+] as const;
+
+export type NpcType = (typeof npcTypes)[number];
+
+export interface NpcDefinition {
+  readonly id: NpcDefinitionId;
+  readonly speed: Tile;
+  readonly maxHealth: number;
+  readonly attackDamage: number;
+  readonly attackSpeed: TimesPerSecond;
+  readonly attackRange: Tile;
+  readonly modelId: ActorModelId;
+  readonly name: string;
+  readonly npcType: NpcType;
+  readonly aggroRange: Tile;
+}
 
 const oneTile = 1 as Tile;
 

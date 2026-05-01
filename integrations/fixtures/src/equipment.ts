@@ -1,4 +1,11 @@
-import type { EquipmentDefinition, EquipmentDefinitionId } from "@mp/world";
+import type { EquipmentDefinitionId } from "./ids";
+
+export interface EquipmentDefinition {
+  readonly type: "equipment";
+  readonly id: EquipmentDefinitionId;
+  readonly name: string;
+  readonly maxDurability: number;
+}
 
 export const equipment: ReadonlyArray<EquipmentDefinition> = [
   {

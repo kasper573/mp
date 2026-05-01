@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { RiftServerEvent } from "@rift/core";
+import type { inferServerEvent } from "@rift/core";
 import { RiftServerModule } from "@rift/core";
 import { inject } from "@rift/module";
 import {
@@ -10,9 +10,8 @@ import {
   RenameCharacterRequest,
   type ActorModelId,
   type AreaId,
-  type CharacterId,
 } from "@mp/world";
-import type { Tile } from "@mp/std";
+import { combine, type Tile } from "@mp/std";
 import type { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";
 
@@ -33,16 +32,14 @@ export class CharacterDirectoryModule extends RiftServerModule {
   }
 
   init(): Cleanup {
-    const offList = this.server.on(ListCharactersRequest, this.#onList);
-    const offRename = this.server.on(RenameCharacterRequest, this.#onRename);
-    return () => {
-      offList();
-      offRename();
-    };
+    return combine(
+      this.server.on(ListCharactersRequest, this.#onList),
+      this.server.on(RenameCharacterRequest, this.#onRename),
+    );
   }
 
   #onRename = async (
-    event: RiftServerEvent<{ characterId: CharacterId; name: string }>,
+    event: inferServerEvent<typeof RenameCharacterRequest>,
   ): Promise<void> => {
     if (event.source.type !== "wire") {
       return;
@@ -74,7 +71,9 @@ export class CharacterDirectoryModule extends RiftServerModule {
     });
   };
 
-  #onList = async (event: RiftServerEvent): Promise<void> => {
+  #onList = async (
+    event: inferServerEvent<typeof ListCharactersRequest>,
+  ): Promise<void> => {
     if (event.source.type !== "wire") {
       return;
     }

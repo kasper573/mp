@@ -1,10 +1,22 @@
-import type { NpcDefinitionId, NpcSpawn, NpcSpawnId, NpcType } from "@mp/world";
+import type { Path, Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
+import type { AreaId, NpcDefinitionId, NpcSpawnId } from "./ids";
+import type { NpcType } from "./npcs";
 import { areaIds } from "./areas";
+
+export interface NpcSpawn {
+  readonly id: NpcSpawnId;
+  readonly count: number;
+  readonly npcId: NpcDefinitionId;
+  readonly areaId: AreaId;
+  readonly coords?: Vector<Tile>;
+  readonly randomRadius?: number;
+  readonly patrol?: Path<Tile>;
+  readonly npcType?: NpcType;
+}
 
 const SOLDIER_ID = "1" as NpcDefinitionId;
 
-// Per-type spawn counts. Aggressive NPCs are denser so a player who stops
-// moving anywhere on the map will get attacked within reasonable time.
 const SPAWNS_PER_TYPE: Record<NpcType, number> = {
   pacifist: 3,
   defensive: 3,

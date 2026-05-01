@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { EntityId, RiftServerEvent } from "@rift/core";
+import type { inferServerEvent } from "@rift/core";
 import { RiftServerModule } from "@rift/core";
 import { createShortId } from "@mp/std";
 import { Kill } from "../combat/events";
@@ -29,9 +29,7 @@ export class NpcRewardModule extends RiftServerModule {
     return this.server.on(Kill, this.#onKill);
   }
 
-  #onKill = (
-    event: RiftServerEvent<{ attackerId: EntityId; victimId: EntityId }>,
-  ): void => {
+  #onKill = (event: inferServerEvent<typeof Kill>): void => {
     const { attackerId, victimId } = event.data;
     const attackerIsCharacter = this.server.world.has(attackerId, CharacterTag);
     if (!attackerIsCharacter) return;
