@@ -110,8 +110,19 @@ function pickSpawnCoord(
   if (spawn.coords) {
     return { x: spawn.coords.x, y: spawn.coords.y };
   }
-  const start = area.start;
-  return { x: start.x, y: start.y };
+  return pickRandomWalkableTile(area);
+}
+
+function pickRandomWalkableTile(area: AreaResource): { x: Tile; y: Tile } {
+  const ids = Array.from(area.graph.nodeIds);
+  if (ids.length === 0) {
+    return { x: area.start.x, y: area.start.y };
+  }
+  const node = area.graph.getNode(ids[Math.floor(Math.random() * ids.length)]);
+  if (!node) {
+    return { x: area.start.x, y: area.start.y };
+  }
+  return { x: node.data.vector.x, y: node.data.vector.y };
 }
 
 function cloneSpawnWithFreshId(spawn: NpcSpawn): NpcSpawn {

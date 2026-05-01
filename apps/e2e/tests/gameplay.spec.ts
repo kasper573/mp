@@ -29,9 +29,16 @@ test("character is killed by aggro enemies when standing still after entering th
 }) => {
   test.setTimeout(120_000);
   await enterGame(page);
-  await expect(page.getByText(/you are dead/i)).toBeVisible({
-    timeout: 60_000,
-  });
+  // The respawn dialog renders its children inside a `<dialog>` element that
+  // is hidden via the user-agent `display: none` rule when the `open`
+  // attribute is absent, but the heading text is still in the accessibility
+  // tree, which causes `getByText(...).toBeVisible()` to incorrectly match.
+  // Asserting on the actual `<dialog open>` attribute is the only signal
+  // that distinguishes "dead, dialog visible" from "alive, dialog rendered
+  // but hidden".
+  await expect(
+    page.locator("dialog[open]").getByText(/you are dead/i),
+  ).toBeVisible({ timeout: 60_000 });
 });
 
 test("clicking on the ground makes the character walk toward the click", async ({
