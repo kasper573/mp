@@ -480,6 +480,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
 
   libraries/auth:
     dependencies:

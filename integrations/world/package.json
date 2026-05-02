@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "bench:packets": "tsx scripts/packet-bench.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
@@ -39,6 +40,7 @@
     "unique-names-generator": "^4.7.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "tsx": "catalog:"
   }
 }
