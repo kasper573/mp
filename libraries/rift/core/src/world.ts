@@ -51,6 +51,11 @@ export interface WorldInternal {
   ingestDestroy(id: EntityId): void;
   ingestAdd<T>(id: EntityId, type: RiftType<T>, value: T): void;
   ingestUpdate<T>(id: EntityId, type: RiftType<T>, value: T): void;
+  ingestUpdateDirty(
+    id: EntityId,
+    type: RiftType,
+    decodeDirty: (signal: RiftSignal<unknown>) => void,
+  ): void;
   ingestRemove(id: EntityId, type: RiftType): void;
 }
 
@@ -130,6 +135,19 @@ export function createWorld(schema: RiftSchema): World {
         return;
       }
       slot.signal.set(value);
+      slot.signal.clearDirty();
+      slot.dirty = false;
+    },
+    ingestUpdateDirty(
+      id: EntityId,
+      type: RiftType,
+      decodeDirty: (signal: RiftSignal<unknown>) => void,
+    ) {
+      const slot = entities.get(id)?.components.get(type);
+      if (!slot) {
+        return;
+      }
+      decodeDirty(slot.signal);
       slot.signal.clearDirty();
       slot.dirty = false;
     },

@@ -59,7 +59,6 @@ export function spawnCharacter(
     coords: init.coords,
     speed: init.speed,
     direction: "s",
-    path: [],
     moveTarget: undefined,
   });
   world.add(id, Combat, {

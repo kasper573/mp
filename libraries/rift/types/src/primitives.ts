@@ -222,15 +222,17 @@ export function enumOf<const Values extends readonly string[]>(
   if (values.length === 0) {
     throw new Error("enumOf requires at least one value");
   }
+  const wide = values.length > 256;
   function encode(w: Writer, v: Values[number]): void {
     const idx = values.indexOf(v);
     if (idx < 0) {
       throw new Error(`enum value out of range: ${v}`);
     }
-    w.writeU16(idx);
+    if (wide) w.writeU16(idx);
+    else w.writeU8(idx);
   }
-  function decode(r: { readU16(): number }): Values[number] {
-    const idx = r.readU16();
+  function decode(r: { readU16(): number; readU8(): number }): Values[number] {
+    const idx = wide ? r.readU16() : r.readU8();
     const v = values[idx];
     if (v === undefined) {
       throw new Error(`enum index out of range: ${idx}`);

@@ -4,6 +4,8 @@ import { RiftServerModule, Tick } from "@rift/core";
 import type { InferValue } from "@rift/types";
 import type { Vector } from "@mp/math";
 import { combine, Rng, type Tile } from "@mp/std";
+import { inject } from "@rift/module";
+import { MovementModule } from "../movement/module";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
@@ -14,7 +16,6 @@ import { Attacked } from "../combat/events";
 import { Movement } from "../movement/components";
 
 const PACIFIST_WANDER_CHANCE = 0.4;
-const EMPTY_PATH: ReadonlyArray<Vector<Tile>> = [];
 // Speed >= 2 triggers the run animation in actor-controller.ts.
 const CHASE_SPEED_MULTIPLIER = 2;
 
@@ -72,6 +73,8 @@ class CombatMemory {
 }
 
 export class NpcAiModule extends RiftServerModule {
+  @inject(MovementModule) accessor movement!: MovementModule;
+
   readonly #areas: ReadonlyMap<AreaId, AreaResource>;
   readonly #memory = new CombatMemory();
   readonly #rng: Rng;
@@ -143,10 +146,10 @@ export class NpcAiModule extends RiftServerModule {
         ai.aggroRange,
       );
       if (!stillEngaged) {
+        this.movement.setPath(id, undefined);
         world.set(id, Combat, { ...combat, attackTargetId: undefined });
         world.set(id, Movement, {
           ...mv,
-          path: EMPTY_PATH,
           moveTarget: undefined,
           speed: ai.idleSpeed,
         });
@@ -198,17 +201,11 @@ export class NpcAiModule extends RiftServerModule {
     mv: InferValue<typeof Movement>,
   ): void {
     const world = this.server.world;
-    if (
-      combat.attackTargetId !== undefined ||
-      mv.moveTarget ||
-      mv.path.length > 0
-    ) {
+    const hadPath = this.movement.hasPath(id);
+    if (combat.attackTargetId !== undefined || mv.moveTarget || hadPath) {
+      this.movement.setPath(id, undefined);
       world.set(id, Combat, { ...combat, attackTargetId: undefined });
-      world.set(id, Movement, {
-        ...mv,
-        path: EMPTY_PATH,
-        moveTarget: undefined,
-      });
+      world.set(id, Movement, { ...mv, moveTarget: undefined });
     }
   }
 
@@ -218,7 +215,7 @@ export class NpcAiModule extends RiftServerModule {
     mv: InferValue<typeof Movement>,
     area: AreaResource,
   ): void {
-    if (mv.path.length > 0 || mv.moveTarget) return;
+    if (mv.moveTarget || this.movement.hasPath(id)) return;
 
     switch (ai.npcType) {
       case "static":

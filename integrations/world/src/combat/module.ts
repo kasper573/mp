@@ -7,7 +7,7 @@ import { ClientCharacterRegistry } from "../identity/client-character-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement } from "../movement/components";
-import { directionBetween } from "../movement/module";
+import { directionBetween, MovementModule } from "../movement/module";
 import { Attacked, AttackRequest, Died, Kill } from "./events";
 
 const HP_REGEN_INTERVAL_MS = 10_000;
@@ -17,6 +17,7 @@ const CHASE_RETARGET_THRESHOLD = 1.5;
 
 export class CombatModule extends RiftServerModule {
   @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
+  @inject(MovementModule) accessor movement!: MovementModule;
 
   #lastRegenMs = 0;
   #elapsedMs = 0;
@@ -88,9 +89,9 @@ export class CombatModule extends RiftServerModule {
             CHASE_RETARGET_THRESHOLD,
           ) ?? false;
         if (!movingTowardTarget) {
+          this.movement.setPath(id, undefined);
           this.server.world.set(id, Movement, {
             ...mv,
-            path: [],
             moveTarget: targetMv.coords,
           });
         }
@@ -117,9 +118,9 @@ export class CombatModule extends RiftServerModule {
         ...combat,
         lastAttackMs: this.#elapsedMs,
       });
+      this.movement.setPath(id, undefined);
       this.server.world.set(id, Movement, {
         ...mv,
-        path: [],
         moveTarget: undefined,
         direction: directionBetween(mv.coords, targetMv.coords),
       });
@@ -145,9 +146,9 @@ export class CombatModule extends RiftServerModule {
           target: { type: "wire", strategy: { type: "broadcast" } },
         });
         if (this.server.world.has(target, NpcTag)) {
+          this.movement.setPath(target, undefined);
           this.server.world.set(target, Movement, {
             ...targetMv,
-            path: [],
             moveTarget: undefined,
           });
         }

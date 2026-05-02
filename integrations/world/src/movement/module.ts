@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { inferServerEvent } from "@rift/core";
+import type { EntityId, inferServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
 import { combine, type Tile } from "@mp/std";
@@ -17,10 +17,14 @@ export interface MovementModuleOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
 }
 
+type Path = ReadonlyArray<Vector<Tile>>;
+
 export class MovementModule extends RiftServerModule {
   @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
 
   readonly #areas: ReadonlyMap<AreaId, AreaResource>;
+  readonly #paths = new Map<EntityId, Path>();
+
   constructor(opts: MovementModuleOptions) {
     super();
     this.#areas = opts.areas;
@@ -30,7 +34,20 @@ export class MovementModule extends RiftServerModule {
     return combine(
       this.server.on(MoveRequest, this.#onMoveRequest),
       this.server.on(Tick, this.#onTick),
+      () => this.#paths.clear(),
     );
+  }
+
+  setPath(entityId: EntityId, path: Path | undefined): void {
+    if (!path || path.length === 0) {
+      this.#paths.delete(entityId);
+    } else {
+      this.#paths.set(entityId, path);
+    }
+  }
+
+  hasPath(entityId: EntityId): boolean {
+    return (this.#paths.get(entityId)?.length ?? 0) > 0;
   }
 
   #onMoveRequest = (event: inferServerEvent<typeof MoveRequest>): void => {
@@ -56,9 +73,9 @@ export class MovementModule extends RiftServerModule {
       return;
     }
     const path = findPath(area, movement.coords, event.data);
+    this.setPath(characterEnt, path);
     this.server.world.set(characterEnt, Movement, {
       ...movement,
-      path: path ?? [],
       moveTarget: event.data,
     });
     const combat = this.server.world.get(characterEnt, Combat);
@@ -78,12 +95,9 @@ export class MovementModule extends RiftServerModule {
     )) {
       const combat = this.server.world.get(id, Combat);
       if (combat && !combat.alive) {
-        if (mv.path.length > 0 || mv.moveTarget) {
-          this.server.world.set(id, Movement, {
-            ...mv,
-            path: [],
-            moveTarget: undefined,
-          });
+        this.#paths.delete(id);
+        if (mv.moveTarget) {
+          this.server.world.set(id, Movement, { ...mv, moveTarget: undefined });
         }
         continue;
       }
@@ -92,34 +106,49 @@ export class MovementModule extends RiftServerModule {
         continue;
       }
 
-      let working = mv;
-      if (working.path.length === 0 && working.moveTarget) {
-        const path = findPath(area, working.coords, working.moveTarget);
-        if (path && path.length > 0) {
-          working = { ...working, path };
+      let path = this.#paths.get(id);
+      if ((!path || path.length === 0) && mv.moveTarget) {
+        const computed = findPath(area, mv.coords, mv.moveTarget);
+        if (computed && computed.length > 0) {
+          path = computed;
+          this.#paths.set(id, path);
         } else {
-          working = { ...working, moveTarget: undefined };
-          this.server.world.set(id, Movement, working);
+          this.#paths.delete(id);
+          this.server.world.set(id, Movement, { ...mv, moveTarget: undefined });
           continue;
         }
       }
 
-      if (working.path.length === 0) {
+      if (!path || path.length === 0) {
         continue;
       }
 
-      const next = stepAlongPath(working, dt);
-      const settled =
-        next.path.length === 0 ? { ...next, moveTarget: undefined } : next;
-      this.server.world.set(id, Movement, settled);
+      const stepped = stepAlongPath(mv, path, dt);
+      if (stepped.path.length === 0) {
+        this.#paths.delete(id);
+        this.server.world.set(id, Movement, {
+          ...mv,
+          coords: stepped.coords,
+          direction: stepped.direction,
+          moveTarget: undefined,
+        });
+      } else {
+        this.#paths.set(id, stepped.path);
+        this.server.world.set(id, Movement, {
+          ...mv,
+          coords: stepped.coords,
+          direction: stepped.direction,
+        });
+      }
 
-      const destination = portalDestinationAt(area, settled.coords);
+      const destination = portalDestinationAt(area, stepped.coords);
       if (destination && this.#areas.has(destination.areaId)) {
+        this.#paths.delete(id);
         this.server.world.set(id, AreaTag, { areaId: destination.areaId });
         this.server.world.set(id, Movement, {
-          ...settled,
+          ...mv,
           coords: destination.coords,
-          path: [],
+          direction: stepped.direction,
           moveTarget: undefined,
         });
       }
@@ -137,25 +166,27 @@ function portalDestinationAt(area: AreaResource, coords: Vector<Tile>) {
   return undefined;
 }
 
-interface MovementStep {
+interface StepResult {
   coords: Vector<Tile>;
-  speed: Tile;
   direction: CardinalDirection;
-  path: ReadonlyArray<Vector<Tile>>;
-  moveTarget: Vector<Tile> | undefined;
+  path: Path;
 }
 
-function stepAlongPath<T extends MovementStep>(mv: T, dt: number): T {
+function stepAlongPath(
+  mv: { coords: Vector<Tile>; speed: Tile; direction: CardinalDirection },
+  path: Path,
+  dt: number,
+): StepResult {
   let distanceToMove = mv.speed * dt;
-  if (!distanceToMove || mv.path.length === 0) {
-    return mv;
+  if (!distanceToMove || path.length === 0) {
+    return { coords: mv.coords, direction: mv.direction, path };
   }
   let coords = mv.coords;
   let direction: CardinalDirection = mv.direction;
   let pathIndex = 0;
-  const lastIndex = mv.path.length - 1;
+  const lastIndex = path.length - 1;
   while (pathIndex <= lastIndex && distanceToMove > 0) {
-    const dest = mv.path[pathIndex];
+    const dest = path[pathIndex];
     const dx = dest.x - coords.x;
     const dy = dest.y - coords.y;
     const distanceToDest = Math.hypot(dx, dy);
@@ -173,8 +204,8 @@ function stepAlongPath<T extends MovementStep>(mv: T, dt: number): T {
       break;
     }
   }
-  const remaining = pathIndex > lastIndex ? [] : mv.path.slice(pathIndex);
-  return { ...mv, coords, path: remaining, direction };
+  const remaining: Path = pathIndex > lastIndex ? [] : path.slice(pathIndex);
+  return { coords, direction, path: remaining };
 }
 
 export function directionBetween(

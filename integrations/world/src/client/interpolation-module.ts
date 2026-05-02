@@ -1,9 +1,8 @@
 import { RiftClientModule } from "@rift/core";
 import type { Cleanup } from "@rift/module";
-import type { CardinalDirection } from "@mp/math";
-import { nearestCardinalDirection } from "@mp/math";
+import { Vector, cardinalDirectionAngles } from "@mp/math";
+import type { Tile } from "@mp/std";
 import { Movement } from "../movement/components";
-import { moveAlongPath } from "../movement/path";
 
 export interface InterpolationOptions {
   readonly subscribeToFrames: (
@@ -28,19 +27,22 @@ export class InterpolationModule extends RiftClientModule {
     if (!this.#opts.enabled()) return;
     const world = this.client.world;
     for (const [id, mv] of world.query(Movement)) {
-      if (mv.path.length === 0) continue;
-      const updated = moveAlongPath(mv, deltaSeconds);
-      const target = updated.path[0];
-      let direction: CardinalDirection = mv.direction;
-      if (target) {
-        direction = nearestCardinalDirection(updated.coords.angle(target));
+      const target = mv.moveTarget;
+      if (!target) continue;
+      const remaining = mv.coords.distance(target);
+      if (remaining === 0) continue;
+      const step = mv.speed * deltaSeconds;
+      let coords;
+      if (step >= remaining) {
+        coords = target;
+      } else {
+        const angle = cardinalDirectionAngles[mv.direction];
+        coords = new Vector(
+          (mv.coords.x + Math.cos(angle) * step) as Tile,
+          (mv.coords.y + Math.sin(angle) * step) as Tile,
+        );
       }
-      world.set(id, Movement, {
-        ...mv,
-        coords: updated.coords,
-        path: updated.path,
-        direction,
-      });
+      world.set(id, Movement, { ...mv, coords });
     }
   }
 }

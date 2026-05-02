@@ -93,6 +93,15 @@ export class Writer {
     this.writeU8(v ? 1 : 0);
   }
 
+  writeVarU32(v: number): void {
+    let value = v >>> 0;
+    while (value >= 0x80) {
+      this.writeU8((value & 0x7f) | 0x80);
+      value >>>= 7;
+    }
+    this.writeU8(value);
+  }
+
   writeBytesRaw(data: Uint8Array): void {
     this.#reserve(data.byteLength);
     this.#buf.set(data, this.#offset);

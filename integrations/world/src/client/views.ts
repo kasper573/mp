@@ -42,7 +42,6 @@ export interface MovementView {
   readonly coords: Vector<Tile>;
   readonly speed: Tile;
   readonly dir: CardinalDirection;
-  readonly path: Path<Tile>;
   readonly moveTarget: Vector<Tile> | undefined;
 }
 
@@ -90,7 +89,6 @@ abstract class ActorBase {
         coords: Vector.zero<Tile>(),
         speed: 0 as Tile,
         dir: "s",
-        path: [],
         moveTarget: undefined,
       };
     }
@@ -98,7 +96,6 @@ abstract class ActorBase {
       coords: m.coords,
       speed: m.speed,
       dir: m.direction,
-      path: m.path,
       moveTarget: m.moveTarget,
     };
   }

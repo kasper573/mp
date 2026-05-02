@@ -87,6 +87,20 @@ export class Reader {
     return this.readU8() !== 0;
   }
 
+  readVarU32(): number {
+    let result = 0;
+    let shift = 0;
+    while (shift < 35) {
+      const byte = this.readU8();
+      result |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) {
+        return result >>> 0;
+      }
+      shift += 7;
+    }
+    throw new Error("varint too long");
+  }
+
   readBytesRaw(n: number): Uint8Array {
     const slice = this.#buf.slice(this.#offset, this.#offset + n);
     this.#offset += n;

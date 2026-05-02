@@ -165,7 +165,6 @@ export class PersistenceModule extends RiftServerModule {
       this.server.world.set(characterEnt, Movement, {
         ...movement,
         coords: spawn,
-        path: [],
         moveTarget: undefined,
       });
     }

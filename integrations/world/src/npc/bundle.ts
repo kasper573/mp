@@ -42,7 +42,6 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
     coords: init.coords,
     speed: init.definition.speed,
     direction: "s",
-    path: [],
     moveTarget: undefined,
   });
   world.add(id, Combat, {

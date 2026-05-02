@@ -1,4 +1,4 @@
-import { array, enumOf, f32, object, optional, transform } from "@rift/types";
+import { enumOf, f32, object, optional, transform } from "@rift/types";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 
@@ -30,7 +30,6 @@ export const Movement = object({
   coords: TileVector,
   speed: f32<Tile>(),
   direction: Direction,
-  path: array(TileVector),
   moveTarget: optional(TileVector),
 });
 

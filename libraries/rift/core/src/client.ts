@@ -159,9 +159,9 @@ export class RiftClient extends EventBus<
 
   #applyAccept(data: Uint8Array): void {
     const r = new Reader(data, 1);
-    const tick = r.readU32();
-    const timeMs = r.readU32();
-    const id = r.readU32() as ClientId;
+    const tick = r.readVarU32();
+    const timeMs = r.readVarU32();
+    const id = r.readVarU32() as ClientId;
     const serverHash = r.readBytes();
     if (serverHash.byteLength !== this.#hash.byteLength) {
       this.#rejectHandshake("schema mismatch");
@@ -175,13 +175,13 @@ export class RiftClient extends EventBus<
     }
     this.#clientId = id;
     const components = this.schema.components;
-    const entityCount = r.readU32();
+    const entityCount = r.readVarU32();
     for (let i = 0; i < entityCount; i++) {
-      const entId = r.readU32() as EntityId;
+      const entId = r.readVarU32() as EntityId;
       this.world[internal].ingestCreate(entId);
-      const compCount = r.readU16();
+      const compCount = r.readVarU32();
       for (let j = 0; j < compCount; j++) {
-        const idx = r.readU16();
+        const idx = r.readVarU32();
         const ty = components[idx];
         this.world[internal].ingestAdd(entId, ty, ty.decode(r));
       }
@@ -209,37 +209,39 @@ export class RiftClient extends EventBus<
 
   #applyDelta(data: Uint8Array): void {
     const r = new Reader(data, 1);
-    const tick = r.readU32();
-    const timeMs = r.readU32();
+    const tick = r.readVarU32();
+    const timeMs = r.readVarU32();
     const components = this.schema.components;
-    const opCount = r.readU32();
+    const opCount = r.readVarU32();
     for (let i = 0; i < opCount; i++) {
       const op = r.readU8() as DeltaOp;
       switch (op) {
         case DeltaOp.EntityCreated: {
-          this.world[internal].ingestCreate(r.readU32() as EntityId);
+          this.world[internal].ingestCreate(r.readVarU32() as EntityId);
           break;
         }
         case DeltaOp.EntityDestroyed: {
-          this.world[internal].ingestDestroy(r.readU32() as EntityId);
+          this.world[internal].ingestDestroy(r.readVarU32() as EntityId);
           break;
         }
         case DeltaOp.ComponentAdded: {
-          const id = r.readU32() as EntityId;
-          const ty = components[r.readU16()];
+          const id = r.readVarU32() as EntityId;
+          const ty = components[r.readVarU32()];
           this.world[internal].ingestAdd(id, ty, ty.decode(r));
           break;
         }
         case DeltaOp.ComponentRemoved: {
-          const id = r.readU32() as EntityId;
-          const ty = components[r.readU16()];
+          const id = r.readVarU32() as EntityId;
+          const ty = components[r.readVarU32()];
           this.world[internal].ingestRemove(id, ty);
           break;
         }
         case DeltaOp.ComponentUpdated: {
-          const id = r.readU32() as EntityId;
-          const ty = components[r.readU16()];
-          this.world[internal].ingestUpdate(id, ty, ty.decode(r));
+          const id = r.readVarU32() as EntityId;
+          const ty = components[r.readVarU32()];
+          this.world[internal].ingestUpdateDirty(id, ty, (signal) => {
+            signal.decodeDirty(r);
+          });
           break;
         }
       }

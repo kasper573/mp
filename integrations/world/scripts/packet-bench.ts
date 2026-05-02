@@ -36,10 +36,7 @@ import { Appearance } from "../src/appearance/components";
 import { NpcAi } from "../src/npc/components";
 import { InventoryRef, OwnedBy } from "../src/inventory/components";
 import { Progression } from "../src/progression/components";
-import {
-  ConsumableInstance,
-  EquipmentInstance,
-} from "../src/item/components";
+import { ConsumableInstance, EquipmentInstance } from "../src/item/components";
 import { createItemDefinitionLookup } from "../src/item/definition-lookup";
 import type { ServerTransport, ServerTransportEvent } from "@rift/core";
 import type { AreaResource } from "../src/area/area-resource";
@@ -99,17 +96,30 @@ interface OpStat {
   bytes: number;
 }
 
+interface SignalDecodable {
+  readonly decode: (r: Reader) => unknown;
+  readonly signal: (v: unknown) => {
+    decode: (r: Reader) => void;
+    decodeDirty: (r: Reader) => void;
+  };
+  readonly default: () => unknown;
+}
+
 function analyzeDelta(
   data: Uint8Array,
-  components: ReadonlyArray<{ readonly decode: (r: Reader) => unknown }>,
+  components: ReadonlyArray<SignalDecodable>,
+  signals: Array<{
+    decode: (r: Reader) => void;
+    decodeDirty: (r: Reader) => void;
+  }>,
   byComp: Map<number, OpStat>,
   byOp: Map<DeltaOp, OpStat>,
 ): void {
   if ((data[0] as Opcode) !== Opcode.Delta) return;
   const r = new Reader(data, 1);
-  r.readU32();
-  r.readU32();
-  const opCount = r.readU32();
+  r.readVarU32();
+  r.readVarU32();
+  const opCount = r.readVarU32();
   for (let i = 0; i < opCount; i++) {
     const opStart = r.offset;
     const op = r.readU8() as DeltaOp;
@@ -117,17 +127,22 @@ function analyzeDelta(
     switch (op) {
       case DeltaOp.EntityCreated:
       case DeltaOp.EntityDestroyed:
-        r.readU32();
+        r.readVarU32();
         break;
       case DeltaOp.ComponentRemoved:
-        r.readU32();
-        compIdx = r.readU16();
+        r.readVarU32();
+        compIdx = r.readVarU32();
         break;
-      case DeltaOp.ComponentAdded:
-      case DeltaOp.ComponentUpdated: {
-        r.readU32();
-        compIdx = r.readU16();
+      case DeltaOp.ComponentAdded: {
+        r.readVarU32();
+        compIdx = r.readVarU32();
         components[compIdx].decode(r);
+        break;
+      }
+      case DeltaOp.ComponentUpdated: {
+        r.readVarU32();
+        compIdx = r.readVarU32();
+        signals[compIdx].decodeDirty(r);
         break;
       }
     }
@@ -191,6 +206,7 @@ async function main(): Promise<void> {
   registry.recordConnection(fakeClientId, {
     id: "user-1" as never,
     name: "bench",
+    token: "" as never,
     roles: new Set(),
   });
   const characterStart = new Vector(
@@ -261,10 +277,7 @@ async function main(): Promise<void> {
   const avg =
     tickSizes.length > 0 ? Math.round(tickBytes / tickSizes.length) : 0;
   const max = tickSizes.reduce((a, b) => Math.max(a, b), 0);
-  const min = tickSizes.reduce(
-    (a, b) => Math.min(a, b),
-    tickSizes[0] ?? 0,
-  );
+  const min = tickSizes.reduce((a, b) => Math.min(a, b), tickSizes[0] ?? 0);
 
   console.log(`[ticks] ${totalTicks} ticks @ ${tickHz}Hz`);
   console.log(`[ticks] sent ${tickSizes.length} delta packets`);
@@ -274,8 +287,17 @@ async function main(): Promise<void> {
 
   const byComp = new Map<number, OpStat>();
   const byOp = new Map<DeltaOp, OpStat>();
+  const signals = schema.components.map((c) =>
+    (c as SignalDecodable).signal((c as SignalDecodable).default()),
+  );
   for (const p of transport.packets.slice(sizesBefore)) {
-    analyzeDelta(p, schema.components, byComp, byOp);
+    analyzeDelta(
+      p,
+      schema.components as ReadonlyArray<SignalDecodable>,
+      signals,
+      byComp,
+      byOp,
+    );
   }
   const opNames: Record<DeltaOp, string> = {
     [DeltaOp.EntityCreated]: "EntityCreated",
@@ -285,13 +307,17 @@ async function main(): Promise<void> {
     [DeltaOp.ComponentUpdated]: "ComponentUpdated",
   };
   console.log(`[breakdown] ops:`);
-  for (const [op, s] of [...byOp.entries()].sort((a, b) => b[1].bytes - a[1].bytes)) {
+  for (const [op, s] of [...byOp.entries()].sort(
+    (a, b) => b[1].bytes - a[1].bytes,
+  )) {
     console.log(
       `  ${opNames[op].padEnd(18)} count=${String(s.count).padStart(5)}  bytes=${String(s.bytes).padStart(7)}  avg=${Math.round(s.bytes / s.count)}B`,
     );
   }
   console.log(`[breakdown] components:`);
-  for (const [idx, s] of [...byComp.entries()].sort((a, b) => b[1].bytes - a[1].bytes)) {
+  for (const [idx, s] of [...byComp.entries()].sort(
+    (a, b) => b[1].bytes - a[1].bytes,
+  )) {
     const name = componentName(idx);
     console.log(
       `  ${name.padEnd(20)} count=${String(s.count).padStart(5)}  bytes=${String(s.bytes).padStart(7)}  avg=${Math.round(s.bytes / s.count)}B`,

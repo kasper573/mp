@@ -248,9 +248,9 @@ export class RiftServer extends EventBus<
   #buildSnapshotFor(slot: ClientSlot): Uint8Array<ArrayBuffer> {
     const w = new Writer(256);
     w.writeU8(Opcode.Accept);
-    w.writeU32(this.#tickNumber);
-    w.writeU32(this.#serverTimeMs >>> 0);
-    w.writeU32(slot.id);
+    w.writeVarU32(this.#tickNumber);
+    w.writeVarU32(this.#serverTimeMs >>> 0);
+    w.writeVarU32(slot.id);
     w.writeBytes(this.#hash);
     const visible: Array<{
       id: EntityId;
@@ -270,12 +270,12 @@ export class RiftServer extends EventBus<
       comps.sort((a, b) => a[1] - b[1]);
       visible.push({ id: ent.id, components: comps });
     }
-    w.writeU32(visible.length);
+    w.writeVarU32(visible.length);
     for (const { id, components } of visible) {
-      w.writeU32(id);
-      w.writeU16(components.length);
+      w.writeVarU32(id);
+      w.writeVarU32(components.length);
       for (const [ty, idx, value] of components) {
-        w.writeU16(idx);
+        w.writeVarU32(idx);
         ty.encode(w, value);
         const known = slot.knownComponents.get(id);
         if (known) {
@@ -295,8 +295,8 @@ export class RiftServer extends EventBus<
     }
     const w = new Writer(128);
     w.writeU8(Opcode.Delta);
-    w.writeU32(this.#tickNumber);
-    w.writeU32(this.#serverTimeMs >>> 0);
+    w.writeVarU32(this.#tickNumber);
+    w.writeVarU32(this.#serverTimeMs >>> 0);
     const ops: Array<() => void> = [];
 
     const visibleNow = new Set<EntityId>();
@@ -310,7 +310,7 @@ export class RiftServer extends EventBus<
       if (!visibleNow.has(id)) {
         ops.push(() => {
           w.writeU8(DeltaOp.EntityDestroyed);
-          w.writeU32(id);
+          w.writeVarU32(id);
         });
         slot.knownEntities.delete(id);
         slot.knownComponents.delete(id);
@@ -326,7 +326,7 @@ export class RiftServer extends EventBus<
       if (isNew) {
         ops.push(() => {
           w.writeU8(DeltaOp.EntityCreated);
-          w.writeU32(id);
+          w.writeVarU32(id);
         });
         slot.knownEntities.add(id);
         slot.knownComponents.set(id, new Set());
@@ -343,17 +343,17 @@ export class RiftServer extends EventBus<
         if (!known.has(ty)) {
           ops.push(() => {
             w.writeU8(DeltaOp.ComponentAdded);
-            w.writeU32(id);
-            w.writeU16(idx);
+            w.writeVarU32(id);
+            w.writeVarU32(idx);
             ty.encode(w, compSlot.signal.value);
           });
           known.add(ty);
         } else if (compSlot.dirty || isNew) {
           ops.push(() => {
             w.writeU8(DeltaOp.ComponentUpdated);
-            w.writeU32(id);
-            w.writeU16(idx);
-            ty.encode(w, compSlot.signal.value);
+            w.writeVarU32(id);
+            w.writeVarU32(idx);
+            compSlot.signal.encodeDirty(w);
           });
         }
       }
@@ -363,8 +363,8 @@ export class RiftServer extends EventBus<
           if (idx !== undefined) {
             ops.push(() => {
               w.writeU8(DeltaOp.ComponentRemoved);
-              w.writeU32(id);
-              w.writeU16(idx);
+              w.writeVarU32(id);
+              w.writeVarU32(idx);
             });
           }
           known.delete(ty);
@@ -375,7 +375,7 @@ export class RiftServer extends EventBus<
     if (ops.length === 0) {
       return;
     }
-    w.writeU32(ops.length);
+    w.writeVarU32(ops.length);
     for (const op of ops) {
       op();
     }

@@ -47,7 +47,7 @@ export class AreaDebugGraphics extends Container {
       (actor) =>
         new DebugPath(() => ({
           tiled: area.tiled,
-          path: actor.movement.path,
+          path: actor.movement.moveTarget ? [actor.movement.moveTarget] : [],
           color: uniqolor(actor.identity.id).color,
         })),
     );

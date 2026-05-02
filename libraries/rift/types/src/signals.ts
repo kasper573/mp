@@ -16,6 +16,8 @@ export interface RiftSignal<T> {
   setRoot(root: RootState): void;
   encode(w: Writer): void;
   decode(r: Reader): void;
+  encodeDirty(w: Writer): void;
+  decodeDirty(r: Reader): void;
 }
 
 function markDirty(root: RootState): void {
@@ -62,6 +64,12 @@ export class LeafSignal<T> extends Signal<T> implements RiftSignal<T> {
   }
   decode(r: Reader): void {
     this.value = this.#decode(r);
+  }
+  encodeDirty(w: Writer): void {
+    this.encode(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.decode(r);
   }
 }
 
@@ -112,6 +120,7 @@ export class ObjectSignal<
 > implements RiftSignal<T> {
   #fields: { [K in keyof T]: RiftSignal<T[K]> };
   #order: readonly (keyof T & string)[];
+  #childRoots: RootState[];
   #root: RootState = { dirty: false };
   #proxy: T;
 
@@ -119,10 +128,21 @@ export class ObjectSignal<
     fields: { [K in keyof T]: RiftSignal<T[K]> },
     order: readonly (keyof T & string)[],
   ) {
+    if (order.length > 32) {
+      throw new Error("ObjectSignal supports up to 32 fields");
+    }
     this.#fields = fields;
     this.#order = order;
-    for (const k of order) {
-      fields[k].setRoot(this.#root);
+    this.#childRoots = order.map(() => ({ dirty: false }));
+    for (let i = 0; i < order.length; i++) {
+      const childRoot = this.#childRoots[i];
+      childRoot.onDirty = () => {
+        if (!this.#root.dirty) {
+          this.#root.dirty = true;
+          this.#root.onDirty?.();
+        }
+      };
+      fields[order[i]].setRoot(childRoot);
     }
     this.#proxy = new Proxy(
       fields as unknown as Record<string, RiftSignal<unknown>>,
@@ -152,13 +172,15 @@ export class ObjectSignal<
   }
   clearDirty(): void {
     this.#root.dirty = false;
+    const fields = this.#fields;
+    const roots = this.#childRoots;
+    for (let i = 0; i < this.#order.length; i++) {
+      roots[i].dirty = false;
+      fields[this.#order[i]].clearDirty();
+    }
   }
   setRoot(r: RootState): void {
     this.#root = r;
-    const fields = this.#fields;
-    for (const k of this.#order) {
-      fields[k].setRoot(r);
-    }
   }
   encode(w: Writer): void {
     const fields = this.#fields;
@@ -170,6 +192,38 @@ export class ObjectSignal<
     const fields = this.#fields;
     for (const k of this.#order) {
       fields[k].decode(r);
+    }
+  }
+  encodeDirty(w: Writer): void {
+    const order = this.#order;
+    const fields = this.#fields;
+    const roots = this.#childRoots;
+    let mask = 0;
+    for (let i = 0; i < order.length; i++) {
+      if (roots[i].dirty) mask |= 1 << i;
+    }
+    if (order.length <= 8) w.writeU8(mask);
+    else if (order.length <= 16) w.writeU16(mask);
+    else w.writeU32(mask);
+    for (let i = 0; i < order.length; i++) {
+      if (mask & (1 << i)) {
+        fields[order[i]].encodeDirty(w);
+      }
+    }
+  }
+  decodeDirty(r: Reader): void {
+    const order = this.#order;
+    const fields = this.#fields;
+    const mask =
+      order.length <= 8
+        ? r.readU8()
+        : order.length <= 16
+          ? r.readU16()
+          : r.readU32();
+    for (let i = 0; i < order.length; i++) {
+      if (mask & (1 << i)) {
+        fields[order[i]].decodeDirty(r);
+      }
     }
   }
 }
@@ -225,6 +279,12 @@ export class ArraySignal<T> implements RiftSignal<readonly T[]> {
       arr[i] = dec(r);
     }
     this.#sig.value = arr;
+  }
+  encodeDirty(w: Writer): void {
+    this.encode(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.decode(r);
   }
 }
 
@@ -312,6 +372,12 @@ export class TupleSignal<
       c.decode(r);
     }
   }
+  encodeDirty(w: Writer): void {
+    this.encode(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.decode(r);
+  }
 }
 
 export class OptionalSignal<T> implements RiftSignal<T | undefined> {
@@ -343,6 +409,7 @@ export class OptionalSignal<T> implements RiftSignal<T | undefined> {
     } else {
       if (!this.#present.peek()) {
         this.#present.value = true;
+        markDirty(this.#root);
       }
       this.#inner.set(v);
     }
@@ -370,6 +437,12 @@ export class OptionalSignal<T> implements RiftSignal<T | undefined> {
     if (p) {
       this.#inner.decode(r);
     }
+  }
+  encodeDirty(w: Writer): void {
+    this.encode(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.decode(r);
   }
 }
 
@@ -444,6 +517,12 @@ export class UnionSignal<
     this.#tag.value = tag;
     this.#variants[tag].decode(r);
   }
+  encodeDirty(w: Writer): void {
+    this.encode(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.decode(r);
+  }
 }
 
 export class TransformSignal<Inner, Outer> implements RiftSignal<Outer> {
@@ -484,5 +563,11 @@ export class TransformSignal<Inner, Outer> implements RiftSignal<Outer> {
   }
   decode(r: Reader): void {
     this.#inner.decode(r);
+  }
+  encodeDirty(w: Writer): void {
+    this.#inner.encodeDirty(w);
+  }
+  decodeDirty(r: Reader): void {
+    this.#inner.decodeDirty(r);
   }
 }
