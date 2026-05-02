@@ -30,9 +30,19 @@ This includes but is not limited to:
 
 # Verification
 
+Before you start working on your task run `pnpm -F world bench:perf` and `pnpm -F world bench:packets` and save the results to temp files.
+
 - After finishing your task, always run and ensure the following commands pass:
   - `pnpm lint`
   - `pnpm format`
   - `pnpm test`
   - `pnpm build`
   - `pnpm -F e2e start:dev:with-services`
+  - `pnpm -F world bench:perf`
+  - `pnpm -F world bench:packets`
+
+Compare the new benchmark results with the ones you saved before starting your task.
+
+- If there is a significant regression in benchmarks, investigate and address the issue before considering the task complete.
+
+- If the benchmark demonstrates poor benchmarks from a practical standpoint even if it wasn't introduced by your changes, you should also address the issue before considering the task complete.
