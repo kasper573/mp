@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
-    "bench:packets": "tsx scripts/packet-bench.ts"
+    "bench:packets": "tsx scripts/packet-bench.ts",
+    "bench:perf": "node --expose-gc --import tsx scripts/perf-bench.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "mitata": "catalog:",
     "tsx": "catalog:"
   }
 }

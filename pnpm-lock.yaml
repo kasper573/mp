@@ -480,6 +480,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
+      mitata:
+        specifier: 'catalog:'
+        version: 1.0.34
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
