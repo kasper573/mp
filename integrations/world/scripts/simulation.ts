@@ -180,8 +180,9 @@ export async function createSimulation(
     coords: characterStart,
     inventoryId: "inv-1" as InventoryId,
     speed: 1 as Tile,
-    health: 100,
-    maxHealth: 100,
+    // Infinite health to stay alive to keep combat module active through simulation
+    health: Number.MAX_SAFE_INTEGER,
+    maxHealth: Number.MAX_SAFE_INTEGER,
     attackDamage: 5,
     attackSpeed: 1 as never,
     attackRange: 1 as Tile,
