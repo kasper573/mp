@@ -7,7 +7,7 @@ import { combine, Rng, type Tile } from "@mp/std";
 import { inject } from "@rift/module";
 import { MovementModule } from "../movement/module";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId } from "../identity/ids";
+import type { AreaId, NpcSpawnId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { NpcAi } from "./components";
@@ -25,44 +25,54 @@ export interface NpcAiOptions {
 }
 
 class CombatMemory {
-  readonly #combats = new Map<EntityId, Array<[EntityId, EntityId]>>();
+  // observer → attacker → set of targets the observer has seen attacker hit.
+  // Keeps every observation O(1) for both writes and the symmetric
+  // hasAttackedEachOther read used by defensive aggro filters.
+  readonly #combats = new Map<EntityId, Map<EntityId, Set<EntityId>>>();
 
   observe(observer: EntityId, attacker: EntityId, target: EntityId): void {
-    let list = this.#combats.get(observer);
-    if (!list) {
-      list = [];
-      this.#combats.set(observer, list);
+    let attackers = this.#combats.get(observer);
+    if (!attackers) {
+      attackers = new Map();
+      this.#combats.set(observer, attackers);
     }
-    list.push([attacker, target]);
+    let targets = attackers.get(attacker);
+    if (!targets) {
+      targets = new Set();
+      attackers.set(attacker, targets);
+    }
+    targets.add(target);
   }
 
-  combatsFor(observer: EntityId): ReadonlyArray<[EntityId, EntityId]> {
-    return this.#combats.get(observer) ?? [];
+  forEachCombat(
+    observer: EntityId,
+    visit: (attacker: EntityId, target: EntityId) => void,
+  ): void {
+    const attackers = this.#combats.get(observer);
+    if (!attackers) return;
+    attackers.forEach((targets, attacker) => {
+      targets.forEach((target) => visit(attacker, target));
+    });
   }
 
   hasAttackedEachOther(observer: EntityId, a: EntityId, b: EntityId): boolean {
-    const list = this.#combats.get(observer);
-    if (!list) return false;
-    let aHitB = false;
-    let bHitA = false;
-    for (const [attacker, target] of list) {
-      if (attacker === a && target === b) aHitB = true;
-      if (attacker === b && target === a) bHitA = true;
-      if (aHitB && bHitA) return true;
-    }
-    return false;
+    const attackers = this.#combats.get(observer);
+    if (!attackers) return false;
+    const aTargets = attackers.get(a);
+    if (!aTargets || !aTargets.has(b)) return false;
+    const bTargets = attackers.get(b);
+    return bTargets?.has(a) ?? false;
   }
 
   forget(deadActorId: EntityId): void {
     this.#combats.delete(deadActorId);
-    for (const [observer, list] of this.#combats) {
-      const filtered = list.filter(
-        ([a, t]) => a !== deadActorId && t !== deadActorId,
-      );
-      if (filtered.length === 0) {
+    for (const [observer, attackers] of this.#combats) {
+      attackers.delete(deadActorId);
+      for (const targets of attackers.values()) {
+        targets.delete(deadActorId);
+      }
+      if (attackers.size === 0) {
         this.#combats.delete(observer);
-      } else if (filtered.length !== list.length) {
-        this.#combats.set(observer, filtered);
       }
     }
   }
@@ -114,12 +124,33 @@ export class NpcAiModule extends RiftServerModule {
     }
   };
 
+  #ralliesBySpawn?: Map<NpcSpawnId, EntityId[]>;
+
+  #buildAllyIndex(): Map<NpcSpawnId, EntityId[]> {
+    const out = new Map<NpcSpawnId, EntityId[]>();
+    for (const [id, tag] of this.server.world.query(NpcTag)) {
+      let bucket = out.get(tag.spawnId);
+      if (!bucket) {
+        bucket = [];
+        out.set(tag.spawnId, bucket);
+      }
+      bucket.push(id);
+    }
+    return out;
+  }
+
   #onTick = (): void => {
     const world = this.server.world;
-    for (const [id, ai, mv, areaTag] of world.query(NpcAi, Movement, AreaTag)) {
+    this.#ralliesBySpawn = this.#buildAllyIndex();
+    for (const [id, ai, mv, areaTag, combat] of world.query(
+      NpcAi,
+      Movement,
+      AreaTag,
+      Combat,
+    )) {
       const area = this.#areas.get(areaTag.areaId);
       if (!area) continue;
-      this.#stepNpc(id, ai, mv, areaTag.areaId, area);
+      this.#stepNpc(id, ai, mv, areaTag.areaId, area, combat);
     }
   };
 
@@ -129,16 +160,16 @@ export class NpcAiModule extends RiftServerModule {
     mv: InferValue<typeof Movement>,
     areaId: AreaId,
     area: AreaResource,
+    combat: InferValue<typeof Combat>,
   ): void {
     const world = this.server.world;
-    const combat = world.get(id, Combat);
-    if (combat && !combat.alive) {
+    if (!combat.alive) {
       this.#clearActions(id, combat, mv);
       this.#memory.forget(id);
       return;
     }
 
-    if (combat?.attackTargetId !== undefined) {
+    if (combat.attackTargetId !== undefined) {
       const stillEngaged = this.#stillInRange(
         combat.attackTargetId,
         mv.coords,
@@ -156,23 +187,16 @@ export class NpcAiModule extends RiftServerModule {
       }
     }
 
-    const refreshedCombat = world.get(id, Combat);
-    if (refreshedCombat?.attackTargetId !== undefined) {
+    if (combat.attackTargetId !== undefined) return;
+
+    const target = this.#findAggroTarget(id, ai, mv, areaId);
+    if (target !== undefined) {
+      world.set(id, Combat, { ...combat, attackTargetId: target });
+      world.set(id, Movement, {
+        ...mv,
+        speed: (ai.idleSpeed * CHASE_SPEED_MULTIPLIER) as Tile,
+      });
       return;
-    }
-    if (refreshedCombat) {
-      const target = this.#findAggroTarget(id, ai, mv, areaId);
-      if (target !== undefined) {
-        world.set(id, Combat, { ...refreshedCombat, attackTargetId: target });
-        const refreshedMv = world.get(id, Movement);
-        if (refreshedMv) {
-          world.set(id, Movement, {
-            ...refreshedMv,
-            speed: (ai.idleSpeed * CHASE_SPEED_MULTIPLIER) as Tile,
-          });
-        }
-        return;
-      }
     }
 
     this.#applyIdleBehaviour(id, ai, mv, area);
@@ -294,44 +318,51 @@ export class NpcAiModule extends RiftServerModule {
     const selfTag = world.get(selfId, NpcTag);
     if (!selfTag) return undefined;
 
-    const allies = new Set<EntityId>();
-    for (const [npcId, tag] of world.query(NpcTag)) {
-      if (tag.spawnId === selfTag.spawnId) {
-        allies.add(npcId);
-      }
-    }
+    const allyList = this.#ralliesBySpawn?.get(selfTag.spawnId);
+    const allies =
+      allyList && allyList.length > 0 ? new Set(allyList) : new Set<EntityId>();
 
     let closest: EntityId | undefined;
     let closestDistSq = aggroRange * aggroRange;
-    for (const [attacker, target] of this.#memory.combatsFor(selfId)) {
+    this.#memory.forEachCombat(selfId, (attacker, target) => {
       const enemyId = allies.has(target)
         ? attacker
         : allies.has(attacker)
           ? target
           : undefined;
-      if (enemyId === undefined || allies.has(enemyId)) continue;
+      if (enemyId === undefined || allies.has(enemyId)) return;
       const enemyMv = world.get(enemyId, Movement);
       const enemyArea = world.get(enemyId, AreaTag);
       const enemyCombat = world.get(enemyId, Combat);
-      if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive)
-        continue;
-      if (enemyArea.areaId !== selfArea) continue;
+      if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive) return;
+      if (enemyArea.areaId !== selfArea) return;
       const distSq = enemyMv.coords.squaredDistance(selfMv.coords);
       if (distSq <= closestDistSq) {
         closestDistSq = distSq;
         closest = enemyId;
       }
-    }
+    });
     return closest;
   }
 
+  readonly #walkableNodesByArea = new WeakMap<
+    AreaResource,
+    ReadonlyArray<Vector<Tile>>
+  >();
+
   #pickRandomWalkable(area: AreaResource): Vector<Tile> {
-    const ids = Array.from(area.graph.nodeIds);
-    if (ids.length === 0) {
-      return area.start;
+    let nodes = this.#walkableNodesByArea.get(area);
+    if (!nodes) {
+      const list: Vector<Tile>[] = [];
+      for (const id of area.graph.nodeIds) {
+        const node = area.graph.getNode(id);
+        if (node) list.push(node.data.vector);
+      }
+      nodes = list;
+      this.#walkableNodesByArea.set(area, nodes);
     }
-    const node = area.graph.getNode(this.#rng.oneOf(ids));
-    return node?.data.vector ?? area.start;
+    if (nodes.length === 0) return area.start;
+    return this.#rng.oneOf(nodes);
   }
 }
 

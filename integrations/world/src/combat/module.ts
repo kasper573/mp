@@ -52,7 +52,7 @@ export class CombatModule extends RiftServerModule {
 
     if (this.#elapsedMs - this.#lastRegenMs >= HP_REGEN_INTERVAL_MS) {
       this.#lastRegenMs = this.#elapsedMs;
-      for (const [id, , combat] of this.server.world.query(
+      for (const [, , combat] of this.server.world.query(
         CharacterTag,
         Combat,
       )) {
@@ -62,7 +62,7 @@ export class CombatModule extends RiftServerModule {
           combat.maxHealth,
         );
         if (next !== combat.health) {
-          this.server.world.set(id, Combat, { ...combat, health: next });
+          combat.health = next;
         }
       }
     }
@@ -75,10 +75,7 @@ export class CombatModule extends RiftServerModule {
       const targetCombat = this.server.world.get(target, Combat);
       const targetMv = this.server.world.get(target, Movement);
       if (!targetCombat || !targetMv || !targetCombat.alive) {
-        this.server.world.set(id, Combat, {
-          ...combat,
-          attackTargetId: undefined,
-        });
+        combat.attackTargetId = undefined;
         continue;
       }
       const distance = mv.coords.distance(targetMv.coords);
@@ -90,10 +87,7 @@ export class CombatModule extends RiftServerModule {
           ) ?? false;
         if (!movingTowardTarget) {
           this.movement.setPath(id, undefined);
-          this.server.world.set(id, Movement, {
-            ...mv,
-            moveTarget: targetMv.coords,
-          });
+          mv.moveTarget = targetMv.coords;
         }
         continue;
       }
@@ -108,22 +102,13 @@ export class CombatModule extends RiftServerModule {
 
       const newHealth = Math.max(0, targetCombat.health - combat.attackDamage);
       const newAlive = newHealth > 0;
-      this.server.world.set(target, Combat, {
-        ...targetCombat,
-        health: newHealth,
-        alive: newAlive,
-      });
+      targetCombat.health = newHealth;
+      targetCombat.alive = newAlive;
 
-      this.server.world.set(id, Combat, {
-        ...combat,
-        lastAttackMs: this.#elapsedMs,
-      });
+      combat.lastAttackMs = this.#elapsedMs;
       this.movement.setPath(id, undefined);
-      this.server.world.set(id, Movement, {
-        ...mv,
-        moveTarget: undefined,
-        direction: directionBetween(mv.coords, targetMv.coords),
-      });
+      mv.moveTarget = undefined;
+      mv.direction = directionBetween(mv.coords, targetMv.coords);
 
       this.server.emit({
         type: Attacked,
@@ -147,10 +132,7 @@ export class CombatModule extends RiftServerModule {
         });
         if (this.server.world.has(target, NpcTag)) {
           this.movement.setPath(target, undefined);
-          this.server.world.set(target, Movement, {
-            ...targetMv,
-            moveTarget: undefined,
-          });
+          targetMv.moveTarget = undefined;
         }
       }
     }

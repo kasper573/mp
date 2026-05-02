@@ -220,10 +220,9 @@ export function createWorld(schema: RiftSchema): World {
       return indexOf(type).has(id);
     },
     get<T>(id: EntityId, type: RiftType<T>): T | undefined {
-      if (!indexOf(type as RiftType).has(id)) {
-        return undefined;
-      }
-      const slot = entities.peekGet(id)?.components.get(type as RiftType);
+      const ent = entities.peekGet(id);
+      if (!ent) return undefined;
+      const slot = ent.components.get(type as RiftType);
       return slot?.signal.value as T | undefined;
     },
     query(...types) {
@@ -243,36 +242,38 @@ function createQueryView<Types extends readonly RiftType[]>(
   excludes: readonly RiftType[],
 ): QueryView<Types> {
   const state = world[internal];
+  const includeCount = includes.length;
+  const excludeCount = excludes.length;
+  // Reused across iterations to avoid per-row allocation; callers are
+  // expected to consume row values within the for..of body and not retain
+  // references to the array across iterations.
+  const row = new Array<unknown>(includeCount + 1);
 
   function matches(ent: EntityHandle): boolean {
-    for (const t of includes) {
-      if (!ent.components.has(t)) {
-        return false;
-      }
+    const comps = ent.components;
+    for (let i = 0; i < includeCount; i++) {
+      if (!comps.has(includes[i])) return false;
     }
-    for (const t of excludes) {
-      if (ent.components.has(t)) {
-        return false;
-      }
+    for (let i = 0; i < excludeCount; i++) {
+      if (comps.has(excludes[i])) return false;
     }
     return true;
   }
 
-  function rowOf(ent: EntityHandle): QueryRow<Types> {
-    const out: unknown[] = [ent.id];
-    for (const t of includes) {
-      out.push(ent.components.get(t)?.signal.value);
+  function fillRow(ent: EntityHandle): QueryRow<Types> {
+    row[0] = ent.id;
+    const comps = ent.components;
+    for (let i = 0; i < includeCount; i++) {
+      row[i + 1] = comps.get(includes[i])?.signal.value;
     }
-    return out as unknown as QueryRow<Types>;
+    return row as unknown as QueryRow<Types>;
   }
 
   function pickSeed(): ReactiveSet<EntityId> | "all" {
-    if (includes.length === 0) {
-      return "all";
-    }
+    if (includeCount === 0) return "all";
     let smallest = state.indexOf(includes[0]);
     let smallestSize = smallest.size;
-    for (let i = 1; i < includes.length; i++) {
+    for (let i = 1; i < includeCount; i++) {
       const s = state.indexOf(includes[i]);
       const n = s.size;
       if (n < smallestSize) {
@@ -280,51 +281,71 @@ function createQueryView<Types extends readonly RiftType[]>(
         smallestSize = n;
       }
     }
-    for (const t of excludes) {
-      void state.indexOf(t).size;
+    for (let i = 0; i < excludeCount; i++) {
+      void state.indexOf(excludes[i]).size;
     }
     return smallest;
   }
 
-  function* iterMatches(): Generator<EntityHandle> {
-    const seed = pickSeed();
-    if (seed === "all") {
-      for (const ent of state.entities.values()) {
-        if (matches(ent)) {
-          yield ent;
-        }
-      }
-      return;
-    }
-    const entities = state.entities;
-    for (const id of seed) {
-      const ent = entities.peekGet(id);
-      if (ent && matches(ent)) {
-        yield ent;
-      }
-    }
-  }
-
   return {
-    *[Symbol.iterator]() {
-      for (const ent of iterMatches()) {
-        yield rowOf(ent);
-      }
+    [Symbol.iterator](): IterableIterator<QueryRow<Types>> {
+      const seed = pickSeed();
+      const all = seed === "all";
+      const entities = state.entities;
+      const seedIter: Iterator<EntityHandle | EntityId> = all
+        ? entities.values()
+        : seed[Symbol.iterator]();
+      const iter: IterableIterator<QueryRow<Types>> = {
+        next(): IteratorResult<QueryRow<Types>> {
+          while (true) {
+            const r = seedIter.next();
+            if (r.done) return { done: true, value: undefined };
+            const ent = all
+              ? (r.value as EntityHandle)
+              : entities.peekGet(r.value as EntityId);
+            if (ent && matches(ent)) {
+              return { done: false, value: fillRow(ent) };
+            }
+          }
+        },
+        [Symbol.iterator]() {
+          return iter;
+        },
+      };
+      return iter;
     },
     get size() {
-      if (includes.length === 1 && excludes.length === 0) {
+      if (includeCount === 1 && excludeCount === 0) {
         return state.indexOf(includes[0]).size;
       }
       let n = 0;
-      for (const _ of iterMatches()) {
-        n++;
+      const seed = pickSeed();
+      if (seed === "all") {
+        for (const ent of state.entities.values()) {
+          if (matches(ent)) n++;
+        }
+      } else {
+        const entities = state.entities;
+        for (const id of seed) {
+          const ent = entities.peekGet(id);
+          if (ent && matches(ent)) n++;
+        }
       }
       return n;
     },
     toArray() {
       const out: QueryRow<Types>[] = [];
-      for (const ent of iterMatches()) {
-        out.push(rowOf(ent));
+      const seed = pickSeed();
+      if (seed === "all") {
+        for (const ent of state.entities.values()) {
+          if (matches(ent)) out.push(snapshotRow(ent, includes));
+        }
+      } else {
+        const entities = state.entities;
+        for (const id of seed) {
+          const ent = entities.peekGet(id);
+          if (ent && matches(ent)) out.push(snapshotRow(ent, includes));
+        }
       }
       return out;
     },
@@ -332,4 +353,15 @@ function createQueryView<Types extends readonly RiftType[]>(
       return createQueryView(world, includes, [...excludes, ...newExcludes]);
     },
   };
+}
+
+function snapshotRow<Types extends readonly RiftType[]>(
+  ent: EntityHandle,
+  includes: Types,
+): QueryRow<Types> {
+  const out: unknown[] = [ent.id];
+  for (let i = 0; i < includes.length; i++) {
+    out.push(ent.components.get(includes[i])?.signal.value);
+  }
+  return out as unknown as QueryRow<Types>;
 }

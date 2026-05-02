@@ -97,7 +97,7 @@ export class MovementModule extends RiftServerModule {
       if (combat && !combat.alive) {
         this.#paths.delete(id);
         if (mv.moveTarget) {
-          this.server.world.set(id, Movement, { ...mv, moveTarget: undefined });
+          mv.moveTarget = undefined;
         }
         continue;
       }
@@ -114,7 +114,7 @@ export class MovementModule extends RiftServerModule {
           this.#paths.set(id, path);
         } else {
           this.#paths.delete(id);
-          this.server.world.set(id, Movement, { ...mv, moveTarget: undefined });
+          mv.moveTarget = undefined;
           continue;
         }
       }
@@ -124,33 +124,21 @@ export class MovementModule extends RiftServerModule {
       }
 
       const stepped = stepAlongPath(mv, path, dt);
+      mv.coords = stepped.coords;
+      mv.direction = stepped.direction;
       if (stepped.path.length === 0) {
         this.#paths.delete(id);
-        this.server.world.set(id, Movement, {
-          ...mv,
-          coords: stepped.coords,
-          direction: stepped.direction,
-          moveTarget: undefined,
-        });
+        mv.moveTarget = undefined;
       } else {
         this.#paths.set(id, stepped.path);
-        this.server.world.set(id, Movement, {
-          ...mv,
-          coords: stepped.coords,
-          direction: stepped.direction,
-        });
       }
 
       const destination = portalDestinationAt(area, stepped.coords);
       if (destination && this.#areas.has(destination.areaId)) {
         this.#paths.delete(id);
         this.server.world.set(id, AreaTag, { areaId: destination.areaId });
-        this.server.world.set(id, Movement, {
-          ...mv,
-          coords: destination.coords,
-          direction: stepped.direction,
-          moveTarget: undefined,
-        });
+        mv.coords = destination.coords;
+        mv.moveTarget = undefined;
       }
     }
   };
