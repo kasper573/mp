@@ -13,8 +13,10 @@
   },
   "scripts": {
     "build": "tsc --noEmit",
+    "bench": "pnpm bench:perf && pnpm bench:packets && pnpm bench:bounds",
     "bench:packets": "tsx scripts/packet-bench.ts",
-    "bench:perf": "node --expose-gc --import tsx scripts/perf-bench.ts"
+    "bench:perf": "node --expose-gc --import tsx scripts/perf-bench.ts",
+    "bench:bounds": "tsx scripts/bounds-bench.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",

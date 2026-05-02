@@ -30,7 +30,7 @@ This includes but is not limited to:
 
 # Verification
 
-Before you start working on your task run `pnpm -F world bench:perf` and `pnpm -F world bench:packets` and save the results to temp files.
+Before you start working on your task run `pnpm -F world bench` and save the results to a temp file.
 
 - After finishing your task, always run and ensure the following commands pass:
   - `pnpm lint`
@@ -38,8 +38,7 @@ Before you start working on your task run `pnpm -F world bench:perf` and `pnpm -
   - `pnpm test`
   - `pnpm build`
   - `pnpm -F e2e start:dev:with-services`
-  - `pnpm -F world bench:perf`
-  - `pnpm -F world bench:packets`
+  - `pnpm -F world bench`
 
 Compare the new benchmark results with the ones you saved before starting your task.
 
