@@ -16,7 +16,8 @@
     "bench": "pnpm bench:perf && pnpm bench:packets && pnpm bench:bounds",
     "bench:packets": "tsx scripts/packet-bench.ts",
     "bench:perf": "node --expose-gc --import tsx scripts/perf-bench.ts",
-    "bench:bounds": "tsx scripts/bounds-bench.ts"
+    "bench:bounds": "tsx scripts/bounds-bench.ts",
+    "bench:profile": "node --cpu-prof --cpu-prof-dir=profiles --heap-prof --heap-prof-dir=profiles --import tsx scripts/profile-bench.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
@@ -44,7 +45,9 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@types/yargs": "catalog:",
     "mitata": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "yargs": "catalog:"
   }
 }

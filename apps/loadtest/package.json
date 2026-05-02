@@ -23,9 +23,9 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/ws": "8.18.1",
-    "@types/yargs": "17.0.35",
+    "@types/yargs": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",
-    "yargs": "18.0.0"
+    "yargs": "catalog:"
   }
 }
