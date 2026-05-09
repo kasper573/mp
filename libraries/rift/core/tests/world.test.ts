@@ -1,14 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import {
-  ComponentAdded,
-  ComponentChanged,
-  ComponentRemoved,
-  defineSchema,
-  EntityCreated,
-  EntityDestroyed,
-  World,
-} from "../src/index";
+import { defineSchema, World } from "../src/index";
 import { f32, object, string, u32 } from "@rift/types";
 import type { EntityId } from "../src/protocol";
 import type { RiftType } from "@rift/types";
@@ -198,39 +190,45 @@ describe("pool change tracking", () => {
 });
 
 describe("world events", () => {
-  it("emits ComponentAdded / ComponentChanged / ComponentRemoved", () => {
+  it("emits componentAdded / componentChanged / componentRemoved", () => {
     const w = new World(schema);
     const id = w.create();
-    const events: Array<{ kind: string; type: RiftType }> = [];
-    w.on(ComponentAdded, ({ type }) => events.push({ kind: "added", type }));
-    w.on(ComponentChanged, ({ type }) =>
-      events.push({ kind: "changed", type }),
-    );
-    w.on(ComponentRemoved, ({ type }) =>
-      events.push({ kind: "removed", type }),
-    );
+    const events: Array<{ kind: string; component: RiftType }> = [];
+    w.on((e) => {
+      if (e.type === "componentAdded") {
+        events.push({ kind: "added", component: e.component });
+      } else if (e.type === "componentChanged") {
+        events.push({ kind: "changed", component: e.component });
+      } else if (e.type === "componentRemoved") {
+        events.push({ kind: "removed", component: e.component });
+      }
+    });
     w.add(id, pos, { x: 0, y: 0 });
     w.write(id, pos, { x: 1 });
     w.remove(id, pos);
     expect(events).toEqual([
-      { kind: "added", type: pos },
-      { kind: "changed", type: pos },
-      { kind: "removed", type: pos },
+      { kind: "added", component: pos },
+      { kind: "changed", component: pos },
+      { kind: "removed", component: pos },
     ]);
   });
-  it("emits EntityCreated / EntityDestroyed", () => {
+  it("emits entityCreated / entityDestroyed", () => {
     const w = new World(schema);
     const events: string[] = [];
-    w.on(EntityCreated, ({ id }) => events.push(`c:${id}`));
-    w.on(EntityDestroyed, ({ id }) => events.push(`d:${id}`));
+    w.on((e) => {
+      if (e.type === "entityCreated") events.push(`c:${e.id}`);
+      else if (e.type === "entityDestroyed") events.push(`d:${e.id}`);
+    });
     const id = w.create();
     w.destroy(id);
     expect(events).toEqual([`c:${id}`, `d:${id}`]);
   });
   it("listener returned unsubscribe stops further events", () => {
     const w = new World(schema);
-    const events: number[] = [];
-    const off = w.on(EntityCreated, ({ id }) => events.push(id));
+    const events: EntityId[] = [];
+    const off = w.on((e) => {
+      if (e.type === "entityCreated") events.push(e.id);
+    });
     w.create();
     off();
     w.create();

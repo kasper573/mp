@@ -1,38 +1,27 @@
-import { EventBus } from "@rift/event";
+import type { RiftType } from "@rift/types";
 import type { EntityId } from "./protocol";
-import { RiftTypeKind, type RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
 
-// Encode/decode throw because these markers are local-only event-bus keys;
-// listing one in a wire schema is a bug, not a runtime path.
-function localWorldEvent<T>(): RiftType<T> {
-  return {
-    kind: RiftTypeKind.Object,
-    inspect: () => new Uint8Array(0),
-    default: () => ({}) as T,
-    encode: () => {
-      throw new Error("world event is local-only and cannot be encoded");
-    },
-    decode: () => {
-      throw new Error("world event is local-only and cannot be decoded");
-    },
-  };
-}
+export type LocalWorldEvent =
+  | { readonly type: "entityCreated"; readonly id: EntityId }
+  | { readonly type: "entityDestroyed"; readonly id: EntityId }
+  | {
+      readonly type: "componentAdded";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    }
+  | {
+      readonly type: "componentChanged";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    }
+  | {
+      readonly type: "componentRemoved";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    };
 
-export const EntityCreated = localWorldEvent<{ id: EntityId }>();
-export const EntityDestroyed = localWorldEvent<{ id: EntityId }>();
-export const ComponentAdded = localWorldEvent<{
-  id: EntityId;
-  type: RiftType;
-}>();
-export const ComponentChanged = localWorldEvent<{
-  id: EntityId;
-  type: RiftType;
-}>();
-export const ComponentRemoved = localWorldEvent<{
-  id: EntityId;
-  type: RiftType;
-}>();
+export type LocalWorldEventHandler = (event: LocalWorldEvent) => void;
 
 export class Pool<T> {
   readonly values = new Map<EntityId, T>();
@@ -103,7 +92,7 @@ export class World {
   readonly schema: RiftSchema;
   readonly #entities = new Set<EntityId>();
   readonly #pools = new Map<RiftType, Pool<unknown>>();
-  readonly #bus = new EventBus<undefined, undefined>();
+  readonly #handlers = new Set<LocalWorldEventHandler>();
   #nextId = 1;
 
   constructor(schema: RiftSchema) {
@@ -118,24 +107,24 @@ export class World {
       if (!this.#entities.has(id)) {
         this.#entities.add(id);
         if (id >= this.#nextId) this.#nextId = id + 1;
-        this.#emit(EntityCreated, { id });
+        this.#emit({ type: "entityCreated", id });
       }
       return id;
     }
     const next = this.#nextId++ as EntityId;
     this.#entities.add(next);
-    this.#emit(EntityCreated, { id: next });
+    this.#emit({ type: "entityCreated", id: next });
     return next;
   }
 
   destroy(id: EntityId): void {
     if (!this.#entities.delete(id)) return;
-    for (const [type, pool] of this.#pools) {
+    for (const [component, pool] of this.#pools) {
       if (pool.remove(id)) {
-        this.#emit(ComponentRemoved, { id, type });
+        this.#emit({ type: "componentRemoved", id, component });
       }
     }
-    this.#emit(EntityDestroyed, { id });
+    this.#emit({ type: "entityDestroyed", id });
   }
 
   exists(id: EntityId): boolean {
@@ -160,7 +149,7 @@ export class World {
     }
     const value = initial ?? type.default();
     pool.add(id, value);
-    this.#emit(ComponentAdded, { id, type: type as RiftType });
+    this.#emit({ type: "componentAdded", id, component: type });
     return value;
   }
 
@@ -169,12 +158,12 @@ export class World {
     if (!pool.write(id, partial)) {
       throw new Error(`entity ${id} does not have component`);
     }
-    this.#emit(ComponentChanged, { id, type: type as RiftType });
+    this.#emit({ type: "componentChanged", id, component: type });
   }
 
   remove(id: EntityId, type: RiftType): void {
     if (this.#poolOf(type).remove(id)) {
-      this.#emit(ComponentRemoved, { id, type });
+      this.#emit({ type: "componentRemoved", id, component: type });
     }
   }
 
@@ -184,10 +173,11 @@ export class World {
     return createQueryView(this, types, []);
   }
 
-  on<Data>(type: RiftType<Data>, handler: (data: Data) => void): () => void {
-    return this.#bus.on(type, (event) => {
-      handler(event.data);
-    });
+  on(handler: LocalWorldEventHandler): () => void {
+    this.#handlers.add(handler);
+    return () => {
+      this.#handlers.delete(handler);
+    };
   }
 
   pool<T>(type: RiftType<T>): Pool<T> {
@@ -217,8 +207,8 @@ export class World {
     return pool;
   }
 
-  #emit<Data>(type: RiftType<Data>, data: Data): void {
-    this.#bus.emit({ type, data, source: undefined, target: undefined });
+  #emit(event: LocalWorldEvent): void {
+    for (const h of this.#handlers) h(event);
   }
 }
 

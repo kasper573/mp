@@ -4,16 +4,7 @@ import {
   type ReadonlySignal,
   type Signal,
 } from "@preact/signals-core";
-import {
-  ComponentAdded,
-  ComponentChanged,
-  ComponentRemoved,
-  EntityCreated,
-  EntityDestroyed,
-  type EntityId,
-  type RiftSchema,
-  World,
-} from "@rift/core";
+import { type EntityId, type RiftSchema, World } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
 
 type Values<T extends readonly RiftType[]> = {
@@ -31,17 +22,22 @@ export class ReactiveWorld extends World {
 
   constructor(schema: RiftSchema) {
     super(schema);
-    this.on(EntityCreated, () => bump(this.#structureVersion));
-    this.on(EntityDestroyed, () => bump(this.#structureVersion));
-    this.on(ComponentAdded, ({ type }) => {
-      bump(this.#structureVersion);
-      bump(this.#poolVersion(type));
+    this.on((event) => {
+      switch (event.type) {
+        case "entityCreated":
+        case "entityDestroyed":
+          bump(this.#structureVersion);
+          return;
+        case "componentAdded":
+        case "componentRemoved":
+          bump(this.#structureVersion);
+          bump(this.#poolVersion(event.component));
+          return;
+        case "componentChanged":
+          bump(this.#poolVersion(event.component));
+          return;
+      }
     });
-    this.on(ComponentRemoved, ({ type }) => {
-      bump(this.#structureVersion);
-      bump(this.#poolVersion(type));
-    });
-    this.on(ComponentChanged, ({ type }) => bump(this.#poolVersion(type)));
   }
 
   #poolVersion(type: RiftType): Signal<number> {
