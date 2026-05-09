@@ -13,6 +13,7 @@
     "profile": "node --expose-gc --import tsx scripts/profile.ts"
   },
   "dependencies": {
+    "@mp/std": "workspace:*",
     "@preact/signals-core": "catalog:",
     "@rift/event": "workspace:*",
     "@rift/types": "workspace:*"

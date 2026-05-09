@@ -1,7 +1,6 @@
 import { object, string, u16, u32 } from "@rift/types";
+import type { Branded } from "@mp/std";
 import type { RiftCloseCode } from "./transport";
-
-export type Branded<T, Name extends string> = T & { readonly __brand: Name };
 
 export type EntityId = Branded<number, "EntityId">;
 export type ClientId = Branded<number, "ClientId">;

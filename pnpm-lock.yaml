@@ -622,6 +622,9 @@ importers:
 
   libraries/rift/core:
     dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../std
       '@preact/signals-core':
         specifier: 'catalog:'
         version: 1.14.1
