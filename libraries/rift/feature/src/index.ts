@@ -1,137 +1,122 @@
-import type { ClientTransport, ServerTransport } from "@rift/core";
-import {
-  defineSchema,
-  type HashFn,
-  RiftClient,
-  RiftServer,
-  type VisibilityFn,
-} from "@rift/core";
+import type { ClientOptions, ServerOptions, World } from "@rift/core";
+import { defineSchema, type HashFn, RiftClient, RiftServer } from "@rift/core";
 import type { ReactiveWorld } from "@rift/reactive";
-import type { World } from "@rift/core";
 import type { RiftType } from "@rift/types";
 
-export type Cleanup = () => void | Promise<void>;
+type MaybePromise<T> = T | Promise<T>;
+export type Cleanup = () => MaybePromise<void>;
 
-export interface Module {
-  stop(): void | Promise<void>;
-}
-
-// oxlint-disable-next-line typescript/no-invalid-void-type -- void is the natural type for a callback that returns nothing
-export type SetupReturn = Module | Cleanup | void;
+export type FeatureSetupFn<Context> = (
+  context: Context,
+  // oxlint-disable-next-line typescript/no-invalid-void-type
+) => MaybePromise<Cleanup | void | undefined>;
 
 export interface Feature {
   readonly components?: readonly RiftType[];
   readonly events?: readonly RiftType[];
-  readonly server?: (server: RiftServer) => SetupReturn | Promise<SetupReturn>;
-  readonly client?: (
-    client: RiftClient,
-    reactive: ReactiveWorld,
-  ) => SetupReturn | Promise<SetupReturn>;
+  readonly server?: FeatureSetupFn<FeatureRiftServer>;
+  readonly client?: FeatureSetupFn<FeatureRiftClient>;
 }
 
 export function defineFeature(f: Feature): Feature {
   return f;
 }
 
-export function normalizeCleanup(r: SetupReturn): Cleanup | undefined {
-  if (!r) return undefined;
-  return typeof r === "function" ? r : (): void | Promise<void> => r.stop();
-}
-
-export interface CreateServerOptions {
-  readonly transport: ServerTransport;
-  readonly hash: HashFn;
-  readonly tickRateHz?: number;
-  readonly handshakeTimeoutMs?: number;
-  readonly visibility?: VisibilityFn;
+export type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
   readonly features: readonly Feature[];
-}
-
-export interface ServerSession {
-  readonly server: RiftServer;
-  start(): Promise<void>;
-  stop(code?: number, reason?: string): Promise<void>;
-}
-
-export function createServer(opts: CreateServerOptions): ServerSession {
-  const components = opts.features.flatMap((f) => f.components ?? []);
-  const events = opts.features.flatMap((f) => f.events ?? []);
-  const schema = defineSchema({ components, events, hash: opts.hash });
-  const server = new RiftServer({
-    schema,
-    transport: opts.transport,
-    tickRateHz: opts.tickRateHz,
-    handshakeTimeoutMs: opts.handshakeTimeoutMs,
-    visibility: opts.visibility,
-  });
-  const cleanups: Cleanup[] = [];
-  return {
-    server,
-    async start() {
-      // Feature setups run before server.start() so subscribers register
-      // before the transport begins delivering messages and before the
-      // first tick fires.
-      for (const f of opts.features) {
-        if (!f.server) continue;
-        // oxlint-disable-next-line no-await-in-loop -- registration-order init is intentional
-        const c = normalizeCleanup(await f.server(server));
-        if (c) cleanups.push(c);
-      }
-      await server.start();
-    },
-    async stop(code, reason) {
-      for (const c of cleanups.reverse()) {
-        // oxlint-disable-next-line no-await-in-loop -- reverse-order teardown
-        await c();
-      }
-      cleanups.length = 0;
-      await server.stop(code, reason);
-    },
-  };
-}
-
-export interface CreateClientOptions {
-  readonly transport: ClientTransport;
   readonly hash: HashFn;
+};
+
+export class FeatureRiftServer extends RiftServer {
+  constructor(private opts: FeatureServerOptions) {
+    super({
+      ...opts,
+      schema: defineSchema({
+        components: opts.features.flatMap((f) => f.components ?? []),
+        events: opts.features.flatMap((f) => f.events ?? []),
+        hash: opts.hash,
+      }),
+    });
+  }
+
+  #cleanup?: Cleanup;
+  override async start(): Promise<void> {
+    this.#cleanup = await setup(
+      this,
+      this.opts.features.map((f) => f.server),
+    );
+    await super.start();
+  }
+
+  override async stop(...args: Parameters<RiftServer["stop"]>): Promise<void> {
+    await this.#cleanup?.();
+    await super.stop(...args);
+    this.#cleanup = undefined;
+  }
+}
+
+export type FeatureClientOptions = Omit<ClientOptions, "schema"> & {
   readonly features: readonly Feature[];
+  readonly hash: HashFn;
   readonly attachReactive: (world: World) => ReactiveWorld;
-}
+};
 
-export interface ClientSession {
-  readonly client: RiftClient;
+export class FeatureRiftClient extends RiftClient {
   readonly reactive: ReactiveWorld;
-  connect(): Promise<void>;
-  disconnect(code?: number, reason?: string): Promise<void>;
+
+  constructor(private opts: FeatureClientOptions) {
+    super({
+      ...opts,
+      schema: defineSchema({
+        components: opts.features.flatMap((f) => f.components ?? []),
+        events: opts.features.flatMap((f) => f.events ?? []),
+        hash: opts.hash,
+      }),
+    });
+    this.reactive = opts.attachReactive(this.world);
+  }
+
+  #cleanup?: Cleanup;
+
+  override async connect(): Promise<void> {
+    // super.connect() resolves only once the handshake snapshot has been
+    // ingested into the world. Running feature setups afterwards lets
+    // each feature query a fully-populated world; running them before
+    // would expose features to a partial world during snapshot ingest.
+    await super.connect();
+
+    this.#cleanup = await setup(
+      this,
+      this.opts.features.map((f) => f.client),
+    );
+  }
+
+  override async disconnect(
+    ...args: Parameters<RiftClient["disconnect"]>
+  ): Promise<void> {
+    await this.#cleanup?.();
+    await super.disconnect(...args);
+    this.#cleanup = undefined;
+  }
 }
 
-export function createClient(opts: CreateClientOptions): ClientSession {
-  const components = opts.features.flatMap((f) => f.components ?? []);
-  const events = opts.features.flatMap((f) => f.events ?? []);
-  const schema = defineSchema({ components, events, hash: opts.hash });
-  const client = new RiftClient({ schema, transport: opts.transport });
-  const reactive = opts.attachReactive(client.world);
+async function setup<Context>(
+  context: Context,
+  setupFns: ReadonlyArray<FeatureSetupFn<Context> | undefined>,
+): Promise<Cleanup> {
   const cleanups: Cleanup[] = [];
-  return {
-    client,
-    reactive,
-    async connect() {
-      await client.connect();
-      // Feature setups run after handshake completes so the client world
-      // is already populated when subscribers register.
-      for (const f of opts.features) {
-        if (!f.client) continue;
-        // oxlint-disable-next-line no-await-in-loop -- registration-order init is intentional
-        const c = normalizeCleanup(await f.client(client, reactive));
-        if (c) cleanups.push(c);
-      }
-    },
-    async disconnect(code, reason) {
-      for (const c of cleanups.reverse()) {
-        // oxlint-disable-next-line no-await-in-loop -- reverse-order teardown
-        await c();
-      }
-      cleanups.length = 0;
-      await client.disconnect(code, reason);
-    },
+  for (const setup of setupFns) {
+    // oxlint-disable-next-line no-await-in-loop
+    const cleanup = await setup?.(context);
+    if (cleanup) {
+      cleanups.push(cleanup);
+    }
+  }
+  cleanups.reverse();
+  return async () => {
+    for (const c of cleanups) {
+      // oxlint-disable-next-line no-await-in-loop
+      await c();
+    }
   };
 }
