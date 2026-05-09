@@ -1,6 +1,6 @@
-import type { ClientOptions, ServerOptions, World } from "@rift/core";
+import type { ClientOptions, ServerOptions } from "@rift/core";
 import { defineSchema, type HashFn, RiftClient, RiftServer } from "@rift/core";
-import type { ReactiveWorld } from "@rift/reactive";
+import { attachReactive, type ReactiveWorld } from "@rift/reactive";
 import type { RiftType } from "@rift/types";
 
 type MaybePromise<T> = T | Promise<T>;
@@ -58,7 +58,6 @@ export class FeatureRiftServer extends RiftServer {
 export type FeatureClientOptions = Omit<ClientOptions, "schema"> & {
   readonly features: readonly Feature[];
   readonly hash: HashFn;
-  readonly attachReactive: (world: World) => ReactiveWorld;
 };
 
 export class FeatureRiftClient extends RiftClient {
@@ -73,7 +72,7 @@ export class FeatureRiftClient extends RiftClient {
         hash: opts.hash,
       }),
     });
-    this.reactive = opts.attachReactive(this.world);
+    this.reactive = attachReactive(this.world);
   }
 
   #cleanup?: Cleanup;
