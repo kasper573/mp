@@ -3,11 +3,8 @@ import type { EntityId } from "./protocol";
 import { RiftTypeKind, type RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
 
-/**
- * Marker `RiftType` used as an event-bus key for purely local world
- * events. Calling encode/decode on these throws by design — they are
- * never replicated and registering them in a wire schema is a bug.
- */
+// Encode/decode throw because these markers are local-only event-bus keys;
+// listing one in a wire schema is a bug, not a runtime path.
 function localWorldEvent<T>(): RiftType<T> {
   return {
     kind: RiftTypeKind.Object,
@@ -37,11 +34,6 @@ export const ComponentRemoved = localWorldEvent<{
   type: RiftType;
 }>();
 
-/**
- * Per-component pool. `values` holds the current state for every entity
- * that has the component; `dirty`/`added`/`removed` accumulate changes
- * since the last `clearChanges()` for the replication layer to consume.
- */
 export class Pool<T> {
   readonly values = new Map<EntityId, T>();
   readonly dirty = new Set<EntityId>();
@@ -61,8 +53,8 @@ export class Pool<T> {
     if (!this.removed.delete(id)) {
       this.added.add(id);
     } else {
-      // Add-after-remove within a single flush window: net effect is
-      // "value mutated", not "added then removed".
+      // Add-after-remove inside one flush window: net effect for the
+      // replication layer is a value mutation, not an add+remove pair.
       this.dirty.add(id);
     }
   }
@@ -71,11 +63,10 @@ export class Pool<T> {
     if (!this.values.has(id)) return false;
     const current = this.values.get(id) as T;
     if (typeof current === "object" && current !== null) {
-      // Object-valued component: shallow merge in place (preserves identity
-      // so consumers holding references see the update).
+      // In-place merge keeps the stored object's identity so consumers
+      // holding references (e.g. cached query rows) see the update.
       Object.assign(current as object, partial);
     } else {
-      // Primitive-valued component (rare but supported): replace.
       this.values.set(id, partial as T);
     }
     if (!this.added.has(id)) this.dirty.add(id);
@@ -85,8 +76,8 @@ export class Pool<T> {
   remove(id: EntityId): boolean {
     if (!this.values.delete(id)) return false;
     if (this.added.delete(id)) {
-      // Remove-after-add within a single flush window: net effect is
-      // "never existed for this client".
+      // Remove-after-add inside one flush window: replication never
+      // saw this entity, so suppress both the add and the remove.
       this.dirty.delete(id);
       return true;
     }
@@ -130,11 +121,6 @@ export class World {
     }
   }
 
-  /**
-   * Auto-assigns a fresh entity id (server-side use), or records an
-   * explicit id (client-side delta-ingestion use, where the server has
-   * already assigned the id). Returns the id.
-   */
   create(id?: EntityId): EntityId {
     if (id !== undefined) {
       if (!this.#entities.has(id)) {
@@ -206,17 +192,11 @@ export class World {
     return createQueryView(this, types, []);
   }
 
-  /**
-   * Subscribe to a world event. The callback receives the event data
-   * directly (no source/target wrapper). Returns an unsubscribe function.
-   */
   on<Data>(type: RiftType<Data>, handler: (data: Data) => void): () => void {
     return this.#bus.on(type, (event) => {
       handler(event.data);
     });
   }
-
-  // Same-package surface used by replication and the reactive layer.
 
   pool<T>(type: RiftType<T>): Pool<T> {
     return this.#poolOf(type) as Pool<T>;
@@ -260,11 +240,11 @@ function createQueryView<Types extends readonly RiftType[]>(
   excludes: readonly RiftType[],
 ): QueryView<Types> {
   const includeCount = includes.length;
-  const excludeCount = excludes.length;
-  // Reused across iterations to avoid per-row allocation. Callers must
-  // consume row values within the loop body and not retain references
-  // to the row across iterations. `toArray()` does the safe copy.
+  // Reused across iterations: iteration callers must consume values
+  // within the loop body and never retain the row reference. `toArray()`
+  // is the allocating-snapshot escape hatch.
   const row = new Array<unknown>(includeCount + 1);
+  const excludeCount = excludes.length;
 
   function poolFor(type: RiftType): Pool<unknown> {
     return world.pool(type);

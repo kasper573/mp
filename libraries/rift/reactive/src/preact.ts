@@ -2,7 +2,7 @@ import { createContext } from "preact";
 import { useContext, useMemo } from "preact/hooks";
 import type { EntityId } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
-import type { ReactiveWorld } from "@rift/core";
+import type { ReactiveWorld } from "./index";
 
 export const RiftContext = createContext<ReactiveWorld | undefined>(undefined);
 

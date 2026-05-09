@@ -11,7 +11,6 @@ import {
   EntityCreated,
   EntityDestroyed,
   type EntityId,
-  type ReactiveWorld,
   type World,
 } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
@@ -25,13 +24,27 @@ type Row<T extends readonly RiftType[]> = readonly [
   ...{ [K in keyof T]: InferValue<T[K]> },
 ];
 
-/**
- * Attach a reactive layer over the given world. The returned
- * `ReactiveWorld` exposes signal-shaped views that re-evaluate when the
- * underlying world emits the relevant change events.
- *
- * Intended for client-side UI integration. Server code does not need this.
- */
+export interface ReactiveWorld {
+  readonly world: World;
+
+  entity<const T extends readonly RiftType[]>(
+    id: EntityId | undefined,
+    ...types: T
+  ): ReadonlySignal<Values<T>>;
+
+  entities<const T extends readonly RiftType[]>(
+    ...types: T
+  ): ReadonlySignal<readonly Row<T>[]>;
+
+  find<const T extends readonly RiftType[]>(
+    predicate: (
+      id: EntityId,
+      ...vs: { [K in keyof T]: InferValue<T[K]> }
+    ) => boolean,
+    ...types: T
+  ): ReadonlySignal<Row<T> | undefined>;
+}
+
 export function attachReactive(world: World): ReactiveWorld {
   const structureVersion = signal(0);
   const poolVersions = new Map<RiftType, Signal<number>>();
@@ -70,7 +83,6 @@ export function attachReactive(world: World): ReactiveWorld {
     ): ReadonlySignal<Values<T>> {
       return computed((): Values<T> => {
         for (const t of types) {
-          // subscribe to relevant version signal
           void poolVersion(t).value;
         }
         if (id === undefined) {
