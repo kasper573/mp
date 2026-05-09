@@ -11,7 +11,8 @@ import {
   EntityCreated,
   EntityDestroyed,
   type EntityId,
-  type World,
+  type RiftSchema,
+  World,
 } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
 
@@ -24,108 +25,84 @@ type Row<T extends readonly RiftType[]> = readonly [
   ...{ [K in keyof T]: InferValue<T[K]> },
 ];
 
-export interface ReactiveWorld {
-  readonly world: World;
+export class ReactiveWorld extends World {
+  readonly #structureVersion = signal(0);
+  readonly #poolVersions = new Map<RiftType, Signal<number>>();
 
-  entity<const T extends readonly RiftType[]>(
+  constructor(schema: RiftSchema) {
+    super(schema);
+    this.on(EntityCreated, () => bump(this.#structureVersion));
+    this.on(EntityDestroyed, () => bump(this.#structureVersion));
+    this.on(ComponentAdded, ({ type }) => {
+      bump(this.#structureVersion);
+      bump(this.#poolVersion(type));
+    });
+    this.on(ComponentRemoved, ({ type }) => {
+      bump(this.#structureVersion);
+      bump(this.#poolVersion(type));
+    });
+    this.on(ComponentChanged, ({ type }) => bump(this.#poolVersion(type)));
+  }
+
+  #poolVersion(type: RiftType): Signal<number> {
+    let v = this.#poolVersions.get(type);
+    if (!v) {
+      v = signal(0);
+      this.#poolVersions.set(type, v);
+    }
+    return v;
+  }
+
+  entitySignal<const T extends readonly RiftType[]>(
     id: EntityId | undefined,
     ...types: T
-  ): ReadonlySignal<Values<T>>;
+  ): ReadonlySignal<Values<T>> {
+    return computed((): Values<T> => {
+      for (const t of types) {
+        void this.#poolVersion(t).value;
+      }
+      if (id === undefined) {
+        return types.map(() => undefined) as unknown as Values<T>;
+      }
+      return types.map((t) => this.get(id, t)) as unknown as Values<T>;
+    });
+  }
 
-  entities<const T extends readonly RiftType[]>(
+  entitiesSignal<const T extends readonly RiftType[]>(
     ...types: T
-  ): ReadonlySignal<readonly Row<T>[]>;
+  ): ReadonlySignal<readonly Row<T>[]> {
+    return computed((): readonly Row<T>[] => {
+      void this.#structureVersion.value;
+      for (const t of types) {
+        void this.#poolVersion(t).value;
+      }
+      return this.query(...types).toArray() as unknown as readonly Row<T>[];
+    });
+  }
 
-  find<const T extends readonly RiftType[]>(
+  querySignal<const T extends readonly RiftType[]>(
     predicate: (
       id: EntityId,
       ...vs: { [K in keyof T]: InferValue<T[K]> }
     ) => boolean,
     ...types: T
-  ): ReadonlySignal<Row<T> | undefined>;
+  ): ReadonlySignal<Row<T> | undefined> {
+    return computed((): Row<T> | undefined => {
+      void this.#structureVersion.value;
+      for (const t of types) {
+        void this.#poolVersion(t).value;
+      }
+      for (const row of this.query(...types)) {
+        const [eid, ...rest] = row;
+        if (predicate(eid, ...(rest as { [K in keyof T]: InferValue<T[K]> }))) {
+          return row as unknown as Row<T>;
+        }
+      }
+      return undefined;
+    });
+  }
 }
 
-export function attachReactive(world: World): ReactiveWorld {
-  const structureVersion = signal(0);
-  const poolVersions = new Map<RiftType, Signal<number>>();
-
-  function poolVersion(type: RiftType): Signal<number> {
-    let v = poolVersions.get(type);
-    if (!v) {
-      v = signal(0);
-      poolVersions.set(type, v);
-    }
-    return v;
-  }
-
-  function bump(s: Signal<number>): void {
-    s.value = s.peek() + 1;
-  }
-
-  world.on(EntityCreated, () => bump(structureVersion));
-  world.on(EntityDestroyed, () => bump(structureVersion));
-  world.on(ComponentAdded, ({ type }) => {
-    bump(structureVersion);
-    bump(poolVersion(type));
-  });
-  world.on(ComponentRemoved, ({ type }) => {
-    bump(structureVersion);
-    bump(poolVersion(type));
-  });
-  world.on(ComponentChanged, ({ type }) => bump(poolVersion(type)));
-
-  return {
-    world,
-
-    entity<const T extends readonly RiftType[]>(
-      id: EntityId | undefined,
-      ...types: T
-    ): ReadonlySignal<Values<T>> {
-      return computed((): Values<T> => {
-        for (const t of types) {
-          void poolVersion(t).value;
-        }
-        if (id === undefined) {
-          return types.map(() => undefined) as unknown as Values<T>;
-        }
-        return types.map((t) => world.get(id, t)) as unknown as Values<T>;
-      });
-    },
-
-    entities<const T extends readonly RiftType[]>(
-      ...types: T
-    ): ReadonlySignal<readonly Row<T>[]> {
-      return computed((): readonly Row<T>[] => {
-        void structureVersion.value;
-        for (const t of types) {
-          void poolVersion(t).value;
-        }
-        return world.query(...types).toArray() as unknown as readonly Row<T>[];
-      });
-    },
-
-    find<const T extends readonly RiftType[]>(
-      predicate: (
-        id: EntityId,
-        ...vs: { [K in keyof T]: InferValue<T[K]> }
-      ) => boolean,
-      ...types: T
-    ): ReadonlySignal<Row<T> | undefined> {
-      return computed((): Row<T> | undefined => {
-        void structureVersion.value;
-        for (const t of types) {
-          void poolVersion(t).value;
-        }
-        for (const row of world.query(...types)) {
-          const [eid, ...rest] = row;
-          if (
-            predicate(eid, ...(rest as { [K in keyof T]: InferValue<T[K]> }))
-          ) {
-            return row as unknown as Row<T>;
-          }
-        }
-        return undefined;
-      });
-    },
-  };
+function bump(s: Signal<number>): void {
+  s.value = s.peek() + 1;
 }

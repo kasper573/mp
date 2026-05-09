@@ -1,6 +1,6 @@
 import type { ClientOptions, ServerOptions } from "@rift/core";
 import { defineSchema, type HashFn, RiftClient, RiftServer } from "@rift/core";
-import { attachReactive, type ReactiveWorld } from "@rift/reactive";
+import { ReactiveWorld } from "@rift/reactive";
 import type { RiftType } from "@rift/types";
 
 type MaybePromise<T> = T | Promise<T>;
@@ -55,24 +55,21 @@ export class FeatureRiftServer extends RiftServer {
   }
 }
 
-export type FeatureClientOptions = Omit<ClientOptions, "schema"> & {
+export type FeatureClientOptions = Omit<ClientOptions, "schema" | "world"> & {
   readonly features: readonly Feature[];
   readonly hash: HashFn;
 };
 
 export class FeatureRiftClient extends RiftClient {
-  readonly reactive: ReactiveWorld;
+  declare readonly world: ReactiveWorld;
 
   constructor(private opts: FeatureClientOptions) {
-    super({
-      ...opts,
-      schema: defineSchema({
-        components: opts.features.flatMap((f) => f.components ?? []),
-        events: opts.features.flatMap((f) => f.events ?? []),
-        hash: opts.hash,
-      }),
+    const schema = defineSchema({
+      components: opts.features.flatMap((f) => f.components ?? []),
+      events: opts.features.flatMap((f) => f.events ?? []),
+      hash: opts.hash,
     });
-    this.reactive = attachReactive(this.world);
+    super({ ...opts, schema, world: new ReactiveWorld(schema) });
   }
 
   #cleanup?: Cleanup;
@@ -83,7 +80,6 @@ export class FeatureRiftClient extends RiftClient {
     // each feature query a fully-populated world; running them before
     // would expose features to a partial world during snapshot ingest.
     await super.connect();
-
     this.#cleanup = await setup(
       this,
       this.opts.features.map((f) => f.client),

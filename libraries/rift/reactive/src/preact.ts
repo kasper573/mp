@@ -14,45 +14,31 @@ function useReactive(): ReactiveWorld {
   return r;
 }
 
-/**
- * Read N components from a single entity. Returns a tuple of values
- * (each `T | undefined`). Re-renders when any of the listed component
- * types change for this entity, or when membership changes.
- */
 export function useEntity<const T extends readonly RiftType[]>(
   id: EntityId | undefined,
   ...types: T
 ): { [K in keyof T]: InferValue<T[K]> | undefined } {
   const r = useReactive();
   const sig = useMemo(
-    () => r.entity(id, ...types),
+    () => r.entitySignal(id, ...types),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- variadic deps
     [r, id, ...types],
   );
   return sig.value;
 }
 
-/**
- * Read all entities matching the given component types. Returns an
- * array of `[id, ...values]` rows. Re-renders when entity membership in
- * the query changes or any listed component type changes.
- */
 export function useEntities<const T extends readonly RiftType[]>(
   ...types: T
 ): readonly (readonly [EntityId, ...{ [K in keyof T]: InferValue<T[K]> }])[] {
   const r = useReactive();
   const sig = useMemo(
-    () => r.entities(...types),
+    () => r.entitiesSignal(...types),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- variadic deps
     [r, ...types],
   );
   return sig.value;
 }
 
-/**
- * Find the first entity matching the given component types whose row
- * satisfies the predicate. Returns the row, or undefined.
- */
 export function useFind<const T extends readonly RiftType[]>(
   predicate: (
     id: EntityId,
@@ -62,7 +48,7 @@ export function useFind<const T extends readonly RiftType[]>(
 ): readonly [EntityId, ...{ [K in keyof T]: InferValue<T[K]> }] | undefined {
   const r = useReactive();
   const sig = useMemo(
-    () => r.find(predicate, ...types),
+    () => r.querySignal(predicate, ...types),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- variadic deps
     [r, predicate, ...types],
   );

@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { effect } from "@preact/signals-core";
 import { f32, object, string, u32 } from "@rift/types";
-import { type EntityId, defineSchema, createWorld } from "@rift/core";
-import { attachReactive } from "../src/index";
+import { type EntityId, defineSchema } from "@rift/core";
+import { ReactiveWorld } from "../src/index";
 
 function sha256(input: Uint8Array): Uint8Array {
   return new Uint8Array(createHash("sha256").update(input).digest());
@@ -19,24 +19,22 @@ const schema = defineSchema({
   hash: sha256,
 });
 
-describe("attachReactive", () => {
+describe("ReactiveWorld", () => {
   it("entity signal emits values for current components", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
+    const w = new ReactiveWorld(schema);
     const id = w.create();
     w.add(id, pos, { x: 1, y: 2 });
     w.add(id, name, "alpha");
-    const sig = r.entity(id, pos, name);
+    const sig = w.entitySignal(id, pos, name);
     expect(sig.value).toEqual([{ x: 1, y: 2 }, "alpha"]);
   });
 
   it("entity signal updates only when a tracked component changes", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
+    const w = new ReactiveWorld(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.add(id, score, 10);
-    const sig = r.entity(id, pos);
+    const sig = w.entitySignal(id, pos);
     let runs = 0;
     const stop = effect(() => {
       void sig.value;
@@ -56,11 +54,10 @@ describe("attachReactive", () => {
   });
 
   it("entities signal updates on entity create/destroy", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
+    const w = new ReactiveWorld(schema);
     const a = w.create();
     w.add(a, score, 1);
-    const sig = r.entities(score);
+    const sig = w.entitiesSignal(score);
     expect(sig.value.length).toBe(1);
 
     const b = w.create();
@@ -72,13 +69,12 @@ describe("attachReactive", () => {
   });
 
   it("entities signal updates on component add/remove for matching entities", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
+    const w = new ReactiveWorld(schema);
     const a = w.create();
     w.add(a, name, "a");
     const b = w.create();
     w.add(b, name, "b");
-    const sig = r.entities(name, score);
+    const sig = w.entitiesSignal(name, score);
     expect(sig.value.length).toBe(0);
 
     w.add(a, score, 10);
@@ -89,9 +85,8 @@ describe("attachReactive", () => {
   });
 
   it("entities signal subscribes even when initial result is empty", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
-    const sig = r.entities(score);
+    const w = new ReactiveWorld(schema);
+    const sig = w.entitiesSignal(score);
     expect(sig.value.length).toBe(0);
     const a = w.create();
     w.add(a, score, 1);
@@ -99,13 +94,12 @@ describe("attachReactive", () => {
   });
 
   it("find signal returns first matching row, undefined when none match", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
+    const w = new ReactiveWorld(schema);
     const a = w.create();
     w.add(a, score, 5);
     const b = w.create();
     w.add(b, score, 25);
-    const sig = r.find((_id, n) => n > 10, score);
+    const sig = w.querySignal((_id, n) => n > 10, score);
     expect(sig.value?.[0]).toBe(b);
 
     w.write(b, score, 0);
@@ -116,9 +110,8 @@ describe("attachReactive", () => {
   });
 
   it("entity(undefined, ...) yields all-undefined values", () => {
-    const w = createWorld(schema);
-    const r = attachReactive(w);
-    const sig = r.entity(undefined as EntityId | undefined, pos, name);
+    const w = new ReactiveWorld(schema);
+    const sig = w.entitySignal(undefined as EntityId | undefined, pos, name);
     expect(sig.value).toEqual([undefined, undefined]);
   });
 });
