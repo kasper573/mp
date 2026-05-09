@@ -14,7 +14,7 @@ import {
 } from "@rift/types";
 import { defineSchema, type EntityId } from "../src/index";
 import { RiftServer } from "../src/server";
-import { createWorld } from "../src/world";
+import { World } from "../src/world";
 import {
   runProfiler,
   type Scenario,
@@ -125,7 +125,7 @@ const scenarios: readonly Scenario[] = [
   {
     name: "world_create_add_1000",
     run() {
-      const w = createWorld(schema);
+      const w = new World(schema);
       for (let i = 0; i < 1000; i++) {
         const e = w.create();
         w.add(e, posComp, { x: i, y: i });
@@ -135,7 +135,7 @@ const scenarios: readonly Scenario[] = [
   {
     name: "world_query_1000_3comp",
     run() {
-      const w = createWorld(schema);
+      const w = new World(schema);
       for (let i = 0; i < 1000; i++) {
         const e = w.create();
         w.add(e, posComp, { x: i, y: i });
@@ -156,7 +156,7 @@ const scenarios: readonly Scenario[] = [
   {
     name: "world_mutate_1000",
     run() {
-      const w = createWorld(schema);
+      const w = new World(schema);
       const ids: EntityId[] = [];
       for (let i = 0; i < 1000; i++) {
         const e = w.create();

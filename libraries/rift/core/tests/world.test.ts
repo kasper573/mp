@@ -7,7 +7,7 @@ import {
   defineSchema,
   EntityCreated,
   EntityDestroyed,
-  createWorld,
+  World,
 } from "../src/index";
 import { f32, object, string, u32 } from "@rift/types";
 import type { EntityId } from "../src/protocol";
@@ -29,13 +29,13 @@ const schema = defineSchema({
 
 describe("world", () => {
   it("create allocates incrementing ids", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const a = w.create();
     const b = w.create();
     expect(b).toBeGreaterThan(a);
   });
   it("create with explicit id records and bumps nextId", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const explicit = w.create(50 as EntityId);
     expect(explicit).toBe(50);
     expect(w.exists(50 as EntityId)).toBe(true);
@@ -43,7 +43,7 @@ describe("world", () => {
     expect(next).toBeGreaterThan(50);
   });
   it("destroy removes entity and clears its components", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 1, y: 2 });
     expect(w.exists(id)).toBe(true);
@@ -52,7 +52,7 @@ describe("world", () => {
     expect(w.has(id, pos)).toBe(false);
   });
   it("add/has/get/remove components", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 1, y: 2 });
     expect(w.has(id, pos)).toBe(true);
@@ -63,13 +63,13 @@ describe("world", () => {
     expect(w.has(id, pos)).toBe(false);
   });
   it("add without initial uses default", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, health);
     expect(w.get(id, health)).toBe(0);
   });
   it("query returns matching entities", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const a = w.create();
     w.add(a, pos, { x: 0, y: 0 });
     w.add(a, name, "A");
@@ -82,7 +82,7 @@ describe("world", () => {
     expect(withName[0][0]).toBe(a);
   });
   it("query exclude chains", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const a = w.create();
     w.add(a, pos, { x: 0, y: 0 });
     w.add(a, name, "A");
@@ -93,7 +93,7 @@ describe("world", () => {
     expect(rows[0][0]).toBe(b);
   });
   it("query is iterable", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const a = w.create();
     w.add(a, pos, { x: 0, y: 0 });
     const b = w.create();
@@ -108,25 +108,25 @@ describe("world", () => {
     expect(ids.sort(numCmp)).toEqual([a, b].sort(numCmp));
   });
   it("add throws if component already exists", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, health, 10);
     expect(() => w.add(id, health, 20)).toThrow();
   });
   it("write updates fields via shallow merge", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 1, y: 2 });
     w.write(id, pos, { x: 42 });
     expect(w.get(id, pos)).toEqual({ x: 42, y: 2 });
   });
   it("write throws if component missing", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     expect(() => w.write(id, health, 1 as never)).toThrow();
   });
   it("query size reflects entity count", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const a = w.create();
     const b = w.create();
     w.add(a, pos, { x: 0, y: 0 });
@@ -143,7 +143,7 @@ describe("world", () => {
 
 describe("pool change tracking", () => {
   it("add records into added; clearChanges drains it", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     expect(w.pool(pos).added.has(id)).toBe(true);
@@ -152,7 +152,7 @@ describe("pool change tracking", () => {
     expect(w.pool(pos).added.size).toBe(0);
   });
   it("write records into dirty (not added) after a flush", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.clearChanges();
@@ -161,7 +161,7 @@ describe("pool change tracking", () => {
     expect(w.pool(pos).dirty.has(id)).toBe(true);
   });
   it("write within the same flush as add stays in added (no dirty)", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.write(id, pos, { x: 1 });
@@ -169,7 +169,7 @@ describe("pool change tracking", () => {
     expect(w.pool(pos).dirty.has(id)).toBe(false);
   });
   it("remove records into removed when component existed before flush", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.clearChanges();
@@ -177,7 +177,7 @@ describe("pool change tracking", () => {
     expect(w.pool(pos).removed.has(id)).toBe(true);
   });
   it("add+remove within one flush nets to nothing observable", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.remove(id, pos);
@@ -186,7 +186,7 @@ describe("pool change tracking", () => {
     expect(w.pool(pos).dirty.has(id)).toBe(false);
   });
   it("destroy emits componentRemoved for each existing component", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
     w.add(id, health, 10);
@@ -199,7 +199,7 @@ describe("pool change tracking", () => {
 
 describe("world events", () => {
   it("emits ComponentAdded / ComponentChanged / ComponentRemoved", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const id = w.create();
     const events: Array<{ kind: string; type: RiftType }> = [];
     w.on(ComponentAdded, ({ type }) => events.push({ kind: "added", type }));
@@ -219,7 +219,7 @@ describe("world events", () => {
     ]);
   });
   it("emits EntityCreated / EntityDestroyed", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const events: string[] = [];
     w.on(EntityCreated, ({ id }) => events.push(`c:${id}`));
     w.on(EntityDestroyed, ({ id }) => events.push(`d:${id}`));
@@ -228,7 +228,7 @@ describe("world events", () => {
     expect(events).toEqual([`c:${id}`, `d:${id}`]);
   });
   it("listener returned unsubscribe stops further events", () => {
-    const w = createWorld(schema);
+    const w = new World(schema);
     const events: number[] = [];
     const off = w.on(EntityCreated, ({ id }) => events.push(id));
     w.create();

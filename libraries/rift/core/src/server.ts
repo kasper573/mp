@@ -14,8 +14,7 @@ import {
   Tick,
 } from "./protocol";
 import { Writer } from "@rift/types";
-import type { World } from "./world";
-import { createWorld } from "./world";
+import { World } from "./world";
 
 export type VisibilityFn = (
   clientId: ClientId,
@@ -90,7 +89,7 @@ export class RiftServer extends EventBus<
     this.#handshakeTimeoutMs = opts.handshakeTimeoutMs ?? 5000;
     this.#tickRateHz = opts.tickRateHz ?? 30;
     this.#visibility = opts.visibility;
-    this.world = createWorld(opts.schema);
+    this.world = new World(opts.schema);
   }
 
   setVisibility(fn: VisibilityFn | undefined): void {
@@ -269,7 +268,7 @@ export class RiftServer extends EventBus<
         const idx = this.schema.componentIndexOf(ty);
         if (idx === undefined) continue;
         const pool = this.world.pool(ty);
-        const value = pool.get(id);
+        const value = pool.values.get(id);
         if (value === undefined) continue;
         comps.push([ty, idx, value]);
       }
@@ -334,7 +333,7 @@ export class RiftServer extends EventBus<
         const idx = this.schema.componentIndexOf(ty);
         if (idx === undefined) continue;
         const pool = this.world.pool(ty);
-        const value = pool.get(id);
+        const value = pool.values.get(id);
         if (value === undefined) continue;
         currentComps.add(ty);
         if (!known.has(ty)) {

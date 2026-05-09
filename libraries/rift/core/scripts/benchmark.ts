@@ -21,7 +21,7 @@ import {
   Writer,
 } from "@rift/types";
 import { RiftServer } from "../src/server";
-import { createWorld } from "../src/world";
+import { World } from "../src/world";
 
 function sha256(input: Uint8Array): Uint8Array {
   return new Uint8Array(createHash("sha256").update(input).digest());
@@ -162,7 +162,7 @@ boxplot(() => {
   summary(() => {
     group("world", () => {
       bench("create+add x1000", () => {
-        const w = createWorld(schema);
+        const w = new World(schema);
         for (let i = 0; i < 1000; i++) {
           const e = w.create();
           w.add(e, posComp, { x: i, y: i });
@@ -170,7 +170,7 @@ boxplot(() => {
         do_not_optimize(w);
       });
       bench("query 1000/3-comp", () => {
-        const w = createWorld(schema);
+        const w = new World(schema);
         for (let i = 0; i < 1000; i++) {
           const e = w.create();
           w.add(e, posComp, { x: i, y: i });
@@ -186,7 +186,7 @@ boxplot(() => {
         do_not_optimize(count);
       });
       bench("mutate 1000 entities", () => {
-        const w = createWorld(schema);
+        const w = new World(schema);
         const ids: EntityId[] = [];
         for (let i = 0; i < 1000; i++) {
           const e = w.create();

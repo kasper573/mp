@@ -8,8 +8,7 @@ import type { RiftSchema } from "./schema";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
 import { DeltaApplied, DeltaOp, Opcode, ClientDisconnected } from "./protocol";
 import { Writer } from "@rift/types";
-import type { World } from "./world";
-import { createWorld } from "./world";
+import { World } from "./world";
 import { RiftCloseCode } from "./transport";
 
 export type ClientConnectionState =
@@ -22,9 +21,8 @@ export type ClientConnectionState =
 export interface ClientOptions {
   readonly schema: RiftSchema;
   readonly transport: ClientTransport;
-  // Pre-built world; defaults to `createWorld(schema)`. Subclasses pass a
-  // specialized `World` (e.g. `ReactiveWorld`) so it survives narrowing
-  // via `declare readonly world: ...`.
+  // Subclasses pass a specialized `World` (e.g. `ReactiveWorld`) so it
+  // survives narrowing via `declare readonly world: ...`.
   readonly world?: World;
 }
 
@@ -62,7 +60,7 @@ export class RiftClient extends EventBus<
     this.schema = opts.schema;
     this.#transport = opts.transport;
     this.#hash = opts.schema.digest();
-    this.world = opts.world ?? createWorld(opts.schema);
+    this.world = opts.world ?? new World(opts.schema);
   }
 
   get state(): ReadonlySignal<ClientConnectionState> {

@@ -40,14 +40,6 @@ export class Pool<T> {
   readonly added = new Set<EntityId>();
   readonly removed = new Set<EntityId>();
 
-  has(id: EntityId): boolean {
-    return this.values.has(id);
-  }
-
-  get(id: EntityId): T | undefined {
-    return this.values.get(id);
-  }
-
   add(id: EntityId, v: T): void {
     this.values.set(id, v);
     if (!this.removed.delete(id)) {
@@ -151,11 +143,11 @@ export class World {
   }
 
   has(id: EntityId, type: RiftType): boolean {
-    return this.#poolOf(type).has(id);
+    return this.#poolOf(type).values.has(id);
   }
 
   get<T>(id: EntityId, type: RiftType<T>): T | undefined {
-    return this.#poolOf(type).get(id) as T | undefined;
+    return this.#poolOf(type).values.get(id) as T | undefined;
   }
 
   add<T>(id: EntityId, type: RiftType<T>, initial?: T): T {
@@ -163,7 +155,7 @@ export class World {
       throw new Error(`entity ${id} does not exist`);
     }
     const pool = this.#poolOf(type) as Pool<T>;
-    if (pool.has(id)) {
+    if (pool.values.has(id)) {
       throw new Error(`entity ${id} already has component`);
     }
     const value = initial ?? type.default();
@@ -230,10 +222,6 @@ export class World {
   }
 }
 
-export function createWorld(schema: RiftSchema): World {
-  return new World(schema);
-}
-
 function createQueryView<Types extends readonly RiftType[]>(
   world: World,
   includes: Types,
@@ -252,10 +240,10 @@ function createQueryView<Types extends readonly RiftType[]>(
 
   function matches(id: EntityId): boolean {
     for (let i = 0; i < includeCount; i++) {
-      if (!poolFor(includes[i]).has(id)) return false;
+      if (!poolFor(includes[i]).values.has(id)) return false;
     }
     for (let i = 0; i < excludeCount; i++) {
-      if (poolFor(excludes[i]).has(id)) return false;
+      if (poolFor(excludes[i]).values.has(id)) return false;
     }
     return true;
   }
@@ -263,7 +251,7 @@ function createQueryView<Types extends readonly RiftType[]>(
   function fillRow(id: EntityId): QueryRow<Types> {
     row[0] = id;
     for (let i = 0; i < includeCount; i++) {
-      row[i + 1] = poolFor(includes[i]).get(id);
+      row[i + 1] = poolFor(includes[i]).values.get(id);
     }
     return row as unknown as QueryRow<Types>;
   }
@@ -271,7 +259,7 @@ function createQueryView<Types extends readonly RiftType[]>(
   function snapshotRow(id: EntityId): QueryRow<Types> {
     const out: unknown[] = [id];
     for (let i = 0; i < includeCount; i++) {
-      out.push(poolFor(includes[i]).get(id));
+      out.push(poolFor(includes[i]).values.get(id));
     }
     return out as unknown as QueryRow<Types>;
   }
