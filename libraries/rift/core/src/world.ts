@@ -1,13 +1,106 @@
+import { EventBus } from "@rift/event";
 import type { EntityId } from "./protocol";
-import { internal } from "./internal";
-import type { InferValue, RiftSignal, RiftType } from "@rift/types";
+import { RiftTypeKind, type RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
-import { ReactiveMap, ReactiveSet } from "./reactive";
 
-export type QueryRow<Types extends readonly RiftType[]> = readonly [
-  EntityId,
-  ...{ [K in keyof Types]: InferValue<Types[K]> },
-];
+/**
+ * Marker `RiftType` used as an event-bus key for purely local world
+ * events. Calling encode/decode on these throws by design — they are
+ * never replicated and registering them in a wire schema is a bug.
+ */
+function localWorldEvent<T>(): RiftType<T> {
+  return {
+    kind: RiftTypeKind.Object,
+    inspect: () => new Uint8Array(0),
+    default: () => ({}) as T,
+    encode: () => {
+      throw new Error("world event is local-only and cannot be encoded");
+    },
+    decode: () => {
+      throw new Error("world event is local-only and cannot be decoded");
+    },
+  };
+}
+
+export const EntityCreated = localWorldEvent<{ id: EntityId }>();
+export const EntityDestroyed = localWorldEvent<{ id: EntityId }>();
+export const ComponentAdded = localWorldEvent<{
+  id: EntityId;
+  type: RiftType;
+}>();
+export const ComponentChanged = localWorldEvent<{
+  id: EntityId;
+  type: RiftType;
+}>();
+export const ComponentRemoved = localWorldEvent<{
+  id: EntityId;
+  type: RiftType;
+}>();
+
+/**
+ * Per-component pool. `values` holds the current state for every entity
+ * that has the component; `dirty`/`added`/`removed` accumulate changes
+ * since the last `clearChanges()` for the replication layer to consume.
+ */
+export class Pool<T> {
+  readonly values = new Map<EntityId, T>();
+  readonly dirty = new Set<EntityId>();
+  readonly added = new Set<EntityId>();
+  readonly removed = new Set<EntityId>();
+
+  has(id: EntityId): boolean {
+    return this.values.has(id);
+  }
+
+  get(id: EntityId): T | undefined {
+    return this.values.get(id);
+  }
+
+  add(id: EntityId, v: T): void {
+    this.values.set(id, v);
+    if (!this.removed.delete(id)) {
+      this.added.add(id);
+    } else {
+      // Add-after-remove within a single flush window: net effect is
+      // "value mutated", not "added then removed".
+      this.dirty.add(id);
+    }
+  }
+
+  write(id: EntityId, partial: Partial<T>): boolean {
+    if (!this.values.has(id)) return false;
+    const current = this.values.get(id) as T;
+    if (typeof current === "object" && current !== null) {
+      // Object-valued component: shallow merge in place (preserves identity
+      // so consumers holding references see the update).
+      Object.assign(current as object, partial);
+    } else {
+      // Primitive-valued component (rare but supported): replace.
+      this.values.set(id, partial as T);
+    }
+    if (!this.added.has(id)) this.dirty.add(id);
+    return true;
+  }
+
+  remove(id: EntityId): boolean {
+    if (!this.values.delete(id)) return false;
+    if (this.added.delete(id)) {
+      // Remove-after-add within a single flush window: net effect is
+      // "never existed for this client".
+      this.dirty.delete(id);
+      return true;
+    }
+    this.dirty.delete(id);
+    this.removed.add(id);
+    return true;
+  }
+
+  clearChanges(): void {
+    this.dirty.clear();
+    this.added.clear();
+    this.removed.clear();
+  }
+}
 
 export interface QueryView<Types extends readonly RiftType[]> {
   [Symbol.iterator](): IterableIterator<QueryRow<Types>>;
@@ -16,224 +109,149 @@ export interface QueryView<Types extends readonly RiftType[]> {
   exclude(...excludes: readonly RiftType[]): QueryView<Types>;
 }
 
-export interface World {
+export type QueryRow<Types extends readonly RiftType[]> = readonly [
+  EntityId,
+  ...{ [K in keyof Types]: InferType<Types[K]> },
+];
+
+type InferType<R> = R extends RiftType<infer T> ? T : never;
+
+export class World {
   readonly schema: RiftSchema;
-  readonly [internal]: WorldInternal;
-  create(): EntityId;
-  destroy(id: EntityId): void;
-  exists(id: EntityId): boolean;
-  add<T>(id: EntityId, type: RiftType<T>, initial?: T): T;
-  set<T>(id: EntityId, type: RiftType<T>, value: T): T;
-  remove(id: EntityId, type: RiftType): void;
-  has(id: EntityId, type: RiftType): boolean;
-  get<T>(id: EntityId, type: RiftType<T>): T | undefined;
-  query<Types extends readonly RiftType[]>(...types: Types): QueryView<Types>;
-  entities(): Iterable<EntityHandle>;
-}
+  readonly #entities = new Set<EntityId>();
+  readonly #pools = new Map<RiftType, Pool<unknown>>();
+  readonly #bus = new EventBus<undefined, undefined>();
+  #nextId = 1;
 
-export interface ComponentSlot<V> {
-  readonly signal: RiftSignal<V>;
-  dirty: boolean;
-}
+  constructor(schema: RiftSchema) {
+    this.schema = schema;
+    for (const type of schema.components) {
+      this.#pools.set(type, new Pool());
+    }
+  }
 
-export interface EntityHandle {
-  readonly id: EntityId;
-  readonly components: Map<RiftType, ComponentSlot<unknown>>;
-}
+  /**
+   * Auto-assigns a fresh entity id (server-side use), or records an
+   * explicit id (client-side delta-ingestion use, where the server has
+   * already assigned the id). Returns the id.
+   */
+  create(id?: EntityId): EntityId {
+    if (id !== undefined) {
+      if (!this.#entities.has(id)) {
+        this.#entities.add(id);
+        if (id >= this.#nextId) this.#nextId = id + 1;
+        this.#emit(EntityCreated, { id });
+      }
+      return id;
+    }
+    const next = this.#nextId++ as EntityId;
+    this.#entities.add(next);
+    this.#emit(EntityCreated, { id: next });
+    return next;
+  }
 
-export interface WorldInternal {
-  readonly entities: ReactiveMap<EntityId, EntityHandle>;
-  readonly componentIndex: Map<RiftType, ReactiveSet<EntityId>>;
-  nextId: number;
-  indexOf(type: RiftType): ReactiveSet<EntityId>;
-  clearDirty(): void;
-  ingestCreate(id: EntityId): void;
-  ingestDestroy(id: EntityId): void;
-  ingestAdd<T>(id: EntityId, type: RiftType<T>, value: T): void;
-  ingestUpdate<T>(id: EntityId, type: RiftType<T>, value: T): void;
-  ingestUpdateDirty(
-    id: EntityId,
-    type: RiftType,
-    decodeDirty: (signal: RiftSignal<unknown>) => void,
-  ): void;
-  ingestRemove(id: EntityId, type: RiftType): void;
+  destroy(id: EntityId): void {
+    if (!this.#entities.delete(id)) return;
+    for (const [type, pool] of this.#pools) {
+      if (pool.remove(id)) {
+        this.#emit(ComponentRemoved, { id, type });
+      }
+    }
+    this.#emit(EntityDestroyed, { id });
+  }
+
+  exists(id: EntityId): boolean {
+    return this.#entities.has(id);
+  }
+
+  has(id: EntityId, type: RiftType): boolean {
+    return this.#poolOf(type).has(id);
+  }
+
+  get<T>(id: EntityId, type: RiftType<T>): T | undefined {
+    return this.#poolOf(type).get(id) as T | undefined;
+  }
+
+  add<T>(id: EntityId, type: RiftType<T>, initial?: T): T {
+    if (!this.#entities.has(id)) {
+      throw new Error(`entity ${id} does not exist`);
+    }
+    const pool = this.#poolOf(type) as Pool<T>;
+    if (pool.has(id)) {
+      throw new Error(`entity ${id} already has component`);
+    }
+    const value = initial ?? type.default();
+    pool.add(id, value);
+    this.#emit(ComponentAdded, { id, type: type as RiftType });
+    return value;
+  }
+
+  write<T>(id: EntityId, type: RiftType<T>, partial: Partial<T>): void {
+    const pool = this.#poolOf(type) as Pool<T>;
+    if (!pool.write(id, partial)) {
+      throw new Error(`entity ${id} does not have component`);
+    }
+    this.#emit(ComponentChanged, { id, type: type as RiftType });
+  }
+
+  remove(id: EntityId, type: RiftType): void {
+    if (this.#poolOf(type).remove(id)) {
+      this.#emit(ComponentRemoved, { id, type });
+    }
+  }
+
+  query<const Types extends readonly RiftType[]>(
+    ...types: Types
+  ): QueryView<Types> {
+    return createQueryView(this, types, []);
+  }
+
+  /**
+   * Subscribe to a world event. The callback receives the event data
+   * directly (no source/target wrapper). Returns an unsubscribe function.
+   */
+  on<Data>(type: RiftType<Data>, handler: (data: Data) => void): () => void {
+    return this.#bus.on(type, (event) => {
+      handler(event.data);
+    });
+  }
+
+  // Same-package surface used by replication and the reactive layer.
+
+  pool<T>(type: RiftType<T>): Pool<T> {
+    return this.#poolOf(type) as Pool<T>;
+  }
+
+  pools(): ReadonlyMap<RiftType, Pool<unknown>> {
+    return this.#pools;
+  }
+
+  entities(): ReadonlySet<EntityId> {
+    return this.#entities;
+  }
+
+  clearChanges(): void {
+    for (const pool of this.#pools.values()) {
+      pool.clearChanges();
+    }
+  }
+
+  #poolOf(type: RiftType): Pool<unknown> {
+    let pool = this.#pools.get(type);
+    if (!pool) {
+      pool = new Pool();
+      this.#pools.set(type, pool);
+    }
+    return pool;
+  }
+
+  #emit<Data>(type: RiftType<Data>, data: Data): void {
+    this.#bus.emit({ type, data, source: undefined, target: undefined });
+  }
 }
 
 export function createWorld(schema: RiftSchema): World {
-  const entities = new ReactiveMap<EntityId, EntityHandle>();
-  const componentIndex = new Map<RiftType, ReactiveSet<EntityId>>();
-  for (const type of schema.components) {
-    componentIndex.set(type, new ReactiveSet());
-  }
-
-  function indexOf(type: RiftType): ReactiveSet<EntityId> {
-    let set = componentIndex.get(type);
-    if (!set) {
-      set = new ReactiveSet();
-      componentIndex.set(type, set);
-    }
-    return set;
-  }
-
-  function detachComponents(ent: EntityHandle): void {
-    for (const ty of ent.components.keys()) {
-      componentIndex.get(ty)?.delete(ent.id);
-    }
-  }
-
-  const state: WorldInternal = {
-    entities,
-    componentIndex,
-    nextId: 1,
-    indexOf,
-    clearDirty() {
-      for (const ent of entities.values()) {
-        for (const slot of ent.components.values()) {
-          slot.dirty = false;
-          slot.signal.clearDirty();
-        }
-      }
-    },
-    ingestCreate(id) {
-      if (entities.has(id)) {
-        return;
-      }
-      entities.set(id, { id, components: new Map() });
-      if (id >= state.nextId) {
-        state.nextId = id + 1;
-      }
-    },
-    ingestDestroy(id) {
-      const ent = entities.get(id);
-      if (!ent) {
-        return;
-      }
-      detachComponents(ent);
-      entities.delete(id);
-    },
-    ingestAdd<T>(id: EntityId, type: RiftType<T>, value: T) {
-      const ent = entities.get(id);
-      if (!ent) {
-        return;
-      }
-      const sig = type.signal(value);
-      ent.components.set(
-        type as RiftType,
-        {
-          signal: sig,
-          dirty: false,
-        } as ComponentSlot<unknown>,
-      );
-      indexOf(type as RiftType).add(id);
-    },
-    ingestUpdate<T>(id: EntityId, type: RiftType<T>, value: T) {
-      const slot = entities.get(id)?.components.get(type as RiftType) as
-        | ComponentSlot<T>
-        | undefined;
-      if (!slot) {
-        state.ingestAdd(id, type, value);
-        return;
-      }
-      slot.signal.set(value);
-      slot.signal.clearDirty();
-      slot.dirty = false;
-    },
-    ingestUpdateDirty(
-      id: EntityId,
-      type: RiftType,
-      decodeDirty: (signal: RiftSignal<unknown>) => void,
-    ) {
-      const slot = entities.get(id)?.components.get(type);
-      if (!slot) {
-        return;
-      }
-      decodeDirty(slot.signal);
-      slot.signal.clearDirty();
-      slot.dirty = false;
-    },
-    ingestRemove(id, type) {
-      const ent = entities.get(id);
-      if (!ent) {
-        return;
-      }
-      if (ent.components.delete(type)) {
-        componentIndex.get(type)?.delete(id);
-      }
-    },
-  };
-
-  const world: World = {
-    schema,
-    [internal]: state,
-    create(): EntityId {
-      const id = state.nextId++ as EntityId;
-      entities.set(id, { id, components: new Map() });
-      return id;
-    },
-    destroy(id) {
-      const ent = entities.get(id);
-      if (!ent) {
-        return;
-      }
-      detachComponents(ent);
-      entities.delete(id);
-    },
-    exists(id) {
-      return entities.has(id);
-    },
-    add<T>(id: EntityId, type: RiftType<T>, initial?: T): T {
-      const ent = entities.get(id);
-      if (!ent) {
-        throw new Error(`entity ${id} does not exist`);
-      }
-      if (ent.components.has(type as RiftType)) {
-        throw new Error(`entity ${id} already has component`);
-      }
-      const value = initial ?? type.default();
-      const sig = type.signal(value);
-      const slot: ComponentSlot<T> = { signal: sig, dirty: true };
-      sig.setRoot(slot);
-      ent.components.set(type as RiftType, slot as ComponentSlot<unknown>);
-      indexOf(type as RiftType).add(id);
-      return sig.value;
-    },
-    set<T>(id: EntityId, type: RiftType<T>, value: T): T {
-      const slot = entities.get(id)?.components.get(type as RiftType) as
-        | ComponentSlot<T>
-        | undefined;
-      if (!slot) {
-        throw new Error(`entity ${id} does not have component`);
-      }
-      slot.signal.set(value);
-      return slot.signal.value;
-    },
-    remove(id, type) {
-      const ent = entities.get(id);
-      if (!ent) {
-        return;
-      }
-      if (ent.components.delete(type)) {
-        componentIndex.get(type)?.delete(id);
-      }
-    },
-    has(id, type) {
-      return indexOf(type).has(id);
-    },
-    get<T>(id: EntityId, type: RiftType<T>): T | undefined {
-      const ent = entities.peekGet(id);
-      if (!ent) return undefined;
-      const slot = ent.components.get(type as RiftType);
-      return slot?.signal.value as T | undefined;
-    },
-    query(...types) {
-      return createQueryView(world, types, []);
-    },
-    entities() {
-      return entities.values();
-    },
-  };
-
-  return world;
+  return new World(schema);
 }
 
 function createQueryView<Types extends readonly RiftType[]>(
@@ -241,70 +259,71 @@ function createQueryView<Types extends readonly RiftType[]>(
   includes: Types,
   excludes: readonly RiftType[],
 ): QueryView<Types> {
-  const state = world[internal];
   const includeCount = includes.length;
   const excludeCount = excludes.length;
-  // Reused across iterations to avoid per-row allocation; callers are
-  // expected to consume row values within the for..of body and not retain
-  // references to the array across iterations.
+  // Reused across iterations to avoid per-row allocation. Callers must
+  // consume row values within the loop body and not retain references
+  // to the row across iterations. `toArray()` does the safe copy.
   const row = new Array<unknown>(includeCount + 1);
 
-  function matches(ent: EntityHandle): boolean {
-    const comps = ent.components;
+  function poolFor(type: RiftType): Pool<unknown> {
+    return world.pool(type);
+  }
+
+  function matches(id: EntityId): boolean {
     for (let i = 0; i < includeCount; i++) {
-      if (!comps.has(includes[i])) return false;
+      if (!poolFor(includes[i]).has(id)) return false;
     }
     for (let i = 0; i < excludeCount; i++) {
-      if (comps.has(excludes[i])) return false;
+      if (poolFor(excludes[i]).has(id)) return false;
     }
     return true;
   }
 
-  function fillRow(ent: EntityHandle): QueryRow<Types> {
-    row[0] = ent.id;
-    const comps = ent.components;
+  function fillRow(id: EntityId): QueryRow<Types> {
+    row[0] = id;
     for (let i = 0; i < includeCount; i++) {
-      row[i + 1] = comps.get(includes[i])?.signal.value;
+      row[i + 1] = poolFor(includes[i]).get(id);
     }
     return row as unknown as QueryRow<Types>;
   }
 
-  function pickSeed(): ReactiveSet<EntityId> | "all" {
-    if (includeCount === 0) return "all";
-    let smallest = state.indexOf(includes[0]);
-    let smallestSize = smallest.size;
+  function snapshotRow(id: EntityId): QueryRow<Types> {
+    const out: unknown[] = [id];
+    for (let i = 0; i < includeCount; i++) {
+      out.push(poolFor(includes[i]).get(id));
+    }
+    return out as unknown as QueryRow<Types>;
+  }
+
+  function pickSeed(): Iterable<EntityId> {
+    if (includeCount === 0) {
+      return world.entities();
+    }
+    let smallest = poolFor(includes[0]);
+    let smallestSize = smallest.values.size;
     for (let i = 1; i < includeCount; i++) {
-      const s = state.indexOf(includes[i]);
-      const n = s.size;
+      const p = poolFor(includes[i]);
+      const n = p.values.size;
       if (n < smallestSize) {
-        smallest = s;
+        smallest = p;
         smallestSize = n;
       }
     }
-    for (let i = 0; i < excludeCount; i++) {
-      void state.indexOf(excludes[i]).size;
-    }
-    return smallest;
+    return smallest.values.keys();
   }
 
   return {
     [Symbol.iterator](): IterableIterator<QueryRow<Types>> {
-      const seed = pickSeed();
-      const all = seed === "all";
-      const entities = state.entities;
-      const seedIter: Iterator<EntityHandle | EntityId> = all
-        ? entities.values()
-        : seed[Symbol.iterator]();
+      const seedIter = pickSeed()[Symbol.iterator]();
       const iter: IterableIterator<QueryRow<Types>> = {
         next(): IteratorResult<QueryRow<Types>> {
           while (true) {
             const r = seedIter.next();
             if (r.done) return { done: true, value: undefined };
-            const ent = all
-              ? (r.value as EntityHandle)
-              : entities.peekGet(r.value as EntityId);
-            if (ent && matches(ent)) {
-              return { done: false, value: fillRow(ent) };
+            const id = r.value;
+            if (matches(id)) {
+              return { done: false, value: fillRow(id) };
             }
           }
         },
@@ -316,36 +335,18 @@ function createQueryView<Types extends readonly RiftType[]>(
     },
     get size() {
       if (includeCount === 1 && excludeCount === 0) {
-        return state.indexOf(includes[0]).size;
+        return poolFor(includes[0]).values.size;
       }
       let n = 0;
-      const seed = pickSeed();
-      if (seed === "all") {
-        for (const ent of state.entities.values()) {
-          if (matches(ent)) n++;
-        }
-      } else {
-        const entities = state.entities;
-        for (const id of seed) {
-          const ent = entities.peekGet(id);
-          if (ent && matches(ent)) n++;
-        }
+      for (const id of pickSeed()) {
+        if (matches(id)) n++;
       }
       return n;
     },
     toArray() {
       const out: QueryRow<Types>[] = [];
-      const seed = pickSeed();
-      if (seed === "all") {
-        for (const ent of state.entities.values()) {
-          if (matches(ent)) out.push(snapshotRow(ent, includes));
-        }
-      } else {
-        const entities = state.entities;
-        for (const id of seed) {
-          const ent = entities.peekGet(id);
-          if (ent && matches(ent)) out.push(snapshotRow(ent, includes));
-        }
+      for (const id of pickSeed()) {
+        if (matches(id)) out.push(snapshotRow(id));
       }
       return out;
     },
@@ -353,15 +354,4 @@ function createQueryView<Types extends readonly RiftType[]>(
       return createQueryView(world, includes, [...excludes, ...newExcludes]);
     },
   };
-}
-
-function snapshotRow<Types extends readonly RiftType[]>(
-  ent: EntityHandle,
-  includes: Types,
-): QueryRow<Types> {
-  const out: unknown[] = [ent.id];
-  for (let i = 0; i < includes.length; i++) {
-    out.push(ent.components.get(includes[i])?.signal.value);
-  }
-  return out as unknown as QueryRow<Types>;
 }

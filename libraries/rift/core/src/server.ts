@@ -2,7 +2,6 @@ import type { ClientId, EntityId } from "./protocol";
 import { RiftCloseCode } from "./transport";
 import { EventBus } from "@rift/event";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
-import { internal } from "./internal";
 import { Reader } from "@rift/types";
 import type { InferValue, RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
@@ -17,31 +16,26 @@ import {
 import { Writer } from "@rift/types";
 import type { World } from "./world";
 import { createWorld } from "./world";
-import {
-  type Cleanup,
-  inject,
-  initializeModules,
-  RiftModule,
-} from "@rift/module";
+
+export type VisibilityFn = (
+  clientId: ClientId,
+) => Iterable<EntityId> | undefined;
 
 export interface ServerOptions {
   readonly schema: RiftSchema;
   readonly transport: ServerTransport;
-  readonly modules?: readonly RiftServerModule[];
   readonly tickRateHz?: number;
   readonly handshakeTimeoutMs?: number;
+  readonly visibility?: VisibilityFn;
 }
 
 interface ClientSlot {
   readonly id: ClientId;
-  visibilityPredicate?: VisibilityPredicate;
   handshakeCompleted: boolean;
   knownEntities: Set<EntityId>;
   knownComponents: Map<EntityId, Set<RiftType>>;
   handshakeTimer?: ReturnType<typeof setTimeout>;
 }
-
-export type VisibilityPredicate = (entityId: EntityId) => boolean;
 
 export type RiftServerEvent<Data = unknown> = RiftEvent<
   Data,
@@ -74,12 +68,12 @@ export class RiftServer extends EventBus<
   readonly schema: RiftSchema;
 
   readonly #transport: ServerTransport;
-  readonly #modules: readonly RiftServerModule[];
   readonly #hash: Uint8Array;
   readonly #clients = new Map<ClientId, ClientSlot>();
   readonly #eventQueue: RiftServerEvent[] = [];
   readonly #handshakeTimeoutMs: number;
   readonly #tickRateHz: number;
+  #visibility?: VisibilityFn;
 
   #tickNumber = 0;
   #lastTickTime = 0;
@@ -87,32 +81,35 @@ export class RiftServer extends EventBus<
   #tickTimer?: ReturnType<typeof setInterval>;
   #started = false;
   #stopping = false;
-  #moduleCleanup?: Cleanup;
 
   constructor(opts: ServerOptions) {
     super();
     this.schema = opts.schema;
     this.#transport = opts.transport;
-    this.#modules = opts.modules ?? [];
     this.#hash = opts.schema.digest();
     this.#handshakeTimeoutMs = opts.handshakeTimeoutMs ?? 5000;
     this.#tickRateHz = opts.tickRateHz ?? 30;
+    this.#visibility = opts.visibility;
     this.world = createWorld(opts.schema);
   }
 
+  setVisibility(fn: VisibilityFn | undefined): void {
+    this.#visibility = fn;
+  }
+
   #unsubscribeFromEmit?: UnsubscribeFn;
-  async start(): Promise<void> {
+  start(): Promise<void> {
     if (this.#started) {
-      return;
+      return Promise.resolve();
     }
     this.#unsubscribeFromEmit = this.onAny(this.#onEmit);
     this.#started = true;
-    this.#moduleCleanup = await initializeModules([this, ...this.#modules]);
     this.#transport.on((ev) => this.#onTransportEvent(ev));
     if (this.#tickRateHz > 0) {
       const interval = 1000 / this.#tickRateHz;
       this.#tickTimer = setInterval(() => this.tick(), interval);
     }
+    return Promise.resolve();
   }
 
   async stop(
@@ -135,10 +132,6 @@ export class RiftServer extends EventBus<
     }
     await this.#transport.shutdown(code, reason);
     this.#clients.clear();
-    if (this.#moduleCleanup) {
-      await this.#moduleCleanup();
-      this.#moduleCleanup = undefined;
-    }
   }
 
   tick(dtSeconds?: number): void {
@@ -167,18 +160,7 @@ export class RiftServer extends EventBus<
       this.#flushClient(slot);
     }
 
-    this.world[internal].clearDirty();
-  }
-
-  setClientVisibilityPredicate(
-    clientId: ClientId,
-    predicate: VisibilityPredicate | undefined,
-  ): void {
-    const slot = this.#clients.get(clientId);
-    if (!slot) {
-      return;
-    }
-    slot.visibilityPredicate = predicate;
+    this.world.clearChanges();
   }
 
   getClientIds(): readonly ClientId[] {
@@ -241,8 +223,31 @@ export class RiftServer extends EventBus<
     }
   }
 
+  #visibleSet(slot: ClientSlot): Set<EntityId> {
+    const visible = new Set<EntityId>();
+    if (this.#visibility === undefined) {
+      for (const id of this.world.entities()) visible.add(id);
+      return visible;
+    }
+    const result = this.#visibility(slot.id);
+    if (result === undefined) {
+      for (const id of this.world.entities()) visible.add(id);
+      return visible;
+    }
+    for (const id of result) visible.add(id);
+    return visible;
+  }
+
   #clientSeesEntity(slot: ClientSlot, entityId: EntityId): boolean {
-    return slot.visibilityPredicate?.(entityId) ?? true;
+    if (this.#visibility === undefined) {
+      return this.world.exists(entityId);
+    }
+    const result = this.#visibility(slot.id);
+    if (result === undefined) return this.world.exists(entityId);
+    for (const id of result) {
+      if (id === entityId) return true;
+    }
+    return false;
   }
 
   #buildSnapshotFor(slot: ClientSlot): Uint8Array<ArrayBuffer> {
@@ -252,26 +257,27 @@ export class RiftServer extends EventBus<
     w.writeVarU32(this.#serverTimeMs >>> 0);
     w.writeVarU32(slot.id);
     w.writeBytes(this.#hash);
-    const visible: Array<{
+    const visible = this.#visibleSet(slot);
+    const entries: Array<{
       id: EntityId;
       components: Array<[RiftType, number, unknown]>;
     }> = [];
-    for (const ent of this.world[internal].entities.values()) {
-      if (!this.#clientSeesEntity(slot, ent.id)) {
-        continue;
-      }
+    for (const id of visible) {
+      if (!this.world.exists(id)) continue;
       const comps: Array<[RiftType, number, unknown]> = [];
-      for (const [ty, compSlot] of ent.components) {
+      for (const ty of this.schema.components) {
         const idx = this.schema.componentIndexOf(ty);
-        if (idx !== undefined) {
-          comps.push([ty, idx, compSlot.signal.value]);
-        }
+        if (idx === undefined) continue;
+        const pool = this.world.pool(ty);
+        const value = pool.get(id);
+        if (value === undefined) continue;
+        comps.push([ty, idx, value]);
       }
       comps.sort((a, b) => a[1] - b[1]);
-      visible.push({ id: ent.id, components: comps });
+      entries.push({ id, components: comps });
     }
-    w.writeVarU32(visible.length);
-    for (const { id, components } of visible) {
+    w.writeVarU32(entries.length);
+    for (const { id, components } of entries) {
       w.writeVarU32(id);
       w.writeVarU32(components.length);
       for (const [ty, idx, value] of components) {
@@ -297,87 +303,69 @@ export class RiftServer extends EventBus<
     w.writeU8(Opcode.Delta);
     w.writeVarU32(this.#tickNumber);
     w.writeVarU32(this.#serverTimeMs >>> 0);
-    const ops: Array<() => void> = [];
+    const headerEnd = w.offset;
 
-    const visibleNow = new Set<EntityId>();
-    for (const ent of this.world[internal].entities.values()) {
-      if (this.#clientSeesEntity(slot, ent.id)) {
-        visibleNow.add(ent.id);
-      }
-    }
+    const visible = this.#visibleSet(slot);
 
+    // Entities the client knew but no longer sees / no longer exist.
     for (const id of slot.knownEntities) {
-      if (!visibleNow.has(id)) {
-        ops.push(() => {
-          w.writeU8(DeltaOp.EntityDestroyed);
-          w.writeVarU32(id);
-        });
+      if (!visible.has(id) || !this.world.exists(id)) {
+        w.writeU8(DeltaOp.EntityDestroyed);
+        w.writeVarU32(id);
         slot.knownEntities.delete(id);
         slot.knownComponents.delete(id);
       }
     }
 
-    for (const id of visibleNow) {
-      const ent = this.world[internal].entities.get(id);
-      if (!ent) {
-        continue;
-      }
+    // Visible entities — adds, updates, removes.
+    for (const id of visible) {
+      if (!this.world.exists(id)) continue;
       const isNew = !slot.knownEntities.has(id);
       if (isNew) {
-        ops.push(() => {
-          w.writeU8(DeltaOp.EntityCreated);
-          w.writeVarU32(id);
-        });
+        w.writeU8(DeltaOp.EntityCreated);
+        w.writeVarU32(id);
         slot.knownEntities.add(id);
         slot.knownComponents.set(id, new Set());
       }
       const known = slot.knownComponents.get(id) ?? new Set<RiftType>();
       slot.knownComponents.set(id, known);
       const currentComps = new Set<RiftType>();
-      for (const [ty, compSlot] of ent.components) {
+      for (const ty of this.schema.components) {
         const idx = this.schema.componentIndexOf(ty);
-        if (idx === undefined) {
-          continue;
-        }
+        if (idx === undefined) continue;
+        const pool = this.world.pool(ty);
+        const value = pool.get(id);
+        if (value === undefined) continue;
         currentComps.add(ty);
         if (!known.has(ty)) {
-          ops.push(() => {
-            w.writeU8(DeltaOp.ComponentAdded);
-            w.writeVarU32(id);
-            w.writeVarU32(idx);
-            ty.encode(w, compSlot.signal.value);
-          });
+          w.writeU8(DeltaOp.ComponentAdded);
+          w.writeVarU32(id);
+          w.writeVarU32(idx);
+          ty.encode(w, value);
           known.add(ty);
-        } else if (compSlot.dirty || isNew) {
-          ops.push(() => {
-            w.writeU8(DeltaOp.ComponentUpdated);
-            w.writeVarU32(id);
-            w.writeVarU32(idx);
-            compSlot.signal.encodeDirty(w);
-          });
+        } else if (pool.dirty.has(id) || isNew) {
+          w.writeU8(DeltaOp.ComponentUpdated);
+          w.writeVarU32(id);
+          w.writeVarU32(idx);
+          ty.encode(w, value);
         }
       }
       for (const ty of known) {
         if (!currentComps.has(ty)) {
           const idx = this.schema.componentIndexOf(ty);
           if (idx !== undefined) {
-            ops.push(() => {
-              w.writeU8(DeltaOp.ComponentRemoved);
-              w.writeVarU32(id);
-              w.writeVarU32(idx);
-            });
+            w.writeU8(DeltaOp.ComponentRemoved);
+            w.writeVarU32(id);
+            w.writeVarU32(idx);
           }
           known.delete(ty);
         }
       }
     }
 
-    if (ops.length === 0) {
+    if (w.offset === headerEnd) {
+      // No ops written — nothing to send.
       return;
-    }
-    w.writeVarU32(ops.length);
-    for (const op of ops) {
-      op();
     }
     this.#transport.send(slot.id, w.finish());
   }
@@ -515,8 +503,4 @@ export class RiftServer extends EventBus<
       }
     }
   }
-}
-
-export abstract class RiftServerModule extends RiftModule {
-  @inject(RiftServer) accessor server!: RiftServer;
 }

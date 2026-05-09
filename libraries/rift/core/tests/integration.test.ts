@@ -2,19 +2,17 @@ import { createHash } from "node:crypto";
 import { effect } from "@preact/signals-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { f32, object, string, u32 } from "@rift/types";
-import { inject } from "@rift/module";
 import {
   ClientConnected,
   ClientDisconnected,
   type ClientId,
   defineSchema,
   DeltaApplied,
+  type EntityId,
   RiftClient,
-  RiftClientModule,
   RiftCloseCode,
   RiftServer,
   type RiftServerEvent,
-  RiftServerModule,
   Tick,
 } from "../src/index";
 import type {
@@ -197,10 +195,7 @@ describe("delta replication", () => {
     await flush();
     expect(client.world.get(e, pos)?.x).toBe(1);
 
-    const p = server.world.get(e, pos);
-    if (p) {
-      p.x = 99;
-    }
+    server.world.write(e, pos, { x: 99 });
     server.tick(0);
     await flush();
     expect(client.world.get(e, pos)?.x).toBe(99);
@@ -218,13 +213,42 @@ describe("delta replication", () => {
     await server.stop();
   });
 
-  it("visibility predicate filters entities for a client", async () => {
+  it("a tick with no changes produces no client bytes", async () => {
     const schema = makeSchema();
-    const pair = makePair(4);
+    const pair = makePair(30);
     const server = new RiftServer({
       schema,
       transport: pair.server,
       tickRateHz: 0,
+    });
+    await server.start();
+    const client = new RiftClient({ schema, transport: pair.client });
+    await client.connect();
+    await flush();
+
+    const sent: Uint8Array[] = [];
+    const origSend = pair.server.send.bind(pair.server);
+    pair.server.send = (id, data) => {
+      sent.push(data);
+      origSend(id, data);
+    };
+
+    server.tick(0);
+    await flush();
+    expect(sent.length).toBe(0);
+
+    await server.stop();
+  });
+
+  it("visibility callback filters entities for a client", async () => {
+    const schema = makeSchema();
+    const pair = makePair(4);
+    let visibleSet: ReadonlySet<EntityId> | undefined;
+    const server = new RiftServer({
+      schema,
+      transport: pair.server,
+      tickRateHz: 0,
+      visibility: () => visibleSet,
     });
     await server.start();
     const client = new RiftClient({ schema, transport: pair.client });
@@ -234,14 +258,15 @@ describe("delta replication", () => {
     server.world.add(visible, name, "yes");
     const hidden = server.world.create();
     server.world.add(hidden, name, "no");
-    server.setClientVisibilityPredicate(pair.fromClient, (id) => id !== hidden);
+
+    visibleSet = new Set([visible]);
     server.tick(0);
     await flush();
 
     expect(client.world.exists(visible)).toBe(true);
     expect(client.world.exists(hidden)).toBe(false);
 
-    server.setClientVisibilityPredicate(pair.fromClient, undefined);
+    visibleSet = undefined;
     server.tick(0);
     await flush();
     expect(client.world.exists(hidden)).toBe(true);
@@ -250,10 +275,12 @@ describe("delta replication", () => {
   it("predicate flip emits destroy then create on next flip", async () => {
     const schema = makeSchema();
     const pair = makePair(16);
+    let visibleSet: ReadonlySet<EntityId> | undefined;
     const server = new RiftServer({
       schema,
       transport: pair.server,
       tickRateHz: 0,
+      visibility: () => visibleSet,
     });
     await server.start();
     const client = new RiftClient({ schema, transport: pair.client });
@@ -265,16 +292,47 @@ describe("delta replication", () => {
     await flush();
     expect(client.world.exists(e)).toBe(true);
 
-    server.setClientVisibilityPredicate(pair.fromClient, () => false);
+    visibleSet = new Set();
     server.tick(0);
     await flush();
     expect(client.world.exists(e)).toBe(false);
 
-    server.setClientVisibilityPredicate(pair.fromClient, () => true);
+    visibleSet = undefined;
     server.tick(0);
     await flush();
     expect(client.world.exists(e)).toBe(true);
     expect(client.world.get(e, name)).toBe("e");
+
+    await server.stop();
+  });
+
+  it("setVisibility replaces the callback at runtime", async () => {
+    const schema = makeSchema();
+    const pair = makePair(40);
+    const server = new RiftServer({
+      schema,
+      transport: pair.server,
+      tickRateHz: 0,
+    });
+    await server.start();
+    const client = new RiftClient({ schema, transport: pair.client });
+    await client.connect();
+
+    const e = server.world.create();
+    server.world.add(e, name, "x");
+    server.tick(0);
+    await flush();
+    expect(client.world.exists(e)).toBe(true);
+
+    server.setVisibility(() => new Set());
+    server.tick(0);
+    await flush();
+    expect(client.world.exists(e)).toBe(false);
+
+    server.setVisibility(undefined);
+    server.tick(0);
+    await flush();
+    expect(client.world.exists(e)).toBe(true);
 
     await server.stop();
   });
@@ -354,13 +412,15 @@ describe("event routing", () => {
     await server.stop();
   });
 
-  it("entity strategy only delivers to clients whose predicate sees that entity", async () => {
+  it("entity strategy only delivers to clients whose visibility sees that entity", async () => {
     const schema = makeSchema();
     const pair = makePair(7);
+    let visibleSet: ReadonlySet<EntityId> | undefined = new Set();
     const server = new RiftServer({
       schema,
       transport: pair.server,
       tickRateHz: 0,
+      visibility: () => visibleSet,
     });
     await server.start();
     const client = new RiftClient({ schema, transport: pair.client });
@@ -372,7 +432,6 @@ describe("event routing", () => {
 
     const target = server.world.create();
     server.world.add(target, name, "target");
-    server.setClientVisibilityPredicate(pair.fromClient, () => false);
 
     server.emit({
       type: pong,
@@ -384,7 +443,7 @@ describe("event routing", () => {
     await flush();
     expect(seen).toEqual([]);
 
-    server.setClientVisibilityPredicate(pair.fromClient, () => true);
+    visibleSet = undefined; // sees everything
     server.emit({
       type: pong,
       data: { value: 2 },
@@ -394,27 +453,6 @@ describe("event routing", () => {
     server.tick(0);
     await flush();
     expect(seen).toEqual([2]);
-
-    await server.stop();
-  });
-
-  it("disconnect drops the visibility predicate so reconnects start clean", async () => {
-    const schema = makeSchema();
-    const pair = makePair(17);
-    const server = new RiftServer({
-      schema,
-      transport: pair.server,
-      tickRateHz: 0,
-    });
-    await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
-    await client.connect();
-    server.setClientVisibilityPredicate(pair.fromClient, () => false);
-    expect(server.getClientIds()).toContain(pair.fromClient);
-
-    await client.disconnect();
-    await flush();
-    expect(server.getClientIds()).not.toContain(pair.fromClient);
 
     await server.stop();
   });
@@ -464,136 +502,6 @@ describe("lifecycle", () => {
     server.tick(0);
     server.tick(0);
     expect(ticks).toEqual([1, 2]);
-    await server.stop();
-  });
-});
-
-describe("modules", () => {
-  it("server module receives DI and observes events via this.server.on", async () => {
-    const schema = makeSchema();
-    const pair = makePair(10);
-    let server!: RiftServer;
-    const observed: number[] = [];
-
-    class HelloModule extends RiftServerModule {
-      init() {
-        server = this.server;
-        return this.server.on(ping, (event) => {
-          observed.push(event.data.note.length);
-        });
-      }
-    }
-
-    const srv = new RiftServer({
-      schema,
-      transport: pair.server,
-      tickRateHz: 0,
-      modules: [new HelloModule()],
-    });
-    await srv.start();
-    const client = new RiftClient({ schema, transport: pair.client });
-    await client.connect();
-    expect(server).toBe(srv);
-
-    client.emit({
-      type: ping,
-      data: { note: "abcd" },
-      source: "local",
-      target: "wire",
-    });
-    await flush();
-    expect(observed).toEqual([4]);
-
-    await srv.stop();
-  });
-
-  it("locally-targeted server emits reach module-registered handlers", async () => {
-    const schema = makeSchema();
-    const pair = makePair(11);
-    const seen: string[] = [];
-
-    class Router extends RiftServerModule {
-      init() {
-        return this.server.on(ping, (event) => {
-          seen.push(event.data.note);
-        });
-      }
-    }
-
-    const router = new Router();
-    const server = new RiftServer({
-      schema,
-      transport: pair.server,
-      tickRateHz: 0,
-      modules: [router],
-    });
-    await server.start();
-
-    server.emit({
-      type: ping,
-      data: { note: "self" },
-      source: { type: "local" },
-      target: { type: "local" },
-    });
-    expect(seen).toEqual(["self"]);
-
-    await server.stop();
-  });
-
-  it("client modules receive DI", async () => {
-    const schema = makeSchema();
-    const pair = makePair(12);
-    let captured!: RiftClient;
-
-    class ClientHello extends RiftClientModule {
-      init() {
-        captured = this.client;
-      }
-    }
-
-    const server = new RiftServer({
-      schema,
-      transport: pair.server,
-      tickRateHz: 0,
-    });
-    await server.start();
-    const client = new RiftClient({
-      schema,
-      transport: pair.client,
-      modules: [new ClientHello()],
-    });
-    await client.connect();
-    expect(captured).toBe(client);
-
-    await server.stop();
-  });
-
-  it("module dependency chain initializes in topological order", async () => {
-    const schema = makeSchema();
-    const pair = makePair(13);
-    const order: string[] = [];
-
-    class Base extends RiftServerModule {
-      init() {
-        order.push("base");
-      }
-    }
-    class Dep extends RiftServerModule {
-      @inject(Base) accessor base!: Base;
-      init() {
-        order.push("dep");
-        expect(this.base).toBeInstanceOf(Base);
-      }
-    }
-
-    const server = new RiftServer({
-      schema,
-      transport: pair.server,
-      tickRateHz: 0,
-      modules: [new Dep(), new Base()],
-    });
-    await server.start();
-    expect(order).toEqual(["base", "dep"]);
     await server.stop();
   });
 });

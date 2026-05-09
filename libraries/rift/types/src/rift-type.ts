@@ -1,5 +1,4 @@
 import type { Reader } from "./reader";
-import type { RiftSignal } from "./signals";
 import type { Writer } from "./writer";
 
 export enum RiftTypeKind {
@@ -32,7 +31,6 @@ export interface RiftType<T = unknown> {
   default(): T;
   encode(w: Writer, value: T): void;
   decode(r: Reader): T;
-  signal(value: T): RiftSignal<T>;
   readonly __t?: T;
 }
 

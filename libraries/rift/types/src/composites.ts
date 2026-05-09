@@ -1,16 +1,11 @@
 import type { Reader } from "./reader";
 import { RiftTypeKind, type RiftType } from "./rift-type";
-import {
-  ArraySignal,
-  ObjectSignal,
-  OptionalSignal,
-  TransformSignal,
-  TupleSignal,
-  UnionSignal,
-  type RiftSignal,
-  type UnionVariant,
-} from "./signals";
 import { Writer } from "./writer";
+
+export interface UnionVariant<Tag extends string, V> {
+  readonly tag: Tag;
+  readonly value: V;
+}
 
 export function object<F extends Record<string, RiftType>>(
   fields: F,
@@ -52,15 +47,6 @@ export function object<F extends Record<string, RiftType>>(
     default: defaultValue,
     encode,
     decode,
-    signal: (v) => {
-      const childSignals = {} as { [K in keyof Value]: RiftSignal<Value[K]> };
-      for (const k of order) {
-        (childSignals as Record<string, RiftSignal<unknown>>)[k] = fields[
-          k
-        ].signal(v[k]);
-      }
-      return new ObjectSignal<Value>(childSignals, order);
-    },
   };
 }
 
@@ -91,12 +77,6 @@ export function array<T>(item: RiftType<T>): RiftType<readonly T[]> {
     default: () => [],
     encode,
     decode,
-    signal: (v) =>
-      new ArraySignal<T>(
-        v,
-        (w, x) => item.encode(w, x),
-        (r) => item.decode(r),
-      ),
   };
 }
 
@@ -142,12 +122,6 @@ export function tuple<const T extends readonly RiftType[]>(
     default: defaultValue,
     encode,
     decode,
-    signal: (v) => {
-      const children = items.map((it, i) => it.signal(v[i])) as {
-        [K in keyof Value]: RiftSignal<Value[K]>;
-      };
-      return new TupleSignal<Value>(children);
-    },
   };
 }
 
@@ -178,7 +152,6 @@ export function optional<T>(inner: RiftType<T>): RiftType<T | undefined> {
     default: () => undefined,
     encode,
     decode,
-    signal: (v) => new OptionalSignal<T>(inner.signal(v ?? inner.default()), v),
   };
 }
 
@@ -232,22 +205,6 @@ export function union<V extends Record<string, RiftType>>(
     default: defaultValue,
     encode,
     decode,
-    signal: (v) => {
-      const childSignals = {} as { [K in keyof V]: RiftSignal<Inner[K]> };
-      for (const k of order) {
-        const init =
-          k === v.tag ? (v.value as Inner[typeof k]) : variants[k].default();
-        (childSignals as Record<string, RiftSignal<unknown>>)[k] =
-          variants[k].signal(init);
-      }
-      return new UnionSignal<Inner>(
-        childSignals,
-        order,
-        v as {
-          [K in keyof Inner]: UnionVariant<K & string, Inner[K]>;
-        }[keyof Inner],
-      );
-    },
   };
 }
 
@@ -274,12 +231,6 @@ export function transform<Inner, Outer>(
     default: () => fromInner(inner.default()),
     encode,
     decode,
-    signal: (v) =>
-      new TransformSignal<Inner, Outer>(
-        inner.signal(toInner(v)),
-        fromInner,
-        toInner,
-      ),
   };
 }
 

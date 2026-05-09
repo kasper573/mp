@@ -8,15 +8,8 @@ import type { RiftSchema } from "./schema";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
 import { DeltaApplied, DeltaOp, Opcode, ClientDisconnected } from "./protocol";
 import { Writer } from "@rift/types";
-import { internal } from "./internal";
 import type { World } from "./world";
 import { createWorld } from "./world";
-import {
-  type Cleanup,
-  inject,
-  initializeModules,
-  RiftModule,
-} from "@rift/module";
 import { RiftCloseCode } from "./transport";
 
 export type ClientConnectionState =
@@ -29,7 +22,6 @@ export type ClientConnectionState =
 export interface ClientOptions {
   readonly schema: RiftSchema;
   readonly transport: ClientTransport;
-  readonly modules?: readonly RiftClientModule[];
 }
 
 export type RiftClientEventOrigin = "local" | "wire";
@@ -51,7 +43,6 @@ export class RiftClient extends EventBus<
   readonly world: World;
 
   readonly #transport: ClientTransport;
-  readonly #modules: readonly RiftClientModule[];
   readonly #hash: Uint8Array;
   readonly #stateSignal = signal<ClientConnectionState>("idle");
   readonly #serverTickSignal = signal(0);
@@ -61,13 +52,11 @@ export class RiftClient extends EventBus<
   #unsub?: () => void;
   #connectResolve?: () => void;
   #connectReject?: (e: Error) => void;
-  #moduleCleanup?: Cleanup;
 
   constructor(opts: ClientOptions) {
     super();
     this.schema = opts.schema;
     this.#transport = opts.transport;
-    this.#modules = opts.modules ?? [];
     this.#hash = opts.schema.digest();
     this.world = createWorld(opts.schema);
   }
@@ -89,19 +78,16 @@ export class RiftClient extends EventBus<
   }
 
   #unsubscribeFromEmit?: UnsubscribeFn;
-  async connect(): Promise<void> {
+  connect(): Promise<void> {
     const current = this.#stateSignal.peek();
     if (
       current === "open" ||
       current === "connecting" ||
       current === "handshaking"
     ) {
-      return;
+      return Promise.resolve();
     }
     this.#unsubscribeFromEmit = this.onAny(this.#onEmit);
-    if (!this.#moduleCleanup) {
-      this.#moduleCleanup = await initializeModules([this, ...this.#modules]);
-    }
     this.#stateSignal.value = "connecting";
     return new Promise<void>((resolve, reject) => {
       this.#connectResolve = resolve;
@@ -113,7 +99,7 @@ export class RiftClient extends EventBus<
     });
   }
 
-  async disconnect(
+  disconnect(
     code = RiftCloseCode.Normal,
     reason = "client disconnect",
   ): Promise<void> {
@@ -122,31 +108,21 @@ export class RiftClient extends EventBus<
     this.#unsub?.();
     this.#unsub = undefined;
     this.#stateSignal.value = "closed";
-    if (this.#moduleCleanup) {
-      await this.#moduleCleanup();
-      this.#moduleCleanup = undefined;
-    }
+    return Promise.resolve();
   }
 
   #onEmit = (event: RiftClientEvent): boolean => {
     switch (event.target) {
-      // Local targeting means simply running the handlers, which is already done by the EventBus emit.
       case "local":
         return true;
-
       case "wire": {
         if (this.#stateSignal.peek() !== "open") {
-          // Can't send if we're not open.
           return false;
         }
-
         const idx = this.schema.eventIndexOf(event.type);
         if (idx === undefined) {
-          // Unknown event type.
           return false;
         }
-
-        // Encode and send
         const w = new Writer(64);
         w.writeU8(Opcode.EventFromClient);
         w.writeU16(idx);
@@ -178,12 +154,12 @@ export class RiftClient extends EventBus<
     const entityCount = r.readVarU32();
     for (let i = 0; i < entityCount; i++) {
       const entId = r.readVarU32() as EntityId;
-      this.world[internal].ingestCreate(entId);
+      this.world.create(entId);
       const compCount = r.readVarU32();
       for (let j = 0; j < compCount; j++) {
         const idx = r.readVarU32();
         const ty = components[idx];
-        this.world[internal].ingestAdd(entId, ty, ty.decode(r));
+        this.world.add(entId, ty, ty.decode(r));
       }
     }
     this.#serverTickSignal.value = tick;
@@ -212,36 +188,34 @@ export class RiftClient extends EventBus<
     const tick = r.readVarU32();
     const timeMs = r.readVarU32();
     const components = this.schema.components;
-    const opCount = r.readVarU32();
-    for (let i = 0; i < opCount; i++) {
+    while (r.remaining > 0) {
       const op = r.readU8() as DeltaOp;
       switch (op) {
         case DeltaOp.EntityCreated: {
-          this.world[internal].ingestCreate(r.readVarU32() as EntityId);
+          this.world.create(r.readVarU32() as EntityId);
           break;
         }
         case DeltaOp.EntityDestroyed: {
-          this.world[internal].ingestDestroy(r.readVarU32() as EntityId);
+          this.world.destroy(r.readVarU32() as EntityId);
           break;
         }
         case DeltaOp.ComponentAdded: {
           const id = r.readVarU32() as EntityId;
           const ty = components[r.readVarU32()];
-          this.world[internal].ingestAdd(id, ty, ty.decode(r));
+          this.world.add(id, ty, ty.decode(r));
           break;
         }
         case DeltaOp.ComponentRemoved: {
           const id = r.readVarU32() as EntityId;
           const ty = components[r.readVarU32()];
-          this.world[internal].ingestRemove(id, ty);
+          this.world.remove(id, ty);
           break;
         }
         case DeltaOp.ComponentUpdated: {
           const id = r.readVarU32() as EntityId;
           const ty = components[r.readVarU32()];
-          this.world[internal].ingestUpdateDirty(id, ty, (signal) => {
-            signal.decodeDirty(r);
-          });
+          const value = ty.decode(r);
+          this.world.write(id, ty, value as Partial<unknown>);
           break;
         }
       }
@@ -330,8 +304,4 @@ export class RiftClient extends EventBus<
       }
     }
   }
-}
-
-export abstract class RiftClientModule extends RiftModule {
-  @inject(RiftClient) accessor client!: RiftClient;
 }

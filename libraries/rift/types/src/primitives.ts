@@ -1,4 +1,3 @@
-import { LeafSignal } from "./signals";
 import { RiftTypeKind, type RiftType } from "./rift-type";
 import { Writer } from "./writer";
 
@@ -15,12 +14,6 @@ export function u8<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeU8(v),
     decode: (r) => r.readU8() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeU8(x),
-        (r) => r.readU8() as T,
-      ),
   };
 }
 
@@ -31,12 +24,6 @@ export function u16<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeU16(v),
     decode: (r) => r.readU16() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeU16(x),
-        (r) => r.readU16() as T,
-      ),
   };
 }
 
@@ -47,12 +34,6 @@ export function u32<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeU32(v),
     decode: (r) => r.readU32() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeU32(x),
-        (r) => r.readU32() as T,
-      ),
   };
 }
 
@@ -63,12 +44,6 @@ export function u64<T extends bigint = bigint>(): RiftType<T> {
     default: () => 0n as T,
     encode: (w, v) => w.writeU64(v),
     decode: (r) => r.readU64() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeU64(x),
-        (r) => r.readU64() as T,
-      ),
   };
 }
 
@@ -79,12 +54,6 @@ export function i8<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeI8(v),
     decode: (r) => r.readI8() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeI8(x),
-        (r) => r.readI8() as T,
-      ),
   };
 }
 
@@ -95,12 +64,6 @@ export function i16<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeI16(v),
     decode: (r) => r.readI16() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeI16(x),
-        (r) => r.readI16() as T,
-      ),
   };
 }
 
@@ -111,12 +74,6 @@ export function i32<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeI32(v),
     decode: (r) => r.readI32() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeI32(x),
-        (r) => r.readI32() as T,
-      ),
   };
 }
 
@@ -127,12 +84,6 @@ export function i64<T extends bigint = bigint>(): RiftType<T> {
     default: () => 0n as T,
     encode: (w, v) => w.writeI64(v),
     decode: (r) => r.readI64() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeI64(x),
-        (r) => r.readI64() as T,
-      ),
   };
 }
 
@@ -143,12 +94,6 @@ export function f32<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeF32(v),
     decode: (r) => r.readF32() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeF32(x),
-        (r) => r.readF32() as T,
-      ),
   };
 }
 
@@ -159,12 +104,6 @@ export function f64<T extends number = number>(): RiftType<T> {
     default: () => 0 as T,
     encode: (w, v) => w.writeF64(v),
     decode: (r) => r.readF64() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeF64(x),
-        (r) => r.readF64() as T,
-      ),
   };
 }
 
@@ -175,12 +114,6 @@ export function bool<T extends boolean = boolean>(): RiftType<T> {
     default: () => false as T,
     encode: (w, v) => w.writeBool(v),
     decode: (r) => r.readBool() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeBool(x),
-        (r) => r.readBool() as T,
-      ),
   };
 }
 
@@ -191,12 +124,6 @@ export function string<T extends string = string>(): RiftType<T> {
     default: () => "" as T,
     encode: (w, v) => w.writeString(v),
     decode: (r) => r.readString() as T,
-    signal: (v) =>
-      new LeafSignal<T>(
-        v,
-        (w, x) => w.writeString(x),
-        (r) => r.readString() as T,
-      ),
   };
 }
 
@@ -207,12 +134,6 @@ export function bytes(): RiftType<Uint8Array> {
     default: () => new Uint8Array(0),
     encode: (w, v) => w.writeBytes(v),
     decode: (r) => r.readBytes(),
-    signal: (v) =>
-      new LeafSignal<Uint8Array>(
-        v,
-        (w, x) => w.writeBytes(x),
-        (r) => r.readBytes(),
-      ),
   };
 }
 
@@ -255,7 +176,6 @@ export function enumOf<const Values extends readonly string[]>(
     default: () => defaultValue,
     encode,
     decode,
-    signal: (v) => new LeafSignal<Values[number]>(v, encode, decode),
   };
 }
 
@@ -336,6 +256,5 @@ export function bitflags<const Flags extends readonly string[]>(
     default: defaultValue,
     encode,
     decode,
-    signal: (v) => new LeafSignal<Value>(v, encode, decode),
   };
 }

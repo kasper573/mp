@@ -1,0 +1,25 @@
+{
+  "name": "@rift/reactive",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./preact": "./src/preact.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@preact/signals": "catalog:",
+    "@preact/signals-core": "catalog:",
+    "@rift/core": "workspace:*",
+    "@rift/types": "workspace:*",
+    "preact": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

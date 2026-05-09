@@ -9,10 +9,8 @@ import {
   f64,
   i32,
   object,
-  optional,
   Reader,
   string,
-  transform,
   tuple,
   u32,
   u64,
@@ -35,7 +33,6 @@ const entityTy = object({
 });
 const arr100Ty = array(posTy);
 const tupleTy = tuple(u8(), string(), f32());
-const optionalTy = optional(string());
 const colorTy = enumOf("red", "green", "blue", "yellow");
 const flag33Names = Array.from({ length: 33 }, (_, i) => `f${i}`);
 const flags33Ty = bitflags(...flag33Names);
@@ -43,11 +40,6 @@ const unionTy = union({
   move: object({ dx: i32(), dy: i32() }),
   jump: object({ h: u32() }),
 });
-const transformTy = transform(
-  u32(),
-  (n) => `id:${n}`,
-  (s) => Number(s.slice(3)),
-);
 const bytesTy = bytes();
 const u64Ty = u64();
 const f64Ty = f64();
@@ -306,71 +298,6 @@ const scenarios: readonly Scenario[] = [
     name: "entity_default",
     run() {
       entityTy.default();
-    },
-  },
-  {
-    name: "leaf_signal_encode_x1000",
-    run() {
-      const sig = u32Ty.signal(42);
-      sig.setRoot({ dirty: false });
-      const w = new Writer(4096);
-      for (let i = 0; i < 1000; i++) {
-        sig.encode(w);
-      }
-      w.finish();
-    },
-  },
-  {
-    name: "leaf_signal_set_changing_x1000",
-    run() {
-      const sig = u32Ty.signal(0);
-      sig.setRoot({ dirty: false });
-      for (let i = 0; i < 1000; i++) {
-        sig.set(i);
-      }
-    },
-  },
-  {
-    name: "object_signal_mutate_x1000",
-    run() {
-      const sig = posTy.signal(posValue);
-      sig.setRoot({ dirty: false });
-      const p = sig.value;
-      for (let i = 0; i < 1000; i++) {
-        (p as { x: number }).x = i;
-      }
-    },
-  },
-  {
-    name: "object_signal_encode_x100",
-    run() {
-      const sig = entityTy.signal(entityValue);
-      sig.setRoot({ dirty: false });
-      const w = new Writer(16384);
-      for (let i = 0; i < 100; i++) {
-        sig.encode(w);
-      }
-      w.finish();
-    },
-  },
-  {
-    name: "transform_set_x1000",
-    run() {
-      const sig = transformTy.signal("id:0");
-      sig.setRoot({ dirty: false });
-      for (let i = 0; i < 1000; i++) {
-        sig.set(`id:${i}`);
-      }
-    },
-  },
-  {
-    name: "optional_toggle_x1000",
-    run() {
-      const sig = optionalTy.signal("hi");
-      sig.setRoot({ dirty: false });
-      for (let i = 0; i < 1000; i++) {
-        sig.set(i % 2 === 0 ? "hi" : undefined);
-      }
     },
   },
   {

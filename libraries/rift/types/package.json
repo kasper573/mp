@@ -12,9 +12,6 @@
     "bench": "tsx scripts/benchmark.ts",
     "profile": "node --expose-gc --import tsx scripts/profile.ts"
   },
-  "dependencies": {
-    "@preact/signals-core": "catalog:"
-  },
   "devDependencies": {
     "mitata": "catalog:",
     "tsx": "catalog:",

@@ -70,26 +70,4 @@ describe("composites", () => {
     const r = new Reader(w.finish());
     expect(ty.decode(r)).toBe("id:9");
   });
-  it("object signal proxy mutation marks dirty", () => {
-    const ty = object({ x: i32(), y: i32() });
-    const sig = ty.signal({ x: 1, y: 2 });
-    let dirtyCount = 0;
-    sig.setRoot({ dirty: false, onDirty: () => dirtyCount++ });
-    const proxy = sig.value;
-    proxy.x = 100;
-    expect(dirtyCount).toBe(1);
-    proxy.y = 200;
-    expect(dirtyCount).toBe(1);
-    expect(sig.peek()).toEqual({ x: 100, y: 200 });
-  });
-  it("tuple signal supports indexed writes", () => {
-    const ty = tuple(i32(), i32());
-    const sig = ty.signal([0, 0]);
-    sig.setRoot({ dirty: false });
-    const proxy = sig.value as unknown as number[];
-    proxy[0] = 7;
-    proxy[1] = 9;
-    expect(proxy[0]).toBe(7);
-    expect(proxy[1]).toBe(9);
-  });
 });
