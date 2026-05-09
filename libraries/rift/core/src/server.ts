@@ -96,6 +96,7 @@ export class RiftServer extends EventBus<
     this.#visibility = fn;
   }
 
+  #unsubscribeFromTransport?: () => void;
   #unsubscribeFromEmit?: UnsubscribeFn;
   start(): Promise<void> {
     if (this.#started) {
@@ -103,7 +104,9 @@ export class RiftServer extends EventBus<
     }
     this.#unsubscribeFromEmit = this.onAny(this.#onEmit);
     this.#started = true;
-    this.#transport.on((ev) => this.#onTransportEvent(ev));
+    this.#unsubscribeFromTransport = this.#transport.on((ev) =>
+      this.#onTransportEvent(ev),
+    );
     if (this.#tickRateHz > 0) {
       const interval = 1000 / this.#tickRateHz;
       this.#tickTimer = setInterval(() => this.tick(), interval);
@@ -120,6 +123,9 @@ export class RiftServer extends EventBus<
     }
     this.#stopping = true;
     this.#unsubscribeFromEmit?.();
+    this.#unsubscribeFromEmit = undefined;
+    this.#unsubscribeFromTransport?.();
+    this.#unsubscribeFromTransport = undefined;
     if (this.#tickTimer) {
       clearInterval(this.#tickTimer);
       this.#tickTimer = undefined;
