@@ -1,5 +1,4 @@
 import type { WritableKeysOf, Simplify } from "type-fest";
-import { type } from "@mp/validate";
 
 // Matches the structure of the `Brand` type from arktype,
 // to make our branded types compatible with arktype's.
@@ -12,26 +11,22 @@ export type Branded<T, Name extends string> = T & {
  * Unit of measurement in 2D screen space.
  * @gqlScalar
  */
-export type Pixel = typeof PixelType.infer;
-export const PixelType = type("number").brand("Pixel");
+export type Pixel = Branded<number, "Pixel">;
 
 /**
  * Unit of measurement in 2D tile space.
  * @gqlScalar
  * */
-export type Tile = typeof TileType.infer;
-export const TileType = type("number").brand("Tile");
+export type Tile = Branded<number, "Tile">;
 
 /** @gqlScalar */
-export type LocalFile = typeof LocalFileType.infer;
-export const LocalFileType = type("string").brand("LocalFile");
+export type LocalFile = Branded<string, "LocalFile">;
 
 /** @gqlScalar */
 export type UrlString = string;
 
 /** @gqlScalar */
-export type TimesPerSecond = typeof TimesPerSecondType.infer;
-export const TimesPerSecondType = type("number").brand("TimesPerSecond");
+export type TimesPerSecond = Branded<number, "TimesPerSecond">;
 
 export type MinimalInput<T extends object> = TreatUndefinedAsOptional<
   WritableSubset<T>
