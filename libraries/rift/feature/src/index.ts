@@ -1,4 +1,4 @@
-import type { ClientOptions, ServerOptions } from "@rift/core";
+import type { ClientTransport, ServerOptions } from "@rift/core";
 import { defineSchema, type HashFn, RiftClient, RiftServer } from "@rift/core";
 import { ReactiveWorld } from "@rift/reactive";
 import type { RiftType } from "@rift/types";
@@ -51,21 +51,20 @@ export class FeatureRiftServer extends RiftServer {
   }
 }
 
-type FeatureClientOptions = Omit<ClientOptions, "schema" | "world"> & {
+interface FeatureClientOptions {
+  readonly transport: ClientTransport;
   readonly features: readonly Feature[];
   readonly hash: HashFn;
-};
+}
 
-export class FeatureRiftClient extends RiftClient {
-  declare readonly world: ReactiveWorld;
-
+export class FeatureRiftClient extends RiftClient<ReactiveWorld> {
   constructor(private opts: FeatureClientOptions) {
     const schema = defineSchema({
       components: opts.features.flatMap((f) => f.components ?? []),
       events: opts.features.flatMap((f) => f.events ?? []),
       hash: opts.hash,
     });
-    super({ ...opts, schema, world: new ReactiveWorld(schema) });
+    super(new ReactiveWorld(schema), opts.transport);
   }
 
   #cleanup?: Cleanup;

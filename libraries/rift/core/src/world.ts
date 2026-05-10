@@ -43,11 +43,14 @@ export class Pool<T> {
   write(id: EntityId, partial: Partial<T>): boolean {
     if (!this.values.has(id)) return false;
     const current = this.values.get(id) as T;
-    if (typeof current === "object" && current !== null) {
-      // In-place merge keeps the stored object's identity so consumers
-      // holding references (e.g. cached query rows) see the update.
-      Object.assign(current as object, partial);
+    if (
+      typeof current === "object" &&
+      current !== null &&
+      !Array.isArray(current)
+    ) {
+      this.values.set(id, { ...current, ...partial } as T);
     } else {
+      // Primitives and array components: caller passes a complete replacement.
       this.values.set(id, partial as T);
     }
     if (!this.added.has(id)) this.dirty.add(id);

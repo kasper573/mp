@@ -3,10 +3,9 @@ import type { ClientId, EntityId } from "./protocol";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
 import { EventBus } from "@rift/event";
 import { Reader, Writer } from "@rift/types";
-import type { RiftSchema } from "./schema";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
 import { DeltaApplied, DeltaOp, Opcode, ClientDisconnected } from "./protocol";
-import { World } from "./world";
+import type { World } from "./world";
 import { RiftCloseCode } from "./transport";
 
 export type ClientConnectionState =
@@ -16,14 +15,6 @@ export type ClientConnectionState =
   | "open"
   | "closed";
 
-export interface ClientOptions {
-  readonly schema: RiftSchema;
-  readonly transport: ClientTransport;
-  // Subclasses pass a specialized `World` (e.g. `ReactiveWorld`) so it
-  // survives narrowing via `declare readonly world: ...`.
-  readonly world?: World;
-}
-
 export type RiftClientEventOrigin = "local" | "wire";
 export type RiftClientEvent<Data = unknown> = RiftEvent<
   Data,
@@ -31,14 +22,10 @@ export type RiftClientEvent<Data = unknown> = RiftEvent<
   RiftClientEventOrigin
 >;
 
-export class RiftClient extends EventBus<
+export class RiftClient<W extends World = World> extends EventBus<
   RiftClientEventOrigin,
   RiftClientEventOrigin
 > {
-  readonly schema: RiftSchema;
-  readonly world: World;
-
-  readonly #transport: ClientTransport;
   readonly #hash: Uint8Array;
   readonly #stateSignal = signal<ClientConnectionState>("idle");
   readonly #serverTickSignal = signal(0);
@@ -49,12 +36,12 @@ export class RiftClient extends EventBus<
   #connectResolve?: () => void;
   #connectReject?: (e: Error) => void;
 
-  constructor(opts: ClientOptions) {
+  constructor(
+    public readonly world: W,
+    private readonly transport: ClientTransport,
+  ) {
     super();
-    this.schema = opts.schema;
-    this.#transport = opts.transport;
-    this.#hash = opts.schema.digest();
-    this.world = opts.world ?? new World(opts.schema);
+    this.#hash = world.schema.digest();
   }
 
   get state(): ReadonlySignal<ClientConnectionState> {
@@ -88,8 +75,8 @@ export class RiftClient extends EventBus<
     return new Promise<void>((resolve, reject) => {
       this.#connectResolve = resolve;
       this.#connectReject = reject;
-      this.#unsub = this.#transport.on((ev) => this.#onTransportEvent(ev));
-      if (this.#transport.state === "open") {
+      this.#unsub = this.transport.on((ev) => this.#onTransportEvent(ev));
+      if (this.transport.state === "open") {
         this.#onTransportEvent({ type: "open" });
       }
     });
@@ -100,7 +87,7 @@ export class RiftClient extends EventBus<
     reason = "client disconnect",
   ): Promise<void> {
     this.#unsubscribeFromEmit?.();
-    this.#transport.close(code, reason);
+    this.transport.close(code, reason);
     this.#unsub?.();
     this.#unsub = undefined;
     this.#stateSignal.value = "closed";
@@ -115,7 +102,7 @@ export class RiftClient extends EventBus<
         if (this.#stateSignal.peek() !== "open") {
           return false;
         }
-        const idx = this.schema.eventIndexOf(event.type);
+        const idx = this.world.schema.eventIndexOf(event.type);
         if (idx === undefined) {
           return false;
         }
@@ -123,7 +110,7 @@ export class RiftClient extends EventBus<
         w.writeU8(Opcode.EventFromClient);
         w.writeU16(idx);
         event.type.encode(w, event.data);
-        this.#transport.send(w.finish());
+        this.transport.send(w.finish());
         return true;
       }
     }
@@ -146,7 +133,7 @@ export class RiftClient extends EventBus<
       }
     }
     this.#clientId = id;
-    const components = this.schema.components;
+    const components = this.world.schema.components;
     const entityCount = r.readVarU32();
     for (let i = 0; i < entityCount; i++) {
       const entId = r.readVarU32() as EntityId;
@@ -173,7 +160,7 @@ export class RiftClient extends EventBus<
   }
 
   #rejectHandshake(reason: string): void {
-    this.#transport.close(RiftCloseCode.SchemaMismatch, reason);
+    this.transport.close(RiftCloseCode.SchemaMismatch, reason);
     this.#connectReject?.(new Error(reason));
     this.#connectReject = undefined;
     this.#connectResolve = undefined;
@@ -183,7 +170,7 @@ export class RiftClient extends EventBus<
     const r = new Reader(data, 1);
     const tick = r.readVarU32();
     const timeMs = r.readVarU32();
-    const components = this.schema.components;
+    const components = this.world.schema.components;
     while (r.remaining > 0) {
       const op = r.readU8() as DeltaOp;
       switch (op) {
@@ -229,7 +216,7 @@ export class RiftClient extends EventBus<
   #applyEventToClient(encodedEvent: Uint8Array): void {
     const r = new Reader(encodedEvent, 1);
     const idx = r.readU16();
-    const type = this.schema.events[idx];
+    const type = this.world.schema.events[idx];
     if (!type) {
       return;
     }
@@ -248,7 +235,7 @@ export class RiftClient extends EventBus<
         const w = new Writer(64);
         w.writeU8(Opcode.Hello);
         w.writeBytes(this.#hash);
-        this.#transport.send(w.finish());
+        this.transport.send(w.finish());
         return;
       }
       case "message": {

@@ -96,12 +96,7 @@ export class WorldSignals {
     return computed(() => {
       for (const t of types) this.#world.trackPool(t);
       if (types.length === 1) {
-        // Pool stores object values by reference and mutates them in
-        // place via `world.write`, so a same-reference return would
-        // dedupe inside the computed and never notify subscribers.
-        // Snapshotting forces a fresh outer reference per evaluation
-        // while preserving the prototype (Vector, Rect, etc.).
-        return snapshot(this.#world.get(id, types[0]));
+        return this.#world.get(id, types[0]);
       }
       return this.#world.get(
         id,
@@ -135,10 +130,4 @@ export class WorldSignals {
 
 function bump(s: Signal<number>): void {
   s.value = s.peek() + 1;
-}
-
-function snapshot<T>(v: T): T {
-  if (v === undefined || v === null || typeof v !== "object") return v;
-  if (Array.isArray(v)) return [...v] as unknown as T;
-  return Object.assign(Object.create(Object.getPrototypeOf(v)), v) as T;
 }
