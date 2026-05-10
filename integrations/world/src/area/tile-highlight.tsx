@@ -1,9 +1,9 @@
 import type { AreaResource } from "./area-resource";
-import type { Actor } from "../client/views";
 import type { FillStyle } from "@mp/graphics";
 import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
+import type { EntityId } from "@rift/core";
 
 export interface TileHighlightOptions {
   area: AreaResource;
@@ -16,7 +16,7 @@ interface HighlightTarget<Type extends string> {
 }
 
 interface AttackHighlightTarget extends HighlightTarget<"attack"> {
-  actor: Actor;
+  entityId: EntityId;
 }
 
 interface MoveHighlightTarget extends HighlightTarget<"move"> {}

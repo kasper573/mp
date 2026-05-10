@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./preact": "./src/preact.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -13,7 +14,8 @@
   "dependencies": {
     "@preact/signals-core": "catalog:",
     "@rift/core": "workspace:*",
-    "@rift/types": "workspace:*"
+    "@rift/types": "workspace:*",
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -11,18 +11,23 @@ import { effect } from "@preact/signals-core";
 import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { TimeSpan } from "@mp/time";
+import type { EntityId } from "@rift/core";
 import type { FeatureRiftClient } from "@rift/feature";
 import { Attacked } from "../combat/events";
+import { Combat } from "../combat/components";
+import { Movement } from "../movement/components";
+import { Appearance } from "../appearance/components";
+import { CharacterTag } from "../identity/components";
+import { Progression } from "../progression/components";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
-import type { Actor } from "../client/views";
 import { interpolationEnabled } from "../client/render-settings";
 
 const TELEPORT_THRESHOLD: Tile = 3 as Tile;
 
 export interface ActorControllerOptions {
   tiled: TiledResource;
-  actor: Actor;
+  entityId: EntityId;
   client: FeatureRiftClient;
   actorTextures: ActorTextureLookup;
 }
@@ -40,12 +45,12 @@ export class ActorController extends Container {
     super();
     this.#options = options;
 
-    const { actor, client } = options;
-    const initial = actorAnimationState(actor);
-    this.#wasAlive = initial.isAlive;
+    const { entityId, client } = options;
+    const initialAlive = client.world.get(entityId, Combat)?.alive ?? false;
+    this.#wasAlive = initialAlive;
 
     this.#sprite = new ActorSprite(
-      initial.isAlive
+      initialAlive
         ? {
             name: "idle-spear",
             type: "smooth-switch",
@@ -56,12 +61,15 @@ export class ActorController extends Container {
             type: "fixed-at-end",
           },
     );
-    this.#sprite.textureLookup = (animationName, direction) =>
-      options.actorTextures(
-        options.actor.appearance.modelId,
+    this.#sprite.textureLookup = (animationName, direction) => {
+      const appearance = client.world.get(entityId, Appearance);
+      if (!appearance) return [];
+      return options.actorTextures(
+        appearance.modelId,
         animationName,
         direction,
       );
+    };
 
     this.#text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
 
@@ -71,7 +79,7 @@ export class ActorController extends Container {
     this.#subscriptions = [
       effect(this.#updateBaseAnimation),
       client.on(Attacked, (ev) => {
-        if (ev.data.entityId !== actor.entityId) return;
+        if (ev.data.entityId !== entityId) return;
         void this.#sprite
           .playToEndAndStop("attack-spear")
           .then(this.#resumeBaseAnimation);
@@ -89,9 +97,7 @@ export class ActorController extends Container {
   }
 
   #updateBaseAnimation = () => {
-    const { isMoving, isFast, isAlive } = actorAnimationState(
-      this.#options.actor,
-    );
+    const { isMoving, isFast, isAlive } = this.#animationState();
     if (this.#wasAlive && !isAlive) {
       void this.#sprite.playToEndAndStop("death-spear");
     } else if (isAlive) {
@@ -103,9 +109,7 @@ export class ActorController extends Container {
   };
 
   #resumeBaseAnimation = () => {
-    const { isMoving, isFast, isAlive } = actorAnimationState(
-      this.#options.actor,
-    );
+    const { isMoving, isFast, isAlive } = this.#animationState();
     if (!isAlive) {
       void this.#sprite.playToEndAndStop("death-spear");
       return;
@@ -115,34 +119,64 @@ export class ActorController extends Container {
     );
   };
 
+  #animationState() {
+    const { entityId, client } = this.#options;
+    const [mv, combat] = client.world.entitySignal(
+      entityId,
+      Movement,
+      Combat,
+    ).value;
+    return {
+      isMoving: !!mv?.moveTarget,
+      isFast: (mv?.speed ?? 0) >= 2,
+      isAlive: combat?.alive ?? false,
+    };
+  }
+
   #onRender = () => {
-    const { actor, tiled } = this.#options;
+    const { entityId, client, tiled } = this.#options;
+    const [mv, combat, appearance, charTag, progression] = client.world.get(
+      entityId,
+      Movement,
+      Combat,
+      Appearance,
+      CharacterTag,
+      Progression,
+    );
 
-    this.#sprite.attackSpeed = actor.combat.attackSpeed;
-    this.#sprite.direction = actor.movement.dir;
+    if (combat) {
+      this.#sprite.attackSpeed = combat.attackSpeed;
+    }
+    if (mv) {
+      this.#sprite.direction = mv.direction;
+    }
 
-    this.alpha = actor.appearance.opacity ?? 1;
+    this.alpha = appearance?.opacity ?? 1;
 
-    if (actor.appearance.color === undefined) {
+    if (appearance?.color === undefined) {
       this.#sprite.filters = [];
     } else {
       this.#sprite.filters = [this.#tintFilter];
-      this.#tintFilter.matrix = createTintFilterMatrix(actor.appearance.color);
+      this.#tintFilter.matrix = createTintFilterMatrix(appearance.color);
     }
 
-    this.#text.text =
-      actor.appearance.name +
-      `\n${actor.combat.health}/${actor.combat.maxHealth}`;
-    if (actor.type === "character") {
-      this.#text.text += `\n${actor.progression.xp}xp`;
+    const name = appearance?.name ?? "";
+    const health = combat?.health ?? 0;
+    const maxHealth = combat?.maxHealth ?? 0;
+    let text = `${name}\n${health}/${maxHealth}`;
+    if (charTag && progression) {
+      text += `\n${progression.xp}xp`;
     }
+    this.#text.text = text;
 
-    this.position.copyFrom(tiled.tileCoordToWorld(this.#stepDisplay()));
-    this.zIndex = this.position.y;
+    if (mv) {
+      this.position.copyFrom(tiled.tileCoordToWorld(this.#stepDisplay(mv)));
+      this.zIndex = this.position.y;
+    }
   };
 
-  #stepDisplay(): Vector<Tile> {
-    const { coords, speed } = this.#options.actor.movement;
+  #stepDisplay(mv: { coords: Vector<Tile>; speed: Tile }): Vector<Tile> {
+    const { coords, speed } = mv;
     if (!this.#displayCoords || !interpolationEnabled.value) {
       this.#displayCoords = coords;
       return coords;
@@ -164,12 +198,4 @@ export class ActorController extends Container {
     );
     return this.#displayCoords;
   }
-}
-
-function actorAnimationState(actor: Actor) {
-  return {
-    isMoving: !!actor.movement.moveTarget,
-    isFast: actor.movement.speed >= 2,
-    isAlive: actor.combat.alive,
-  };
 }

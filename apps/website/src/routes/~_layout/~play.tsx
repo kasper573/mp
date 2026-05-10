@@ -1,8 +1,8 @@
 import {
+  characterEntitySignal,
   GameAssetLoaderContext,
   GameClient,
   RiftClientContext,
-  characterSignal,
   joinAsPlayer,
   type AutoRejoinIntent,
   type CharacterId,
@@ -37,8 +37,8 @@ function PlayPage() {
 
   const { client, characters } = useRiftClient(intent);
 
-  const character = useMemo(
-    () => characterSignal(client.world, characterIdSignal),
+  const characterEntity = useMemo(
+    () => characterEntitySignal(client.world, characterIdSignal),
     [client, characterIdSignal],
   );
 
@@ -56,7 +56,7 @@ function PlayPage() {
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <GameClient
             client={client}
-            character={character}
+            characterEntity={characterEntity}
             additionalDebugUi={<MiscDebugUi />}
             viewDistance={fixtures.viewDistance}
             interactive

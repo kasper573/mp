@@ -1,4 +1,4 @@
-import type { RiftType } from "@rift/types";
+import type { InferValue, RiftType } from "@rift/types";
 import type { EntityId } from "./protocol";
 import type { RiftSchema } from "./schema";
 
@@ -117,26 +117,48 @@ export class World {
     return next;
   }
 
-  destroy(id: EntityId): void {
-    if (!this.#entities.delete(id)) return;
-    for (const [component, pool] of this.#pools) {
-      if (pool.remove(id)) {
-        this.#emit({ type: "componentRemoved", id, component });
+  destroy(...ids: readonly EntityId[]): void {
+    for (const id of ids) {
+      if (!this.#entities.delete(id)) continue;
+      for (const [component, pool] of this.#pools) {
+        if (pool.remove(id)) {
+          this.#emit({ type: "componentRemoved", id, component });
+        }
       }
+      this.#emit({ type: "entityDestroyed", id });
     }
-    this.#emit({ type: "entityDestroyed", id });
   }
 
   exists(id: EntityId): boolean {
     return this.#entities.has(id);
   }
 
-  has(id: EntityId, type: RiftType): boolean {
-    return this.#poolOf(type).values.has(id);
+  has(
+    id: EntityId,
+    ...types: readonly [RiftType, ...(readonly RiftType[])]
+  ): boolean {
+    for (const t of types) {
+      if (!this.#poolOf(t).values.has(id)) return false;
+    }
+    return true;
   }
 
-  get<T>(id: EntityId, type: RiftType<T>): T | undefined {
-    return this.#poolOf(type).values.get(id) as T | undefined;
+  get<T>(id: EntityId, type: RiftType<T>): T | undefined;
+  get<
+    const Types extends readonly [RiftType, RiftType, ...(readonly RiftType[])],
+  >(
+    id: EntityId,
+    ...types: Types
+  ): { [K in keyof Types]: InferValue<Types[K]> | undefined };
+  get(id: EntityId, ...types: readonly RiftType[]): unknown {
+    if (types.length === 1) {
+      return this.#poolOf(types[0]).values.get(id);
+    }
+    const out = new Array<unknown>(types.length);
+    for (let i = 0; i < types.length; i++) {
+      out[i] = this.#poolOf(types[i]).values.get(id);
+    }
+    return out;
   }
 
   add<T>(id: EntityId, type: RiftType<T>, initial?: T): T {
@@ -161,9 +183,22 @@ export class World {
     this.#emit({ type: "componentChanged", id, component: type });
   }
 
-  remove(id: EntityId, type: RiftType): void {
-    if (this.#poolOf(type).remove(id)) {
-      this.#emit({ type: "componentRemoved", id, component: type });
+  upsert<T>(id: EntityId, type: RiftType<T>, value: T): void {
+    if (this.#poolOf(type).values.has(id)) {
+      this.write(id, type, value);
+    } else {
+      this.add(id, type, value);
+    }
+  }
+
+  remove(
+    id: EntityId,
+    ...types: readonly [RiftType, ...(readonly RiftType[])]
+  ): void {
+    for (const t of types) {
+      if (this.#poolOf(t).remove(id)) {
+        this.#emit({ type: "componentRemoved", id, component: t });
+      }
     }
   }
 

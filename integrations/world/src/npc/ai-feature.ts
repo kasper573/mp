@@ -1,6 +1,5 @@
 import type { Cleanup, Feature } from "@rift/feature";
 import { Tick, type EntityId, type World } from "@rift/core";
-import type { InferValue } from "@rift/types";
 import type { Vector } from "@mp/math";
 import { combine, Rng, type Tile } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
@@ -76,6 +75,15 @@ class CombatMemory {
   }
 }
 
+interface AiCtx {
+  readonly world: World;
+  readonly memory: CombatMemory;
+  readonly ralliesBySpawn: Map<NpcSpawnId, EntityId[]>;
+  readonly pickRandomWalkable: (area: AreaResource) => Vector<Tile>;
+  readonly rng: Rng;
+  readonly areas: ReadonlyMap<AreaId, AreaResource>;
+}
+
 export function npcAiFeature(opts: NpcAiOptions): Feature {
   const rng = opts.rng ?? new Rng();
   return {
@@ -128,28 +136,16 @@ export function npcAiFeature(opts: NpcAiOptions): Feature {
         }),
 
         server.on(Tick, () => {
-          const ralliesBySpawn = buildAllyIndex(server.world);
-          for (const [id, ai, mv, areaTag, combat] of server.world.query(
-            NpcAi,
-            Movement,
-            AreaTag,
-            Combat,
-          )) {
-            const area = opts.areas.get(areaTag.areaId);
-            if (!area) continue;
-            stepNpc(
-              server.world,
-              memory,
-              ralliesBySpawn,
-              pickRandomWalkable,
-              rng,
-              id,
-              ai,
-              mv,
-              areaTag.areaId,
-              area,
-              combat,
-            );
+          const ctx: AiCtx = {
+            world: server.world,
+            memory,
+            ralliesBySpawn: buildAllyIndex(server.world),
+            pickRandomWalkable,
+            rng,
+            areas: opts.areas,
+          };
+          for (const [id] of server.world.query(NpcAi)) {
+            stepNpc(ctx, id);
           }
         }),
 
@@ -172,37 +168,36 @@ function buildAllyIndex(world: World): Map<NpcSpawnId, EntityId[]> {
   return out;
 }
 
-function stepNpc(
-  world: World,
-  memory: CombatMemory,
-  ralliesBySpawn: Map<NpcSpawnId, EntityId[]>,
-  pickRandomWalkable: (area: AreaResource) => Vector<Tile>,
-  rng: Rng,
-  id: EntityId,
-  ai: InferValue<typeof NpcAi>,
-  mv: InferValue<typeof Movement>,
-  areaId: AreaId,
-  area: AreaResource,
-  combat: InferValue<typeof Combat>,
-): void {
+function stepNpc(ctx: AiCtx, id: EntityId): void {
+  const [ai, mv, areaTag, combat] = ctx.world.get(
+    id,
+    NpcAi,
+    Movement,
+    AreaTag,
+    Combat,
+  );
+  if (!ai || !mv || !areaTag || !combat) return;
+  const area = ctx.areas.get(areaTag.areaId);
+  if (!area) return;
+
   if (!combat.alive) {
-    clearActions(world, id, combat, mv);
-    memory.forget(id);
+    clearActions(ctx, id);
+    ctx.memory.forget(id);
     return;
   }
 
   if (combat.attackTargetId !== undefined) {
     const stillEngaged = stillInRange(
-      world,
+      ctx,
       combat.attackTargetId,
       mv.coords,
-      areaId,
+      areaTag.areaId,
       ai.aggroRange,
     );
     if (!stillEngaged) {
-      world.remove(id, PathFollow);
-      world.write(id, Combat, { attackTargetId: undefined });
-      world.write(id, Movement, {
+      ctx.world.remove(id, PathFollow);
+      ctx.world.write(id, Combat, { attackTargetId: undefined });
+      ctx.world.write(id, Movement, {
         moveTarget: undefined,
         speed: ai.idleSpeed,
       });
@@ -211,36 +206,31 @@ function stepNpc(
 
   if (combat.attackTargetId !== undefined) return;
 
-  const target = findAggroTarget(
-    world,
-    memory,
-    ralliesBySpawn,
-    id,
-    ai,
-    mv,
-    areaId,
-  );
+  const target = findAggroTarget(ctx, id, areaTag.areaId);
   if (target !== undefined) {
-    world.write(id, Combat, { attackTargetId: target });
-    world.write(id, Movement, {
+    ctx.world.write(id, Combat, { attackTargetId: target });
+    ctx.world.write(id, Movement, {
       speed: (ai.idleSpeed * CHASE_SPEED_MULTIPLIER) as Tile,
     });
     return;
   }
 
-  applyIdleBehaviour(world, pickRandomWalkable, rng, id, ai, mv, area);
+  applyIdleBehaviour(ctx, id, area);
 }
 
 function stillInRange(
-  world: World,
+  ctx: AiCtx,
   targetId: EntityId,
   selfCoords: Vector<Tile>,
   selfArea: AreaId,
   aggroRange: number,
 ): boolean {
-  const targetMv = world.get(targetId, Movement);
-  const targetArea = world.get(targetId, AreaTag);
-  const targetCombat = world.get(targetId, Combat);
+  const [targetMv, targetArea, targetCombat] = ctx.world.get(
+    targetId,
+    Movement,
+    AreaTag,
+    Combat,
+  );
   if (!targetMv || !targetArea || !targetCombat || !targetCombat.alive) {
     return false;
   }
@@ -248,67 +238,65 @@ function stillInRange(
   return targetMv.coords.isWithinDistance(selfCoords, aggroRange);
 }
 
-function clearActions(
-  world: World,
-  id: EntityId,
-  combat: InferValue<typeof Combat>,
-  mv: InferValue<typeof Movement>,
-): void {
-  const hadPath = world.has(id, PathFollow);
+function clearActions(ctx: AiCtx, id: EntityId): void {
+  const [combat, mv] = ctx.world.get(id, Combat, Movement);
+  if (!combat || !mv) return;
+  const hadPath = ctx.world.has(id, PathFollow);
   if (combat.attackTargetId !== undefined || mv.moveTarget || hadPath) {
-    world.remove(id, PathFollow);
-    world.write(id, Combat, { attackTargetId: undefined });
-    world.write(id, Movement, { moveTarget: undefined });
+    ctx.world.remove(id, PathFollow);
+    ctx.world.write(id, Combat, { attackTargetId: undefined });
+    ctx.world.write(id, Movement, { moveTarget: undefined });
   }
 }
 
 function applyIdleBehaviour(
-  world: World,
-  pickRandomWalkable: (area: AreaResource) => Vector<Tile>,
-  rng: Rng,
+  ctx: AiCtx,
   id: EntityId,
-  ai: InferValue<typeof NpcAi>,
-  mv: InferValue<typeof Movement>,
   area: AreaResource,
 ): void {
-  if (mv.moveTarget || world.has(id, PathFollow)) return;
+  const [ai, mv] = ctx.world.get(id, NpcAi, Movement);
+  if (!ai || !mv) return;
+  if (mv.moveTarget || ctx.world.has(id, PathFollow)) return;
 
   switch (ai.npcType) {
     case "static":
       return;
     case "patrol":
       if (ai.patrol && ai.patrol.length > 0) {
-        world.write(id, Movement, {
+        ctx.world.write(id, Movement, {
           moveTarget: pickFarthestPoint(mv.coords, ai.patrol),
         });
       }
       return;
     case "pacifist":
-      if (rng.next() < PACIFIST_WANDER_CHANCE) {
-        world.write(id, Movement, { moveTarget: pickRandomWalkable(area) });
+      if (ctx.rng.next() < PACIFIST_WANDER_CHANCE) {
+        ctx.world.write(id, Movement, {
+          moveTarget: ctx.pickRandomWalkable(area),
+        });
       }
       return;
     case "aggressive":
     case "defensive":
     case "protective":
-      world.write(id, Movement, { moveTarget: pickRandomWalkable(area) });
+      ctx.world.write(id, Movement, {
+        moveTarget: ctx.pickRandomWalkable(area),
+      });
       return;
   }
 }
 
 function findAggroTarget(
-  world: World,
-  memory: CombatMemory,
-  ralliesBySpawn: Map<NpcSpawnId, EntityId[]>,
+  ctx: AiCtx,
   selfId: EntityId,
-  ai: InferValue<typeof NpcAi>,
-  selfMv: InferValue<typeof Movement>,
   selfArea: AreaId,
 ): EntityId | undefined {
+  const [ai, selfMv] = ctx.world.get(selfId, NpcAi, Movement);
+  if (!ai || !selfMv) return undefined;
+
   switch (ai.npcType) {
     case "aggressive":
       return findClosestCharacter(
-        world,
+        ctx,
         selfId,
         selfArea,
         selfMv.coords,
@@ -316,21 +304,19 @@ function findAggroTarget(
       );
     case "defensive":
       return findClosestCharacter(
-        world,
+        ctx,
         selfId,
         selfArea,
         selfMv.coords,
         ai.aggroRange,
         (candidateId) =>
-          memory.hasAttackedEachOther(selfId, selfId, candidateId),
+          ctx.memory.hasAttackedEachOther(selfId, selfId, candidateId),
       );
     case "protective":
       return findProtectiveTarget(
-        world,
-        memory,
-        ralliesBySpawn,
+        ctx,
         selfId,
-        selfMv,
+        selfMv.coords,
         selfArea,
         ai.aggroRange,
       );
@@ -340,36 +326,37 @@ function findAggroTarget(
 }
 
 function findProtectiveTarget(
-  world: World,
-  memory: CombatMemory,
-  ralliesBySpawn: Map<NpcSpawnId, EntityId[]>,
+  ctx: AiCtx,
   selfId: EntityId,
-  selfMv: InferValue<typeof Movement>,
+  selfCoords: Vector<Tile>,
   selfArea: AreaId,
   aggroRange: number,
 ): EntityId | undefined {
-  const selfTag = world.get(selfId, NpcTag);
+  const selfTag = ctx.world.get(selfId, NpcTag);
   if (!selfTag) return undefined;
 
-  const allyList = ralliesBySpawn.get(selfTag.spawnId);
+  const allyList = ctx.ralliesBySpawn.get(selfTag.spawnId);
   const allies =
     allyList && allyList.length > 0 ? new Set(allyList) : new Set<EntityId>();
 
   let closest: EntityId | undefined;
   let closestDistSq = aggroRange * aggroRange;
-  memory.forEachCombat(selfId, (attacker, target) => {
+  ctx.memory.forEachCombat(selfId, (attacker, target) => {
     const enemyId = allies.has(target)
       ? attacker
       : allies.has(attacker)
         ? target
         : undefined;
     if (enemyId === undefined || allies.has(enemyId)) return;
-    const enemyMv = world.get(enemyId, Movement);
-    const enemyArea = world.get(enemyId, AreaTag);
-    const enemyCombat = world.get(enemyId, Combat);
+    const [enemyMv, enemyArea, enemyCombat] = ctx.world.get(
+      enemyId,
+      Movement,
+      AreaTag,
+      Combat,
+    );
     if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive) return;
     if (enemyArea.areaId !== selfArea) return;
-    const distSq = enemyMv.coords.squaredDistance(selfMv.coords);
+    const distSq = enemyMv.coords.squaredDistance(selfCoords);
     if (distSq <= closestDistSq) {
       closestDistSq = distSq;
       closest = enemyId;
@@ -379,7 +366,7 @@ function findProtectiveTarget(
 }
 
 function findClosestCharacter(
-  world: World,
+  ctx: AiCtx,
   selfId: EntityId,
   selfArea: AreaId,
   selfCoords: Vector<Tile>,
@@ -388,14 +375,14 @@ function findClosestCharacter(
 ): EntityId | undefined {
   let closest: EntityId | undefined;
   let closestDistSq = aggroRange * aggroRange;
-  for (const [candidateId, , candidateMv, candidateArea] of world.query(
+  for (const [candidateId, , candidateMv, candidateArea] of ctx.world.query(
     CharacterTag,
     Movement,
     AreaTag,
   )) {
     if (candidateId === selfId) continue;
     if (candidateArea.areaId !== selfArea) continue;
-    const candidateCombat = world.get(candidateId, Combat);
+    const candidateCombat = ctx.world.get(candidateId, Combat);
     if (!candidateCombat || !candidateCombat.alive) continue;
     if (filter && !filter(candidateId)) continue;
     const distSq = candidateMv.coords.squaredDistance(selfCoords);

@@ -54,8 +54,11 @@ export function combatFeature(): Feature {
           for (const [id, combat, mv] of server.world.query(Combat, Movement)) {
             if (!combat.attackTargetId || !combat.alive) continue;
             const target = combat.attackTargetId;
-            const targetCombat = server.world.get(target, Combat);
-            const targetMv = server.world.get(target, Movement);
+            const [targetCombat, targetMv] = server.world.get(
+              target,
+              Combat,
+              Movement,
+            );
             if (!targetCombat || !targetMv || !targetCombat.alive) {
               server.world.write(id, Combat, { attackTargetId: undefined });
               continue;

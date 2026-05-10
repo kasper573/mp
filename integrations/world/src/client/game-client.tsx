@@ -2,16 +2,17 @@ import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
 import type { ReadonlySignal } from "@preact/signals-core";
+import type { EntityId } from "@rift/core";
 import type { FeatureRiftClient } from "@rift/feature";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
 import { isConnectedSignal } from "./signals";
-import type { Character } from "./views";
+import { AreaTag } from "../area/components";
 import type { ViewDistanceSettings } from "../visibility/view-distance";
 
 export interface GameClientProps {
   client: FeatureRiftClient;
-  character: ReadonlySignal<Character | undefined>;
+  characterEntity: ReadonlySignal<EntityId | undefined>;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;
   enableUi?: boolean;
@@ -29,8 +30,8 @@ export function GameClient(props: GameClientProps) {
     );
   }
 
-  const character = props.character.value;
-  if (!character) {
+  const entityId = props.characterEntity.value;
+  if (entityId === undefined) {
     return (
       <LoadingSpinner debugDescription="no character joined">
         Joining
@@ -38,8 +39,8 @@ export function GameClient(props: GameClientProps) {
     );
   }
 
-  const areaId = character.areaId;
-  if (!areaId) {
+  const [areaTag] = props.client.world.entitySignal(entityId, AreaTag).value;
+  if (!areaTag) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">
         Loading area
@@ -57,10 +58,10 @@ export function GameClient(props: GameClientProps) {
     >
       <GameRenderer
         client={props.client}
-        character={props.character}
+        characterEntity={props.characterEntity}
         interactive={props.interactive}
         additionalDebugUi={props.additionalDebugUi}
-        areaIdToLoadAssetsFor={areaId}
+        areaIdToLoadAssetsFor={areaTag.areaId}
         enableUi={props.enableUi}
         viewDistance={props.viewDistance}
       />

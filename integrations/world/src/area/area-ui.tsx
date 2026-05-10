@@ -3,33 +3,55 @@ import * as styles from "./area-ui.css";
 import { useItemDefinition, useRiftClient } from "../client/context";
 import { RespawnDialog } from "../character/respawn-dialog";
 import type {
-  Character,
   ConsumableInstanceView,
   EquipmentInstanceView,
 } from "../client/views";
-import type { ReadonlySignal } from "@preact/signals-core";
+import { computed, type ReadonlySignal } from "@preact/signals-core";
+import type { EntityId } from "@rift/core";
 import { inventorySignal } from "../client/signals";
+import { Combat } from "../combat/components";
+import { InventoryRef } from "../inventory/components";
 import { Suspense, type ReactElement } from "preact/compat";
 
 export interface AreaUiProps {
-  character: ReadonlySignal<Character | undefined>;
+  characterEntity: ReadonlySignal<EntityId | undefined>;
 }
 
-export function AreaUi({ character }: AreaUiProps) {
-  const isDead = !character.value?.combat.alive;
+export function AreaUi({ characterEntity }: AreaUiProps) {
+  const client = useRiftClient();
+  const isDead = useMemo(
+    () =>
+      computed(() => {
+        const id = characterEntity.value;
+        if (id === undefined) return true;
+        const [combat] = client.world.entitySignal(id, Combat).value;
+        return !combat?.alive;
+      }),
+    [client, characterEntity],
+  );
   return (
     <>
-      <Inventory character={character} />
-      <RespawnDialog open={isDead} />
+      <Inventory characterEntity={characterEntity} />
+      <RespawnDialog open={isDead.value} />
     </>
   );
 }
 
-function Inventory({ character }: AreaUiProps) {
+function Inventory({ characterEntity }: AreaUiProps) {
   const client = useRiftClient();
+  const inventoryId = useMemo(
+    () =>
+      computed(() => {
+        const id = characterEntity.value;
+        if (id === undefined) return undefined;
+        const [ref] = client.world.entitySignal(id, InventoryRef).value;
+        return ref?.inventoryId;
+      }),
+    [client, characterEntity],
+  );
   const inventory = useMemo(
-    () => inventorySignal(client.world, character),
-    [client, character],
+    () => inventorySignal(client.world, inventoryId),
+    [client, inventoryId],
   );
 
   return (

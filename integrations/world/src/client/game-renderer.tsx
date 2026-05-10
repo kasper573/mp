@@ -7,6 +7,7 @@ import type { ReadonlySignal, Signal } from "@preact/signals-core";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
+import type { EntityId } from "@rift/core";
 import type { FeatureRiftClient } from "@rift/feature";
 import { useState } from "preact/hooks";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
@@ -19,7 +20,6 @@ import { AreaUi } from "../area/area-ui";
 import { useActorTextures, useAreaAssets } from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
-import type { Character } from "./views";
 import { useObjectSignal } from "./use-object-signal";
 import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
@@ -27,7 +27,7 @@ import { Dock, ErrorFallback } from "@mp/ui";
 interface GameRendererProps {
   interactive: boolean;
   client: FeatureRiftClient;
-  character: ReadonlySignal<Character | undefined>;
+  characterEntity: ReadonlySignal<EntityId | undefined>;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
   enableUi?: boolean;
@@ -37,7 +37,7 @@ interface GameRendererProps {
 export function GameRenderer({
   interactive,
   client,
-  character,
+  characterEntity,
   areaIdToLoadAssetsFor,
   additionalDebugUi,
   enableUi = true,
@@ -51,7 +51,7 @@ export function GameRenderer({
   const optionsSignal = useObjectSignal({
     interactive,
     client,
-    character,
+    characterEntity,
     areaAssets,
     actorTextures,
     showDebugUi,
@@ -71,7 +71,7 @@ export function GameRenderer({
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
         <Suspense fallback={<UILoadingFallback />}>
-          <AreaUi character={character} />
+          <AreaUi characterEntity={characterEntity} />
           {showDebugUi.value && (
             <GameDebugUi>
               {additionalDebugUi}
@@ -100,7 +100,7 @@ function buildStage(
   opt: {
     interactive: boolean;
     client: FeatureRiftClient;
-    character: ReadonlySignal<Character | undefined>;
+    characterEntity: ReadonlySignal<EntityId | undefined>;
     areaAssets: AreaAssets;
     actorTextures: ActorTextureLookup;
     showDebugUi: Signal<boolean>;
@@ -121,7 +121,7 @@ function buildStage(
     engine,
     debugSettings: () => areaDebugSettingsStorage.value,
     client: opt.client,
-    character: opt.character,
+    characterEntity: opt.characterEntity,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,
     areaSpritesheets: opt.areaAssets.spritesheets,

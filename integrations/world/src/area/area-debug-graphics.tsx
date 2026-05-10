@@ -6,7 +6,6 @@ import {
   clientViewDistanceRect,
   type ViewDistanceSettings,
 } from "../visibility/view-distance";
-import type { Actor, NpcInstance } from "../client/views";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
@@ -14,21 +13,29 @@ import { Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
+import type { EntityId } from "@rift/core";
+import type { FeatureRiftClient } from "@rift/feature";
 import uniqolor from "uniqolor";
+import { Movement } from "../movement/components";
+import { Combat } from "../combat/components";
+import { Appearance } from "../appearance/components";
+import { NpcAi } from "../npc/components";
+import { NpcTag } from "../identity/components";
 import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
 
 export class AreaDebugGraphics extends Container {
-  private attackRanges: ReactiveCollection<Actor>;
-  private aggroRanges: ReactiveCollection<NpcInstance>;
+  private attackRanges: ReactiveCollection<EntityId>;
+  private aggroRanges: ReactiveCollection<EntityId>;
   private fogOfWar: DebugNetworkFogOfWar;
 
   constructor(
     engine: Engine,
     area: AreaResource,
-    actors: ReadonlySignal<readonly Actor[]>,
+    client: FeatureRiftClient,
+    actorIds: ReadonlySignal<EntityId[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
     private viewDistance: ViewDistanceSettings,
@@ -42,27 +49,40 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.attackRanges = new ReactiveCollection(
-      actors,
-      (actor) =>
-        new DebugCircle(() => ({
-          tiled: area.tiled,
-          pos: actor.movement.coords,
-          radius: actor.combat.attackRange,
-          color: uniqolor(actor.identity.id).color,
-        })),
+      actorIds,
+      (entityId) =>
+        new DebugCircle(() => {
+          const [mv, combat] = client.world.get(entityId, Movement, Combat);
+          return {
+            tiled: area.tiled,
+            pos: mv?.coords ?? Vector.zero(),
+            radius: combat?.attackRange ?? (0 as Tile),
+            color: uniqolor(String(entityId)).color,
+          };
+        }),
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(() => actors.value.filter((actor) => actor.type === "npc")),
-      (npc) =>
-        new DebugCircle(() => ({
-          tiled: area.tiled,
-          pos: npc.movement.coords,
-          radius: npc.aggroRange,
-          color: npc.appearance.color
-            ? hexColorFromInt(npc.appearance.color)
-            : uniqolor(npc.identity.id).color,
-        })),
+      computed(() =>
+        actorIds.value.filter((id) => client.world.has(id, NpcTag)),
+      ),
+      (entityId) =>
+        new DebugCircle(() => {
+          const [mv, ai, appearance] = client.world.get(
+            entityId,
+            Movement,
+            NpcAi,
+            Appearance,
+          );
+          return {
+            tiled: area.tiled,
+            pos: mv?.coords ?? Vector.zero(),
+            radius: ai?.aggroRange ?? (0 as Tile),
+            color: appearance?.color
+              ? hexColorFromInt(appearance.color)
+              : uniqolor(String(entityId)).color,
+          };
+        }),
     );
 
     this.fogOfWar = new DebugNetworkFogOfWar(

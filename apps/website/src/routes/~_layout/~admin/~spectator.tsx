@@ -1,8 +1,8 @@
 import {
+  characterEntitySignal,
   GameAssetLoaderContext,
   RiftClientContext,
   SpectatorClient,
-  characterSignal,
   type AutoRejoinIntent,
   type CharacterId,
 } from "@mp/world";
@@ -37,8 +37,8 @@ function RouteComponent() {
     [spectatedId],
   );
   const { client, characters } = useRiftClient(intent);
-  const character = useMemo(
-    () => characterSignal(client.world, spectatedId),
+  const characterEntity = useMemo(
+    () => characterEntitySignal(client.world, spectatedId),
     [client, spectatedId],
   );
 
@@ -70,7 +70,7 @@ function RouteComponent() {
               characterOptions={characterOptions}
               spectatedId={spectatedId}
               client={client}
-              character={character}
+              characterEntity={characterEntity}
               additionalDebugUi={<MiscDebugUi />}
               viewDistance={fixtures.viewDistance}
               interactive={false}

@@ -84,6 +84,18 @@ export class ReactiveWorld extends World {
     });
   }
 
+  // Like entitiesSignal but only fires on membership changes — values can
+  // mutate freely without triggering this signal. Useful for reactive
+  // collection bindings that key on EntityId.
+  entityIdsSignal(...types: readonly RiftType[]): ReadonlySignal<EntityId[]> {
+    return computed((): EntityId[] => {
+      void this.#structureVersion.value;
+      const ids: EntityId[] = [];
+      for (const [id] of this.query(...types)) ids.push(id);
+      return ids;
+    });
+  }
+
   querySignal<const T extends readonly RiftType[]>(
     predicate: (
       id: EntityId,

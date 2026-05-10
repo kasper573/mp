@@ -51,17 +51,29 @@ export interface PersistenceFeatureOptions {
   readonly spawnPointForArea: (areaId: AreaId) => Vector<Tile> | undefined;
 }
 
+interface PersistCtx {
+  readonly world: World;
+  readonly repo: DbRepository;
+  readonly snapshots: Map<EntityId, CharacterSnapshot>;
+  readonly defaultModelId: ActorModelId;
+}
+
 export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
   return {
     server(server): Cleanup {
       const snapshots = new Map<EntityId, CharacterSnapshot>();
-      const flushDirty = (): Promise<void> =>
-        flushAllDirty(server.world, opts.repo, snapshots, opts.defaultModelId);
+      const ctx: PersistCtx = {
+        world: server.world,
+        repo: opts.repo,
+        snapshots,
+        defaultModelId: opts.defaultModelId,
+      };
+      const flushDirty = (): Promise<void> => flushAllDirty(ctx);
       const timer = setInterval(() => void flushDirty(), opts.syncIntervalMs);
 
       const offEvents = combine(
         server.on(ClientDisconnected, (event) => {
-          cleanupClient(server.world, snapshots, opts, event.data.clientId);
+          cleanupClient(ctx, event.data.clientId);
         }),
         server.on(JoinAsPlayer, async (event) => {
           if (event.source.type !== "wire") return;
@@ -74,22 +86,18 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
           });
           if (access.isErr() || !access.value) return;
           if (entityForClient(server.world, clientId) !== undefined) return;
-          destroyStaleCharacterEntities(server.world, snapshots, event.data);
+          destroyStaleCharacterEntities(ctx, event.data);
           const entityId = await hydrateCharacter(
             server.world,
             opts,
             event.data,
           );
           if (entityId === undefined) return;
-          if (server.world.has(entityId, OwnedByClient)) {
-            server.world.write(entityId, OwnedByClient, { clientId });
-          } else {
-            server.world.add(entityId, OwnedByClient, { clientId });
-          }
+          server.world.upsert(entityId, OwnedByClient, { clientId });
         }),
         server.on(Leave, (event) => {
           if (event.source.type !== "wire") return;
-          cleanupClient(server.world, snapshots, opts, event.source.clientId);
+          cleanupClient(ctx, event.source.clientId);
         }),
         server.on(Respawn, (event) => {
           if (event.source.type !== "wire") return;
@@ -98,8 +106,12 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
             event.source.clientId,
           );
           if (characterEnt === undefined) return;
-          const combat = server.world.get(characterEnt, Combat);
-          const area = server.world.get(characterEnt, AreaTag);
+          const [combat, area, mv] = server.world.get(
+            characterEnt,
+            Combat,
+            AreaTag,
+            Movement,
+          );
           if (!combat || !area) return;
           if (combat.alive) return;
           const spawn = opts.spawnPointForArea(area.areaId);
@@ -110,7 +122,7 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
             attackTargetId: undefined,
             lastAttackMs: undefined,
           });
-          if (server.world.has(characterEnt, Movement)) {
+          if (mv) {
             server.world.write(characterEnt, Movement, {
               coords: spawn,
               moveTarget: undefined,
@@ -130,47 +142,30 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
 }
 
 function destroyStaleCharacterEntities(
-  world: World,
-  snapshots: Map<EntityId, CharacterSnapshot>,
+  ctx: PersistCtx,
   characterId: CharacterId,
 ): void {
   const stale: EntityId[] = [];
-  for (const [id, tag] of world.query(CharacterTag)) {
+  for (const [id, tag] of ctx.world.query(CharacterTag)) {
     if (tag.characterId === characterId) stale.push(id);
   }
   for (const id of stale) {
-    snapshots.delete(id);
-    world.destroy(id);
+    ctx.snapshots.delete(id);
+    ctx.world.destroy(id);
   }
 }
 
-function cleanupClient(
-  world: World,
-  snapshots: Map<EntityId, CharacterSnapshot>,
-  opts: PersistenceFeatureOptions,
-  clientId: ClientId,
-): void {
-  const characterEnt = entityForClient(world, clientId);
+function cleanupClient(ctx: PersistCtx, clientId: ClientId): void {
+  const characterEnt = entityForClient(ctx.world, clientId);
   if (characterEnt === undefined) return;
-  void flushEntity(
-    world,
-    opts.repo,
-    snapshots,
-    opts.defaultModelId,
-    characterEnt,
-  );
-  snapshots.delete(characterEnt);
-  world.destroy(characterEnt);
+  void flushEntity(ctx, characterEnt);
+  ctx.snapshots.delete(characterEnt);
+  ctx.world.destroy(characterEnt);
 }
 
-async function flushAllDirty(
-  world: World,
-  repo: DbRepository,
-  snapshots: Map<EntityId, CharacterSnapshot>,
-  defaultModelId: ActorModelId,
-): Promise<void> {
+async function flushAllDirty(ctx: PersistCtx): Promise<void> {
   const entityIds: EntityId[] = [];
-  for (const [id] of world.query(
+  for (const [id] of ctx.world.query(
     CharacterTag,
     Movement,
     Combat,
@@ -180,26 +175,19 @@ async function flushAllDirty(
   )) {
     entityIds.push(id);
   }
-  await Promise.all(
-    entityIds.map((id) =>
-      flushEntity(world, repo, snapshots, defaultModelId, id),
-    ),
-  );
+  await Promise.all(entityIds.map((id) => flushEntity(ctx, id)));
 }
 
-async function flushEntity(
-  world: World,
-  repo: DbRepository,
-  snapshots: Map<EntityId, CharacterSnapshot>,
-  defaultModelId: ActorModelId,
-  id: EntityId,
-): Promise<void> {
-  const tag = world.get(id, CharacterTag);
-  const mv = world.get(id, Movement);
-  const combat = world.get(id, Combat);
-  const prog = world.get(id, Progression);
-  const inv = world.get(id, InventoryRef);
-  const area = world.get(id, AreaTag);
+async function flushEntity(ctx: PersistCtx, id: EntityId): Promise<void> {
+  const [tag, mv, combat, prog, inv, area] = ctx.world.get(
+    id,
+    CharacterTag,
+    Movement,
+    Combat,
+    Progression,
+    InventoryRef,
+    AreaTag,
+  );
   if (!tag || !mv || !combat || !prog || !inv || !area) return;
   const next: CharacterSnapshot = {
     areaId: area.areaId,
@@ -211,13 +199,13 @@ async function flushEntity(
     attackSpeed: combat.attackSpeed,
     attackRange: combat.attackRange,
     maxHealth: combat.maxHealth,
-    modelId: defaultModelId,
+    modelId: ctx.defaultModelId,
     name: "",
     inventoryId: inv.inventoryId,
   };
-  const prev = snapshots.get(id);
+  const prev = ctx.snapshots.get(id);
   if (prev && shallowEqual(prev, next)) return;
-  const result = await repo.upsertCharacter({
+  const result = await ctx.repo.upsertCharacter({
     characterId: tag.characterId,
     fields: {
       areaId: next.areaId,
@@ -231,7 +219,7 @@ async function flushEntity(
       xp: next.xp,
     },
   });
-  if (result.isOk()) snapshots.set(id, next);
+  if (result.isOk()) ctx.snapshots.set(id, next);
 }
 
 async function hydrateCharacter(

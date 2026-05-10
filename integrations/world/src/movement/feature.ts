@@ -1,5 +1,5 @@
 import type { Cleanup, Feature } from "@rift/feature";
-import { Tick, type EntityId, type World } from "@rift/core";
+import { Tick } from "@rift/core";
 import { combine, type Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 import type { AreaResource } from "../area/area-resource";
@@ -28,19 +28,21 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
             event.source.clientId,
           );
           if (characterEnt === undefined) return;
-          const movement = server.world.get(characterEnt, Movement);
-          if (!movement) return;
-          const tag = server.world.get(characterEnt, AreaTag);
-          if (!tag) return;
+          const [movement, tag, combat] = server.world.get(
+            characterEnt,
+            Movement,
+            AreaTag,
+            Combat,
+          );
+          if (!movement || !tag) return;
           const area = opts.areas.get(tag.areaId);
           if (!area) return;
           const path = findPath(area, movement.coords, event.data);
-          if (path) writePath(server.world, characterEnt, path);
+          if (path) server.world.upsert(characterEnt, PathFollow, { path });
           else server.world.remove(characterEnt, PathFollow);
           server.world.write(characterEnt, Movement, {
             moveTarget: event.data,
           });
-          const combat = server.world.get(characterEnt, Combat);
           if (combat?.attackTargetId !== undefined) {
             server.world.write(characterEnt, Combat, {
               attackTargetId: undefined,
@@ -69,7 +71,7 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
             if ((!path || path.length === 0) && mv.moveTarget) {
               const computed = findPath(area, mv.coords, mv.moveTarget);
               if (computed && computed.length > 0) {
-                writePath(server.world, id, computed);
+                server.world.upsert(id, PathFollow, { path: computed });
                 path = computed;
               } else {
                 server.world.remove(id, PathFollow);
@@ -89,7 +91,7 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
               server.world.remove(id, PathFollow);
               server.world.write(id, Movement, { moveTarget: undefined });
             } else {
-              writePath(server.world, id, stepped.path);
+              server.world.upsert(id, PathFollow, { path: stepped.path });
             }
 
             const destination = portalDestinationAt(area, stepped.coords);
@@ -106,14 +108,6 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
       );
     },
   };
-}
-
-function writePath(world: World, id: EntityId, path: Path): void {
-  if (world.has(id, PathFollow)) {
-    world.write(id, PathFollow, { path });
-  } else {
-    world.add(id, PathFollow, { path });
-  }
 }
 
 function portalDestinationAt(area: AreaResource, coords: Vector<Tile>) {

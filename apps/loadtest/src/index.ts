@@ -1,12 +1,13 @@
 import { FeatureRiftClient } from "@rift/feature";
 import {
+  AreaTag,
   CharacterList,
-  actorListSignal,
+  Combat,
+  Movement,
   autoRejoinFeature,
+  characterEntitySignal,
   characterListFeature,
-  characterSignal,
   fnv1a64,
-  isGameReadySignal,
   joinAsPlayer,
   moveCharacter,
   respawnCharacter,
@@ -16,7 +17,7 @@ import {
   type CharacterId,
 } from "@mp/world";
 import { wsTransport, type WebSocketLike } from "@rift/ws";
-import { signal, type ReadonlySignal } from "@preact/signals-core";
+import { computed, signal, type ReadonlySignal } from "@preact/signals-core";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
@@ -121,8 +122,16 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
 
       await client.connect();
 
-      const character = characterSignal(client.world, characterIdSignal);
-      const ready = isGameReadySignal(character);
+      const characterEntity = characterEntitySignal(
+        client.world,
+        characterIdSignal,
+      );
+      const ready = computed(() => {
+        const id = characterEntity.value;
+        if (id === undefined) return false;
+        const [areaTag] = client.world.entitySignal(id, AreaTag).value;
+        return !!areaTag;
+      });
 
       if (verbose) {
         logger.info(`Socket ${n} waiting for character list...`);
@@ -141,21 +150,24 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       }
       await waitUntil(ready, (v) => v, 15_000);
 
-      const actors = actorListSignal(client.world);
+      const actorIds = client.world.entityIdsSignal(Movement);
       const endTime = Date.now() + timeout.totalMilliseconds;
       await runUntil(
         endTime,
         () => !stopped,
         () => {
-          const ch = character.value;
-          if (ch && !ch.combat.health) {
-            logger.info(`Character for socket ${n} will respawn`);
-            respawnCharacter(client);
-          }
-          if (ch) {
-            const walkable: Vector<Tile>[] = actors.value
-              .map((a) => a.movement.coords)
-              .filter((v): v is Vector<Tile> => Boolean(v));
+          const charEnt = characterEntity.value;
+          if (charEnt !== undefined) {
+            const [combat] = client.world.entitySignal(charEnt, Combat).value;
+            if (combat && !combat.health) {
+              logger.info(`Character for socket ${n} will respawn`);
+              respawnCharacter(client);
+            }
+            const walkable: Vector<Tile>[] = [];
+            for (const id of actorIds.value) {
+              const [mv] = client.world.entitySignal(id, Movement).value;
+              if (mv) walkable.push(mv.coords);
+            }
             if (walkable.length > 0) {
               const to = rng.oneOf(walkable);
               moveCharacter(client, to);

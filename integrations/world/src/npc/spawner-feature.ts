@@ -21,11 +21,24 @@ export interface NpcSpawnerOptions {
   readonly rng?: Rng;
 }
 
+interface SpawnerCtx {
+  readonly world: World;
+  readonly opts: NpcSpawnerOptions;
+  readonly npcsById: ReadonlyMap<string, NpcDefinition>;
+  readonly rng: Rng;
+}
+
 export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
   const npcsById = new Map(opts.npcs.map((n) => [n.id, n]));
   const rng = opts.rng ?? new Rng();
   return {
     server(server): Cleanup {
+      const ctx: SpawnerCtx = {
+        world: server.world,
+        opts,
+        npcsById,
+        rng,
+      };
       const pendingRespawns = new Map<
         EntityId,
         { spawnId: NpcSpawnId; respawnAtMs: number }
@@ -38,7 +51,7 @@ export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
           elapsedMs += event.data.dt * 1000;
 
           if (!initialized) {
-            spawnInitial(server.world, opts, npcsById, rng);
+            spawnInitial(ctx);
             initialized = true;
           }
 
@@ -55,7 +68,7 @@ export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
 
           for (const [entId, info] of pendingRespawns) {
             if (elapsedMs < info.respawnAtMs) continue;
-            respawn(server.world, opts, npcsById, rng, entId, info.spawnId);
+            respawn(ctx, entId, info.spawnId);
             pendingRespawns.delete(entId);
           }
         }),
@@ -67,47 +80,35 @@ export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
   };
 }
 
-function spawnInitial(
-  world: World,
-  opts: NpcSpawnerOptions,
-  npcsById: ReadonlyMap<string, NpcDefinition>,
-  rng: Rng,
-): void {
-  for (const spawn of opts.spawns) {
-    const def = npcsById.get(spawn.npcId);
-    const area = opts.areas.get(spawn.areaId);
+function spawnInitial(ctx: SpawnerCtx): void {
+  for (const spawn of ctx.opts.spawns) {
+    const def = ctx.npcsById.get(spawn.npcId);
+    const area = ctx.opts.areas.get(spawn.areaId);
     if (!def || !area) continue;
     for (let i = 0; i < spawn.count; i++) {
-      spawnNpc(world, {
+      spawnNpc(ctx.world, {
         definition: def,
         spawn,
-        coords: pickSpawnCoord(spawn, area, rng),
-        actorModels: opts.actorModels,
+        coords: pickSpawnCoord(spawn, area, ctx.rng),
+        actorModels: ctx.opts.actorModels,
       });
     }
   }
 }
 
-function respawn(
-  world: World,
-  opts: NpcSpawnerOptions,
-  npcsById: ReadonlyMap<string, NpcDefinition>,
-  rng: Rng,
-  entId: EntityId,
-  spawnId: NpcSpawnId,
-): void {
-  world.destroy(entId);
-  const spawn = opts.spawns.find((s) => s.id === spawnId);
+function respawn(ctx: SpawnerCtx, entId: EntityId, spawnId: NpcSpawnId): void {
+  ctx.world.destroy(entId);
+  const spawn = ctx.opts.spawns.find((s) => s.id === spawnId);
   if (!spawn) return;
-  const def = npcsById.get(spawn.npcId);
-  const area = opts.areas.get(spawn.areaId);
+  const def = ctx.npcsById.get(spawn.npcId);
+  const area = ctx.opts.areas.get(spawn.areaId);
   if (!def || !area) return;
   for (let i = 0; i < spawn.count; i++) {
-    spawnNpc(world, {
+    spawnNpc(ctx.world, {
       definition: def,
       spawn: { ...spawn, id: createShortId() },
-      coords: pickSpawnCoord(spawn, area, rng),
-      actorModels: opts.actorModels,
+      coords: pickSpawnCoord(spawn, area, ctx.rng),
+      actorModels: ctx.opts.actorModels,
     });
   }
 }

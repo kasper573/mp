@@ -1,191 +1,17 @@
 import type { EntityId } from "@rift/core";
 import type { ReactiveWorld } from "@rift/reactive";
-import { Appearance } from "../appearance/components";
-import { AreaTag } from "../area/components";
-import { CharacterTag, NpcTag } from "../identity/components";
-import { Combat } from "../combat/components";
 import {
   ConsumableInstance as RiftConsumable,
   EquipmentInstance as RiftEquipment,
 } from "../item/components";
 import { InventoryRef } from "../inventory/components";
-import { Movement } from "../movement/components";
-import { NpcAi } from "../npc/components";
-import { Progression } from "../progression/components";
 import type {
-  ActorModelId,
-  AreaId,
-  CharacterId,
-  ConsumableInstanceId,
   ConsumableDefinitionId,
-  EquipmentInstanceId,
+  ConsumableInstanceId,
   EquipmentDefinitionId,
+  EquipmentInstanceId,
   InventoryId,
-  NpcDefinitionId,
-  NpcSpawnId,
 } from "../identity/ids";
-import { Rect, Vector } from "@mp/math";
-import type { CardinalDirection, Path } from "@mp/math";
-import type { Tile, TimesPerSecond } from "@mp/std";
-import type { UserId } from "@mp/auth";
-
-export type ActorId = CharacterId | NpcInstanceId;
-export type NpcInstanceId = EntityId & { readonly __npcInstance: true };
-
-export interface AppearanceView {
-  readonly modelId: ActorModelId;
-  readonly name: string;
-  readonly color: number | undefined;
-  readonly opacity: number | undefined;
-}
-
-export interface MovementView {
-  readonly coords: Vector<Tile>;
-  readonly speed: Tile;
-  readonly dir: CardinalDirection;
-  readonly moveTarget: Vector<Tile> | undefined;
-}
-
-export interface CombatView {
-  readonly hitBox: Rect<Tile>;
-  readonly health: number;
-  readonly maxHealth: number;
-  readonly alive: boolean;
-  readonly attackDamage: number;
-  readonly attackSpeed: TimesPerSecond;
-  readonly attackRange: Tile;
-}
-
-export interface ProgressionView {
-  readonly xp: number;
-}
-
-export type ActorType = "character" | "npc";
-
-abstract class ActorBase {
-  abstract readonly type: ActorType;
-  abstract readonly identity: {
-    readonly id: ActorId;
-    readonly userId?: UserId;
-  };
-  constructor(
-    protected readonly world: ReactiveWorld,
-    readonly entityId: EntityId,
-  ) {}
-
-  get appearance(): AppearanceView {
-    this.world.trackPool(Appearance);
-    const a = this.world.get(this.entityId, Appearance);
-    return {
-      modelId: a?.modelId ?? ("" as ActorModelId),
-      name: a?.name ?? "",
-      color: a?.color,
-      opacity: a?.opacity,
-    };
-  }
-
-  get movement(): MovementView {
-    this.world.trackPool(Movement);
-    const m = this.world.get(this.entityId, Movement);
-    if (!m) {
-      return {
-        coords: Vector.zero<Tile>(),
-        speed: 0 as Tile,
-        dir: "s",
-        moveTarget: undefined,
-      };
-    }
-    return {
-      coords: m.coords,
-      speed: m.speed,
-      dir: m.direction,
-      moveTarget: m.moveTarget,
-    };
-  }
-
-  get combat(): CombatView {
-    this.world.trackPool(Combat);
-    const c = this.world.get(this.entityId, Combat);
-    if (!c) {
-      return {
-        hitBox: new Rect(0 as Tile, 0 as Tile, 1 as Tile, 1 as Tile),
-        health: 0,
-        maxHealth: 0,
-        alive: false,
-        attackDamage: 0,
-        attackSpeed: 0 as TimesPerSecond,
-        attackRange: 0 as Tile,
-      };
-    }
-    return {
-      hitBox: c.hitBox,
-      health: c.health,
-      maxHealth: c.maxHealth,
-      alive: c.alive,
-      attackDamage: c.attackDamage,
-      attackSpeed: c.attackSpeed,
-      attackRange: c.attackRange,
-    };
-  }
-
-  get areaId(): AreaId | undefined {
-    this.world.trackPool(AreaTag);
-    return this.world.get(this.entityId, AreaTag)?.areaId;
-  }
-}
-
-export class Character extends ActorBase {
-  readonly type = "character" as const;
-
-  get identity(): { readonly id: CharacterId; readonly userId: UserId } {
-    this.world.trackPool(CharacterTag);
-    const tag = this.world.get(this.entityId, CharacterTag);
-    return {
-      id: tag?.characterId ?? ("" as CharacterId),
-      userId: tag?.userId ?? ("" as UserId),
-    };
-  }
-
-  get progression(): ProgressionView {
-    this.world.trackPool(Progression);
-    return { xp: this.world.get(this.entityId, Progression)?.xp ?? 0 };
-  }
-
-  get inventoryId(): InventoryId | undefined {
-    this.world.trackPool(InventoryRef);
-    return this.world.get(this.entityId, InventoryRef)?.inventoryId;
-  }
-}
-
-export class NpcInstance extends ActorBase {
-  readonly type = "npc" as const;
-
-  get identity(): {
-    readonly id: NpcInstanceId;
-    readonly npcId: NpcDefinitionId;
-    readonly spawnId: NpcSpawnId;
-  } {
-    this.world.trackPool(NpcTag);
-    const tag = this.world.get(this.entityId, NpcTag);
-    return {
-      id: this.entityId as NpcInstanceId,
-      npcId: tag?.definitionId ?? ("" as NpcDefinitionId),
-      spawnId: tag?.spawnId ?? ("" as NpcSpawnId),
-    };
-  }
-
-  get aggroRange(): Tile {
-    this.world.trackPool(NpcAi);
-    return this.world.get(this.entityId, NpcAi)?.aggroRange ?? (0 as Tile);
-  }
-
-  get patrol(): Path<Tile> | undefined {
-    this.world.trackPool(NpcAi);
-    return this.world.get(this.entityId, NpcAi)?.patrol;
-  }
-}
-
-export type Actor = Character | NpcInstance;
 
 export interface ConsumableInstanceView {
   readonly type: "consumable";
@@ -236,21 +62,6 @@ export function readItemInstance(
       inventoryId: inventoryRef.inventoryId,
       durability: e.durability,
     };
-  }
-  return undefined;
-}
-
-export function readActor(
-  world: ReactiveWorld,
-  entityId: EntityId,
-): Actor | undefined {
-  world.trackPool(CharacterTag);
-  if (world.has(entityId, CharacterTag)) {
-    return new Character(world, entityId);
-  }
-  world.trackPool(NpcTag);
-  if (world.has(entityId, NpcTag)) {
-    return new NpcInstance(world, entityId);
   }
   return undefined;
 }
