@@ -33,6 +33,7 @@
     "require-await": "error",
     "symbol-description": "error",
     "checked-requires-onchange-or-readonly": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
     "jsx-no-useless-fragment": "error",
     "rules-of-hooks": "error",
     "ban-ts-comment": [

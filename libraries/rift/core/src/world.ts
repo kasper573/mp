@@ -172,7 +172,7 @@ export class World {
     if (!this.#entities.has(id)) {
       throw new Error(`entity ${id} does not exist`);
     }
-    const pool = this.#poolOf(type) as Pool<T>;
+    const pool = this.#poolOf(type);
     if (pool.values.has(id)) {
       throw new Error(`entity ${id} already has component`);
     }
@@ -183,7 +183,7 @@ export class World {
   }
 
   write<T>(id: EntityId, type: RiftType<T>, partial: Partial<T>): void {
-    const pool = this.#poolOf(type) as Pool<T>;
+    const pool = this.#poolOf(type);
     if (!pool.write(id, partial)) {
       throw new Error(`entity ${id} does not have component`);
     }
@@ -223,7 +223,7 @@ export class World {
   }
 
   pool<T>(type: RiftType<T>): Pool<T> {
-    return this.#poolOf(type) as Pool<T>;
+    return this.#poolOf(type);
   }
 
   entities(): ReadonlySet<EntityId> {
@@ -236,13 +236,13 @@ export class World {
     }
   }
 
-  #poolOf(type: RiftType): Pool<unknown> {
+  #poolOf<T>(type: RiftType<T>): Pool<T> {
     let pool = this.#pools.get(type);
     if (!pool) {
       pool = new Pool(type);
       this.#pools.set(type, pool);
     }
-    return pool;
+    return pool as Pool<T>;
   }
 
   #emit(event: LocalWorldEvent): void {
