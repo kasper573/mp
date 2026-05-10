@@ -1,16 +1,13 @@
 import { StorageSignal } from "@mp/state";
 import { Button, Checkbox } from "@mp/ui";
-import {
-  interpolationEnabled,
-  recallCharacter,
-  useRiftClient,
-} from "@mp/world";
+import { interpolationEnabled, recallCharacter, RiftContext } from "@mp/world";
+import { useContext } from "preact/hooks";
 import { env } from "../env";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
 export function MiscDebugUi() {
-  const client = useRiftClient();
+  const client = useContext(RiftContext);
   return (
     <>
       <div>Client version: {env.version}</div>

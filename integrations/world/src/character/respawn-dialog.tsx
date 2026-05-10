@@ -1,10 +1,11 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { useRiftClient } from "../client/context";
+import { useContext } from "preact/hooks";
+import { RiftContext } from "../client/context";
 import { respawnCharacter } from "../client/actions";
 
 export function RespawnDialog(props: DialogProps) {
-  const client = useRiftClient();
+  const client = useContext(RiftContext);
   return (
     <Dialog {...props}>
       <h1>You are dead</h1>

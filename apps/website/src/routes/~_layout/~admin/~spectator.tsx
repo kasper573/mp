@@ -1,7 +1,7 @@
 import {
   characterEntitySignal,
   GameAssetLoaderContext,
-  RiftClientContext,
+  RiftContext,
   SpectatorClient,
   type AutoRejoinIntent,
   type CharacterId,
@@ -61,7 +61,7 @@ function RouteComponent() {
       }}
     >
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
-        <RiftClientContext.Provider value={client}>
+        <RiftContext.Provider value={client}>
           <GameAssetLoaderContext.Provider value={gameAssetLoader}>
             <div className={atoms({ mb: "xl" })}>
               Characters available: {characters.characters.value.length}
@@ -76,7 +76,7 @@ function RouteComponent() {
               interactive={false}
             />
           </GameAssetLoaderContext.Provider>
-        </RiftClientContext.Provider>
+        </RiftContext.Provider>
       </Suspense>
     </div>
   );

@@ -1,6 +1,5 @@
-import { useMemo } from "preact/hooks";
 import * as styles from "./area-ui.css";
-import { useItemDefinition, useRiftClient } from "../client/context";
+import { useItemDefinition, useRift } from "../client/context";
 import { RespawnDialog } from "../character/respawn-dialog";
 import type {
   ConsumableInstanceView,
@@ -18,46 +17,35 @@ export interface AreaUiProps {
 }
 
 export function AreaUi({ characterEntity }: AreaUiProps) {
-  const client = useRiftClient();
-  const isDead = useMemo(
-    () =>
-      computed(() => {
-        const id = characterEntity.value;
-        if (id === undefined) return true;
-        const combat = client.world.signal.get(id, Combat).value;
-        return !combat?.alive;
-      }),
-    [client, characterEntity],
+  const isDead = useRift((c) =>
+    computed(() => {
+      const id = characterEntity.value;
+      if (id === undefined) return true;
+      return !c.world.signal.get(id, Combat).value?.alive;
+    }),
   );
   return (
     <>
       <Inventory characterEntity={characterEntity} />
-      <RespawnDialog open={isDead.value} />
+      <RespawnDialog open={isDead} />
     </>
   );
 }
 
 function Inventory({ characterEntity }: AreaUiProps) {
-  const client = useRiftClient();
-  const inventoryId = useMemo(
-    () =>
-      computed(() => {
-        const id = characterEntity.value;
-        if (id === undefined) return undefined;
-        const ref = client.world.signal.get(id, InventoryRef).value;
-        return ref?.inventoryId;
-      }),
-    [client, characterEntity],
-  );
-  const inventory = useMemo(
-    () => inventorySignal(client.world, inventoryId),
-    [client, inventoryId],
-  );
+  const items = useRift((c) => {
+    const inventoryId = computed(() => {
+      const id = characterEntity.value;
+      if (id === undefined) return undefined;
+      return c.world.signal.get(id, InventoryRef).value?.inventoryId;
+    });
+    return inventorySignal(c.world, inventoryId);
+  });
 
   return (
     <div className={styles.inventory}>
       <div className={styles.itemGrid}>
-        {inventory.value.map((item): ReactElement => {
+        {items.map((item): ReactElement => {
           switch (item.type) {
             case "equipment":
               return (

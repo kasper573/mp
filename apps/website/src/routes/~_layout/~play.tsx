@@ -2,7 +2,7 @@ import {
   characterEntitySignal,
   GameAssetLoaderContext,
   GameClient,
-  RiftClientContext,
+  RiftContext,
   joinAsPlayer,
   type AutoRejoinIntent,
   type CharacterId,
@@ -52,7 +52,7 @@ function PlayPage() {
 
   return (
     <Suspense fallback={<LoadingSpinner debugDescription="~play.tsx" />}>
-      <RiftClientContext.Provider value={client}>
+      <RiftContext.Provider value={client}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <GameClient
             client={client}
@@ -62,7 +62,7 @@ function PlayPage() {
             interactive
           />
         </GameAssetLoaderContext.Provider>
-      </RiftClientContext.Provider>
+      </RiftContext.Provider>
     </Suspense>
   );
 }

@@ -1,18 +1,30 @@
 import { createContext } from "preact";
 import { useContext } from "preact/hooks";
+import type { ReadonlySignal } from "@preact/signals-core";
 import type { MpRiftClient } from "../feature";
 import type { GameAssetLoader } from "./game-asset-loader";
 
-export const RiftClientContext = createContext<MpRiftClient | undefined>(
-  undefined,
+export const RiftContext = createContext(
+  new Proxy({} as MpRiftClient, {
+    get() {
+      throw new Error("RiftContext has not been provided");
+    },
+  }),
 );
 
-export function useRiftClient(): MpRiftClient {
-  const client = useContext(RiftClientContext);
-  if (!client) {
-    throw new Error("RiftClientContext has not been provided");
-  }
-  return client;
+/**
+ * Subscribe a Preact component to the rift client.
+ *
+ * The selector receives the client and returns any `ReadonlySignal`. The
+ * hook reads `.value`, so the component re-renders when the signal updates.
+ *
+ *   const movement = useRift((c) => c.world.signal.get(id, Movement));
+ *   const ids = useRift((c) => c.world.signal.entities(Movement, AreaTag));
+ */
+export function useRift<T>(
+  selector: (client: MpRiftClient) => ReadonlySignal<T>,
+): T {
+  return selector(useContext(RiftContext)).value;
 }
 
 export const GameAssetLoaderContext = createContext(

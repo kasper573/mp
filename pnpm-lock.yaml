@@ -638,9 +638,6 @@ importers:
       '@rift/types':
         specifier: workspace:*
         version: link:../types
-      preact:
-        specifier: 'catalog:'
-        version: 10.29.1
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
