@@ -15,7 +15,10 @@ import { createSimulation } from "./simulation";
 
 const TICK_HZ = 20;
 const TICK_BUDGET_MS = 1000 / TICK_HZ;
-const SAMPLE_TICKS = 50;
+// Doubling phase only needs "above or below threshold", so a shorter window
+// is fine. Refine phase keeps the full window for precise p95.
+const DOUBLING_SAMPLE_TICKS = 20;
+const REFINE_SAMPLE_TICKS = 50;
 const WARMUP_TICKS = 30;
 
 const DEFAULT_PLAYER_COUNTS: readonly number[] = [1, 5, 25, 100];
@@ -121,7 +124,11 @@ function percentile(sorted: readonly number[], q: number): number {
   return sorted[idx];
 }
 
-async function measure(playerCount: number, npcCount: number): Promise<Sample> {
+async function measure(
+  playerCount: number,
+  npcCount: number,
+  sampleTicks: number,
+): Promise<Sample> {
   const sim = await createSimulation({
     npcCount,
     playerCount,
@@ -129,15 +136,15 @@ async function measure(playerCount: number, npcCount: number): Promise<Sample> {
     warmupTicks: WARMUP_TICKS,
   });
 
-  const tickSamples = new Array<number>(SAMPLE_TICKS);
+  const tickSamples = new Array<number>(sampleTicks);
   sim.transport.resetCapture();
-  for (let i = 0; i < SAMPLE_TICKS; i++) {
+  for (let i = 0; i < sampleTicks; i++) {
     const start = performance.now();
     sim.tick(1);
     tickSamples[i] = performance.now() - start;
   }
 
-  const elapsedSec = SAMPLE_TICKS / TICK_HZ;
+  const elapsedSec = sampleTicks / TICK_HZ;
   const allPackets = [...sim.transport.bytes];
   const packetsSorted = [...allPackets].sort((a, b) => a - b);
   const tickSorted = [...tickSamples].sort((a, b) => a - b);
@@ -229,13 +236,14 @@ async function findBoundsForPlayerCount(
 ): Promise<readonly PerMetricBound[]> {
   const bounds = METRICS.map(() => emptyBound());
 
-  // Doubling phase: keep doubling until every metric has at least one
-  // failing probe, or we hit maxProbe.
+  // Doubling phase: short sample window — we only need above/below the
+  // threshold, not precise percentiles. The refine phase tightens with the
+  // full window.
   let count = 25;
   while (count <= maxProbe) {
     progress.set("phase", `probe ${count} npcs`);
     progress.render();
-    const sample = await measure(playerCount, count);
+    const sample = await measure(playerCount, count, DOUBLING_SAMPLE_TICKS);
     let allFailed = true;
     for (let i = 0; i < METRICS.length; i++) {
       const m = METRICS[i];
@@ -248,30 +256,45 @@ async function findBoundsForPlayerCount(
     count *= 2;
   }
 
-  // Binary-search refine each metric within its (safe, firstBad) bracket.
-  for (let i = 0; i < METRICS.length; i++) {
-    const m = METRICS[i];
-    const b = bounds[i];
-    if (b.firstBad === 0) continue; // never failed inside probe range
-    let lo = b.safe;
-    let hi = b.firstBad;
-    while (hi - lo > RESOLUTION) {
-      const mid = Math.floor((lo + hi) / 2);
-      progress.set("phase", `refine ${m.name} ∈ [${lo}, ${hi}] @ ${mid}`);
-      progress.render();
-      const sample = await measure(playerCount, mid);
+  // Shared binary-search refine: pick the metric with the widest remaining
+  // bracket, probe its midpoint, then fold the resulting sample back into
+  // EVERY metric's bracket. One measurement updates all live bounds.
+  while (true) {
+    let widestIdx = -1;
+    let widestSpan = RESOLUTION;
+    for (let i = 0; i < METRICS.length; i++) {
+      const b = bounds[i];
+      if (b.firstBad === 0) continue;
+      const span = b.firstBad - b.safe;
+      if (span > widestSpan) {
+        widestSpan = span;
+        widestIdx = i;
+      }
+    }
+    if (widestIdx === -1) break;
+    const drive = bounds[widestIdx];
+    const mid = Math.floor((drive.safe + drive.firstBad) / 2);
+    progress.set(
+      "phase",
+      `refine ${METRICS[widestIdx].name} ∈ [${drive.safe}, ${drive.firstBad}] @ ${mid}`,
+    );
+    progress.render();
+    const sample = await measure(playerCount, mid, REFINE_SAMPLE_TICKS);
+    for (let i = 0; i < METRICS.length; i++) {
+      const b = bounds[i];
+      if (b.firstBad === 0) continue;
+      if (mid <= b.safe || mid >= b.firstBad) continue;
+      const m = METRICS[i];
       if (m.extract(sample) > m.threshold) {
-        hi = mid;
         b.firstBad = mid;
         b.firstBadSample = sample;
       } else {
-        lo = mid;
         b.safe = mid;
         b.safeSample = sample;
       }
-      progress.setSample(mid, sample);
-      progress.render();
     }
+    progress.setSample(mid, sample);
+    progress.render();
   }
 
   return bounds;
@@ -363,7 +386,7 @@ function fmtMetricValue(m: MetricSpec, v: number): string {
 }
 
 console.log(
-  `tick rate ${TICK_HZ} Hz, sample window ${SAMPLE_TICKS} ticks (${SAMPLE_TICKS / TICK_HZ}s)`,
+  `tick rate ${TICK_HZ} Hz, sample window doubling=${DOUBLING_SAMPLE_TICKS} ticks / refine=${REFINE_SAMPLE_TICKS} ticks`,
 );
 console.log(`thresholds:`);
 for (const m of METRICS) {
