@@ -25,6 +25,8 @@ services:
 
   mp-game-server:
     env_file: *env_files
+    environment:
+      MP_GAME_SERVER_FILE_SERVER_BASE_URL: http://file-server
     logging: *logging
     build:
       dockerfile: ./docker/Dockerfile.mp-node-app
@@ -41,6 +43,8 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
+      file-server:
+        condition: service_started
       keycloak-healthcheck:
         condition: service_healthy
       postgres:

@@ -1,6 +1,5 @@
 import { builtinModules } from "node:module";
 import { defineConfig } from "vite";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 
 const nodeBuiltins = [
   ...builtinModules,
@@ -8,24 +7,21 @@ const nodeBuiltins = [
 ];
 
 export default defineConfig({
-  plugins: [vanillaExtractPlugin()],
   ssr: {
     target: "node",
     noExternal: true,
   },
   build: {
-    ssr: "src/main.ts",
+    ssr: "scripts/provision.ts",
     outDir: "dist",
     emptyOutDir: true,
     target: "node22",
     sourcemap: true,
     minify: true,
     rolldownOptions: {
-      // Pino reads its own files at runtime via __dirname, which forces it
-      // to be installed alongside the bundle rather than included in it.
-      external: [...nodeBuiltins, "pino", "pino-pretty"],
+      external: nodeBuiltins,
       output: {
-        entryFileNames: "index.js",
+        entryFileNames: "provision.js",
         format: "esm",
       },
     },
