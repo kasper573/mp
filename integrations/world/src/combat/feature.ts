@@ -5,7 +5,7 @@ import { entityForClient } from "../identity/client-character-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement, PathFollow } from "../movement/components";
-import { directionBetween } from "../movement/module";
+import { directionBetween } from "../movement/feature";
 import { Attacked, AttackRequest, Died, Kill } from "./events";
 
 const HP_REGEN_INTERVAL_MS = 10_000;

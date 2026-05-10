@@ -30,12 +30,12 @@ import {
   clientUserRegistryFeature,
 } from "../src/identity/client-character-registry";
 import { OwnedByClient } from "../src/identity/components";
-import { combatFeature } from "../src/combat/module";
-import { movementFeature } from "../src/movement/module";
-import { npcAiFeature } from "../src/npc/ai-module";
-import { npcRewardFeature } from "../src/npc/reward-module";
-import { npcSpawnerFeature } from "../src/npc/spawner-module";
-import { visibilityFeature } from "../src/visibility/module";
+import { combatFeature } from "../src/combat/feature";
+import { movementFeature } from "../src/movement/feature";
+import { npcAiFeature } from "../src/npc/ai-feature";
+import { npcRewardFeature } from "../src/npc/reward-feature";
+import { npcSpawnerFeature } from "../src/npc/spawner-feature";
+import { visibilityFeature } from "../src/visibility/feature";
 import { spawnCharacter } from "../src/character/bundle";
 import { createItemDefinitionLookup } from "../src/item/definition-lookup";
 import { loadAreaResource } from "../src/area/load";

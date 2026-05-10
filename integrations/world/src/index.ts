@@ -15,11 +15,11 @@ export * from "./appearance/actor-sprite-tester";
 export * from "./movement/components";
 export * from "./movement/events";
 export * from "./movement/path";
-export * from "./movement/module";
+export * from "./movement/feature";
 
 export * from "./combat/components";
 export * from "./combat/events";
-export * from "./combat/module";
+export * from "./combat/feature";
 
 export * from "./progression/components";
 
@@ -28,9 +28,9 @@ export * from "./inventory/components";
 export * from "./npc/components";
 export * from "./npc/definitions";
 export * from "./npc/bundle";
-export * from "./npc/spawner-module";
-export * from "./npc/ai-module";
-export * from "./npc/reward-module";
+export * from "./npc/spawner-feature";
+export * from "./npc/ai-feature";
+export * from "./npc/reward-feature";
 
 export * from "./item/components";
 export * from "./item/definitions";
@@ -55,7 +55,7 @@ export * from "./area/tile-highlight";
 export * from "./area/tile-renderer-tester";
 
 export * from "./visibility/view-distance";
-export * from "./visibility/module";
+export * from "./visibility/feature";
 
 export * from "./character/events";
 export * from "./character/bundle";
@@ -66,9 +66,9 @@ export * from "./character/spectator-client";
 export * from "./client/views";
 export * from "./client/signals";
 export * from "./client/actions";
-export * from "./client/interpolation-module";
-export * from "./client/auto-rejoin-module";
-export * from "./client/character-list-module";
+export * from "./client/interpolation-feature";
+export * from "./client/auto-rejoin-feature";
+export * from "./client/character-list-feature";
 export * from "./client/context";
 export * from "./client/game-asset-loader";
 export * from "./client/game-client";

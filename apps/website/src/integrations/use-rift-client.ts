@@ -18,7 +18,7 @@ import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { AuthContext } from "./contexts";
 import { env } from "../env";
 
-export interface RiftClientWithModules {
+export interface WiredRiftClient {
   readonly client: FeatureRiftClient;
   readonly characters: CharacterList;
   readonly interpolation: InterpolationLayer;
@@ -31,7 +31,7 @@ export function useRiftClient(intent: () => AutoRejoinIntent | undefined): {
 } {
   const auth = useContext(AuthContext);
 
-  const wired = useMemo<RiftClientWithModules>(() => {
+  const wired = useMemo<WiredRiftClient>(() => {
     const url = new URL(env.gameServerUrl);
     url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
     const socket = new WebSocket(url.toString());
