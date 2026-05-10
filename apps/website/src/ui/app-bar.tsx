@@ -1,4 +1,4 @@
-import { systemRoles } from "@mp/keycloak";
+import { gatewayRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
 import { LinearProgress } from "@mp/ui";
 import { useRouterState } from "@tanstack/react-router";
@@ -22,6 +22,10 @@ export default function AppBar() {
 
       {auth.identity.value?.roles.has(systemRoles.useDevTools) && (
         <Link to="/admin/devtools">Dev Tools</Link>
+      )}
+
+      {auth.identity.value?.roles.has(gatewayRoles.spectate) && (
+        <Link to="/admin/spectator">Spectator</Link>
       )}
 
       <LinearProgress
