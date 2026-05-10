@@ -2,15 +2,13 @@ import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 import { setProperty } from "dot-prop";
 
-export function parseEnv<T>(
-  parse: (value: unknown) => T,
+export function parseEnv<T extends object>(
   envInput: FlatObject,
   prefix = "",
 ): Result<T, Error> {
   try {
     const selected = selectProperties(envInput, prefix);
-    const nested = flatToNestedObject(selected);
-    return ok(parse(nested));
+    return ok(flatToNestedObject(selected));
   } catch (error) {
     return err(new Error("Failed to parse env", { cause: error }));
   }
@@ -32,13 +30,13 @@ function selectProperties(flat: FlatObject, prefix: string): FlatObject {
   return res;
 }
 
-function flatToNestedObject(flat: FlatObject): NestedObject {
+function flatToNestedObject<T extends object>(flat: FlatObject): T {
   const obj: NestedObject = {};
   for (const originalKey in flat) {
     const key = camelizeAndDotNotateKey(originalKey);
     setProperty(obj, key, flat[originalKey]);
   }
-  return obj;
+  return obj as T;
 }
 
 function camelizeAndDotNotateKey(key: string): string {

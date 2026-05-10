@@ -29,9 +29,7 @@ function getClientEnv(): ClientEnv {
     throw new Error("Client env vars is missing");
   }
 
-  // We blind trust the env object instead of using @mp/validate,
-  // since @mp/validate adds ~100kb to the client bundle size.
-  const res = parseEnv((v) => v as ClientEnv, obj, "MP_WEBSITE_");
+  const res = parseEnv<ClientEnv>(obj, "MP_WEBSITE_");
 
   if (res.isErr()) {
     throw new Error("Invalid client env vars:\n\n" + res.error);

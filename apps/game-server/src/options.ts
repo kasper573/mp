@@ -1,32 +1,28 @@
 import { parseEnv } from "@mp/env";
-import { authAlgorithms } from "@mp/auth/server";
-import { boolish, csv, numeric, type } from "@mp/validate";
+import type { AuthAlgorithm } from "@mp/auth/server";
 
-export type GameServerOptions = typeof gameServerOptionsSchema.infer;
-
-export const gameServerOptionsSchema = type({
-  port: numeric(),
-  wsEndpointPath: "string",
-  hostname: "string",
-  databaseConnectionString: "string",
-  fileServerBaseUrl: "string",
-  tickRateHz: numeric(),
-  syncIntervalMs: numeric(),
+export interface GameServerOptions {
+  port: number;
+  wsEndpointPath: string;
+  hostname: string;
+  databaseConnectionString: string;
+  fileServerBaseUrl: string;
+  tickRateHz: number;
+  syncIntervalMs: number;
   log: {
-    level: "string?",
-    pretty: boolish().optional(),
-  },
+    level?: string;
+    pretty?: boolean;
+  };
   auth: {
-    issuer: "string",
-    audience: "string",
-    jwksUri: "string",
-    algorithms: csv(type.enumerated(...authAlgorithms)),
-    allowBypassUsers: boolish(),
-  },
-}).onDeepUndeclaredKey("delete");
+    issuer: string;
+    audience: string;
+    jwksUri: string;
+    algorithms: AuthAlgorithm[];
+    allowBypassUsers: boolean;
+  };
+}
 
-export const opt = parseEnv(
-  (v) => gameServerOptionsSchema.assert(v),
+export const opt = parseEnv<GameServerOptions>(
   process.env,
   "MP_GAME_SERVER_",
 )._unsafeUnwrap();
