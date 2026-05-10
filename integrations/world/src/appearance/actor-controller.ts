@@ -5,14 +5,20 @@ import {
   Container,
   createTintFilterMatrix,
   Text,
+  Ticker,
 } from "@mp/graphics";
 import { effect } from "@preact/signals-core";
+import { Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
 import { TimeSpan } from "@mp/time";
 import type { FeatureRiftClient } from "@rift/feature";
 import { Attacked } from "../combat/events";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import type { Actor } from "../client/views";
+import { interpolationEnabled } from "../client/render-settings";
+
+const TELEPORT_THRESHOLD: Tile = 3 as Tile;
 
 export interface ActorControllerOptions {
   tiled: TiledResource;
@@ -28,6 +34,7 @@ export class ActorController extends Container {
   #tintFilter = new ColorMatrixFilter();
   #options: ActorControllerOptions;
   #wasAlive: boolean;
+  #displayCoords?: Vector<Tile>;
 
   constructor(options: ActorControllerOptions) {
     super();
@@ -130,9 +137,33 @@ export class ActorController extends Container {
       this.#text.text += `\n${actor.progression.xp}xp`;
     }
 
-    this.position.copyFrom(tiled.tileCoordToWorld(actor.movement.coords));
+    this.position.copyFrom(tiled.tileCoordToWorld(this.#stepDisplay()));
     this.zIndex = this.position.y;
   };
+
+  #stepDisplay(): Vector<Tile> {
+    const { coords, speed } = this.#options.actor.movement;
+    if (!this.#displayCoords || !interpolationEnabled.value) {
+      this.#displayCoords = coords;
+      return coords;
+    }
+    const remaining = this.#displayCoords.distance(coords);
+    if (remaining > TELEPORT_THRESHOLD) {
+      this.#displayCoords = coords;
+      return coords;
+    }
+    const step = speed * (Ticker.shared.deltaMS / 1000);
+    if (step >= remaining || remaining < 0.001) {
+      this.#displayCoords = coords;
+      return coords;
+    }
+    const k = step / remaining;
+    this.#displayCoords = new Vector(
+      (this.#displayCoords.x + (coords.x - this.#displayCoords.x) * k) as Tile,
+      (this.#displayCoords.y + (coords.y - this.#displayCoords.y) * k) as Tile,
+    );
+    return this.#displayCoords;
+  }
 }
 
 function actorAnimationState(actor: Actor) {

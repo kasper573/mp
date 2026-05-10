@@ -2,7 +2,7 @@ import type { EntityId, RiftClient } from "@rift/core";
 import type { ReactiveWorld } from "@rift/reactive";
 import { computed, type ReadonlySignal } from "@preact/signals-core";
 import type { AreaId, CharacterId } from "../identity/ids";
-import { CharacterTag } from "../identity/components";
+import { CharacterTag, NpcTag } from "../identity/components";
 import { Movement } from "../movement/components";
 import { InventoryRef } from "../inventory/components";
 import type { Actor, Character, ItemInstance } from "./views";
@@ -44,11 +44,28 @@ export function actorListSignal(
   world: ReactiveWorld,
 ): ReadonlySignal<readonly Actor[]> {
   const moving = world.entitiesSignal(Movement);
+  // Cache stable Actor instances by entityId so consumers using reference
+  // identity (e.g. reactiveCollectionBinding) don't churn on every tick.
+  const cache = new Map<EntityId, Actor>();
   return computed(() => {
+    void moving.value;
+    world.trackPool(CharacterTag);
+    world.trackPool(NpcTag);
     const result: Actor[] = [];
+    const seen = new Set<EntityId>();
     for (const [id] of moving.value) {
-      const actor = readActor(world, id);
-      if (actor) result.push(actor);
+      seen.add(id);
+      let actor = cache.get(id);
+      if (!actor) {
+        const created = readActor(world, id);
+        if (!created) continue;
+        actor = created;
+        cache.set(id, actor);
+      }
+      result.push(actor);
+    }
+    for (const id of cache.keys()) {
+      if (!seen.has(id)) cache.delete(id);
     }
     return result;
   });

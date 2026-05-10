@@ -1,8 +1,11 @@
-import { PropertySignal, StorageSignal } from "@mp/state";
+import { StorageSignal } from "@mp/state";
 import { Button, Checkbox } from "@mp/ui";
-import { recallCharacter, useRiftClient } from "@mp/world";
+import {
+  interpolationEnabled,
+  recallCharacter,
+  useRiftClient,
+} from "@mp/world";
 import { env } from "../env";
-import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
@@ -17,9 +20,7 @@ export function MiscDebugUi() {
       <br />
       <label>
         Use client side game state interpolator:{" "}
-        <Checkbox
-          signal={new PropertySignal(miscDebugSettings, "useInterpolator")}
-        />
+        <Checkbox signal={interpolationEnabled} />
       </label>
       <br />
       <Button onClick={() => recallCharacter(client)}>Recall</Button>
