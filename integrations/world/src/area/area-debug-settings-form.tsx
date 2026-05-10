@@ -30,11 +30,6 @@ export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
         <Checkbox signal={new PropertySignal(signal, "showAggroRange")} />
         Show npc aggro range
       </label>
-      <br />
-      <label>
-        <Checkbox signal={new PropertySignal(signal, "showActorPaths")} />
-        Show actor paths
-      </label>
     </>
   );
 }
@@ -44,7 +39,6 @@ export interface AreaDebugSettings {
   showFogOfWar: boolean;
   showAttackRange: boolean;
   showAggroRange: boolean;
-  showActorPaths: boolean;
 }
 
 export const visibleGraphTypes = [

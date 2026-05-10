@@ -10,7 +10,7 @@ import type { Actor, NpcInstance } from "../client/views";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
-import { type Path, Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
@@ -21,7 +21,6 @@ import type {
 } from "./area-debug-settings-form";
 
 export class AreaDebugGraphics extends Container {
-  private actorPaths: ReactiveCollection<DebugPath>;
   private attackRanges: ReactiveCollection<Actor>;
   private aggroRanges: ReactiveCollection<NpcInstance>;
   private fogOfWar: DebugNetworkFogOfWar;
@@ -40,16 +39,6 @@ export class AreaDebugGraphics extends Container {
       engine,
       area,
       () => this.settings().visibleGraphType,
-    );
-
-    this.actorPaths = new ReactiveCollection(
-      actors,
-      (actor) =>
-        new DebugPath(() => ({
-          tiled: area.tiled,
-          path: actor.movement.moveTarget ? [actor.movement.moveTarget] : [],
-          color: uniqolor(actor.identity.id).color,
-        })),
     );
 
     this.attackRanges = new ReactiveCollection(
@@ -82,7 +71,6 @@ export class AreaDebugGraphics extends Container {
       () => this.viewDistance,
     );
 
-    this.addChild(this.actorPaths);
     this.addChild(debugTiled);
     this.addChild(this.attackRanges);
     this.addChild(this.aggroRanges);
@@ -92,7 +80,6 @@ export class AreaDebugGraphics extends Container {
   }
 
   #onRender = () => {
-    this.actorPaths.visible = this.settings().showActorPaths;
     this.attackRanges.visible = this.settings().showAttackRange;
     this.aggroRanges.visible = this.settings().showAggroRange;
     this.fogOfWar.visible = this.settings().showFogOfWar;
@@ -214,27 +201,6 @@ class DebugCircle extends Graphics {
   };
 }
 
-class DebugPath extends Graphics {
-  constructor(
-    private options: () => {
-      tiled: TiledResource;
-      path: Path<Tile> | undefined;
-      color: string;
-    },
-  ) {
-    super();
-    this.onRender = this.#onRender;
-  }
-
-  #onRender = () => {
-    const { tiled, path, color } = this.options();
-    this.clear();
-    if (path?.length) {
-      drawPath(this, path.map(tiled.tileCoordToWorld), color);
-    }
-  };
-}
-
 class DebugNetworkFogOfWar extends Graphics {
   constructor(
     private playerCoords: () => Vector<Tile>,
@@ -276,18 +242,6 @@ function drawGraphNode(
       .filter((v) => v !== undefined)
       .map(tiled.tileCoordToWorld),
   );
-}
-
-function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
-  const [start, ...rest] = Array.from(path);
-
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.strokeStyle = { width: 1, color };
-  for (const { x, y } of rest) {
-    ctx.lineTo(x, y);
-  }
-  ctx.stroke();
 }
 
 function drawManyLinesFromSameStart(
