@@ -14,6 +14,7 @@ import {
   RiftServer,
   type RiftServerEvent,
   Tick,
+  World,
 } from "../src/index";
 import type {
   ClientTransport,
@@ -143,7 +144,7 @@ describe("RiftServer + RiftClient handshake", () => {
     server.world.add(e, name, "alpha");
     await server.start();
 
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     expect(client.state.value).toBe("open");
@@ -166,10 +167,7 @@ describe("RiftServer + RiftClient handshake", () => {
     });
     await server.start();
 
-    const client = new RiftClient({
-      schema: altSchema(),
-      transport: pair.client,
-    });
+    const client = new RiftClient(new World(altSchema()), pair.client);
     await expect(client.connect()).rejects.toThrow(/schema mismatch/);
 
     await server.stop();
@@ -186,7 +184,7 @@ describe("delta replication", () => {
       tickRateHz: 0,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     const e = server.world.create();
@@ -222,7 +220,7 @@ describe("delta replication", () => {
       tickRateHz: 0,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
     await flush();
 
@@ -251,7 +249,7 @@ describe("delta replication", () => {
       visibility: () => visibleSet,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     const visible = server.world.create();
@@ -283,7 +281,7 @@ describe("delta replication", () => {
       visibility: () => visibleSet,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     const e = server.world.create();
@@ -315,7 +313,7 @@ describe("delta replication", () => {
       tickRateHz: 0,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     const e = server.world.create();
@@ -353,7 +351,7 @@ describe("event routing", () => {
     });
     await server.start();
 
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
     client.emit({
@@ -382,7 +380,7 @@ describe("event routing", () => {
       tickRateHz: 0,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
 
     const got: number[] = [];
     client.on(pong, (event) => {
@@ -423,7 +421,7 @@ describe("event routing", () => {
       visibility: () => visibleSet,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     const seen: number[] = [];
     client.on(pong, (event) => {
       seen.push(event.data.value);
@@ -475,7 +473,7 @@ describe("lifecycle", () => {
       events.push("disconnect");
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
     expect(events).toEqual(["connect"]);
 
@@ -516,7 +514,7 @@ describe("RiftClient.state signal", () => {
       tickRateHz: 0,
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
 
     const observed: string[] = [];
     const dispose = effect(() => {
@@ -555,7 +553,7 @@ describe("emit guard", () => {
       received.push(event.data.note);
     });
     await server.start();
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
 
     client.emit({
       type: ping,
@@ -593,7 +591,7 @@ describe("server time replication", () => {
     server.tick(0.1);
     server.tick(0.2);
 
-    const client = new RiftClient({ schema, transport: pair.client });
+    const client = new RiftClient(new World(schema), pair.client);
     const applied: Array<{ tick: number; timeMs: number }> = [];
     client.on(DeltaApplied, (e) => {
       applied.push({ tick: e.data.tick, timeMs: e.data.timeMs });
