@@ -31,7 +31,7 @@ const DEFAULT_PLAYER_COUNTS = [1, 25, 100, 250, 500] as const;
 
 const CORE_METRICS: readonly MetricSpec[] = [
   {
-    name: "tick p95",
+    name: "server tick latency (p95)",
     unit: "ms",
     threshold: TICK_BUDGET_MS,
     extract: (s) => s.tick.p95,
@@ -39,26 +39,26 @@ const CORE_METRICS: readonly MetricSpec[] = [
   {
     // MTU is 1500 B on Ethernet — beyond it IP-level fragmentation kicks in
     // and tail latency gets weird.
-    name: "packet max",
+    name: "outbound packet size (max)",
     unit: "B",
     threshold: 1500,
     extract: (s) => s.packet.max,
   },
   {
-    name: "packet p95",
+    name: "outbound packet size (p95)",
     unit: "B",
     threshold: 1200,
     extract: (s) => s.packet.p95,
   },
   {
-    // 30 kB/s sustained per client is in line with other tile/action games.
-    name: "per-client avg",
+    // 30 kB/s sustained per player is in line with other tile/action games.
+    name: "per-player bandwidth (avg)",
     unit: "B/s",
     threshold: 30_000,
     extract: (s) => s.perClient.avgBps,
   },
   {
-    name: "per-client p95",
+    name: "per-player bandwidth (p95)",
     unit: "B/s",
     threshold: 50_000,
     extract: (s) => s.perClient.p95Bps,
@@ -70,7 +70,7 @@ const CORE_METRICS: readonly MetricSpec[] = [
 const AGGREGATE_METRIC: MetricSpec = {
   // ~800 Mbps server egress — anything past this is a fat-pipe problem,
   // not a code problem.
-  name: "aggregate",
+  name: "total outbound bandwidth",
   unit: "B/s",
   threshold: 100_000_000,
   extract: (s) => s.aggregateBps,
@@ -129,15 +129,11 @@ for (const s of scenarios) {
 const progress = createProgress();
 progress.setTotal(scenarios.length);
 
-console.log(
-  `tick rate ${TICK_HZ} Hz, sample window doubling=${DOUBLING_SAMPLE_TICKS} ticks / refine=${REFINE_SAMPLE_TICKS} ticks`,
-);
-console.log(`player counts: ${args.players.join(", ")}`);
-console.log(`thresholds:`);
+console.log(`player counts under test: ${args.players.join(", ")}`);
+console.log(`metric budgets:`);
 for (const m of METRICS) {
-  console.log(`  ${m.name.padEnd(18)} ≤ ${fmtThreshold(m)}`);
+  console.log(`  ${m.name.padEnd(30)} ≤ ${fmtThreshold(m)}`);
 }
-console.log("");
 
 for (const [playerCount, group] of groups) {
   await runGroup(playerCount, group);
@@ -156,7 +152,7 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
   // every scenario has a firstBad (or we hit maxProbe).
   let count = 25;
   while (count <= args.maxProbe) {
-    progress.set("phase", `probe ${count} npcs`);
+    progress.set("phase", `testing with ${count} NPCs`);
     progress.render();
     const sample = await measure(playerCount, count, DOUBLING_SAMPLE_TICKS);
     applySample(group, count, sample);
@@ -183,7 +179,7 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
     const mid = Math.floor((widest.safe + widest.firstBad) / 2);
     progress.set(
       "phase",
-      `refine ${widest.metric.name} ∈ [${widest.safe}, ${widest.firstBad}] @ ${mid}`,
+      `narrowing "${widest.metric.name}" (${widest.safe} pass / ${widest.firstBad} fail); testing ${mid} NPCs`,
     );
     progress.render();
     const sample = await measure(playerCount, mid, REFINE_SAMPLE_TICKS);
@@ -340,27 +336,16 @@ function blankSample(): Sample {
 // --- reporting -------------------------------------------------------------
 
 function printGroupTable(playerCount: number, group: Scenario[]): void {
+  const row = (name: string, bound: string) => `  ${name.padEnd(28)}  ${bound}`;
+
   console.log(`\n=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
-  console.log(
-    `  metric              safe npcs   first-drop   safe value      drop value`,
-  );
+  console.log(row("metric", "upper bound (NPCs before exceeding budget)"));
   for (const s of group) {
-    const safe = String(s.safe).padStart(9);
-    const drop =
-      s.firstBad === 0 ? "    n/a  " : String(s.firstBad).padStart(9);
-    const safeVal = fmtMetricValue(
-      s.metric,
-      s.metric.extract(s.safeSample),
-    ).padStart(14);
-    const dropVal =
+    const bound =
       s.firstBad === 0
-        ? "          n/a"
-        : fmtMetricValue(s.metric, s.metric.extract(s.firstBadSample)).padStart(
-            14,
-          );
-    console.log(
-      `  ${s.metric.name.padEnd(18)}${safe}    ${drop}    ${safeVal}    ${dropVal}`,
-    );
+        ? `${s.safe}+ (never exceeded budget within probe range)`
+        : `${s.safe} (next @ ${s.firstBad} exceeded budget: ${fmtMetricValue(s.metric, s.metric.extract(s.firstBadSample))})`;
+    console.log(row(s.metric.name, bound));
   }
 }
 
@@ -407,18 +392,19 @@ function createProgress() {
   function render(): void {
     const elapsed = ((performance.now() - state.startedAt) / 1000).toFixed(0);
     const lines = [
+      "",
       `[scenario ${state.resolved}/${state.total}] ${state.scenario}`,
-      `  elapsed:    ${elapsed}s`,
-      `  phase:      ${state.phase}`,
+      `  elapsed:               ${elapsed}s`,
+      `  phase:                 ${state.phase}`,
     ];
     const sample = state.lastSample;
     if (sample) {
       lines.push(
-        `  last probe: ${state.lastProbe} npcs`,
-        `  tick        p50=${fmt(sample.tick.p50)}ms p95=${fmt(sample.tick.p95)}ms max=${fmt(sample.tick.max)}ms`,
-        `  packet      p95=${fmtBytes(sample.packet.p95)} max=${fmtBytes(sample.packet.max)}`,
-        `  client      avg=${fmtBytes(sample.perClient.avgBps)}/s p95=${fmtBytes(sample.perClient.p95Bps)}/s`,
-        `  aggregate   ${fmtBytes(sample.aggregateBps)}/s`,
+        `  last test run:         ${state.lastProbe} NPCs`,
+        `  server tick latency:   p50=${fmt(sample.tick.p50)}ms p95=${fmt(sample.tick.p95)}ms max=${fmt(sample.tick.max)}ms`,
+        `  outbound packet size:  p95=${fmtBytes(sample.packet.p95)} max=${fmtBytes(sample.packet.max)}`,
+        `  per-player bandwidth:  avg=${fmtBytes(sample.perClient.avgBps)}/s p95=${fmtBytes(sample.perClient.p95Bps)}/s`,
+        `  total outbound:        ${fmtBytes(sample.aggregateBps)}/s`,
       );
     }
     logUpdate(lines.join("\n"));
