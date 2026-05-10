@@ -201,6 +201,100 @@ boxplot(() => {
         }
         do_not_optimize(w);
       });
+      bench("get(id, single) x1000", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: i, y: i });
+          w.add(e, velocityComp, { dx: 0, dy: 0 });
+          w.add(e, hpComp, i);
+          ids.push(e);
+        }
+        for (const id of ids) {
+          do_not_optimize(w.get(id, posComp));
+        }
+      });
+      bench("get(id, variadic 3) x1000", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: i, y: i });
+          w.add(e, velocityComp, { dx: 0, dy: 0 });
+          w.add(e, hpComp, i);
+          ids.push(e);
+        }
+        for (const id of ids) {
+          do_not_optimize(w.get(id, posComp, velocityComp, hpComp));
+        }
+      });
+      bench("has(id, variadic 3) x1000", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: i, y: i });
+          if (i % 2 === 0) w.add(e, velocityComp, { dx: 0, dy: 0 });
+          if (i % 3 === 0) w.add(e, hpComp, i);
+          ids.push(e);
+        }
+        for (const id of ids) {
+          do_not_optimize(w.has(id, posComp, velocityComp, hpComp));
+        }
+      });
+      bench("upsert (add+update mix) x1000", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          if (i % 2 === 0) w.add(e, posComp, { x: 0, y: 0 });
+          ids.push(e);
+        }
+        for (let i = 0; i < ids.length; i++) {
+          w.upsert(ids[i], posComp, { x: i, y: i });
+        }
+        do_not_optimize(w);
+      });
+      bench("remove component x1000", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: 0, y: 0 });
+          w.add(e, velocityComp, { dx: 0, dy: 0 });
+          ids.push(e);
+        }
+        for (const id of ids) {
+          w.remove(id, posComp);
+        }
+        do_not_optimize(w);
+      });
+      bench("destroy x1000 (3 comps each)", () => {
+        const w = new World(schema);
+        const ids: EntityId[] = [];
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: 0, y: 0 });
+          w.add(e, velocityComp, { dx: 0, dy: 0 });
+          w.add(e, hpComp, i);
+          ids.push(e);
+        }
+        w.destroy(...ids);
+        do_not_optimize(w);
+      });
+      bench("event emit (1 listener, 1000 mutations)", () => {
+        const w = new World(schema);
+        let count = 0;
+        w.on(() => {
+          count++;
+        });
+        for (let i = 0; i < 1000; i++) {
+          const e = w.create();
+          w.add(e, posComp, { x: i, y: i });
+        }
+        do_not_optimize(count);
+      });
     });
   });
 });

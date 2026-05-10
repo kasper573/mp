@@ -30,7 +30,11 @@ import {
   SessionRegistry,
   sessionRegistryFeature,
 } from "../src/identity/session-registry";
-import { OwnedByClient } from "../src/identity/components";
+import {
+  CharacterClaim,
+  ClientScopeTag,
+  OwnedByClient,
+} from "../src/identity/components";
 import { combatFeature } from "../src/combat/feature";
 import { movementFeature } from "../src/movement/feature";
 import { npcAiFeature } from "../src/npc/ai-feature";
@@ -168,8 +172,9 @@ export async function createSimulation(
     Math.floor(area.tiled.tileCount.x / 2) as Tile,
     Math.floor(area.tiled.tileCount.y / 2) as Tile,
   );
+  const characterId = "char-1" as CharacterId;
   const characterEnt = spawnCharacter(server.world, {
-    characterId: "char-1" as CharacterId,
+    characterId,
     userId: fakeUserId,
     name: "Bencher",
     modelId: actorModels[0].id,
@@ -186,6 +191,18 @@ export async function createSimulation(
     actorModels: actorModelsById,
   });
   server.world.add(characterEnt, OwnedByClient, { clientId: fakeClientId });
+
+  // Mirror the production scope wiring (see character-directory.ts): a
+  // per-client scope entity with CharacterClaim is what visibility uses to
+  // find the watched character. Without it, the visibility filter strips
+  // every NPC delta and the packet bench measures empty payloads.
+  const scopeEnt = server.world.create();
+  server.world.add(scopeEnt, ClientScopeTag, {});
+  server.world.add(scopeEnt, OwnedByClient, { clientId: fakeClientId });
+  server.world.add(scopeEnt, CharacterClaim, {
+    mode: "player",
+    characterId,
+  });
 
   for (let i = 0; i < warmupTicks; i++) {
     server.tick(dt);

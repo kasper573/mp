@@ -162,6 +162,13 @@ boxplot(() => {
         }
         do_not_optimize(w.finish());
       });
+      bench("writeVarU32", () => {
+        const w = new Writer(8192);
+        for (let i = 0; i < 1000; i++) {
+          w.writeVarU32(i * 1009);
+        }
+        do_not_optimize(w.finish());
+      });
     });
   });
 });
@@ -219,6 +226,19 @@ boxplot(() => {
         const r = new Reader(bufString);
         for (let i = 0; i < 1000; i++) {
           do_not_optimize(r.readString());
+        }
+      });
+      const bufVarU32 = (() => {
+        const w = new Writer(8192);
+        for (let i = 0; i < 1000; i++) {
+          w.writeVarU32(i * 1009);
+        }
+        return w.finish();
+      })();
+      bench("readVarU32", () => {
+        const r = new Reader(bufVarU32);
+        for (let i = 0; i < 1000; i++) {
+          do_not_optimize(r.readVarU32());
         }
       });
     });

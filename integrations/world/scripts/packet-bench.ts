@@ -4,7 +4,13 @@ import { DeltaOp, Opcode } from "@rift/core";
 import { Reader } from "@rift/types";
 import type { RiftType } from "@rift/types";
 import { schemaComponents } from "../src/schema";
-import { CharacterTag, NpcTag } from "../src/identity/components";
+import {
+  CharacterClaim,
+  CharacterList,
+  CharacterTag,
+  ClientScopeTag,
+  NpcTag,
+} from "../src/identity/components";
 import { AreaTag } from "../src/area/components";
 import { Movement } from "../src/movement/components";
 import { Combat } from "../src/combat/components";
@@ -72,6 +78,9 @@ function analyzeDelta(
 const componentLabels = new Map<unknown, string>([
   [CharacterTag, "CharacterTag"],
   [NpcTag, "NpcTag"],
+  [ClientScopeTag, "ClientScopeTag"],
+  [CharacterList, "CharacterList"],
+  [CharacterClaim, "CharacterClaim"],
   [AreaTag, "AreaTag"],
   [Movement, "Movement"],
   [Combat, "Combat"],
