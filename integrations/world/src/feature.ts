@@ -14,8 +14,8 @@ type FeatureSetupFn<Context> = (
 export interface Feature {
   readonly components?: readonly RiftType[];
   readonly events?: readonly RiftType[];
-  readonly server?: FeatureSetupFn<FeatureRiftServer>;
-  readonly client?: FeatureSetupFn<FeatureRiftClient>;
+  readonly server?: FeatureSetupFn<MpRiftServer>;
+  readonly client?: FeatureSetupFn<MpRiftClient>;
 }
 
 type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
@@ -23,7 +23,7 @@ type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
   readonly hash: HashFn;
 };
 
-export class FeatureRiftServer extends RiftServer {
+export class MpRiftServer extends RiftServer {
   constructor(private opts: FeatureServerOptions) {
     super({
       ...opts,
@@ -57,7 +57,7 @@ interface FeatureClientOptions {
   readonly hash: HashFn;
 }
 
-export class FeatureRiftClient extends RiftClient<ReactiveWorld> {
+export class MpRiftClient extends RiftClient<ReactiveWorld> {
   constructor(private opts: FeatureClientOptions) {
     const schema = defineSchema({
       components: opts.features.flatMap((f) => f.components ?? []),

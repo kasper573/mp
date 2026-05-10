@@ -1,4 +1,4 @@
-import type { Feature } from "@rift/feature";
+import type { Feature } from "../feature";
 import { signal, type ReadonlySignal, type Signal } from "@preact/signals-core";
 import { combine } from "@mp/std";
 import {

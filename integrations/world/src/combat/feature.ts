@@ -1,4 +1,4 @@
-import type { Cleanup, Feature } from "@rift/feature";
+import type { Cleanup, Feature } from "../feature";
 import { Tick } from "@rift/core";
 import { combine } from "@mp/std";
 import { entityForClient } from "../identity/client-character-registry";

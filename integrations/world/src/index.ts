@@ -1,5 +1,6 @@
 export * from "./schema";
 export * from "./hash";
+export * from "./feature";
 
 export * from "./identity/components";
 export * from "./identity/ids";

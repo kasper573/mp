@@ -1,4 +1,4 @@
-import type { Cleanup, Feature } from "@rift/feature";
+import type { Cleanup, Feature } from "@mp/world";
 import type { ClientId, EntityId, World } from "@rift/core";
 import { ClientDisconnected } from "@rift/core";
 import {

@@ -1,13 +1,13 @@
 import { createContext } from "preact";
-import type { FeatureRiftClient } from "@rift/feature";
 import { useContext } from "preact/hooks";
+import type { MpRiftClient } from "../feature";
 import type { GameAssetLoader } from "./game-asset-loader";
 
-export const RiftClientContext = createContext<FeatureRiftClient | undefined>(
+export const RiftClientContext = createContext<MpRiftClient | undefined>(
   undefined,
 );
 
-export function useRiftClient(): FeatureRiftClient {
+export function useRiftClient(): MpRiftClient {
   const client = useContext(RiftClientContext);
   if (!client) {
     throw new Error("RiftClientContext has not been provided");

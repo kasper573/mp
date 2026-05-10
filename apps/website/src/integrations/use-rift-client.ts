@@ -1,4 +1,4 @@
-import { FeatureRiftClient } from "@rift/feature";
+import { MpRiftClient } from "@mp/world";
 import {
   CharacterList,
   autoRejoinFeature,
@@ -15,7 +15,7 @@ import { AuthContext } from "./contexts";
 import { env } from "../env";
 
 export interface WiredRiftClient {
-  readonly client: FeatureRiftClient;
+  readonly client: MpRiftClient;
   readonly characters: CharacterList;
 }
 
@@ -31,7 +31,7 @@ export function useRiftClient(
 
     const characters = new CharacterList();
 
-    const client = new FeatureRiftClient({
+    const client = new MpRiftClient({
       transport: wsTransport(socket),
       hash: fnv1a64,
       features: [

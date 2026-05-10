@@ -146,9 +146,6 @@ importers:
       '@mp/world':
         specifier: workspace:*
         version: link:../../integrations/world
-      '@rift/feature':
-        specifier: workspace:*
-        version: link:../../libraries/rift/feature
       '@rift/wss':
         specifier: workspace:*
         version: link:../../libraries/rift/wss
@@ -198,9 +195,6 @@ importers:
       '@preact/signals-core':
         specifier: 'catalog:'
         version: 1.14.1
-      '@rift/feature':
-        specifier: workspace:*
-        version: link:../../libraries/rift/feature
       '@rift/ws':
         specifier: workspace:*
         version: link:../../libraries/rift/ws
@@ -274,9 +268,6 @@ importers:
       '@mp/world':
         specifier: workspace:*
         version: link:../../integrations/world
-      '@rift/feature':
-        specifier: workspace:*
-        version: link:../../libraries/rift/feature
       '@rift/ws':
         specifier: workspace:*
         version: link:../../libraries/rift/ws
@@ -338,9 +329,6 @@ importers:
       '@rift/core':
         specifier: workspace:*
         version: link:../../libraries/rift/core
-      '@rift/feature':
-        specifier: workspace:*
-        version: link:../../libraries/rift/feature
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.20.0)
@@ -452,9 +440,6 @@ importers:
       '@rift/core':
         specifier: workspace:*
         version: link:../../libraries/rift/core
-      '@rift/feature':
-        specifier: workspace:*
-        version: link:../../libraries/rift/feature
       '@rift/reactive':
         specifier: workspace:*
         version: link:../../libraries/rift/reactive
@@ -634,22 +619,6 @@ importers:
 
   libraries/rift/event:
     dependencies:
-      '@rift/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  libraries/rift/feature:
-    dependencies:
-      '@rift/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rift/reactive':
-        specifier: workspace:*
-        version: link:../reactive
       '@rift/types':
         specifier: workspace:*
         version: link:../types

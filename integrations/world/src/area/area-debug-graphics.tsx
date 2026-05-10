@@ -14,7 +14,7 @@ import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
 import type { EntityId } from "@rift/core";
-import type { FeatureRiftClient } from "@rift/feature";
+import type { MpRiftClient } from "../feature";
 import uniqolor from "uniqolor";
 import { Movement } from "../movement/components";
 import { Combat } from "../combat/components";
@@ -34,7 +34,7 @@ export class AreaDebugGraphics extends Container {
   constructor(
     engine: Engine,
     area: AreaResource,
-    client: FeatureRiftClient,
+    client: MpRiftClient,
     actorIds: ReadonlySignal<EntityId[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,

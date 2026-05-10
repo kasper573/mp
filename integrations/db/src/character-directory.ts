@@ -1,4 +1,4 @@
-import type { Cleanup, Feature } from "@rift/feature";
+import type { Cleanup, Feature } from "@mp/world";
 import {
   CharacterListResponse,
   CharacterRenamedResponse,

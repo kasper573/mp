@@ -1,4 +1,4 @@
-import type { Feature } from "@rift/feature";
+import type { Feature } from "../feature";
 import { effect } from "@preact/signals-core";
 import type { CharacterId } from "../identity/ids";
 import { joinAsPlayer, joinAsSpectator } from "./actions";

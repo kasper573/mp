@@ -8,7 +8,7 @@ import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
 import type { EntityId } from "@rift/core";
-import type { FeatureRiftClient } from "@rift/feature";
+import type { MpRiftClient } from "../feature";
 import { useState } from "preact/hooks";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import {
@@ -26,7 +26,7 @@ import { Dock, ErrorFallback } from "@mp/ui";
 
 interface GameRendererProps {
   interactive: boolean;
-  client: FeatureRiftClient;
+  client: MpRiftClient;
   characterEntity: ReadonlySignal<EntityId | undefined>;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
@@ -99,7 +99,7 @@ function buildStage(
   app: Application,
   opt: {
     interactive: boolean;
-    client: FeatureRiftClient;
+    client: MpRiftClient;
     characterEntity: ReadonlySignal<EntityId | undefined>;
     areaAssets: AreaAssets;
     actorTextures: ActorTextureLookup;

@@ -7,7 +7,7 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rng } from "@mp/std";
 import type { AccessToken, UserId } from "@mp/auth";
 import { Opcode, type ClientId } from "@rift/core";
-import { FeatureRiftServer } from "@rift/feature";
+import { MpRiftServer } from "../src/feature";
 import { Writer } from "@rift/types";
 import {
   actorModels,
@@ -55,7 +55,7 @@ export interface CapturingTransport extends ServerTransport {
 }
 
 export interface Simulation {
-  readonly server: FeatureRiftServer;
+  readonly server: MpRiftServer;
   readonly transport: CapturingTransport;
   readonly area: AreaResource;
   readonly tickHz: number;
@@ -127,7 +127,7 @@ export async function createSimulation(
   const itemLookup = createItemDefinitionLookup(consumables, equipment);
   const rng = new Rng();
 
-  const server = new FeatureRiftServer({
+  const server = new MpRiftServer({
     transport,
     hash: fnv1a64,
     tickRateHz: 0,

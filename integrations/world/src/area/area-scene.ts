@@ -15,7 +15,7 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import type { EntityId } from "@rift/core";
-import type { FeatureRiftClient } from "@rift/feature";
+import type { MpRiftClient } from "../feature";
 import { ActorController } from "../appearance/actor-controller";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import { attackTarget, moveCharacter } from "../client/actions";
@@ -30,7 +30,7 @@ import { TileHighlight } from "./tile-highlight";
 export interface AreaSceneOptions {
   area: AreaResource;
   engine: Engine;
-  client: FeatureRiftClient;
+  client: MpRiftClient;
   characterEntity: ReadonlySignal<EntityId | undefined>;
   actorTextures: ActorTextureLookup;
   areaSpritesheets: TiledSpritesheetRecord;

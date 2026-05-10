@@ -12,7 +12,7 @@ import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { TimeSpan } from "@mp/time";
 import type { EntityId } from "@rift/core";
-import type { FeatureRiftClient } from "@rift/feature";
+import type { MpRiftClient } from "../feature";
 import { Attacked } from "../combat/events";
 import { Combat } from "../combat/components";
 import { Movement } from "../movement/components";
@@ -28,7 +28,7 @@ const TELEPORT_THRESHOLD: Tile = 3 as Tile;
 export interface ActorControllerOptions {
   tiled: TiledResource;
   entityId: EntityId;
-  client: FeatureRiftClient;
+  client: MpRiftClient;
   actorTextures: ActorTextureLookup;
 }
 

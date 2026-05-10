@@ -1,4 +1,4 @@
-import type { Cleanup, Feature } from "@rift/feature";
+import type { Cleanup, Feature } from "../feature";
 import { Tick, type EntityId, type World } from "@rift/core";
 import type { Vector } from "@mp/math";
 import { combine, Rng, type Tile } from "@mp/std";

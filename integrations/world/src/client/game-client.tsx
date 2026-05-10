@@ -3,7 +3,7 @@ import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
 import type { ReadonlySignal } from "@preact/signals-core";
 import type { EntityId } from "@rift/core";
-import type { FeatureRiftClient } from "@rift/feature";
+import type { MpRiftClient } from "../feature";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
 import { isConnectedSignal } from "./signals";
@@ -11,7 +11,7 @@ import { AreaTag } from "../area/components";
 import type { ViewDistanceSettings } from "../visibility/view-distance";
 
 export interface GameClientProps {
-  client: FeatureRiftClient;
+  client: MpRiftClient;
   characterEntity: ReadonlySignal<EntityId | undefined>;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;

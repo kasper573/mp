@@ -4,7 +4,7 @@ import {
   type EntityId,
   type World,
 } from "@rift/core";
-import type { Feature } from "@rift/feature";
+import type { Feature } from "../feature";
 import type { UserId, UserIdentity } from "@mp/auth";
 import { OwnedByClient } from "./components";
 

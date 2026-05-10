@@ -21,7 +21,6 @@
     "@mp/std": "workspace:*",
     "@mp/world": "workspace:*",
     "@rift/core": "workspace:*",
-    "@rift/feature": "workspace:*",
     "drizzle-orm": "0.45.2",
     "pg": "8.20.0"
   },

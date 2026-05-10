@@ -2,7 +2,7 @@ import { createServer as createHttpServer } from "node:http";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 import { wssTransport } from "@rift/wss";
-import { FeatureRiftServer } from "@rift/feature";
+import { MpRiftServer } from "@mp/world";
 import { createPinoLogger } from "@mp/logger/pino";
 import { Rng, setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
@@ -106,7 +106,7 @@ if (!defaultAreaResource) {
 }
 const rng = new Rng();
 
-const server = new FeatureRiftServer({
+const server = new MpRiftServer({
   transport,
   hash: fnv1a64,
   tickRateHz: opt.tickRateHz,

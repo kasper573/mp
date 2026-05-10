@@ -1,4 +1,4 @@
-import type { Cleanup, Feature } from "@rift/feature";
+import type { Cleanup, Feature } from "../feature";
 import { createShortId } from "@mp/std";
 import { Kill } from "../combat/events";
 import { CharacterTag, NpcTag } from "../identity/components";

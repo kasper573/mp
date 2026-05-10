@@ -1,4 +1,4 @@
-import { FeatureRiftClient } from "@rift/feature";
+import { MpRiftClient } from "@mp/world";
 import {
   AreaTag,
   CharacterList,
@@ -108,7 +108,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
 
       const characters = new CharacterList();
 
-      const client = new FeatureRiftClient({
+      const client = new MpRiftClient({
         transport: wsTransport(socket as unknown as WebSocketLike),
         hash: fnv1a64,
         features: [
