@@ -47,6 +47,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "catalog:",
+    "log-update": "^8.0.0",
     "mitata": "catalog:",
     "tsx": "catalog:",
     "yargs": "catalog:"

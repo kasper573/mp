@@ -1,6 +1,9 @@
 // oxlint-disable no-await-in-loop
 // oxlint-disable no-console
 import { performance } from "node:perf_hooks";
+import logUpdate from "log-update";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import { createSimulation } from "./simulation";
 
 /**
@@ -15,12 +18,33 @@ const TICK_BUDGET_MS = 1000 / TICK_HZ;
 const SAMPLE_TICKS = 50;
 const WARMUP_TICKS = 30;
 
-const PLAYER_COUNTS: readonly number[] = [1, 5, 25, 100];
+const DEFAULT_PLAYER_COUNTS: readonly number[] = [1, 5, 25, 100];
 
 /** Final granularity of the binary search. */
 const RESOLUTION = 25;
 /** Upper sanity cap on doubling phase, prevents runaway. */
 const MAX_PROBE = 25_000;
+
+const args = yargs(hideBin(process.argv))
+  .option("players", {
+    type: "string",
+    description:
+      "Comma-separated player counts to run (e.g. '1,5'). Defaults to all.",
+  })
+  .option("max-probe", {
+    type: "number",
+    description: `Cap on doubling phase NPC count. Default ${MAX_PROBE}.`,
+  })
+  .strict()
+  .parseSync();
+
+const playerCounts: readonly number[] = args.players
+  ? args.players
+      .split(",")
+      .map((s) => Number.parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n >= 0)
+  : DEFAULT_PLAYER_COUNTS;
+const maxProbe = args["max-probe"] ?? MAX_PROBE;
 
 interface Sample {
   readonly tick: { avg: number; p50: number; p95: number; max: number };
@@ -206,9 +230,11 @@ async function findBoundsForPlayerCount(
   const bounds = METRICS.map(() => emptyBound());
 
   // Doubling phase: keep doubling until every metric has at least one
-  // failing probe, or we hit MAX_PROBE.
+  // failing probe, or we hit maxProbe.
   let count = 25;
-  while (count <= MAX_PROBE) {
+  while (count <= maxProbe) {
+    progress.set("phase", `probe ${count} npcs`);
+    progress.render();
     const sample = await measure(playerCount, count);
     let allFailed = true;
     for (let i = 0; i < METRICS.length; i++) {
@@ -216,13 +242,8 @@ async function findBoundsForPlayerCount(
       update(bounds[i], count, sample, m.threshold, m.extract);
       if (bounds[i].firstBad === 0) allFailed = false;
     }
-    console.log(
-      `  probe ${count} npcs: tick_p95=${fmt(sample.tick.p95)}ms ` +
-        `pkt_max=${Math.round(sample.packet.max)}B ` +
-        `pkt_p95=${Math.round(sample.packet.p95)}B ` +
-        `client_avg=${Math.round(sample.perClient.avgBps)}B/s ` +
-        `agg=${Math.round(sample.aggregateBps)}B/s`,
-    );
+    progress.setSample(count, sample);
+    progress.render();
     if (allFailed) break;
     count *= 2;
   }
@@ -236,6 +257,8 @@ async function findBoundsForPlayerCount(
     let hi = b.firstBad;
     while (hi - lo > RESOLUTION) {
       const mid = Math.floor((lo + hi) / 2);
+      progress.set("phase", `refine ${m.name} ∈ [${lo}, ${hi}] @ ${mid}`);
+      progress.render();
       const sample = await measure(playerCount, mid);
       if (m.extract(sample) > m.threshold) {
         hi = mid;
@@ -246,10 +269,74 @@ async function findBoundsForPlayerCount(
         b.safe = mid;
         b.safeSample = sample;
       }
+      progress.setSample(mid, sample);
+      progress.render();
     }
   }
 
   return bounds;
+}
+
+interface ProgressState {
+  scenario: string;
+  phase: string;
+  lastProbe: number;
+  lastSample: Sample | undefined;
+  startedAt: number;
+}
+
+const progress = createProgress();
+
+function createProgress() {
+  const state: ProgressState = {
+    scenario: "",
+    phase: "",
+    lastProbe: 0,
+    lastSample: undefined,
+    startedAt: performance.now(),
+  };
+
+  function set<K extends keyof ProgressState>(
+    key: K,
+    value: ProgressState[K],
+  ): void {
+    state[key] = value;
+  }
+
+  function setSample(probe: number, sample: Sample): void {
+    state.lastProbe = probe;
+    state.lastSample = sample;
+  }
+
+  function setScenario(scenario: string): void {
+    state.scenario = scenario;
+    state.startedAt = performance.now();
+    state.lastSample = undefined;
+    state.lastProbe = 0;
+  }
+
+  function render(): void {
+    const elapsed = ((performance.now() - state.startedAt) / 1000).toFixed(0);
+    const header = `[${state.scenario}] (${elapsed}s) ${state.phase}`;
+    const sample = state.lastSample;
+    const detail = sample
+      ? [
+          `  last probe: ${state.lastProbe} npcs`,
+          `  tick     p50=${fmt(sample.tick.p50)}ms p95=${fmt(sample.tick.p95)}ms max=${fmt(sample.tick.max)}ms`,
+          `  packet   p95=${Math.round(sample.packet.p95)}B max=${Math.round(sample.packet.max)}B`,
+          `  client   avg=${Math.round(sample.perClient.avgBps)}B/s p95=${Math.round(sample.perClient.p95Bps)}B/s`,
+          `  aggregate ${Math.round(sample.aggregateBps)}B/s`,
+        ].join("\n")
+      : "";
+    logUpdate(detail ? `${header}\n${detail}` : header);
+  }
+
+  function done(): void {
+    logUpdate.clear();
+    logUpdate.done();
+  }
+
+  return { set, setSample, setScenario, render, done };
 }
 
 function fmt(n: number): string {
@@ -264,13 +351,13 @@ function fmtBytes(n: number): string {
 
 function fmtThreshold(m: MetricSpec): string {
   if (m.unit === "B/s") return `${fmtBytes(m.threshold)}/s`;
-  if (m.unit === "B") return `${fmtBytes(m.threshold)}`;
+  if (m.unit === "B") return fmtBytes(m.threshold);
   return `${m.threshold} ${m.unit}`;
 }
 
 function fmtMetricValue(m: MetricSpec, v: number): string {
   if (m.unit === "B/s") return `${fmtBytes(v)}/s`;
-  if (m.unit === "B") return `${fmtBytes(v)}`;
+  if (m.unit === "B") return fmtBytes(v);
   if (m.unit === "ms") return `${v.toFixed(2)} ms`;
   return `${v} ${m.unit}`;
 }
@@ -284,10 +371,20 @@ for (const m of METRICS) {
 }
 console.log("");
 
-for (const playerCount of PLAYER_COUNTS) {
-  console.log(`\n=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
+if (playerCounts.length === 0) {
+  console.error(`no player counts to run (--players parsed as empty)`);
+  process.exit(1);
+}
+console.log(`player counts: ${playerCounts.join(", ")}`);
+console.log("");
+
+for (const playerCount of playerCounts) {
+  progress.setScenario(`${playerCount} player${playerCount === 1 ? "" : "s"}`);
+  progress.set("phase", "starting");
+  progress.render();
   const bounds = await findBoundsForPlayerCount(playerCount);
-  console.log("");
+  progress.done();
+  console.log(`\n=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
   console.log(
     `  metric              safe npcs   first-drop   safe value      drop value`,
   );
