@@ -24,13 +24,6 @@ export function object<F extends Record<string, RiftType>>(
     }
     return out as Value;
   }
-  function defaultValue(): Value {
-    const out: Record<string, unknown> = {};
-    for (const k of order) {
-      out[k] = fields[k].default();
-    }
-    return out as Value;
-  }
   function inspect(): Uint8Array {
     const w = new Writer(32);
     w.writeU8(RiftTypeKind.Object);
@@ -44,7 +37,6 @@ export function object<F extends Record<string, RiftType>>(
   return {
     kind: RiftTypeKind.Object,
     inspect,
-    default: defaultValue,
     encode,
     decode,
   };
@@ -74,7 +66,6 @@ export function array<T>(item: RiftType<T>): RiftType<readonly T[]> {
   return {
     kind: RiftTypeKind.Array,
     inspect,
-    default: () => [],
     encode,
     decode,
   };
@@ -100,13 +91,6 @@ export function tuple<const T extends readonly RiftType[]>(
     }
     return out as Value;
   }
-  function defaultValue(): Value {
-    const out = new Array<unknown>(items.length);
-    for (let i = 0; i < items.length; i++) {
-      out[i] = items[i].default();
-    }
-    return out as Value;
-  }
   function inspect(): Uint8Array {
     const w = new Writer(32);
     w.writeU8(RiftTypeKind.Tuple);
@@ -119,7 +103,6 @@ export function tuple<const T extends readonly RiftType[]>(
   return {
     kind: RiftTypeKind.Tuple,
     inspect,
-    default: defaultValue,
     encode,
     decode,
   };
@@ -149,7 +132,6 @@ export function optional<T>(inner: RiftType<T>): RiftType<T | undefined> {
   return {
     kind: RiftTypeKind.Optional,
     inspect,
-    default: () => undefined,
     encode,
     decode,
   };
@@ -185,10 +167,6 @@ export function union<V extends Record<string, RiftType>>(
     const value = variants[tag].decode(r);
     return { tag, value } as Value;
   }
-  function defaultValue(): Value {
-    const tag = order[0];
-    return { tag, value: variants[tag].default() } as Value;
-  }
   function inspect(): Uint8Array {
     const w = new Writer(32);
     w.writeU8(RiftTypeKind.Union);
@@ -202,7 +180,6 @@ export function union<V extends Record<string, RiftType>>(
   return {
     kind: RiftTypeKind.Union,
     inspect,
-    default: defaultValue,
     encode,
     decode,
   };
@@ -228,7 +205,6 @@ export function transform<Inner, Outer>(
   return {
     kind: RiftTypeKind.Transform,
     inspect,
-    default: () => fromInner(inner.default()),
     encode,
     decode,
   };

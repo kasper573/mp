@@ -168,7 +168,7 @@ export class World {
     return out;
   }
 
-  add<T>(id: EntityId, type: RiftType<T>, initial?: T): T {
+  add<T>(id: EntityId, type: RiftType<T>, value: T): T {
     if (!this.#entities.has(id)) {
       throw new Error(`entity ${id} does not exist`);
     }
@@ -176,7 +176,6 @@ export class World {
     if (pool.values.has(id)) {
       throw new Error(`entity ${id} already has component`);
     }
-    const value = initial ?? type.default();
     pool.add(id, value);
     this.#emit({ type: "componentAdded", id, component: type });
     return value;

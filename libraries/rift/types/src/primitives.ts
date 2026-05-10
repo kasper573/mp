@@ -11,7 +11,6 @@ export function u8<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U8,
     inspect: () => primitiveInspect(RiftTypeKind.U8),
-    default: () => 0 as T,
     encode: (w, v) => w.writeU8(v),
     decode: (r) => r.readU8() as T,
   };
@@ -21,7 +20,6 @@ export function u16<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U16,
     inspect: () => primitiveInspect(RiftTypeKind.U16),
-    default: () => 0 as T,
     encode: (w, v) => w.writeU16(v),
     decode: (r) => r.readU16() as T,
   };
@@ -31,7 +29,7 @@ export function u32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U32,
     inspect: () => primitiveInspect(RiftTypeKind.U32),
-    default: () => 0 as T,
+
     encode: (w, v) => w.writeU32(v),
     decode: (r) => r.readU32() as T,
   };
@@ -41,7 +39,6 @@ export function u64<T extends bigint = bigint>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U64,
     inspect: () => primitiveInspect(RiftTypeKind.U64),
-    default: () => 0n as T,
     encode: (w, v) => w.writeU64(v),
     decode: (r) => r.readU64() as T,
   };
@@ -51,7 +48,6 @@ export function i8<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I8,
     inspect: () => primitiveInspect(RiftTypeKind.I8),
-    default: () => 0 as T,
     encode: (w, v) => w.writeI8(v),
     decode: (r) => r.readI8() as T,
   };
@@ -61,7 +57,6 @@ export function i16<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I16,
     inspect: () => primitiveInspect(RiftTypeKind.I16),
-    default: () => 0 as T,
     encode: (w, v) => w.writeI16(v),
     decode: (r) => r.readI16() as T,
   };
@@ -71,7 +66,6 @@ export function i32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I32,
     inspect: () => primitiveInspect(RiftTypeKind.I32),
-    default: () => 0 as T,
     encode: (w, v) => w.writeI32(v),
     decode: (r) => r.readI32() as T,
   };
@@ -81,7 +75,6 @@ export function i64<T extends bigint = bigint>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I64,
     inspect: () => primitiveInspect(RiftTypeKind.I64),
-    default: () => 0n as T,
     encode: (w, v) => w.writeI64(v),
     decode: (r) => r.readI64() as T,
   };
@@ -91,7 +84,6 @@ export function f32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.F32,
     inspect: () => primitiveInspect(RiftTypeKind.F32),
-    default: () => 0 as T,
     encode: (w, v) => w.writeF32(v),
     decode: (r) => r.readF32() as T,
   };
@@ -101,7 +93,7 @@ export function f64<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.F64,
     inspect: () => primitiveInspect(RiftTypeKind.F64),
-    default: () => 0 as T,
+
     encode: (w, v) => w.writeF64(v),
     decode: (r) => r.readF64() as T,
   };
@@ -111,7 +103,6 @@ export function bool<T extends boolean = boolean>(): RiftType<T> {
   return {
     kind: RiftTypeKind.Bool,
     inspect: () => primitiveInspect(RiftTypeKind.Bool),
-    default: () => false as T,
     encode: (w, v) => w.writeBool(v),
     decode: (r) => r.readBool() as T,
   };
@@ -121,7 +112,6 @@ export function string<T extends string = string>(): RiftType<T> {
   return {
     kind: RiftTypeKind.String,
     inspect: () => primitiveInspect(RiftTypeKind.String),
-    default: () => "" as T,
     encode: (w, v) => w.writeString(v),
     decode: (r) => r.readString() as T,
   };
@@ -131,7 +121,6 @@ export function bytes(): RiftType<Uint8Array> {
   return {
     kind: RiftTypeKind.Bytes,
     inspect: () => primitiveInspect(RiftTypeKind.Bytes),
-    default: () => new Uint8Array(0),
     encode: (w, v) => w.writeBytes(v),
     decode: (r) => r.readBytes(),
   };
@@ -169,11 +158,9 @@ export function enumOf<const Values extends readonly string[]>(
     }
     return w.finish();
   }
-  const defaultValue = values[0];
   return {
     kind: RiftTypeKind.EnumOf,
     inspect,
-    default: () => defaultValue,
     encode,
     decode,
   };
@@ -188,13 +175,6 @@ export function bitflags<const Flags extends readonly string[]>(
   }
   const width =
     flags.length <= 8 ? 1 : flags.length <= 16 ? 2 : flags.length <= 32 ? 4 : 8;
-  function defaultValue(): Value {
-    const v: Record<string, boolean> = {};
-    for (const f of flags) {
-      v[f] = false;
-    }
-    return v as Value;
-  }
   function encode(w: Writer, v: Value): void {
     if (width === 8) {
       let bits = 0n;
@@ -253,7 +233,6 @@ export function bitflags<const Flags extends readonly string[]>(
   return {
     kind: RiftTypeKind.Bitflags,
     inspect,
-    default: defaultValue,
     encode,
     decode,
   };

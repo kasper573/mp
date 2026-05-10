@@ -371,12 +371,6 @@ boxplot(() => {
       bench("entity.inspect()", () => {
         do_not_optimize(entityTy.inspect());
       });
-      bench("entity.default()", () => {
-        do_not_optimize(entityTy.default());
-      });
-      bench("arr100.default()", () => {
-        do_not_optimize(arr100Ty.default());
-      });
     });
   });
 });

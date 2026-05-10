@@ -54,12 +54,6 @@ describe("world", () => {
     w.remove(id, pos);
     expect(w.has(id, pos)).toBe(false);
   });
-  it("add without initial uses default", () => {
-    const w = new World(schema);
-    const id = w.create();
-    w.add(id, health);
-    expect(w.get(id, health)).toBe(0);
-  });
   it("query returns matching entities", () => {
     const w = new World(schema);
     const a = w.create();

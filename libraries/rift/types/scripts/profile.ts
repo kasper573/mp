@@ -295,12 +295,6 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
-    name: "entity_default",
-    run() {
-      entityTy.default();
-    },
-  },
-  {
     name: "f64_decode",
     run() {
       const w = new Writer(16);
