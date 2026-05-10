@@ -1,4 +1,4 @@
-import type { InferValue, RiftType } from "@rift/types";
+import { RiftTypeKind, type InferValue, type RiftType } from "@rift/types";
 import type { EntityId } from "./protocol";
 import type { RiftSchema } from "./schema";
 
@@ -28,6 +28,15 @@ export class Pool<T> {
   readonly dirty = new Set<EntityId>();
   readonly added = new Set<EntityId>();
   readonly removed = new Set<EntityId>();
+  readonly #mergeOnWrite: boolean;
+
+  constructor(type: RiftType<T>) {
+    // Object-shaped components accept partial writes and are merged into
+    // a fresh object so signal subscribers see a different reference.
+    // Every other kind (primitives, arrays, tuples, unions, transforms)
+    // is written whole, so the partial IS the replacement.
+    this.#mergeOnWrite = type.kind === RiftTypeKind.Object;
+  }
 
   add(id: EntityId, v: T): void {
     this.values.set(id, v);
@@ -42,15 +51,10 @@ export class Pool<T> {
 
   write(id: EntityId, partial: Partial<T>): boolean {
     if (!this.values.has(id)) return false;
-    const current = this.values.get(id) as T;
-    if (
-      typeof current === "object" &&
-      current !== null &&
-      !Array.isArray(current)
-    ) {
+    if (this.#mergeOnWrite) {
+      const current = this.values.get(id) as T & object;
       this.values.set(id, { ...current, ...partial } as T);
     } else {
-      // Primitives and array components: caller passes a complete replacement.
       this.values.set(id, partial as T);
     }
     if (!this.added.has(id)) this.dirty.add(id);
@@ -101,7 +105,7 @@ export class World {
   constructor(schema: RiftSchema) {
     this.schema = schema;
     for (const type of schema.components) {
-      this.#pools.set(type, new Pool());
+      this.#pools.set(type, new Pool(type));
     }
   }
 
@@ -235,7 +239,7 @@ export class World {
   #poolOf(type: RiftType): Pool<unknown> {
     let pool = this.#pools.get(type);
     if (!pool) {
-      pool = new Pool();
+      pool = new Pool(type);
       this.#pools.set(type, pool);
     }
     return pool;
