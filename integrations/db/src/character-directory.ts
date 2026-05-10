@@ -6,11 +6,10 @@ import {
   CharacterTag,
   ListCharactersRequest,
   RenameCharacterRequest,
-  type ActorModelId,
-  type AreaId,
   type CharacterId,
   type SessionRegistry,
 } from "@mp/world";
+import type { ActorModelId, AreaId } from "@mp/fixtures";
 import { userRoles } from "@mp/keycloak";
 import { combine, type Tile } from "@mp/std";
 import type { Vector } from "@mp/math";

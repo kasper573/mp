@@ -2,7 +2,8 @@ import type { UserId } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, inventoryTable } from "../schema";
-import type { ActorModelId, AreaId, CharacterId } from "@mp/world";
+import type { CharacterId } from "@mp/world";
+import type { ActorModelId, AreaId } from "@mp/fixtures";
 import type { Vector } from "@mp/math";
 import { procedure } from "../utils/procedure";
 

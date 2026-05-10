@@ -1,5 +1,5 @@
 import type { RoleDefinition, UserId } from "@mp/auth";
-import type { CharacterId } from "./ids";
+import type { CharacterId } from "../character/id";
 import type { ClientId } from "@rift/core";
 
 export interface UserSessionIdentity {

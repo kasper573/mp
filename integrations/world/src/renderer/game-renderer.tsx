@@ -17,7 +17,7 @@ import {
 import { AreaScene } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
 import { AreaTag } from "../area/components";
-import type { AreaId } from "../identity/ids";
+import type { AreaId } from "@mp/fixtures";
 import { RiftContext, type MpRiftClient } from "../client";
 import {
   GameAssetLoaderContext,

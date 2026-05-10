@@ -1,4 +1,4 @@
-import type { ActorModelId } from "../identity/ids";
+import type { ActorModelId } from "@mp/fixtures";
 import { Engine } from "@mp/engine";
 import { actorModelStates, type ActorModelState } from "./actor-model";
 import { Container, Text } from "@mp/graphics";

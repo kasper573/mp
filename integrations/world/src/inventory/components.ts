@@ -1,6 +1,8 @@
 import { object, string, u32 } from "@rift/types";
 import type { EntityId } from "@rift/core";
-import type { InventoryId } from "../identity/ids";
+import type { Branded } from "@mp/std";
+
+export type InventoryId = Branded<string, "InventoryId">;
 
 export const InventoryRef = object({
   inventoryId: string<InventoryId>(),

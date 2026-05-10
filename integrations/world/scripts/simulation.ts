@@ -41,7 +41,9 @@ import { spawnCharacter } from "../src/character/bundle";
 import { createItemDefinitionLookup } from "../src/item/definition-lookup";
 import { loadAreaResource } from "../src/area/load";
 import type { AreaResource } from "../src/area/area-resource";
-import type { AreaId, CharacterId, InventoryId } from "../src/identity/ids";
+import type { AreaId } from "@mp/fixtures";
+import type { CharacterId } from "../src/character/id";
+import type { InventoryId } from "../src/inventory/components";
 
 const FIXTURES_DIR = resolve(
   dirname(fileURLToPath(import.meta.url)),

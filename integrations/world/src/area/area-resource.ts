@@ -2,14 +2,13 @@ import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph } from "@mp/path-finding";
 import type { Pixel, Result } from "@mp/std";
-import { assert, err, ok, TileType, type Tile } from "@mp/std";
+import { assert, err, ok, type Tile } from "@mp/std";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import { type } from "@mp/validate";
-import { AreaIdType, type AreaId } from "../identity/ids";
 import { graphFromTiled } from "./graph-from-tiled";
 import { hitTestTiledObject } from "./hit-test";
 import { TiledFixture } from "./tiled-fixture";
 import type { TiledResource } from "./tiled-resource";
+import type { AreaId } from "@mp/fixtures";
 
 export class AreaResource {
   readonly start: Vector<Tile>;
@@ -77,13 +76,13 @@ export function getDestinationFromObject(
   if (prop.type !== "string") {
     return err(new Error(`'goto' property must be a string`));
   }
-  const res = portalDestinationComponentsType(prop.value.split(","));
-  if (res instanceof type.errors) {
-    return err(
-      new Error(`'goto' property invalid: ${res.summary}`, { cause: res }),
-    );
-  }
-  const [areaId, x, y] = res;
+  const [areaString, xString, yString] = prop.value
+    .split(",")
+    .map((s) => s.trim());
+
+  const areaId = areaString as AreaId;
+  const x = Number(xString) as Tile;
+  const y = Number(yString) as Tile;
   return ok({
     areaId,
     coords: new Vector(x, y),
@@ -101,10 +100,3 @@ export interface PortalDestination {
 }
 
 export const dynamicLayerName = "Dynamic";
-
-const stringTileType = type("string").pipe(Number).pipe(TileType);
-const portalDestinationComponentsType = type([
-  AreaIdType,
-  stringTileType,
-  stringTileType,
-]);

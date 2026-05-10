@@ -4,7 +4,7 @@ import { combine, type Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 import type { AreaResource } from "../area/area-resource";
 import { hitTestTiledObject } from "../area/hit-test";
-import type { AreaId } from "../identity/ids";
+import type { AreaId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
 import { entityForClient } from "../identity/session-registry";
 import { Movement, PathFollow, type CardinalDirection } from "./components";

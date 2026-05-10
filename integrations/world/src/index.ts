@@ -5,7 +5,6 @@ export * from "./client";
 export * from "./server";
 
 export * from "./identity/components";
-export * from "./identity/ids";
 export * from "./identity/session-registry";
 export * from "./identity/session";
 
@@ -64,6 +63,7 @@ export * from "./area/tile-renderer-tester";
 export * from "./visibility/view-distance";
 export * from "./visibility/feature";
 
+export * from "./character/id";
 export * from "./character/events";
 export * from "./character/bundle";
 export * from "./character/actions";

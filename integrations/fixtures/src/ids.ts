@@ -1,26 +1,15 @@
-import { type } from "@mp/validate";
+import type { Branded } from "@mp/std";
 
-export type ActorModelId = typeof ActorModelIdType.infer;
-export const ActorModelIdType = type("string").brand("ActorModelId");
+export type ActorModelId = Branded<string, "ActorModelId">;
 
-export type AreaId = typeof AreaIdType.infer;
-export const AreaIdType = type("string").brand("AreaId");
+export type AreaId = Branded<string, "AreaId">;
 
-export type NpcDefinitionId = typeof NpcDefinitionIdType.infer;
-export const NpcDefinitionIdType = type("string").brand("NpcDefinitionId");
+export type NpcDefinitionId = Branded<string, "NpcDefinitionId">;
 
-export type NpcSpawnId = typeof NpcSpawnIdType.infer;
-export const NpcSpawnIdType = type("string").brand("NpcSpawnId");
+export type NpcSpawnId = Branded<string, "NpcSpawnId">;
 
-export type NpcRewardId = typeof NpcRewardIdType.infer;
-export const NpcRewardIdType = type("string").brand("NpcRewardId");
+export type NpcRewardId = Branded<string, "NpcRewardId">;
 
-export type ConsumableDefinitionId = typeof ConsumableDefinitionIdType.infer;
-export const ConsumableDefinitionIdType = type("string").brand(
-  "ConsumableDefinitionId",
-);
+export type ConsumableDefinitionId = Branded<string, "ConsumableDefinitionId">;
 
-export type EquipmentDefinitionId = typeof EquipmentDefinitionIdType.infer;
-export const EquipmentDefinitionIdType = type("string").brand(
-  "EquipmentDefinitionId",
-);
+export type EquipmentDefinitionId = Branded<string, "EquipmentDefinitionId">;

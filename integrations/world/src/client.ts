@@ -19,7 +19,7 @@ import {
 } from "./character/character-list-feature";
 import { characterEntitySignal } from "./character/signals";
 import { fnv1a64 } from "./hash";
-import type { CharacterId } from "./identity/ids";
+import type { CharacterId } from "./character/id";
 import { schemaComponents, schemaEvents } from "./schema";
 import type { Cleanup, Feature } from "./feature";
 import { setupFeatures } from "./feature";

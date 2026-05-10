@@ -1,7 +1,7 @@
 import type { EntityId } from "@rift/core";
 import type { ReactiveWorld } from "@rift/reactive";
 import { computed, type ReadonlySignal } from "@preact/signals-core";
-import type { CharacterId } from "../identity/ids";
+import type { CharacterId } from "./id";
 import { CharacterTag } from "../identity/components";
 
 export function characterEntitySignal(

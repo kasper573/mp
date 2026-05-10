@@ -3,7 +3,7 @@ import { Tick, type EntityId, type World } from "@rift/core";
 import type { Vector } from "@mp/math";
 import { combine, Rng, type Tile } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId, NpcSpawnId } from "../identity/ids";
+import type { AreaId, NpcSpawnId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { NpcAi } from "./components";

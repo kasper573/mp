@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/fixtures": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",

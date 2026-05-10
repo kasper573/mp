@@ -1,7 +1,8 @@
 import { object, string, u32 } from "@rift/types";
 import type { ClientId } from "@rift/core";
 import type { UserId } from "@mp/auth";
-import type { CharacterId, NpcDefinitionId, NpcSpawnId } from "./ids";
+import type { NpcDefinitionId, NpcSpawnId } from "@mp/fixtures";
+import type { CharacterId } from "../character/id";
 
 export const CharacterTag = object({
   characterId: string<CharacterId>(),

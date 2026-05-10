@@ -2,12 +2,9 @@ import type { World, EntityId } from "@rift/core";
 import type { Vector } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import type { UserId } from "@mp/auth";
-import type {
-  ActorModelId,
-  AreaId,
-  CharacterId,
-  InventoryId,
-} from "../identity/ids";
+import type { ActorModelId, AreaId } from "@mp/fixtures";
+import type { CharacterId } from "./id";
+import type { InventoryId } from "../inventory/components";
 import { CharacterTag } from "../identity/components";
 import { AreaTag } from "../area/components";
 import { Appearance } from "../appearance/components";

@@ -5,7 +5,7 @@ import type { Tile } from "@mp/std";
 import { combine, createShortId, Rng } from "@mp/std";
 import type { ActorModelLookup } from "../appearance/actor-model";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId, NpcSpawnId } from "../identity/ids";
+import type { AreaId, NpcSpawnId } from "@mp/fixtures";
 import { NpcTag } from "../identity/components";
 import { Combat } from "../combat/components";
 import { spawnNpc } from "./bundle";

@@ -1,5 +1,5 @@
 import { createTiledLoader } from "@mp/tiled-loader";
-import type { AreaId } from "../identity/ids";
+import type { AreaId } from "@mp/fixtures";
 import { AreaResource } from "./area-resource";
 import { TiledResource } from "./tiled-resource";
 

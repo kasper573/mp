@@ -2,7 +2,7 @@ import type { Feature } from "../feature";
 import { signal, type ReadonlySignal, type Signal } from "@preact/signals-core";
 import { combine } from "@mp/std";
 import { CharacterListResponse, CharacterRenamedResponse } from "./events";
-import type { CharacterId } from "../identity/ids";
+import type { CharacterId } from "./id";
 import { requestCharacterList } from "./actions";
 
 interface KnownCharacter {

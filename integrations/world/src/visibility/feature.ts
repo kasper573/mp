@@ -1,7 +1,7 @@
 import type { Feature } from "../feature";
 import type { ClientId, EntityId, World } from "@rift/core";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId } from "../identity/ids";
+import type { AreaId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
 import { Movement } from "../movement/components";
 import { OwnedBy } from "../inventory/components";

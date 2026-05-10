@@ -1,5 +1,5 @@
 import { f32, object, optional, string } from "@rift/types";
-import type { ActorModelId } from "../identity/ids";
+import type { ActorModelId } from "@mp/fixtures";
 
 export const Appearance = object({
   modelId: string<ActorModelId>(),

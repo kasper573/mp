@@ -34,7 +34,6 @@
     "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
-    "@mp/validate": "workspace:*",
     "@preact/signals-core": "catalog:",
     "@rift/core": "workspace:*",
     "@rift/reactive": "workspace:*",

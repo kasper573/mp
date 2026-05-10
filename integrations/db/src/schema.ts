@@ -2,15 +2,17 @@ import type { UserId } from "@mp/auth";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import { integer, pgTable, real, uuid, varchar } from "drizzle-orm/pg-core";
 import type {
-  ActorModelId,
-  AreaId,
   CharacterId,
-  ConsumableDefinitionId,
   ConsumableInstanceId,
-  EquipmentDefinitionId,
   EquipmentInstanceId,
   InventoryId,
 } from "@mp/world";
+import type {
+  ActorModelId,
+  AreaId,
+  ConsumableDefinitionId,
+  EquipmentDefinitionId,
+} from "@mp/fixtures";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 

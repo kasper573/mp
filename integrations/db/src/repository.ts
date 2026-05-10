@@ -1,7 +1,7 @@
 import type { UserId } from "@mp/auth";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
-import type { ActorModelId, AreaId } from "@mp/world";
+import type { ActorModelId, AreaId } from "@mp/fixtures";
 import { createDrizzleClient } from "./utils/client";
 import { mayAccessCharacter } from "./procedures/may-access-character";
 import { selectCharacterByUser } from "./procedures/select-character-by-user";

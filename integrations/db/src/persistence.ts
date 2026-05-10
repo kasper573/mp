@@ -16,13 +16,8 @@ import {
   spawnCharacter,
   type SessionRegistry,
 } from "@mp/world";
-import type {
-  ActorModelId,
-  ActorModelLookup,
-  AreaId,
-  CharacterId,
-  InventoryId,
-} from "@mp/world";
+import type { ActorModelLookup, CharacterId, InventoryId } from "@mp/world";
+import type { ActorModelId, AreaId } from "@mp/fixtures";
 import { combine, type Tile, type TimesPerSecond } from "@mp/std";
 import type { Vector } from "@mp/math";
 import type { DbRepository } from "./repository";

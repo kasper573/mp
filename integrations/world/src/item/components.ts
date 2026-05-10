@@ -1,10 +1,12 @@
 import { f32, object, string, u32 } from "@rift/types";
+import type { Branded } from "@mp/std";
 import type {
   ConsumableDefinitionId,
-  ConsumableInstanceId,
   EquipmentDefinitionId,
-  EquipmentInstanceId,
-} from "../identity/ids";
+} from "@mp/fixtures";
+
+export type ConsumableInstanceId = Branded<string, "ConsumableInstanceId">;
+export type EquipmentInstanceId = Branded<string, "EquipmentInstanceId">;
 
 export const ConsumableInstance = object({
   instanceId: string<ConsumableInstanceId>(),

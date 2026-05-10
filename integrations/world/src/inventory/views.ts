@@ -4,14 +4,15 @@ import {
   ConsumableInstance as RiftConsumable,
   EquipmentInstance as RiftEquipment,
 } from "../item/components";
-import { InventoryRef } from "./components";
+import { InventoryRef, type InventoryId } from "./components";
+import type {
+  ConsumableInstanceId,
+  EquipmentInstanceId,
+} from "../item/components";
 import type {
   ConsumableDefinitionId,
-  ConsumableInstanceId,
   EquipmentDefinitionId,
-  EquipmentInstanceId,
-  InventoryId,
-} from "../identity/ids";
+} from "@mp/fixtures";
 
 export interface ConsumableInstanceView {
   readonly type: "consumable";

@@ -1,10 +1,11 @@
 import type { World, EntityId } from "@rift/core";
 import { OwnedBy } from "../inventory/components";
-import { ConsumableInstance, EquipmentInstance } from "./components";
-import type {
-  ConsumableInstanceId,
-  EquipmentInstanceId,
-} from "../identity/ids";
+import {
+  ConsumableInstance,
+  EquipmentInstance,
+  type ConsumableInstanceId,
+  type EquipmentInstanceId,
+} from "./components";
 import type { ItemDefinition } from "./definitions";
 
 export type SpawnItemInit =

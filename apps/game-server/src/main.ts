@@ -23,7 +23,8 @@ import {
   schemaEvents,
   createItemDefinitionLookup,
 } from "@mp/world";
-import type { AreaId, AreaResource } from "@mp/world";
+import type { AreaResource } from "@mp/world";
+import type { AreaId } from "@mp/fixtures";
 import {
   characterDirectoryFeature,
   persistenceFeature,

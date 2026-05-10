@@ -1,4 +1,4 @@
-import type { AreaId } from "../identity/ids";
+import type { AreaId } from "@mp/fixtures";
 import type { AreaResource } from "../area/area-resource";
 import type { ItemDefinitionLookup } from "../item/definition-lookup";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";

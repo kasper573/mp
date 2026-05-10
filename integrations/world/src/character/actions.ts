@@ -9,7 +9,7 @@ import {
   RequestFullState,
   Respawn,
 } from "./events";
-import type { CharacterId } from "../identity/ids";
+import type { CharacterId } from "./id";
 
 export function respawnCharacter(client: RiftClient): void {
   client.emit({
