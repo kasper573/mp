@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rng } from "@mp/std";
 import type { UserId } from "@mp/auth";
@@ -56,8 +56,14 @@ const FIXTURES_DIR = resolve(
 
 export interface CapturingTransport extends ServerTransport {
   emit(ev: ServerTransportEvent): void;
+  /** All packet byte lengths, in send order, across all clients. */
   bytes: number[];
+  /** All packet payloads, in send order, across all clients. */
   packets: Uint8Array[];
+  /** Per-client byte lengths in send order. */
+  bytesByClient: Map<ClientId, number[]>;
+  /** Reset all capture buffers. */
+  resetCapture(): void;
 }
 
 export interface Simulation {
@@ -66,6 +72,7 @@ export interface Simulation {
   readonly area: AreaResource;
   readonly tickHz: number;
   readonly dt: number;
+  readonly clientIds: readonly ClientId[];
   /** Run N ticks. */
   tick(count: number): void;
   /** Tear down server. */
@@ -75,7 +82,8 @@ export interface Simulation {
 export interface SimulationOptions {
   readonly tickHz?: number;
   readonly warmupTicks?: number;
-  readonly connectFakeClient?: boolean;
+  /** Number of fake clients (each with character + scope). Default 1. 0 = no clients. */
+  readonly playerCount?: number;
   readonly npcCount?: number;
 }
 
@@ -115,12 +123,34 @@ function buildNpcSpawns(
   );
 }
 
+function pickPlayerSpawnCoords(
+  area: AreaResource,
+  count: number,
+): Vector<Tile>[] {
+  if (count <= 0) return [];
+  // Distribute players across walkable graph nodes so they don't all share
+  // the same viewport. Sample evenly through the node list (which is
+  // insertion-ordered, so roughly spatially coherent).
+  const nodeIds = Array.from(area.graph.nodeIds);
+  if (nodeIds.length === 0) {
+    return Array.from({ length: count }, () => area.start);
+  }
+  const stride = nodeIds.length / count;
+  const out: Vector<Tile>[] = [];
+  for (let i = 0; i < count; i++) {
+    const id = nodeIds[Math.floor(i * stride)];
+    const node = area.graph.getNode(id);
+    out.push(node?.data.vector ?? area.start);
+  }
+  return out;
+}
+
 export async function createSimulation(
   opts: SimulationOptions = {},
 ): Promise<Simulation> {
   const tickHz = opts.tickHz ?? 20;
   const warmupTicks = opts.warmupTicks ?? 60;
-  const connectFakeClient = opts.connectFakeClient ?? true;
+  const playerCount = opts.playerCount ?? 1;
   const npcCount = opts.npcCount ?? FIXTURE_NPC_TOTAL;
 
   const areaId = areaFixtures[0].id;
@@ -161,65 +191,65 @@ export async function createSimulation(
   await server.start();
 
   const dt = 1 / tickHz;
-  const fakeClientId = 1 as ClientId;
-  const fakeUserId = "user-1" as UserId;
-  registry.recordConnection(fakeClientId, {
-    name: "bench",
-    id: fakeUserId,
-    roles: new Set(),
-  });
-  const characterStart = new Vector(
-    Math.floor(area.tiled.tileCount.x / 2) as Tile,
-    Math.floor(area.tiled.tileCount.y / 2) as Tile,
-  );
-  const characterId = "char-1" as CharacterId;
-  const characterEnt = spawnCharacter(server.world, {
-    characterId,
-    userId: fakeUserId,
-    name: "Bencher",
-    modelId: actorModels[0].id,
-    areaId,
-    coords: characterStart,
-    inventoryId: "inv-1" as InventoryId,
-    speed: 1 as Tile,
-    health: Number.MAX_SAFE_INTEGER,
-    maxHealth: Number.MAX_SAFE_INTEGER,
-    attackDamage: 5,
-    attackSpeed: 1 as TimesPerSecond,
-    attackRange: 1 as Tile,
-    xp: 0,
-    actorModels: actorModelsById,
-  });
-  server.world.add(characterEnt, OwnedByClient, { clientId: fakeClientId });
+  const clientIds: ClientId[] = [];
+  const playerCoords = pickPlayerSpawnCoords(area, playerCount);
 
-  // Mirror the production scope wiring (see character-directory.ts): a
-  // per-client scope entity with CharacterClaim is what visibility uses to
-  // find the watched character. Without it, the visibility filter strips
-  // every NPC delta and the packet bench measures empty payloads.
-  const scopeEnt = server.world.create();
-  server.world.add(scopeEnt, ClientScopeTag, {});
-  server.world.add(scopeEnt, OwnedByClient, { clientId: fakeClientId });
-  server.world.add(scopeEnt, CharacterClaim, {
-    mode: "player",
-    characterId,
-  });
+  for (let i = 0; i < playerCount; i++) {
+    const clientId = (i + 1) as ClientId;
+    clientIds.push(clientId);
+    const userId = `user-${i + 1}` as UserId;
+    registry.recordConnection(clientId, {
+      name: `bench-${i + 1}`,
+      id: userId,
+      roles: new Set(),
+    });
+
+    const characterId = `char-${i + 1}` as CharacterId;
+    const characterEnt = spawnCharacter(server.world, {
+      characterId,
+      userId,
+      name: `Bencher${i + 1}`,
+      modelId: actorModels[0].id,
+      areaId,
+      coords: playerCoords[i],
+      inventoryId: `inv-${i + 1}` as InventoryId,
+      speed: 1 as Tile,
+      health: Number.MAX_SAFE_INTEGER,
+      maxHealth: Number.MAX_SAFE_INTEGER,
+      attackDamage: 5,
+      attackSpeed: 1 as TimesPerSecond,
+      attackRange: 1 as Tile,
+      xp: 0,
+      actorModels: actorModelsById,
+    });
+    server.world.add(characterEnt, OwnedByClient, { clientId });
+
+    const scopeEnt = server.world.create();
+    server.world.add(scopeEnt, ClientScopeTag, {});
+    server.world.add(scopeEnt, OwnedByClient, { clientId });
+    server.world.add(scopeEnt, CharacterClaim, {
+      mode: "player",
+      characterId,
+    });
+  }
 
   for (let i = 0; i < warmupTicks; i++) {
     server.tick(dt);
   }
 
-  if (connectFakeClient) {
-    transport.bytes.length = 0;
-    transport.packets.length = 0;
-    transport.emit({ type: "open", clientId: fakeClientId });
-    const helloWriter = new Writer(64);
-    helloWriter.writeU8(Opcode.Hello);
-    helloWriter.writeBytes(server.schema.digest());
-    transport.emit({
-      type: "message",
-      clientId: fakeClientId,
-      data: helloWriter.finish(),
-    });
+  if (playerCount > 0) {
+    transport.resetCapture();
+    for (const clientId of clientIds) {
+      transport.emit({ type: "open", clientId });
+      const helloWriter = new Writer(64);
+      helloWriter.writeU8(Opcode.Hello);
+      helloWriter.writeBytes(server.schema.digest());
+      transport.emit({
+        type: "message",
+        clientId,
+        data: helloWriter.finish(),
+      });
+    }
   }
 
   return {
@@ -228,6 +258,7 @@ export async function createSimulation(
     area,
     tickHz,
     dt,
+    clientIds,
     tick(count: number) {
       for (let i = 0; i < count; i++) {
         server.tick(dt);
@@ -258,22 +289,35 @@ function makeTransport(): CapturingTransport {
   const listeners = new Set<(ev: ServerTransportEvent) => void>();
   const packets: Uint8Array[] = [];
   const bytes: number[] = [];
+  const bytesByClient = new Map<ClientId, number[]>();
   return {
     on(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    send(_clientId, data) {
+    send(clientId, data) {
       packets.push(data);
       bytes.push(data.byteLength);
+      let perClient = bytesByClient.get(clientId);
+      if (!perClient) {
+        perClient = [];
+        bytesByClient.set(clientId, perClient);
+      }
+      perClient.push(data.byteLength);
     },
     close() {},
     async shutdown() {},
     emit(ev) {
       for (const l of listeners) l(ev);
     },
+    resetCapture() {
+      packets.length = 0;
+      bytes.length = 0;
+      bytesByClient.clear();
+    },
     bytes,
     packets,
+    bytesByClient,
   };
 }
 
