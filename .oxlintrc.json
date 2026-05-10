@@ -139,7 +139,18 @@
       "rules": {
         "typescript/no-unnecessary-type-arguments": "off",
         "prefer-for-of": "off",
-        "complexity": "off"
+        "complexity": "off",
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@mp/**"],
+                "message": "rift packages must not depend on @mp/* — keep rift portable."
+              }
+            ]
+          }
+        ]
       }
     },
     // Ensure that the game package does not import from its export files

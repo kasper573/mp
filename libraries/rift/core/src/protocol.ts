@@ -1,4 +1,5 @@
 import { object, string, u16, u32 } from "@rift/types";
+// oxlint-disable-next-line no-restricted-imports
 import type { Branded } from "@mp/std";
 import type { RiftCloseCode } from "./transport";
 
