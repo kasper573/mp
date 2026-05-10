@@ -16,7 +16,7 @@
     "@mp/time": "workspace:*",
     "@mp/world": "workspace:*",
     "@preact/signals-core": "catalog:",
-    "@rift/core": "workspace:*",
+    "@rift/feature": "workspace:*",
     "@rift/ws": "workspace:*",
     "ws": "8.20.0"
   },

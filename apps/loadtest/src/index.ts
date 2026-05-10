@@ -1,14 +1,17 @@
-import { RiftClient } from "@rift/core";
+import { FeatureRiftClient } from "@rift/feature";
 import {
-  AutoRejoinModule,
-  CharacterListModule,
+  CharacterList,
   actorListSignal,
+  autoRejoinFeature,
+  characterListFeature,
   characterSignal,
+  fnv1a64,
   isGameReadySignal,
   joinAsPlayer,
   moveCharacter,
   respawnCharacter,
-  schema,
+  schemaComponents,
+  schemaEvents,
   type AutoRejoinIntent,
   type CharacterId,
 } from "@mp/world";
@@ -102,13 +105,16 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         return id ? { mode: "player", characterId: id } : undefined;
       };
 
-      const characters = new CharacterListModule();
-      const autoRejoin = new AutoRejoinModule({ intent });
+      const characters = new CharacterList();
 
-      const client = new RiftClient({
-        schema,
+      const client = new FeatureRiftClient({
         transport: wsTransport(socket as unknown as WebSocketLike),
-        modules: [characters, autoRejoin],
+        hash: fnv1a64,
+        features: [
+          { components: schemaComponents, events: schemaEvents },
+          characterListFeature(characters),
+          autoRejoinFeature({ intent }),
+        ],
       });
 
       stopClient = () => void client.disconnect();

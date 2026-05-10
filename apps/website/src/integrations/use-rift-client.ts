@@ -1,9 +1,13 @@
-import { RiftClient } from "@rift/core";
+import { FeatureRiftClient } from "@rift/feature";
 import {
-  AutoRejoinModule,
-  CharacterListModule,
-  InterpolationModule,
-  schema,
+  CharacterList,
+  autoRejoinFeature,
+  characterListFeature,
+  fnv1a64,
+  InterpolationLayer,
+  interpolationFeature,
+  schemaComponents,
+  schemaEvents,
   type AutoRejoinIntent,
 } from "@mp/world";
 import { wsTransport } from "@rift/ws";
@@ -15,14 +19,15 @@ import { AuthContext } from "./contexts";
 import { env } from "../env";
 
 export interface RiftClientWithModules {
-  readonly client: RiftClient;
-  readonly characters: CharacterListModule;
-  readonly autoRejoin: AutoRejoinModule;
+  readonly client: FeatureRiftClient;
+  readonly characters: CharacterList;
+  readonly interpolation: InterpolationLayer;
 }
 
 export function useRiftClient(intent: () => AutoRejoinIntent | undefined): {
-  readonly client: RiftClient;
-  readonly characters: CharacterListModule;
+  readonly client: FeatureRiftClient;
+  readonly characters: CharacterList;
+  readonly interpolation: InterpolationLayer;
 } {
   const auth = useContext(AuthContext);
 
@@ -31,24 +36,28 @@ export function useRiftClient(intent: () => AutoRejoinIntent | undefined): {
     url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
     const socket = new WebSocket(url.toString());
 
-    const characters = new CharacterListModule();
-    const autoRejoin = new AutoRejoinModule({ intent });
-    const interpolation = new InterpolationModule({
-      enabled: () => miscDebugSettings.value.useInterpolator,
-      subscribeToFrames: (onFrame) => {
-        const handler = (ticker: Ticker) => onFrame(ticker.deltaMS / 1000);
-        Ticker.shared.add(handler);
-        return () => Ticker.shared.remove(handler);
-      },
-    });
+    const characters = new CharacterList();
+    const interpolation = new InterpolationLayer();
 
-    const client = new RiftClient({
-      schema,
+    const client = new FeatureRiftClient({
       transport: wsTransport(socket),
-      modules: [characters, autoRejoin, interpolation],
+      hash: fnv1a64,
+      features: [
+        { components: schemaComponents, events: schemaEvents },
+        characterListFeature(characters),
+        autoRejoinFeature({ intent }),
+        interpolationFeature(interpolation, {
+          enabled: () => miscDebugSettings.value.useInterpolator,
+          subscribeToFrames: (onFrame) => {
+            const handler = (ticker: Ticker) => onFrame(ticker.deltaMS / 1000);
+            Ticker.shared.add(handler);
+            return () => Ticker.shared.remove(handler);
+          },
+        }),
+      ],
     });
 
-    return { client, characters, autoRejoin };
+    return { client, characters, interpolation };
   }, [auth, intent]);
 
   useEffect(() => {
@@ -58,5 +67,9 @@ export function useRiftClient(intent: () => AutoRejoinIntent | undefined): {
     };
   }, [wired]);
 
-  return { client: wired.client, characters: wired.characters };
+  return {
+    client: wired.client,
+    characters: wired.characters,
+    interpolation: wired.interpolation,
+  };
 }

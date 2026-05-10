@@ -8,7 +8,7 @@ import {
 } from "@mp/graphics";
 import { effect } from "@preact/signals-core";
 import { TimeSpan } from "@mp/time";
-import type { RiftClient } from "@rift/core";
+import type { FeatureRiftClient } from "@rift/feature";
 import { Attacked } from "../combat/events";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
@@ -17,7 +17,7 @@ import type { Actor } from "../client/views";
 export interface ActorControllerOptions {
   tiled: TiledResource;
   actor: Actor;
-  client: RiftClient;
+  client: FeatureRiftClient;
   actorTextures: ActorTextureLookup;
 }
 

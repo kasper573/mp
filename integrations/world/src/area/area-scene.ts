@@ -14,7 +14,7 @@ import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
-import type { RiftClient } from "@rift/core";
+import type { FeatureRiftClient } from "@rift/feature";
 import { ActorController } from "../appearance/actor-controller";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import { actorListSignal } from "../client/signals";
@@ -29,7 +29,7 @@ import { TileHighlight } from "./tile-highlight";
 export interface AreaSceneOptions {
   area: AreaResource;
   engine: Engine;
-  client: RiftClient;
+  client: FeatureRiftClient;
   character: ReadonlySignal<Character | undefined>;
   actorTextures: ActorTextureLookup;
   areaSpritesheets: TiledSpritesheetRecord;

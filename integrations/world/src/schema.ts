@@ -1,5 +1,3 @@
-import { defineSchema, type RiftSchema } from "@rift/core";
-import { fnv1a64 } from "./hash";
 import { identityComponents } from "./identity/components";
 import { appearanceComponents } from "./appearance/components";
 import { movementComponents } from "./movement/components";
@@ -13,18 +11,20 @@ import { itemComponents } from "./item/components";
 import { areaComponents } from "./area/components";
 import { characterEvents } from "./character/events";
 
-export const schema: RiftSchema = defineSchema({
-  components: [
-    ...identityComponents,
-    ...appearanceComponents,
-    ...movementComponents,
-    ...combatComponents,
-    ...progressionComponents,
-    ...inventoryComponents,
-    ...npcComponents,
-    ...itemComponents,
-    ...areaComponents,
-  ],
-  events: [...characterEvents, ...movementEvents, ...combatEvents],
-  hash: fnv1a64,
-});
+export const schemaComponents = [
+  ...identityComponents,
+  ...appearanceComponents,
+  ...movementComponents,
+  ...combatComponents,
+  ...progressionComponents,
+  ...inventoryComponents,
+  ...npcComponents,
+  ...itemComponents,
+  ...areaComponents,
+] as const;
+
+export const schemaEvents = [
+  ...characterEvents,
+  ...movementEvents,
+  ...combatEvents,
+] as const;

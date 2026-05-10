@@ -1,29 +1,32 @@
 import { createServer as createHttpServer } from "node:http";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
-import { RiftServer } from "@rift/core";
 import { wssTransport } from "@rift/wss";
+import { FeatureRiftServer } from "@rift/feature";
 import { createPinoLogger } from "@mp/logger/pino";
 import { Rng, setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
 import { playerRoles } from "@mp/keycloak";
 import type { AccessToken, UserIdentity } from "@mp/auth";
 import {
-  ClientCharacterRegistry,
-  CombatModule,
-  MovementModule,
-  NpcAiModule,
-  NpcRewardModule,
-  NpcSpawnerModule,
-  VisibilityModule,
-  createItemDefinitionLookup,
+  ClientUserRegistry,
+  clientUserRegistryFeature,
+  combatFeature,
+  fnv1a64,
   loadAreaResource,
-  schema,
+  movementFeature,
+  npcAiFeature,
+  npcRewardFeature,
+  npcSpawnerFeature,
+  visibilityFeature,
+  schemaComponents,
+  schemaEvents,
+  createItemDefinitionLookup,
 } from "@mp/world";
 import type { AreaId, AreaResource } from "@mp/world";
 import {
-  CharacterDirectoryModule,
-  PersistenceModule,
+  characterDirectoryFeature,
+  persistenceFeature,
   createDbRepository,
 } from "@mp/db";
 import * as fixtures from "@mp/fixtures";
@@ -89,8 +92,7 @@ httpServer.on("upgrade", async (req, socket, head) => {
 });
 
 const transport = wssTransport(wss);
-
-const registry = new ClientCharacterRegistry();
+const registry = new ClientUserRegistry();
 const itemLookup = createItemDefinitionLookup(
   fixtures.consumables,
   fixtures.equipment,
@@ -104,39 +106,42 @@ if (!defaultAreaResource) {
 }
 const rng = new Rng();
 
-const server = new RiftServer({
-  schema,
+const server = new FeatureRiftServer({
   transport,
+  hash: fnv1a64,
   tickRateHz: opt.tickRateHz,
-  modules: [
-    registry,
-    new CharacterDirectoryModule({
+  features: [
+    { components: schemaComponents, events: schemaEvents },
+    clientUserRegistryFeature(registry),
+    characterDirectoryFeature({
       repo,
+      registry,
       defaultModelId,
       defaultSpawn: {
         areaId: defaultArea.id,
         coords: defaultAreaResource.start,
       },
     }),
-    new PersistenceModule({
+    persistenceFeature({
       repo,
+      registry,
       syncIntervalMs: opt.syncIntervalMs,
       defaultModelId,
       actorModels: fixtures.actorModelsById,
       spawnPointForArea: (id) => areas.get(id)?.start,
     }),
-    new MovementModule({ areas }),
-    new CombatModule(),
-    new VisibilityModule({ viewDistance: fixtures.viewDistance, areas }),
-    new NpcSpawnerModule({
+    movementFeature({ areas }),
+    combatFeature(),
+    visibilityFeature({ viewDistance: fixtures.viewDistance, areas }),
+    npcSpawnerFeature({
       areas,
       npcs: fixtures.npcs,
       spawns: fixtures.npcSpawns,
       actorModels: fixtures.actorModelsById,
       rng,
     }),
-    new NpcAiModule({ areas, rng }),
-    new NpcRewardModule({
+    npcAiFeature({ areas, rng }),
+    npcRewardFeature({
       rewardsByNpcId: fixtures.npcRewardsByNpcId,
       itemLookup,
     }),

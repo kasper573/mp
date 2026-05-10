@@ -2,7 +2,8 @@
 // oxlint-disable no-console
 import { DeltaOp, Opcode } from "@rift/core";
 import { Reader } from "@rift/types";
-import { schema } from "../src/schema";
+import type { RiftType } from "@rift/types";
+import { schemaComponents } from "../src/schema";
 import { CharacterTag, NpcTag } from "../src/identity/components";
 import { AreaTag } from "../src/area/components";
 import { Movement } from "../src/movement/components";
@@ -23,22 +24,9 @@ interface OpStat {
   bytes: number;
 }
 
-interface SignalDecodable {
-  readonly decode: (r: Reader) => unknown;
-  readonly signal: (v: unknown) => {
-    decode: (r: Reader) => void;
-    decodeDirty: (r: Reader) => void;
-  };
-  readonly default: () => unknown;
-}
-
 function analyzeDelta(
   data: Uint8Array,
-  components: ReadonlyArray<SignalDecodable>,
-  signals: Array<{
-    decode: (r: Reader) => void;
-    decodeDirty: (r: Reader) => void;
-  }>,
+  components: ReadonlyArray<RiftType>,
   byComp: Map<number, OpStat>,
   byOp: Map<DeltaOp, OpStat>,
 ): void {
@@ -46,8 +34,7 @@ function analyzeDelta(
   const r = new Reader(data, 1);
   r.readVarU32();
   r.readVarU32();
-  const opCount = r.readVarU32();
-  for (let i = 0; i < opCount; i++) {
+  while (r.remaining > 0) {
     const opStart = r.offset;
     const op = r.readU8() as DeltaOp;
     let compIdx: number | undefined;
@@ -60,16 +47,11 @@ function analyzeDelta(
         r.readVarU32();
         compIdx = r.readVarU32();
         break;
-      case DeltaOp.ComponentAdded: {
-        r.readVarU32();
-        compIdx = r.readVarU32();
-        components[compIdx].decode(r);
-        break;
-      }
+      case DeltaOp.ComponentAdded:
       case DeltaOp.ComponentUpdated: {
         r.readVarU32();
         compIdx = r.readVarU32();
-        signals[compIdx].decodeDirty(r);
+        components[compIdx].decode(r);
         break;
       }
     }
@@ -103,7 +85,7 @@ const componentLabels = new Map<unknown, string>([
 ]);
 
 function componentName(idx: number): string {
-  return componentLabels.get(schema.components[idx]) ?? `comp[${idx}]`;
+  return componentLabels.get(schemaComponents[idx]) ?? `comp[${idx}]`;
 }
 
 const opNames: Record<DeltaOp, string> = {
@@ -146,17 +128,8 @@ async function runScenario(npcCount: number): Promise<void> {
 
   const byComp = new Map<number, OpStat>();
   const byOp = new Map<DeltaOp, OpStat>();
-  const signals = schema.components.map((c) =>
-    (c as SignalDecodable).signal((c as SignalDecodable).default()),
-  );
   for (const p of sim.transport.packets.slice(sizesBefore)) {
-    analyzeDelta(
-      p,
-      schema.components as ReadonlyArray<SignalDecodable>,
-      signals,
-      byComp,
-      byOp,
-    );
+    analyzeDelta(p, schemaComponents, byComp, byOp);
   }
   console.log(`[breakdown] ops:`);
   for (const [op, s] of [...byOp.entries()].sort(

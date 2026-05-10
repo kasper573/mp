@@ -1,4 +1,5 @@
-import type { EntityId, RiftClient, World } from "@rift/core";
+import type { EntityId, RiftClient } from "@rift/core";
+import type { ReactiveWorld } from "@rift/reactive";
 import { computed, type ReadonlySignal } from "@preact/signals-core";
 import type { AreaId, CharacterId } from "../identity/ids";
 import { CharacterTag } from "../identity/components";
@@ -12,13 +13,14 @@ export function isConnectedSignal(client: RiftClient): ReadonlySignal<boolean> {
 }
 
 export function characterEntitySignal(
-  world: World,
+  world: ReactiveWorld,
   characterId: ReadonlySignal<CharacterId | undefined>,
 ): ReadonlySignal<EntityId | undefined> {
+  const characters = world.entitiesSignal(CharacterTag);
   return computed(() => {
     const id = characterId.value;
     if (!id) return undefined;
-    for (const [entId, tag] of world.query(CharacterTag)) {
+    for (const [entId, tag] of characters.value) {
       if (tag.characterId === id) return entId;
     }
     return undefined;
@@ -26,7 +28,7 @@ export function characterEntitySignal(
 }
 
 export function characterSignal(
-  world: World,
+  world: ReactiveWorld,
   characterId: ReadonlySignal<CharacterId | undefined>,
 ): ReadonlySignal<Character | undefined> {
   const entitySignal = characterEntitySignal(world, characterId);
@@ -39,11 +41,12 @@ export function characterSignal(
 }
 
 export function actorListSignal(
-  world: World,
+  world: ReactiveWorld,
 ): ReadonlySignal<readonly Actor[]> {
+  const moving = world.entitiesSignal(Movement);
   return computed(() => {
     const result: Actor[] = [];
-    for (const [id] of world.query(Movement)) {
+    for (const [id] of moving.value) {
       const actor = readActor(world, id);
       if (actor) result.push(actor);
     }
@@ -52,16 +55,16 @@ export function actorListSignal(
 }
 
 export function inventorySignal(
-  world: World,
+  world: ReactiveWorld,
   character: ReadonlySignal<Character | undefined>,
 ): ReadonlySignal<readonly ItemInstance[]> {
+  const refs = world.entitiesSignal(InventoryRef);
   return computed(() => {
     const inventoryId = character.value?.inventoryId;
     if (!inventoryId) return [];
     const result: ItemInstance[] = [];
-    for (const [id] of world.query(InventoryRef)) {
-      const ref = world.get(id, InventoryRef);
-      if (ref?.inventoryId !== inventoryId) continue;
+    for (const [id, ref] of refs.value) {
+      if (ref.inventoryId !== inventoryId) continue;
       const item = readItemInstance(world, id);
       if (item) result.push(item);
     }

@@ -1,6 +1,4 @@
-import type { Cleanup } from "@rift/module";
-import type { inferServerEvent } from "@rift/core";
-import { RiftServerModule } from "@rift/core";
+import type { Cleanup, Feature } from "@rift/feature";
 import { createShortId } from "@mp/std";
 import { Kill } from "../combat/events";
 import { CharacterTag, NpcTag } from "../identity/components";
@@ -15,61 +13,50 @@ export interface NpcRewardOptions {
   readonly itemLookup: ItemDefinitionLookup;
 }
 
-export class NpcRewardModule extends RiftServerModule {
-  readonly #rewardsByNpc: ReadonlyMap<string, ReadonlyArray<NpcReward>>;
-  readonly #itemLookup: ItemDefinitionLookup;
+export function npcRewardFeature(opts: NpcRewardOptions): Feature {
+  return {
+    server(server): Cleanup {
+      return server.on(Kill, (event) => {
+        const { attackerId, victimId } = event.data;
+        if (!server.world.has(attackerId, CharacterTag)) return;
+        const victimNpc = server.world.get(victimId, NpcTag);
+        if (!victimNpc) return;
 
-  constructor(opts: NpcRewardOptions) {
-    super();
-    this.#rewardsByNpc = opts.rewardsByNpcId;
-    this.#itemLookup = opts.itemLookup;
-  }
+        const rewards = opts.rewardsByNpcId.get(victimNpc.definitionId);
+        if (!rewards) return;
 
-  init(): Cleanup {
-    return this.server.on(Kill, this.#onKill);
-  }
-
-  #onKill = (event: inferServerEvent<typeof Kill>): void => {
-    const { attackerId, victimId } = event.data;
-    const attackerIsCharacter = this.server.world.has(attackerId, CharacterTag);
-    if (!attackerIsCharacter) return;
-    const victimNpc = this.server.world.get(victimId, NpcTag);
-    if (!victimNpc) return;
-
-    const rewards = this.#rewardsByNpc.get(victimNpc.definitionId);
-    if (!rewards) return;
-
-    for (const reward of rewards) {
-      if (reward.type === "xp") {
-        const prog = this.server.world.get(attackerId, Progression);
-        if (prog) {
-          this.server.world.set(attackerId, Progression, {
-            ...prog,
-            xp: prog.xp + reward.xp,
-          });
+        for (const reward of rewards) {
+          if (reward.type === "xp") {
+            const prog = server.world.get(attackerId, Progression);
+            if (prog) {
+              server.world.write(attackerId, Progression, {
+                xp: prog.xp + reward.xp,
+              });
+            }
+            continue;
+          }
+          const def = opts.itemLookup(reward.reference);
+          if (def.type === "consumable") {
+            const id = spawnItem(server.world, {
+              type: "consumable",
+              definition: def,
+              instanceId: createShortId(),
+              stackSize: reward.amount,
+              ownerId: attackerId,
+            });
+            server.world.write(id, OwnedBy, { ownerId: attackerId });
+          } else {
+            const id = spawnItem(server.world, {
+              type: "equipment",
+              definition: def,
+              instanceId: createShortId(),
+              durability: def.maxDurability,
+              ownerId: attackerId,
+            });
+            server.world.write(id, OwnedBy, { ownerId: attackerId });
+          }
         }
-        continue;
-      }
-      const def = this.#itemLookup(reward.reference);
-      if (def.type === "consumable") {
-        const id = spawnItem(this.server.world, {
-          type: "consumable",
-          definition: def,
-          instanceId: createShortId(),
-          stackSize: reward.amount,
-          ownerId: attackerId,
-        });
-        this.server.world.set(id, OwnedBy, { ownerId: attackerId });
-      } else {
-        const id = spawnItem(this.server.world, {
-          type: "equipment",
-          definition: def,
-          instanceId: createShortId(),
-          durability: def.maxDurability,
-          ownerId: attackerId,
-        });
-        this.server.world.set(id, OwnedBy, { ownerId: attackerId });
-      }
-    }
+      });
+    },
   };
 }

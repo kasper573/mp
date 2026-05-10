@@ -2,7 +2,7 @@ import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
 import type { ReadonlySignal } from "@preact/signals-core";
-import type { RiftClient } from "@rift/core";
+import type { FeatureRiftClient } from "@rift/feature";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
 import { isConnectedSignal } from "./signals";
@@ -10,7 +10,7 @@ import type { Character } from "./views";
 import type { ViewDistanceSettings } from "../visibility/view-distance";
 
 export interface GameClientProps {
-  client: RiftClient;
+  client: FeatureRiftClient;
   character: ReadonlySignal<Character | undefined>;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;

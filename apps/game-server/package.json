@@ -25,7 +25,7 @@
     "@mp/std": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/world": "workspace:*",
-    "@rift/core": "workspace:*",
+    "@rift/feature": "workspace:*",
     "@rift/wss": "workspace:*",
     "dotenv": "catalog:",
     "ws": "8.20.0"

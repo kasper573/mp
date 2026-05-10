@@ -36,6 +36,8 @@
     "@mp/validate": "workspace:*",
     "@preact/signals-core": "catalog:",
     "@rift/core": "workspace:*",
+    "@rift/feature": "workspace:*",
+    "@rift/reactive": "workspace:*",
     "@rift/types": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "preact": "catalog:",

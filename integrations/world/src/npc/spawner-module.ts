@@ -1,12 +1,11 @@
-import type { Cleanup } from "@rift/module";
-import type { EntityId, inferServerEvent } from "@rift/core";
-import { RiftServerModule, Tick } from "@rift/core";
+import type { Cleanup, Feature } from "@rift/feature";
+import { type EntityId, Tick, type World } from "@rift/core";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { combine, createShortId, Rng } from "@mp/std";
 import type { ActorModelLookup } from "../appearance/actor-model";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId, NpcDefinitionId, NpcSpawnId } from "../identity/ids";
+import type { AreaId, NpcSpawnId } from "../identity/ids";
 import { NpcTag } from "../identity/components";
 import { Combat } from "../combat/components";
 import { spawnNpc } from "./bundle";
@@ -22,103 +21,108 @@ export interface NpcSpawnerOptions {
   readonly rng?: Rng;
 }
 
-export class NpcSpawnerModule extends RiftServerModule {
-  readonly #areas: ReadonlyMap<AreaId, AreaResource>;
-  readonly #npcsById: ReadonlyMap<NpcDefinitionId, NpcDefinition>;
-  readonly #spawns: ReadonlyArray<NpcSpawn>;
-  readonly #actorModels: ActorModelLookup;
-  readonly #rng: Rng;
-  readonly #pendingRespawns = new Map<
-    EntityId,
-    { spawnId: NpcSpawnId; respawnAtMs: number }
-  >();
-  #elapsedMs = 0;
-  #initialized = false;
+export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
+  const npcsById = new Map(opts.npcs.map((n) => [n.id, n]));
+  const rng = opts.rng ?? new Rng();
+  return {
+    server(server): Cleanup {
+      const pendingRespawns = new Map<
+        EntityId,
+        { spawnId: NpcSpawnId; respawnAtMs: number }
+      >();
+      let elapsedMs = 0;
+      let initialized = false;
 
-  constructor(opts: NpcSpawnerOptions) {
-    super();
-    this.#areas = opts.areas;
-    this.#npcsById = new Map(opts.npcs.map((n) => [n.id, n]));
-    this.#spawns = opts.spawns;
-    this.#actorModels = opts.actorModels;
-    this.#rng = opts.rng ?? new Rng();
-  }
+      return combine(
+        server.on(Tick, (event) => {
+          elapsedMs += event.data.dt * 1000;
 
-  init(): Cleanup {
-    return combine(this.server.on(Tick, this.#onTick), () => {
-      this.#pendingRespawns.clear();
-      this.#elapsedMs = 0;
-      this.#initialized = false;
-    });
-  }
+          if (!initialized) {
+            spawnInitial(server.world, opts, npcsById, rng);
+            initialized = true;
+          }
 
-  #onTick = (event: inferServerEvent<typeof Tick>): void => {
-    this.#elapsedMs += event.data.dt * 1000;
+          for (const [id, , combat] of server.world.query(NpcTag, Combat)) {
+            if (!combat.alive && !pendingRespawns.has(id)) {
+              const tag = server.world.get(id, NpcTag);
+              if (!tag) continue;
+              pendingRespawns.set(id, {
+                spawnId: tag.spawnId,
+                respawnAtMs: elapsedMs + RESPAWN_DELAY_MS,
+              });
+            }
+          }
 
-    if (!this.#initialized) {
-      this.#spawnInitialPopulation();
-      this.#initialized = true;
-    }
-
-    for (const [id, , combat] of this.server.world.query(NpcTag, Combat)) {
-      if (!combat.alive && !this.#pendingRespawns.has(id)) {
-        const tag = this.server.world.get(id, NpcTag);
-        if (!tag) continue;
-        this.#pendingRespawns.set(id, {
-          spawnId: tag.spawnId,
-          respawnAtMs: this.#elapsedMs + RESPAWN_DELAY_MS,
-        });
-      }
-    }
-
-    for (const [entId, info] of this.#pendingRespawns) {
-      if (this.#elapsedMs < info.respawnAtMs) continue;
-      this.#respawn(entId, info.spawnId);
-      this.#pendingRespawns.delete(entId);
-    }
+          for (const [entId, info] of pendingRespawns) {
+            if (elapsedMs < info.respawnAtMs) continue;
+            respawn(server.world, opts, npcsById, rng, entId, info.spawnId);
+            pendingRespawns.delete(entId);
+          }
+        }),
+        () => {
+          pendingRespawns.clear();
+        },
+      );
+    },
   };
+}
 
-  #respawn(entId: EntityId, spawnId: NpcSpawnId): void {
-    this.server.world.destroy(entId);
-    const spawn = this.#spawns.find((s) => s.id === spawnId);
-    if (!spawn) return;
-    const def = this.#npcsById.get(spawn.npcId);
-    const area = this.#areas.get(spawn.areaId);
-    if (!def || !area) return;
+function spawnInitial(
+  world: World,
+  opts: NpcSpawnerOptions,
+  npcsById: ReadonlyMap<string, NpcDefinition>,
+  rng: Rng,
+): void {
+  for (const spawn of opts.spawns) {
+    const def = npcsById.get(spawn.npcId);
+    const area = opts.areas.get(spawn.areaId);
+    if (!def || !area) continue;
     for (let i = 0; i < spawn.count; i++) {
-      spawnNpc(this.server.world, {
+      spawnNpc(world, {
         definition: def,
-        spawn: { ...spawn, id: createShortId() },
-        coords: this.#pickSpawnCoord(spawn, area),
-        actorModels: this.#actorModels,
+        spawn,
+        coords: pickSpawnCoord(spawn, area, rng),
+        actorModels: opts.actorModels,
       });
     }
   }
+}
 
-  #spawnInitialPopulation(): void {
-    for (const spawn of this.#spawns) {
-      const def = this.#npcsById.get(spawn.npcId);
-      const area = this.#areas.get(spawn.areaId);
-      if (!def || !area) continue;
-      for (let i = 0; i < spawn.count; i++) {
-        spawnNpc(this.server.world, {
-          definition: def,
-          spawn,
-          coords: this.#pickSpawnCoord(spawn, area),
-          actorModels: this.#actorModels,
-        });
-      }
-    }
+function respawn(
+  world: World,
+  opts: NpcSpawnerOptions,
+  npcsById: ReadonlyMap<string, NpcDefinition>,
+  rng: Rng,
+  entId: EntityId,
+  spawnId: NpcSpawnId,
+): void {
+  world.destroy(entId);
+  const spawn = opts.spawns.find((s) => s.id === spawnId);
+  if (!spawn) return;
+  const def = npcsById.get(spawn.npcId);
+  const area = opts.areas.get(spawn.areaId);
+  if (!def || !area) return;
+  for (let i = 0; i < spawn.count; i++) {
+    spawnNpc(world, {
+      definition: def,
+      spawn: { ...spawn, id: createShortId() },
+      coords: pickSpawnCoord(spawn, area, rng),
+      actorModels: opts.actorModels,
+    });
   }
+}
 
-  #pickSpawnCoord(spawn: NpcSpawn, area: AreaResource): Vector<Tile> {
-    if (spawn.coords) {
-      return spawn.coords;
-    }
-    const ids = Array.from(area.graph.nodeIds);
-    if (ids.length === 0) {
-      return area.start;
-    }
-    return area.graph.getNode(this.#rng.oneOf(ids))?.data.vector ?? area.start;
+function pickSpawnCoord(
+  spawn: NpcSpawn,
+  area: AreaResource,
+  rng: Rng,
+): Vector<Tile> {
+  if (spawn.coords) {
+    return spawn.coords;
   }
+  const ids = Array.from(area.graph.nodeIds);
+  if (ids.length === 0) {
+    return area.start;
+  }
+  return area.graph.getNode(rng.oneOf(ids))?.data.vector ?? area.start;
 }

@@ -49,6 +49,14 @@ export class ReactiveWorld extends World {
     return v;
   }
 
+  trackPool(type: RiftType): void {
+    void this.#poolVersion(type).value;
+  }
+
+  trackStructure(): void {
+    void this.#structureVersion.value;
+  }
+
   entitySignal<const T extends readonly RiftType[]>(
     id: EntityId | undefined,
     ...types: T

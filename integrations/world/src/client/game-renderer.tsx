@@ -7,7 +7,7 @@ import type { ReadonlySignal, Signal } from "@preact/signals-core";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
-import type { RiftClient } from "@rift/core";
+import type { FeatureRiftClient } from "@rift/feature";
 import { useState } from "preact/hooks";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import {
@@ -26,7 +26,7 @@ import { Dock, ErrorFallback } from "@mp/ui";
 
 interface GameRendererProps {
   interactive: boolean;
-  client: RiftClient;
+  client: FeatureRiftClient;
   character: ReadonlySignal<Character | undefined>;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
@@ -99,7 +99,7 @@ function buildStage(
   app: Application,
   opt: {
     interactive: boolean;
-    client: RiftClient;
+    client: FeatureRiftClient;
     character: ReadonlySignal<Character | undefined>;
     areaAssets: AreaAssets;
     actorTextures: ActorTextureLookup;

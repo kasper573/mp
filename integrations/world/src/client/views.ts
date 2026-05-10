@@ -1,4 +1,5 @@
-import type { World, EntityId } from "@rift/core";
+import type { EntityId } from "@rift/core";
+import type { ReactiveWorld } from "@rift/reactive";
 import { Appearance } from "../appearance/components";
 import { AreaTag } from "../area/components";
 import { CharacterTag, NpcTag } from "../identity/components";
@@ -68,11 +69,12 @@ abstract class ActorBase {
     readonly userId?: UserId;
   };
   constructor(
-    protected readonly world: World,
+    protected readonly world: ReactiveWorld,
     readonly entityId: EntityId,
   ) {}
 
   get appearance(): AppearanceView {
+    this.world.trackPool(Appearance);
     const a = this.world.get(this.entityId, Appearance);
     return {
       modelId: a?.modelId ?? ("" as ActorModelId),
@@ -83,6 +85,7 @@ abstract class ActorBase {
   }
 
   get movement(): MovementView {
+    this.world.trackPool(Movement);
     const m = this.world.get(this.entityId, Movement);
     if (!m) {
       return {
@@ -101,6 +104,7 @@ abstract class ActorBase {
   }
 
   get combat(): CombatView {
+    this.world.trackPool(Combat);
     const c = this.world.get(this.entityId, Combat);
     if (!c) {
       return {
@@ -125,6 +129,7 @@ abstract class ActorBase {
   }
 
   get areaId(): AreaId | undefined {
+    this.world.trackPool(AreaTag);
     return this.world.get(this.entityId, AreaTag)?.areaId;
   }
 }
@@ -133,6 +138,7 @@ export class Character extends ActorBase {
   readonly type = "character" as const;
 
   get identity(): { readonly id: CharacterId; readonly userId: UserId } {
+    this.world.trackPool(CharacterTag);
     const tag = this.world.get(this.entityId, CharacterTag);
     return {
       id: tag?.characterId ?? ("" as CharacterId),
@@ -141,10 +147,12 @@ export class Character extends ActorBase {
   }
 
   get progression(): ProgressionView {
+    this.world.trackPool(Progression);
     return { xp: this.world.get(this.entityId, Progression)?.xp ?? 0 };
   }
 
   get inventoryId(): InventoryId | undefined {
+    this.world.trackPool(InventoryRef);
     return this.world.get(this.entityId, InventoryRef)?.inventoryId;
   }
 }
@@ -157,6 +165,7 @@ export class NpcInstance extends ActorBase {
     readonly npcId: NpcDefinitionId;
     readonly spawnId: NpcSpawnId;
   } {
+    this.world.trackPool(NpcTag);
     const tag = this.world.get(this.entityId, NpcTag);
     return {
       id: this.entityId as NpcInstanceId,
@@ -166,10 +175,12 @@ export class NpcInstance extends ActorBase {
   }
 
   get aggroRange(): Tile {
+    this.world.trackPool(NpcAi);
     return this.world.get(this.entityId, NpcAi)?.aggroRange ?? (0 as Tile);
   }
 
   get patrol(): Path<Tile> | undefined {
+    this.world.trackPool(NpcAi);
     return this.world.get(this.entityId, NpcAi)?.patrol;
   }
 }
@@ -196,13 +207,15 @@ export type ItemInstance = ConsumableInstanceView | EquipmentInstanceView;
 export type ItemInstanceId = ConsumableInstanceId | EquipmentInstanceId;
 
 export function readItemInstance(
-  world: World,
+  world: ReactiveWorld,
   entityId: EntityId,
 ): ItemInstance | undefined {
+  world.trackPool(InventoryRef);
   const inventoryRef = world.get(entityId, InventoryRef);
   if (!inventoryRef) {
     return undefined;
   }
+  world.trackPool(RiftConsumable);
   const c = world.get(entityId, RiftConsumable);
   if (c) {
     return {
@@ -213,6 +226,7 @@ export function readItemInstance(
       stackSize: c.stackSize,
     };
   }
+  world.trackPool(RiftEquipment);
   const e = world.get(entityId, RiftEquipment);
   if (e) {
     return {
@@ -226,10 +240,15 @@ export function readItemInstance(
   return undefined;
 }
 
-export function readActor(world: World, entityId: EntityId): Actor | undefined {
+export function readActor(
+  world: ReactiveWorld,
+  entityId: EntityId,
+): Actor | undefined {
+  world.trackPool(CharacterTag);
   if (world.has(entityId, CharacterTag)) {
     return new Character(world, entityId);
   }
+  world.trackPool(NpcTag);
   if (world.has(entityId, NpcTag)) {
     return new NpcInstance(world, entityId);
   }

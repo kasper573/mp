@@ -1,4 +1,4 @@
-import { enumOf, f32, object, optional, transform } from "@rift/types";
+import { array, enumOf, f32, object, optional, transform } from "@rift/types";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 
@@ -31,6 +31,13 @@ export const Movement = object({
   speed: f32<Tile>(),
   direction: Direction,
   moveTarget: optional(TileVector),
+});
+
+// Server-only: pathfinding state for entities that are being moved along
+// a precomputed route. Read by AI/combat to clear pathing on combat
+// transitions; written by the movement system. Not replicated.
+export const PathFollow = object({
+  path: array(TileVector),
 });
 
 export const movementComponents = [Movement] as const;

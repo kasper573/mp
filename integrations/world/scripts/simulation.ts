@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { Rng } from "@mp/std";
-import { Opcode, RiftServer, type ClientId } from "@rift/core";
+import { Opcode, type ClientId } from "@rift/core";
+import { FeatureRiftServer } from "@rift/feature";
 import { Writer } from "@rift/types";
 import {
   actorModels,
@@ -22,14 +23,19 @@ import {
   viewDistance,
 } from "@mp/fixtures";
 import type { ServerTransport, ServerTransportEvent } from "@rift/core";
-import { schema } from "../src/schema";
-import { ClientCharacterRegistry } from "../src/identity/client-character-registry";
-import { MovementModule } from "../src/movement/module";
-import { CombatModule } from "../src/combat/module";
-import { VisibilityModule } from "../src/visibility/module";
-import { NpcSpawnerModule } from "../src/npc/spawner-module";
-import { NpcAiModule } from "../src/npc/ai-module";
-import { NpcRewardModule } from "../src/npc/reward-module";
+import { schemaComponents, schemaEvents } from "../src/schema";
+import { fnv1a64 } from "../src/hash";
+import {
+  ClientUserRegistry,
+  clientUserRegistryFeature,
+} from "../src/identity/client-character-registry";
+import { OwnedByClient } from "../src/identity/components";
+import { combatFeature } from "../src/combat/module";
+import { movementFeature } from "../src/movement/module";
+import { npcAiFeature } from "../src/npc/ai-module";
+import { npcRewardFeature } from "../src/npc/reward-module";
+import { npcSpawnerFeature } from "../src/npc/spawner-module";
+import { visibilityFeature } from "../src/visibility/module";
 import { spawnCharacter } from "../src/character/bundle";
 import { createItemDefinitionLookup } from "../src/item/definition-lookup";
 import { loadAreaResource } from "../src/area/load";
@@ -48,7 +54,7 @@ export interface CapturingTransport extends ServerTransport {
 }
 
 export interface Simulation {
-  readonly server: RiftServer;
+  readonly server: FeatureRiftServer;
   readonly transport: CapturingTransport;
   readonly area: AreaResource;
   readonly tickHz: number;
@@ -60,17 +66,9 @@ export interface Simulation {
 }
 
 export interface SimulationOptions {
-  /** Tick rate, default 20Hz. */
   readonly tickHz?: number;
-  /** Number of warmup ticks before client handshake (lets NPCs spawn). Default 60. */
   readonly warmupTicks?: number;
-  /** Whether to perform a fake handshake so the server flushes deltas to a fake client. Default true. */
   readonly connectFakeClient?: boolean;
-  /**
-   * Total NPCs spawned per area. Distributed across npc types in the same
-   * proportions as the @mp/fixtures default (3:3:8:3 pacifist:defensive:aggressive:protective).
-   * Default 17 (= the fixture default).
-   */
   readonly npcCount?: number;
 }
 
@@ -110,11 +108,6 @@ function buildNpcSpawns(
   );
 }
 
-/**
- * Builds a sterile RiftServer with the full @mp/world module stack loaded
- * against the real forest fixture. Used as the source of truth for benchmarks
- * (packet size, cpu, memory) so each one measures the same simulation shape.
- */
 export async function createSimulation(
   opts: SimulationOptions = {},
 ): Promise<Simulation> {
@@ -129,28 +122,29 @@ export async function createSimulation(
   const spawns = buildNpcSpawns(npcCount, [areaId]);
 
   const transport = makeTransport();
-  const registry = new ClientCharacterRegistry();
+  const registry = new ClientUserRegistry();
   const itemLookup = createItemDefinitionLookup(consumables, equipment);
   const rng = new Rng();
 
-  const server = new RiftServer({
-    schema,
+  const server = new FeatureRiftServer({
     transport,
+    hash: fnv1a64,
     tickRateHz: 0,
-    modules: [
-      registry,
-      new MovementModule({ areas: areaMap }),
-      new CombatModule(),
-      new VisibilityModule({ viewDistance, areas: areaMap }),
-      new NpcSpawnerModule({
+    features: [
+      { components: schemaComponents, events: schemaEvents },
+      clientUserRegistryFeature(registry),
+      movementFeature({ areas: areaMap }),
+      combatFeature(),
+      visibilityFeature({ viewDistance, areas: areaMap }),
+      npcSpawnerFeature({
         areas: areaMap,
         npcs,
         spawns,
         actorModels: actorModelsById,
         rng,
       }),
-      new NpcAiModule({ areas: areaMap, rng }),
-      new NpcRewardModule({
+      npcAiFeature({ areas: areaMap, rng }),
+      npcRewardFeature({
         rewardsByNpcId: npcRewardsByNpcId,
         itemLookup,
       }),
@@ -180,7 +174,6 @@ export async function createSimulation(
     coords: characterStart,
     inventoryId: "inv-1" as InventoryId,
     speed: 1 as Tile,
-    // Infinite health to stay alive to keep combat module active through simulation
     health: Number.MAX_SAFE_INTEGER,
     maxHealth: Number.MAX_SAFE_INTEGER,
     attackDamage: 5,
@@ -189,7 +182,7 @@ export async function createSimulation(
     xp: 0,
     actorModels: actorModelsById,
   });
-  registry.setCharacterEntity(fakeClientId, characterEnt);
+  server.world.add(characterEnt, OwnedByClient, { clientId: fakeClientId });
 
   for (let i = 0; i < warmupTicks; i++) {
     server.tick(dt);
@@ -201,7 +194,7 @@ export async function createSimulation(
     transport.emit({ type: "open", clientId: fakeClientId });
     const helloWriter = new Writer(64);
     helloWriter.writeU8(Opcode.Hello);
-    helloWriter.writeBytes(schema.digest());
+    helloWriter.writeBytes(server.schema.digest());
     transport.emit({
       type: "message",
       clientId: fakeClientId,
@@ -264,12 +257,5 @@ function makeTransport(): CapturingTransport {
   };
 }
 
-/**
- * Default benchmark scenario: stationary player at map center,
- * NPCs from fixture spawned and aggro/wander as their AI dictates.
- * Returns the number of ticks to run for the standard 10-second simulation.
- */
 export const SIMULATION_SECONDS = 10;
-
-/** NPC counts that every benchmark sweeps over. */
 export const NPC_COUNT_SCENARIOS: readonly number[] = [25, 100, 200];
