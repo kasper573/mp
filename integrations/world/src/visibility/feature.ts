@@ -5,7 +5,7 @@ import type { AreaId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
 import { CharacterTag } from "../identity/components";
 import { Movement } from "../movement/components";
-import { OwnedBy } from "../inventory/components";
+import { InventoryRef } from "../inventory/components";
 import {
   scopeEntityForClient,
   type SessionRegistry,
@@ -71,8 +71,11 @@ function computeVisibility(
     if (visibleRect.contains(mv.coords)) visible.add(id);
   }
   visible.add(watcherEntity);
-  for (const [id, owned] of world.query(OwnedBy)) {
-    if (owned.ownerId === watcherEntity) visible.add(id);
+  const watcherInv = world.get(watcherEntity, InventoryRef);
+  if (watcherInv !== undefined) {
+    for (const [id, ref] of world.query(InventoryRef)) {
+      if (ref.inventoryId === watcherInv.inventoryId) visible.add(id);
+    }
   }
   return visible;
 }

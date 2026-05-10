@@ -39,25 +39,23 @@ export function npcRewardFeature(opts: NpcRewardOptions): Feature {
             continue;
           }
           const def = opts.itemLookup(reward.reference);
-          const itemId =
-            def.type === "consumable"
-              ? spawnItem(server.world, {
-                  type: "consumable",
-                  definition: def,
-                  instanceId: createShortId(),
-                  stackSize: reward.amount,
-                  ownerId: attackerId,
-                })
-              : spawnItem(server.world, {
-                  type: "equipment",
-                  definition: def,
-                  instanceId: createShortId(),
-                  durability: def.maxDurability,
-                  ownerId: attackerId,
-                });
-          server.world.add(itemId, InventoryRef, {
-            inventoryId: attackerInventory.inventoryId,
-          });
+          if (def.type === "consumable") {
+            spawnItem(server.world, {
+              type: "consumable",
+              definition: def,
+              instanceId: createShortId(),
+              stackSize: reward.amount,
+              inventoryId: attackerInventory.inventoryId,
+            });
+          } else {
+            spawnItem(server.world, {
+              type: "equipment",
+              definition: def,
+              instanceId: createShortId(),
+              durability: def.maxDurability,
+              inventoryId: attackerInventory.inventoryId,
+            });
+          }
         }
       });
     },

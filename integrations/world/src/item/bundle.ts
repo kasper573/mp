@@ -1,5 +1,5 @@
 import type { World, EntityId } from "@rift/core";
-import { OwnedBy } from "../inventory/components";
+import { InventoryRef, type InventoryId } from "../inventory/components";
 import {
   ConsumableInstance,
   EquipmentInstance,
@@ -14,14 +14,14 @@ export type SpawnItemInit =
       readonly definition: Extract<ItemDefinition, { type: "consumable" }>;
       readonly instanceId: ConsumableInstanceId;
       readonly stackSize: number;
-      readonly ownerId?: EntityId;
+      readonly inventoryId: InventoryId;
     }
   | {
       readonly type: "equipment";
       readonly definition: Extract<ItemDefinition, { type: "equipment" }>;
       readonly instanceId: EquipmentInstanceId;
       readonly durability: number;
-      readonly ownerId?: EntityId;
+      readonly inventoryId: InventoryId;
     };
 
 export function spawnItem(world: World, init: SpawnItemInit): EntityId {
@@ -39,8 +39,6 @@ export function spawnItem(world: World, init: SpawnItemInit): EntityId {
       durability: init.durability,
     });
   }
-  if (init.ownerId !== undefined) {
-    world.add(id, OwnedBy, { ownerId: init.ownerId });
-  }
+  world.add(id, InventoryRef, { inventoryId: init.inventoryId });
   return id;
 }

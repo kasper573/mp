@@ -10,7 +10,7 @@ import { Movement } from "../src/movement/components";
 import { Combat } from "../src/combat/components";
 import { Appearance } from "../src/appearance/components";
 import { NpcAi } from "../src/npc/components";
-import { InventoryRef, OwnedBy } from "../src/inventory/components";
+import { InventoryRef } from "../src/inventory/components";
 import { Progression } from "../src/progression/components";
 import { ConsumableInstance, EquipmentInstance } from "../src/item/components";
 import {
@@ -78,7 +78,6 @@ const componentLabels = new Map<unknown, string>([
   [Appearance, "Appearance"],
   [NpcAi, "NpcAi"],
   [InventoryRef, "InventoryRef"],
-  [OwnedBy, "OwnedBy"],
   [Progression, "Progression"],
   [ConsumableInstance, "ConsumableInstance"],
   [EquipmentInstance, "EquipmentInstance"],
