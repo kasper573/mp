@@ -61,7 +61,7 @@ interface InnerProps {
 }
 
 function Inner(props: InnerProps) {
-  const characterEntity = claimedCharacterEntity(props.client.world);
+  const characterEntity = claimedCharacterEntity(props.client.world.signal);
 
   if (props.client.state.value !== "open") {
     return (

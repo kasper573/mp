@@ -91,7 +91,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} connected`);
       }
 
-      const characterEntity = claimedCharacterEntity(client.world);
+      const characterEntity = claimedCharacterEntity(client.world.signal);
       const ready = computed(() => {
         const id = characterEntity.value;
         if (id === undefined) return false;
@@ -102,7 +102,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} waiting for character list...`);
       }
       const characterId = await waitUntil(
-        ownedCharacters(client.world),
+        ownedCharacters(client.world.signal),
         (list) => list.length > 0,
         15_000,
       ).then((list) => list[0].id);

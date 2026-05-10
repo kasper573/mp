@@ -37,7 +37,7 @@ function PlayPage() {
   }, [client]);
 
   useSignalEffect(() => {
-    const first = ownedCharacters(client.world).value[0]?.id;
+    const first = ownedCharacters(client.world.signal).value[0]?.id;
     if (first) joinAsPlayer(client, first);
   });
 

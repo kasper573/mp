@@ -14,12 +14,16 @@ import type { InferValue, RiftType } from "@rift/types";
 
 export class ReactiveWorld extends World {
   static memo<T>(
-    factory: (world: ReactiveWorld) => T,
-  ): (world: ReactiveWorld) => T {
-    const cache = new WeakMap<ReactiveWorld, T>();
-    return (world) => {
-      if (!cache.has(world)) cache.set(world, factory(world));
-      return cache.get(world) as T;
+    compute: (s: WorldSignals) => T,
+  ): (s: WorldSignals) => ReadonlySignal<T> {
+    const cache = new WeakMap<WorldSignals, ReadonlySignal<T>>();
+    return (s) => {
+      let cached = cache.get(s);
+      if (!cached) {
+        cached = computed(() => compute(s));
+        cache.set(s, cached);
+      }
+      return cached;
     };
   }
 

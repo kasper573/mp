@@ -50,7 +50,9 @@ function RouteComponent() {
 
   const spectatable = useComputed(() => {
     const me = auth.identity.value?.id;
-    return liveCharacters(client.world).value.filter((c) => c.userId !== me);
+    return liveCharacters(client.world.signal).value.filter(
+      (c) => c.userId !== me,
+    );
   });
 
   const characterOptions: { value: CharacterId | undefined; label: string }[] =

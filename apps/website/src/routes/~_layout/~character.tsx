@@ -37,7 +37,7 @@ function CharacterPage() {
   }, [client]);
 
   const myCharacter = useComputed(
-    () => ownedCharacters(client.world).value[0],
+    () => ownedCharacters(client.world.signal).value[0],
   ).value;
   const savedAt = useSignal<number | undefined>(undefined);
 
