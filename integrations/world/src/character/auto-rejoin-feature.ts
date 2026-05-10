@@ -1,5 +1,5 @@
 import type { Feature } from "../feature";
-import { effect } from "@preact/signals-core";
+import { effect, type ReadonlySignal } from "@preact/signals-core";
 import type { CharacterId } from "../identity/ids";
 import { joinAsPlayer, joinAsSpectator } from "./actions";
 
@@ -9,7 +9,7 @@ export interface AutoRejoinIntent {
 }
 
 export interface AutoRejoinOptions {
-  readonly intent: () => AutoRejoinIntent | undefined;
+  readonly intent: ReadonlySignal<AutoRejoinIntent | undefined>;
 }
 
 export function autoRejoinFeature(opts: AutoRejoinOptions): Feature {
@@ -19,7 +19,7 @@ export function autoRejoinFeature(opts: AutoRejoinOptions): Feature {
       return effect(() => {
         const isOpen = client.state.value === "open";
         if (isOpen && !wasOpen) {
-          const intent = opts.intent();
+          const intent = opts.intent.peek();
           if (intent) {
             if (intent.mode === "player") {
               joinAsPlayer(client, intent.characterId);

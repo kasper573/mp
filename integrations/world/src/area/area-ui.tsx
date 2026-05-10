@@ -1,13 +1,14 @@
 import * as styles from "./area-ui.css";
-import { useItemDefinition, useRift } from "../client/context";
+import { useRift } from "../client";
+import { useItemDefinition } from "../renderer/context";
 import { RespawnDialog } from "../character/respawn-dialog";
 import type {
   ConsumableInstanceView,
   EquipmentInstanceView,
-} from "../client/views";
+} from "../inventory/views";
 import { computed, type ReadonlySignal } from "@preact/signals-core";
 import type { EntityId } from "@rift/core";
-import { inventorySignal } from "../client/signals";
+import { inventorySignal } from "../inventory/signals";
 import { Combat } from "../combat/components";
 import { InventoryRef } from "../inventory/components";
 import { Suspense, type ReactElement } from "preact/compat";

@@ -14,7 +14,7 @@ import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
 import type { EntityId } from "@rift/core";
-import type { MpRiftClient } from "../feature";
+import type { MpRiftClient } from "../client";
 import uniqolor from "uniqolor";
 import { Movement } from "../movement/components";
 import { Combat } from "../combat/components";

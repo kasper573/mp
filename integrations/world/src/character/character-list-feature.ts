@@ -1,10 +1,7 @@
 import type { Feature } from "../feature";
 import { signal, type ReadonlySignal, type Signal } from "@preact/signals-core";
 import { combine } from "@mp/std";
-import {
-  CharacterListResponse,
-  CharacterRenamedResponse,
-} from "../character/events";
+import { CharacterListResponse, CharacterRenamedResponse } from "./events";
 import type { CharacterId } from "../identity/ids";
 import { requestCharacterList } from "./actions";
 
@@ -16,7 +13,7 @@ interface KnownCharacter {
 export class CharacterList {
   readonly #characters: Signal<readonly KnownCharacter[]> = signal([]);
 
-  get characters(): ReadonlySignal<readonly KnownCharacter[]> {
+  get signal(): ReadonlySignal<readonly KnownCharacter[]> {
     return this.#characters;
   }
 

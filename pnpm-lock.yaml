@@ -195,19 +195,10 @@ importers:
       '@preact/signals-core':
         specifier: 'catalog:'
         version: 1.14.1
-      '@rift/ws':
-        specifier: workspace:*
-        version: link:../../libraries/rift/ws
-      ws:
-        specifier: 8.20.0
-        version: 8.20.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
-      '@types/ws':
-        specifier: 8.18.1
-        version: 8.18.1
       '@types/yargs':
         specifier: 'catalog:'
         version: 17.0.35
@@ -268,9 +259,6 @@ importers:
       '@mp/world':
         specifier: workspace:*
         version: link:../../integrations/world
-      '@rift/ws':
-        specifier: workspace:*
-        version: link:../../libraries/rift/ws
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.96.2(react@19.1.0)
@@ -446,6 +434,9 @@ importers:
       '@rift/types':
         specifier: workspace:*
         version: link:../../libraries/rift/types
+      '@rift/ws':
+        specifier: workspace:*
+        version: link:../../libraries/rift/ws
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.96.2(react@19.1.0)

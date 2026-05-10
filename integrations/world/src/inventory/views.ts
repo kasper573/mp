@@ -4,7 +4,7 @@ import {
   ConsumableInstance as RiftConsumable,
   EquipmentInstance as RiftEquipment,
 } from "../item/components";
-import { InventoryRef } from "../inventory/components";
+import { InventoryRef } from "./components";
 import type {
   ConsumableDefinitionId,
   ConsumableInstanceId,

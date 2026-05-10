@@ -1,11 +1,16 @@
 import { Button, Card } from "@mp/ui";
-import { CharacterRenamedResponse, renameCharacter } from "@mp/world";
-import { useComputed, useSignal } from "@mp/state/react";
-import { useMount } from "@mp/state/react";
+import {
+  CharacterRenamedResponse,
+  MpRiftClient,
+  renameCharacter,
+} from "@mp/world";
+import { useComputed, useMount, useSignal } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useContext, useEffect, useMemo } from "preact/hooks";
 import { atoms } from "@mp/style";
+import { AuthContext } from "../../integrations/contexts";
+import { env } from "../../env";
 import { NavLink } from "../../integrations/router/nav-link";
-import { useRiftClient } from "../../integrations/use-rift-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import type { ReactNode } from "preact/compat";
 
@@ -14,8 +19,26 @@ export const Route = createFileRoute("/_layout/character")({
 });
 
 function CharacterPage() {
-  const { client, characters } = useRiftClient(() => undefined);
-  const myCharacter = useComputed(() => characters.characters.value[0]).value;
+  const auth = useContext(AuthContext);
+
+  const client = useMemo(
+    () =>
+      new MpRiftClient({
+        url: env.gameServerUrl,
+        accessToken: auth.identity.value?.token,
+        mode: "player",
+      }),
+    [auth],
+  );
+
+  useEffect(() => {
+    void client.connect();
+    return () => void client.disconnect();
+  }, [client]);
+
+  const myCharacter = useComputed(
+    () => client.characters.signal.value[0],
+  ).value;
   const savedAt = useSignal<number | undefined>(undefined);
 
   useMount(() =>

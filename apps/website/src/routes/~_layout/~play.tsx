@@ -1,20 +1,17 @@
 import {
-  characterEntitySignal,
-  GameAssetLoaderContext,
-  GameClient,
-  RiftContext,
+  GameRenderer,
   joinAsPlayer,
-  type AutoRejoinIntent,
+  MpRiftClient,
   type CharacterId,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
-import { LoadingSpinner } from "@mp/ui";
-import { signal } from "@mp/state";
 import { useSignalEffect } from "@mp/state/react";
+import { AdditionalDebugUiContext } from "@mp/world";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useMemo } from "preact/compat";
+import { useContext, useEffect, useMemo } from "preact/hooks";
 import { gameAssetLoader } from "../../integrations/assets";
-import { useRiftClient } from "../../integrations/use-rift-client";
+import { AuthContext } from "../../integrations/contexts";
+import { env } from "../../env";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 
@@ -23,46 +20,42 @@ export const Route = createFileRoute("/_layout/play")({
 });
 
 function PlayPage() {
-  const characterIdSignal = useMemo(
-    () => signal<CharacterId | undefined>(undefined),
-    [],
-  );
-  const intent = useMemo(
-    () => (): AutoRejoinIntent | undefined => {
-      const id = characterIdSignal.value;
-      return id ? { mode: "player", characterId: id } : undefined;
-    },
-    [characterIdSignal],
+  const auth = useContext(AuthContext);
+
+  const client = useMemo(
+    () =>
+      new MpRiftClient({
+        url: env.gameServerUrl,
+        accessToken: auth.identity.value?.token,
+        mode: "player",
+      }),
+    [auth],
   );
 
-  const { client, characters } = useRiftClient(intent);
-
-  const characterEntity = useMemo(
-    () => characterEntitySignal(client.world, characterIdSignal),
-    [client, characterIdSignal],
-  );
+  useEffect(() => {
+    void client.connect();
+    return () => void client.disconnect();
+  }, [client]);
 
   useSignalEffect(() => {
-    const first = characters.characters.value[0]?.id;
-    if (first && characterIdSignal.value !== first) {
-      characterIdSignal.value = first;
+    const first: CharacterId | undefined =
+      client.characters.signal.value[0]?.id;
+    if (first && client.selectedCharacterId.peek() !== first) {
+      client.selectedCharacterId.value = first;
       joinAsPlayer(client, first);
     }
   });
 
   return (
-    <Suspense fallback={<LoadingSpinner debugDescription="~play.tsx" />}>
-      <RiftContext.Provider value={client}>
-        <GameAssetLoaderContext.Provider value={gameAssetLoader}>
-          <GameClient
-            client={client}
-            characterEntity={characterEntity}
-            additionalDebugUi={<MiscDebugUi />}
-            viewDistance={fixtures.viewDistance}
-            interactive
-          />
-        </GameAssetLoaderContext.Provider>
-      </RiftContext.Provider>
-    </Suspense>
+    <AdditionalDebugUiContext.Provider value={miscDebugUi}>
+      <GameRenderer
+        client={client}
+        assetLoader={gameAssetLoader}
+        viewDistance={fixtures.viewDistance}
+        interactive
+      />
+    </AdditionalDebugUiContext.Provider>
   );
 }
+
+const miscDebugUi = <MiscDebugUi />;

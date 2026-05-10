@@ -1,19 +1,17 @@
 import {
-  characterEntitySignal,
-  GameAssetLoaderContext,
-  RiftContext,
-  SpectatorClient,
-  type AutoRejoinIntent,
+  AdditionalDebugUiContext,
+  GameRenderer,
+  MpRiftClient,
   type CharacterId,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
 import { gatewayRoles } from "@mp/keycloak";
-import { signal } from "@mp/state";
-import { LoadingSpinner } from "@mp/ui";
+import { Select } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useMemo } from "preact/compat";
+import { useContext, useEffect, useMemo } from "preact/hooks";
 import { gameAssetLoader } from "../../../integrations/assets";
-import { useRiftClient } from "../../../integrations/use-rift-client";
+import { AuthContext } from "../../../integrations/contexts";
+import { env } from "../../../env";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
 import { atoms } from "@mp/style";
@@ -25,27 +23,27 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const spectatedId = useMemo(
-    () => signal<CharacterId | undefined>(undefined),
-    [],
+  const auth = useContext(AuthContext);
+
+  const client = useMemo(
+    () =>
+      new MpRiftClient({
+        url: env.gameServerUrl,
+        accessToken: auth.identity.value?.token,
+        mode: "spectator",
+      }),
+    [auth],
   );
-  const intent = useMemo(
-    () => (): AutoRejoinIntent | undefined => {
-      const id = spectatedId.value;
-      return id ? { mode: "spectator", characterId: id } : undefined;
-    },
-    [spectatedId],
-  );
-  const { client, characters } = useRiftClient(intent);
-  const characterEntity = useMemo(
-    () => characterEntitySignal(client.world, spectatedId),
-    [client, spectatedId],
-  );
+
+  useEffect(() => {
+    void client.connect();
+    return () => void client.disconnect();
+  }, [client]);
 
   const characterOptions: { value: CharacterId | undefined; label: string }[] =
     [
       { value: undefined, label: "Select character to spectate" },
-      ...characters.characters.value.map((c) => ({
+      ...client.characters.signal.value.map((c) => ({
         value: c.id,
         label: c.name,
       })),
@@ -60,24 +58,24 @@ function RouteComponent() {
         flex: 1,
       }}
     >
-      <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
-        <RiftContext.Provider value={client}>
-          <GameAssetLoaderContext.Provider value={gameAssetLoader}>
-            <div className={atoms({ mb: "xl" })}>
-              Characters available: {characters.characters.value.length}
-            </div>
-            <SpectatorClient
-              characterOptions={characterOptions}
-              spectatedId={spectatedId}
-              client={client}
-              characterEntity={characterEntity}
-              additionalDebugUi={<MiscDebugUi />}
-              viewDistance={fixtures.viewDistance}
-              interactive={false}
-            />
-          </GameAssetLoaderContext.Provider>
-        </RiftContext.Provider>
-      </Suspense>
+      <div className={atoms({ mb: "xl" })}>
+        Characters available: {client.characters.signal.value.length}
+      </div>
+      <Select<CharacterId | undefined>
+        options={characterOptions}
+        signal={client.selectedCharacterId}
+      />
+      <AdditionalDebugUiContext.Provider value={miscDebugUi}>
+        <GameRenderer
+          client={client}
+          assetLoader={gameAssetLoader}
+          viewDistance={fixtures.viewDistance}
+          interactive={false}
+          enableUi={false}
+        />
+      </AdditionalDebugUiContext.Provider>
     </div>
   );
 }
+
+const miscDebugUi = <MiscDebugUi />;

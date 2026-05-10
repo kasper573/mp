@@ -1,8 +1,4 @@
-import type { EntityId, RiftClient } from "@rift/core";
-import type { Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
-import { AttackRequest } from "../combat/events";
-import { MoveRequest } from "../movement/events";
+import type { RiftClient } from "@rift/core";
 import {
   JoinAsPlayer,
   JoinAsSpectator,
@@ -12,26 +8,8 @@ import {
   RenameCharacterRequest,
   RequestFullState,
   Respawn,
-} from "../character/events";
+} from "./events";
 import type { CharacterId } from "../identity/ids";
-
-export function moveCharacter(client: RiftClient, to: Vector<Tile>): void {
-  client.emit({
-    type: MoveRequest,
-    data: to,
-    source: "local",
-    target: "wire",
-  });
-}
-
-export function attackTarget(client: RiftClient, targetId: EntityId): void {
-  client.emit({
-    type: AttackRequest,
-    data: targetId,
-    source: "local",
-    target: "wire",
-  });
-}
 
 export function respawnCharacter(client: RiftClient): void {
   client.emit({

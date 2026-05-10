@@ -38,6 +38,7 @@
     "@rift/core": "workspace:*",
     "@rift/reactive": "workspace:*",
     "@rift/types": "workspace:*",
+    "@rift/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "preact": "catalog:",
     "uniqolor": "1.1.1",

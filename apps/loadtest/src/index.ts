@@ -1,27 +1,17 @@
-import { MpRiftClient } from "@mp/world";
 import {
   AreaTag,
-  CharacterList,
-  Combat,
-  Movement,
-  autoRejoinFeature,
   characterEntitySignal,
-  characterListFeature,
-  fnv1a64,
+  Combat,
   joinAsPlayer,
   moveCharacter,
+  Movement,
+  MpRiftClient,
   respawnCharacter,
-  schemaComponents,
-  schemaEvents,
-  type AutoRejoinIntent,
-  type CharacterId,
 } from "@mp/world";
-import { wsTransport, type WebSocketLike } from "@rift/ws";
-import { computed, signal, type ReadonlySignal } from "@preact/signals-core";
+import { computed, type ReadonlySignal } from "@preact/signals-core";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
-import { WebSocket } from "ws";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { readCliOptions } from "./cli";
@@ -75,7 +65,6 @@ async function testAllGameClients(): Promise<boolean> {
 }
 
 function testOneGameClient(n: number, rng: Rng): Promise<void> {
-  let socket: WebSocket | undefined;
   let stopped = false;
   let stopClient: () => void = () => {};
   return new Promise<void>((resolve, reject) => {
@@ -89,42 +78,22 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Creating socket ${n}`);
       }
 
-      const accessToken = createBypassUser(`Load Test ${n}`);
-      const url = new URL(gameServerUrl);
-      url.searchParams.set("accessToken", accessToken);
-      socket = new WebSocket(url.toString());
-      socket.binaryType = "arraybuffer";
-
-      await waitForOpen(socket);
-      if (verbose) {
-        logger.info(`Socket ${n} connected`);
-      }
-
-      const characterIdSignal = signal<CharacterId | undefined>(undefined);
-      const intent = (): AutoRejoinIntent | undefined => {
-        const id = characterIdSignal.value;
-        return id ? { mode: "player", characterId: id } : undefined;
-      };
-
-      const characters = new CharacterList();
-
       const client = new MpRiftClient({
-        transport: wsTransport(socket as unknown as WebSocketLike),
-        hash: fnv1a64,
-        features: [
-          { components: schemaComponents, events: schemaEvents },
-          characterListFeature(characters),
-          autoRejoinFeature({ intent }),
-        ],
+        url: gameServerUrl,
+        accessToken: createBypassUser(`Load Test ${n}`),
+        mode: "player",
       });
 
       stopClient = () => void client.disconnect();
 
       await client.connect();
+      if (verbose) {
+        logger.info(`Socket ${n} connected`);
+      }
 
       const characterEntity = characterEntitySignal(
         client.world,
-        characterIdSignal,
+        client.selectedCharacterId,
       );
       const ready = computed(() => {
         const id = characterEntity.value;
@@ -136,12 +105,12 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} waiting for character list...`);
       }
       const characterId = await waitUntil(
-        characters.characters,
+        client.characters.signal,
         (list) => list.length > 0,
         15_000,
       ).then((list) => list[0].id);
 
-      characterIdSignal.value = characterId;
+      client.selectedCharacterId.value = characterId;
       joinAsPlayer(client, characterId);
 
       if (verbose) {
@@ -182,26 +151,6 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
     })().catch(failTest);
   }).finally(() => {
     stopClient();
-    socket?.close();
-  });
-}
-
-async function waitForOpen(socket: WebSocket) {
-  await new Promise<void>((resolve, reject) => {
-    const onOpen = () => {
-      resolve();
-      removeEventListeners();
-    };
-    const onError = (error: WebSocket.ErrorEvent) => {
-      reject(new Error(error.message));
-      removeEventListeners();
-    };
-    function removeEventListeners() {
-      socket.removeEventListener("open", onOpen);
-      socket.removeEventListener("error", onError);
-    }
-    socket.addEventListener("error", onError);
-    socket.addEventListener("open", onOpen);
   });
 }
 

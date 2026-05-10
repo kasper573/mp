@@ -7,7 +7,7 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rng } from "@mp/std";
 import type { AccessToken, UserId } from "@mp/auth";
 import { Opcode, type ClientId } from "@rift/core";
-import { MpRiftServer } from "../src/feature";
+import { MpRiftServer } from "../src/server";
 import { Writer } from "@rift/types";
 import {
   actorModels,

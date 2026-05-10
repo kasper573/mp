@@ -1,6 +1,8 @@
 export * from "./schema";
 export * from "./hash";
 export * from "./feature";
+export * from "./client";
+export * from "./server";
 
 export * from "./identity/components";
 export * from "./identity/ids";
@@ -16,14 +18,18 @@ export * from "./appearance/actor-sprite-tester";
 export * from "./movement/components";
 export * from "./movement/events";
 export * from "./movement/feature";
+export * from "./movement/actions";
 
 export * from "./combat/components";
 export * from "./combat/events";
 export * from "./combat/feature";
+export * from "./combat/actions";
 
 export * from "./progression/components";
 
 export * from "./inventory/components";
+export * from "./inventory/views";
+export * from "./inventory/signals";
 
 export * from "./npc/components";
 export * from "./npc/definitions";
@@ -59,18 +65,15 @@ export * from "./visibility/feature";
 
 export * from "./character/events";
 export * from "./character/bundle";
+export * from "./character/actions";
+export * from "./character/signals";
+export * from "./character/auto-rejoin-feature";
+export * from "./character/character-list-feature";
 export * from "./character/respawn-dialog";
-export * from "./character/spectator-client";
 
-export * from "./client/views";
-export * from "./client/signals";
-export * from "./client/actions";
-export * from "./client/auto-rejoin-feature";
-export * from "./client/character-list-feature";
-export * from "./client/render-settings";
-export * from "./client/context";
-export * from "./client/game-asset-loader";
-export * from "./client/game-client";
-export * from "./client/game-renderer";
-export * from "./client/game-debug-ui";
-export * from "./client/pending-queries-description";
+export * from "./renderer/asset-loader";
+export * from "./renderer/settings";
+export * from "./renderer/context";
+export * from "./renderer/game-renderer";
+export * from "./renderer/debug-ui";
+export * from "./renderer/pending-queries-description";

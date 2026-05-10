@@ -1,15 +1,14 @@
-import type { AreaId } from "../identity/ids";
 import type { ViewDistanceSettings } from "../visibility/view-distance";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
+import type { EntityId } from "@rift/core";
 import type { ReadonlySignal, Signal } from "@preact/signals-core";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
-import type { JSX } from "preact";
-import type { EntityId } from "@rift/core";
-import type { MpRiftClient } from "../feature";
 import { useState } from "preact/hooks";
+import { Suspense } from "preact/compat";
+import { Dock, ErrorFallback, LoadingSpinner } from "@mp/ui";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -17,32 +16,115 @@ import {
 } from "../area/area-debug-settings-form";
 import { AreaScene } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
-import { useActorTextures, useAreaAssets } from "./context";
-import type { AreaAssets } from "./game-asset-loader";
-import { GameDebugUi } from "./game-debug-ui";
+import { AreaTag } from "../area/components";
+import type { AreaId } from "../identity/ids";
+import { RiftContext, type MpRiftClient } from "../client";
+import {
+  GameAssetLoaderContext,
+  useActorTextures,
+  useAreaAssets,
+} from "./context";
+import type { AreaAssets, GameAssetLoader } from "./asset-loader";
+import { GameDebugUi } from "./debug-ui";
+import { PendingQueriesDescription } from "./pending-queries-description";
 import { useObjectSignal } from "./use-object-signal";
-import { Suspense } from "preact/compat";
-import { Dock, ErrorFallback } from "@mp/ui";
 
-interface GameRendererProps {
-  interactive: boolean;
+export interface GameRendererProps {
   client: MpRiftClient;
-  characterEntity: ReadonlySignal<EntityId | undefined>;
-  additionalDebugUi?: JSX.Element;
-  areaIdToLoadAssetsFor: AreaId;
-  enableUi?: boolean;
+  assetLoader: GameAssetLoader;
+  interactive: boolean;
   viewDistance: ViewDistanceSettings;
+  enableUi?: boolean;
 }
 
-export function GameRenderer({
-  interactive,
+export function GameRenderer(props: GameRendererProps) {
+  return (
+    <RiftContext.Provider value={props.client}>
+      <GameAssetLoaderContext.Provider value={props.assetLoader}>
+        <Inner
+          client={props.client}
+          interactive={props.interactive}
+          viewDistance={props.viewDistance}
+          enableUi={props.enableUi}
+        />
+      </GameAssetLoaderContext.Provider>
+    </RiftContext.Provider>
+  );
+}
+
+interface InnerProps {
+  client: MpRiftClient;
+  interactive: boolean;
+  viewDistance: ViewDistanceSettings;
+  enableUi?: boolean;
+}
+
+function Inner(props: InnerProps) {
+  const characterEntity = props.client.selectedCharacterEntity;
+
+  if (props.client.state.value !== "open") {
+    return (
+      <LoadingSpinner debugDescription="rift client not connected">
+        Connecting
+      </LoadingSpinner>
+    );
+  }
+
+  const entityId = characterEntity.value;
+  if (entityId === undefined) {
+    return (
+      <LoadingSpinner debugDescription="no character joined">
+        Joining
+      </LoadingSpinner>
+    );
+  }
+
+  const areaTag = props.client.world.signal.get(entityId, AreaTag).value;
+  if (!areaTag) {
+    return (
+      <LoadingSpinner debugDescription="areaId unavailable">
+        Loading area
+      </LoadingSpinner>
+    );
+  }
+
+  return (
+    <Suspense
+      fallback={
+        <LoadingSpinner>
+          Loading assets: <PendingQueriesDescription />
+        </LoadingSpinner>
+      }
+    >
+      <Stage
+        client={props.client}
+        characterEntity={characterEntity}
+        areaIdToLoadAssetsFor={areaTag.areaId}
+        interactive={props.interactive}
+        viewDistance={props.viewDistance}
+        enableUi={props.enableUi}
+      />
+    </Suspense>
+  );
+}
+
+interface StageProps {
+  client: MpRiftClient;
+  characterEntity: ReadonlySignal<EntityId | undefined>;
+  areaIdToLoadAssetsFor: AreaId;
+  interactive: boolean;
+  viewDistance: ViewDistanceSettings;
+  enableUi?: boolean;
+}
+
+function Stage({
   client,
   characterEntity,
   areaIdToLoadAssetsFor,
-  additionalDebugUi,
-  enableUi = true,
+  interactive,
   viewDistance,
-}: GameRendererProps) {
+  enableUi = true,
+}: StageProps) {
   const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -74,7 +156,6 @@ export function GameRenderer({
           <AreaUi characterEntity={characterEntity} />
           {showDebugUi.value && (
             <GameDebugUi>
-              {additionalDebugUi}
               <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
             </GameDebugUi>
           )}
@@ -95,18 +176,17 @@ function UILoadingFallback() {
   return null;
 }
 
-function buildStage(
-  app: Application,
-  opt: {
-    interactive: boolean;
-    client: MpRiftClient;
-    characterEntity: ReadonlySignal<EntityId | undefined>;
-    areaAssets: AreaAssets;
-    actorTextures: ActorTextureLookup;
-    showDebugUi: Signal<boolean>;
-    viewDistance: ViewDistanceSettings;
-  },
-) {
+interface BuildStageOptions {
+  interactive: boolean;
+  client: MpRiftClient;
+  characterEntity: ReadonlySignal<EntityId | undefined>;
+  areaAssets: AreaAssets;
+  actorTextures: ActorTextureLookup;
+  showDebugUi: Signal<boolean>;
+  viewDistance: ViewDistanceSettings;
+}
+
+function buildStage(app: Application, opt: BuildStageOptions) {
   const engine = new Engine(app.canvas);
 
   const subscriptions = [

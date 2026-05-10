@@ -20,7 +20,7 @@ import {
   generateTileset,
   generateTilesetTile,
 } from "./test-tile-map-generator";
-import { useQuerySignal } from "../client/use-query-signal";
+import { useQuerySignal } from "../renderer/use-query-signal";
 
 const testTilesetTextureUrl = new URL(
   "./tile-renderer-tester.tileset.png",

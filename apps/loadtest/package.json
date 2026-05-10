@@ -15,13 +15,10 @@
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/world": "workspace:*",
-    "@preact/signals-core": "catalog:",
-    "@rift/ws": "workspace:*",
-    "ws": "8.20.0"
+    "@preact/signals-core": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/ws": "8.18.1",
     "@types/yargs": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",

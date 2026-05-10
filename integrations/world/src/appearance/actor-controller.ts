@@ -12,7 +12,7 @@ import { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { TimeSpan } from "@mp/time";
 import type { EntityId } from "@rift/core";
-import type { MpRiftClient } from "../feature";
+import type { MpRiftClient } from "../client";
 import { Attacked } from "../combat/events";
 import { Combat } from "../combat/components";
 import { Movement } from "../movement/components";
@@ -21,7 +21,7 @@ import { CharacterTag } from "../identity/components";
 import { Progression } from "../progression/components";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
-import { interpolationEnabled } from "../client/render-settings";
+import { interpolationEnabled } from "../renderer/settings";
 
 const TELEPORT_THRESHOLD: Tile = 3 as Tile;
 

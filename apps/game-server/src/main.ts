@@ -2,7 +2,7 @@ import { createServer as createHttpServer } from "node:http";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 import { wssTransport } from "@rift/wss";
-import { MpRiftServer } from "@mp/world";
+import { MpRiftServer, wsHandshakeAccessTokenParam } from "@mp/world";
 import { createPinoLogger } from "@mp/logger/pino";
 import { Rng, setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
@@ -73,7 +73,7 @@ const wss = new WebSocketServer({ noServer: true });
 
 httpServer.on("upgrade", async (req, socket, head) => {
   const url = new URL(req.url ?? "", "ws://x");
-  const token = url.searchParams.get("accessToken");
+  const token = url.searchParams.get(wsHandshakeAccessTokenParam);
   if (!token) {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();

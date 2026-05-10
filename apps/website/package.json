@@ -26,7 +26,6 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/world": "workspace:*",
-    "@rift/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
     "@tanstack/react-router": "1.168.10",
