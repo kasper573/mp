@@ -17,6 +17,7 @@ import {
 import { AreaScene } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
 import { AreaTag } from "../area/components";
+import { claimedCharacterEntity } from "../character/signals";
 import type { AreaId } from "@mp/fixtures";
 import { RiftContext, type MpRiftClient } from "../client";
 import {
@@ -60,7 +61,7 @@ interface InnerProps {
 }
 
 function Inner(props: InnerProps) {
-  const characterEntity = props.client.selectedCharacterEntity;
+  const characterEntity = claimedCharacterEntity(props.client.world);
 
   if (props.client.state.value !== "open") {
     return (

@@ -1,4 +1,4 @@
-import { array, copy, object, string } from "@rift/types";
+import { copy, object, string } from "@rift/types";
 import type { CharacterId } from "./id";
 import type { InventoryId } from "../inventory/components";
 import { TileVector } from "../movement/components";
@@ -19,10 +19,6 @@ export const Respawn = object({});
 export const Recall = object({});
 
 export const RequestFullState = object({});
-
-export const ListCharactersRequest = object({});
-
-export const CharacterListResponse = array(CharacterSummary);
 
 export const CreateCharacterRequest = string();
 
@@ -55,8 +51,6 @@ export const characterEvents = [
   Respawn,
   Recall,
   RequestFullState,
-  ListCharactersRequest,
-  CharacterListResponse,
   CreateCharacterRequest,
   CharacterCreatedResponse,
   DeleteCharacterRequest,

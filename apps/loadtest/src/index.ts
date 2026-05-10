@@ -1,11 +1,12 @@
 import {
   AreaTag,
-  characterEntitySignal,
+  claimedCharacterEntity,
   Combat,
   joinAsPlayer,
   moveCharacter,
   Movement,
   MpRiftClient,
+  ownedCharacters,
   respawnCharacter,
 } from "@mp/world";
 import { computed, type ReadonlySignal } from "@preact/signals-core";
@@ -81,7 +82,6 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       const client = new MpRiftClient({
         url: gameServerUrl,
         accessToken: createBypassUser(`Load Test ${n}`),
-        mode: "player",
       });
 
       stopClient = () => void client.disconnect();
@@ -91,10 +91,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} connected`);
       }
 
-      const characterEntity = characterEntitySignal(
-        client.world,
-        client.selectedCharacterId,
-      );
+      const characterEntity = claimedCharacterEntity(client.world);
       const ready = computed(() => {
         const id = characterEntity.value;
         if (id === undefined) return false;
@@ -105,12 +102,11 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} waiting for character list...`);
       }
       const characterId = await waitUntil(
-        client.characters.signal,
+        ownedCharacters(client.world),
         (list) => list.length > 0,
         15_000,
       ).then((list) => list[0].id);
 
-      client.selectedCharacterId.value = characterId;
       joinAsPlayer(client, characterId);
 
       if (verbose) {

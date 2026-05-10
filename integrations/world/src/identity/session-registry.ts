@@ -4,17 +4,15 @@ import {
   type EntityId,
   type World,
 } from "@rift/core";
-import { combine } from "@mp/std";
-import { userRoles } from "@mp/keycloak";
 import type { Feature } from "../feature";
 import type { UserId } from "@mp/auth";
-import { JoinAsPlayer, JoinAsSpectator } from "../character/events";
-import { CharacterTag, OwnedByClient } from "./components";
-import type {
-  UserSession,
-  UserSessionCharacterClaim,
-  UserSessionIdentity,
-} from "./session";
+import {
+  CharacterClaim,
+  CharacterTag,
+  ClientScopeTag,
+  OwnedByClient,
+} from "./components";
+import type { UserSession, UserSessionIdentity } from "./session";
 
 export class SessionRegistry {
   readonly #sessions = new Map<ClientId, UserSession>();
@@ -25,21 +23,6 @@ export class SessionRegistry {
 
   forgetConnection(clientId: ClientId): void {
     this.#sessions.delete(clientId);
-  }
-
-  setCharacterClaim(
-    clientId: ClientId,
-    claim: UserSessionCharacterClaim,
-  ): void {
-    const session = this.#sessions.get(clientId);
-    if (!session) return;
-    this.#sessions.set(clientId, { ...session, character: claim });
-  }
-
-  clearCharacterClaim(clientId: ClientId): void {
-    const session = this.#sessions.get(clientId);
-    if (!session) return;
-    this.#sessions.set(clientId, { ...session, character: undefined });
   }
 
   getSession(clientId: ClientId): UserSession | undefined {
@@ -53,38 +36,14 @@ export class SessionRegistry {
   getUserId(clientId: ClientId): UserId | undefined {
     return this.#sessions.get(clientId)?.user?.id;
   }
-
-  getCharacterClaim(clientId: ClientId): UserSessionCharacterClaim | undefined {
-    return this.#sessions.get(clientId)?.character;
-  }
 }
 
 export function sessionRegistryFeature(registry: SessionRegistry): Feature {
   return {
     server(server) {
-      return combine(
-        server.on(ClientDisconnected, ({ data }) => {
-          registry.forgetConnection(data.clientId);
-        }),
-        server.on(JoinAsPlayer, (event) => {
-          if (event.source.type !== "wire") return;
-          const user = registry.getUser(event.source.clientId);
-          if (!user || !user.roles.has(userRoles.join)) return;
-          registry.setCharacterClaim(event.source.clientId, {
-            type: "player",
-            id: event.data,
-          });
-        }),
-        server.on(JoinAsSpectator, (event) => {
-          if (event.source.type !== "wire") return;
-          const user = registry.getUser(event.source.clientId);
-          if (!user || !user.roles.has(userRoles.spectate)) return;
-          registry.setCharacterClaim(event.source.clientId, {
-            type: "spectator",
-            id: event.data,
-          });
-        }),
-      );
+      return server.on(ClientDisconnected, ({ data }) => {
+        registry.forgetConnection(data.clientId);
+      });
     },
   };
 }
@@ -93,7 +52,17 @@ export function entityForClient(
   world: World,
   clientId: ClientId,
 ): EntityId | undefined {
-  for (const [id, owned] of world.query(OwnedByClient)) {
+  for (const [id, owned, _tag] of world.query(OwnedByClient, CharacterTag)) {
+    if (owned.clientId === clientId) return id;
+  }
+  return undefined;
+}
+
+export function scopeEntityForClient(
+  world: World,
+  clientId: ClientId,
+): EntityId | undefined {
+  for (const [id, owned, _tag] of world.query(OwnedByClient, ClientScopeTag)) {
     if (owned.clientId === clientId) return id;
   }
   return undefined;
@@ -101,13 +70,14 @@ export function entityForClient(
 
 export function watchedEntityForClient(
   world: World,
-  registry: SessionRegistry,
   clientId: ClientId,
 ): EntityId | undefined {
-  const claim = registry.getCharacterClaim(clientId);
+  const scope = scopeEntityForClient(world, clientId);
+  if (scope === undefined) return undefined;
+  const claim = world.get(scope, CharacterClaim);
   if (!claim) return undefined;
   for (const [id, tag] of world.query(CharacterTag)) {
-    if (tag.characterId === claim.id) return id;
+    if (tag.characterId === claim.characterId) return id;
   }
   return undefined;
 }

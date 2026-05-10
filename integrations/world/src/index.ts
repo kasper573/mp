@@ -68,7 +68,6 @@ export * from "./character/events";
 export * from "./character/bundle";
 export * from "./character/actions";
 export * from "./character/signals";
-export * from "./character/character-list-feature";
 export * from "./character/respawn-dialog";
 
 export * from "./renderer/asset-loader";

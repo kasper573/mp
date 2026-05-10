@@ -46,6 +46,9 @@ repo.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,
+  algorithms: (typeof opt.auth.algorithms === "string"
+    ? (opt.auth.algorithms as string).split(",").map((s) => s.trim())
+    : opt.auth.algorithms) as typeof opt.auth.algorithms,
   bypassUserRoles: playerRoles,
 });
 

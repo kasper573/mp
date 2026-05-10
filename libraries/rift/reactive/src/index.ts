@@ -13,6 +13,16 @@ import {
 import type { InferValue, RiftType } from "@rift/types";
 
 export class ReactiveWorld extends World {
+  static memo<T>(
+    factory: (world: ReactiveWorld) => T,
+  ): (world: ReactiveWorld) => T {
+    const cache = new WeakMap<ReactiveWorld, T>();
+    return (world) => {
+      if (!cache.has(world)) cache.set(world, factory(world));
+      return cache.get(world) as T;
+    };
+  }
+
   readonly #structureVersion = signal(0);
   readonly #poolVersions = new Map<RiftType, Signal<number>>();
 

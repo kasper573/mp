@@ -1,11 +1,14 @@
 import {
   AdditionalDebugUiContext,
   GameRenderer,
+  joinAsSpectator,
+  liveCharacters,
   MpRiftClient,
   type CharacterId,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
 import { userRoles } from "@mp/keycloak";
+import { useComputed, useSignal, useSignalEffect } from "@mp/state/react";
 import { Select } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useContext, useEffect, useMemo } from "preact/hooks";
@@ -24,13 +27,13 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 
 function RouteComponent() {
   const auth = useContext(AuthContext);
+  const spectatedId = useSignal<CharacterId | undefined>(undefined);
 
   const client = useMemo(
     () =>
       new MpRiftClient({
         url: env.gameServerUrl,
         accessToken: auth.identity.value?.token,
-        mode: "spectator",
       }),
     [auth],
   );
@@ -40,13 +43,20 @@ function RouteComponent() {
     return () => void client.disconnect();
   }, [client]);
 
+  useSignalEffect(() => {
+    const id = spectatedId.value;
+    if (id) joinAsSpectator(client, id);
+  });
+
+  const spectatable = useComputed(() => {
+    const me = auth.identity.value?.id;
+    return liveCharacters(client.world).value.filter((c) => c.userId !== me);
+  });
+
   const characterOptions: { value: CharacterId | undefined; label: string }[] =
     [
       { value: undefined, label: "Select character to spectate" },
-      ...client.characters.signal.value.map((c) => ({
-        value: c.id,
-        label: c.name,
-      })),
+      ...spectatable.value.map((c) => ({ value: c.id, label: c.name })),
     ];
 
   return (
@@ -59,11 +69,11 @@ function RouteComponent() {
       }}
     >
       <div className={atoms({ mb: "xl" })}>
-        Characters available: {client.characters.signal.value.length}
+        Characters available: {spectatable.value.length}
       </div>
       <Select<CharacterId | undefined>
         options={characterOptions}
-        signal={client.selectedCharacterId}
+        signal={spectatedId}
       />
       <AdditionalDebugUiContext.Provider value={miscDebugUi}>
         <GameRenderer

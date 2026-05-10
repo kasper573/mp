@@ -1,4 +1,4 @@
-import { object, string, u32 } from "@rift/types";
+import { array, object, string, u32 } from "@rift/types";
 import type { ClientId } from "@rift/core";
 import type { UserId } from "@mp/auth";
 import type { NpcDefinitionId, NpcSpawnId } from "@mp/fixtures";
@@ -21,4 +21,24 @@ export const OwnedByClient = object({
   clientId: u32<ClientId>(),
 });
 
-export const identityComponents = [CharacterTag, NpcTag] as const;
+export const ClientScopeTag = object({});
+
+export const KnownCharacter = object({
+  id: string<CharacterId>(),
+  name: string(),
+});
+
+export const CharacterList = array(KnownCharacter);
+
+export const CharacterClaim = object({
+  mode: string(),
+  characterId: string<CharacterId>(),
+});
+
+export const identityComponents = [
+  CharacterTag,
+  NpcTag,
+  ClientScopeTag,
+  CharacterList,
+  CharacterClaim,
+] as const;

@@ -1,14 +1,19 @@
 import type { Cleanup, Feature } from "@mp/world";
 import {
-  Appearance,
-  CharacterListResponse,
+  CharacterClaim,
+  CharacterList,
   CharacterRenamedResponse,
-  CharacterTag,
-  ListCharactersRequest,
+  ClientScopeTag,
+  JoinAsPlayer,
+  JoinAsSpectator,
+  OwnedByClient,
   RenameCharacterRequest,
+  scopeEntityForClient,
   type CharacterId,
   type SessionRegistry,
+  type UserSessionIdentity,
 } from "@mp/world";
+import { ClientConnected, ClientDisconnected, type ClientId } from "@rift/core";
 import type { ActorModelId, AreaId } from "@mp/fixtures";
 import { userRoles } from "@mp/keycloak";
 import { combine, type Tile } from "@mp/std";
@@ -32,48 +37,52 @@ export function characterDirectoryFeature(
 ): Feature {
   return {
     server(server): Cleanup {
+      async function ensureScope(clientId: ClientId): Promise<void> {
+        const user = opts.registry.getUser(clientId);
+        if (!user) return;
+        let scope = scopeEntityForClient(server.world, clientId);
+        if (scope === undefined) {
+          scope = server.world.create();
+          server.world.add(scope, ClientScopeTag, {});
+          server.world.add(scope, OwnedByClient, { clientId });
+        }
+        const characters = await loadCharacters(opts, user);
+        server.world.upsert(scope, CharacterList, characters);
+      }
+
       return combine(
-        server.on(ListCharactersRequest, async (event) => {
+        server.on(ClientConnected, ({ data }) => {
+          void ensureScope(data.clientId);
+        }),
+
+        server.on(ClientDisconnected, ({ data }) => {
+          const scope = scopeEntityForClient(server.world, data.clientId);
+          if (scope !== undefined) server.world.destroy(scope);
+        }),
+
+        server.on(JoinAsPlayer, (event) => {
           if (event.source.type !== "wire") return;
           const clientId = event.source.clientId;
           const user = opts.registry.getUser(clientId);
-          if (!user) return;
+          if (!user || !user.roles.has(userRoles.join)) return;
+          const scope = scopeEntityForClient(server.world, clientId);
+          if (scope === undefined) return;
+          server.world.upsert(scope, CharacterClaim, {
+            mode: "player",
+            characterId: event.data,
+          });
+        }),
 
-          let characters: CharacterSummary[];
-          if (user.roles.has(userRoles.spectate)) {
-            characters = [];
-            for (const [, tag, appearance] of server.world.query(
-              CharacterTag,
-              Appearance,
-            )) {
-              if (tag.userId === user.id) continue;
-              characters.push({ id: tag.characterId, name: appearance.name });
-            }
-          } else {
-            const ensureResult =
-              await opts.repo.selectOrCreateCharacterIdForUser({
-                user,
-                spawnPoint: opts.defaultSpawn,
-                defaultModelId: opts.defaultModelId,
-              });
-            if (ensureResult.isErr()) return;
-            const characterId = ensureResult.value;
-            const listResult = await opts.repo.selectCharacterList([
-              characterId,
-            ]);
-            characters = listResult.isOk()
-              ? listResult.value.map((c) => ({ id: c.id, name: c.name }))
-              : [];
-          }
-
-          server.emit({
-            type: CharacterListResponse,
-            data: characters,
-            source: { type: "local" },
-            target: {
-              type: "wire",
-              strategy: { type: "list", ids: [clientId] },
-            },
+        server.on(JoinAsSpectator, (event) => {
+          if (event.source.type !== "wire") return;
+          const clientId = event.source.clientId;
+          const user = opts.registry.getUser(clientId);
+          if (!user || !user.roles.has(userRoles.spectate)) return;
+          const scope = scopeEntityForClient(server.world, clientId);
+          if (scope === undefined) return;
+          server.world.upsert(scope, CharacterClaim, {
+            mode: "spectator",
+            characterId: event.data,
           });
         }),
 
@@ -108,4 +117,21 @@ export function characterDirectoryFeature(
       );
     },
   };
+}
+
+async function loadCharacters(
+  opts: CharacterDirectoryOptions,
+  user: UserSessionIdentity,
+): Promise<readonly CharacterSummary[]> {
+  const ensureResult = await opts.repo.selectOrCreateCharacterIdForUser({
+    user,
+    spawnPoint: opts.defaultSpawn,
+    defaultModelId: opts.defaultModelId,
+  });
+  if (ensureResult.isErr()) return [];
+  const characterId = ensureResult.value;
+  const listResult = await opts.repo.selectCharacterList([characterId]);
+  return listResult.isOk()
+    ? listResult.value.map((c) => ({ id: c.id, name: c.name }))
+    : [];
 }

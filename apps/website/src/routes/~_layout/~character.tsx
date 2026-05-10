@@ -2,6 +2,7 @@ import { Button, Card } from "@mp/ui";
 import {
   CharacterRenamedResponse,
   MpRiftClient,
+  ownedCharacters,
   renameCharacter,
 } from "@mp/world";
 import { useComputed, useMount, useSignal } from "@mp/state/react";
@@ -26,7 +27,6 @@ function CharacterPage() {
       new MpRiftClient({
         url: env.gameServerUrl,
         accessToken: auth.identity.value?.token,
-        mode: "player",
       }),
     [auth],
   );
@@ -37,7 +37,7 @@ function CharacterPage() {
   }, [client]);
 
   const myCharacter = useComputed(
-    () => client.characters.signal.value[0],
+    () => ownedCharacters(client.world).value[0],
   ).value;
   const savedAt = useSignal<number | undefined>(undefined);
 

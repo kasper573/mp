@@ -1,12 +1,12 @@
 import {
+  AdditionalDebugUiContext,
   GameRenderer,
   joinAsPlayer,
   MpRiftClient,
-  type CharacterId,
+  ownedCharacters,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
 import { useSignalEffect } from "@mp/state/react";
-import { AdditionalDebugUiContext } from "@mp/world";
 import { createFileRoute } from "@tanstack/react-router";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { gameAssetLoader } from "../../integrations/assets";
@@ -27,7 +27,6 @@ function PlayPage() {
       new MpRiftClient({
         url: env.gameServerUrl,
         accessToken: auth.identity.value?.token,
-        mode: "player",
       }),
     [auth],
   );
@@ -38,12 +37,8 @@ function PlayPage() {
   }, [client]);
 
   useSignalEffect(() => {
-    const first: CharacterId | undefined =
-      client.characters.signal.value[0]?.id;
-    if (first && client.selectedCharacterId.peek() !== first) {
-      client.selectedCharacterId.value = first;
-      joinAsPlayer(client, first);
-    }
+    const first = ownedCharacters(client.world).value[0]?.id;
+    if (first) joinAsPlayer(client, first);
   });
 
   return (

@@ -3,7 +3,6 @@ import {
   JoinAsPlayer,
   JoinAsSpectator,
   Leave,
-  ListCharactersRequest,
   Recall,
   RenameCharacterRequest,
   RequestFullState,
@@ -56,15 +55,6 @@ export function joinAsSpectator(
 export function leaveGame(client: RiftClient): void {
   client.emit({
     type: Leave,
-    data: {},
-    source: "local",
-    target: "wire",
-  });
-}
-
-export function requestCharacterList(client: RiftClient): void {
-  client.emit({
-    type: ListCharactersRequest,
     data: {},
     source: "local",
     target: "wire",

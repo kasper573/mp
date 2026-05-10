@@ -40,7 +40,6 @@
     "@rift/types": "workspace:*",
     "@rift/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
-    "partysocket": "^1.1.18",
     "preact": "catalog:",
     "uniqolor": "1.1.1",
     "unique-names-generator": "^4.7.1"
