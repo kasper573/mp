@@ -12,16 +12,15 @@ import {
 } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
 
-type Values<T extends readonly RiftType[]> = {
-  [K in keyof T]: InferValue<T[K]> | undefined;
-};
-
 export class ReactiveWorld extends World {
   readonly #structureVersion = signal(0);
   readonly #poolVersions = new Map<RiftType, Signal<number>>();
 
+  readonly signal: WorldSignals;
+
   constructor(schema: RiftSchema) {
     super(schema);
+    this.signal = new WorldSignals(this);
     this.on((event) => {
       switch (event.type) {
         case "entityCreated":
@@ -56,69 +55,90 @@ export class ReactiveWorld extends World {
   trackStructure(): void {
     void this.#structureVersion.value;
   }
+}
 
-  entitySignal<const T extends readonly RiftType[]>(
-    id: EntityId | undefined,
-    ...types: T
-  ): ReadonlySignal<Values<T>> {
-    return computed((): Values<T> => {
-      for (const t of types) {
-        void this.#poolVersion(t).value;
-      }
-      const result = types.map((t) =>
-        id === undefined ? undefined : this.get(id, t),
-      );
-      return result as Values<T>;
+// Mirrors the read-only surface of `World` but every method returns a
+// `ReadonlySignal` that updates when the relevant component pool(s) or
+// the entity structure change. Use `world.signal.X(...)` whenever you
+// need reactive reads; use `world.X(...)` for the imperative one-shot.
+export class WorldSignals {
+  readonly #world: ReactiveWorld;
+
+  constructor(world: ReactiveWorld) {
+    this.#world = world;
+  }
+
+  exists(id: EntityId): ReadonlySignal<boolean> {
+    return computed(() => {
+      this.#world.trackStructure();
+      return this.#world.exists(id);
     });
   }
 
-  entitiesSignal<const T extends readonly RiftType[]>(
+  has(
+    id: EntityId,
+    ...types: readonly [RiftType, ...(readonly RiftType[])]
+  ): ReadonlySignal<boolean> {
+    return computed(() => {
+      for (const t of types) this.#world.trackPool(t);
+      return this.#world.has(id, ...types);
+    });
+  }
+
+  get<T>(id: EntityId, type: RiftType<T>): ReadonlySignal<T | undefined>;
+  get<
+    const Types extends readonly [RiftType, RiftType, ...(readonly RiftType[])],
+  >(
+    id: EntityId,
+    ...types: Types
+  ): ReadonlySignal<{ [K in keyof Types]: InferValue<Types[K]> | undefined }>;
+  get(id: EntityId, ...types: readonly RiftType[]): ReadonlySignal<unknown> {
+    return computed(() => {
+      for (const t of types) this.#world.trackPool(t);
+      if (types.length === 1) {
+        // Pool stores object values by reference and mutates them in
+        // place via `world.write`, so a same-reference return would
+        // dedupe inside the computed and never notify subscribers.
+        // Snapshotting forces a fresh outer reference per evaluation
+        // while preserving the prototype (Vector, Rect, etc.).
+        return snapshot(this.#world.get(id, types[0]));
+      }
+      return this.#world.get(
+        id,
+        ...(types as readonly [RiftType, RiftType, ...(readonly RiftType[])]),
+      );
+    });
+  }
+
+  query<const T extends readonly RiftType[]>(
     ...types: T
   ): ReadonlySignal<readonly QueryRow<T>[]> {
     return computed((): readonly QueryRow<T>[] => {
-      void this.#structureVersion.value;
-      for (const t of types) {
-        void this.#poolVersion(t).value;
-      }
-      return this.query(...types).toArray();
+      this.#world.trackStructure();
+      for (const t of types) this.#world.trackPool(t);
+      return this.#world.query(...types).toArray();
     });
   }
 
-  // Like entitiesSignal but only fires on membership changes — values can
-  // mutate freely without triggering this signal. Useful for reactive
-  // collection bindings that key on EntityId.
-  entityIdsSignal(...types: readonly RiftType[]): ReadonlySignal<EntityId[]> {
+  // Like query() but only returns matching entity IDs and only fires when
+  // membership changes — component value mutations don't trigger this signal.
+  // Useful for reactive collection bindings keyed on EntityId.
+  entities(...types: readonly RiftType[]): ReadonlySignal<EntityId[]> {
     return computed((): EntityId[] => {
-      void this.#structureVersion.value;
+      this.#world.trackStructure();
       const ids: EntityId[] = [];
-      for (const [id] of this.query(...types)) ids.push(id);
+      for (const [id] of this.#world.query(...types)) ids.push(id);
       return ids;
-    });
-  }
-
-  querySignal<const T extends readonly RiftType[]>(
-    predicate: (
-      id: EntityId,
-      ...vs: { [K in keyof T]: InferValue<T[K]> }
-    ) => boolean,
-    ...types: T
-  ): ReadonlySignal<QueryRow<T> | undefined> {
-    return computed((): QueryRow<T> | undefined => {
-      void this.#structureVersion.value;
-      for (const t of types) {
-        void this.#poolVersion(t).value;
-      }
-      for (const row of this.query(...types)) {
-        const [eid, ...rest] = row;
-        if (predicate(eid, ...(rest as { [K in keyof T]: InferValue<T[K]> }))) {
-          return row;
-        }
-      }
-      return undefined;
     });
   }
 }
 
 function bump(s: Signal<number>): void {
   s.value = s.peek() + 1;
+}
+
+function snapshot<T>(v: T): T {
+  if (v === undefined || v === null || typeof v !== "object") return v;
+  if (Array.isArray(v)) return [...v] as unknown as T;
+  return Object.assign(Object.create(Object.getPrototypeOf(v)), v) as T;
 }

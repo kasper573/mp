@@ -24,7 +24,7 @@ export function AreaUi({ characterEntity }: AreaUiProps) {
       computed(() => {
         const id = characterEntity.value;
         if (id === undefined) return true;
-        const [combat] = client.world.entitySignal(id, Combat).value;
+        const combat = client.world.signal.get(id, Combat).value;
         return !combat?.alive;
       }),
     [client, characterEntity],
@@ -44,7 +44,7 @@ function Inventory({ characterEntity }: AreaUiProps) {
       computed(() => {
         const id = characterEntity.value;
         if (id === undefined) return undefined;
-        const [ref] = client.world.entitySignal(id, InventoryRef).value;
+        const ref = client.world.signal.get(id, InventoryRef).value;
         return ref?.inventoryId;
       }),
     [client, characterEntity],

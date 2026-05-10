@@ -39,7 +39,7 @@ export function GameClient(props: GameClientProps) {
     );
   }
 
-  const [areaTag] = props.client.world.entitySignal(entityId, AreaTag).value;
+  const areaTag = props.client.world.signal.get(entityId, AreaTag).value;
   if (!areaTag) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">

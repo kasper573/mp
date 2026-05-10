@@ -121,7 +121,7 @@ export class ActorController extends Container {
 
   #animationState() {
     const { entityId, client } = this.#options;
-    const [mv, combat] = client.world.entitySignal(
+    const [mv, combat] = client.world.signal.get(
       entityId,
       Movement,
       Combat,

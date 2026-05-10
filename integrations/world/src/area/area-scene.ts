@@ -45,7 +45,7 @@ export class AreaScene extends Container {
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
 
-    this.actorIds = options.client.world.entityIdsSignal(Movement);
+    this.actorIds = options.client.world.signal.entities(Movement);
 
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
@@ -101,7 +101,7 @@ export class AreaScene extends Container {
         const coords =
           id === undefined
             ? undefined
-            : options.client.world.entitySignal(id, Movement).value[0]?.coords;
+            : options.client.world.signal.get(id, Movement).value?.coords;
         return options.area.tiled.tileCoordToWorld(coords ?? Vector.zero());
       }),
       () => ({
@@ -140,7 +140,7 @@ export class AreaScene extends Container {
     const world = this.options.client.world;
     const tile = this.pointerTile.value;
     for (const id of this.actorIds.value) {
-      const [mv, combat] = world.entitySignal(id, Movement, Combat).value;
+      const [mv, combat] = world.signal.get(id, Movement, Combat).value;
       if (!mv || !combat || !combat.alive) continue;
       if (combat.hitBox.offset(mv.coords).contains(tile)) return id;
     }
@@ -151,7 +151,7 @@ export class AreaScene extends Container {
     const targetId = this.actorAtPointer.value;
     const ownEntity = this.options.characterEntity.value;
     if (targetId !== undefined && targetId !== ownEntity) {
-      const [mv, combat] = this.options.client.world.entitySignal(
+      const [mv, combat] = this.options.client.world.signal.get(
         targetId,
         Movement,
         Combat,

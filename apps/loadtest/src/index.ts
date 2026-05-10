@@ -129,8 +129,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       const ready = computed(() => {
         const id = characterEntity.value;
         if (id === undefined) return false;
-        const [areaTag] = client.world.entitySignal(id, AreaTag).value;
-        return !!areaTag;
+        return client.world.signal.has(id, AreaTag).value;
       });
 
       if (verbose) {
@@ -150,7 +149,7 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       }
       await waitUntil(ready, (v) => v, 15_000);
 
-      const actorIds = client.world.entityIdsSignal(Movement);
+      const actorIds = client.world.signal.entities(Movement);
       const endTime = Date.now() + timeout.totalMilliseconds;
       await runUntil(
         endTime,
@@ -158,14 +157,14 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         () => {
           const charEnt = characterEntity.value;
           if (charEnt !== undefined) {
-            const [combat] = client.world.entitySignal(charEnt, Combat).value;
+            const combat = client.world.signal.get(charEnt, Combat).value;
             if (combat && !combat.health) {
               logger.info(`Character for socket ${n} will respawn`);
               respawnCharacter(client);
             }
             const walkable: Vector<Tile>[] = [];
             for (const id of actorIds.value) {
-              const [mv] = client.world.entitySignal(id, Movement).value;
+              const mv = client.world.signal.get(id, Movement).value;
               if (mv) walkable.push(mv.coords);
             }
             if (walkable.length > 0) {

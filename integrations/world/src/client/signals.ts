@@ -15,7 +15,7 @@ export function characterEntitySignal(
   world: ReactiveWorld,
   characterId: ReadonlySignal<CharacterId | undefined>,
 ): ReadonlySignal<EntityId | undefined> {
-  const characters = world.entitiesSignal(CharacterTag);
+  const characters = world.signal.query(CharacterTag);
   return computed(() => {
     const id = characterId.value;
     if (!id) return undefined;
@@ -30,7 +30,7 @@ export function inventorySignal(
   world: ReactiveWorld,
   inventoryId: ReadonlySignal<string | undefined>,
 ): ReadonlySignal<readonly ItemInstance[]> {
-  const refs = world.entitiesSignal(InventoryRef);
+  const refs = world.signal.query(InventoryRef);
   return computed(() => {
     const inv = inventoryId.value;
     if (!inv) return [];

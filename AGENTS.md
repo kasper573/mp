@@ -8,7 +8,7 @@
 
 - Only write comments that explain why something is done, never how. The code itself should be clear enough to explain what it does, and even ideally why it does it. Only when you observe a piece of code and realize that it is not clear at all why it is the way it is, should you write a comment explaining the reasoning behind it.
 
-- In classes, prefer javascript native private fields and methods (using the `#` syntax) over Typescript's `private` modifier, since the former provides true privacy at runtime, while the latter is only a compile-time construct that can be easily bypassed.
+- In classes, prefer javascript native private fields and methods (using the `#` syntax) over Typescript's `private` modifier, since the former provides true privacy at runtime, while the latter is only a compile-time construct that can be easily bypassed. Using private accessor for constructor parameters is however fine, since it reduces boilerplate, so it's a good exception to the rule.
 
 - Prefer composition over inheritance
 
