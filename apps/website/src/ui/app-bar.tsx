@@ -1,4 +1,4 @@
-import { gatewayRoles, systemRoles } from "@mp/keycloak";
+import { gameRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
 import { LinearProgress } from "@mp/ui";
 import { useRouterState } from "@tanstack/react-router";
@@ -24,7 +24,7 @@ export default function AppBar() {
         <Link to="/admin/devtools">Dev Tools</Link>
       )}
 
-      {auth.identity.value?.roles.has(gatewayRoles.spectate) && (
+      {auth.identity.value?.roles.has(gameRoles.spectate) && (
         <Link to="/admin/spectator">Spectator</Link>
       )}
 

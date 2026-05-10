@@ -5,7 +5,7 @@ import {
   type CharacterId,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
-import { gatewayRoles } from "@mp/keycloak";
+import { gameRoles } from "@mp/keycloak";
 import { Select } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useContext, useEffect, useMemo } from "preact/hooks";
@@ -18,7 +18,7 @@ import { atoms } from "@mp/style";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
-    requiredRoles: [gatewayRoles.spectate],
+    requiredRoles: [gameRoles.spectate],
   }),
 });
 
