@@ -76,16 +76,12 @@ export class ReactiveWorld extends World {
 // the entity structure change. Use `world.signal.X(...)` whenever you
 // need reactive reads; use `world.X(...)` for the imperative one-shot.
 export class WorldSignals {
-  readonly #world: ReactiveWorld;
-
-  constructor(world: ReactiveWorld) {
-    this.#world = world;
-  }
+  constructor(public readonly world: ReactiveWorld) {}
 
   exists(id: EntityId): ReadonlySignal<boolean> {
     return computed(() => {
-      this.#world.trackStructure();
-      return this.#world.exists(id);
+      this.world.trackStructure();
+      return this.world.exists(id);
     });
   }
 
@@ -94,8 +90,8 @@ export class WorldSignals {
     ...types: readonly [RiftType, ...(readonly RiftType[])]
   ): ReadonlySignal<boolean> {
     return computed(() => {
-      for (const t of types) this.#world.trackPool(t);
-      return this.#world.has(id, ...types);
+      for (const t of types) this.world.trackPool(t);
+      return this.world.has(id, ...types);
     });
   }
 
@@ -108,11 +104,11 @@ export class WorldSignals {
   ): ReadonlySignal<{ [K in keyof Types]: InferValue<Types[K]> | undefined }>;
   get(id: EntityId, ...types: readonly RiftType[]): ReadonlySignal<unknown> {
     return computed(() => {
-      for (const t of types) this.#world.trackPool(t);
+      for (const t of types) this.world.trackPool(t);
       if (types.length === 1) {
-        return this.#world.get(id, types[0]);
+        return this.world.get(id, types[0]);
       }
-      return this.#world.get(
+      return this.world.get(
         id,
         ...(types as readonly [RiftType, RiftType, ...(readonly RiftType[])]),
       );
@@ -123,9 +119,9 @@ export class WorldSignals {
     ...types: T
   ): ReadonlySignal<readonly QueryRow<T>[]> {
     return computed((): readonly QueryRow<T>[] => {
-      this.#world.trackStructure();
-      for (const t of types) this.#world.trackPool(t);
-      return this.#world.query(...types).toArray();
+      this.world.trackStructure();
+      for (const t of types) this.world.trackPool(t);
+      return this.world.query(...types).toArray();
     });
   }
 
@@ -134,9 +130,9 @@ export class WorldSignals {
   // Useful for reactive collection bindings keyed on EntityId.
   entities(...types: readonly RiftType[]): ReadonlySignal<EntityId[]> {
     return computed((): EntityId[] => {
-      this.#world.trackStructure();
+      this.world.trackStructure();
       const ids: EntityId[] = [];
-      for (const [id] of this.#world.query(...types)) ids.push(id);
+      for (const [id] of this.world.query(...types)) ids.push(id);
       return ids;
     });
   }

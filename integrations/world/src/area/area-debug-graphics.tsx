@@ -11,7 +11,7 @@ import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
-import { computed, effect, type ReadonlySignal } from "@preact/signals-core";
+import { effect } from "@preact/signals-core";
 import type { Pixel, Tile } from "@mp/std";
 import type { EntityId } from "@rift/core";
 import type { MpRiftClient } from "../client";
@@ -20,7 +20,11 @@ import { Movement } from "../movement/components";
 import { Combat } from "../combat/components";
 import { Appearance } from "../appearance/components";
 import { NpcAi } from "../npc/components";
-import { NpcTag } from "../identity/components";
+import {
+  actors,
+  claimedCharacterMovement,
+  npcActors,
+} from "../character/signals";
 import type {
   AreaDebugSettings,
   VisibleGraphType,
@@ -35,12 +39,12 @@ export class AreaDebugGraphics extends Container {
     engine: Engine,
     area: AreaResource,
     client: MpRiftClient,
-    actorIds: ReadonlySignal<EntityId[]>,
-    playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
     private viewDistance: ViewDistanceSettings,
   ) {
     super();
+
+    const s = client.world.signal;
 
     const debugTiled = new DebugTiledGraph(
       engine,
@@ -49,7 +53,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.attackRanges = new ReactiveCollection(
-      actorIds,
+      actors(s),
       (entityId) =>
         new DebugCircle(() => {
           const [mv, combat] = client.world.get(entityId, Movement, Combat);
@@ -63,9 +67,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(() =>
-        actorIds.value.filter((id) => client.world.has(id, NpcTag)),
-      ),
+      npcActors(s),
       (entityId) =>
         new DebugCircle(() => {
           const [mv, ai, appearance] = client.world.get(
@@ -86,7 +88,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.fogOfWar = new DebugNetworkFogOfWar(
-      () => playerCoords() ?? Vector.zero(),
+      () => claimedCharacterMovement(s).value?.coords ?? Vector.zero(),
       () => area.tiled,
       () => this.viewDistance,
     );

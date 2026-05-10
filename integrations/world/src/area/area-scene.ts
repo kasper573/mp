@@ -9,7 +9,7 @@ import {
   Ticker,
 } from "@mp/graphics";
 import { Rect, Vector } from "@mp/math";
-import { computed, type ReadonlySignal } from "@preact/signals-core";
+import { computed } from "@preact/signals-core";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
@@ -22,6 +22,11 @@ import { attackTarget } from "../combat/actions";
 import { moveCharacter } from "../movement/actions";
 import { Combat } from "../combat/components";
 import { Movement } from "../movement/components";
+import {
+  actors,
+  claimedCharacterEntity,
+  claimedCharacterMovement,
+} from "../character/signals";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { AreaResource } from "./area-resource";
@@ -32,7 +37,6 @@ export interface AreaSceneOptions {
   area: AreaResource;
   engine: Engine;
   client: MpRiftClient;
-  characterEntity: ReadonlySignal<EntityId | undefined>;
   actorTextures: ActorTextureLookup;
   areaSpritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
@@ -41,12 +45,12 @@ export interface AreaSceneOptions {
 
 export class AreaScene extends Container {
   private cleanupFns: Array<() => void>;
-  private actorIds: ReadonlySignal<EntityId[]>;
 
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
 
-    this.actorIds = options.client.world.signal.entities(Movement);
+    const s = options.client.world.signal;
+    const actorIds = actors(s);
 
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
@@ -58,12 +62,6 @@ export class AreaScene extends Container {
       options.engine,
       options.area,
       options.client,
-      this.actorIds,
-      () => {
-        const id = options.characterEntity.value;
-        if (id === undefined) return undefined;
-        return options.client.world.get(id, Movement)?.coords;
-      },
       options.debugSettings,
       options.viewDistance,
     );
@@ -82,7 +80,7 @@ export class AreaScene extends Container {
     this.cleanupFns = [
       reactiveCollectionBinding(
         tiledRenderer.dynamicLayer,
-        this.actorIds,
+        actorIds,
         (entityId) =>
           new ActorController({
             entityId,
@@ -98,11 +96,7 @@ export class AreaScene extends Container {
 
     this.cameraPos = new VectorSpring(
       computed(() => {
-        const id = options.characterEntity.value;
-        const coords =
-          id === undefined
-            ? undefined
-            : options.client.world.signal.get(id, Movement).value?.coords;
+        const coords = claimedCharacterMovement(s).value?.coords;
         return options.area.tiled.tileCoordToWorld(coords ?? Vector.zero());
       }),
       () => ({
@@ -140,7 +134,7 @@ export class AreaScene extends Container {
   actorAtPointer = computed((): EntityId | undefined => {
     const world = this.options.client.world;
     const tile = this.pointerTile.value;
-    for (const id of this.actorIds.value) {
+    for (const id of actors(world.signal).value) {
       const [mv, combat] = world.signal.get(id, Movement, Combat).value;
       if (!mv || !combat || !combat.alive) continue;
       if (combat.hitBox.offset(mv.coords).contains(tile)) return id;
@@ -150,7 +144,8 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const targetId = this.actorAtPointer.value;
-    const ownEntity = this.options.characterEntity.value;
+    const s = this.options.client.world.signal;
+    const ownEntity = claimedCharacterEntity(s).value;
     if (targetId !== undefined && targetId !== ownEntity) {
       const [mv, combat] = this.options.client.world.signal.get(
         targetId,

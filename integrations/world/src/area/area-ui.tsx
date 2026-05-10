@@ -6,42 +6,20 @@ import type {
   ConsumableInstanceView,
   EquipmentInstanceView,
 } from "../inventory/views";
-import { computed, type ReadonlySignal } from "@preact/signals-core";
-import type { EntityId } from "@rift/core";
-import { inventorySignal } from "../inventory/signals";
-import { Combat } from "../combat/components";
-import { InventoryRef } from "../inventory/components";
+import { claimedInventoryItems } from "../inventory/signals";
 import { Suspense, type ReactElement } from "preact/compat";
 
-export interface AreaUiProps {
-  characterEntity: ReadonlySignal<EntityId | undefined>;
-}
-
-export function AreaUi({ characterEntity }: AreaUiProps) {
-  const isDead = useRift((c) =>
-    computed(() => {
-      const id = characterEntity.value;
-      if (id === undefined) return true;
-      return !c.world.signal.get(id, Combat).value?.alive;
-    }),
-  );
+export function AreaUi() {
   return (
     <>
-      <Inventory characterEntity={characterEntity} />
-      <RespawnDialog open={isDead} />
+      <Inventory />
+      <RespawnDialog />
     </>
   );
 }
 
-function Inventory({ characterEntity }: AreaUiProps) {
-  const items = useRift((c) => {
-    const inventoryId = computed(() => {
-      const id = characterEntity.value;
-      if (id === undefined) return undefined;
-      return c.world.signal.get(id, InventoryRef).value?.inventoryId;
-    });
-    return inventorySignal(c.world, inventoryId);
-  });
+function Inventory() {
+  const items = useRift((c) => claimedInventoryItems(c.world.signal));
 
   return (
     <div className={styles.inventory}>

@@ -2,8 +2,7 @@ import type { ViewDistanceSettings } from "../visibility/view-distance";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
-import type { EntityId } from "@rift/core";
-import type { ReadonlySignal, Signal } from "@preact/signals-core";
+import type { Signal } from "@preact/signals-core";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { useState } from "preact/hooks";
@@ -16,9 +15,10 @@ import {
 } from "../area/area-debug-settings-form";
 import { AreaScene } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
-import { AreaTag } from "../area/components";
-import { claimedCharacterEntity } from "../character/signals";
-import type { AreaId } from "@mp/fixtures";
+import {
+  claimedCharacterAreaId,
+  claimedCharacterEntity,
+} from "../character/signals";
 import { RiftContext, type MpRiftClient } from "../client";
 import {
   GameAssetLoaderContext,
@@ -61,7 +61,7 @@ interface InnerProps {
 }
 
 function Inner(props: InnerProps) {
-  const characterEntity = claimedCharacterEntity(props.client.world.signal);
+  const s = props.client.world.signal;
 
   if (props.client.state.value !== "open") {
     return (
@@ -71,8 +71,7 @@ function Inner(props: InnerProps) {
     );
   }
 
-  const entityId = characterEntity.value;
-  if (entityId === undefined) {
+  if (claimedCharacterEntity(s).value === undefined) {
     return (
       <LoadingSpinner debugDescription="no character joined">
         Joining
@@ -80,8 +79,8 @@ function Inner(props: InnerProps) {
     );
   }
 
-  const areaTag = props.client.world.signal.get(entityId, AreaTag).value;
-  if (!areaTag) {
+  const areaId = claimedCharacterAreaId(s).value;
+  if (areaId === undefined) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">
         Loading area
@@ -99,8 +98,6 @@ function Inner(props: InnerProps) {
     >
       <Stage
         client={props.client}
-        characterEntity={characterEntity}
-        areaIdToLoadAssetsFor={areaTag.areaId}
         interactive={props.interactive}
         viewDistance={props.viewDistance}
         enableUi={props.enableUi}
@@ -111,8 +108,6 @@ function Inner(props: InnerProps) {
 
 interface StageProps {
   client: MpRiftClient;
-  characterEntity: ReadonlySignal<EntityId | undefined>;
-  areaIdToLoadAssetsFor: AreaId;
   interactive: boolean;
   viewDistance: ViewDistanceSettings;
   enableUi?: boolean;
@@ -120,13 +115,15 @@ interface StageProps {
 
 function Stage({
   client,
-  characterEntity,
-  areaIdToLoadAssetsFor,
   interactive,
   viewDistance,
   enableUi = true,
 }: StageProps) {
-  const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
+  const areaId = claimedCharacterAreaId(client.world.signal).value;
+  if (areaId === undefined) {
+    throw new Error("Stage rendered without a claimed-character area id");
+  }
+  const areaAssets = useAreaAssets(areaId);
   const actorTextures = useActorTextures();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
@@ -134,7 +131,6 @@ function Stage({
   const optionsSignal = useObjectSignal({
     interactive,
     client,
-    characterEntity,
     areaAssets,
     actorTextures,
     showDebugUi,
@@ -154,7 +150,7 @@ function Stage({
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
         <Suspense fallback={<UILoadingFallback />}>
-          <AreaUi characterEntity={characterEntity} />
+          <AreaUi />
           {showDebugUi.value && (
             <GameDebugUi>
               <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
@@ -180,7 +176,6 @@ function UILoadingFallback() {
 interface BuildStageOptions {
   interactive: boolean;
   client: MpRiftClient;
-  characterEntity: ReadonlySignal<EntityId | undefined>;
   areaAssets: AreaAssets;
   actorTextures: ActorTextureLookup;
   showDebugUi: Signal<boolean>;
@@ -202,7 +197,6 @@ function buildStage(app: Application, opt: BuildStageOptions) {
     engine,
     debugSettings: () => areaDebugSettingsStorage.value,
     client: opt.client,
-    characterEntity: opt.characterEntity,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,
     areaSpritesheets: opt.areaAssets.spritesheets,
