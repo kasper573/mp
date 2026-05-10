@@ -7,10 +7,10 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { Rng, setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
 import { playerRoles } from "@mp/keycloak";
-import type { AccessToken, UserIdentity } from "@mp/auth";
+import type { AccessToken } from "@mp/auth";
 import {
-  ClientUserRegistry,
-  clientUserRegistryFeature,
+  SessionRegistry,
+  sessionRegistryFeature,
   combatFeature,
   fnv1a64,
   loadAreaResource,
@@ -32,6 +32,7 @@ import {
 import * as fixtures from "@mp/fixtures";
 import "dotenv/config";
 import { opt } from "./options";
+import type { UserSessionIdentity } from "@mp/world";
 
 const shutdownCleanups: Array<() => unknown> = [];
 setupGracefulShutdown(process, shutdownCleanups);
@@ -57,7 +58,7 @@ const loadedAreas = await Promise.all(
 const areas = new Map<AreaId, AreaResource>(loadedAreas);
 logger.info(`Loaded ${areas.size} area(s)`);
 
-const userByWs = new WeakMap<WebSocket, UserIdentity>();
+const userByWs = new WeakMap<WebSocket, UserSessionIdentity>();
 
 const httpServer = createHttpServer((req, res) => {
   if (req.url === "/health") {
@@ -86,13 +87,14 @@ httpServer.on("upgrade", async (req, socket, head) => {
     return;
   }
   wss.handleUpgrade(req, socket, head, (ws) => {
-    userByWs.set(ws, result.value);
+    const { id, roles, name } = result.value;
+    userByWs.set(ws, { id, roles, name });
     wss.emit("connection", ws, req);
   });
 });
 
 const transport = wssTransport(wss);
-const registry = new ClientUserRegistry();
+const registry = new SessionRegistry();
 const itemLookup = createItemDefinitionLookup(
   fixtures.consumables,
   fixtures.equipment,
@@ -112,7 +114,7 @@ const server = new MpRiftServer({
   tickRateHz: opt.tickRateHz,
   features: [
     { components: schemaComponents, events: schemaEvents },
-    clientUserRegistryFeature(registry),
+    sessionRegistryFeature(registry),
     characterDirectoryFeature({
       repo,
       registry,
@@ -132,7 +134,11 @@ const server = new MpRiftServer({
     }),
     movementFeature({ areas }),
     combatFeature(),
-    visibilityFeature({ viewDistance: fixtures.viewDistance, areas }),
+    visibilityFeature({
+      viewDistance: fixtures.viewDistance,
+      areas,
+      registry,
+    }),
     npcSpawnerFeature({
       areas,
       npcs: fixtures.npcs,

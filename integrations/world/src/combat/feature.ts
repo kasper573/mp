@@ -1,7 +1,7 @@
 import type { Cleanup, Feature } from "../feature";
 import { Tick } from "@rift/core";
 import { combine } from "@mp/std";
-import { entityForClient } from "../identity/client-character-registry";
+import { entityForClient } from "../identity/session-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement, PathFollow } from "../movement/components";

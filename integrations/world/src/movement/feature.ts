@@ -6,7 +6,7 @@ import type { AreaResource } from "../area/area-resource";
 import { hitTestTiledObject } from "../area/hit-test";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
-import { entityForClient } from "../identity/client-character-registry";
+import { entityForClient } from "../identity/session-registry";
 import { Movement, PathFollow, type CardinalDirection } from "./components";
 import { MoveRequest } from "./events";
 import { Combat } from "../combat/components";

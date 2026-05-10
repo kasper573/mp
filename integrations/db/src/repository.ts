@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { ActorModelId, AreaId } from "@mp/world";
@@ -22,7 +22,7 @@ export function createDbRepository(connectionString: string) {
     selectCharacterList: selectCharacterList.build(drizzle),
     selectCharacterRow: selectCharacterRow.build(drizzle),
     selectOrCreateCharacterIdForUser: (input: {
-      user: UserIdentity;
+      user: { id: UserId; name: string };
       spawnPoint: { areaId: AreaId; coords: Vector<Tile> };
       defaultModelId?: ActorModelId;
     }) =>

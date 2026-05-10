@@ -1,20 +1,12 @@
-import { type } from "@mp/validate";
+import type { Branded } from "@mp/std";
 
-export type CharacterId = typeof CharacterIdType.infer;
-export const CharacterIdType = type("string").brand("CharacterId");
+export type CharacterId = Branded<string, "CharacterId">;
 
-export type InventoryId = typeof InventoryIdType.infer;
-export const InventoryIdType = type("string").brand("InventoryId");
+export type InventoryId = Branded<string, "InventoryId">;
 
-export type ConsumableInstanceId = typeof ConsumableInstanceIdType.infer;
-export const ConsumableInstanceIdType = type("string").brand(
-  "ConsumableInstanceId",
-);
+export type ConsumableInstanceId = Branded<string, "ConsumableInstanceId">;
 
-export type EquipmentInstanceId = typeof EquipmentInstanceIdType.infer;
-export const EquipmentInstanceIdType = type("string").brand(
-  "EquipmentInstanceId",
-);
+export type EquipmentInstanceId = Branded<string, "EquipmentInstanceId">;
 
 export type {
   ActorModelId,
@@ -25,6 +17,7 @@ export type {
   NpcRewardId,
   NpcSpawnId,
 } from "@mp/fixtures";
+
 export {
   ActorModelIdType,
   AreaIdType,

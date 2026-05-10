@@ -6,7 +6,8 @@ export * from "./server";
 
 export * from "./identity/components";
 export * from "./identity/ids";
-export * from "./identity/client-character-registry";
+export * from "./identity/session-registry";
+export * from "./identity/session";
 
 export * from "./appearance/components";
 export * from "./appearance/actor-model";
@@ -67,7 +68,6 @@ export * from "./character/events";
 export * from "./character/bundle";
 export * from "./character/actions";
 export * from "./character/signals";
-export * from "./character/auto-rejoin-feature";
 export * from "./character/character-list-feature";
 export * from "./character/respawn-dialog";
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Vector } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rng } from "@mp/std";
-import type { AccessToken, UserId } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import { Opcode, type ClientId } from "@rift/core";
 import { MpRiftServer } from "../src/server";
 import { Writer } from "@rift/types";
@@ -27,9 +27,9 @@ import type { ServerTransport, ServerTransportEvent } from "@rift/core";
 import { schemaComponents, schemaEvents } from "../src/schema";
 import { fnv1a64 } from "../src/hash";
 import {
-  ClientUserRegistry,
-  clientUserRegistryFeature,
-} from "../src/identity/client-character-registry";
+  SessionRegistry,
+  sessionRegistryFeature,
+} from "../src/identity/session-registry";
 import { OwnedByClient } from "../src/identity/components";
 import { combatFeature } from "../src/combat/feature";
 import { movementFeature } from "../src/movement/feature";
@@ -123,7 +123,7 @@ export async function createSimulation(
   const spawns = buildNpcSpawns(npcCount, [areaId]);
 
   const transport = makeTransport();
-  const registry = new ClientUserRegistry();
+  const registry = new SessionRegistry();
   const itemLookup = createItemDefinitionLookup(consumables, equipment);
   const rng = new Rng();
 
@@ -133,10 +133,10 @@ export async function createSimulation(
     tickRateHz: 0,
     features: [
       { components: schemaComponents, events: schemaEvents },
-      clientUserRegistryFeature(registry),
+      sessionRegistryFeature(registry),
       movementFeature({ areas: areaMap }),
       combatFeature(),
-      visibilityFeature({ viewDistance, areas: areaMap }),
+      visibilityFeature({ viewDistance, areas: areaMap, registry }),
       npcSpawnerFeature({
         areas: areaMap,
         npcs,
@@ -158,9 +158,8 @@ export async function createSimulation(
   const fakeClientId = 1 as ClientId;
   const fakeUserId = "user-1" as UserId;
   registry.recordConnection(fakeClientId, {
-    id: fakeUserId,
     name: "bench",
-    token: "" as AccessToken,
+    id: fakeUserId,
     roles: new Set(),
   });
   const characterStart = new Vector(

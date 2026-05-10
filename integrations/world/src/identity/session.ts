@@ -1,0 +1,47 @@
+import type { RoleDefinition, UserId } from "@mp/auth";
+import type { CharacterId } from "./ids";
+import type { ClientId } from "@rift/core";
+
+export interface UserSessionIdentity {
+  id: UserId;
+  roles: ReadonlySetLike<RoleDefinition>;
+  name: string;
+}
+
+export interface UserSession {
+  readonly id: ClientId;
+
+  /**
+   * Set when the user is authenticated
+   */
+  readonly user?: UserSessionIdentity;
+
+  /**
+   * The character that the user will be subscribing to game state for
+   */
+  readonly character?: UserSessionCharacterClaim;
+}
+
+/**
+ * The user may claim character data in different ways
+ */
+export type UserSessionCharacterClaim =
+  | PlayerCharacterClaim
+  | SpectatorCharacterClaim;
+
+/**
+ * Players receive game state, can control the character, and contribute to character online status.
+ */
+export interface PlayerCharacterClaim {
+  readonly type: "player";
+  readonly id: CharacterId;
+}
+
+/**
+ * Spectators only receive game state and cannot control the character.
+ * They also do not contribute to character online status.
+ */
+export interface SpectatorCharacterClaim {
+  readonly type: "spectator";
+  readonly id: CharacterId;
+}

@@ -5,7 +5,10 @@ import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { Movement } from "../movement/components";
 import { OwnedBy } from "../inventory/components";
-import { entityForClient } from "../identity/client-character-registry";
+import {
+  type SessionRegistry,
+  watchedEntityForClient,
+} from "../identity/session-registry";
 import {
   clientViewDistanceRect,
   type ViewDistanceSettings,
@@ -14,6 +17,7 @@ import {
 export interface VisibilityFeatureOptions {
   readonly viewDistance: ViewDistanceSettings;
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
+  readonly registry: SessionRegistry;
 }
 
 export function visibilityFeature(opts: VisibilityFeatureOptions): Feature {
@@ -32,7 +36,7 @@ function computeVisibility(
   opts: VisibilityFeatureOptions,
   clientId: ClientId,
 ): Iterable<EntityId> | undefined {
-  const watcherEntity = entityForClient(world, clientId);
+  const watcherEntity = watchedEntityForClient(world, opts.registry, clientId);
   if (watcherEntity === undefined) return [];
 
   const watcherArea = world.get(watcherEntity, AreaTag);

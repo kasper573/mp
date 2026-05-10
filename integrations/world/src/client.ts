@@ -1,19 +1,18 @@
 import { createContext } from "preact";
 import { useContext } from "preact/compat";
 import { defineSchema, RiftClient } from "@rift/core";
+import type { EntityId } from "@rift/core";
 import { ReactiveWorld } from "@rift/reactive";
 import { wsTransport } from "@rift/ws";
 import {
-  computed,
+  effect,
   signal,
   type ReadonlySignal,
   type Signal,
 } from "@preact/signals-core";
+import { WebSocket } from "partysocket";
 import type { AccessToken } from "@mp/auth";
-import {
-  autoRejoinFeature,
-  type AutoRejoinIntent,
-} from "./character/auto-rejoin-feature";
+import { joinAsPlayer, joinAsSpectator } from "./character/actions";
 import {
   CharacterList,
   characterListFeature,
@@ -21,7 +20,6 @@ import {
 import { characterEntitySignal } from "./character/signals";
 import { fnv1a64 } from "./hash";
 import type { CharacterId } from "./identity/ids";
-import type { EntityId } from "@rift/core";
 import { schemaComponents, schemaEvents } from "./schema";
 import type { Cleanup, Feature } from "./feature";
 import { setupFeatures } from "./feature";
@@ -38,6 +36,8 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
   readonly selectedCharacterEntity: ReadonlySignal<EntityId | undefined>;
 
   readonly #features: readonly Feature[];
+  readonly #mode: "player" | "spectator";
+  readonly #disposeAutoJoin: () => void;
 
   constructor(opts: MpRiftClientOptions) {
     const characters = new CharacterList();
@@ -47,15 +47,6 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
       { components: schemaComponents, events: schemaEvents },
       characterListFeature(characters),
     ];
-
-    const mode = opts.mode;
-    if (mode) {
-      const intent = computed((): AutoRejoinIntent | undefined => {
-        const id = selectedCharacterId.value;
-        return id ? { mode, characterId: id } : undefined;
-      });
-      features.push(autoRejoinFeature({ intent }));
-    }
 
     const url = new URL(opts.url);
     url.searchParams.set(wsHandshakeAccessTokenParam, opts.accessToken ?? "");
@@ -71,12 +62,21 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
     );
 
     this.#features = features;
+    this.#mode = opts.mode;
     this.characters = characters;
     this.selectedCharacterId = selectedCharacterId;
     this.selectedCharacterEntity = characterEntitySignal(
       this.world,
       selectedCharacterId,
     );
+
+    this.#disposeAutoJoin = effect(() => {
+      if (this.state.value !== "open") return;
+      const id = this.selectedCharacterId.value;
+      if (!id) return;
+      if (this.#mode === "player") joinAsPlayer(this, id);
+      else joinAsSpectator(this, id);
+    });
   }
 
   #cleanup?: Cleanup;
@@ -96,6 +96,7 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
   override async disconnect(
     ...args: Parameters<RiftClient["disconnect"]>
   ): Promise<void> {
+    this.#disposeAutoJoin();
     await this.#cleanup?.();
     await super.disconnect(...args);
     this.#cleanup = undefined;

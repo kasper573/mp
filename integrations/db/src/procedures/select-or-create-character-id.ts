@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, inventoryTable } from "../schema";
@@ -8,7 +8,7 @@ import { procedure } from "../utils/procedure";
 
 export const selectOrCreateCharacterIdForUser = procedure()
   .input<{
-    user: UserIdentity;
+    user: { id: UserId; name: string };
     spawnPoint: {
       areaId: AreaId;
       coords: Vector<Tile>;

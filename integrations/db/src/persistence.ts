@@ -14,7 +14,7 @@ import {
   Respawn,
   entityForClient,
   spawnCharacter,
-  type ClientUserRegistry,
+  type SessionRegistry,
 } from "@mp/world";
 import type {
   ActorModelId,
@@ -44,7 +44,7 @@ interface CharacterSnapshot {
 
 export interface PersistenceFeatureOptions {
   readonly repo: DbRepository;
-  readonly registry: ClientUserRegistry;
+  readonly registry: SessionRegistry;
   readonly syncIntervalMs: number;
   readonly defaultModelId: ActorModelId;
   readonly actorModels: ActorModelLookup;
