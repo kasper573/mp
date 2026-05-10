@@ -1,7 +1,7 @@
 import type { RiftType } from "@rift/types";
 
 // oxlint-disable-next-line typescript/no-explicit-any
-export type AnyEventHandler = EventHandler<any, any, any>;
+type AnyEventHandler = EventHandler<any, any, any>;
 
 export type EventHandler<Data, Source, Target> = (
   event: RiftEvent<Data, Source, Target>,

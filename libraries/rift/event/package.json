@@ -13,9 +13,6 @@
     "@rift/types": "workspace:*"
   },
   "devDependencies": {
-    "mitata": "catalog:",
-    "tsx": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

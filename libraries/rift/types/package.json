@@ -13,6 +13,7 @@
     "profile": "node --expose-gc --import tsx scripts/profile.ts"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "mitata": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

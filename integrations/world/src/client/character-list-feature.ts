@@ -8,7 +8,7 @@ import {
 import type { CharacterId } from "../identity/ids";
 import { requestCharacterList } from "./actions";
 
-export interface KnownCharacter {
+interface KnownCharacter {
   readonly id: CharacterId;
   readonly name: string;
 }

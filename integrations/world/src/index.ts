@@ -14,7 +14,6 @@ export * from "./appearance/actor-sprite-tester";
 
 export * from "./movement/components";
 export * from "./movement/events";
-export * from "./movement/path";
 export * from "./movement/feature";
 
 export * from "./combat/components";
@@ -59,7 +58,6 @@ export * from "./visibility/feature";
 
 export * from "./character/events";
 export * from "./character/bundle";
-export * from "./character/access";
 export * from "./character/respawn-dialog";
 export * from "./character/spectator-client";
 

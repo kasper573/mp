@@ -4,21 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./preact": "./src/preact.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
     "test": "vitest run --typecheck"
   },
   "dependencies": {
-    "@preact/signals": "catalog:",
     "@preact/signals-core": "catalog:",
     "@rift/core": "workspace:*",
-    "@rift/types": "workspace:*",
-    "preact": "catalog:"
+    "@rift/types": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

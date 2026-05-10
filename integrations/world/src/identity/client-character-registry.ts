@@ -26,10 +26,6 @@ export class ClientUserRegistry {
   getUserId(clientId: ClientId): UserId | undefined {
     return this.#userByClient.get(clientId)?.id;
   }
-
-  clientIds(): IterableIterator<ClientId> {
-    return this.#userByClient.keys();
-  }
 }
 
 export function clientUserRegistryFeature(
@@ -52,11 +48,4 @@ export function entityForClient(
     if (owned.clientId === clientId) return id;
   }
   return undefined;
-}
-
-export function clientForEntity(
-  world: World,
-  entityId: EntityId,
-): ClientId | undefined {
-  return world.get(entityId, OwnedByClient)?.clientId;
 }

@@ -6,7 +6,7 @@ import type { RiftType } from "@rift/types";
 type MaybePromise<T> = T | Promise<T>;
 export type Cleanup = () => MaybePromise<void>;
 
-export type FeatureSetupFn<Context> = (
+type FeatureSetupFn<Context> = (
   context: Context,
   // oxlint-disable-next-line typescript/no-invalid-void-type
 ) => MaybePromise<Cleanup | void | undefined>;
@@ -18,11 +18,7 @@ export interface Feature {
   readonly client?: FeatureSetupFn<FeatureRiftClient>;
 }
 
-export function defineFeature(f: Feature): Feature {
-  return f;
-}
-
-export type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
+type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
   readonly features: readonly Feature[];
   readonly hash: HashFn;
 };
@@ -55,7 +51,7 @@ export class FeatureRiftServer extends RiftServer {
   }
 }
 
-export type FeatureClientOptions = Omit<ClientOptions, "schema" | "world"> & {
+type FeatureClientOptions = Omit<ClientOptions, "schema" | "world"> & {
   readonly features: readonly Feature[];
   readonly hash: HashFn;
 };

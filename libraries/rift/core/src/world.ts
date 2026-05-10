@@ -184,10 +184,6 @@ export class World {
     return this.#poolOf(type) as Pool<T>;
   }
 
-  pools(): ReadonlyMap<RiftType, Pool<unknown>> {
-    return this.#pools;
-  }
-
   entities(): ReadonlySet<EntityId> {
     return this.#entities;
   }

@@ -4,8 +4,7 @@
     "@mp/tsconfig",
     "pino-pretty",
     "@prefresh/core",
-    "vite-node",
-    "@babel/plugin-proposal-decorators"
+    "vite-node"
   ],
   "ignoreWorkspaces": ["libraries/rift/*"]
 }

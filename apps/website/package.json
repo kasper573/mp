@@ -35,7 +35,6 @@
     "preact": "catalog:"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-decorators": "7.29.0",
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",

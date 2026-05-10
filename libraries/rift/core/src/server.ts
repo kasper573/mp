@@ -2,8 +2,8 @@ import type { ClientId, EntityId } from "./protocol";
 import { RiftCloseCode } from "./transport";
 import { EventBus } from "@rift/event";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
-import { Reader } from "@rift/types";
-import type { InferValue, RiftType } from "@rift/types";
+import { Reader, Writer } from "@rift/types";
+import type { RiftType } from "@rift/types";
 import type { RiftSchema } from "./schema";
 import type { ServerTransportEvent, ServerTransport } from "./transport";
 import {
@@ -13,7 +13,6 @@ import {
   ClientDisconnected,
   Tick,
 } from "./protocol";
-import { Writer } from "@rift/types";
 import { World } from "./world";
 
 export type VisibilityFn = (
@@ -40,10 +39,6 @@ export type RiftServerEvent<Data = unknown> = RiftEvent<
   Data,
   RiftServerEventSource,
   RiftServerEventTarget
->;
-
-export type inferServerEvent<Type extends RiftType> = RiftServerEvent<
-  InferValue<Type>
 >;
 
 export type RiftServerEventSource =

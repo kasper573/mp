@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import { Rng } from "@mp/std";
+import type { AccessToken, UserId } from "@mp/auth";
 import { Opcode, type ClientId } from "@rift/core";
 import { FeatureRiftServer } from "@rift/feature";
 import { Writer } from "@rift/types";
@@ -155,10 +156,11 @@ export async function createSimulation(
 
   const dt = 1 / tickHz;
   const fakeClientId = 1 as ClientId;
+  const fakeUserId = "user-1" as UserId;
   registry.recordConnection(fakeClientId, {
-    id: "user-1" as never,
+    id: fakeUserId,
     name: "bench",
-    token: "" as never,
+    token: "" as AccessToken,
     roles: new Set(),
   });
   const characterStart = new Vector(
@@ -167,7 +169,7 @@ export async function createSimulation(
   );
   const characterEnt = spawnCharacter(server.world, {
     characterId: "char-1" as CharacterId,
-    userId: "user-1" as never,
+    userId: fakeUserId,
     name: "Bencher",
     modelId: actorModels[0].id,
     areaId,
@@ -177,7 +179,7 @@ export async function createSimulation(
     health: Number.MAX_SAFE_INTEGER,
     maxHealth: Number.MAX_SAFE_INTEGER,
     attackDamage: 5,
-    attackSpeed: 1 as never,
+    attackSpeed: 1 as TimesPerSecond,
     attackRange: 1 as Tile,
     xp: 0,
     actorModels: actorModelsById,

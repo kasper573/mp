@@ -1,6 +1,6 @@
 import type { Cleanup, Feature } from "@rift/feature";
 import type { ClientId, EntityId, World } from "@rift/core";
-import { ClientConnected, ClientDisconnected } from "@rift/core";
+import { ClientDisconnected } from "@rift/core";
 import {
   AreaTag,
   CharacterTag,
@@ -60,9 +60,6 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
       const timer = setInterval(() => void flushDirty(), opts.syncIntervalMs);
 
       const offEvents = combine(
-        server.on(ClientConnected, () => {
-          // No-op; user identity is recorded by the app on transport open.
-        }),
         server.on(ClientDisconnected, (event) => {
           cleanupClient(server.world, snapshots, opts, event.data.clientId);
         }),

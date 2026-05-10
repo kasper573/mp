@@ -33,11 +33,9 @@
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "@swc/core": "1.15.32",
     "@types/ws": "8.18.1",
     "@vanilla-extract/vite-plugin": "catalog:",
     "tsx": "catalog:",
-    "unplugin-swc": "1.5.9",
     "vite": "catalog:",
     "vite-node": "6.0.0"
   }

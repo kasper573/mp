@@ -10,10 +10,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "useDefineForClassFields": true,
-    "experimentalDecorators": false,
-    "emitDecoratorMetadata": false,
-    "lib": ["ESNext", "ESNext.Decorators"],
+    "lib": ["ESNext"],
     "types": []
   },
   "exclude": ["node_modules", "dist"]
