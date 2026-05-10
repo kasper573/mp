@@ -8,7 +8,7 @@ import { AreaTag } from "../area/components";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { NpcAi } from "./components";
 import { Combat } from "../combat/components";
-import { Attacked } from "../combat/events";
+import { Attacked, Died } from "../combat/events";
 import { Movement, PathFollow } from "../movement/components";
 
 const PACIFIST_WANDER_CHANCE = 0.4;
@@ -48,13 +48,12 @@ class CombatMemory {
     });
   }
 
-  hasAttackedEachOther(observer: EntityId, a: EntityId, b: EntityId): boolean {
-    const attackers = this.#combats.get(observer);
-    if (!attackers) return false;
-    const aTargets = attackers.get(a);
-    if (!aTargets || !aTargets.has(b)) return false;
-    const bTargets = attackers.get(b);
-    return bTargets?.has(a) ?? false;
+  hasAttacked(
+    observer: EntityId,
+    attacker: EntityId,
+    target: EntityId,
+  ): boolean {
+    return this.#combats.get(observer)?.get(attacker)?.has(target) ?? false;
   }
 
   forget(deadActorId: EntityId): void {
@@ -110,6 +109,10 @@ export function npcAiFeature(opts: NpcAiOptions): Feature {
       }
 
       return combine(
+        server.on(Died, (event) => {
+          memory.forget(event.data);
+        }),
+
         server.on(Attacked, (event) => {
           const { entityId: attacker, targetId } = event.data;
           const attackerMv = server.world.get(attacker, Movement);
@@ -182,7 +185,6 @@ function stepNpc(ctx: AiCtx, id: EntityId): void {
 
   if (!combat.alive) {
     clearActions(ctx, id);
-    ctx.memory.forget(id);
     return;
   }
 
@@ -309,8 +311,7 @@ function findAggroTarget(
         selfArea,
         selfMv.coords,
         ai.aggroRange,
-        (candidateId) =>
-          ctx.memory.hasAttackedEachOther(selfId, selfId, candidateId),
+        (candidateId) => ctx.memory.hasAttacked(selfId, candidateId, selfId),
       );
     case "protective":
       return findProtectiveTarget(
