@@ -179,7 +179,7 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
     const mid = Math.floor((widest.safe + widest.firstBad) / 2);
     progress.set(
       "phase",
-      `narrowing "${widest.metric.name}" (${widest.safe} pass / ${widest.firstBad} fail); testing ${mid} NPCs`,
+      `narrowing "${widest.metric.name}"; testing ${mid} NPCs`,
     );
     progress.render();
     const sample = await measure(playerCount, mid, REFINE_SAMPLE_TICKS);
@@ -339,12 +339,12 @@ function printGroupTable(playerCount: number, group: Scenario[]): void {
   const row = (name: string, bound: string) => `  ${name.padEnd(28)}  ${bound}`;
 
   console.log(`\n=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
-  console.log(row("metric", "upper bound (NPCs before exceeding budget)"));
+  console.log(row("[metric]", "[upper bound]"));
   for (const s of group) {
     const bound =
       s.firstBad === 0
         ? `${s.safe}+ (never exceeded budget within probe range)`
-        : `${s.safe} (next @ ${s.firstBad} exceeded budget: ${fmtMetricValue(s.metric, s.metric.extract(s.firstBadSample))})`;
+        : `${s.safe} (next @ ${s.firstBad} exceeded ${fmtThreshold(s.metric)} budget: ${fmtMetricValue(s.metric, s.metric.extract(s.firstBadSample))})`;
     console.log(row(s.metric.name, bound));
   }
 }
