@@ -13,7 +13,7 @@ import { createSimulation } from "./simulation";
  * scenarios — generated upfront, then iterated.
  *
  * Scenarios sharing a player count are refined in a single shared
- * binary-search pass: each measurement produces values for all 6 metrics, so
+ * binary-search pass: one measurement produces values for every metric, so
  * we drive probes off the widest-bracket scenario and fold each sample into
  * every still-open scenario.
  */
@@ -27,9 +27,9 @@ const REFINE_SAMPLE_TICKS = 50;
 const WARMUP_TICKS = 30;
 const RESOLUTION = 25;
 const DEFAULT_MAX_PROBE = 25_000;
-const DEFAULT_PLAYER_COUNTS = [1, 5, 25, 100] as const;
+const DEFAULT_PLAYER_COUNTS = [1, 25, 100, 250, 500] as const;
 
-const METRICS: readonly MetricSpec[] = [
+const CORE_METRICS: readonly MetricSpec[] = [
   {
     name: "tick p95",
     unit: "ms",
@@ -63,15 +63,18 @@ const METRICS: readonly MetricSpec[] = [
     threshold: 50_000,
     extract: (s) => s.perClient.p95Bps,
   },
-  {
-    // ~800 Mbps server egress — anything past this is a fat-pipe problem,
-    // not a code problem.
-    name: "aggregate",
-    unit: "B/s",
-    threshold: 100_000_000,
-    extract: (s) => s.aggregateBps,
-  },
 ];
+
+// Off by default — only fires at extreme NPC counts and brackets dominate
+// wall time of high-player-count scenarios. Opt in with --aggregate.
+const AGGREGATE_METRIC: MetricSpec = {
+  // ~800 Mbps server egress — anything past this is a fat-pipe problem,
+  // not a code problem.
+  name: "aggregate",
+  unit: "B/s",
+  threshold: 100_000_000,
+  extract: (s) => s.aggregateBps,
+};
 
 const args = yargs(hideBin(process.argv))
   .option("players", {
@@ -94,8 +97,18 @@ const args = yargs(hideBin(process.argv))
     description: "Cap on doubling phase NPC count.",
     default: DEFAULT_MAX_PROBE,
   })
+  .option("aggregate", {
+    type: "boolean",
+    description:
+      "Include the aggregate-egress metric. Off by default — it dominates wall time at high player counts and rarely fires usefully.",
+    default: false,
+  })
   .strict()
   .parseSync();
+
+const METRICS: readonly MetricSpec[] = args.aggregate
+  ? [...CORE_METRICS, AGGREGATE_METRIC]
+  : CORE_METRICS;
 
 // --- top-level execution ---------------------------------------------------
 
@@ -188,13 +201,18 @@ function applySample(
 ): void {
   for (const s of group) {
     if (s.resolved) continue;
+    // Only fold this probe into the bracket if npcCount actually sits inside
+    // it. Without this guard a noisy out-of-bracket reading can invert the
+    // bracket (firstBad < safe) — possible because samples aren't monotonic
+    // in npcCount and shared-search drives probes that aren't necessarily
+    // inside every metric's range.
+    if (npcCount <= s.safe) continue;
+    if (s.firstBad !== 0 && npcCount >= s.firstBad) continue;
     const value = s.metric.extract(sample);
     if (value > s.metric.threshold) {
-      if (s.firstBad === 0 || npcCount < s.firstBad) {
-        s.firstBad = npcCount;
-        s.firstBadSample = sample;
-      }
-    } else if (npcCount > s.safe) {
+      s.firstBad = npcCount;
+      s.firstBadSample = sample;
+    } else {
       s.safe = npcCount;
       s.safeSample = sample;
     }
@@ -322,7 +340,7 @@ function blankSample(): Sample {
 // --- reporting -------------------------------------------------------------
 
 function printGroupTable(playerCount: number, group: Scenario[]): void {
-  console.log(`=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
+  console.log(`\n=== ${playerCount} player${playerCount === 1 ? "" : "s"} ===`);
   console.log(
     `  metric              safe npcs   first-drop   safe value      drop value`,
   );
@@ -343,7 +361,6 @@ function printGroupTable(playerCount: number, group: Scenario[]): void {
     console.log(
       `  ${s.metric.name.padEnd(18)}${safe}    ${drop}    ${safeVal}    ${dropVal}`,
     );
-    console.log("");
   }
 }
 
