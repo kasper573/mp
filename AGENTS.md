@@ -16,6 +16,8 @@
 
 - Prioritize terseness and simplicity in your code, but not at the expense of readability and maintainability, both in the micro and macro aspects of the codebase. Strive to write code that is as concise as possible while still being clear and easy to understand. As opposed to writing code that works and solves the problem but is needlessly verbose and complex, which is extremely typical of LLM generated code, so you must be especially vigilant about this.
 
+- When it comes to the order of code inside a single file, you should organize your code from the perspective of a new reader who is not familiar with the codebase. It's better to start with consumer first, implementation last. For example, put exports at the top and local helpers at the bottom, since the exports are what most readers will be looking for and interested in, while the local helpers are just implementation details that they don't need to see right away.
+
 ## Typescript
 
 When writing typescript you must adhere to principal engineer and advanced level typescript practices and strictness.
