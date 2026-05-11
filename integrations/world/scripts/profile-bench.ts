@@ -10,6 +10,11 @@ const args = yargs(hideBin(process.argv))
     demandOption: true,
     default: 200,
   })
+  .option("players", {
+    type: "number",
+    description: "Number of fake player clients",
+    default: 1,
+  })
   .option("iterations", {
     type: "number",
     description: "Number of ticks to profile (default: one full sim)",
@@ -17,10 +22,15 @@ const args = yargs(hideBin(process.argv))
   .strict()
   .parseSync();
 
-const sim = await createSimulation({ npcCount: args.npcs });
+const sim = await createSimulation({
+  npcCount: args.npcs,
+  playerCount: args.players,
+});
 const iterations = args.iterations ?? sim.tickHz * SIMULATION_SECONDS;
 
-console.log(`profiling ${iterations} ticks @ ${args.npcs} NPCs (forest map)`);
+console.log(
+  `profiling ${iterations} ticks @ ${args.npcs} NPCs, ${args.players} players (forest map)`,
+);
 const t0 = performance.now();
 sim.tick(iterations);
 const elapsedMs = performance.now() - t0;
