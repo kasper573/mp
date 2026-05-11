@@ -2,7 +2,7 @@ import { signal, type ReadonlySignal } from "@preact/signals-core";
 import type { ClientId, EntityId } from "./protocol";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
 import { EventBus } from "@rift/event";
-import { Reader, Writer } from "@rift/types";
+import { isObjectType, Reader, Writer } from "@rift/types";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
 import { DeltaApplied, DeltaOp, Opcode, ClientDisconnected } from "./protocol";
 import type { World } from "./world";
@@ -197,8 +197,14 @@ export class RiftClient<W extends World = World> extends EventBus<
         case DeltaOp.ComponentUpdated: {
           const id = r.readVarU32() as EntityId;
           const ty = components[r.readVarU32()];
-          const value = ty.decode(r);
-          this.world.write(id, ty, value as Partial<unknown>);
+          if (isObjectType(ty)) {
+            const current = this.world.get(id, ty) ?? {};
+            const merged = ty.decodePartial(r, current);
+            this.world.write(id, ty, merged);
+          } else {
+            const value = ty.decode(r);
+            this.world.write(id, ty, value as Partial<unknown>);
+          }
           break;
         }
       }

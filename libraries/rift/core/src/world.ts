@@ -1,105 +1,19 @@
-import { RiftTypeKind, type InferValue, type RiftType } from "@rift/types";
+import {
+  isObjectType,
+  type ObjectType,
+  RiftTypeKind,
+  type InferValue,
+  type RiftType,
+} from "@rift/types";
 import type { EntityId } from "./protocol";
 import type { RiftSchema } from "./schema";
-
-export type LocalWorldEvent =
-  | { readonly type: "entityCreated"; readonly id: EntityId }
-  | { readonly type: "entityDestroyed"; readonly id: EntityId }
-  | {
-      readonly type: "componentAdded";
-      readonly id: EntityId;
-      readonly component: RiftType;
-    }
-  | {
-      readonly type: "componentChanged";
-      readonly id: EntityId;
-      readonly component: RiftType;
-    }
-  | {
-      readonly type: "componentRemoved";
-      readonly id: EntityId;
-      readonly component: RiftType;
-    };
-
-export type LocalWorldEventHandler = (event: LocalWorldEvent) => void;
-
-export class Pool<T> {
-  readonly values = new Map<EntityId, T>();
-  readonly dirty = new Set<EntityId>();
-  readonly added = new Set<EntityId>();
-  readonly removed = new Set<EntityId>();
-  readonly #mergeOnWrite: boolean;
-
-  constructor(type: RiftType<T>) {
-    // Object-shaped components accept partial writes and are merged into
-    // a fresh object so signal subscribers see a different reference.
-    // Every other kind (primitives, arrays, tuples, unions, transforms)
-    // is written whole, so the partial IS the replacement.
-    this.#mergeOnWrite = type.kind === RiftTypeKind.Object;
-  }
-
-  add(id: EntityId, v: T): void {
-    this.values.set(id, v);
-    if (!this.removed.delete(id)) {
-      this.added.add(id);
-    } else {
-      // Add-after-remove inside one flush window: net effect for the
-      // replication layer is a value mutation, not an add+remove pair.
-      this.dirty.add(id);
-    }
-  }
-
-  write(id: EntityId, partial: Partial<T>): boolean {
-    if (!this.values.has(id)) return false;
-    if (this.#mergeOnWrite) {
-      const current = this.values.get(id) as T & object;
-      this.values.set(id, { ...current, ...partial } as T);
-    } else {
-      this.values.set(id, partial as T);
-    }
-    if (!this.added.has(id)) this.dirty.add(id);
-    return true;
-  }
-
-  remove(id: EntityId): boolean {
-    if (!this.values.delete(id)) return false;
-    if (this.added.delete(id)) {
-      // Remove-after-add inside one flush window: replication never
-      // saw this entity, so suppress both the add and the remove.
-      this.dirty.delete(id);
-      return true;
-    }
-    this.dirty.delete(id);
-    this.removed.add(id);
-    return true;
-  }
-
-  clearChanges(): void {
-    this.dirty.clear();
-    this.added.clear();
-    this.removed.clear();
-  }
-}
-
-export interface QueryView<Types extends readonly RiftType[]> {
-  [Symbol.iterator](): IterableIterator<QueryRow<Types>>;
-  readonly size: number;
-  toArray(): readonly QueryRow<Types>[];
-  exclude(...excludes: readonly RiftType[]): QueryView<Types>;
-}
-
-export type QueryRow<Types extends readonly RiftType[]> = readonly [
-  EntityId,
-  ...{ [K in keyof Types]: InferType<Types[K]> },
-];
-
-type InferType<R> = R extends RiftType<infer T> ? T : never;
 
 export class World {
   readonly schema: RiftSchema;
   readonly #entities = new Set<EntityId>();
   readonly #pools = new Map<RiftType, Pool<unknown>>();
   readonly #handlers = new Set<LocalWorldEventHandler>();
+  readonly #syncHandlers = new Set<LocalWorldEventHandler>();
   #nextId = 1;
 
   constructor(schema: RiftSchema) {
@@ -183,10 +97,16 @@ export class World {
 
   write<T>(id: EntityId, type: RiftType<T>, partial: Partial<T>): void {
     const pool = this.#poolOf(type);
-    if (!pool.write(id, partial)) {
+    const result = pool.write(id, partial);
+    if (result === "missing") {
       throw new Error(`entity ${id} does not have component`);
     }
-    this.#emit({ type: "componentChanged", id, component: type });
+    if (result === "changed") {
+      // componentChanged is coalesced — emitted once per (entity, component)
+      // at drain time (see drainPendingEvents). Sync subscribers still fire
+      // synchronously so legacy behaviour for derived-state features holds.
+      this.#emitSync({ type: "componentChanged", id, component: type });
+    }
   }
 
   upsert<T>(id: EntityId, type: RiftType<T>, value: T): void {
@@ -221,6 +141,30 @@ export class World {
     };
   }
 
+  // Synchronous subscribers fire inside the calling stack (today's behaviour
+  // for componentChanged). Most features should use `on` instead — handlers
+  // there fire once per (entity, component) at drain time with final state,
+  // which avoids "event during event" reentrancy.
+  onSync(handler: LocalWorldEventHandler): () => void {
+    this.#syncHandlers.add(handler);
+    return () => {
+      this.#syncHandlers.delete(handler);
+    };
+  }
+
+  // Drain coalesced componentChanged events. Called by RiftServer at the
+  // end of each tick, before clearChanges. Each (entity, component) pair
+  // that was written-with-actual-change at least once during the tick
+  // produces exactly one componentChanged event.
+  drainPendingEvents(): void {
+    if (this.#handlers.size === 0) return;
+    for (const [component, pool] of this.#pools) {
+      for (const id of pool.dirty.keys()) {
+        this.#emit({ type: "componentChanged", id, component });
+      }
+    }
+  }
+
   pool<T>(type: RiftType<T>): Pool<T> {
     return this.#poolOf(type);
   }
@@ -246,6 +190,100 @@ export class World {
 
   #emit(event: LocalWorldEvent): void {
     for (const h of this.#handlers) h(event);
+  }
+
+  // Used only for `componentChanged` (which is coalesced for `on` subscribers
+  // but still delivered synchronously to `onSync` subscribers).
+  #emitSync(event: LocalWorldEvent): void {
+    if (this.#syncHandlers.size === 0) return;
+    for (const h of this.#syncHandlers) h(event);
+  }
+}
+
+export class Pool<T> {
+  readonly values = new Map<EntityId, T>();
+  // For object-shaped components, the number is a bitmask of dirty field
+  // indices. For other shapes it's WHOLE_DIRTY (the whole value is dirty).
+  readonly dirty = new Map<EntityId, number>();
+  readonly added = new Set<EntityId>();
+  readonly removed = new Set<EntityId>();
+  readonly #mergeOnWrite: boolean;
+  readonly #fieldBit: ReadonlyMap<string, number> | undefined;
+
+  constructor(type: RiftType<T>) {
+    // Object-shaped components accept partial writes and are merged into
+    // a fresh object so signal subscribers see a different reference.
+    // Every other kind (primitives, arrays, tuples, unions, transforms)
+    // is written whole, so the partial IS the replacement.
+    this.#mergeOnWrite = type.kind === RiftTypeKind.Object;
+    this.#fieldBit = isObjectType(type as RiftType)
+      ? (type as unknown as ObjectType<Record<string, RiftType>>).fieldBit
+      : undefined;
+  }
+
+  add(id: EntityId, v: T): void {
+    this.values.set(id, v);
+    if (!this.removed.delete(id)) {
+      this.added.add(id);
+    } else {
+      // Add-after-remove inside one flush window: net effect for the
+      // replication layer is a value mutation, not an add+remove pair.
+      this.dirty.set(id, WHOLE_DIRTY);
+    }
+  }
+
+  write(id: EntityId, partial: Partial<T>): WriteResult {
+    if (!this.values.has(id)) return "missing";
+    if (this.#mergeOnWrite) {
+      const current = this.values.get(id) as T & object;
+      // Skip the write entirely if every key in `partial` already equals
+      // the current value.
+      if (
+        shallowEqualPartial(
+          current as Readonly<Record<string, unknown>>,
+          partial as Readonly<Record<string, unknown>>,
+        )
+      ) {
+        return "unchanged";
+      }
+      this.values.set(id, { ...current, ...partial } as T);
+      if (!this.added.has(id)) {
+        this.dirty.set(
+          id,
+          mergeDirtyMask(
+            this.dirty.get(id) ?? 0,
+            current as Readonly<Record<string, unknown>>,
+            partial as Readonly<Record<string, unknown>>,
+            this.#fieldBit,
+          ),
+        );
+      }
+    } else {
+      const current = this.values.get(id);
+      if (Object.is(current, partial)) return "unchanged";
+      this.values.set(id, partial as T);
+      if (!this.added.has(id)) this.dirty.set(id, WHOLE_DIRTY);
+    }
+    return "changed";
+  }
+
+  remove(id: EntityId): boolean {
+    if (!this.values.delete(id)) return false;
+    if (this.added.delete(id)) {
+      // Remove-after-add inside one flush window: replication never
+      // saw this entity, so suppress both the add and the remove.
+      this.dirty.delete(id);
+      return true;
+    }
+    this.dirty.delete(id);
+    this.removed.add(id);
+    return true;
+  }
+
+  clearChanges(): void {
+    this.dirty.clear();
+    this.added.clear();
+    this.removed.clear();
   }
 }
 
@@ -350,3 +388,72 @@ function createQueryView<Types extends readonly RiftType[]>(
     },
   };
 }
+
+function shallowEqualPartial(
+  current: Readonly<Record<string, unknown>>,
+  partial: Readonly<Record<string, unknown>>,
+): boolean {
+  for (const key in partial) {
+    if (!Object.is(current[key], partial[key])) return false;
+  }
+  return true;
+}
+
+function mergeDirtyMask(
+  existing: number,
+  current: Readonly<Record<string, unknown>>,
+  partial: Readonly<Record<string, unknown>>,
+  fieldBit: ReadonlyMap<string, number> | undefined,
+): number {
+  if (!fieldBit) return WHOLE_DIRTY;
+  let mask = existing;
+  for (const k in partial) {
+    const bit = fieldBit.get(k);
+    if (bit === undefined) continue;
+    if (Object.is(current[k], partial[k])) continue;
+    mask |= 1 << bit;
+  }
+  return mask;
+}
+
+// Sentinel mask for components that aren't object-shaped (and therefore
+// don't have per-field bits). When dirty, the entire value is "dirty"; we
+// represent that as all-bits-set so iteration code can just OR in.
+export const WHOLE_DIRTY = 0xffff_ffff;
+
+export interface QueryView<Types extends readonly RiftType[]> {
+  [Symbol.iterator](): IterableIterator<QueryRow<Types>>;
+  readonly size: number;
+  toArray(): readonly QueryRow<Types>[];
+  exclude(...excludes: readonly RiftType[]): QueryView<Types>;
+}
+
+export type QueryRow<Types extends readonly RiftType[]> = readonly [
+  EntityId,
+  ...{ [K in keyof Types]: InferType<Types[K]> },
+];
+
+type InferType<R> = R extends RiftType<infer T> ? T : never;
+
+export type LocalWorldEvent =
+  | { readonly type: "entityCreated"; readonly id: EntityId }
+  | { readonly type: "entityDestroyed"; readonly id: EntityId }
+  | {
+      readonly type: "componentAdded";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    }
+  | {
+      readonly type: "componentChanged";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    }
+  | {
+      readonly type: "componentRemoved";
+      readonly id: EntityId;
+      readonly component: RiftType;
+    };
+
+export type LocalWorldEventHandler = (event: LocalWorldEvent) => void;
+
+export type WriteResult = "changed" | "unchanged" | "missing";

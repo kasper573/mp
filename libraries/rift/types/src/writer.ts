@@ -14,6 +14,10 @@ export class Writer {
     return this.#offset;
   }
 
+  reset(): void {
+    this.#offset = 0;
+  }
+
   #reserve(n: number): void {
     const need = this.#offset + n;
     if (need <= this.#buf.byteLength) {
@@ -94,12 +98,19 @@ export class Writer {
   }
 
   writeVarU32(v: number): void {
+    // Single reserve up front — max 5 bytes for u32 varint — then write
+    // bytes straight into the buffer without going through #reserve per
+    // byte. Called millions of times per tick at scale.
+    this.#reserve(5);
     let value = v >>> 0;
+    let off = this.#offset;
+    const buf = this.#buf;
     while (value >= 0x80) {
-      this.writeU8((value & 0x7f) | 0x80);
+      buf[off++] = (value & 0x7f) | 0x80;
       value >>>= 7;
     }
-    this.writeU8(value);
+    buf[off++] = value;
+    this.#offset = off;
   }
 
   writeBytesRaw(data: Uint8Array): void {

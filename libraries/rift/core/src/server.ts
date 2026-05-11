@@ -2,8 +2,9 @@ import type { ClientId, EntityId } from "./protocol";
 import { RiftCloseCode } from "./transport";
 import { EventBus } from "@rift/event";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
-import { Reader, Writer } from "@rift/types";
+import { isObjectType, Reader, Writer } from "@rift/types";
 import type { RiftType } from "@rift/types";
+import { WHOLE_DIRTY } from "./world";
 import type { RiftSchema } from "./schema";
 import type { ServerTransportEvent, ServerTransport } from "./transport";
 import {
@@ -33,6 +34,9 @@ interface ClientSlot {
   knownEntities: Set<EntityId>;
   knownComponents: Map<EntityId, Set<RiftType>>;
   handshakeTimer?: ReturnType<typeof setTimeout>;
+  // Pooled writer reused across ticks. Sized large enough to avoid
+  // #reserve doubling for typical delta packets.
+  readonly writer: Writer;
 }
 
 export type RiftServerEvent<Data = unknown> = RiftEvent<
@@ -67,6 +71,7 @@ export class RiftServer extends EventBus<
   readonly #eventQueue: RiftServerEvent[] = [];
   readonly #handshakeTimeoutMs: number;
   readonly #tickRateHz: number;
+  readonly #scratchWriter = new Writer(512);
   #visibility?: VisibilityFn;
 
   #tickNumber = 0;
@@ -156,11 +161,46 @@ export class RiftServer extends EventBus<
     });
     this.#drainEventQueue();
 
+    const sharedUpdates = this.#composeSharedUpdates();
+
     for (const slot of this.#clients.values()) {
-      this.#flushClient(slot);
+      this.#flushClient(slot, sharedUpdates);
     }
 
+    this.world.drainPendingEvents();
     this.world.clearChanges();
+  }
+
+  // Encode each dirty (entity, component) ComponentUpdated payload once
+  // into shared bytes. #flushClient then memcpys these into each recipient's
+  // writer instead of re-encoding per client. With N clients all seeing the
+  // same M entities, this drops the per-tick encode cost from N*M to M.
+  //
+  // Keyed per-(entity, component) — not per-entity — so #flushClient can
+  // skip components that this particular client doesn't yet know (those
+  // get a per-client ComponentAdded with full encode instead).
+  #composeSharedUpdates(): Map<EntityId, Map<RiftType, Uint8Array>> {
+    const out = new Map<EntityId, Map<RiftType, Uint8Array>>();
+    const scratch = this.#scratchWriter;
+    for (const ty of this.schema.components) {
+      const idx = this.schema.componentIndexOf(ty);
+      if (idx === undefined) continue;
+      const pool = this.world.pool(ty);
+      if (pool.dirty.size === 0) continue;
+      for (const [id, mask] of pool.dirty) {
+        const value = pool.values.get(id);
+        if (value === undefined) continue;
+        scratch.reset();
+        this.#writeComponentUpdated(scratch, id, idx, ty, value, mask);
+        let perEntity = out.get(id);
+        if (perEntity === undefined) {
+          perEntity = new Map();
+          out.set(id, perEntity);
+        }
+        perEntity.set(ty, scratch.finish());
+      }
+    }
+    return out;
   }
 
   getClientIds(): readonly ClientId[] {
@@ -295,11 +335,15 @@ export class RiftServer extends EventBus<
     return w.finish();
   }
 
-  #flushClient(slot: ClientSlot): void {
+  #flushClient(
+    slot: ClientSlot,
+    sharedUpdates: Map<EntityId, Map<RiftType, Uint8Array>>,
+  ): void {
     if (!slot.handshakeCompleted) {
       return;
     }
-    const w = new Writer(128);
+    const w = slot.writer;
+    w.reset();
     w.writeU8(Opcode.Delta);
     w.writeVarU32(this.#tickNumber);
     w.writeVarU32(this.#serverTimeMs >>> 0);
@@ -330,6 +374,7 @@ export class RiftServer extends EventBus<
       const known = slot.knownComponents.get(id) ?? new Set<RiftType>();
       slot.knownComponents.set(id, known);
       const currentComps = new Set<RiftType>();
+      const sharedForEntity = sharedUpdates.get(id);
       for (const ty of this.schema.components) {
         const idx = this.schema.componentIndexOf(ty);
         if (idx === undefined) continue;
@@ -343,11 +388,11 @@ export class RiftServer extends EventBus<
           w.writeVarU32(idx);
           ty.encode(w, value);
           known.add(ty);
-        } else if (pool.dirty.has(id) || isNew) {
-          w.writeU8(DeltaOp.ComponentUpdated);
-          w.writeVarU32(id);
-          w.writeVarU32(idx);
-          ty.encode(w, value);
+          continue;
+        }
+        const sharedBytes = sharedForEntity?.get(ty);
+        if (sharedBytes !== undefined) {
+          w.writeBytesRaw(sharedBytes);
         }
       }
       for (const ty of known) {
@@ -368,6 +413,28 @@ export class RiftServer extends EventBus<
       return;
     }
     this.#transport.send(slot.id, w.finish());
+  }
+
+  #writeComponentUpdated(
+    w: Writer,
+    id: EntityId,
+    idx: number,
+    ty: RiftType,
+    value: unknown,
+    mask: number | undefined,
+  ): void {
+    w.writeU8(DeltaOp.ComponentUpdated);
+    w.writeVarU32(id);
+    w.writeVarU32(idx);
+    if (isObjectType(ty)) {
+      ty.encodePartial(
+        w,
+        value as Record<string, unknown>,
+        mask ?? WHOLE_DIRTY,
+      );
+    } else {
+      ty.encode(w, value);
+    }
   }
 
   #finalizeHandshake(slot: ClientSlot): void {
@@ -445,6 +512,7 @@ export class RiftServer extends EventBus<
           handshakeCompleted: false,
           knownEntities: new Set(),
           knownComponents: new Map(),
+          writer: new Writer(4096),
         };
         slot.handshakeTimer = setTimeout(() => {
           this.#transport.close(

@@ -50,9 +50,15 @@ export class ReactiveWorld extends World {
           bump(this.#structureVersion);
           bump(this.#poolVersion(event.component));
           return;
-        case "componentChanged":
-          bump(this.#poolVersion(event.component));
-          return;
+      }
+    });
+    // Reactive signals need to invalidate on every write, not just at the
+    // tick boundary — otherwise an effect that depends on `pos` wouldn't
+    // re-run inside the same tick after `world.write(...)`. Subscribe to
+    // the sync stream for componentChanged specifically.
+    this.onSync((event) => {
+      if (event.type === "componentChanged") {
+        bump(this.#poolVersion(event.component));
       }
     });
   }

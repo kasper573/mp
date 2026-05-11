@@ -1,7 +1,7 @@
 // oxlint-disable no-await-in-loop
 // oxlint-disable no-console
 import { DeltaOp, Opcode } from "@rift/core";
-import { Reader } from "@rift/types";
+import { isObjectType, Reader } from "@rift/types";
 import type { RiftType } from "@rift/types";
 import { schemaComponents } from "../src/schema";
 import {
@@ -53,11 +53,21 @@ function analyzeDelta(
         r.readVarU32();
         compIdx = r.readVarU32();
         break;
-      case DeltaOp.ComponentAdded:
-      case DeltaOp.ComponentUpdated: {
+      case DeltaOp.ComponentAdded: {
         r.readVarU32();
         compIdx = r.readVarU32();
         components[compIdx].decode(r);
+        break;
+      }
+      case DeltaOp.ComponentUpdated: {
+        r.readVarU32();
+        compIdx = r.readVarU32();
+        const ty = components[compIdx];
+        if (isObjectType(ty)) {
+          ty.decodePartial(r, {});
+        } else {
+          ty.decode(r);
+        }
         break;
       }
     }

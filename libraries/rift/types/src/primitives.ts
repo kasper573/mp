@@ -29,7 +29,6 @@ export function u32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U32,
     inspect: () => primitiveInspect(RiftTypeKind.U32),
-
     encode: (w, v) => w.writeU32(v),
     decode: (r) => r.readU32() as T,
   };
@@ -133,36 +132,33 @@ export function enumOf<const Values extends readonly string[]>(
     throw new Error("enumOf requires at least one value");
   }
   const wide = values.length > 256;
-  function encode(w: Writer, v: Values[number]): void {
-    const idx = values.indexOf(v);
-    if (idx < 0) {
-      throw new Error(`enum value out of range: ${v}`);
-    }
-    if (wide) w.writeU16(idx);
-    else w.writeU8(idx);
-  }
-  function decode(r: { readU16(): number; readU8(): number }): Values[number] {
-    const idx = wide ? r.readU16() : r.readU8();
-    const v = values[idx];
-    if (v === undefined) {
-      throw new Error(`enum index out of range: ${idx}`);
-    }
-    return v;
-  }
-  function inspect(): Uint8Array {
-    const w = new Writer(16);
-    w.writeU8(RiftTypeKind.EnumOf);
-    w.writeU16(values.length);
-    for (const v of values) {
-      w.writeString(v);
-    }
-    return w.finish();
-  }
   return {
     kind: RiftTypeKind.EnumOf,
-    inspect,
-    encode,
-    decode,
+    encode(w, v) {
+      const idx = values.indexOf(v);
+      if (idx < 0) {
+        throw new Error(`enum value out of range: ${v}`);
+      }
+      if (wide) w.writeU16(idx);
+      else w.writeU8(idx);
+    },
+    decode(r) {
+      const idx = wide ? r.readU16() : r.readU8();
+      const v = values[idx];
+      if (v === undefined) {
+        throw new Error(`enum index out of range: ${idx}`);
+      }
+      return v;
+    },
+    inspect() {
+      const w = new Writer(16);
+      w.writeU8(RiftTypeKind.EnumOf);
+      w.writeU16(values.length);
+      for (const v of values) {
+        w.writeString(v);
+      }
+      return w.finish();
+    },
   };
 }
 
@@ -175,65 +171,61 @@ export function bitflags<const Flags extends readonly string[]>(
   }
   const width =
     flags.length <= 8 ? 1 : flags.length <= 16 ? 2 : flags.length <= 32 ? 4 : 8;
-  function encode(w: Writer, v: Value): void {
-    if (width === 8) {
-      let bits = 0n;
-      for (let i = 0; i < flags.length; i++) {
-        if ((v as Record<string, boolean>)[flags[i]]) {
-          bits |= 1n << BigInt(i);
-        }
-      }
-      w.writeU64(bits);
-      return;
-    }
-    let bits = 0;
-    for (let i = 0; i < flags.length; i++) {
-      if ((v as Record<string, boolean>)[flags[i]]) {
-        bits |= 1 << i;
-      }
-    }
-    if (width === 1) {
-      w.writeU8(bits);
-    } else if (width === 2) {
-      w.writeU16(bits);
-    } else {
-      w.writeU32(bits);
-    }
-  }
-  function decode(r: {
-    readU8(): number;
-    readU16(): number;
-    readU32(): number;
-    readU64(): bigint;
-  }): Value {
-    const out: Record<string, boolean> = {};
-    if (width === 8) {
-      const bits = r.readU64();
-      for (let i = 0; i < flags.length; i++) {
-        out[flags[i]] = (bits & (1n << BigInt(i))) !== 0n;
-      }
-      return out as Value;
-    }
-    const bits =
-      width === 1 ? r.readU8() : width === 2 ? r.readU16() : r.readU32();
-    for (let i = 0; i < flags.length; i++) {
-      out[flags[i]] = (bits & (1 << i)) !== 0;
-    }
-    return out as Value;
-  }
-  function inspect(): Uint8Array {
-    const w = new Writer(16);
-    w.writeU8(RiftTypeKind.Bitflags);
-    w.writeU16(flags.length);
-    for (const f of flags) {
-      w.writeString(f);
-    }
-    return w.finish();
-  }
   return {
     kind: RiftTypeKind.Bitflags,
-    inspect,
-    encode,
-    decode,
+    encode(w, v) {
+      if (width === 8) {
+        let bits = 0n;
+        for (let i = 0; i < flags.length; i++) {
+          if ((v as Record<string, boolean>)[flags[i]]) {
+            bits |= 1n << BigInt(i);
+          }
+        }
+        w.writeU64(bits);
+        return;
+      }
+      let bits = 0;
+      for (let i = 0; i < flags.length; i++) {
+        if ((v as Record<string, boolean>)[flags[i]]) {
+          bits |= 1 << i;
+        }
+      }
+      if (width === 1) {
+        w.writeU8(bits);
+      } else if (width === 2) {
+        w.writeU16(bits);
+      } else {
+        w.writeU32(bits);
+      }
+    },
+    decode(r) {
+      const out: Record<string, boolean> = {};
+      if (width === 8) {
+        const bits = r.readU64();
+        for (let i = 0; i < flags.length; i++) {
+          out[flags[i]] = (bits & (1n << BigInt(i))) !== 0n;
+        }
+        return out as Value;
+      }
+      const bits =
+        width === 1 ? r.readU8() : width === 2 ? r.readU16() : r.readU32();
+      for (let i = 0; i < flags.length; i++) {
+        out[flags[i]] = (bits & (1 << i)) !== 0;
+      }
+      return out as Value;
+    },
+    inspect() {
+      const w = new Writer(16);
+      w.writeU8(RiftTypeKind.Bitflags);
+      w.writeU16(flags.length);
+      for (const f of flags) {
+        w.writeString(f);
+      }
+      return w.finish();
+    },
   };
+}
+
+export function copy<T>(ty: RiftType<T>): RiftType<T> {
+  return { ...ty };
 }
