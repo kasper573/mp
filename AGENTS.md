@@ -1,24 +1,26 @@
-# LLM Agent Coding Instructions
+# General coding guidelines
 
-- When writing React/Preact code, do not use `useEffect` inside application code (code that resides in `/apps` or `/integrations`). It should only be used as an implementation detail when building custom hooks. If you need an effect, look for existing custom hooks that achieve what you're trying to do, or create a new custom hook instead inside a resuable location, preferably inside the `libraries` workspace.
-
-- When writing code inside `/integrations/db`, never include auth checks or input validations. These should always be handled in the application code that calls the database procedures.
-
-- You must read and understand the [README.md](README.md) file for documentation on the project structure and conventions. Any and all additional documentation linked from the README.md must also be read and understood.
-
-- Only write comments that explain why something is done, never how. The code itself should be clear enough to explain what it does, and even ideally why it does it. Only when you observe a piece of code and realize that it is not clear at all why it is the way it is, should you write a comment explaining the reasoning behind it.
-
-- In classes, prefer javascript native private fields and methods (using the `#` syntax) over Typescript's `private` modifier, since the former provides true privacy at runtime, while the latter is only a compile-time construct that can be easily bypassed. Using private accessor for constructor parameters is however fine, since it reduces boilerplate, so it's a good exception to the rule.
-
-- Prefer composition over inheritance
+- You should prioritize simplicity, stability, maintainability, readability at all times, and THEN performance comes into the picture. This does not mean performance is less important. You simply must find good engineering solutions that maintain our top priorities, and then you STILL make the system performant.
 
 - Prefer functional and prodecural patterns over object-oriented programming. This doesn't mean classes are banned completely, but they should be used sparingly and only when they provide a clear benefit.
 
-- Prioritize terseness and simplicity in your code, but not at the expense of readability and maintainability, both in the micro and macro aspects of the codebase. Strive to write code that is as concise as possible while still being clear and easy to understand. As opposed to writing code that works and solves the problem but is needlessly verbose and complex, which is extremely typical of LLM generated code, so you must be especially vigilant about this.
+- Prefer composition over inheritance
+
+- In classes, prefer javascript native private fields and methods (using the `#` syntax) over Typescript's `private` modifier, since the former provides true privacy at runtime, while the latter is only a compile-time construct that can be easily bypassed. Using private accessor for constructor parameters is however fine, since it reduces boilerplate, so it's a good exception to the rule.
 
 - When it comes to the order of code inside a single file, you should organize your code from the perspective of a new reader who is not familiar with the codebase. It's better to start with consumer first, implementation last. For example, put exports at the top and local helpers at the bottom, since the exports are what most readers will be looking for and interested in, while the local helpers are just implementation details that they don't need to see right away.
 
-## Typescript
+- Only write comments that explain why something is done, never how. The code itself should be clear enough to explain what it does, and even ideally why it does it. Only when you observe a piece of code and realize that it is not clear at all why it is the way it is, should you write a comment explaining the reasoning behind it.
+
+## Project guidelines
+
+- When writing code inside `/integrations/db`, never include auth checks or input validations. These should always be handled in the application code that calls the database procedures.
+
+## React/Preact guidelines
+
+- When writing React/Preact code, do not use `useEffect` inside application code (code that resides in `/apps` or `/integrations`). It should only be used as an implementation detail when building custom hooks. If you need an effect, look for existing custom hooks that achieve what you're trying to do, or create a new custom hook instead inside a resuable location, preferably inside the `libraries` workspace.
+
+## Typescript guidelines
 
 When writing typescript you must adhere to principal engineer and advanced level typescript practices and strictness.
 This includes but is not limited to:
