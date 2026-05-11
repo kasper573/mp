@@ -3,6 +3,7 @@ import { useContext } from "preact/compat";
 import { defineSchema, RiftClient } from "@rift/core";
 import { ReactiveWorld } from "@rift/reactive";
 import { wsTransport } from "@rift/ws";
+import { WebSocket as PartySocket } from "partysocket";
 import type { ReadonlySignal } from "@preact/signals-core";
 import type { AccessToken } from "@mp/auth";
 import { fnv1a64 } from "./hash";
@@ -33,7 +34,7 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
     });
     super(
       new ReactiveWorld(schema),
-      wsTransport(new WebSocket(url.toString())),
+      wsTransport(new PartySocket(url.toString())),
     );
 
     this.#features = features;
