@@ -1,6 +1,6 @@
 # General coding guidelines
 
-- You should prioritize simplicity, stability, maintainability, readability at all times, and THEN performance comes into the picture. This does not mean performance is less important. You simply must find good engineering solutions that maintain our top priorities, and then you STILL make the system performant.
+- You should prioritize simplicity, stability and readability at all times. By stability we mean code stability, not system runtime stability (albeit that is of course important as well, it is not the point of this guideline). Code stability means that the codebase is not brittle and can easily be extended or modified without systems breaking apart and causing bugs in unexpected areas. And then, finally, performance comes into the picture. This does not mean performance is not important. On the contrary, we highly value performance. However, you simply must find good engineering solutions that maintain our top priorities, and then you STILL make the system performant.
 
 - Prefer functional and prodecural patterns over object-oriented programming. This doesn't mean classes are banned completely, but they should be used sparingly and only when they provide a clear benefit.
 
