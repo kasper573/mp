@@ -23,6 +23,7 @@ export enum RiftTypeKind {
   Optional = 19,
   Union = 20,
   Transform = 21,
+  Q16 = 22,
 }
 
 export interface RiftType<T = unknown> {

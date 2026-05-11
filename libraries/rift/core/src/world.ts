@@ -13,6 +13,10 @@ export class World {
   readonly #entities = new Set<EntityId>();
   readonly #pools = new Map<RiftType, Pool<unknown>>();
   readonly #handlers = new Set<LocalWorldEventHandler>();
+  // Inverse of (pool, id) presence: which components does each entity
+  // currently have? Maintained inside add/remove/destroy so per-entity
+  // iteration in replication doesn't need to probe every pool.
+  readonly #componentsByEntity = new Map<EntityId, Set<RiftType>>();
   #nextId = 1;
 
   constructor(schema: RiftSchema) {
@@ -49,6 +53,7 @@ export class World {
           this.#emit({ type: "componentRemoved", id, component });
         }
       }
+      this.#componentsByEntity.delete(id);
       this.#emit({ type: "entityDestroyed", id });
     }
   }
@@ -96,6 +101,12 @@ export class World {
       throw new Error(`entity ${id} already has component`);
     }
     pool.add(id, value);
+    let set = this.#componentsByEntity.get(id);
+    if (set === undefined) {
+      set = new Set();
+      this.#componentsByEntity.set(id, set);
+    }
+    set.add(type);
     this.#emit({ type: "componentAdded", id, component: type });
     return value;
   }
@@ -123,10 +134,15 @@ export class World {
     id: EntityId,
     ...types: readonly [RiftType, ...(readonly RiftType[])]
   ): void {
+    const set = this.#componentsByEntity.get(id);
     for (const t of types) {
       if (this.#poolOf(t).remove(id)) {
+        set?.delete(t);
         this.#emit({ type: "componentRemoved", id, component: t });
       }
+    }
+    if (set && set.size === 0) {
+      this.#componentsByEntity.delete(id);
     }
   }
 
@@ -145,6 +161,10 @@ export class World {
 
   pool<T>(type: RiftType<T>): Pool<T> {
     return this.#poolOf(type);
+  }
+
+  componentsOf(id: EntityId): ReadonlySet<RiftType> {
+    return this.#componentsByEntity.get(id) ?? EMPTY_COMPONENT_SET;
   }
 
   // Without args, returns the full set (no allocation). With component
@@ -400,6 +420,8 @@ function mergeDirtyMask(
 // don't have per-field bits). When dirty, the entire value is "dirty"; we
 // represent that as all-bits-set so iteration code can just OR in.
 export const WHOLE_DIRTY = 0xffff_ffff;
+
+const EMPTY_COMPONENT_SET: ReadonlySet<RiftType> = new Set();
 
 export interface QueryView<Types extends readonly RiftType[]> {
   [Symbol.iterator](): IterableIterator<QueryRow<Types>>;

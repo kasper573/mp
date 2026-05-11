@@ -113,14 +113,12 @@ function respawn(ctx: SpawnerCtx, entId: EntityId, spawnId: NpcSpawnId): void {
   if (!def || !area) {
     return;
   }
-  for (let i = 0; i < spawn.count; i++) {
-    spawnNpc(ctx.world, {
-      definition: def,
-      spawn: { ...spawn, id: createShortId() },
-      coords: pickSpawnCoord(spawn, area, ctx.rng),
-      actorModels: ctx.opts.actorModels,
-    });
-  }
+  spawnNpc(ctx.world, {
+    definition: def,
+    spawn: { ...spawn, id: createShortId() },
+    coords: pickSpawnCoord(spawn, area, ctx.rng),
+    actorModels: ctx.opts.actorModels,
+  });
 }
 
 function pickSpawnCoord(

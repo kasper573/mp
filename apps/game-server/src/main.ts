@@ -136,8 +136,8 @@ const riftServer = new MpRiftServer({
       actorModels: fixtures.actorModelsById,
       spawnPointForArea: (id) => areas.get(id)?.start,
     }),
-    movementFeature({ areas }),
-    combatFeature(),
+    movementFeature({ areas, registry }),
+    combatFeature({ registry }),
     visibilityFeature({
       viewDistance: fixtures.viewDistance,
       areas,

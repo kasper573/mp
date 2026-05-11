@@ -362,19 +362,20 @@ function findProtectiveTarget(
     return undefined;
   }
 
-  const allyList = ctx.ralliesBySpawn.get(selfTag.spawnId);
-  const allies =
-    allyList && allyList.length > 0 ? new Set(allyList) : new Set<EntityId>();
+  const allies: ReadonlyArray<EntityId> =
+    ctx.ralliesBySpawn.get(selfTag.spawnId) ?? [];
 
   let closest: EntityId | undefined;
   let closestDistSq = aggroRange * aggroRange;
   ctx.memory.forEachCombat(selfId, (attacker, target) => {
-    const enemyId = allies.has(target)
+    const targetIsAlly = allies.includes(target);
+    const attackerIsAlly = allies.includes(attacker);
+    const enemyId = targetIsAlly
       ? attacker
-      : allies.has(attacker)
+      : attackerIsAlly
         ? target
         : undefined;
-    if (enemyId === undefined || allies.has(enemyId)) {
+    if (enemyId === undefined || allies.includes(enemyId)) {
       return;
     }
     const [enemyMv, enemyArea, enemyCombat] = ctx.world.get(

@@ -90,6 +90,33 @@ export function f64<T extends number = number>(): RiftType<T> {
   };
 }
 
+// Quantizes a number as i16 via a fixed integer scale: wire-byte width is
+// halved versus f32 at the cost of precision = 1/scale. The scale is part
+// of the digest so a change rotates the schema hash.
+export function q16<T extends number = number>(scale: number): RiftType<T> {
+  if (!Number.isInteger(scale) || scale <= 0 || scale > 0x7fff) {
+    throw new Error(`fixedI16 scale must be a positive integer ≤ 32767`);
+  }
+  const max = 0x7fff / scale;
+  const min = -0x8000 / scale;
+  return {
+    kind: RiftTypeKind.Q16,
+    digest(w) {
+      w.writeU8(RiftTypeKind.Q16);
+      w.writeU16(scale);
+    },
+    encode(w, v) {
+      if (v > max || v < min) {
+        throw new Error(
+          `fixedI16(scale=${scale}) value ${v} outside encodable range [${min}, ${max}]`,
+        );
+      }
+      w.writeI16(Math.round(v * scale));
+    },
+    decode: (r) => (r.readI16() / scale) as T,
+  };
+}
+
 export function bool<T extends boolean = boolean>(): RiftType<T> {
   return {
     kind: RiftTypeKind.Bool,

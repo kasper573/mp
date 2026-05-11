@@ -125,6 +125,18 @@ describe("world", () => {
     w.destroy(b);
     expect(w.query(pos).size).toBe(0);
   });
+  it("componentsOf tracks add/remove/destroy", () => {
+    const w = new World(schema);
+    const id = w.create();
+    expect(w.componentsOf(id).size).toBe(0);
+    w.add(id, pos, { x: 0, y: 0 });
+    w.add(id, health, 10);
+    expect(new Set(w.componentsOf(id))).toEqual(new Set([pos, health]));
+    w.remove(id, pos);
+    expect(new Set(w.componentsOf(id))).toEqual(new Set([health]));
+    w.destroy(id);
+    expect(w.componentsOf(id).size).toBe(0);
+  });
 });
 
 describe("pool change tracking", () => {

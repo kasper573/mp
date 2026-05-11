@@ -42,7 +42,7 @@ export function characterDirectoryFeature(
         if (!user) {
           return;
         }
-        let scope = scopeEntityForClient(server.world, clientId);
+        let scope = scopeEntityForClient(opts.registry, clientId);
         if (scope === undefined) {
           scope = server.world.create();
           server.world.add(scope, ClientScopeTag, {});
@@ -58,7 +58,7 @@ export function characterDirectoryFeature(
         }),
 
         server.on(ClientDisconnected, ({ data }) => {
-          const scope = scopeEntityForClient(server.world, data.clientId);
+          const scope = scopeEntityForClient(opts.registry, data.clientId);
           if (scope !== undefined) {
             server.world.destroy(scope);
           }
@@ -73,7 +73,7 @@ export function characterDirectoryFeature(
           if (!user || !user.roles.has(userRoles.join)) {
             return;
           }
-          const scope = scopeEntityForClient(server.world, clientId);
+          const scope = scopeEntityForClient(opts.registry, clientId);
           if (scope === undefined) {
             return;
           }
@@ -92,7 +92,7 @@ export function characterDirectoryFeature(
           if (!user || !user.roles.has(userRoles.spectate)) {
             return;
           }
-          const scope = scopeEntityForClient(server.world, clientId);
+          const scope = scopeEntityForClient(opts.registry, clientId);
           if (scope === undefined) {
             return;
           }

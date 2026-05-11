@@ -8,13 +8,17 @@ import type { AreaResource } from "../area/area-resource";
 import { hitTestTiledObject } from "../area/hit-test";
 import type { AreaId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
-import { entityForClient } from "../identity/session-registry";
+import {
+  entityForClient,
+  type SessionRegistry,
+} from "../identity/session-registry";
 import { Movement, PathFollow, type CardinalDirection } from "./components";
 import { MoveRequest, MoveToPortal } from "./events";
 import { Combat } from "../combat/components";
 
 export interface MovementFeatureOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
+  readonly registry: SessionRegistry;
 }
 
 export function movementFeature(opts: MovementFeatureOptions): Feature {
@@ -49,12 +53,12 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
 
         server.on(Tick, (event) => {
           const dt = event.data.dt;
-          for (const [id, mv, areaTag] of server.world.query(
+          for (const [id, mv, areaTag, combat] of server.world.query(
             Movement,
             AreaTag,
+            Combat,
           )) {
-            const combat = server.world.get(id, Combat);
-            if (combat && !combat.alive) {
+            if (!combat.alive) {
               server.world.remove(id, PathFollow);
               if (mv.moveTarget) {
                 server.world.write(id, Movement, { moveTarget: undefined });
@@ -160,7 +164,7 @@ function beginCharacterMove(
   target: Vector<Tile>,
   desiredPortalId: ObjectId | undefined,
 ): void {
-  const characterEnt = entityForClient(server.world, clientId);
+  const characterEnt = entityForClient(opts.registry, clientId);
   if (characterEnt === undefined) {
     return;
   }

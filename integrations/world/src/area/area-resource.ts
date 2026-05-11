@@ -9,6 +9,7 @@ import { hitTestTiledObject } from "./hit-test";
 import { TiledFixture } from "./tiled-fixture";
 import type { TiledResource } from "./tiled-resource";
 import type { AreaId } from "@mp/fixtures";
+import { TILE_COORD_MAX } from "../primitives";
 
 export class AreaResource {
   readonly start: Vector<Tile>;
@@ -20,6 +21,14 @@ export class AreaResource {
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
+    const { x: w, y: h } = tiled.tileCount;
+    if (w > TILE_COORD_MAX || h > TILE_COORD_MAX) {
+      throw new Error(
+        `Area "${id}" is ${w}x${h} tiles but the wire format (TileVector) ` +
+          `can encode at most ${TILE_COORD_MAX} tiles per axis`,
+      );
+    }
+
     this.dynamicLayer = assert(
       this.tiled.map.layers.find((l) => l.name === dynamicLayerName),
       `Map must have a '${dynamicLayerName}' layer`,

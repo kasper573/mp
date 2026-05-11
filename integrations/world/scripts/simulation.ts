@@ -172,8 +172,8 @@ export async function createSimulation(
     features: [
       { components: schemaComponents, events: schemaEvents },
       sessionRegistryFeature(registry),
-      movementFeature({ areas: areaMap }),
-      combatFeature(),
+      movementFeature({ areas: areaMap, registry }),
+      combatFeature({ registry }),
       visibilityFeature({ viewDistance, areas: areaMap, registry }),
       npcSpawnerFeature({
         areas: areaMap,

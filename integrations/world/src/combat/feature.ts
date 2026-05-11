@@ -1,7 +1,10 @@
 import type { Cleanup, Feature } from "../feature";
 import { Tick } from "@rift/core";
 import { combine } from "@mp/std";
-import { entityForClient } from "../identity/session-registry";
+import {
+  entityForClient,
+  type SessionRegistry,
+} from "../identity/session-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement, PathFollow } from "../movement/components";
@@ -13,7 +16,11 @@ const HP_REGEN_AMOUNT = 5;
 const TILE_DIAGONAL_MARGIN = Math.sqrt(2) - 1;
 const CHASE_RETARGET_THRESHOLD = 1.5;
 
-export function combatFeature(): Feature {
+export interface CombatFeatureOptions {
+  readonly registry: SessionRegistry;
+}
+
+export function combatFeature(opts: CombatFeatureOptions): Feature {
   return {
     server(server): Cleanup {
       let lastRegenMs = 0;
@@ -24,7 +31,10 @@ export function combatFeature(): Feature {
           if (event.source.type !== "wire") {
             return;
           }
-          const attacker = entityForClient(server.world, event.source.clientId);
+          const attacker = entityForClient(
+            opts.registry,
+            event.source.clientId,
+          );
           if (attacker === undefined) {
             return;
           }

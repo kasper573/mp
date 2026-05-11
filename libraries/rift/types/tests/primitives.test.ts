@@ -6,6 +6,7 @@ import {
   enumOf,
   f32,
   f64,
+  q16,
   i16,
   i32,
   i64,
@@ -104,5 +105,28 @@ describe("primitives", () => {
     const ty = u32<UserId>();
     const v = 42 as UserId;
     expect(roundtrip(ty, v)).toBe(42);
+  });
+  it("q16 roundtrips within 1/scale precision", () => {
+    const ty = q16(256);
+    const cases = [-127.5, -1.25, -1 / 256, 0, 1 / 256, 1.25, 127.5];
+    for (const v of cases) {
+      expect(Math.abs(roundtrip(ty, v) - v)).toBeLessThanOrEqual(1 / 256);
+    }
+  });
+  it("q16 emits exactly 2 bytes", () => {
+    const w = new Writer(4);
+    q16(256).encode(w, 1);
+    expect(w.offset).toBe(2);
+  });
+  it("q16 digest differs by scale", () => {
+    const w1 = new Writer(8);
+    q16(256).digest(w1);
+    const w2 = new Writer(8);
+    q16(128).digest(w2);
+    expect(w1.finish()).not.toEqual(w2.finish());
+  });
+  it("q16 throws when value escapes encodable range", () => {
+    const ty = q16(256);
+    expect(() => roundtrip(ty, 200)).toThrow();
   });
 });

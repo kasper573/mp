@@ -49,6 +49,7 @@ export interface PersistenceFeatureOptions {
 interface PersistCtx {
   readonly world: World;
   readonly repo: DbRepository;
+  readonly registry: SessionRegistry;
   readonly snapshots: Map<EntityId, CharacterSnapshot>;
   readonly defaultModelId: ActorModelId;
 }
@@ -60,6 +61,7 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
       const ctx: PersistCtx = {
         world: server.world,
         repo: opts.repo,
+        registry: opts.registry,
         snapshots,
         defaultModelId: opts.defaultModelId,
       };
@@ -86,7 +88,7 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
           if (access.isErr() || !access.value) {
             return;
           }
-          if (entityForClient(server.world, clientId) !== undefined) {
+          if (entityForClient(opts.registry, clientId) !== undefined) {
             return;
           }
           destroyStaleCharacterEntities(ctx, event.data);
@@ -111,7 +113,7 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
             return;
           }
           const characterEnt = entityForClient(
-            server.world,
+            opts.registry,
             event.source.clientId,
           );
           if (characterEnt === undefined) {
@@ -175,7 +177,7 @@ function destroyStaleCharacterEntities(
 }
 
 function cleanupClient(ctx: PersistCtx, clientId: ClientId): void {
-  const characterEnt = entityForClient(ctx.world, clientId);
+  const characterEnt = entityForClient(ctx.registry, clientId);
   if (characterEnt === undefined) {
     return;
   }

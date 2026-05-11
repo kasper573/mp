@@ -5,6 +5,7 @@ import type { RiftEvent, UnsubscribeFn } from "./event";
 import { isObjectType, Reader, Writer } from "@rift/types";
 import type { RiftType } from "@rift/types";
 import { WHOLE_DIRTY } from "./world";
+import type { Pool } from "./world";
 import { hashEquals, type RiftSchema } from "./schema";
 import type { ServerTransportEvent, ServerTransport } from "./transport";
 import {
@@ -16,9 +17,15 @@ import {
 } from "./protocol";
 import { World } from "./world";
 
+interface ComponentEntry {
+  readonly ty: RiftType;
+  readonly idx: number;
+  readonly pool: Pool<unknown>;
+}
+
 export type VisibilityFn = (
   clientId: ClientId,
-) => Iterable<EntityId> | undefined;
+) => ReadonlySet<EntityId> | undefined;
 
 export interface ServerOptions {
   readonly schema: RiftSchema;
@@ -72,6 +79,12 @@ export class RiftServer extends EventBus<
   readonly #handshakeTimeoutMs: number;
   readonly #tickRateHz: number;
   readonly #scratchWriter = new Writer(512);
+  // Schema is fixed for the lifetime of the server, so resolve each component
+  // type to its (index, pool) once and reuse — the per-tick hot loops in
+  // #composeSharedUpdates / #flushClient / #buildSnapshotFor would otherwise
+  // re-resolve both for every (entity, component) pair.
+  readonly #componentEntries: ReadonlyArray<ComponentEntry>;
+  readonly #componentEntryByType: ReadonlyMap<RiftType, ComponentEntry>;
   #visibility?: VisibilityFn;
 
   #tickNumber = 0;
@@ -90,6 +103,14 @@ export class RiftServer extends EventBus<
     this.#tickRateHz = opts.tickRateHz ?? 30;
     this.#visibility = opts.visibility;
     this.world = new World(opts.schema);
+    this.#componentEntries = opts.schema.components.map((ty, idx) => ({
+      ty,
+      idx,
+      pool: this.world.pool(ty),
+    }));
+    this.#componentEntryByType = new Map(
+      this.#componentEntries.map((e) => [e.ty, e]),
+    );
   }
 
   setVisibility(fn: VisibilityFn | undefined): void {
@@ -180,12 +201,7 @@ export class RiftServer extends EventBus<
   #composeSharedUpdates(): Map<EntityId, Map<RiftType, Uint8Array>> {
     const out = new Map<EntityId, Map<RiftType, Uint8Array>>();
     const scratch = this.#scratchWriter;
-    for (const ty of this.schema.components) {
-      const idx = this.schema.componentIndexOf(ty);
-      if (idx === undefined) {
-        continue;
-      }
-      const pool = this.world.pool(ty);
+    for (const { ty, idx, pool } of this.#componentEntries) {
       if (pool.dirty.size === 0) {
         continue;
       }
@@ -267,25 +283,11 @@ export class RiftServer extends EventBus<
     }
   }
 
-  #visibleSet(slot: ClientSlot): Set<EntityId> {
-    const visible = new Set<EntityId>();
+  #visibleSet(slot: ClientSlot): ReadonlySet<EntityId> {
     if (this.#visibility === undefined) {
-      for (const id of this.world.entities()) {
-        visible.add(id);
-      }
-      return visible;
+      return this.world.entities();
     }
-    const result = this.#visibility(slot.id);
-    if (result === undefined) {
-      for (const id of this.world.entities()) {
-        visible.add(id);
-      }
-      return visible;
-    }
-    for (const id of result) {
-      visible.add(id);
-    }
-    return visible;
+    return this.#visibility(slot.id) ?? this.world.entities();
   }
 
   #clientSeesEntity(slot: ClientSlot, entityId: EntityId): boolean {
@@ -296,12 +298,7 @@ export class RiftServer extends EventBus<
     if (result === undefined) {
       return this.world.exists(entityId);
     }
-    for (const id of result) {
-      if (id === entityId) {
-        return true;
-      }
-    }
-    return false;
+    return result.has(entityId);
   }
 
   #buildSnapshotFor(slot: ClientSlot): Uint8Array<ArrayBuffer> {
@@ -321,19 +318,14 @@ export class RiftServer extends EventBus<
         continue;
       }
       const comps: Array<[RiftType, number, unknown]> = [];
-      for (const ty of this.schema.components) {
-        const idx = this.schema.componentIndexOf(ty);
-        if (idx === undefined) {
-          continue;
-        }
-        const pool = this.world.pool(ty);
+      // #componentEntries is already in schema (index) order, so no sort needed.
+      for (const { ty, idx, pool } of this.#componentEntries) {
         const value = pool.values.get(id);
         if (value === undefined) {
           continue;
         }
         comps.push([ty, idx, value]);
       }
-      comps.sort((a, b) => a[1] - b[1]);
       entries.push({ id, components: comps });
     }
     w.writeVarU32(entries.length);
@@ -386,32 +378,29 @@ export class RiftServer extends EventBus<
       if (!this.world.exists(id)) {
         continue;
       }
-      const isNew = !slot.knownEntities.has(id);
-      if (isNew) {
+      let known = slot.knownComponents.get(id);
+      if (known === undefined) {
         w.writeU8(DeltaOp.EntityCreated);
         w.writeVarU32(id);
         slot.knownEntities.add(id);
-        slot.knownComponents.set(id, new Set());
+        known = new Set();
+        slot.knownComponents.set(id, known);
       }
-      const known = slot.knownComponents.get(id) ?? new Set<RiftType>();
-      slot.knownComponents.set(id, known);
-      const currentComps = new Set<RiftType>();
+      const present = this.world.componentsOf(id);
       const sharedForEntity = sharedUpdates.get(id);
-      for (const ty of this.schema.components) {
-        const idx = this.schema.componentIndexOf(ty);
-        if (idx === undefined) {
+      for (const ty of present) {
+        const entry = this.#componentEntryByType.get(ty);
+        if (entry === undefined) {
           continue;
         }
-        const pool = this.world.pool(ty);
-        const value = pool.values.get(id);
-        if (value === undefined) {
-          continue;
-        }
-        currentComps.add(ty);
         if (!known.has(ty)) {
+          const value = entry.pool.values.get(id);
+          if (value === undefined) {
+            continue;
+          }
           w.writeU8(DeltaOp.ComponentAdded);
           w.writeVarU32(id);
-          w.writeVarU32(idx);
+          w.writeVarU32(entry.idx);
           ty.encode(w, value);
           known.add(ty);
           continue;
@@ -422,15 +411,16 @@ export class RiftServer extends EventBus<
         }
       }
       for (const ty of known) {
-        if (!currentComps.has(ty)) {
-          const idx = this.schema.componentIndexOf(ty);
-          if (idx !== undefined) {
-            w.writeU8(DeltaOp.ComponentRemoved);
-            w.writeVarU32(id);
-            w.writeVarU32(idx);
-          }
-          known.delete(ty);
+        if (present.has(ty)) {
+          continue;
         }
+        const entry = this.#componentEntryByType.get(ty);
+        if (entry !== undefined) {
+          w.writeU8(DeltaOp.ComponentRemoved);
+          w.writeVarU32(id);
+          w.writeVarU32(entry.idx);
+        }
+        known.delete(ty);
       }
     }
 
