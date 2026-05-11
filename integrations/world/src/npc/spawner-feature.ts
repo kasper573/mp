@@ -58,7 +58,9 @@ export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
           for (const [id, , combat] of server.world.query(NpcTag, Combat)) {
             if (!combat.alive && !pendingRespawns.has(id)) {
               const tag = server.world.get(id, NpcTag);
-              if (!tag) continue;
+              if (!tag) {
+                continue;
+              }
               pendingRespawns.set(id, {
                 spawnId: tag.spawnId,
                 respawnAtMs: elapsedMs + RESPAWN_DELAY_MS,
@@ -67,7 +69,9 @@ export function npcSpawnerFeature(opts: NpcSpawnerOptions): Feature {
           }
 
           for (const [entId, info] of pendingRespawns) {
-            if (elapsedMs < info.respawnAtMs) continue;
+            if (elapsedMs < info.respawnAtMs) {
+              continue;
+            }
             respawn(ctx, entId, info.spawnId);
             pendingRespawns.delete(entId);
           }
@@ -84,7 +88,9 @@ function spawnInitial(ctx: SpawnerCtx): void {
   for (const spawn of ctx.opts.spawns) {
     const def = ctx.npcsById.get(spawn.npcId);
     const area = ctx.opts.areas.get(spawn.areaId);
-    if (!def || !area) continue;
+    if (!def || !area) {
+      continue;
+    }
     for (let i = 0; i < spawn.count; i++) {
       spawnNpc(ctx.world, {
         definition: def,
@@ -99,10 +105,14 @@ function spawnInitial(ctx: SpawnerCtx): void {
 function respawn(ctx: SpawnerCtx, entId: EntityId, spawnId: NpcSpawnId): void {
   ctx.world.destroy(entId);
   const spawn = ctx.opts.spawns.find((s) => s.id === spawnId);
-  if (!spawn) return;
+  if (!spawn) {
+    return;
+  }
   const def = ctx.npcsById.get(spawn.npcId);
   const area = ctx.opts.areas.get(spawn.areaId);
-  if (!def || !area) return;
+  if (!def || !area) {
+    return;
+  }
   for (let i = 0; i < spawn.count; i++) {
     spawnNpc(ctx.world, {
       definition: def,

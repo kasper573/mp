@@ -27,7 +27,9 @@ export class World {
     if (id !== undefined) {
       if (!this.#entities.has(id)) {
         this.#entities.add(id);
-        if (id >= this.#nextId) this.#nextId = id + 1;
+        if (id >= this.#nextId) {
+          this.#nextId = id + 1;
+        }
         this.#emit({ type: "entityCreated", id });
       }
       return id;
@@ -40,7 +42,9 @@ export class World {
 
   destroy(...ids: readonly EntityId[]): void {
     for (const id of ids) {
-      if (!this.#entities.delete(id)) continue;
+      if (!this.#entities.delete(id)) {
+        continue;
+      }
       for (const [component, pool] of this.#pools) {
         if (pool.remove(id)) {
           this.#emit({ type: "componentRemoved", id, component });
@@ -59,7 +63,9 @@ export class World {
     ...types: readonly [RiftType, ...(readonly RiftType[])]
   ): boolean {
     for (const t of types) {
-      if (!this.#poolOf(t).values.has(id)) return false;
+      if (!this.#poolOf(t).values.has(id)) {
+        return false;
+      }
     }
     return true;
   }
@@ -157,7 +163,9 @@ export class World {
   // that was written-with-actual-change at least once during the tick
   // produces exactly one componentChanged event.
   drainPendingEvents(): void {
-    if (this.#handlers.size === 0) return;
+    if (this.#handlers.size === 0) {
+      return;
+    }
     for (const [component, pool] of this.#pools) {
       for (const id of pool.dirty.keys()) {
         this.#emit({ type: "componentChanged", id, component });
@@ -189,14 +197,20 @@ export class World {
   }
 
   #emit(event: LocalWorldEvent): void {
-    for (const h of this.#handlers) h(event);
+    for (const h of this.#handlers) {
+      h(event);
+    }
   }
 
   // Used only for `componentChanged` (which is coalesced for `on` subscribers
   // but still delivered synchronously to `onSync` subscribers).
   #emitSync(event: LocalWorldEvent): void {
-    if (this.#syncHandlers.size === 0) return;
-    for (const h of this.#syncHandlers) h(event);
+    if (this.#syncHandlers.size === 0) {
+      return;
+    }
+    for (const h of this.#syncHandlers) {
+      h(event);
+    }
   }
 }
 
@@ -233,7 +247,9 @@ export class Pool<T> {
   }
 
   write(id: EntityId, partial: Partial<T>): WriteResult {
-    if (!this.values.has(id)) return "missing";
+    if (!this.values.has(id)) {
+      return "missing";
+    }
     if (this.#mergeOnWrite) {
       const current = this.values.get(id) as T & object;
       // Skip the write entirely if every key in `partial` already equals
@@ -260,15 +276,21 @@ export class Pool<T> {
       }
     } else {
       const current = this.values.get(id);
-      if (Object.is(current, partial)) return "unchanged";
+      if (Object.is(current, partial)) {
+        return "unchanged";
+      }
       this.values.set(id, partial as T);
-      if (!this.added.has(id)) this.dirty.set(id, WHOLE_DIRTY);
+      if (!this.added.has(id)) {
+        this.dirty.set(id, WHOLE_DIRTY);
+      }
     }
     return "changed";
   }
 
   remove(id: EntityId): boolean {
-    if (!this.values.delete(id)) return false;
+    if (!this.values.delete(id)) {
+      return false;
+    }
     if (this.added.delete(id)) {
       // Remove-after-add inside one flush window: replication never
       // saw this entity, so suppress both the add and the remove.
@@ -305,10 +327,14 @@ function createQueryView<Types extends readonly RiftType[]>(
 
   function matches(id: EntityId): boolean {
     for (let i = 0; i < includeCount; i++) {
-      if (!poolFor(includes[i]).values.has(id)) return false;
+      if (!poolFor(includes[i]).values.has(id)) {
+        return false;
+      }
     }
     for (let i = 0; i < excludeCount; i++) {
-      if (poolFor(excludes[i]).values.has(id)) return false;
+      if (poolFor(excludes[i]).values.has(id)) {
+        return false;
+      }
     }
     return true;
   }
@@ -353,7 +379,9 @@ function createQueryView<Types extends readonly RiftType[]>(
         next(): IteratorResult<QueryRow<Types>> {
           while (true) {
             const r = seedIter.next();
-            if (r.done) return { done: true, value: undefined };
+            if (r.done) {
+              return { done: true, value: undefined };
+            }
             const id = r.value;
             if (matches(id)) {
               return { done: false, value: fillRow(id) };
@@ -372,14 +400,18 @@ function createQueryView<Types extends readonly RiftType[]>(
       }
       let n = 0;
       for (const id of pickSeed()) {
-        if (matches(id)) n++;
+        if (matches(id)) {
+          n++;
+        }
       }
       return n;
     },
     toArray() {
       const out: QueryRow<Types>[] = [];
       for (const id of pickSeed()) {
-        if (matches(id)) out.push(snapshotRow(id));
+        if (matches(id)) {
+          out.push(snapshotRow(id));
+        }
       }
       return out;
     },
@@ -394,7 +426,9 @@ function shallowEqualPartial(
   partial: Readonly<Record<string, unknown>>,
 ): boolean {
   for (const key in partial) {
-    if (!Object.is(current[key], partial[key])) return false;
+    if (!Object.is(current[key], partial[key])) {
+      return false;
+    }
   }
   return true;
 }
@@ -405,12 +439,18 @@ function mergeDirtyMask(
   partial: Readonly<Record<string, unknown>>,
   fieldBit: ReadonlyMap<string, number> | undefined,
 ): number {
-  if (!fieldBit) return WHOLE_DIRTY;
+  if (!fieldBit) {
+    return WHOLE_DIRTY;
+  }
   let mask = existing;
   for (const k in partial) {
     const bit = fieldBit.get(k);
-    if (bit === undefined) continue;
-    if (Object.is(current[k], partial[k])) continue;
+    if (bit === undefined) {
+      continue;
+    }
+    if (Object.is(current[k], partial[k])) {
+      continue;
+    }
     mask |= 1 << bit;
   }
   return mask;

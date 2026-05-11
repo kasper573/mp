@@ -84,7 +84,9 @@ export async function detectImageShift(
   let best = { dx: 0, dy: 0, score: baseline };
   for (let dy = -maxShiftSamplesY; dy <= maxShiftSamplesY; dy++) {
     for (let dx = -maxShiftSamplesX; dx <= maxShiftSamplesX; dx++) {
-      if (dx === 0 && dy === 0) continue;
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
       const score = meanAbsDiff(dx, dy);
       if (score < best.score) {
         best = { dx, dy, score };

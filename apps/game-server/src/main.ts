@@ -159,9 +159,13 @@ const server = new MpRiftServer({
 });
 
 transport.on((event) => {
-  if (event.type !== "open") return;
+  if (event.type !== "open") {
+    return;
+  }
   const ws = event.ws as WebSocket | undefined;
-  if (!ws) return;
+  if (!ws) {
+    return;
+  }
   const user = userByWs.get(ws);
   if (user !== undefined) {
     registry.recordConnection(event.clientId, user);

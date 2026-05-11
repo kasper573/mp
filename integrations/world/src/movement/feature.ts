@@ -22,24 +22,35 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
     server(server): Cleanup {
       return combine(
         server.on(MoveRequest, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const characterEnt = entityForClient(
             server.world,
             event.source.clientId,
           );
-          if (characterEnt === undefined) return;
+          if (characterEnt === undefined) {
+            return;
+          }
           const [movement, tag, combat] = server.world.get(
             characterEnt,
             Movement,
             AreaTag,
             Combat,
           );
-          if (!movement || !tag) return;
+          if (!movement || !tag) {
+            return;
+          }
           const area = opts.areas.get(tag.areaId);
-          if (!area) return;
+          if (!area) {
+            return;
+          }
           const path = findPath(area, movement.coords, event.data);
-          if (path) server.world.upsert(characterEnt, PathFollow, { path });
-          else server.world.remove(characterEnt, PathFollow);
+          if (path) {
+            server.world.upsert(characterEnt, PathFollow, { path });
+          } else {
+            server.world.remove(characterEnt, PathFollow);
+          }
           server.world.write(characterEnt, Movement, {
             moveTarget: event.data,
           });
@@ -65,7 +76,9 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
               continue;
             }
             const area = opts.areas.get(areaTag.areaId);
-            if (!area) continue;
+            if (!area) {
+              continue;
+            }
 
             let path = server.world.get(id, PathFollow)?.path;
             if ((!path || path.length === 0) && mv.moveTarget) {
@@ -80,7 +93,9 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
               }
             }
 
-            if (!path || path.length === 0) continue;
+            if (!path || path.length === 0) {
+              continue;
+            }
 
             const stepped = stepAlongPath(mv, path, dt);
             server.world.write(id, Movement, {
@@ -172,13 +187,27 @@ export function directionBetween(
 function dirFromDelta(dx: number, dy: number): CardinalDirection {
   const angle = Math.atan2(dy, dx);
   const slice = Math.PI / 4;
-  if (angle >= -slice / 2 && angle < slice / 2) return "e";
-  if (angle >= slice / 2 && angle < (3 * slice) / 2) return "se";
-  if (angle >= (3 * slice) / 2 && angle < (5 * slice) / 2) return "s";
-  if (angle >= (5 * slice) / 2 && angle < (7 * slice) / 2) return "sw";
-  if (angle >= (7 * slice) / 2 || angle < -(7 * slice) / 2) return "w";
-  if (angle >= -(7 * slice) / 2 && angle < -(5 * slice) / 2) return "nw";
-  if (angle >= -(5 * slice) / 2 && angle < -(3 * slice) / 2) return "n";
+  if (angle >= -slice / 2 && angle < slice / 2) {
+    return "e";
+  }
+  if (angle >= slice / 2 && angle < (3 * slice) / 2) {
+    return "se";
+  }
+  if (angle >= (3 * slice) / 2 && angle < (5 * slice) / 2) {
+    return "s";
+  }
+  if (angle >= (5 * slice) / 2 && angle < (7 * slice) / 2) {
+    return "sw";
+  }
+  if (angle >= (7 * slice) / 2 || angle < -(7 * slice) / 2) {
+    return "w";
+  }
+  if (angle >= -(7 * slice) / 2 && angle < -(5 * slice) / 2) {
+    return "nw";
+  }
+  if (angle >= -(5 * slice) / 2 && angle < -(3 * slice) / 2) {
+    return "n";
+  }
   return "ne";
 }
 
@@ -189,8 +218,12 @@ export function findPath(
 ): ReadonlyArray<Vector<Tile>> | undefined {
   const fromNode = area.graph.getProximityNode(from);
   const toNode = area.graph.getProximityNode(to);
-  if (!fromNode || !toNode) return;
+  if (!fromNode || !toNode) {
+    return;
+  }
   const path = area.graph.findPath(fromNode, toNode);
-  if (!path) return;
+  if (!path) {
+    return;
+  }
   return path;
 }

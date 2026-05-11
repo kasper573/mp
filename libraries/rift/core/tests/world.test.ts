@@ -216,7 +216,9 @@ describe("world events", () => {
     w.clearChanges();
     const events: string[] = [];
     w.on((e) => {
-      if (e.type === "componentChanged") events.push("changed");
+      if (e.type === "componentChanged") {
+        events.push("changed");
+      }
     });
     w.write(id, pos, { x: 1 });
     w.write(id, pos, { x: 2 });
@@ -232,7 +234,9 @@ describe("world events", () => {
     w.clearChanges();
     const events: number[] = [];
     w.onSync((e) => {
-      if (e.type === "componentChanged") events.push(events.length);
+      if (e.type === "componentChanged") {
+        events.push(events.length);
+      }
     });
     w.write(id, pos, { x: 1 });
     w.write(id, pos, { x: 2 });
@@ -242,8 +246,11 @@ describe("world events", () => {
     const w = new World(schema);
     const events: string[] = [];
     w.on((e) => {
-      if (e.type === "entityCreated") events.push(`c:${e.id}`);
-      else if (e.type === "entityDestroyed") events.push(`d:${e.id}`);
+      if (e.type === "entityCreated") {
+        events.push(`c:${e.id}`);
+      } else if (e.type === "entityDestroyed") {
+        events.push(`d:${e.id}`);
+      }
     });
     const id = w.create();
     w.destroy(id);
@@ -253,7 +260,9 @@ describe("world events", () => {
     const w = new World(schema);
     const events: EntityId[] = [];
     const off = w.on((e) => {
-      if (e.type === "entityCreated") events.push(e.id);
+      if (e.type === "entityCreated") {
+        events.push(e.id);
+      }
     });
     w.create();
     off();

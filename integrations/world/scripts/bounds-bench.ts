@@ -159,7 +159,9 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
     progress.setSample(count, sample);
     markResolved(group);
     progress.render();
-    if (group.every((s) => s.firstBad !== 0)) break;
+    if (group.every((s) => s.firstBad !== 0)) {
+      break;
+    }
     count *= 2;
   }
 
@@ -175,7 +177,9 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
   // the resulting sample into every still-open scenario.
   while (true) {
     const widest = pickWidestUnresolved(group);
-    if (!widest) break;
+    if (!widest) {
+      break;
+    }
     const mid = Math.floor((widest.safe + widest.firstBad) / 2);
     progress.set(
       "phase",
@@ -196,14 +200,20 @@ function applySample(
   sample: Sample,
 ): void {
   for (const s of group) {
-    if (s.resolved) continue;
+    if (s.resolved) {
+      continue;
+    }
     // Only fold this probe into the bracket if npcCount actually sits inside
     // it. Without this guard a noisy out-of-bracket reading can invert the
     // bracket (firstBad < safe) — possible because samples aren't monotonic
     // in npcCount and shared-search drives probes that aren't necessarily
     // inside every metric's range.
-    if (npcCount <= s.safe) continue;
-    if (s.firstBad !== 0 && npcCount >= s.firstBad) continue;
+    if (npcCount <= s.safe) {
+      continue;
+    }
+    if (s.firstBad !== 0 && npcCount >= s.firstBad) {
+      continue;
+    }
     const value = s.metric.extract(sample);
     if (value > s.metric.threshold) {
       s.firstBad = npcCount;
@@ -217,8 +227,12 @@ function applySample(
 
 function markResolved(group: Scenario[]): void {
   for (const s of group) {
-    if (s.resolved) continue;
-    if (s.firstBad === 0) continue; // unbracketed (might still get a fail later)
+    if (s.resolved) {
+      continue;
+    }
+    if (s.firstBad === 0) {
+      continue;
+    } // unbracketed (might still get a fail later)
     if (s.firstBad - s.safe <= RESOLUTION) {
       s.resolved = true;
       progress.bumpResolved();
@@ -230,8 +244,12 @@ function pickWidestUnresolved(group: Scenario[]): Scenario | undefined {
   let best: Scenario | undefined;
   let bestSpan = RESOLUTION;
   for (const s of group) {
-    if (s.resolved) continue;
-    if (s.firstBad === 0) continue; // unbracketed — can't refine
+    if (s.resolved) {
+      continue;
+    }
+    if (s.firstBad === 0) {
+      continue;
+    } // unbracketed — can't refine
     const span = s.firstBad - s.safe;
     if (span > bestSpan) {
       bestSpan = span;
@@ -305,7 +323,9 @@ async function measure(
 }
 
 function percentile(sorted: readonly number[], q: number): number {
-  if (sorted.length === 0) return 0;
+  if (sorted.length === 0) {
+    return 0;
+  }
   const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * q));
   return sorted[idx];
 }
@@ -425,20 +445,32 @@ function fmt(n: number): string {
 }
 
 function fmtBytes(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} MB`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} kB`;
+  if (n >= 1_000_000) {
+    return `${(n / 1_000_000).toFixed(1)} MB`;
+  }
+  if (n >= 1_000) {
+    return `${(n / 1_000).toFixed(1)} kB`;
+  }
   return `${Math.round(n)} B`;
 }
 
 function fmtThreshold(m: MetricSpec): string {
-  if (m.unit === "B/s") return `${fmtBytes(m.threshold)}/s`;
-  if (m.unit === "B") return fmtBytes(m.threshold);
+  if (m.unit === "B/s") {
+    return `${fmtBytes(m.threshold)}/s`;
+  }
+  if (m.unit === "B") {
+    return fmtBytes(m.threshold);
+  }
   return `${m.threshold} ${m.unit}`;
 }
 
 function fmtMetricValue(m: MetricSpec, v: number): string {
-  if (m.unit === "B/s") return `${fmtBytes(v)}/s`;
-  if (m.unit === "B") return fmtBytes(v);
+  if (m.unit === "B/s") {
+    return `${fmtBytes(v)}/s`;
+  }
+  if (m.unit === "B") {
+    return fmtBytes(v);
+  }
   return `${v.toFixed(2)} ms`;
 }
 

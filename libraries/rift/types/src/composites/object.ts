@@ -91,9 +91,15 @@ type MaskWidth = 1 | 2 | 4;
 
 // Components with up to 8 fields fit in 1 byte, up to 16 in 2, up to 32 in 4.
 function fieldMaskWidth(fieldCount: number): MaskWidth {
-  if (fieldCount <= 8) return 1;
-  if (fieldCount <= 16) return 2;
-  if (fieldCount <= 32) return 4;
+  if (fieldCount <= 8) {
+    return 1;
+  }
+  if (fieldCount <= 16) {
+    return 2;
+  }
+  if (fieldCount <= 32) {
+    return 4;
+  }
   throw new Error(
     `Object types with more than 32 fields are not supported (got ${fieldCount})`,
   );

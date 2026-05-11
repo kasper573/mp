@@ -63,7 +63,9 @@ export class ActorController extends Container {
     );
     this.#sprite.textureLookup = (animationName, direction) => {
       const appearance = client.world.get(entityId, Appearance);
-      if (!appearance) return [];
+      if (!appearance) {
+        return [];
+      }
       return options.actorTextures(
         appearance.modelId,
         animationName,
@@ -79,7 +81,9 @@ export class ActorController extends Container {
     this.#subscriptions = [
       effect(this.#updateBaseAnimation),
       client.on(Attacked, (ev) => {
-        if (ev.data.entityId !== entityId) return;
+        if (ev.data.entityId !== entityId) {
+          return;
+        }
         void this.#sprite
           .playToEndAndStop("attack-spear")
           .then(this.#resumeBaseAnimation);

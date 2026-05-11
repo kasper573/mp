@@ -18,15 +18,23 @@ export function npcRewardFeature(opts: NpcRewardOptions): Feature {
     server(server): Cleanup {
       return server.on(Kill, (event) => {
         const { attackerId, victimId } = event.data;
-        if (!server.world.has(attackerId, CharacterTag)) return;
+        if (!server.world.has(attackerId, CharacterTag)) {
+          return;
+        }
         const victimNpc = server.world.get(victimId, NpcTag);
-        if (!victimNpc) return;
+        if (!victimNpc) {
+          return;
+        }
 
         const rewards = opts.rewardsByNpcId.get(victimNpc.definitionId);
-        if (!rewards) return;
+        if (!rewards) {
+          return;
+        }
 
         const attackerInventory = server.world.get(attackerId, InventoryRef);
-        if (!attackerInventory) return;
+        if (!attackerInventory) {
+          return;
+        }
 
         for (const reward of rewards) {
           if (reward.type === "xp") {

@@ -96,7 +96,9 @@ export class WorldSignals {
     ...types: readonly [RiftType, ...(readonly RiftType[])]
   ): ReadonlySignal<boolean> {
     return computed(() => {
-      for (const t of types) this.trackPool(t);
+      for (const t of types) {
+        this.trackPool(t);
+      }
       return this.world.has(id, ...types);
     });
   }
@@ -110,7 +112,9 @@ export class WorldSignals {
   ): ReadonlySignal<{ [K in keyof Types]: InferValue<Types[K]> | undefined }>;
   get(id: EntityId, ...types: readonly RiftType[]): ReadonlySignal<unknown> {
     return computed(() => {
-      for (const t of types) this.trackPool(t);
+      for (const t of types) {
+        this.trackPool(t);
+      }
       if (types.length === 1) {
         return this.world.get(id, types[0]);
       }
@@ -126,7 +130,9 @@ export class WorldSignals {
   ): ReadonlySignal<readonly QueryRow<T>[]> {
     return computed((): readonly QueryRow<T>[] => {
       this.trackStructure();
-      for (const t of types) this.trackPool(t);
+      for (const t of types) {
+        this.trackPool(t);
+      }
       return this.world.query(...types).toArray();
     });
   }
@@ -138,7 +144,9 @@ export class WorldSignals {
     return computed((): EntityId[] => {
       this.trackStructure();
       const ids: EntityId[] = [];
-      for (const [id] of this.world.query(...types)) ids.push(id);
+      for (const [id] of this.world.query(...types)) {
+        ids.push(id);
+      }
       return ids;
     });
   }

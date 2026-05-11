@@ -89,7 +89,9 @@ test("camera follows the character when walking a significant distance", async (
   // region for the entire test. Because the click is at a fixed screen
   // position, it stays on-canvas even as the camera scrolls.
   const box = await canvas.boundingBox();
-  if (!box) throw new Error("canvas has no bounding box");
+  if (!box) {
+    throw new Error("canvas has no bounding box");
+  }
   const clickPosition = {
     x: box.x + box.width * 0.95,
     y: box.y + box.height * 0.95,

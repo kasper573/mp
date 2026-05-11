@@ -21,11 +21,17 @@ export function combatFeature(): Feature {
 
       return combine(
         server.on(AttackRequest, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const attacker = entityForClient(server.world, event.source.clientId);
-          if (attacker === undefined) return;
+          if (attacker === undefined) {
+            return;
+          }
           const combat = server.world.get(attacker, Combat);
-          if (!combat || !combat.alive) return;
+          if (!combat || !combat.alive) {
+            return;
+          }
           server.world.write(attacker, Combat, {
             attackTargetId: event.data,
           });
@@ -40,7 +46,9 @@ export function combatFeature(): Feature {
               CharacterTag,
               Combat,
             )) {
-              if (!combat.alive) continue;
+              if (!combat.alive) {
+                continue;
+              }
               const next = Math.min(
                 combat.health + HP_REGEN_AMOUNT,
                 combat.maxHealth,
@@ -52,7 +60,9 @@ export function combatFeature(): Feature {
           }
 
           for (const [id, combat, mv] of server.world.query(Combat, Movement)) {
-            if (!combat.attackTargetId || !combat.alive) continue;
+            if (!combat.attackTargetId || !combat.alive) {
+              continue;
+            }
             const target = combat.attackTargetId;
             const [targetCombat, targetMv] = server.world.get(
               target,

@@ -21,22 +21,30 @@ export const clientScopeEntity = ReactiveWorld.memo(
 
 export const ownedCharacters = ReactiveWorld.memo((s) => {
   const scope = clientScopeEntity(s).value;
-  if (scope === undefined) return [];
+  if (scope === undefined) {
+    return [];
+  }
   return s.get(scope, CharacterList).value ?? [];
 });
 
 export const characterClaim = ReactiveWorld.memo((s) => {
   const scope = clientScopeEntity(s).value;
-  if (scope === undefined) return undefined;
+  if (scope === undefined) {
+    return undefined;
+  }
   return s.get(scope, CharacterClaim).value;
 });
 
 export const claimedCharacterEntity = ReactiveWorld.memo(
   (s): EntityId | undefined => {
     const claim = characterClaim(s).value;
-    if (!claim) return undefined;
+    if (!claim) {
+      return undefined;
+    }
     for (const [id, tag] of s.query(CharacterTag).value) {
-      if (tag.characterId === claim.characterId) return id;
+      if (tag.characterId === claim.characterId) {
+        return id;
+      }
     }
     return undefined;
   },
@@ -44,25 +52,33 @@ export const claimedCharacterEntity = ReactiveWorld.memo(
 
 export const claimedCharacterCombat = ReactiveWorld.memo((s) => {
   const id = claimedCharacterEntity(s).value;
-  if (id === undefined) return undefined;
+  if (id === undefined) {
+    return undefined;
+  }
   return s.get(id, Combat).value;
 });
 
 export const claimedCharacterMovement = ReactiveWorld.memo((s) => {
   const id = claimedCharacterEntity(s).value;
-  if (id === undefined) return undefined;
+  if (id === undefined) {
+    return undefined;
+  }
   return s.get(id, Movement).value;
 });
 
 export const claimedCharacterAreaId = ReactiveWorld.memo((s) => {
   const id = claimedCharacterEntity(s).value;
-  if (id === undefined) return undefined;
+  if (id === undefined) {
+    return undefined;
+  }
   return s.get(id, AreaTag).value?.areaId;
 });
 
 export const claimedCharacterInventoryId = ReactiveWorld.memo((s) => {
   const id = claimedCharacterEntity(s).value;
-  if (id === undefined) return undefined;
+  if (id === undefined) {
+    return undefined;
+  }
   return s.get(id, InventoryRef).value?.inventoryId;
 });
 

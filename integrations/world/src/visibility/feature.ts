@@ -42,7 +42,9 @@ function computeVisibility(
   const visible = new Set<EntityId>();
 
   const scope = scopeEntityForClient(world, clientId);
-  if (scope !== undefined) visible.add(scope);
+  if (scope !== undefined) {
+    visible.add(scope);
+  }
 
   const watcherEntity = watchedEntityForClient(world, clientId);
   if (watcherEntity === undefined) {
@@ -50,16 +52,22 @@ function computeVisibility(
     // pick one to spectate.
     const user = opts.registry.getUser(clientId);
     if (user?.roles.has(userRoles.spectate)) {
-      for (const [id] of world.query(CharacterTag)) visible.add(id);
+      for (const [id] of world.query(CharacterTag)) {
+        visible.add(id);
+      }
     }
     return visible;
   }
 
   const watcherArea = world.get(watcherEntity, AreaTag);
   const watcherMv = world.get(watcherEntity, Movement);
-  if (!watcherArea || !watcherMv) return visible;
+  if (!watcherArea || !watcherMv) {
+    return visible;
+  }
   const area = opts.areas.get(watcherArea.areaId);
-  if (!area) return visible;
+  if (!area) {
+    return visible;
+  }
 
   const visibleRect = clientViewDistanceRect(
     watcherMv.coords,
@@ -67,14 +75,20 @@ function computeVisibility(
     opts.viewDistance.tileCount,
   );
   for (const [id, mv, entArea] of world.query(Movement, AreaTag)) {
-    if (entArea.areaId !== watcherArea.areaId) continue;
-    if (visibleRect.contains(mv.coords)) visible.add(id);
+    if (entArea.areaId !== watcherArea.areaId) {
+      continue;
+    }
+    if (visibleRect.contains(mv.coords)) {
+      visible.add(id);
+    }
   }
   visible.add(watcherEntity);
   const watcherInv = world.get(watcherEntity, InventoryRef);
   if (watcherInv !== undefined) {
     for (const [id, ref] of world.query(InventoryRef)) {
-      if (ref.inventoryId === watcherInv.inventoryId) visible.add(id);
+      if (ref.inventoryId === watcherInv.inventoryId) {
+        visible.add(id);
+      }
     }
   }
   return visible;

@@ -6,12 +6,18 @@ import { itemInstance } from "./views";
 
 export const claimedInventoryItems = ReactiveWorld.memo((s) => {
   const inv = claimedCharacterInventoryId(s).value;
-  if (!inv) return [];
+  if (!inv) {
+    return [];
+  }
   const result: ItemInstance[] = [];
   for (const [id, ref] of s.query(InventoryRef).value) {
-    if (ref.inventoryId !== inv) continue;
+    if (ref.inventoryId !== inv) {
+      continue;
+    }
     const item = itemInstance(s, id);
-    if (item) result.push(item);
+    if (item) {
+      result.push(item);
+    }
   }
   return result;
 });

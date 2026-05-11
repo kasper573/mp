@@ -45,7 +45,9 @@ function RouteComponent() {
 
   useSignalEffect(() => {
     const id = spectatedId.value;
-    if (id) joinAsSpectator(client, id);
+    if (id) {
+      joinAsSpectator(client, id);
+    }
   });
 
   const spectatable = useComputed(() => {

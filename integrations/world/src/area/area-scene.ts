@@ -136,8 +136,12 @@ export class AreaScene extends Container {
     const tile = this.pointerTile.value;
     for (const id of actors(world.signal).value) {
       const [mv, combat] = world.signal.get(id, Movement, Combat).value;
-      if (!mv || !combat || !combat.alive) continue;
-      if (combat.hitBox.offset(mv.coords).contains(tile)) return id;
+      if (!mv || !combat || !combat.alive) {
+        continue;
+      }
+      if (combat.hitBox.offset(mv.coords).contains(tile)) {
+        return id;
+      }
     }
     return undefined;
   });

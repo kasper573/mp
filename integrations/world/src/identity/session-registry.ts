@@ -53,7 +53,9 @@ export function entityForClient(
   clientId: ClientId,
 ): EntityId | undefined {
   for (const [id, owned, _tag] of world.query(OwnedByClient, CharacterTag)) {
-    if (owned.clientId === clientId) return id;
+    if (owned.clientId === clientId) {
+      return id;
+    }
   }
   return undefined;
 }
@@ -63,7 +65,9 @@ export function scopeEntityForClient(
   clientId: ClientId,
 ): EntityId | undefined {
   for (const [id, owned, _tag] of world.query(OwnedByClient, ClientScopeTag)) {
-    if (owned.clientId === clientId) return id;
+    if (owned.clientId === clientId) {
+      return id;
+    }
   }
   return undefined;
 }
@@ -73,11 +77,17 @@ export function watchedEntityForClient(
   clientId: ClientId,
 ): EntityId | undefined {
   const scope = scopeEntityForClient(world, clientId);
-  if (scope === undefined) return undefined;
+  if (scope === undefined) {
+    return undefined;
+  }
   const claim = world.get(scope, CharacterClaim);
-  if (!claim) return undefined;
+  if (!claim) {
+    return undefined;
+  }
   for (const [id, tag] of world.query(CharacterTag)) {
-    if (tag.characterId === claim.characterId) return id;
+    if (tag.characterId === claim.characterId) {
+      return id;
+    }
   }
   return undefined;
 }

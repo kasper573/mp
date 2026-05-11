@@ -71,46 +71,68 @@ export function persistenceFeature(opts: PersistenceFeatureOptions): Feature {
           cleanupClient(ctx, event.data.clientId);
         }),
         server.on(JoinAsPlayer, async (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const clientId = event.source.clientId;
           const userId = opts.registry.getUserId(clientId);
-          if (!userId) return;
+          if (!userId) {
+            return;
+          }
           const access = await opts.repo.mayAccessCharacter({
             userId,
             characterId: event.data,
           });
-          if (access.isErr() || !access.value) return;
-          if (entityForClient(server.world, clientId) !== undefined) return;
+          if (access.isErr() || !access.value) {
+            return;
+          }
+          if (entityForClient(server.world, clientId) !== undefined) {
+            return;
+          }
           destroyStaleCharacterEntities(ctx, event.data);
           const entityId = await hydrateCharacter(
             server.world,
             opts,
             event.data,
           );
-          if (entityId === undefined) return;
+          if (entityId === undefined) {
+            return;
+          }
           server.world.upsert(entityId, OwnedByClient, { clientId });
         }),
         server.on(Leave, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           cleanupClient(ctx, event.source.clientId);
         }),
         server.on(Respawn, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const characterEnt = entityForClient(
             server.world,
             event.source.clientId,
           );
-          if (characterEnt === undefined) return;
+          if (characterEnt === undefined) {
+            return;
+          }
           const [combat, area, mv] = server.world.get(
             characterEnt,
             Combat,
             AreaTag,
             Movement,
           );
-          if (!combat || !area) return;
-          if (combat.alive) return;
+          if (!combat || !area) {
+            return;
+          }
+          if (combat.alive) {
+            return;
+          }
           const spawn = opts.spawnPointForArea(area.areaId);
-          if (!spawn) return;
+          if (!spawn) {
+            return;
+          }
           server.world.write(characterEnt, Combat, {
             health: combat.maxHealth,
             alive: true,
@@ -142,7 +164,9 @@ function destroyStaleCharacterEntities(
 ): void {
   const stale: EntityId[] = [];
   for (const [id, tag] of ctx.world.query(CharacterTag)) {
-    if (tag.characterId === characterId) stale.push(id);
+    if (tag.characterId === characterId) {
+      stale.push(id);
+    }
   }
   for (const id of stale) {
     ctx.snapshots.delete(id);
@@ -152,7 +176,9 @@ function destroyStaleCharacterEntities(
 
 function cleanupClient(ctx: PersistCtx, clientId: ClientId): void {
   const characterEnt = entityForClient(ctx.world, clientId);
-  if (characterEnt === undefined) return;
+  if (characterEnt === undefined) {
+    return;
+  }
   void flushEntity(ctx, characterEnt);
   ctx.snapshots.delete(characterEnt);
   ctx.world.destroy(characterEnt);
@@ -183,7 +209,9 @@ async function flushEntity(ctx: PersistCtx, id: EntityId): Promise<void> {
     InventoryRef,
     AreaTag,
   );
-  if (!tag || !mv || !combat || !prog || !inv || !area) return;
+  if (!tag || !mv || !combat || !prog || !inv || !area) {
+    return;
+  }
   const next: CharacterSnapshot = {
     areaId: area.areaId,
     coords: mv.coords,
@@ -199,7 +227,9 @@ async function flushEntity(ctx: PersistCtx, id: EntityId): Promise<void> {
     inventoryId: inv.inventoryId,
   };
   const prev = ctx.snapshots.get(id);
-  if (prev && shallowEqual(prev, next)) return;
+  if (prev && shallowEqual(prev, next)) {
+    return;
+  }
   const result = await ctx.repo.upsertCharacter({
     characterId: tag.characterId,
     fields: {
@@ -214,7 +244,9 @@ async function flushEntity(ctx: PersistCtx, id: EntityId): Promise<void> {
       xp: next.xp,
     },
   });
-  if (result.isOk()) ctx.snapshots.set(id, next);
+  if (result.isOk()) {
+    ctx.snapshots.set(id, next);
+  }
 }
 
 async function hydrateCharacter(
@@ -223,9 +255,13 @@ async function hydrateCharacter(
   characterId: CharacterId,
 ): Promise<EntityId | undefined> {
   const result = await opts.repo.selectCharacterRow(characterId);
-  if (result.isErr()) return undefined;
+  if (result.isErr()) {
+    return undefined;
+  }
   const row = result.value;
-  if (!row) return undefined;
+  if (!row) {
+    return undefined;
+  }
   return spawnCharacter(world, {
     characterId: row.id,
     userId: row.userId,
@@ -249,14 +285,18 @@ function shallowEqual<T extends object>(a: T, b: T): boolean {
   for (const key of Object.keys(a) as (keyof T)[]) {
     const av = a[key];
     const bv = b[key];
-    if (av === bv) continue;
+    if (av === bv) {
+      continue;
+    }
     if (
       typeof av === "object" &&
       av !== null &&
       typeof bv === "object" &&
       bv !== null
     ) {
-      if (!shallowEqual(av as object, bv as object)) return false;
+      if (!shallowEqual(av as object, bv as object)) {
+        return false;
+      }
       continue;
     }
     return false;

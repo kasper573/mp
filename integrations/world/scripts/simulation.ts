@@ -127,7 +127,9 @@ function pickPlayerSpawnCoords(
   area: AreaResource,
   count: number,
 ): Vector<Tile>[] {
-  if (count <= 0) return [];
+  if (count <= 0) {
+    return [];
+  }
   // Distribute players across walkable graph nodes so they don't all share
   // the same viewport. Sample evenly through the node list (which is
   // insertion-ordered, so roughly spatially coherent).
@@ -308,7 +310,9 @@ function makeTransport(): CapturingTransport {
     close() {},
     async shutdown() {},
     emit(ev) {
-      for (const l of listeners) l(ev);
+      for (const l of listeners) {
+        l(ev);
+      }
     },
     resetCapture() {
       packets.length = 0;

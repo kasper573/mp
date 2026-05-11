@@ -131,8 +131,11 @@ export function enumOf<const Values extends readonly string[]>(
       if (idx < 0) {
         throw new Error(`enum value out of range: ${v}`);
       }
-      if (wide) w.writeU16(idx);
-      else w.writeU8(idx);
+      if (wide) {
+        w.writeU16(idx);
+      } else {
+        w.writeU8(idx);
+      }
     },
     decode(r) {
       const idx = wide ? r.readU16() : r.readU8();

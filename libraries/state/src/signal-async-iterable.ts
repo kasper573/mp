@@ -8,7 +8,9 @@ export function toAsyncIterable<T>(signal: Signal<T>): AsyncIterable<T> {
       let done = false;
 
       const unsubscribe = signal.subscribe((value: T) => {
-        if (done) return;
+        if (done) {
+          return;
+        }
 
         if (pendingResolve) {
           pendingResolve({ value, done: false });

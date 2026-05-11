@@ -235,8 +235,12 @@ boxplot(() => {
         for (let i = 0; i < 1000; i++) {
           const e = w.create();
           w.add(e, posComp, { x: i, y: i });
-          if (i % 2 === 0) w.add(e, velocityComp, { dx: 0, dy: 0 });
-          if (i % 3 === 0) w.add(e, hpComp, i);
+          if (i % 2 === 0) {
+            w.add(e, velocityComp, { dx: 0, dy: 0 });
+          }
+          if (i % 3 === 0) {
+            w.add(e, hpComp, i);
+          }
           ids.push(e);
         }
         for (const id of ids) {
@@ -248,7 +252,9 @@ boxplot(() => {
         const ids: EntityId[] = [];
         for (let i = 0; i < 1000; i++) {
           const e = w.create();
-          if (i % 2 === 0) w.add(e, posComp, { x: 0, y: 0 });
+          if (i % 2 === 0) {
+            w.add(e, posComp, { x: 0, y: 0 });
+          }
           ids.push(e);
         }
         for (let i = 0; i < ids.length; i++) {

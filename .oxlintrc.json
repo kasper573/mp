@@ -45,6 +45,7 @@
         "ts-check": true
       }
     ],
+    "curly": ["error", "all"],
     "no-unsafe-function-type": "error",
     "prefer-enum-initializers": "error",
     "prefer-ts-expect-error": "error",

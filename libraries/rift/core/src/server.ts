@@ -184,12 +184,18 @@ export class RiftServer extends EventBus<
     const scratch = this.#scratchWriter;
     for (const ty of this.schema.components) {
       const idx = this.schema.componentIndexOf(ty);
-      if (idx === undefined) continue;
+      if (idx === undefined) {
+        continue;
+      }
       const pool = this.world.pool(ty);
-      if (pool.dirty.size === 0) continue;
+      if (pool.dirty.size === 0) {
+        continue;
+      }
       for (const [id, mask] of pool.dirty) {
         const value = pool.values.get(id);
-        if (value === undefined) continue;
+        if (value === undefined) {
+          continue;
+        }
         scratch.reset();
         this.#writeComponentUpdated(scratch, id, idx, ty, value, mask);
         let perEntity = out.get(id);
@@ -266,15 +272,21 @@ export class RiftServer extends EventBus<
   #visibleSet(slot: ClientSlot): Set<EntityId> {
     const visible = new Set<EntityId>();
     if (this.#visibility === undefined) {
-      for (const id of this.world.entities()) visible.add(id);
+      for (const id of this.world.entities()) {
+        visible.add(id);
+      }
       return visible;
     }
     const result = this.#visibility(slot.id);
     if (result === undefined) {
-      for (const id of this.world.entities()) visible.add(id);
+      for (const id of this.world.entities()) {
+        visible.add(id);
+      }
       return visible;
     }
-    for (const id of result) visible.add(id);
+    for (const id of result) {
+      visible.add(id);
+    }
     return visible;
   }
 
@@ -283,9 +295,13 @@ export class RiftServer extends EventBus<
       return this.world.exists(entityId);
     }
     const result = this.#visibility(slot.id);
-    if (result === undefined) return this.world.exists(entityId);
+    if (result === undefined) {
+      return this.world.exists(entityId);
+    }
     for (const id of result) {
-      if (id === entityId) return true;
+      if (id === entityId) {
+        return true;
+      }
     }
     return false;
   }
@@ -303,14 +319,20 @@ export class RiftServer extends EventBus<
       components: Array<[RiftType, number, unknown]>;
     }> = [];
     for (const id of visible) {
-      if (!this.world.exists(id)) continue;
+      if (!this.world.exists(id)) {
+        continue;
+      }
       const comps: Array<[RiftType, number, unknown]> = [];
       for (const ty of this.schema.components) {
         const idx = this.schema.componentIndexOf(ty);
-        if (idx === undefined) continue;
+        if (idx === undefined) {
+          continue;
+        }
         const pool = this.world.pool(ty);
         const value = pool.values.get(id);
-        if (value === undefined) continue;
+        if (value === undefined) {
+          continue;
+        }
         comps.push([ty, idx, value]);
       }
       comps.sort((a, b) => a[1] - b[1]);
@@ -363,7 +385,9 @@ export class RiftServer extends EventBus<
 
     // Visible entities — adds, updates, removes.
     for (const id of visible) {
-      if (!this.world.exists(id)) continue;
+      if (!this.world.exists(id)) {
+        continue;
+      }
       const isNew = !slot.knownEntities.has(id);
       if (isNew) {
         w.writeU8(DeltaOp.EntityCreated);
@@ -377,10 +401,14 @@ export class RiftServer extends EventBus<
       const sharedForEntity = sharedUpdates.get(id);
       for (const ty of this.schema.components) {
         const idx = this.schema.componentIndexOf(ty);
-        if (idx === undefined) continue;
+        if (idx === undefined) {
+          continue;
+        }
         const pool = this.world.pool(ty);
         const value = pool.values.get(id);
-        if (value === undefined) continue;
+        if (value === undefined) {
+          continue;
+        }
         currentComps.add(ty);
         if (!known.has(ty)) {
           w.writeU8(DeltaOp.ComponentAdded);

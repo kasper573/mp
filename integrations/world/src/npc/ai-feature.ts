@@ -42,7 +42,9 @@ class CombatMemory {
     visit: (attacker: EntityId, target: EntityId) => void,
   ): void {
     const attackers = this.#combats.get(observer);
-    if (!attackers) return;
+    if (!attackers) {
+      return;
+    }
     attackers.forEach((targets, attacker) => {
       targets.forEach((target) => visit(attacker, target));
     });
@@ -99,12 +101,16 @@ export function npcAiFeature(opts: NpcAiOptions): Feature {
           const list: Vector<Tile>[] = [];
           for (const id of area.graph.nodeIds) {
             const node = area.graph.getNode(id);
-            if (node) list.push(node.data.vector);
+            if (node) {
+              list.push(node.data.vector);
+            }
           }
           nodes = list;
           walkableNodesByArea.set(area, nodes);
         }
-        if (nodes.length === 0) return area.start;
+        if (nodes.length === 0) {
+          return area.start;
+        }
         return rng.oneOf(nodes);
       }
 
@@ -121,7 +127,9 @@ export function npcAiFeature(opts: NpcAiOptions): Feature {
             NpcAi,
             Movement,
           )) {
-            if (observerId === attacker) continue;
+            if (observerId === attacker) {
+              continue;
+            }
             const seesAttacker =
               attackerMv?.coords.isWithinDistance(
                 observerMv.coords,
@@ -179,9 +187,13 @@ function stepNpc(ctx: AiCtx, id: EntityId): void {
     AreaTag,
     Combat,
   );
-  if (!ai || !mv || !areaTag || !combat) return;
+  if (!ai || !mv || !areaTag || !combat) {
+    return;
+  }
   const area = ctx.areas.get(areaTag.areaId);
-  if (!area) return;
+  if (!area) {
+    return;
+  }
 
   if (!combat.alive) {
     clearActions(ctx, id);
@@ -206,7 +218,9 @@ function stepNpc(ctx: AiCtx, id: EntityId): void {
     }
   }
 
-  if (combat.attackTargetId !== undefined) return;
+  if (combat.attackTargetId !== undefined) {
+    return;
+  }
 
   const target = findAggroTarget(ctx, id, areaTag.areaId);
   if (target !== undefined) {
@@ -236,13 +250,17 @@ function stillInRange(
   if (!targetMv || !targetArea || !targetCombat || !targetCombat.alive) {
     return false;
   }
-  if (targetArea.areaId !== selfArea) return false;
+  if (targetArea.areaId !== selfArea) {
+    return false;
+  }
   return targetMv.coords.isWithinDistance(selfCoords, aggroRange);
 }
 
 function clearActions(ctx: AiCtx, id: EntityId): void {
   const [combat, mv] = ctx.world.get(id, Combat, Movement);
-  if (!combat || !mv) return;
+  if (!combat || !mv) {
+    return;
+  }
   const hadPath = ctx.world.has(id, PathFollow);
   if (combat.attackTargetId !== undefined || mv.moveTarget || hadPath) {
     ctx.world.remove(id, PathFollow);
@@ -257,8 +275,12 @@ function applyIdleBehaviour(
   area: AreaResource,
 ): void {
   const [ai, mv] = ctx.world.get(id, NpcAi, Movement);
-  if (!ai || !mv) return;
-  if (mv.moveTarget || ctx.world.has(id, PathFollow)) return;
+  if (!ai || !mv) {
+    return;
+  }
+  if (mv.moveTarget || ctx.world.has(id, PathFollow)) {
+    return;
+  }
 
   switch (ai.npcType) {
     case "static":
@@ -293,7 +315,9 @@ function findAggroTarget(
   selfArea: AreaId,
 ): EntityId | undefined {
   const [ai, selfMv] = ctx.world.get(selfId, NpcAi, Movement);
-  if (!ai || !selfMv) return undefined;
+  if (!ai || !selfMv) {
+    return undefined;
+  }
 
   switch (ai.npcType) {
     case "aggressive":
@@ -334,7 +358,9 @@ function findProtectiveTarget(
   aggroRange: number,
 ): EntityId | undefined {
   const selfTag = ctx.world.get(selfId, NpcTag);
-  if (!selfTag) return undefined;
+  if (!selfTag) {
+    return undefined;
+  }
 
   const allyList = ctx.ralliesBySpawn.get(selfTag.spawnId);
   const allies =
@@ -348,15 +374,21 @@ function findProtectiveTarget(
       : allies.has(attacker)
         ? target
         : undefined;
-    if (enemyId === undefined || allies.has(enemyId)) return;
+    if (enemyId === undefined || allies.has(enemyId)) {
+      return;
+    }
     const [enemyMv, enemyArea, enemyCombat] = ctx.world.get(
       enemyId,
       Movement,
       AreaTag,
       Combat,
     );
-    if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive) return;
-    if (enemyArea.areaId !== selfArea) return;
+    if (!enemyMv || !enemyArea || !enemyCombat || !enemyCombat.alive) {
+      return;
+    }
+    if (enemyArea.areaId !== selfArea) {
+      return;
+    }
     const distSq = enemyMv.coords.squaredDistance(selfCoords);
     if (distSq <= closestDistSq) {
       closestDistSq = distSq;
@@ -381,11 +413,19 @@ function findClosestCharacter(
     Movement,
     AreaTag,
   )) {
-    if (candidateId === selfId) continue;
-    if (candidateArea.areaId !== selfArea) continue;
+    if (candidateId === selfId) {
+      continue;
+    }
+    if (candidateArea.areaId !== selfArea) {
+      continue;
+    }
     const candidateCombat = ctx.world.get(candidateId, Combat);
-    if (!candidateCombat || !candidateCombat.alive) continue;
-    if (filter && !filter(candidateId)) continue;
+    if (!candidateCombat || !candidateCombat.alive) {
+      continue;
+    }
+    if (filter && !filter(candidateId)) {
+      continue;
+    }
     const distSq = candidateMv.coords.squaredDistance(selfCoords);
     if (distSq <= closestDistSq) {
       closestDistSq = distSq;

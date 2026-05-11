@@ -39,7 +39,9 @@ export function characterDirectoryFeature(
     server(server): Cleanup {
       async function ensureScope(clientId: ClientId): Promise<void> {
         const user = opts.registry.getUser(clientId);
-        if (!user) return;
+        if (!user) {
+          return;
+        }
         let scope = scopeEntityForClient(server.world, clientId);
         if (scope === undefined) {
           scope = server.world.create();
@@ -57,16 +59,24 @@ export function characterDirectoryFeature(
 
         server.on(ClientDisconnected, ({ data }) => {
           const scope = scopeEntityForClient(server.world, data.clientId);
-          if (scope !== undefined) server.world.destroy(scope);
+          if (scope !== undefined) {
+            server.world.destroy(scope);
+          }
         }),
 
         server.on(JoinAsPlayer, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const clientId = event.source.clientId;
           const user = opts.registry.getUser(clientId);
-          if (!user || !user.roles.has(userRoles.join)) return;
+          if (!user || !user.roles.has(userRoles.join)) {
+            return;
+          }
           const scope = scopeEntityForClient(server.world, clientId);
-          if (scope === undefined) return;
+          if (scope === undefined) {
+            return;
+          }
           server.world.upsert(scope, CharacterClaim, {
             mode: "player",
             characterId: event.data,
@@ -74,12 +84,18 @@ export function characterDirectoryFeature(
         }),
 
         server.on(JoinAsSpectator, (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const clientId = event.source.clientId;
           const user = opts.registry.getUser(clientId);
-          if (!user || !user.roles.has(userRoles.spectate)) return;
+          if (!user || !user.roles.has(userRoles.spectate)) {
+            return;
+          }
           const scope = scopeEntityForClient(server.world, clientId);
-          if (scope === undefined) return;
+          if (scope === undefined) {
+            return;
+          }
           server.world.upsert(scope, CharacterClaim, {
             mode: "spectator",
             characterId: event.data,
@@ -87,20 +103,28 @@ export function characterDirectoryFeature(
         }),
 
         server.on(RenameCharacterRequest, async (event) => {
-          if (event.source.type !== "wire") return;
+          if (event.source.type !== "wire") {
+            return;
+          }
           const clientId = event.source.clientId;
           const userId = opts.registry.getUserId(clientId);
-          if (!userId) return;
+          if (!userId) {
+            return;
+          }
           const access = await opts.repo.mayAccessCharacter({
             userId,
             characterId: event.data.characterId,
           });
-          if (access.isErr() || !access.value) return;
+          if (access.isErr() || !access.value) {
+            return;
+          }
           const updated = await opts.repo.updateCharacter({
             characterId: event.data.characterId,
             newName: event.data.name,
           });
-          if (updated.isErr()) return;
+          if (updated.isErr()) {
+            return;
+          }
           server.emit({
             type: CharacterRenamedResponse,
             data: {
@@ -128,7 +152,9 @@ async function loadCharacters(
     spawnPoint: opts.defaultSpawn,
     defaultModelId: opts.defaultModelId,
   });
-  if (ensureResult.isErr()) return [];
+  if (ensureResult.isErr()) {
+    return [];
+  }
   const characterId = ensureResult.value;
   const listResult = await opts.repo.selectCharacterList([characterId]);
   return listResult.isOk()

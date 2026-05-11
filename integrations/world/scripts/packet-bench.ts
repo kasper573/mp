@@ -36,7 +36,9 @@ function analyzeDelta(
   byComp: Map<number, OpStat>,
   byOp: Map<DeltaOp, OpStat>,
 ): void {
-  if ((data[0] as Opcode) !== Opcode.Delta) return;
+  if ((data[0] as Opcode) !== Opcode.Delta) {
+    return;
+  }
   const r = new Reader(data, 1);
   r.readVarU32();
   r.readVarU32();

@@ -94,7 +94,9 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       const characterEntity = claimedCharacterEntity(client.world.signal);
       const ready = computed(() => {
         const id = characterEntity.value;
-        if (id === undefined) return false;
+        if (id === undefined) {
+          return false;
+        }
         return client.world.signal.has(id, AreaTag).value;
       });
 
@@ -130,7 +132,9 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
             const walkable: Vector<Tile>[] = [];
             for (const id of actorIds.value) {
               const mv = client.world.signal.get(id, Movement).value;
-              if (mv) walkable.push(mv.coords);
+              if (mv) {
+                walkable.push(mv.coords);
+              }
             }
             if (walkable.length > 0) {
               const to = rng.oneOf(walkable);
