@@ -108,7 +108,7 @@ export function q16<T extends number = number>(scale: number): RiftType<T> {
     encode(w, v) {
       if (v > max || v < min) {
         throw new Error(
-          `fixedI16(scale=${scale}) value ${v} outside encodable range [${min}, ${max}]`,
+          `q16(scale=${scale}) value ${v} outside encodable range [${min}, ${max}]`,
         );
       }
       w.writeI16(Math.round(v * scale));
