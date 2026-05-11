@@ -112,7 +112,7 @@ if (!defaultAreaResource) {
 }
 const rng = new Rng();
 
-const server = new MpRiftServer({
+const riftServer = new MpRiftServer({
   transport,
   hash: fnv1a64,
   tickRateHz: opt.tickRateHz,
@@ -172,12 +172,24 @@ transport.on((event) => {
   }
 });
 
-await server.start();
+await riftServer.start();
 
 httpServer.listen(opt.port, opt.hostname);
 logger.info(`game service connected on ${opt.hostname}:${opt.port}`);
 
 shutdownCleanups.push(async () => {
-  await server.stop();
+  await riftServer.stop();
+  for (const client of wss.clients) {
+    client.terminate();
+  }
+  wss.close();
+  httpServer.closeAllConnections();
   await new Promise<void>((resolve) => httpServer.close(() => resolve()));
 });
+
+// vite-node --watch reuses the process for file changes. accept() makes this
+// module a self-accepting HMR boundary so upstream import changes route
+// through dispose() — releasing port 9998 — instead of triggering a
+// full-reload, which does not run dispose hooks.
+import.meta.hot?.accept();
+import.meta.hot?.dispose(() => Promise.all(shutdownCleanups.map((fn) => fn())));
