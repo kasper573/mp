@@ -8,12 +8,12 @@ const args = yargs(hideBin(process.argv))
     type: "number",
     description: "Total NPCs spawned in the area",
     demandOption: true,
-    default: 200,
+    default: 1000,
   })
   .option("players", {
     type: "number",
     description: "Number of fake player clients",
-    default: 1,
+    default: 50,
   })
   .option("iterations", {
     type: "number",
