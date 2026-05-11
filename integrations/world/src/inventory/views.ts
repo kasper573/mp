@@ -1,5 +1,5 @@
 import type { EntityId } from "@rift/core";
-import type { WorldSignals } from "@rift/reactive";
+import type { ReactiveWorld } from "@rift/reactive";
 import {
   ConsumableInstance as RiftConsumable,
   EquipmentInstance as RiftEquipment,
@@ -34,14 +34,14 @@ export type ItemInstance = ConsumableInstanceView | EquipmentInstanceView;
 export type ItemInstanceId = ConsumableInstanceId | EquipmentInstanceId;
 
 export function itemInstance(
-  signal: WorldSignals,
+  world: ReactiveWorld,
   entityId: EntityId,
 ): ItemInstance | undefined {
-  const inventoryRef = signal.get(entityId, InventoryRef).value;
+  const inventoryRef = world.get(entityId, InventoryRef);
   if (!inventoryRef) {
     return undefined;
   }
-  const c = signal.get(entityId, RiftConsumable).value;
+  const c = world.get(entityId, RiftConsumable);
   if (c) {
     return {
       type: "consumable",
@@ -51,7 +51,7 @@ export function itemInstance(
       stackSize: c.stackSize,
     };
   }
-  const e = signal.get(entityId, RiftEquipment).value;
+  const e = world.get(entityId, RiftEquipment);
   if (e) {
     return {
       type: "equipment",

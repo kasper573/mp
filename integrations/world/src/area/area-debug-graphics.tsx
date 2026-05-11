@@ -44,7 +44,7 @@ export class AreaDebugGraphics extends Container {
   ) {
     super();
 
-    const s = client.world.signal;
+    const world = client.world;
 
     const debugTiled = new DebugTiledGraph(
       engine,
@@ -53,7 +53,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.attackRanges = new ReactiveCollection(
-      actors(s),
+      actors(world),
       (entityId) =>
         new DebugCircle(() => {
           const [mv, combat] = client.world.get(entityId, Movement, Combat);
@@ -67,7 +67,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      npcActors(s),
+      npcActors(world),
       (entityId) =>
         new DebugCircle(() => {
           const [mv, ai, appearance] = client.world.get(
@@ -88,7 +88,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.fogOfWar = new DebugNetworkFogOfWar(
-      () => claimedCharacterMovement(s).value?.coords ?? Vector.zero(),
+      () => claimedCharacterMovement(world).value?.coords ?? Vector.zero(),
       () => area.tiled,
       () => this.viewDistance,
     );

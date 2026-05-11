@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./event";
 export * from "./protocol";
 export * from "./schema";
 export * from "./server";

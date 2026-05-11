@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
-import { effect } from "@preact/signals-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { f32, object, string, u32 } from "@rift/types";
 import {
   ClientConnected,
   ClientDisconnected,
   type ClientId,
+  ClientStateChanged,
   defineSchema,
   DeltaApplied,
   type EntityId,
@@ -147,7 +147,7 @@ describe("RiftServer + RiftClient handshake", () => {
     const client = new RiftClient(new World(schema), pair.client);
     await client.connect();
 
-    expect(client.state.value).toBe("open");
+    expect(client.state).toBe("open");
     expect(client.clientId).toBe(pair.fromClient);
     const mirrored = client.world.get(e, pos);
     expect(mirrored?.x).toBe(4);
@@ -504,8 +504,8 @@ describe("lifecycle", () => {
   });
 });
 
-describe("RiftClient.state signal", () => {
-  it("exposes a readonly signal that subscribers can observe", async () => {
+describe("RiftClient state transitions", () => {
+  it("emits ClientStateChanged for every transition", async () => {
     const schema = makeSchema();
     const pair = makePair(14);
     const server = new RiftServer({
@@ -517,18 +517,19 @@ describe("RiftClient.state signal", () => {
     const client = new RiftClient(new World(schema), pair.client);
 
     const observed: string[] = [];
-    const dispose = effect(() => {
-      observed.push(client.state.value);
+    client.on(ClientStateChanged, (event) => {
+      observed.push(event.data.state);
     });
 
+    expect(client.state).toBe("idle");
     await client.connect();
+    expect(client.state).toBe("open");
     await client.disconnect();
-    dispose();
+    expect(client.state).toBe("closed");
 
-    expect(observed[0]).toBe("idle");
-    expect(observed.includes("connecting")).toBe(true);
-    expect(observed.includes("handshaking")).toBe(true);
-    expect(observed.includes("open")).toBe(true);
+    expect(observed).toContain("connecting");
+    expect(observed).toContain("handshaking");
+    expect(observed).toContain("open");
     expect(observed[observed.length - 1]).toBe("closed");
 
     await server.stop();
@@ -598,8 +599,8 @@ describe("server time replication", () => {
     });
     await client.connect();
 
-    expect(client.serverTick.value).toBe(2);
-    expect(client.serverTime.value).toBe(300);
+    expect(client.serverTick).toBe(2);
+    expect(client.serverTime).toBe(300);
     expect(applied[0]).toEqual({ tick: 2, timeMs: 300 });
 
     const e = server.world.create();
@@ -607,8 +608,8 @@ describe("server time replication", () => {
     server.tick(0.05);
     await flush();
 
-    expect(client.serverTick.value).toBe(3);
-    expect(client.serverTime.value).toBe(350);
+    expect(client.serverTick).toBe(3);
+    expect(client.serverTime).toBe(350);
     expect(applied.at(-1)).toEqual({ tick: 3, timeMs: 350 });
 
     await server.stop();

@@ -1,11 +1,11 @@
 import type { ClientId, EntityId } from "./protocol";
 import { RiftCloseCode } from "./transport";
-import { EventBus } from "@rift/event";
-import type { RiftEvent, UnsubscribeFn } from "@rift/event";
+import { EventBus } from "./event";
+import type { RiftEvent, UnsubscribeFn } from "./event";
 import { isObjectType, Reader, Writer } from "@rift/types";
 import type { RiftType } from "@rift/types";
 import { WHOLE_DIRTY } from "./world";
-import type { RiftSchema } from "./schema";
+import { hashEquals, type RiftSchema } from "./schema";
 import type { ServerTransportEvent, ServerTransport } from "./transport";
 import {
   DeltaOp,
@@ -482,16 +482,7 @@ export class RiftServer extends EventBus<
   #handleHello(slot: ClientSlot, data: Uint8Array): void {
     const r = new Reader(data, 1);
     const clientHash = r.readBytes();
-    let mismatch = clientHash.byteLength !== this.#hash.byteLength;
-    if (!mismatch) {
-      for (let i = 0; i < this.#hash.byteLength; i++) {
-        if (clientHash[i] !== this.#hash[i]) {
-          mismatch = true;
-          break;
-        }
-      }
-    }
-    if (mismatch) {
+    if (!hashEquals(clientHash, this.#hash)) {
       this.#transport.close(
         slot.id,
         RiftCloseCode.SchemaMismatch,

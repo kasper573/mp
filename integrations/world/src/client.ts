@@ -1,10 +1,15 @@
 import { createContext } from "preact";
 import { useContext } from "preact/compat";
-import { defineSchema, RiftClient } from "@rift/core";
+import {
+  type ClientState,
+  ClientStateChanged,
+  defineSchema,
+  RiftClient,
+} from "@rift/core";
 import { ReactiveWorld } from "@rift/reactive";
 import { wsTransport } from "@rift/ws";
 import { WebSocket as PartySocket } from "partysocket";
-import type { ReadonlySignal } from "@preact/signals-core";
+import { signal, type ReadonlySignal } from "@preact/signals-core";
 import type { AccessToken } from "@mp/auth";
 import { fnv1a64 } from "./hash";
 import { schemaComponents, schemaEvents } from "./schema";
@@ -18,6 +23,7 @@ export interface MpRiftClientOptions {
 
 export class MpRiftClient extends RiftClient<ReactiveWorld> {
   readonly #features: readonly Feature[];
+  readonly #stateSignal = signal<ClientState>("idle");
 
   constructor(opts: MpRiftClientOptions) {
     const features: Feature[] = [
@@ -38,6 +44,16 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
     );
 
     this.#features = features;
+    this.on(ClientStateChanged, (event) => {
+      this.#stateSignal.value = event.data.state;
+    });
+  }
+
+  // Reactive mirror of `RiftClient.state`. Use `state$.value` to read
+  // inside a tracking scope; the imperative `state` getter on the base
+  // class is still available for one-shot reads.
+  get state$(): ReadonlySignal<ClientState> {
+    return this.#stateSignal;
   }
 
   #cleanup?: Cleanup;

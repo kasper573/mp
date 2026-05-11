@@ -6,7 +6,7 @@ import { claimedCharacterIsDead } from "./signals";
 
 export function RespawnDialog() {
   const client = useContext(RiftContext);
-  const open = claimedCharacterIsDead(client.world.signal).value;
+  const open = claimedCharacterIsDead(client.world).value;
   return (
     <Dialog open={open}>
       <h1>You are dead</h1>

@@ -1,4 +1,5 @@
 import {
+  batch,
   computed,
   signal,
   type ReadonlySignal,
@@ -6,22 +7,26 @@ import {
 } from "@preact/signals-core";
 import {
   type EntityId,
-  type QueryRow,
+  type QueryView,
   type RiftSchema,
   World,
 } from "@rift/core";
 import type { InferValue, RiftType } from "@rift/types";
 
+// World variant whose read methods auto-subscribe to the relevant
+// structure/pool version signals when called inside a reactive scope
+// (e.g. the callback of `computed`, `effect`, or `ReactiveWorld.memo`).
+// Outside a reactive scope the reads behave exactly like `World`.
 export class ReactiveWorld extends World {
   static memo<T>(
-    compute: (s: WorldSignals) => T,
-  ): (s: WorldSignals) => ReadonlySignal<T> {
-    const cache = new WeakMap<WorldSignals, ReadonlySignal<T>>();
-    return (s) => {
-      let cached = cache.get(s);
+    compute: (w: ReactiveWorld) => T,
+  ): (w: ReactiveWorld) => ReadonlySignal<T> {
+    const cache = new WeakMap<ReactiveWorld, ReadonlySignal<T>>();
+    return (w) => {
+      let cached = cache.get(w);
       if (!cached) {
-        cached = computed(() => compute(s));
-        cache.set(s, cached);
+        cached = computed(() => compute(w));
+        cache.set(w, cached);
       }
       return cached;
     };
@@ -30,15 +35,8 @@ export class ReactiveWorld extends World {
   readonly #structureVersion = signal(0);
   readonly #poolVersions = new Map<RiftType, Signal<number>>();
 
-  readonly signal: WorldSignals;
-
   constructor(schema: RiftSchema) {
     super(schema);
-    this.signal = new WorldSignals(
-      this,
-      () => void this.#structureVersion.value,
-      (t) => void this.#poolVersion(t).value,
-    );
     this.on((event) => {
       switch (event.type) {
         case "entityCreated":
@@ -57,6 +55,75 @@ export class ReactiveWorld extends World {
     });
   }
 
+  override exists(id: EntityId): boolean {
+    void this.#structureVersion.value;
+    return super.exists(id);
+  }
+
+  override has(
+    id: EntityId,
+    ...types: readonly [RiftType, ...(readonly RiftType[])]
+  ): boolean {
+    for (const t of types) {
+      void this.#poolVersion(t).value;
+    }
+    return super.has(id, ...types);
+  }
+
+  override get<T>(id: EntityId, type: RiftType<T>): T | undefined;
+  override get<
+    const Types extends readonly [RiftType, RiftType, ...(readonly RiftType[])],
+  >(
+    id: EntityId,
+    ...types: Types
+  ): { [K in keyof Types]: InferValue<Types[K]> | undefined };
+  override get(id: EntityId, ...types: readonly RiftType[]): unknown {
+    for (const t of types) {
+      void this.#poolVersion(t).value;
+    }
+    if (types.length === 1) {
+      return super.get(id, types[0]);
+    }
+    return super.get(
+      id,
+      ...(types as readonly [RiftType, RiftType, ...(readonly RiftType[])]),
+    );
+  }
+
+  override query<const Types extends readonly RiftType[]>(
+    ...types: Types
+  ): QueryView<Types> {
+    void this.#structureVersion.value;
+    for (const t of types) {
+      void this.#poolVersion(t).value;
+    }
+    return super.query(...types);
+  }
+
+  override transaction<T>(fn: () => T): T {
+    return batch(fn);
+  }
+
+  // Tracks ONLY structure version — so subscribers don't re-run on
+  // value mutations of the matched components, only on membership change.
+  override entities(): ReadonlySet<EntityId>;
+  override entities(...types: readonly RiftType[]): EntityId[];
+  override entities(
+    ...types: readonly RiftType[]
+  ): ReadonlySet<EntityId> | EntityId[] {
+    void this.#structureVersion.value;
+    if (types.length === 0) {
+      return super.entities();
+    }
+    const ids: EntityId[] = [];
+    // Use super.query so we don't trigger pool-version tracking from
+    // our own `query` override.
+    for (const [id] of super.query(...types)) {
+      ids.push(id);
+    }
+    return ids;
+  }
+
   #poolVersion(type: RiftType): Signal<number> {
     let v = this.#poolVersions.get(type);
     if (!v) {
@@ -64,85 +131,6 @@ export class ReactiveWorld extends World {
       this.#poolVersions.set(type, v);
     }
     return v;
-  }
-}
-
-// Mirrors the read-only surface of `World` but every method returns a
-// `ReadonlySignal` that updates when the relevant component pool(s) or
-// the entity structure change. Use `world.signal.X(...)` whenever you
-// need reactive reads; use `world.X(...)` for the imperative one-shot.
-export class WorldSignals {
-  constructor(
-    private readonly world: ReactiveWorld,
-    private readonly trackStructure: () => void,
-    private readonly trackPool: (type: RiftType) => void,
-  ) {}
-
-  exists(id: EntityId): ReadonlySignal<boolean> {
-    return computed(() => {
-      this.trackStructure();
-      return this.world.exists(id);
-    });
-  }
-
-  has(
-    id: EntityId,
-    ...types: readonly [RiftType, ...(readonly RiftType[])]
-  ): ReadonlySignal<boolean> {
-    return computed(() => {
-      for (const t of types) {
-        this.trackPool(t);
-      }
-      return this.world.has(id, ...types);
-    });
-  }
-
-  get<T>(id: EntityId, type: RiftType<T>): ReadonlySignal<T | undefined>;
-  get<
-    const Types extends readonly [RiftType, RiftType, ...(readonly RiftType[])],
-  >(
-    id: EntityId,
-    ...types: Types
-  ): ReadonlySignal<{ [K in keyof Types]: InferValue<Types[K]> | undefined }>;
-  get(id: EntityId, ...types: readonly RiftType[]): ReadonlySignal<unknown> {
-    return computed(() => {
-      for (const t of types) {
-        this.trackPool(t);
-      }
-      if (types.length === 1) {
-        return this.world.get(id, types[0]);
-      }
-      return this.world.get(
-        id,
-        ...(types as readonly [RiftType, RiftType, ...(readonly RiftType[])]),
-      );
-    });
-  }
-
-  query<const T extends readonly RiftType[]>(
-    ...types: T
-  ): ReadonlySignal<readonly QueryRow<T>[]> {
-    return computed((): readonly QueryRow<T>[] => {
-      this.trackStructure();
-      for (const t of types) {
-        this.trackPool(t);
-      }
-      return this.world.query(...types).toArray();
-    });
-  }
-
-  // Like query() but only returns matching entity IDs and only fires when
-  // membership changes — component value mutations don't trigger this signal.
-  // Useful for reactive collection bindings keyed on EntityId.
-  entities(...types: readonly RiftType[]): ReadonlySignal<EntityId[]> {
-    return computed((): EntityId[] => {
-      this.trackStructure();
-      const ids: EntityId[] = [];
-      for (const [id] of this.world.query(...types)) {
-        ids.push(id);
-      }
-      return ids;
-    });
   }
 }
 

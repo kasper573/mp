@@ -17,6 +17,18 @@ export interface RiftSchema {
   digest(): Uint8Array;
 }
 
+export function hashEquals(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) {
+    return false;
+  }
+  for (let i = 0; i < a.byteLength; i++) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function defineSchema(opts: RiftSchemaOptions): RiftSchema {
   const componentIndex = buildIndex(opts.components);
   const eventIndex = buildIndex(opts.events);

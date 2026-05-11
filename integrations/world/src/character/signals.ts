@@ -9,39 +9,44 @@ import {
   CharacterList,
   CharacterTag,
   ClientScopeTag,
+  NpcTag,
 } from "../identity/components";
 import { InventoryRef } from "../inventory/components";
 import { Movement } from "../movement/components";
-import { NpcTag } from "../identity/components";
 import type { CharacterId } from "./id";
 
 export const clientScopeEntity = ReactiveWorld.memo(
-  (s): EntityId | undefined => s.query(ClientScopeTag).value[0]?.[0],
+  (w): EntityId | undefined => {
+    for (const [id] of w.query(ClientScopeTag)) {
+      return id;
+    }
+    return undefined;
+  },
 );
 
-export const ownedCharacters = ReactiveWorld.memo((s) => {
-  const scope = clientScopeEntity(s).value;
+export const ownedCharacters = ReactiveWorld.memo((w) => {
+  const scope = clientScopeEntity(w).value;
   if (scope === undefined) {
     return [];
   }
-  return s.get(scope, CharacterList).value ?? [];
+  return w.get(scope, CharacterList) ?? [];
 });
 
-export const characterClaim = ReactiveWorld.memo((s) => {
-  const scope = clientScopeEntity(s).value;
+export const characterClaim = ReactiveWorld.memo((w) => {
+  const scope = clientScopeEntity(w).value;
   if (scope === undefined) {
     return undefined;
   }
-  return s.get(scope, CharacterClaim).value;
+  return w.get(scope, CharacterClaim);
 });
 
 export const claimedCharacterEntity = ReactiveWorld.memo(
-  (s): EntityId | undefined => {
-    const claim = characterClaim(s).value;
+  (w): EntityId | undefined => {
+    const claim = characterClaim(w).value;
     if (!claim) {
       return undefined;
     }
-    for (const [id, tag] of s.query(CharacterTag).value) {
+    for (const [id, tag] of w.query(CharacterTag)) {
       if (tag.characterId === claim.characterId) {
         return id;
       }
@@ -50,47 +55,35 @@ export const claimedCharacterEntity = ReactiveWorld.memo(
   },
 );
 
-export const claimedCharacterCombat = ReactiveWorld.memo((s) => {
-  const id = claimedCharacterEntity(s).value;
-  if (id === undefined) {
-    return undefined;
-  }
-  return s.get(id, Combat).value;
+export const claimedCharacterCombat = ReactiveWorld.memo((w) => {
+  const id = claimedCharacterEntity(w).value;
+  return id === undefined ? undefined : w.get(id, Combat);
 });
 
-export const claimedCharacterMovement = ReactiveWorld.memo((s) => {
-  const id = claimedCharacterEntity(s).value;
-  if (id === undefined) {
-    return undefined;
-  }
-  return s.get(id, Movement).value;
+export const claimedCharacterMovement = ReactiveWorld.memo((w) => {
+  const id = claimedCharacterEntity(w).value;
+  return id === undefined ? undefined : w.get(id, Movement);
 });
 
-export const claimedCharacterAreaId = ReactiveWorld.memo((s) => {
-  const id = claimedCharacterEntity(s).value;
-  if (id === undefined) {
-    return undefined;
-  }
-  return s.get(id, AreaTag).value?.areaId;
+export const claimedCharacterAreaId = ReactiveWorld.memo((w) => {
+  const id = claimedCharacterEntity(w).value;
+  return id === undefined ? undefined : w.get(id, AreaTag)?.areaId;
 });
 
-export const claimedCharacterInventoryId = ReactiveWorld.memo((s) => {
-  const id = claimedCharacterEntity(s).value;
-  if (id === undefined) {
-    return undefined;
-  }
-  return s.get(id, InventoryRef).value?.inventoryId;
+export const claimedCharacterInventoryId = ReactiveWorld.memo((w) => {
+  const id = claimedCharacterEntity(w).value;
+  return id === undefined ? undefined : w.get(id, InventoryRef)?.inventoryId;
 });
 
-export const claimedCharacterIsDead = ReactiveWorld.memo((s) => {
-  const combat = claimedCharacterCombat(s).value;
+export const claimedCharacterIsDead = ReactiveWorld.memo((w) => {
+  const combat = claimedCharacterCombat(w).value;
   return !combat?.alive;
 });
 
-export const actors = ReactiveWorld.memo((s) => s.entities(Movement).value);
+export const actors = ReactiveWorld.memo((w) => w.entities(Movement));
 
-export const npcActors = ReactiveWorld.memo((s) =>
-  actors(s).value.filter((id) => s.has(id, NpcTag).value),
+export const npcActors = ReactiveWorld.memo((w) =>
+  actors(w).value.filter((id) => w.has(id, NpcTag)),
 );
 
 export interface LiveCharacter {
@@ -99,9 +92,9 @@ export interface LiveCharacter {
   readonly name: string;
 }
 
-export const liveCharacters = ReactiveWorld.memo((s): LiveCharacter[] => {
+export const liveCharacters = ReactiveWorld.memo((w): LiveCharacter[] => {
   const list: LiveCharacter[] = [];
-  for (const [, tag, appearance] of s.query(CharacterTag, Appearance).value) {
+  for (const [, tag, appearance] of w.query(CharacterTag, Appearance)) {
     list.push({
       id: tag.characterId,
       userId: tag.userId,

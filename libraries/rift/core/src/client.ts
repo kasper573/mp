@@ -1,19 +1,18 @@
-import { batch, signal, type ReadonlySignal } from "@preact/signals-core";
-import type { ClientId, EntityId } from "./protocol";
-import type { RiftEvent, UnsubscribeFn } from "@rift/event";
-import { EventBus } from "@rift/event";
+import type { ClientState, ClientId, EntityId } from "./protocol";
+import type { RiftEvent } from "./event";
+import { EventBus } from "./event";
 import { isObjectType, Reader, Writer } from "@rift/types";
 import type { ClientTransport, ClientTransportEvent } from "./transport";
-import { DeltaApplied, DeltaOp, Opcode, ClientDisconnected } from "./protocol";
+import {
+  ClientStateChanged,
+  DeltaApplied,
+  DeltaOp,
+  Opcode,
+  ClientDisconnected,
+} from "./protocol";
 import type { World } from "./world";
 import { RiftCloseCode } from "./transport";
-
-export type ClientConnectionState =
-  | "idle"
-  | "connecting"
-  | "handshaking"
-  | "open"
-  | "closed";
+import { hashEquals } from "./schema";
 
 export type RiftClientEventOrigin = "local" | "wire";
 export type RiftClientEvent<Data = unknown> = RiftEvent<
@@ -27,14 +26,14 @@ export class RiftClient<W extends World = World> extends EventBus<
   RiftClientEventOrigin
 > {
   readonly #hash: Uint8Array;
-  readonly #stateSignal = signal<ClientConnectionState>("idle");
-  readonly #serverTickSignal = signal(0);
-  readonly #serverTimeSignal = signal(0);
 
+  #state: ClientState = "idle";
+  #serverTick = 0;
+  #serverTime = 0;
   #clientId?: ClientId;
-  #unsub?: () => void;
-  #connectResolve?: () => void;
-  #connectReject?: (e: Error) => void;
+  #unsubFromTransport?: () => void;
+  #unsubFromEmit?: () => void;
+  #pendingConnect?: PromiseWithResolvers<void>;
 
   constructor(
     public readonly world: W,
@@ -44,54 +43,80 @@ export class RiftClient<W extends World = World> extends EventBus<
     this.#hash = world.schema.digest();
   }
 
-  get state(): ReadonlySignal<ClientConnectionState> {
-    return this.#stateSignal;
+  get state(): ClientState {
+    return this.#state;
   }
 
-  get serverTick(): ReadonlySignal<number> {
-    return this.#serverTickSignal;
+  get serverTick(): number {
+    return this.#serverTick;
   }
 
-  get serverTime(): ReadonlySignal<number> {
-    return this.#serverTimeSignal;
+  get serverTime(): number {
+    return this.#serverTime;
   }
 
   get clientId(): ClientId | undefined {
     return this.#clientId;
   }
 
-  #unsubscribeFromEmit?: UnsubscribeFn;
   connect(): Promise<void> {
-    const current = this.#stateSignal.peek();
-    if (
-      current === "open" ||
-      current === "connecting" ||
-      current === "handshaking"
-    ) {
+    if (this.#pendingConnect) {
+      return this.#pendingConnect.promise;
+    }
+    if (this.#state === "open") {
       return Promise.resolve();
     }
-    this.#unsubscribeFromEmit = this.onAny(this.#onEmit);
-    this.#stateSignal.value = "connecting";
-    return new Promise<void>((resolve, reject) => {
-      this.#connectResolve = resolve;
-      this.#connectReject = reject;
-      this.#unsub = this.transport.on((ev) => this.#onTransportEvent(ev));
-      if (this.transport.state === "open") {
-        this.#onTransportEvent({ type: "open" });
-      }
-    });
+    const pending: PromiseWithResolvers<void> = Promise.withResolvers();
+    this.#pendingConnect = pending;
+    this.#unsubFromEmit = this.onAny(this.#onEmit);
+    this.#unsubFromTransport = this.transport.on((ev) =>
+      this.#onTransportEvent(ev),
+    );
+    this.#setState("connecting");
+    if (this.transport.state === "open") {
+      this.#onTransportEvent({ type: "open" });
+    }
+    return pending.promise;
   }
 
   disconnect(
     code = RiftCloseCode.Normal,
     reason = "client disconnect",
   ): Promise<void> {
-    this.#unsubscribeFromEmit?.();
     this.transport.close(code, reason);
-    this.#unsub?.();
-    this.#unsub = undefined;
-    this.#stateSignal.value = "closed";
+    this.#teardown();
+    this.#setState("closed");
     return Promise.resolve();
+  }
+
+  #setState(next: ClientState): void {
+    if (next === this.#state) {
+      return;
+    }
+    this.#state = next;
+    this.emit({
+      type: ClientStateChanged,
+      data: { state: next },
+      source: "local",
+      target: "local",
+    });
+  }
+
+  #teardown(): void {
+    this.#unsubFromEmit?.();
+    this.#unsubFromEmit = undefined;
+    this.#unsubFromTransport?.();
+    this.#unsubFromTransport = undefined;
+  }
+
+  #settleConnect(err?: Error): void {
+    const pending = this.#pendingConnect;
+    this.#pendingConnect = undefined;
+    if (err) {
+      pending?.reject(err);
+    } else {
+      pending?.resolve();
+    }
   }
 
   #onEmit = (event: RiftClientEvent): boolean => {
@@ -99,7 +124,7 @@ export class RiftClient<W extends World = World> extends EventBus<
       case "local":
         return true;
       case "wire": {
-        if (this.#stateSignal.peek() !== "open") {
+        if (this.#state !== "open") {
           return false;
         }
         const idx = this.world.schema.eventIndexOf(event.type);
@@ -122,21 +147,16 @@ export class RiftClient<W extends World = World> extends EventBus<
     const timeMs = r.readVarU32();
     const id = r.readVarU32() as ClientId;
     const serverHash = r.readBytes();
-    if (serverHash.byteLength !== this.#hash.byteLength) {
+    if (!hashEquals(serverHash, this.#hash)) {
       this.#rejectHandshake("schema mismatch");
       return;
     }
-    for (let i = 0; i < this.#hash.byteLength; i++) {
-      if (serverHash[i] !== this.#hash[i]) {
-        this.#rejectHandshake("schema mismatch");
-        return;
-      }
-    }
     this.#clientId = id;
-    // Without batching, an effect watching the world fires mid-snapshot
-    // while state is still "handshaking", and any wire emit it triggers
-    // is silently dropped by `#onEmit`.
-    batch(() => {
+    // `world.transaction` lets reactive worlds batch their internal signal
+    // bumps into a single notification, so subscribers see a fully-applied
+    // snapshot and any wire emit they trigger lands AFTER the state flips
+    // to "open" (otherwise `#onEmit` would silently drop it).
+    this.world.transaction(() => {
       this.world.clear();
       const components = this.world.schema.components;
       const entityCount = r.readVarU32();
@@ -150,13 +170,11 @@ export class RiftClient<W extends World = World> extends EventBus<
           this.world.add(entId, ty, ty.decode(r));
         }
       }
-      this.#serverTickSignal.value = tick;
-      this.#serverTimeSignal.value = timeMs;
-      this.#stateSignal.value = "open";
+      this.#serverTick = tick;
+      this.#serverTime = timeMs;
+      this.#setState("open");
     });
-    this.#connectResolve?.();
-    this.#connectResolve = undefined;
-    this.#connectReject = undefined;
+    this.#settleConnect();
     this.emit({
       type: DeltaApplied,
       data: { tick, timeMs },
@@ -167,9 +185,7 @@ export class RiftClient<W extends World = World> extends EventBus<
 
   #rejectHandshake(reason: string): void {
     this.transport.close(RiftCloseCode.SchemaMismatch, reason);
-    this.#connectReject?.(new Error(reason));
-    this.#connectReject = undefined;
-    this.#connectResolve = undefined;
+    this.#settleConnect(new Error(reason));
   }
 
   #applyDelta(data: Uint8Array): void {
@@ -177,9 +193,7 @@ export class RiftClient<W extends World = World> extends EventBus<
     const tick = r.readVarU32();
     const timeMs = r.readVarU32();
     const components = this.world.schema.components;
-    // Batch for the same reason as #applyAccept: consumers see one
-    // post-delta world, not a half-applied stream.
-    batch(() => {
+    this.world.transaction(() => {
       while (r.remaining > 0) {
         const op = r.readU8() as DeltaOp;
         switch (op) {
@@ -218,8 +232,8 @@ export class RiftClient<W extends World = World> extends EventBus<
           }
         }
       }
-      this.#serverTickSignal.value = tick;
-      this.#serverTimeSignal.value = timeMs;
+      this.#serverTick = tick;
+      this.#serverTime = timeMs;
     });
     this.emit({
       type: DeltaApplied,
@@ -247,7 +261,7 @@ export class RiftClient<W extends World = World> extends EventBus<
   #onTransportEvent(ev: ClientTransportEvent): void {
     switch (ev.type) {
       case "open": {
-        this.#stateSignal.value = "handshaking";
+        this.#setState("handshaking");
         const w = new Writer(64);
         w.writeU8(Opcode.Hello);
         w.writeBytes(this.#hash);
@@ -269,9 +283,9 @@ export class RiftClient<W extends World = World> extends EventBus<
         return;
       }
       case "close": {
-        const prev = this.#stateSignal.peek();
-        const wasConnecting = prev === "connecting" || prev === "handshaking";
-        this.#stateSignal.value = "closed";
+        const wasConnecting =
+          this.#state === "connecting" || this.#state === "handshaking";
+        this.#setState("closed");
         if (this.#clientId !== undefined) {
           this.emit({
             type: ClientDisconnected,
@@ -285,20 +299,15 @@ export class RiftClient<W extends World = World> extends EventBus<
           });
         }
         if (wasConnecting) {
-          this.#connectReject?.(
+          this.#settleConnect(
             new Error(`closed before handshake: ${ev.reason}`),
           );
-          this.#connectReject = undefined;
-          this.#connectResolve = undefined;
         }
+        this.#teardown();
         return;
       }
       case "error": {
-        if (this.#connectReject) {
-          this.#connectReject(ev.error);
-          this.#connectReject = undefined;
-          this.#connectResolve = undefined;
-        }
+        this.#settleConnect(ev.error);
         return;
       }
     }

@@ -19,7 +19,7 @@ export function AreaUi() {
 }
 
 function Inventory() {
-  const items = useRift((c) => claimedInventoryItems(c.world.signal));
+  const items = useRift((c) => claimedInventoryItems(c.world));
 
   return (
     <div className={styles.inventory}>

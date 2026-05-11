@@ -147,8 +147,19 @@ export class World {
     return this.#poolOf(type);
   }
 
-  entities(): ReadonlySet<EntityId> {
-    return this.#entities;
+  // Without args, returns the full set (no allocation). With component
+  // types, returns a fresh array of matching IDs.
+  entities(): ReadonlySet<EntityId>;
+  entities(...types: readonly RiftType[]): EntityId[];
+  entities(...types: readonly RiftType[]): ReadonlySet<EntityId> | EntityId[] {
+    if (types.length === 0) {
+      return this.#entities;
+    }
+    const ids: EntityId[] = [];
+    for (const [id] of this.query(...types)) {
+      ids.push(id);
+    }
+    return ids;
   }
 
   clear(): void {
@@ -160,6 +171,13 @@ export class World {
     for (const pool of this.#pools.values()) {
       pool.clearChanges();
     }
+  }
+
+  // Hook for subclasses that want to batch derived observers (e.g. reactive
+  // signal bumps) around a sequence of writes. The base implementation is
+  // a passthrough so callers can use it unconditionally.
+  transaction<T>(fn: () => T): T {
+    return fn();
   }
 
   #poolOf<T>(type: RiftType<T>): Pool<T> {
@@ -279,88 +297,55 @@ function createQueryView<Types extends readonly RiftType[]>(
   excludes: readonly RiftType[],
 ): QueryView<Types> {
   const includeCount = includes.length;
-  // Reused across iterations: iteration callers must consume values
-  // within the loop body and never retain the row reference. `toArray()`
-  // is the allocating-snapshot escape hatch.
-  const row = new Array<unknown>(includeCount + 1);
   const excludeCount = excludes.length;
-
-  function poolFor(type: RiftType): Pool<unknown> {
-    return world.pool(type);
-  }
 
   function matches(id: EntityId): boolean {
     for (let i = 0; i < includeCount; i++) {
-      if (!poolFor(includes[i]).values.has(id)) {
+      if (!world.pool(includes[i]).values.has(id)) {
         return false;
       }
     }
     for (let i = 0; i < excludeCount; i++) {
-      if (poolFor(excludes[i]).values.has(id)) {
+      if (world.pool(excludes[i]).values.has(id)) {
         return false;
       }
     }
     return true;
   }
 
-  function fillRow(id: EntityId): QueryRow<Types> {
-    row[0] = id;
+  function buildRow(id: EntityId): QueryRow<Types> {
+    const row: unknown[] = [id];
     for (let i = 0; i < includeCount; i++) {
-      row[i + 1] = poolFor(includes[i]).values.get(id);
+      row.push(world.pool(includes[i]).values.get(id));
     }
     return row as unknown as QueryRow<Types>;
-  }
-
-  function snapshotRow(id: EntityId): QueryRow<Types> {
-    const out: unknown[] = [id];
-    for (let i = 0; i < includeCount; i++) {
-      out.push(poolFor(includes[i]).values.get(id));
-    }
-    return out as unknown as QueryRow<Types>;
   }
 
   function pickSeed(): Iterable<EntityId> {
     if (includeCount === 0) {
       return world.entities();
     }
-    let smallest = poolFor(includes[0]);
-    let smallestSize = smallest.values.size;
+    let smallest = world.pool(includes[0]);
     for (let i = 1; i < includeCount; i++) {
-      const p = poolFor(includes[i]);
-      const n = p.values.size;
-      if (n < smallestSize) {
+      const p = world.pool(includes[i]);
+      if (p.values.size < smallest.values.size) {
         smallest = p;
-        smallestSize = n;
       }
     }
     return smallest.values.keys();
   }
 
   return {
-    [Symbol.iterator](): IterableIterator<QueryRow<Types>> {
-      const seedIter = pickSeed()[Symbol.iterator]();
-      const iter: IterableIterator<QueryRow<Types>> = {
-        next(): IteratorResult<QueryRow<Types>> {
-          while (true) {
-            const r = seedIter.next();
-            if (r.done) {
-              return { done: true, value: undefined };
-            }
-            const id = r.value;
-            if (matches(id)) {
-              return { done: false, value: fillRow(id) };
-            }
-          }
-        },
-        [Symbol.iterator]() {
-          return iter;
-        },
-      };
-      return iter;
+    *[Symbol.iterator](): IterableIterator<QueryRow<Types>> {
+      for (const id of pickSeed()) {
+        if (matches(id)) {
+          yield buildRow(id);
+        }
+      }
     },
     get size() {
       if (includeCount === 1 && excludeCount === 0) {
-        return poolFor(includes[0]).values.size;
+        return world.pool(includes[0]).values.size;
       }
       let n = 0;
       for (const id of pickSeed()) {
@@ -369,15 +354,6 @@ function createQueryView<Types extends readonly RiftType[]>(
         }
       }
       return n;
-    },
-    toArray() {
-      const out: QueryRow<Types>[] = [];
-      for (const id of pickSeed()) {
-        if (matches(id)) {
-          out.push(snapshotRow(id));
-        }
-      }
-      return out;
     },
     exclude(...newExcludes) {
       return createQueryView(world, includes, [...excludes, ...newExcludes]);
@@ -428,7 +404,6 @@ export const WHOLE_DIRTY = 0xffff_ffff;
 export interface QueryView<Types extends readonly RiftType[]> {
   [Symbol.iterator](): IterableIterator<QueryRow<Types>>;
   readonly size: number;
-  toArray(): readonly QueryRow<Types>[];
   exclude(...excludes: readonly RiftType[]): QueryView<Types>;
 }
 

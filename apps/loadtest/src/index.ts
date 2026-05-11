@@ -91,20 +91,17 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         logger.info(`Socket ${n} connected`);
       }
 
-      const characterEntity = claimedCharacterEntity(client.world.signal);
+      const characterEntity = claimedCharacterEntity(client.world);
       const ready = computed(() => {
         const id = characterEntity.value;
-        if (id === undefined) {
-          return false;
-        }
-        return client.world.signal.has(id, AreaTag).value;
+        return id !== undefined && client.world.has(id, AreaTag);
       });
 
       if (verbose) {
         logger.info(`Socket ${n} waiting for character list...`);
       }
       const characterId = await waitUntil(
-        ownedCharacters(client.world.signal),
+        ownedCharacters(client.world),
         (list) => list.length > 0,
         15_000,
       ).then((list) => list[0].id);
@@ -116,7 +113,6 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
       }
       await waitUntil(ready, (v) => v, 15_000);
 
-      const actorIds = client.world.signal.entities(Movement);
       const endTime = Date.now() + timeout.totalMilliseconds;
       await runUntil(
         endTime,
@@ -124,14 +120,14 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         () => {
           const charEnt = characterEntity.value;
           if (charEnt !== undefined) {
-            const combat = client.world.signal.get(charEnt, Combat).value;
+            const combat = client.world.get(charEnt, Combat);
             if (combat && !combat.health) {
               logger.info(`Character for socket ${n} will respawn`);
               respawnCharacter(client);
             }
             const walkable: Vector<Tile>[] = [];
-            for (const id of actorIds.value) {
-              const mv = client.world.signal.get(id, Movement).value;
+            for (const id of client.world.entities(Movement)) {
+              const mv = client.world.get(id, Movement);
               if (mv) {
                 walkable.push(mv.coords);
               }

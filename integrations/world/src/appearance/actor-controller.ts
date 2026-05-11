@@ -125,11 +125,7 @@ export class ActorController extends Container {
 
   #animationState() {
     const { entityId, client } = this.#options;
-    const [mv, combat] = client.world.signal.get(
-      entityId,
-      Movement,
-      Combat,
-    ).value;
+    const [mv, combat] = client.world.get(entityId, Movement, Combat);
     return {
       isMoving: !!mv?.moveTarget,
       isFast: (mv?.speed ?? 0) >= 2,

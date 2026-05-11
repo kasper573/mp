@@ -50,8 +50,8 @@ export class AreaScene extends Container {
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
 
-    const s = options.client.world.signal;
-    const actorIds = actors(s);
+    const world = options.client.world;
+    const actorIds = actors(world);
 
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
@@ -97,7 +97,7 @@ export class AreaScene extends Container {
 
     this.cameraPos = new VectorSpring(
       computed(() => {
-        const coords = claimedCharacterMovement(s).value?.coords;
+        const coords = claimedCharacterMovement(world).value?.coords;
         return options.area.tiled.tileCoordToWorld(coords ?? Vector.zero());
       }),
       () => ({
@@ -135,8 +135,8 @@ export class AreaScene extends Container {
   actorAtPointer = computed((): EntityId | undefined => {
     const world = this.options.client.world;
     const tile = this.pointerTile.value;
-    for (const id of actors(world.signal).value) {
-      const [mv, combat] = world.signal.get(id, Movement, Combat).value;
+    for (const id of actors(world).value) {
+      const [mv, combat] = world.get(id, Movement, Combat);
       if (!mv || !combat || !combat.alive) {
         continue;
       }
@@ -149,14 +149,10 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const targetId = this.actorAtPointer.value;
-    const s = this.options.client.world.signal;
-    const ownEntity = claimedCharacterEntity(s).value;
+    const world = this.options.client.world;
+    const ownEntity = claimedCharacterEntity(world).value;
     if (targetId !== undefined && targetId !== ownEntity) {
-      const [mv, combat] = this.options.client.world.signal.get(
-        targetId,
-        Movement,
-        Combat,
-      ).value;
+      const [mv, combat] = world.get(targetId, Movement, Combat);
       if (mv && combat) {
         return {
           entityId: targetId,

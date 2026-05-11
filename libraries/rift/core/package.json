@@ -14,8 +14,6 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "@preact/signals-core": "catalog:",
-    "@rift/event": "workspace:*",
     "@rift/types": "workspace:*"
   },
   "devDependencies": {

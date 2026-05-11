@@ -1,4 +1,5 @@
-import { object, string, u16, u32 } from "@rift/types";
+import type { InferValue } from "@rift/types";
+import { enumOf, object, string, u16, u32 } from "@rift/types";
 // oxlint-disable-next-line no-restricted-imports
 import type { Branded } from "@mp/std";
 import type { RiftCloseCode } from "./transport";
@@ -41,4 +42,17 @@ export const ClientDisconnected = object({
   // oxlint-disable-next-line typescript/no-unnecessary-type-arguments
   code: u16<RiftCloseCode>(),
   reason: string(),
+});
+
+export const ClientState = enumOf(
+  "idle",
+  "connecting",
+  "handshaking",
+  "open",
+  "closed",
+);
+export type ClientState = InferValue<typeof ClientState>;
+
+export const ClientStateChanged = object({
+  state: ClientState,
 });

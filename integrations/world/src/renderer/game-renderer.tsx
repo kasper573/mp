@@ -61,9 +61,9 @@ interface InnerProps {
 }
 
 function Inner(props: InnerProps) {
-  const s = props.client.world.signal;
+  const world = props.client.world;
 
-  if (props.client.state.value !== "open") {
+  if (props.client.state$.value !== "open") {
     return (
       <LoadingSpinner debugDescription="rift client not connected">
         Connecting
@@ -71,7 +71,7 @@ function Inner(props: InnerProps) {
     );
   }
 
-  if (claimedCharacterEntity(s).value === undefined) {
+  if (claimedCharacterEntity(world).value === undefined) {
     return (
       <LoadingSpinner debugDescription="no character joined">
         Joining
@@ -79,7 +79,7 @@ function Inner(props: InnerProps) {
     );
   }
 
-  const areaId = claimedCharacterAreaId(s).value;
+  const areaId = claimedCharacterAreaId(world).value;
   if (areaId === undefined) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">
@@ -119,7 +119,7 @@ function Stage({
   viewDistance,
   enableUi = true,
 }: StageProps) {
-  const areaId = claimedCharacterAreaId(client.world.signal).value;
+  const areaId = claimedCharacterAreaId(client.world).value;
   if (areaId === undefined) {
     throw new Error("Stage rendered without a claimed-character area id");
   }

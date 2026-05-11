@@ -61,9 +61,9 @@ describe("world", () => {
     w.add(a, name, "A");
     const b = w.create();
     w.add(b, pos, { x: 1, y: 1 });
-    const rows = w.query(pos).toArray();
+    const rows = [...w.query(pos)];
     expect(rows.length).toBe(2);
-    const withName = w.query(pos, name).toArray();
+    const withName = [...w.query(pos, name)];
     expect(withName.length).toBe(1);
     expect(withName[0][0]).toBe(a);
   });
@@ -74,7 +74,7 @@ describe("world", () => {
     w.add(a, name, "A");
     const b = w.create();
     w.add(b, pos, { x: 1, y: 1 });
-    const rows = w.query(pos).exclude(name).toArray();
+    const rows = [...w.query(pos).exclude(name)];
     expect(rows.length).toBe(1);
     expect(rows[0][0]).toBe(b);
   });
