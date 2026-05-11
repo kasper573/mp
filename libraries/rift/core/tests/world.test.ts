@@ -200,8 +200,6 @@ describe("world events", () => {
     w.add(id, pos, { x: 0, y: 0 });
     w.clearChanges();
     w.write(id, pos, { x: 1 });
-    // componentChanged is coalesced — drain to flush.
-    w.drainPendingEvents();
     w.remove(id, pos);
     expect(events).toEqual([
       { kind: "added", component: pos },
@@ -209,7 +207,22 @@ describe("world events", () => {
       { kind: "removed", component: pos },
     ]);
   });
-  it("componentChanged coalesces multiple writes within a tick", () => {
+  it("componentChanged fires synchronously per write", () => {
+    const w = new World(schema);
+    const id = w.create();
+    w.add(id, pos, { x: 0, y: 0 });
+    w.clearChanges();
+    const events: number[] = [];
+    w.on((e) => {
+      if (e.type === "componentChanged") {
+        events.push(events.length);
+      }
+    });
+    w.write(id, pos, { x: 1 });
+    w.write(id, pos, { x: 2 });
+    expect(events).toEqual([0, 1]);
+  });
+  it("write that doesn't change the value emits no componentChanged event", () => {
     const w = new World(schema);
     const id = w.create();
     w.add(id, pos, { x: 0, y: 0 });
@@ -220,27 +233,8 @@ describe("world events", () => {
         events.push("changed");
       }
     });
-    w.write(id, pos, { x: 1 });
-    w.write(id, pos, { x: 2 });
-    w.write(id, pos, { y: 5 });
-    expect(events).toEqual([]); // not yet drained
-    w.drainPendingEvents();
-    expect(events).toEqual(["changed"]); // single coalesced event
-  });
-  it("onSync delivers componentChanged synchronously per write", () => {
-    const w = new World(schema);
-    const id = w.create();
-    w.add(id, pos, { x: 0, y: 0 });
-    w.clearChanges();
-    const events: number[] = [];
-    w.onSync((e) => {
-      if (e.type === "componentChanged") {
-        events.push(events.length);
-      }
-    });
-    w.write(id, pos, { x: 1 });
-    w.write(id, pos, { x: 2 });
-    expect(events).toEqual([0, 1]);
+    w.write(id, pos, { x: 0 });
+    expect(events).toEqual([]);
   });
   it("emits entityCreated / entityDestroyed", () => {
     const w = new World(schema);

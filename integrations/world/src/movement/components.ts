@@ -1,6 +1,7 @@
 import { array, enumOf, f32, object, optional, transform } from "@rift/types";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
+import type { ObjectId } from "@mp/tiled-loader";
 
 export const TileVector = transform(
   object({
@@ -31,6 +32,11 @@ export const Movement = object({
   speed: f32<Tile>(),
   direction: Direction,
   moveTarget: optional(TileVector),
+});
+
+export const MoveToPortal = object({
+  portalId: f32<ObjectId>(),
+  movement: Movement,
 });
 
 // Server-only: pathfinding state for entities that are being moved along

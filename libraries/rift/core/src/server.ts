@@ -167,7 +167,6 @@ export class RiftServer extends EventBus<
       this.#flushClient(slot, sharedUpdates);
     }
 
-    this.world.drainPendingEvents();
     this.world.clearChanges();
   }
 

@@ -13,7 +13,6 @@ export class World {
   readonly #entities = new Set<EntityId>();
   readonly #pools = new Map<RiftType, Pool<unknown>>();
   readonly #handlers = new Set<LocalWorldEventHandler>();
-  readonly #syncHandlers = new Set<LocalWorldEventHandler>();
   #nextId = 1;
 
   constructor(schema: RiftSchema) {
@@ -108,10 +107,7 @@ export class World {
       throw new Error(`entity ${id} does not have component`);
     }
     if (result === "changed") {
-      // componentChanged is coalesced — emitted once per (entity, component)
-      // at drain time (see drainPendingEvents). Sync subscribers still fire
-      // synchronously so legacy behaviour for derived-state features holds.
-      this.#emitSync({ type: "componentChanged", id, component: type });
+      this.#emit({ type: "componentChanged", id, component: type });
     }
   }
 
@@ -147,32 +143,6 @@ export class World {
     };
   }
 
-  // Synchronous subscribers fire inside the calling stack (today's behaviour
-  // for componentChanged). Most features should use `on` instead — handlers
-  // there fire once per (entity, component) at drain time with final state,
-  // which avoids "event during event" reentrancy.
-  onSync(handler: LocalWorldEventHandler): () => void {
-    this.#syncHandlers.add(handler);
-    return () => {
-      this.#syncHandlers.delete(handler);
-    };
-  }
-
-  // Drain coalesced componentChanged events. Called by RiftServer at the
-  // end of each tick, before clearChanges. Each (entity, component) pair
-  // that was written-with-actual-change at least once during the tick
-  // produces exactly one componentChanged event.
-  drainPendingEvents(): void {
-    if (this.#handlers.size === 0) {
-      return;
-    }
-    for (const [component, pool] of this.#pools) {
-      for (const id of pool.dirty.keys()) {
-        this.#emit({ type: "componentChanged", id, component });
-      }
-    }
-  }
-
   pool<T>(type: RiftType<T>): Pool<T> {
     return this.#poolOf(type);
   }
@@ -198,17 +168,6 @@ export class World {
 
   #emit(event: LocalWorldEvent): void {
     for (const h of this.#handlers) {
-      h(event);
-    }
-  }
-
-  // Used only for `componentChanged` (which is coalesced for `on` subscribers
-  // but still delivered synchronously to `onSync` subscribers).
-  #emitSync(event: LocalWorldEvent): void {
-    if (this.#syncHandlers.size === 0) {
-      return;
-    }
-    for (const h of this.#syncHandlers) {
       h(event);
     }
   }
