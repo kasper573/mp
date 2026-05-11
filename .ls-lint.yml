@@ -22,4 +22,5 @@ ignore:
   - "./{apps,integrations,libraries}/*/.turbo"
   - "./{apps,integrations,libraries}/*/dist"
   - "./{apps,integrations,libraries}/*/node_modules"
+  - "./{apps,integrations,libraries}/**/profiles"
   - "**/node_modules"
