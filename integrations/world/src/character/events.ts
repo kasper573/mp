@@ -1,7 +1,7 @@
 import { copy, object, string } from "@rift/types";
 import type { CharacterId } from "./id";
 import type { InventoryId } from "../inventory/components";
-import { TileVector } from "../movement/components";
+import { TileVector } from "../primitives";
 
 export const CharacterSummary = object({
   id: string<CharacterId>(),

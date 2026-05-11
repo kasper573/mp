@@ -140,8 +140,7 @@ export class RiftServer extends EventBus<
   }
 
   tick(dtSeconds?: number): void {
-    const now =
-      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const now = performance.now();
     const dt =
       dtSeconds ??
       (this.#lastTickTime === 0

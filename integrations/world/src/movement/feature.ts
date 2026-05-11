@@ -1,6 +1,8 @@
 import type { Cleanup, Feature } from "../feature";
+import type { ClientId, RiftServer } from "@rift/core";
 import { Tick } from "@rift/core";
 import { combine, type Tile } from "@mp/std";
+import type { ObjectId } from "@mp/tiled-loader";
 import { Vector } from "@mp/math";
 import type { AreaResource } from "../area/area-resource";
 import { hitTestTiledObject } from "../area/hit-test";
@@ -8,10 +10,8 @@ import type { AreaId } from "@mp/fixtures";
 import { AreaTag } from "../area/components";
 import { entityForClient } from "../identity/session-registry";
 import { Movement, PathFollow, type CardinalDirection } from "./components";
-import { MoveRequest } from "./events";
+import { MoveRequest, MoveToPortal } from "./events";
 import { Combat } from "../combat/components";
-
-type Path = ReadonlyArray<Vector<Tile>>;
 
 export interface MovementFeatureOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
@@ -25,40 +25,26 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
           if (event.source.type !== "wire") {
             return;
           }
-          const characterEnt = entityForClient(
-            server.world,
+          beginCharacterMove(
+            server,
+            opts,
             event.source.clientId,
+            event.data,
+            undefined,
           );
-          if (characterEnt === undefined) {
+        }),
+
+        server.on(MoveToPortal, (event) => {
+          if (event.source.type !== "wire") {
             return;
           }
-          const [movement, tag, combat] = server.world.get(
-            characterEnt,
-            Movement,
-            AreaTag,
-            Combat,
+          beginCharacterMove(
+            server,
+            opts,
+            event.source.clientId,
+            event.data.movement,
+            event.data.portalId,
           );
-          if (!movement || !tag) {
-            return;
-          }
-          const area = opts.areas.get(tag.areaId);
-          if (!area) {
-            return;
-          }
-          const path = findPath(area, movement.coords, event.data);
-          if (path) {
-            server.world.upsert(characterEnt, PathFollow, { path });
-          } else {
-            server.world.remove(characterEnt, PathFollow);
-          }
-          server.world.write(characterEnt, Movement, {
-            moveTarget: event.data,
-          });
-          if (combat?.attackTargetId !== undefined) {
-            server.world.write(characterEnt, Combat, {
-              attackTargetId: undefined,
-            });
-          }
         }),
 
         server.on(Tick, (event) => {
@@ -109,14 +95,24 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
               server.world.upsert(id, PathFollow, { path: stepped.path });
             }
 
-            const destination = portalDestinationAt(area, stepped.coords);
-            if (destination && opts.areas.has(destination.areaId)) {
-              server.world.remove(id, PathFollow);
-              server.world.write(id, AreaTag, { areaId: destination.areaId });
-              server.world.write(id, Movement, {
-                coords: destination.coords,
-                moveTarget: undefined,
-              });
+            if (mv.desiredPortalId !== undefined) {
+              const portal = findPortalById(area, mv.desiredPortalId);
+              const worldPos = area.tiled.tileCoordToWorld(stepped.coords);
+              if (
+                portal &&
+                hitTestTiledObject(portal.object, worldPos) &&
+                opts.areas.has(portal.destination.areaId)
+              ) {
+                server.world.remove(id, PathFollow);
+                server.world.write(id, AreaTag, {
+                  areaId: portal.destination.areaId,
+                });
+                server.world.write(id, Movement, {
+                  coords: portal.destination.coords,
+                  moveTarget: undefined,
+                  desiredPortalId: undefined,
+                });
+              }
             }
           }
         }),
@@ -125,20 +121,84 @@ export function movementFeature(opts: MovementFeatureOptions): Feature {
   };
 }
 
-function portalDestinationAt(area: AreaResource, coords: Vector<Tile>) {
-  const worldPos = area.tiled.tileCoordToWorld(coords);
-  for (const portal of area.portals) {
-    if (hitTestTiledObject(portal.object, worldPos)) {
-      return portal.destination;
-    }
-  }
-  return undefined;
+export function directionBetween(
+  from: Vector<Tile>,
+  to: Vector<Tile>,
+): CardinalDirection {
+  return dirFromDelta(to.x - from.x, to.y - from.y);
 }
+
+export function findPath(
+  area: AreaResource,
+  from: Vector<Tile>,
+  to: Vector<Tile>,
+): ReadonlyArray<Vector<Tile>> | undefined {
+  const fromNode = area.graph.getProximityNode(from);
+  const toNode = area.graph.getProximityNode(to);
+  if (!fromNode || !toNode) {
+    return;
+  }
+  const path = area.graph.findPath(fromNode, toNode);
+  if (!path) {
+    return;
+  }
+  return path;
+}
+
+type Path = ReadonlyArray<Vector<Tile>>;
 
 interface StepResult {
   coords: Vector<Tile>;
   direction: CardinalDirection;
   path: Path;
+}
+
+function beginCharacterMove(
+  server: RiftServer,
+  opts: MovementFeatureOptions,
+  clientId: ClientId,
+  target: Vector<Tile>,
+  desiredPortalId: ObjectId | undefined,
+): void {
+  const characterEnt = entityForClient(server.world, clientId);
+  if (characterEnt === undefined) {
+    return;
+  }
+  const [movement, tag, combat] = server.world.get(
+    characterEnt,
+    Movement,
+    AreaTag,
+    Combat,
+  );
+  if (!movement || !tag) {
+    return;
+  }
+  const area = opts.areas.get(tag.areaId);
+  if (!area) {
+    return;
+  }
+  const path = findPath(area, movement.coords, target);
+  if (path) {
+    server.world.upsert(characterEnt, PathFollow, { path });
+  } else {
+    server.world.remove(characterEnt, PathFollow);
+  }
+  server.world.write(characterEnt, Movement, {
+    moveTarget: target,
+    desiredPortalId,
+  });
+  if (combat?.attackTargetId !== undefined) {
+    server.world.write(characterEnt, Combat, { attackTargetId: undefined });
+  }
+}
+
+function findPortalById(area: AreaResource, portalId: ObjectId) {
+  for (const portal of area.portals) {
+    if (portal.object.id === portalId) {
+      return portal;
+    }
+  }
+  return undefined;
 }
 
 function stepAlongPath(
@@ -177,13 +237,6 @@ function stepAlongPath(
   return { coords, direction, path: remaining };
 }
 
-export function directionBetween(
-  from: Vector<Tile>,
-  to: Vector<Tile>,
-): CardinalDirection {
-  return dirFromDelta(to.x - from.x, to.y - from.y);
-}
-
 function dirFromDelta(dx: number, dy: number): CardinalDirection {
   const angle = Math.atan2(dy, dx);
   const slice = Math.PI / 4;
@@ -209,21 +262,4 @@ function dirFromDelta(dx: number, dy: number): CardinalDirection {
     return "n";
   }
   return "ne";
-}
-
-export function findPath(
-  area: AreaResource,
-  from: Vector<Tile>,
-  to: Vector<Tile>,
-): ReadonlyArray<Vector<Tile>> | undefined {
-  const fromNode = area.graph.getProximityNode(from);
-  const toNode = area.graph.getProximityNode(to);
-  if (!fromNode || !toNode) {
-    return;
-  }
-  const path = area.graph.findPath(fromNode, toNode);
-  if (!path) {
-    return;
-  }
-  return path;
 }

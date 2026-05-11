@@ -57,6 +57,7 @@ export function spawnCharacter(
     speed: init.speed,
     direction: "s",
     moveTarget: undefined,
+    desiredPortalId: undefined,
   });
   world.add(id, Combat, {
     hitBox: model.hitBox,

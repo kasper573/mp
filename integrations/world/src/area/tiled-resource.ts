@@ -1,4 +1,5 @@
-import type { VectorLike } from "@mp/math";
+import type { RectLike, VectorLike } from "@mp/math";
+import { Rect } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
 import {
@@ -24,6 +25,15 @@ export class TiledResource {
     return new Vector(
       (x / this.map.tilewidth - 0.5) as Tile,
       (y / this.map.tileheight - 0.5) as Tile,
+    );
+  };
+
+  worldRectToTile = ({ x, y, width, height }: RectLike<Pixel>): Rect<Tile> => {
+    return new Rect(
+      (x / this.map.tilewidth - 0.5) as Tile,
+      (y / this.map.tileheight - 0.5) as Tile,
+      (width / this.map.tilewidth) as Tile,
+      (height / this.map.tileheight) as Tile,
     );
   };
 

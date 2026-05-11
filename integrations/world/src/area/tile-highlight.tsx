@@ -4,6 +4,7 @@ import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { EntityId } from "@rift/core";
+import type { ObjectId } from "@mp/tiled-loader";
 
 export interface TileHighlightOptions {
   area: AreaResource;
@@ -21,7 +22,14 @@ interface AttackHighlightTarget extends HighlightTarget<"attack"> {
 
 interface MoveHighlightTarget extends HighlightTarget<"move"> {}
 
-export type TileHighlightTarget = AttackHighlightTarget | MoveHighlightTarget;
+interface PortalHighlightTarget extends HighlightTarget<"portal"> {
+  portalId: ObjectId;
+}
+
+export type TileHighlightTarget =
+  | AttackHighlightTarget
+  | MoveHighlightTarget
+  | PortalHighlightTarget;
 
 export class TileHighlight extends Graphics {
   constructor(private options: () => TileHighlightOptions) {
@@ -53,5 +61,6 @@ export class TileHighlight extends Graphics {
 const visibleStyles: Record<TileHighlightTarget["type"], FillStyle> = {
   move: { color: "rgba(100,100,100,0.5)" },
   attack: { color: "rgba(0, 13, 197, 0.75)" },
+  portal: { color: "rgba(150, 0, 200, 0.6)" },
 };
 const hiddenStyle: FillStyle = { color: "rgba(0,0,0,0)" };

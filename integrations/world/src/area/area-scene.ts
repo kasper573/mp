@@ -19,7 +19,8 @@ import type { MpRiftClient } from "../client";
 import { ActorController } from "../appearance/actor-controller";
 import type { ActorTextureLookup } from "../appearance/actor-texture-lookup";
 import { attackTarget } from "../combat/actions";
-import { moveCharacter } from "../movement/actions";
+import { moveCharacter, moveCharacterToPortal } from "../movement/actions";
+import { hitTestTiledObject, tiledObjectBoundingBox } from "./hit-test";
 import { Combat } from "../combat/components";
 import { Movement } from "../movement/components";
 import {
@@ -165,7 +166,18 @@ export class AreaScene extends Container {
       }
     }
 
-    const tileNode = this.options.area.graph.getNodeAt(this.pointerTile.value);
+    const tile = this.pointerTile.value;
+    const portal = portalAtTile(this.options.area, tile);
+    if (portal) {
+      return {
+        type: "portal",
+        rect: this.options.area.tiled.worldRectToTile(
+          tiledObjectBoundingBox(portal.object),
+        ),
+        portalId: portal.object.id,
+      };
+    }
+    const tileNode = this.options.area.graph.getNodeAt(tile);
     if (tileNode) {
       return {
         rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
@@ -178,6 +190,15 @@ export class AreaScene extends Container {
     const target = this.highlightTarget.value;
     if (target?.type === "attack") {
       attackTarget(this.options.client, target.entityId);
+    } else if (target?.type === "portal") {
+      moveCharacterToPortal(
+        this.options.client,
+        target.portalId,
+        new Vector(
+          (target.rect.x + target.rect.width / 2) as Tile,
+          (target.rect.y + target.rect.height / 2) as Tile,
+        ),
+      );
     }
   };
 
@@ -206,6 +227,16 @@ export class AreaScene extends Container {
       this.moveThrottled.clear();
     }
   };
+}
+
+function portalAtTile(area: AreaResource, tile: Vector<Tile>) {
+  const worldPos = area.tiled.tileCoordToWorld(tile);
+  for (const portal of area.portals) {
+    if (hitTestTiledObject(portal.object, worldPos)) {
+      return portal;
+    }
+  }
+  return undefined;
 }
 
 function createZoomLevelForViewDistance(

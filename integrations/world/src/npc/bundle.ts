@@ -43,6 +43,7 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
     speed: init.definition.speed,
     direction: "s",
     moveTarget: undefined,
+    desiredPortalId: undefined,
   });
   world.add(id, Combat, {
     hitBox: model.hitBox,

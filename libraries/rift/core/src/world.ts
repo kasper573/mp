@@ -151,6 +151,11 @@ export class World {
     return this.#entities;
   }
 
+  clear(): void {
+    this.destroy(...this.#entities);
+    this.#nextId = 1;
+  }
+
   clearChanges(): void {
     for (const pool of this.#pools.values()) {
       pool.clearChanges();

@@ -1,4 +1,4 @@
-import { signal, type ReadonlySignal } from "@preact/signals-core";
+import { batch, signal, type ReadonlySignal } from "@preact/signals-core";
 import type { ClientId, EntityId } from "./protocol";
 import type { RiftEvent, UnsubscribeFn } from "@rift/event";
 import { EventBus } from "@rift/event";
@@ -133,21 +133,27 @@ export class RiftClient<W extends World = World> extends EventBus<
       }
     }
     this.#clientId = id;
-    const components = this.world.schema.components;
-    const entityCount = r.readVarU32();
-    for (let i = 0; i < entityCount; i++) {
-      const entId = r.readVarU32() as EntityId;
-      this.world.create(entId);
-      const compCount = r.readVarU32();
-      for (let j = 0; j < compCount; j++) {
-        const idx = r.readVarU32();
-        const ty = components[idx];
-        this.world.add(entId, ty, ty.decode(r));
+    // Without batching, an effect watching the world fires mid-snapshot
+    // while state is still "handshaking", and any wire emit it triggers
+    // is silently dropped by `#onEmit`.
+    batch(() => {
+      this.world.clear();
+      const components = this.world.schema.components;
+      const entityCount = r.readVarU32();
+      for (let i = 0; i < entityCount; i++) {
+        const entId = r.readVarU32() as EntityId;
+        this.world.create(entId);
+        const compCount = r.readVarU32();
+        for (let j = 0; j < compCount; j++) {
+          const idx = r.readVarU32();
+          const ty = components[idx];
+          this.world.add(entId, ty, ty.decode(r));
+        }
       }
-    }
-    this.#serverTickSignal.value = tick;
-    this.#serverTimeSignal.value = timeMs;
-    this.#stateSignal.value = "open";
+      this.#serverTickSignal.value = tick;
+      this.#serverTimeSignal.value = timeMs;
+      this.#stateSignal.value = "open";
+    });
     this.#connectResolve?.();
     this.#connectResolve = undefined;
     this.#connectReject = undefined;
@@ -171,46 +177,50 @@ export class RiftClient<W extends World = World> extends EventBus<
     const tick = r.readVarU32();
     const timeMs = r.readVarU32();
     const components = this.world.schema.components;
-    while (r.remaining > 0) {
-      const op = r.readU8() as DeltaOp;
-      switch (op) {
-        case DeltaOp.EntityCreated: {
-          this.world.create(r.readVarU32() as EntityId);
-          break;
-        }
-        case DeltaOp.EntityDestroyed: {
-          this.world.destroy(r.readVarU32() as EntityId);
-          break;
-        }
-        case DeltaOp.ComponentAdded: {
-          const id = r.readVarU32() as EntityId;
-          const ty = components[r.readVarU32()];
-          this.world.add(id, ty, ty.decode(r));
-          break;
-        }
-        case DeltaOp.ComponentRemoved: {
-          const id = r.readVarU32() as EntityId;
-          const ty = components[r.readVarU32()];
-          this.world.remove(id, ty);
-          break;
-        }
-        case DeltaOp.ComponentUpdated: {
-          const id = r.readVarU32() as EntityId;
-          const ty = components[r.readVarU32()];
-          if (isObjectType(ty)) {
-            const current = this.world.get(id, ty) ?? {};
-            const merged = ty.decodePartial(r, current);
-            this.world.write(id, ty, merged);
-          } else {
-            const value = ty.decode(r);
-            this.world.write(id, ty, value as Partial<unknown>);
+    // Batch for the same reason as #applyAccept: consumers see one
+    // post-delta world, not a half-applied stream.
+    batch(() => {
+      while (r.remaining > 0) {
+        const op = r.readU8() as DeltaOp;
+        switch (op) {
+          case DeltaOp.EntityCreated: {
+            this.world.create(r.readVarU32() as EntityId);
+            break;
           }
-          break;
+          case DeltaOp.EntityDestroyed: {
+            this.world.destroy(r.readVarU32() as EntityId);
+            break;
+          }
+          case DeltaOp.ComponentAdded: {
+            const id = r.readVarU32() as EntityId;
+            const ty = components[r.readVarU32()];
+            this.world.add(id, ty, ty.decode(r));
+            break;
+          }
+          case DeltaOp.ComponentRemoved: {
+            const id = r.readVarU32() as EntityId;
+            const ty = components[r.readVarU32()];
+            this.world.remove(id, ty);
+            break;
+          }
+          case DeltaOp.ComponentUpdated: {
+            const id = r.readVarU32() as EntityId;
+            const ty = components[r.readVarU32()];
+            if (isObjectType(ty)) {
+              const current = this.world.get(id, ty) ?? {};
+              const merged = ty.decodePartial(r, current);
+              this.world.write(id, ty, merged);
+            } else {
+              const value = ty.decode(r);
+              this.world.write(id, ty, value as Partial<unknown>);
+            }
+            break;
+          }
         }
       }
-    }
-    this.#serverTickSignal.value = tick;
-    this.#serverTimeSignal.value = timeMs;
+      this.#serverTickSignal.value = tick;
+      this.#serverTimeSignal.value = timeMs;
+    });
     this.emit({
       type: DeltaApplied,
       data: { tick, timeMs },

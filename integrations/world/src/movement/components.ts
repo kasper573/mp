@@ -1,16 +1,7 @@
-import { array, enumOf, f32, object, optional, transform } from "@rift/types";
+import { array, enumOf, f32, object, optional, u32 } from "@rift/types";
 import type { Tile } from "@mp/std";
-import { Vector } from "@mp/math";
 import type { ObjectId } from "@mp/tiled-loader";
-
-export const TileVector = transform(
-  object({
-    x: f32<Tile>(),
-    y: f32<Tile>(),
-  }),
-  ({ x, y }) => new Vector(x, y),
-  (v) => ({ x: v.x, y: v.y }),
-);
+import { TileVector } from "../primitives";
 
 export const cardinalDirections = [
   "e",
@@ -32,11 +23,7 @@ export const Movement = object({
   speed: f32<Tile>(),
   direction: Direction,
   moveTarget: optional(TileVector),
-});
-
-export const MoveToPortal = object({
-  portalId: f32<ObjectId>(),
-  movement: Movement,
+  desiredPortalId: optional(u32<ObjectId>()),
 });
 
 // Server-only: pathfinding state for entities that are being moved along

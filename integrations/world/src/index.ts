@@ -1,6 +1,7 @@
 export * from "./schema";
 export * from "./hash";
 export * from "./feature";
+export * from "./primitives";
 export * from "./client";
 export * from "./server";
 
