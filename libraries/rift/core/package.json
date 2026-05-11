@@ -19,6 +19,7 @@
     "@rift/types": "workspace:*"
   },
   "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "mitata": "catalog:",
     "tsx": "catalog:",

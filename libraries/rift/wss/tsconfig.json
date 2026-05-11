@@ -1,7 +1,1 @@
-{
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "lib": ["ESNext"],
-    "types": ["node"]
-  }
-}
+{ "extends": "@mp/tsconfig/node.json" }

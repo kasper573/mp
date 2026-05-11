@@ -16,6 +16,7 @@
     "@rift/types": "workspace:*"
   },
   "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

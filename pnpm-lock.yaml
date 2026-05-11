@@ -595,6 +595,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.2
@@ -617,6 +620,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -633,6 +639,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.2
@@ -645,6 +654,9 @@ importers:
 
   libraries/rift/types:
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.2
@@ -667,6 +679,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -677,6 +692,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../tsconfig
       '@types/node':
         specifier: 'catalog:'
         version: 25.5.2

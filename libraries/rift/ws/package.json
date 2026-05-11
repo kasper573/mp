@@ -13,6 +13,7 @@
     "@rift/core": "workspace:*"
   },
   "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
     "typescript": "catalog:"
   }
 }
