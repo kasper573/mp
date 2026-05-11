@@ -12,22 +12,37 @@ import { createSimulation } from "./simulation";
  * threshold. The set of (player count, metric) pairs IS the list of
  * scenarios — generated upfront, then iterated.
  *
- * Scenarios sharing a player count are refined in a single shared
- * binary-search pass: one measurement produces values for every metric, so
- * we drive probes off the widest-bracket scenario and fold each sample into
- * every still-open scenario.
+ * Each measurement yields actual metric values, not just pass/fail, so we
+ * drive next-probe selection from the data instead of doubling/bisecting:
+ *
+ *   - Bracketing: fit a power law per metric (log-log linear regression)
+ *     across all prior probes and jump to the smallest predicted crossover,
+ *     capped at 4× the last probe so a bad early fit can't blow up wall
+ *     time. Falls back to doubling when no fit is yet usable.
+ *
+ *   - Refine: regula falsi between the bracket endpoints, clamped to the
+ *     bracket's interior 80% so degenerate fits still shrink the bracket
+ *     each iteration.
+ *
+ * Scenarios sharing a player count refine together: one measurement
+ * produces values for every metric, so each probe is folded into every
+ * still-open scenario.
  */
 
 // --- top-level constants ---------------------------------------------------
 
 const TICK_HZ = 20;
 const TICK_BUDGET_MS = 1000 / TICK_HZ;
-const DOUBLING_SAMPLE_TICKS = 20;
+const BRACKET_SAMPLE_TICKS = 20;
 const REFINE_SAMPLE_TICKS = 50;
 const WARMUP_TICKS = 30;
 const RESOLUTION = 25;
 const DEFAULT_MAX_PROBE = 25_000;
 const DEFAULT_PLAYER_COUNTS = [1, 25, 100, 250, 500] as const;
+const INITIAL_PROBE_NPCS = 25;
+const MAX_BRACKET_JUMP = 4;
+const CROSSOVER_OVERSHOOT = 1.2;
+const REFINE_INTERIOR_MARGIN = 0.1;
 
 const CORE_METRICS: readonly MetricSpec[] = [
   {
@@ -94,7 +109,7 @@ const args = yargs(hideBin(process.argv))
   })
   .option("maxProbe", {
     type: "number",
-    description: "Cap on doubling phase NPC count.",
+    description: "Cap on bracketing-phase NPC count.",
     default: DEFAULT_MAX_PROBE,
   })
   .option("aggregate", {
@@ -148,21 +163,24 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
   progress.set("phase", "starting");
   progress.render();
 
-  // Doubling: each probe brackets every still-unbracketed metric. Stop once
-  // every scenario has a firstBad (or we hit maxProbe).
-  let count = 25;
-  while (count <= args.maxProbe) {
-    progress.set("phase", `testing with ${count} NPCs`);
-    progress.render();
-    const sample = await measure(playerCount, count, DOUBLING_SAMPLE_TICKS);
-    applySample(group, count, sample);
-    progress.setSample(count, sample);
-    markResolved(group);
-    progress.render();
-    if (group.every((s) => s.firstBad !== 0)) {
+  const history: ProbeRecord[] = [];
+
+  // Bracketing: predict each unbracketed metric's crossover from its
+  // observed values and probe the smallest. Stops once every scenario has
+  // a firstBad or the next predicted probe exceeds maxProbe.
+  while (true) {
+    const next = chooseBracketingProbe(group, history, args.maxProbe);
+    if (next === undefined) {
       break;
     }
-    count *= 2;
+    progress.set("phase", `probing ${next} NPCs`);
+    progress.render();
+    const sample = await measure(playerCount, next, BRACKET_SAMPLE_TICKS);
+    history.push({ npc: next, sample });
+    applySample(group, next, sample);
+    progress.setSample(next, sample);
+    markResolved(group);
+    progress.render();
   }
 
   // Metrics that never failed within the probed range are bound = n/a.
@@ -173,25 +191,123 @@ async function runGroup(playerCount: number, group: Scenario[]): Promise<void> {
     }
   }
 
-  // Refine: pick widest-bracket unresolved scenario, probe its midpoint, fold
-  // the resulting sample into every still-open scenario.
+  // Refine: pick widest-bracket unresolved scenario, probe via regula
+  // falsi, fold the sample into every still-open scenario.
   while (true) {
     const widest = pickWidestUnresolved(group);
     if (!widest) {
       break;
     }
-    const mid = Math.floor((widest.safe + widest.firstBad) / 2);
+    const next = nextRefineProbe(widest);
     progress.set(
       "phase",
-      `narrowing "${widest.metric.name}"; testing ${mid} NPCs`,
+      `narrowing "${widest.metric.name}"; probing ${next} NPCs`,
     );
     progress.render();
-    const sample = await measure(playerCount, mid, REFINE_SAMPLE_TICKS);
-    applySample(group, mid, sample);
-    progress.setSample(mid, sample);
+    const sample = await measure(playerCount, next, REFINE_SAMPLE_TICKS);
+    applySample(group, next, sample);
+    progress.setSample(next, sample);
     markResolved(group);
     progress.render();
   }
+}
+
+function chooseBracketingProbe(
+  group: readonly Scenario[],
+  history: readonly ProbeRecord[],
+  maxProbe: number,
+): number | undefined {
+  const unbracketed = group.filter((s) => !s.resolved && s.firstBad === 0);
+  if (unbracketed.length === 0) {
+    return undefined;
+  }
+
+  if (history.length === 0) {
+    return Math.min(INITIAL_PROBE_NPCS, maxProbe);
+  }
+
+  const last = history[history.length - 1].npc;
+
+  // Smallest predicted crossover across still-unbracketed metrics — the
+  // first one to fail tells us the most.
+  let predicted = Number.POSITIVE_INFINITY;
+  for (const s of unbracketed) {
+    const crossover = predictCrossover(s.metric, history);
+    if (crossover !== undefined && crossover > last) {
+      predicted = Math.min(predicted, crossover);
+    }
+  }
+
+  let next = Number.isFinite(predicted)
+    ? Math.ceil(predicted * CROSSOVER_OVERSHOOT)
+    : last * 2;
+
+  next = Math.min(next, last * MAX_BRACKET_JUMP);
+  next = Math.max(next, last + RESOLUTION);
+  next = Math.min(next, maxProbe);
+
+  return next > last ? next : undefined;
+}
+
+function predictCrossover(
+  metric: MetricSpec,
+  history: readonly ProbeRecord[],
+): number | undefined {
+  // OLS on (log npc, log value) — predicts the npc count at which the
+  // metric equals its threshold assuming power-law growth v = a·n^b.
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let sxy = 0;
+  for (const r of history) {
+    const v = metric.extract(r.sample);
+    if (v <= 0 || r.npc <= 0) {
+      continue;
+    }
+    const x = Math.log(r.npc);
+    const y = Math.log(v);
+    n += 1;
+    sx += x;
+    sy += y;
+    sxx += x * x;
+    sxy += x * y;
+  }
+  if (n < 2) {
+    return undefined;
+  }
+  const denom = n * sxx - sx * sx;
+  if (Math.abs(denom) < 1e-9) {
+    return undefined;
+  }
+  const slope = (n * sxy - sx * sy) / denom;
+  if (slope < 1e-6) {
+    // Metric is flat or shrinking with npc count — no crossing to predict.
+    return undefined;
+  }
+  const intercept = (sy - slope * sx) / n;
+  return Math.pow(metric.threshold / Math.exp(intercept), 1 / slope);
+}
+
+function nextRefineProbe(s: Scenario): number {
+  const a = s.safe;
+  const b = s.firstBad;
+  const span = b - a;
+
+  const va = s.metric.extract(s.safeSample);
+  const vb = s.metric.extract(s.firstBadSample);
+  const t = s.metric.threshold;
+
+  // Regula falsi when the bracket samples are themselves bracketing the
+  // threshold; otherwise (noise inverted the values inside the bracket)
+  // bisect.
+  const target =
+    vb > va && va < t && vb > t
+      ? a + ((t - va) / (vb - va)) * span
+      : a + span / 2;
+
+  const margin = Math.max(1, Math.floor(span * REFINE_INTERIOR_MARGIN));
+  return Math.max(a + margin, Math.min(b - margin, Math.round(target)));
 }
 
 function applySample(
@@ -488,6 +604,11 @@ interface MetricSpec {
   readonly unit: "ms" | "B" | "B/s";
   readonly threshold: number;
   readonly extract: (s: Sample) => number;
+}
+
+interface ProbeRecord {
+  readonly npc: number;
+  readonly sample: Sample;
 }
 
 interface Scenario {
