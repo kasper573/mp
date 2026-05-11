@@ -34,7 +34,7 @@ This includes but is not limited to:
 
 # Verification
 
-Before you start working on your task run `pnpm -F world bench` and save the results to a temp file.
+Before you start working on your task run `pnpm -r bench` and `pnpm -r profile` and save the results to a temp file.
 
 - After finishing your task, always run and ensure the following commands pass:
   - `pnpm lint`
@@ -42,10 +42,11 @@ Before you start working on your task run `pnpm -F world bench` and save the res
   - `pnpm test`
   - `pnpm build`
   - `pnpm -F e2e start:dev:with-services`
-  - `pnpm -F world bench`
+  - `pnpm -r bench`
+  - `pnpm -r profile`
 
-Compare the new benchmark results with the ones you saved before starting your task.
+Compare the new benchmark and profile results with the ones you saved before starting your task.
 
-- If there is a significant regression in benchmarks, investigate and address the issue before considering the task complete.
+- If there is a significant regression in benchmarks or profiles, investigate and address the issue before considering the task complete.
 
-- If the benchmark demonstrates poor benchmarks from a practical standpoint even if it wasn't introduced by your changes, you should also address the issue before considering the task complete.
+- If the benchmarks and profiles demonstrates poor results from a practical standpoint even if it wasn't introduced by your changes, you should also address the issue before considering the task complete.

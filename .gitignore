@@ -25,6 +25,7 @@ tsconfig.vitest-temp.json
 tsconfig.tmp.json
 .claude
 *.gen.*
+*.cpuprofile
 
 # Local files for common editors
 .idea
