@@ -1,5 +1,4 @@
 import { RiftTypeKind, type RiftType } from "../rift-type";
-import { Writer } from "../writer";
 
 export function optional<T>(inner: RiftType<T>): RiftType<T | undefined> {
   return {
@@ -18,11 +17,9 @@ export function optional<T>(inner: RiftType<T>): RiftType<T | undefined> {
       }
       return inner.decode(r);
     },
-    inspect() {
-      const w = new Writer(16);
+    digest(w) {
       w.writeU8(RiftTypeKind.Optional);
-      w.writeBytes(inner.inspect());
-      return w.finish();
+      inner.digest(w);
     },
   };
 }

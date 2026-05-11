@@ -365,11 +365,15 @@ boxplot(() => {
 boxplot(() => {
   summary(() => {
     group("type meta", () => {
-      bench("pos.inspect()", () => {
-        do_not_optimize(posTy.inspect());
+      bench("pos.digest()", () => {
+        const w = new Writer(64);
+        posTy.digest(w);
+        do_not_optimize(w.finish());
       });
-      bench("entity.inspect()", () => {
-        do_not_optimize(entityTy.inspect());
+      bench("entity.digest()", () => {
+        const w = new Writer(256);
+        entityTy.digest(w);
+        do_not_optimize(w.finish());
       });
     });
   });

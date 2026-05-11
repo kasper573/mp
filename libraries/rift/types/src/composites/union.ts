@@ -1,5 +1,4 @@
 import { RiftTypeKind, type RiftType } from "../rift-type";
-import { Writer } from "../writer";
 
 export interface UnionVariant<Tag extends string, V> {
   readonly tag: Tag;
@@ -38,15 +37,13 @@ export function union<V extends Record<string, RiftType>>(
       const value = variants[tag].decode(r);
       return { tag, value } as Value;
     },
-    inspect() {
-      const w = new Writer(32);
+    digest(w) {
       w.writeU8(RiftTypeKind.Union);
       w.writeU16(order.length);
       for (const k of order) {
         w.writeString(k);
-        w.writeBytes(variants[k].inspect());
+        variants[k].digest(w);
       }
-      return w.finish();
     },
   };
 }

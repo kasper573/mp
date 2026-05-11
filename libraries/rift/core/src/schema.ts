@@ -55,11 +55,11 @@ export function defineSchema(opts: RiftSchemaOptions): RiftSchema {
       const w = new Writer(256);
       w.writeU16(this.components.length);
       for (const ty of this.components) {
-        w.writeBytes(ty.inspect());
+        ty.digest(w);
       }
       w.writeU16(this.events.length);
       for (const ty of this.events) {
-        w.writeBytes(ty.inspect());
+        ty.digest(w);
       }
       cachedDigest = opts.hash(w.finish());
       return cachedDigest;

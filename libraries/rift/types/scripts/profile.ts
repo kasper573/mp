@@ -289,9 +289,11 @@ const scenarios: readonly Scenario[] = [
     },
   },
   {
-    name: "entity_inspect",
+    name: "entity_digest",
     run() {
-      entityTy.inspect();
+      const w = new Writer(256);
+      entityTy.digest(w);
+      w.finish();
     },
   },
   {

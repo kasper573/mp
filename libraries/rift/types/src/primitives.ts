@@ -1,16 +1,9 @@
 import { RiftTypeKind, type RiftType } from "./rift-type";
-import { Writer } from "./writer";
-
-function primitiveInspect(kind: RiftTypeKind): Uint8Array {
-  const w = new Writer(1);
-  w.writeU8(kind);
-  return w.finish();
-}
 
 export function u8<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U8,
-    inspect: () => primitiveInspect(RiftTypeKind.U8),
+    digest: (w) => w.writeU8(RiftTypeKind.U8),
     encode: (w, v) => w.writeU8(v),
     decode: (r) => r.readU8() as T,
   };
@@ -19,7 +12,7 @@ export function u8<T extends number = number>(): RiftType<T> {
 export function u16<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U16,
-    inspect: () => primitiveInspect(RiftTypeKind.U16),
+    digest: (w) => w.writeU8(RiftTypeKind.U16),
     encode: (w, v) => w.writeU16(v),
     decode: (r) => r.readU16() as T,
   };
@@ -28,7 +21,7 @@ export function u16<T extends number = number>(): RiftType<T> {
 export function u32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U32,
-    inspect: () => primitiveInspect(RiftTypeKind.U32),
+    digest: (w) => w.writeU8(RiftTypeKind.U32),
     encode: (w, v) => w.writeU32(v),
     decode: (r) => r.readU32() as T,
   };
@@ -37,7 +30,7 @@ export function u32<T extends number = number>(): RiftType<T> {
 export function u64<T extends bigint = bigint>(): RiftType<T> {
   return {
     kind: RiftTypeKind.U64,
-    inspect: () => primitiveInspect(RiftTypeKind.U64),
+    digest: (w) => w.writeU8(RiftTypeKind.U64),
     encode: (w, v) => w.writeU64(v),
     decode: (r) => r.readU64() as T,
   };
@@ -46,7 +39,7 @@ export function u64<T extends bigint = bigint>(): RiftType<T> {
 export function i8<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I8,
-    inspect: () => primitiveInspect(RiftTypeKind.I8),
+    digest: (w) => w.writeU8(RiftTypeKind.I8),
     encode: (w, v) => w.writeI8(v),
     decode: (r) => r.readI8() as T,
   };
@@ -55,7 +48,7 @@ export function i8<T extends number = number>(): RiftType<T> {
 export function i16<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I16,
-    inspect: () => primitiveInspect(RiftTypeKind.I16),
+    digest: (w) => w.writeU8(RiftTypeKind.I16),
     encode: (w, v) => w.writeI16(v),
     decode: (r) => r.readI16() as T,
   };
@@ -64,7 +57,7 @@ export function i16<T extends number = number>(): RiftType<T> {
 export function i32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I32,
-    inspect: () => primitiveInspect(RiftTypeKind.I32),
+    digest: (w) => w.writeU8(RiftTypeKind.I32),
     encode: (w, v) => w.writeI32(v),
     decode: (r) => r.readI32() as T,
   };
@@ -73,7 +66,7 @@ export function i32<T extends number = number>(): RiftType<T> {
 export function i64<T extends bigint = bigint>(): RiftType<T> {
   return {
     kind: RiftTypeKind.I64,
-    inspect: () => primitiveInspect(RiftTypeKind.I64),
+    digest: (w) => w.writeU8(RiftTypeKind.I64),
     encode: (w, v) => w.writeI64(v),
     decode: (r) => r.readI64() as T,
   };
@@ -82,7 +75,7 @@ export function i64<T extends bigint = bigint>(): RiftType<T> {
 export function f32<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.F32,
-    inspect: () => primitiveInspect(RiftTypeKind.F32),
+    digest: (w) => w.writeU8(RiftTypeKind.F32),
     encode: (w, v) => w.writeF32(v),
     decode: (r) => r.readF32() as T,
   };
@@ -91,8 +84,7 @@ export function f32<T extends number = number>(): RiftType<T> {
 export function f64<T extends number = number>(): RiftType<T> {
   return {
     kind: RiftTypeKind.F64,
-    inspect: () => primitiveInspect(RiftTypeKind.F64),
-
+    digest: (w) => w.writeU8(RiftTypeKind.F64),
     encode: (w, v) => w.writeF64(v),
     decode: (r) => r.readF64() as T,
   };
@@ -101,7 +93,7 @@ export function f64<T extends number = number>(): RiftType<T> {
 export function bool<T extends boolean = boolean>(): RiftType<T> {
   return {
     kind: RiftTypeKind.Bool,
-    inspect: () => primitiveInspect(RiftTypeKind.Bool),
+    digest: (w) => w.writeU8(RiftTypeKind.Bool),
     encode: (w, v) => w.writeBool(v),
     decode: (r) => r.readBool() as T,
   };
@@ -110,7 +102,7 @@ export function bool<T extends boolean = boolean>(): RiftType<T> {
 export function string<T extends string = string>(): RiftType<T> {
   return {
     kind: RiftTypeKind.String,
-    inspect: () => primitiveInspect(RiftTypeKind.String),
+    digest: (w) => w.writeU8(RiftTypeKind.String),
     encode: (w, v) => w.writeString(v),
     decode: (r) => r.readString() as T,
   };
@@ -119,7 +111,7 @@ export function string<T extends string = string>(): RiftType<T> {
 export function bytes(): RiftType<Uint8Array> {
   return {
     kind: RiftTypeKind.Bytes,
-    inspect: () => primitiveInspect(RiftTypeKind.Bytes),
+    digest: (w) => w.writeU8(RiftTypeKind.Bytes),
     encode: (w, v) => w.writeBytes(v),
     decode: (r) => r.readBytes(),
   };
@@ -150,14 +142,12 @@ export function enumOf<const Values extends readonly string[]>(
       }
       return v;
     },
-    inspect() {
-      const w = new Writer(16);
+    digest(w) {
       w.writeU8(RiftTypeKind.EnumOf);
       w.writeU16(values.length);
       for (const v of values) {
         w.writeString(v);
       }
-      return w.finish();
     },
   };
 }
@@ -214,14 +204,12 @@ export function bitflags<const Flags extends readonly string[]>(
       }
       return out as Value;
     },
-    inspect() {
-      const w = new Writer(16);
+    digest(w) {
       w.writeU8(RiftTypeKind.Bitflags);
       w.writeU16(flags.length);
       for (const f of flags) {
         w.writeString(f);
       }
-      return w.finish();
     },
   };
 }

@@ -27,7 +27,7 @@ export enum RiftTypeKind {
 
 export interface RiftType<T = unknown> {
   readonly kind: RiftTypeKind;
-  inspect(): Uint8Array;
+  digest(w: Writer): void;
   encode(w: Writer, value: T): void;
   decode(r: Reader): T;
   readonly __t?: T;

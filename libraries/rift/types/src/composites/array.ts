@@ -1,5 +1,4 @@
 import { RiftTypeKind, type RiftType } from "../rift-type";
-import { Writer } from "../writer";
 
 export function array<T>(item: RiftType<T>): RiftType<readonly T[]> {
   return {
@@ -18,11 +17,9 @@ export function array<T>(item: RiftType<T>): RiftType<readonly T[]> {
       }
       return out;
     },
-    inspect() {
-      const w = new Writer(32);
+    digest(w) {
       w.writeU8(RiftTypeKind.Array);
-      w.writeBytes(item.inspect());
-      return w.finish();
+      item.digest(w);
     },
   };
 }

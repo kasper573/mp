@@ -1,5 +1,4 @@
 import { RiftTypeKind, type RiftType } from "../rift-type";
-import { Writer } from "../writer";
 
 type TupleValues<T extends readonly RiftType[]> = {
   [K in keyof T]: T[K] extends RiftType<infer V> ? V : never;
@@ -23,14 +22,12 @@ export function tuple<const T extends readonly RiftType[]>(
       }
       return out as Value;
     },
-    inspect() {
-      const w = new Writer(32);
+    digest(w) {
       w.writeU8(RiftTypeKind.Tuple);
       w.writeU16(items.length);
       for (const it of items) {
-        w.writeBytes(it.inspect());
+        it.digest(w);
       }
-      return w.finish();
     },
   };
 }

@@ -1,6 +1,6 @@
 import type { Reader } from "../reader";
 import { RiftTypeKind, type RiftType } from "../rift-type";
-import { Writer } from "../writer";
+import type { Writer } from "../writer";
 
 export type FieldValues<F extends Record<string, RiftType>> = {
   [K in keyof F]: F[K] extends RiftType<infer V> ? V : never;
@@ -50,15 +50,13 @@ export function object<F extends Record<string, RiftType>>(
       }
       return out as Value;
     },
-    inspect() {
-      const w = new Writer(32);
+    digest(w) {
       w.writeU8(RiftTypeKind.Object);
       w.writeU16(order.length);
       for (const k of order) {
         w.writeString(k);
-        w.writeBytes(fields[k].inspect());
+        fields[k].digest(w);
       }
-      return w.finish();
     },
     encodePartial(w, value, mask): void {
       writeMask(w, mask, maskWidth);
