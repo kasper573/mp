@@ -17,11 +17,11 @@ export function wssTransport(wss: WebSocketServer): ServerTransport {
     }
   }
 
-  wss.on("connection", (socket: WebSocket) => {
+  wss.on("connection", (socket) => {
     const id = nextId++ as ClientId;
     sockets.set(id, socket);
     socket.binaryType = "nodebuffer";
-    socket.on("message", (data: Buffer | ArrayBuffer | Buffer[]) => {
+    socket.on("message", (data) => {
       let bytes: Uint8Array;
       if (data instanceof ArrayBuffer) {
         bytes = new Uint8Array(data);
@@ -41,7 +41,7 @@ export function wssTransport(wss: WebSocketServer): ServerTransport {
       }
       emit({ type: "message", clientId: id, data: bytes });
     });
-    socket.on("close", (code: number, reason: Buffer) => {
+    socket.on("close", (code, reason) => {
       sockets.delete(id);
       emit({
         type: "close",
