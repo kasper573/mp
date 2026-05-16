@@ -54,8 +54,8 @@ const FIXTURES_DIR = resolve(
   "../../../docker/file-server/public/areas",
 );
 
-export interface CapturingTransport extends ServerTransport {
-  emit(ev: ServerTransportEvent): void;
+export interface CapturingTransport extends ServerTransport<void> {
+  emit(ev: ServerTransportEvent<void>): void;
   /** All packet byte lengths, in send order, across all clients. */
   bytes: number[];
   /** All packet payloads, in send order, across all clients. */
@@ -240,7 +240,7 @@ export async function createSimulation(
   if (playerCount > 0) {
     transport.resetCapture();
     for (const clientId of clientIds) {
-      transport.emit({ type: "open", clientId });
+      transport.emit({ type: "open", clientId, socket: undefined });
       const helloWriter = new Writer(64);
       helloWriter.writeU8(Opcode.Hello);
       helloWriter.writeBytes(server.schema.digest());
@@ -286,7 +286,7 @@ function loadBenchArea(id: AreaId): Promise<AreaResource> {
 }
 
 function makeTransport(): CapturingTransport {
-  const listeners = new Set<(ev: ServerTransportEvent) => void>();
+  const listeners = new Set<(ev: ServerTransportEvent<void>) => void>();
   const packets: Uint8Array[] = [];
   const bytes: number[] = [];
   const bytesByClient = new Map<ClientId, number[]>();

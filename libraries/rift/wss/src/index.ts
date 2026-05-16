@@ -6,12 +6,12 @@ import {
 } from "@rift/core";
 import type { WebSocket, WebSocketServer } from "ws";
 
-export function wssTransport(wss: WebSocketServer): ServerTransport {
-  const listeners = new Set<(ev: ServerTransportEvent) => void>();
+export function wssTransport(wss: WebSocketServer): ServerTransport<WebSocket> {
+  const listeners = new Set<(ev: ServerTransportEvent<WebSocket>) => void>();
   const sockets = new Map<ClientId, WebSocket>();
   let nextId = 1;
 
-  function emit(ev: ServerTransportEvent): void {
+  function emit(ev: ServerTransportEvent<WebSocket>): void {
     for (const l of listeners) {
       l(ev);
     }
@@ -53,7 +53,7 @@ export function wssTransport(wss: WebSocketServer): ServerTransport {
     socket.on("error", (error: Error) => {
       emit({ type: "error", clientId: id, error });
     });
-    emit({ type: "open", clientId: id, ws: socket });
+    emit({ type: "open", clientId: id, socket });
   });
 
   return {

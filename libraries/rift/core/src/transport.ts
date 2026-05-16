@@ -2,11 +2,11 @@ import type { ClientId } from "./protocol";
 
 export type ConnectionState = "connecting" | "open" | "closing" | "closed";
 
-export type ServerTransportEvent =
+export type ServerTransportEvent<Socket> =
   | {
       readonly type: "open";
       readonly clientId: ClientId;
-      readonly ws?: unknown;
+      readonly socket: Socket;
     }
   | {
       readonly type: "message";
@@ -25,8 +25,8 @@ export type ServerTransportEvent =
       readonly error: Error;
     };
 
-export interface ServerTransport {
-  on(listener: (event: ServerTransportEvent) => void): () => void;
+export interface ServerTransport<Socket> {
+  on(listener: (event: ServerTransportEvent<Socket>) => void): () => void;
   send(clientId: ClientId, data: Uint8Array<ArrayBuffer>): void;
   close(clientId: ClientId, code: RiftCloseCode, reason?: string): void;
   shutdown(code?: RiftCloseCode, reason?: string): Promise<void>;

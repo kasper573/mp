@@ -29,7 +29,7 @@ export type VisibilityFn = (
 
 export interface ServerOptions {
   readonly schema: RiftSchema;
-  readonly transport: ServerTransport;
+  readonly transport: ServerTransport<unknown>;
   readonly tickRateHz?: number;
   readonly handshakeTimeoutMs?: number;
   readonly visibility?: VisibilityFn;
@@ -72,7 +72,7 @@ export class RiftServer extends EventBus<
   readonly world: World;
   readonly schema: RiftSchema;
 
-  readonly #transport: ServerTransport;
+  readonly #transport: ServerTransport<unknown>;
   readonly #hash: Uint8Array;
   readonly #clients = new Map<ClientId, ClientSlot>();
   readonly #eventQueue: RiftServerEvent[] = [];
@@ -502,7 +502,7 @@ export class RiftServer extends EventBus<
     });
   }
 
-  #onTransportEvent(ev: ServerTransportEvent): void {
+  #onTransportEvent(ev: ServerTransportEvent<unknown>): void {
     switch (ev.type) {
       case "open": {
         const slot: ClientSlot = {

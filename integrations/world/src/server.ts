@@ -26,11 +26,9 @@ export class MpRiftServer extends RiftServer {
     );
   }
 
-  override async dispose(
-    ...args: Parameters<RiftServer["dispose"]>
-  ): Promise<void> {
+  override async dispose(): Promise<void> {
     await this.#cleanup?.();
     this.#cleanup = undefined;
-    await super.dispose(...args);
+    await super.dispose();
   }
 }

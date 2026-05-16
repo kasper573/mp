@@ -50,7 +50,7 @@ function altSchema() {
 }
 
 interface PairedTransports {
-  server: ServerTransport;
+  server: ServerTransport<unknown>;
   client: ClientTransport;
   fromClient: ClientId;
   triggerClientError(err: Error): void;
@@ -58,24 +58,24 @@ interface PairedTransports {
 
 function makePair(clientId: number): PairedTransports {
   const id = clientId as ClientId;
-  let serverListener: ((ev: ServerTransportEvent) => void) | undefined;
+  let serverListener: ((ev: ServerTransportEvent<unknown>) => void) | undefined;
   let clientListener: ((ev: ClientTransportEvent) => void) | undefined;
   let clientState: "connecting" | "open" | "closing" | "closed" = "open";
 
-  function emitToServer(ev: ServerTransportEvent): void {
+  function emitToServer(ev: ServerTransportEvent<void>): void {
     serverListener?.(ev);
   }
   function emitToClient(ev: ClientTransportEvent): void {
     clientListener?.(ev);
   }
 
-  const server: ServerTransport = {
+  const server: ServerTransport<unknown> = {
     on(listener) {
       serverListener = listener;
       // Match production wssTransport ordering: server "connection" fires
       // before the client-side WS open. Without this, a synchronously-
       // constructed RiftClient would send Hello before the server has a slot.
-      emitToServer({ type: "open", clientId: id });
+      emitToServer({ type: "open", clientId: id, socket: undefined });
       return () => {
         serverListener = undefined;
       };
@@ -557,12 +557,14 @@ describe("emit guard", () => {
     // constructor's sync Hello path is deferred, exposing the pre-handshake
     // window for the test to observe.
     const id = 99 as ClientId;
-    let serverListener: ((ev: ServerTransportEvent) => void) | undefined;
+    let serverListener:
+      | ((ev: ServerTransportEvent<unknown>) => void)
+      | undefined;
     let clientListener: ((ev: ClientTransportEvent) => void) | undefined;
     let clientState: "connecting" | "open" | "closing" | "closed" =
       "connecting";
 
-    const serverTransport: ServerTransport = {
+    const serverTransport: ServerTransport<unknown> = {
       on(listener) {
         serverListener = listener;
         return () => {
@@ -622,7 +624,7 @@ describe("emit guard", () => {
     expect(received).toEqual([]);
 
     clientState = "open";
-    serverListener?.({ type: "open", clientId: id });
+    serverListener?.({ type: "open", clientId: id, socket: undefined });
     clientListener?.({ type: "open" });
     await awaitOpen(client);
 
@@ -645,12 +647,14 @@ describe("server time replication", () => {
     // Client starts in "connecting" so the DeltaApplied listener can be
     // attached before the handshake's initial snapshot fires.
     const id = 50 as ClientId;
-    let serverListener: ((ev: ServerTransportEvent) => void) | undefined;
+    let serverListener:
+      | ((ev: ServerTransportEvent<unknown>) => void)
+      | undefined;
     let clientListener: ((ev: ClientTransportEvent) => void) | undefined;
     let clientState: "connecting" | "open" | "closing" | "closed" =
       "connecting";
 
-    const serverTransport: ServerTransport = {
+    const serverTransport: ServerTransport<unknown> = {
       on(listener) {
         serverListener = listener;
         return () => {
@@ -704,7 +708,7 @@ describe("server time replication", () => {
     });
 
     clientState = "open";
-    serverListener?.({ type: "open", clientId: id });
+    serverListener?.({ type: "open", clientId: id, socket: undefined });
     clientListener?.({ type: "open" });
     await awaitOpen(client);
 
