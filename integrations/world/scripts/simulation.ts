@@ -190,8 +190,6 @@ export async function createSimulation(
     ],
   });
 
-  await server.start();
-
   const dt = 1 / tickHz;
   const clientIds: ClientId[] = [];
   const playerCoords = pickPlayerSpawnCoords(area, playerCount);
@@ -267,7 +265,7 @@ export async function createSimulation(
       }
     },
     async stop() {
-      await server.stop();
+      await server.dispose();
     },
   };
 }

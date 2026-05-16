@@ -172,13 +172,11 @@ transport.on((event) => {
   }
 });
 
-await riftServer.start();
-
 httpServer.listen(opt.port, opt.hostname);
 logger.info(`game service connected on ${opt.hostname}:${opt.port}`);
 
 shutdownCleanups.push(async () => {
-  await riftServer.stop();
+  await riftServer.dispose();
   for (const client of wss.clients) {
     client.terminate();
   }

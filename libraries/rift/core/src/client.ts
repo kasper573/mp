@@ -33,7 +33,8 @@ export class RiftClient<W extends World = World> extends EventBus<
   #clientId?: ClientId;
   #unsubFromTransport?: () => void;
   #unsubFromEmit?: () => void;
-  #pendingConnect?: PromiseWithResolvers<void>;
+  #disposed = false;
+  #closeReason?: string;
 
   constructor(
     public readonly world: W,
@@ -41,6 +42,14 @@ export class RiftClient<W extends World = World> extends EventBus<
   ) {
     super();
     this.#hash = world.schema.digest();
+    this.#unsubFromEmit = this.onAny(this.#onEmit);
+    this.#unsubFromTransport = this.transport.on((ev) =>
+      this.#onTransportEvent(ev),
+    );
+    this.#setState("connecting");
+    if (this.transport.state === "open") {
+      this.#onTransportEvent({ type: "open" });
+    }
   }
 
   get state(): ClientState {
@@ -59,34 +68,18 @@ export class RiftClient<W extends World = World> extends EventBus<
     return this.#clientId;
   }
 
-  connect(): Promise<void> {
-    if (this.#pendingConnect) {
-      return this.#pendingConnect.promise;
-    }
-    if (this.#state === "open") {
-      return Promise.resolve();
-    }
-    const pending: PromiseWithResolvers<void> = Promise.withResolvers();
-    this.#pendingConnect = pending;
-    this.#unsubFromEmit = this.onAny(this.#onEmit);
-    this.#unsubFromTransport = this.transport.on((ev) =>
-      this.#onTransportEvent(ev),
-    );
-    this.#setState("connecting");
-    if (this.transport.state === "open") {
-      this.#onTransportEvent({ type: "open" });
-    }
-    return pending.promise;
+  get closeReason(): string | undefined {
+    return this.#closeReason;
   }
 
-  disconnect(
-    code = RiftCloseCode.Normal,
-    reason = "client disconnect",
-  ): Promise<void> {
+  dispose(code = RiftCloseCode.Normal, reason = "client disposed"): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
     this.transport.close(code, reason);
     this.#teardown();
     this.#setState("closed");
-    return Promise.resolve();
   }
 
   #setState(next: ClientState): void {
@@ -107,16 +100,6 @@ export class RiftClient<W extends World = World> extends EventBus<
     this.#unsubFromEmit = undefined;
     this.#unsubFromTransport?.();
     this.#unsubFromTransport = undefined;
-  }
-
-  #settleConnect(err?: Error): void {
-    const pending = this.#pendingConnect;
-    this.#pendingConnect = undefined;
-    if (err) {
-      pending?.reject(err);
-    } else {
-      pending?.resolve();
-    }
   }
 
   #onEmit = (event: RiftClientEvent): boolean => {
@@ -174,7 +157,6 @@ export class RiftClient<W extends World = World> extends EventBus<
       this.#serverTime = timeMs;
       this.#setState("open");
     });
-    this.#settleConnect();
     this.emit({
       type: DeltaApplied,
       data: { tick, timeMs },
@@ -185,7 +167,6 @@ export class RiftClient<W extends World = World> extends EventBus<
 
   #rejectHandshake(reason: string): void {
     this.transport.close(RiftCloseCode.SchemaMismatch, reason);
-    this.#settleConnect(new Error(reason));
   }
 
   #applyDelta(data: Uint8Array): void {
@@ -283,8 +264,7 @@ export class RiftClient<W extends World = World> extends EventBus<
         return;
       }
       case "close": {
-        const wasConnecting =
-          this.#state === "connecting" || this.#state === "handshaking";
+        this.#closeReason = ev.reason;
         this.#setState("closed");
         if (this.#clientId !== undefined) {
           this.emit({
@@ -298,16 +278,10 @@ export class RiftClient<W extends World = World> extends EventBus<
             target: "local",
           });
         }
-        if (wasConnecting) {
-          this.#settleConnect(
-            new Error(`closed before handshake: ${ev.reason}`),
-          );
-        }
         this.#teardown();
         return;
       }
       case "error": {
-        this.#settleConnect(ev.error);
         return;
       }
     }

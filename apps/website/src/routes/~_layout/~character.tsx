@@ -1,3 +1,4 @@
+import type { AccessToken } from "@mp/auth";
 import { Button, Card } from "@mp/ui";
 import {
   CharacterRenamedResponse,
@@ -5,9 +6,14 @@ import {
   ownedCharacters,
   renameCharacter,
 } from "@mp/world";
-import { useComputed, useMount, useSignal } from "@mp/state/react";
+import {
+  useComputed,
+  useDisposable,
+  useMount,
+  useSignal,
+} from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useContext, useEffect, useMemo } from "preact/hooks";
+import { useContext } from "preact/hooks";
 import { atoms } from "@mp/style";
 import { AuthContext } from "../../integrations/contexts";
 import { env } from "../../env";
@@ -19,22 +25,13 @@ export const Route = createFileRoute("/_layout/character")({
   component: AuthBoundary.wrap(CharacterPage),
 });
 
+function createClient(accessToken: AccessToken | undefined): MpRiftClient {
+  return new MpRiftClient({ url: env.gameServerUrl, accessToken });
+}
+
 function CharacterPage() {
   const auth = useContext(AuthContext);
-
-  const client = useMemo(
-    () =>
-      new MpRiftClient({
-        url: env.gameServerUrl,
-        accessToken: auth.identity.value?.token,
-      }),
-    [auth],
-  );
-
-  useEffect(() => {
-    void client.connect();
-    return () => void client.disconnect();
-  }, [client]);
+  const client = useDisposable(createClient, [auth.identity.value?.token]);
 
   const myCharacter = useComputed(
     () => ownedCharacters(client.world).value[0],

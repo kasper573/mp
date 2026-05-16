@@ -8,7 +8,7 @@ export type Cleanup = () => MaybePromise<void>;
 export type FeatureSetupFn<Context> = (
   context: Context,
   // oxlint-disable-next-line typescript/no-invalid-void-type
-) => MaybePromise<Cleanup | void | undefined>;
+) => Cleanup | void | undefined;
 
 export interface Feature {
   readonly components?: readonly RiftType[];
@@ -17,14 +17,13 @@ export interface Feature {
   readonly client?: FeatureSetupFn<MpRiftClient>;
 }
 
-export async function setupFeatures<Context>(
+export function setupFeatures<Context>(
   context: Context,
   setupFns: ReadonlyArray<FeatureSetupFn<Context> | undefined>,
-): Promise<Cleanup> {
+): Cleanup {
   const cleanups: Cleanup[] = [];
   for (const setup of setupFns) {
-    // oxlint-disable-next-line no-await-in-loop
-    const cleanup = await setup?.(context);
+    const cleanup = setup?.(context);
     if (cleanup) {
       cleanups.push(cleanup);
     }

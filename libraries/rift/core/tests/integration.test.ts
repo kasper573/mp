@@ -72,7 +72,10 @@ function makePair(clientId: number): PairedTransports {
   const server: ServerTransport = {
     on(listener) {
       serverListener = listener;
-      queueMicrotask(() => emitToServer({ type: "open", clientId: id }));
+      // Match production wssTransport ordering: server "connection" fires
+      // before the client-side WS open. Without this, a synchronously-
+      // constructed RiftClient would send Hello before the server has a slot.
+      emitToServer({ type: "open", clientId: id });
       return () => {
         serverListener = undefined;
       };
@@ -123,11 +126,35 @@ function makePair(clientId: number): PairedTransports {
   };
 }
 
-function flush(times = 4): Promise<void> {
-  return Array.from({ length: times }).reduce<Promise<void>>(
-    (p) => p.then(() => undefined),
-    Promise.resolve(),
-  );
+async function flush(times = 4): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    // oxlint-disable-next-line no-await-in-loop
+    await Promise.resolve();
+  }
+}
+
+function awaitOpen(client: RiftClient): Promise<void> {
+  if (client.state === "open") {
+    return Promise.resolve();
+  }
+  if (client.state === "closed") {
+    return Promise.reject(
+      new Error(client.closeReason ?? "client closed before reaching open"),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const off = client.on(ClientStateChanged, (event) => {
+      if (event.data.state === "open") {
+        off();
+        resolve();
+      } else if (event.data.state === "closed") {
+        off();
+        reject(
+          new Error(client.closeReason ?? "client closed before reaching open"),
+        );
+      }
+    });
+  });
 }
 
 describe("RiftServer + RiftClient handshake", () => {
@@ -142,10 +169,9 @@ describe("RiftServer + RiftClient handshake", () => {
     const e = server.world.create();
     server.world.add(e, pos, { x: 4, y: 5 });
     server.world.add(e, name, "alpha");
-    await server.start();
 
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     expect(client.state).toBe("open");
     expect(client.clientId).toBe(pair.fromClient);
@@ -154,7 +180,7 @@ describe("RiftServer + RiftClient handshake", () => {
     expect(mirrored?.y).toBe(5);
     expect(client.world.get(e, name)).toBe("alpha");
 
-    await server.stop();
+    await server.dispose();
     await flush();
   });
 
@@ -165,12 +191,11 @@ describe("RiftServer + RiftClient handshake", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
 
     const client = new RiftClient(new World(altSchema()), pair.client);
-    await expect(client.connect()).rejects.toThrow(/schema mismatch/);
+    await expect(awaitOpen(client)).rejects.toThrow(/schema mismatch/);
 
-    await server.stop();
+    await server.dispose();
   });
 });
 
@@ -183,9 +208,8 @@ describe("delta replication", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     const e = server.world.create();
     server.world.add(e, pos, { x: 1, y: 2 });
@@ -208,7 +232,7 @@ describe("delta replication", () => {
     await flush();
     expect(client.world.exists(e)).toBe(false);
 
-    await server.stop();
+    await server.dispose();
   });
 
   it("a tick with no changes produces no client bytes", async () => {
@@ -219,9 +243,8 @@ describe("delta replication", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
     await flush();
 
     const sent: Uint8Array[] = [];
@@ -235,7 +258,7 @@ describe("delta replication", () => {
     await flush();
     expect(sent.length).toBe(0);
 
-    await server.stop();
+    await server.dispose();
   });
 
   it("visibility callback filters entities for a client", async () => {
@@ -248,9 +271,8 @@ describe("delta replication", () => {
       tickRateHz: 0,
       visibility: () => visibleSet,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     const visible = server.world.create();
     server.world.add(visible, name, "yes");
@@ -280,9 +302,8 @@ describe("delta replication", () => {
       tickRateHz: 0,
       visibility: () => visibleSet,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     const e = server.world.create();
     server.world.add(e, name, "e");
@@ -301,7 +322,7 @@ describe("delta replication", () => {
     expect(client.world.exists(e)).toBe(true);
     expect(client.world.get(e, name)).toBe("e");
 
-    await server.stop();
+    await server.dispose();
   });
 
   it("setVisibility replaces the callback at runtime", async () => {
@@ -312,9 +333,8 @@ describe("delta replication", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     const e = server.world.create();
     server.world.add(e, name, "x");
@@ -332,7 +352,7 @@ describe("delta replication", () => {
     await flush();
     expect(client.world.exists(e)).toBe(true);
 
-    await server.stop();
+    await server.dispose();
   });
 });
 
@@ -349,10 +369,9 @@ describe("event routing", () => {
     server.on(ping, (event) => {
       received.push(event);
     });
-    await server.start();
 
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
 
     client.emit({
       type: ping,
@@ -368,7 +387,7 @@ describe("event routing", () => {
       type: "wire",
       clientId: pair.fromClient,
     });
-    await server.stop();
+    await server.dispose();
   });
 
   it("broadcast and client-list strategies deliver server emits to clients", async () => {
@@ -379,14 +398,13 @@ describe("event routing", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
 
     const got: number[] = [];
     client.on(pong, (event) => {
       got.push(event.data.value);
     });
-    await client.connect();
+    await awaitOpen(client);
 
     server.emit({
       type: pong,
@@ -407,7 +425,7 @@ describe("event routing", () => {
     await flush();
 
     expect(got.sort((a, b) => a - b)).toEqual([7, 11]);
-    await server.stop();
+    await server.dispose();
   });
 
   it("entity strategy only delivers to clients whose visibility sees that entity", async () => {
@@ -420,13 +438,12 @@ describe("event routing", () => {
       tickRateHz: 0,
       visibility: () => visibleSet,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
     const seen: number[] = [];
     client.on(pong, (event) => {
       seen.push(event.data.value);
     });
-    await client.connect();
+    await awaitOpen(client);
 
     const target = server.world.create();
     server.world.add(target, name, "target");
@@ -452,7 +469,7 @@ describe("event routing", () => {
     await flush();
     expect(seen).toEqual([2]);
 
-    await server.stop();
+    await server.dispose();
   });
 });
 
@@ -472,16 +489,15 @@ describe("lifecycle", () => {
     server.on(ClientDisconnected, () => {
       events.push("disconnect");
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
-    await client.connect();
+    await awaitOpen(client);
     expect(events).toEqual(["connect"]);
 
-    await client.disconnect();
+    client.dispose();
     await flush();
     expect(events).toEqual(["connect", "disconnect"]);
 
-    await server.stop();
+    await server.dispose();
   });
 
   it("fires Tick handlers each tick", async () => {
@@ -496,16 +512,15 @@ describe("lifecycle", () => {
     server.on(Tick, (event) => {
       ticks.push(event.data.tick);
     });
-    await server.start();
     server.tick(0);
     server.tick(0);
     expect(ticks).toEqual([1, 2]);
-    await server.stop();
+    await server.dispose();
   });
 });
 
 describe("RiftClient state transitions", () => {
-  it("emits ClientStateChanged for every transition", async () => {
+  it("transitions through the expected states during construction and disposal", async () => {
     const schema = makeSchema();
     const pair = makePair(14);
     const server = new RiftServer({
@@ -513,26 +528,21 @@ describe("RiftClient state transitions", () => {
       transport: pair.server,
       tickRateHz: 0,
     });
-    await server.start();
     const client = new RiftClient(new World(schema), pair.client);
 
-    const observed: string[] = [];
+    await awaitOpen(client);
+    expect(client.state).toBe("open");
+
+    const afterOpen: string[] = [];
     client.on(ClientStateChanged, (event) => {
-      observed.push(event.data.state);
+      afterOpen.push(event.data.state);
     });
 
-    expect(client.state).toBe("idle");
-    await client.connect();
-    expect(client.state).toBe("open");
-    await client.disconnect();
+    client.dispose();
     expect(client.state).toBe("closed");
+    expect(afterOpen).toEqual(["closed"]);
 
-    expect(observed).toContain("connecting");
-    expect(observed).toContain("handshaking");
-    expect(observed).toContain("open");
-    expect(observed[observed.length - 1]).toBe("closed");
-
-    await server.stop();
+    await server.dispose();
   });
 });
 
@@ -543,18 +553,64 @@ describe("emit guard", () => {
   });
 
   it("client.emit drops wire-targeted events while not open", async () => {
-    const pair = makePair(15);
+    // Custom transport pair: client starts in "connecting" so the
+    // constructor's sync Hello path is deferred, exposing the pre-handshake
+    // window for the test to observe.
+    const id = 99 as ClientId;
+    let serverListener: ((ev: ServerTransportEvent) => void) | undefined;
+    let clientListener: ((ev: ClientTransportEvent) => void) | undefined;
+    let clientState: "connecting" | "open" | "closing" | "closed" =
+      "connecting";
+
+    const serverTransport: ServerTransport = {
+      on(listener) {
+        serverListener = listener;
+        return () => {
+          serverListener = undefined;
+        };
+      },
+      send(_id, data) {
+        clientListener?.({ type: "message", data });
+      },
+      close(_id, code, reason = "") {
+        clientState = "closed";
+        clientListener?.({ type: "close", code, reason });
+        serverListener?.({ type: "close", clientId: id, code, reason });
+      },
+      shutdown() {
+        return Promise.resolve();
+      },
+    };
+    const clientTransport: ClientTransport = {
+      get state() {
+        return clientState;
+      },
+      on(listener) {
+        clientListener = listener;
+        return () => {
+          clientListener = undefined;
+        };
+      },
+      send(data) {
+        serverListener?.({ type: "message", clientId: id, data });
+      },
+      close(code = RiftCloseCode.Normal, reason = "") {
+        clientState = "closed";
+        clientListener?.({ type: "close", code, reason });
+        serverListener?.({ type: "close", clientId: id, code, reason });
+      },
+    };
+
     const server = new RiftServer({
       schema,
-      transport: pair.server,
+      transport: serverTransport,
       tickRateHz: 0,
     });
     const received: string[] = [];
     server.on(ping, (event) => {
       received.push(event.data.note);
     });
-    await server.start();
-    const client = new RiftClient(new World(schema), pair.client);
+    const client = new RiftClient(new World(schema), clientTransport);
 
     client.emit({
       type: ping,
@@ -565,7 +621,11 @@ describe("emit guard", () => {
     await flush();
     expect(received).toEqual([]);
 
-    await client.connect();
+    clientState = "open";
+    serverListener?.({ type: "open", clientId: id });
+    clientListener?.({ type: "open" });
+    await awaitOpen(client);
+
     client.emit({
       type: ping,
       data: { note: "later" },
@@ -575,29 +635,78 @@ describe("emit guard", () => {
     await flush();
     expect(received).toEqual(["later"]);
 
-    await server.stop();
+    await server.dispose();
   });
 });
 
 describe("server time replication", () => {
   it("stamps tick and timeMs on accept and deltas", async () => {
     const schema = makeSchema();
-    const pair = makePair(50);
+    // Client starts in "connecting" so the DeltaApplied listener can be
+    // attached before the handshake's initial snapshot fires.
+    const id = 50 as ClientId;
+    let serverListener: ((ev: ServerTransportEvent) => void) | undefined;
+    let clientListener: ((ev: ClientTransportEvent) => void) | undefined;
+    let clientState: "connecting" | "open" | "closing" | "closed" =
+      "connecting";
+
+    const serverTransport: ServerTransport = {
+      on(listener) {
+        serverListener = listener;
+        return () => {
+          serverListener = undefined;
+        };
+      },
+      send(_id, data) {
+        clientListener?.({ type: "message", data });
+      },
+      close(_id, code, reason = "") {
+        clientState = "closed";
+        clientListener?.({ type: "close", code, reason });
+        serverListener?.({ type: "close", clientId: id, code, reason });
+      },
+      shutdown() {
+        return Promise.resolve();
+      },
+    };
+    const clientTransport: ClientTransport = {
+      get state() {
+        return clientState;
+      },
+      on(listener) {
+        clientListener = listener;
+        return () => {
+          clientListener = undefined;
+        };
+      },
+      send(data) {
+        serverListener?.({ type: "message", clientId: id, data });
+      },
+      close(code = RiftCloseCode.Normal, reason = "") {
+        clientState = "closed";
+        clientListener?.({ type: "close", code, reason });
+        serverListener?.({ type: "close", clientId: id, code, reason });
+      },
+    };
+
     const server = new RiftServer({
       schema,
-      transport: pair.server,
+      transport: serverTransport,
       tickRateHz: 0,
     });
-    await server.start();
     server.tick(0.1);
     server.tick(0.2);
 
-    const client = new RiftClient(new World(schema), pair.client);
+    const client = new RiftClient(new World(schema), clientTransport);
     const applied: Array<{ tick: number; timeMs: number }> = [];
     client.on(DeltaApplied, (e) => {
       applied.push({ tick: e.data.tick, timeMs: e.data.timeMs });
     });
-    await client.connect();
+
+    clientState = "open";
+    serverListener?.({ type: "open", clientId: id });
+    clientListener?.({ type: "open" });
+    await awaitOpen(client);
 
     expect(client.serverTick).toBe(2);
     expect(client.serverTime).toBe(300);
@@ -612,6 +721,6 @@ describe("server time replication", () => {
     expect(client.serverTime).toBe(350);
     expect(applied.at(-1)).toEqual({ tick: 3, timeMs: 350 });
 
-    await server.stop();
+    await server.dispose();
   });
 });

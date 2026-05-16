@@ -9,7 +9,9 @@ type FeatureServerOptions = Omit<ServerOptions, "schema"> & {
 };
 
 export class MpRiftServer extends RiftServer {
-  constructor(private opts: FeatureServerOptions) {
+  #cleanup?: Cleanup;
+
+  constructor(opts: FeatureServerOptions) {
     super({
       ...opts,
       schema: defineSchema({
@@ -18,20 +20,17 @@ export class MpRiftServer extends RiftServer {
         hash: opts.hash,
       }),
     });
-  }
-
-  #cleanup?: Cleanup;
-  override async start(): Promise<void> {
-    this.#cleanup = await setupFeatures(
+    this.#cleanup = setupFeatures(
       this,
-      this.opts.features.map((f) => f.server),
+      opts.features.map((f) => f.server),
     );
-    await super.start();
   }
 
-  override async stop(...args: Parameters<RiftServer["stop"]>): Promise<void> {
+  override async dispose(
+    ...args: Parameters<RiftServer["dispose"]>
+  ): Promise<void> {
     await this.#cleanup?.();
-    await super.stop(...args);
     this.#cleanup = undefined;
+    await super.dispose(...args);
   }
 }

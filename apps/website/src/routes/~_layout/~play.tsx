@@ -1,3 +1,4 @@
+import type { AccessToken } from "@mp/auth";
 import {
   AdditionalDebugUiContext,
   GameRenderer,
@@ -6,9 +7,9 @@ import {
   ownedCharacters,
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
-import { useSignalEffect } from "@mp/state/react";
+import { useDisposable, useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useContext, useEffect, useMemo } from "preact/hooks";
+import { useContext } from "preact/hooks";
 import { gameAssetLoader } from "../../integrations/assets";
 import { AuthContext } from "../../integrations/contexts";
 import { env } from "../../env";
@@ -19,22 +20,13 @@ export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
 });
 
+function createClient(accessToken: AccessToken | undefined): MpRiftClient {
+  return new MpRiftClient({ url: env.gameServerUrl, accessToken });
+}
+
 function PlayPage() {
   const auth = useContext(AuthContext);
-
-  const client = useMemo(
-    () =>
-      new MpRiftClient({
-        url: env.gameServerUrl,
-        accessToken: auth.identity.value?.token,
-      }),
-    [auth],
-  );
-
-  useEffect(() => {
-    void client.connect();
-    return () => void client.disconnect();
-  }, [client]);
+  const client = useDisposable(createClient, [auth.identity.value?.token]);
 
   useSignalEffect(() => {
     const first = ownedCharacters(client.world).value[0]?.id;

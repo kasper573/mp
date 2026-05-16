@@ -1,5 +1,6 @@
 import {
   AreaTag,
+  awaitOpen,
   claimedCharacterEntity,
   Combat,
   joinAsPlayer,
@@ -84,9 +85,9 @@ function testOneGameClient(n: number, rng: Rng): Promise<void> {
         accessToken: createBypassUser(`Load Test ${n}`),
       });
 
-      stopClient = () => void client.disconnect();
+      stopClient = () => client.dispose();
 
-      await client.connect();
+      await awaitOpen(client);
       if (verbose) {
         logger.info(`Socket ${n} connected`);
       }

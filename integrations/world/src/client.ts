@@ -22,8 +22,8 @@ export interface MpRiftClientOptions {
 }
 
 export class MpRiftClient extends RiftClient<ReactiveWorld> {
-  readonly #features: readonly Feature[];
   readonly #stateSignal = signal<ClientState>("idle");
+  #cleanup?: Cleanup;
 
   constructor(opts: MpRiftClientOptions) {
     const features: Feature[] = [
@@ -43,40 +43,58 @@ export class MpRiftClient extends RiftClient<ReactiveWorld> {
       wsTransport(new PartySocket(url.toString())),
     );
 
-    this.#features = features;
     this.on(ClientStateChanged, (event) => {
       this.#stateSignal.value = event.data.state;
     });
+
+    this.#cleanup = setupFeatures(
+      this,
+      features.map((f) => f.client),
+    );
   }
 
-  // Reactive mirror of `RiftClient.state`. Use `state$.value` to read
-  // inside a tracking scope; the imperative `state` getter on the base
-  // class is still available for one-shot reads.
   get state$(): ReadonlySignal<ClientState> {
     return this.#stateSignal;
   }
 
-  #cleanup?: Cleanup;
+  override dispose(...args: Parameters<RiftClient["dispose"]>): void {
+    void this.#cleanup?.();
+    this.#cleanup = undefined;
+    super.dispose(...args);
+  }
+}
 
-  override async connect(): Promise<void> {
-    // super.connect() resolves only once the handshake snapshot has been
-    // ingested into the world. Running feature setups afterwards lets
-    // each feature query a fully-populated world; running them before
-    // would expose features to a partial world during snapshot ingest.
-    await super.connect();
-    this.#cleanup = await setupFeatures(
-      this,
-      this.#features.map((f) => f.client),
+export function awaitOpen(
+  client: MpRiftClient,
+  timeoutMs = 15_000,
+): Promise<void> {
+  if (client.state === "open") {
+    return Promise.resolve();
+  }
+  if (client.state === "closed") {
+    return Promise.reject(
+      new Error(client.closeReason ?? "client closed before reaching open"),
     );
   }
-
-  override async disconnect(
-    ...args: Parameters<RiftClient["disconnect"]>
-  ): Promise<void> {
-    await this.#cleanup?.();
-    await super.disconnect(...args);
-    this.#cleanup = undefined;
-  }
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      off();
+      reject(new Error("client did not reach open before timeout"));
+    }, timeoutMs);
+    const off = client.on(ClientStateChanged, (event) => {
+      if (event.data.state === "open") {
+        clearTimeout(timer);
+        off();
+        resolve();
+      } else if (event.data.state === "closed") {
+        clearTimeout(timer);
+        off();
+        reject(
+          new Error(client.closeReason ?? "client closed before reaching open"),
+        );
+      }
+    });
+  });
 }
 
 export const RiftContext = createContext(

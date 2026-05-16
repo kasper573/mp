@@ -91,8 +91,9 @@ export class RiftServer extends EventBus<
   #lastTickTime = 0;
   #serverTimeMs = 0;
   #tickTimer?: ReturnType<typeof setInterval>;
-  #started = false;
-  #stopping = false;
+  #disposed = false;
+  #unsubscribeFromTransport?: () => void;
+  #unsubscribeFromEmit?: UnsubscribeFn;
 
   constructor(opts: ServerOptions) {
     super();
@@ -111,20 +112,7 @@ export class RiftServer extends EventBus<
     this.#componentEntryByType = new Map(
       this.#componentEntries.map((e) => [e.ty, e]),
     );
-  }
-
-  setVisibility(fn: VisibilityFn | undefined): void {
-    this.#visibility = fn;
-  }
-
-  #unsubscribeFromTransport?: () => void;
-  #unsubscribeFromEmit?: UnsubscribeFn;
-  start(): Promise<void> {
-    if (this.#started) {
-      return Promise.resolve();
-    }
     this.#unsubscribeFromEmit = this.onAny(this.#onEmit);
-    this.#started = true;
     this.#unsubscribeFromTransport = this.#transport.on((ev) =>
       this.#onTransportEvent(ev),
     );
@@ -132,17 +120,20 @@ export class RiftServer extends EventBus<
       const interval = 1000 / this.#tickRateHz;
       this.#tickTimer = setInterval(() => this.tick(), interval);
     }
-    return Promise.resolve();
   }
 
-  async stop(
+  setVisibility(fn: VisibilityFn | undefined): void {
+    this.#visibility = fn;
+  }
+
+  async dispose(
     code: number = RiftCloseCode.ServerShutdown,
     reason = "shutdown",
   ): Promise<void> {
-    if (this.#stopping) {
+    if (this.#disposed) {
       return;
     }
-    this.#stopping = true;
+    this.#disposed = true;
     this.#unsubscribeFromEmit?.();
     this.#unsubscribeFromEmit = undefined;
     this.#unsubscribeFromTransport?.();

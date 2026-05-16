@@ -1,3 +1,4 @@
+import type { AccessToken } from "@mp/auth";
 import {
   AdditionalDebugUiContext,
   GameRenderer,
@@ -8,10 +9,15 @@ import {
 } from "@mp/world";
 import * as fixtures from "@mp/fixtures";
 import { userRoles } from "@mp/keycloak";
-import { useComputed, useSignal, useSignalEffect } from "@mp/state/react";
+import {
+  useComputed,
+  useDisposable,
+  useSignal,
+  useSignalEffect,
+} from "@mp/state/react";
 import { Select } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { useContext, useEffect, useMemo } from "preact/hooks";
+import { useContext } from "preact/hooks";
 import { gameAssetLoader } from "../../../integrations/assets";
 import { AuthContext } from "../../../integrations/contexts";
 import { env } from "../../../env";
@@ -25,23 +31,14 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
   }),
 });
 
+function createClient(accessToken: AccessToken | undefined): MpRiftClient {
+  return new MpRiftClient({ url: env.gameServerUrl, accessToken });
+}
+
 function RouteComponent() {
   const auth = useContext(AuthContext);
   const spectatedId = useSignal<CharacterId | undefined>(undefined);
-
-  const client = useMemo(
-    () =>
-      new MpRiftClient({
-        url: env.gameServerUrl,
-        accessToken: auth.identity.value?.token,
-      }),
-    [auth],
-  );
-
-  useEffect(() => {
-    void client.connect();
-    return () => void client.disconnect();
-  }, [client]);
+  const client = useDisposable(createClient, [auth.identity.value?.token]);
 
   useSignalEffect(() => {
     const id = spectatedId.value;
