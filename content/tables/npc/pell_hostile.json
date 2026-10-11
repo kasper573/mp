@@ -1,0 +1,61 @@
+{
+  "name": "Pell",
+  "model": "pell",
+  "stats": {
+    "health": 40.0,
+    "max_health": 40.0,
+    "damage": 4.0,
+    "attack_speed": 1.1,
+    "attack_delay": 400.0,
+    "movement_speed": 1.0,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "nameplate",
+      "role": "Gambler"
+    },
+    {
+      "type": "voice",
+      "babble": "pell"
+    },
+    {
+      "type": "loot",
+      "xp": 25,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 15
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 10.0
+      }
+    },
+    {
+      "type": "inline_script",
+      "nodes": {
+        "dead": {
+          "type": "remember",
+          "memory": "pell_dead"
+        },
+        "defeated": {
+          "type": "on",
+          "event": "defeated",
+          "next": "fight_over"
+        },
+        "fight_over": {
+          "type": "forget",
+          "memories": [
+            "pell_fighting"
+          ],
+          "next": "dead"
+        }
+      }
+    }
+  ]
+}

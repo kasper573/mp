@@ -1,0 +1,23 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "bloomvale_inn_furniture",
+      "tiles": [
+        [
+          48,
+          49
+        ],
+        [
+          50,
+          51
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

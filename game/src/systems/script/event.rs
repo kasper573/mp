@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::core::content::serial;
 use crate::core::script::{EventDef, Name, OwnerKind, ValueType};
 use crate::core::tiling::Tiles;
 use crate::data;
@@ -38,7 +39,8 @@ pub enum Who {
     Anyone,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
 pub enum RiftEvent {
     Started,
     Run,
@@ -56,7 +58,9 @@ pub enum RiftEvent {
     Interacted {
         verb: Verb,
         reach: Tiles,
+        #[serde(skip_serializing_if = "serial::is_empty")]
         marks: &'static [data::attention::Id],
+        #[serde(skip_serializing_if = "serial::is_false")]
         news: bool,
     },
     Heard {
@@ -66,6 +70,7 @@ pub enum RiftEvent {
     CameNear {
         within: Tiles,
         by: Who,
+        #[serde(skip_serializing_if = "Option::is_none")]
         npc: Option<data::npc::Id>,
     },
     Attacked,
@@ -78,9 +83,11 @@ pub enum RiftEvent {
     Completed,
     Failed,
     Bought {
+        #[serde(skip_serializing_if = "Option::is_none")]
         item: Option<data::item::Id>,
     },
     Sold {
+        #[serde(skip_serializing_if = "Option::is_none")]
         item: Option<data::item::Id>,
     },
 }

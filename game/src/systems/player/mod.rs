@@ -102,11 +102,13 @@ pub struct Welcome {
 /// grind it down, so test/dev sessions never die to NPCs.
 const IMMORTAL_HEALTH: f32 = 9999.0;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct PlayerDef {
     pub model: data::model::Id,
     pub job: data::job::Id,
+    #[serde(serialize_with = "crate::systems::stat::stats_map")]
     pub stats: &'static [Stat],
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub modules: &'static [PlayerModule],
 }
 
@@ -126,7 +128,8 @@ impl ModuleSet for PlayerDef {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum PlayerModule {
     Tint(Tint),
     Regen(HealthRegen),

@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use serde::Serialize;
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
@@ -28,7 +29,8 @@ pub type Aim = Option<&'static Condition>;
 
 macro_rules! effects {
     ($($variant:ident($ty:ty)),* $(,)?) => {
-        #[derive(Clone)]
+        #[derive(Clone, Serialize)]
+        #[serde(tag = "type", rename_all = "snake_case")]
         pub enum RiftEffect {
             $($variant($ty),)*
         }
@@ -150,10 +152,12 @@ pub fn refuse(world: &mut World, cx: &FlowCx, wired: Arrow, reason: impl Into<St
     );
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct PlaySound {
     pub sfx: super::Fill<SfxId>,
+    #[serde(rename = "for", serialize_with = "play_sound_for")]
     pub for_everyone: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
@@ -184,6 +188,10 @@ impl EffectDef<RiftScripting> for PlaySound {
             .into_iter()
             .collect()
     }
+}
+
+fn play_sound_for<S: serde::Serializer>(everyone: &bool, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(if *everyone { "everyone" } else { "subject" })
 }
 
 pub fn interface_sound(

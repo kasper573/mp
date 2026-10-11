@@ -1,0 +1,25 @@
+{
+  "name": "Health Potion",
+  "icon": "icons/potion/red_potion.png",
+  "sfx": {
+    "pickup": "pickup_glass",
+    "trade": "trade_glass",
+    "drop": "landing01",
+    "use": "heal01"
+  },
+  "kind": {
+    "type": "consumable",
+    "health_bonus": 10.0,
+    "lasts": 0.0
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Tastes of copper and seaweed. Works anyway."
+    },
+    {
+      "type": "stack",
+      "max": 10
+    }
+  ]
+}

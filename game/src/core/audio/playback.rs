@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::core::assets::AssetRef;
@@ -34,7 +35,7 @@ impl Plugin for SfxPlugin {
 
 pub use crate::data::sfx::Id as SfxId;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct SfxDef {
     pub file: AssetRef,
     pub volume: SfxScalar,
@@ -49,6 +50,21 @@ impl crate::core::content::ContentRow for SfxDef {
 pub enum SfxScalar {
     Fixed(f32),
     Random(f32, f32),
+}
+
+impl Serialize for SfxScalar {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        match self {
+            SfxScalar::Fixed(value) => serializer.serialize_f32(*value),
+            SfxScalar::Random(min, max) => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("min", min)?;
+                map.serialize_entry("max", max)?;
+                map.end()
+            }
+        }
+    }
 }
 
 #[derive(Resource, Default)]

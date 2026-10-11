@@ -1,0 +1,9 @@
+{
+  "label": "Pick the fourth choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit4"
+    }
+  ]
+}

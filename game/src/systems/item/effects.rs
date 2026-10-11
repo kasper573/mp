@@ -1,7 +1,9 @@
 use bevy_ecs::prelude::*;
+use serde::Serialize;
 
 use super::{DroppedItem, Id, Inventory, ItemStack, ReservedBy};
 use crate::core::content::Content;
+use crate::core::content::serial;
 use crate::core::math::Pos;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, Name, OwnerKind, ValueType,
@@ -16,77 +18,112 @@ use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
 use crate::systems::script::{Condition, Place, Reach, RiftScripting};
 use crate::systems::visibility::Presence;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Items {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub take: &'static [ItemStack],
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub give: &'static [ItemStack],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct UseItem {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub item: Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub used: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Equip {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub item: Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Unequip {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub slot: EquipmentSlot,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct DropItems {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub item: Id,
     pub count: &'static Condition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct SpawnGroundItems {
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub items: &'static [ItemStack],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
+    #[serde(rename = "for", serialize_with = "ground_items_for")]
     pub for_subject: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub seconds: Option<&'static Condition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ClearGroundItems {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
     pub within: &'static Condition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct MoveItems {
     pub from: &'static Condition,
     pub to: &'static Condition,
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub items: &'static [ItemStack],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
+#[serde(untagged)]
 pub enum Spot {
     Place(Place),
     Actor(&'static Condition),
+}
+
+fn ground_items_for<S: serde::Serializer>(
+    for_subject: &bool,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(if *for_subject { "subject" } else { "anyone" })
 }
 
 impl EffectDef<RiftScripting> for Items {

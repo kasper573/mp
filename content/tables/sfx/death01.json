@@ -1,0 +1,8 @@
+{
+  "file": "audio/combat/death01.wav",
+  "volume": {
+    "min": 0.63,
+    "max": 0.79
+  },
+  "pitch": 1.0
+}

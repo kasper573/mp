@@ -64,7 +64,15 @@ pub struct Inventory {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ItemStack {
     pub item: Id,
+    #[serde(
+        default = "one",
+        skip_serializing_if = "crate::core::content::serial::is_one"
+    )]
     pub count: u32,
+}
+
+fn one() -> u32 {
+    1
 }
 
 impl ItemStack {
@@ -264,12 +272,13 @@ pub struct ItemsDropped {
     pub from: Pos<Tiles>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ItemDef {
     pub name: &'static str,
     pub icon: AssetRef,
     pub sfx: ItemSfx,
     pub kind: ItemKind,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub modules: &'static [ItemModule],
 }
 
@@ -292,7 +301,8 @@ impl ModuleSet for ItemDef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
@@ -301,15 +311,16 @@ pub enum ItemModule {
     QuestItem,
     Bound,
     Currency,
+    #[serde(untagged)]
     Script(ScriptModule),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Flavor {
     pub text: &'static str,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Stack {
     pub max: u32,
 }
@@ -322,6 +333,7 @@ pub enum ItemFlag {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ItemCategory {
     Consumable,
     Equipment,
@@ -419,7 +431,8 @@ impl ItemDef {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemKind {
     Consumable {
         health_bonus: f32,
@@ -427,6 +440,7 @@ pub enum ItemKind {
     },
     Equipment {
         slot: equipment::EquipmentSlot,
+        #[serde(skip_serializing_if = "Option::is_none")]
         requires: Option<&'static Condition>,
     },
     Usable,
@@ -439,11 +453,12 @@ impl ItemKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ItemSfx {
     pub pickup: SfxId,
     pub trade: SfxId,
     pub drop: SfxId,
+    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     pub on_use: Option<SfxId>,
 }
 

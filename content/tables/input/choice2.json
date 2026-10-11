@@ -1,0 +1,9 @@
+{
+  "label": "Pick the second choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit2"
+    }
+  ]
+}

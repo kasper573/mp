@@ -67,7 +67,7 @@ impl Fixture for InputAction {
     type Row = InputDef;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct InputDef {
     pub label: &'static str,
     pub bindings: &'static [InputBinding],
@@ -77,12 +77,14 @@ impl crate::core::content::ContentRow for InputDef {
     const TABLE: &'static str = "input";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputBinding {
     Key(KeyGesture),
     AnyKey,
     Mouse {
         button: MouseButton,
+        #[serde(flatten)]
         modifiers: KeyModifiers,
     },
     Click(ClickGesture),

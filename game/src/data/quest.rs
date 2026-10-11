@@ -37,17 +37,17 @@ crate::table! {
         xp: 120,
         reveal: &[Locked, Needs, Costs, Gains],
         modules: &[
-            QuestModule::Shown(&NOT_SIDED_WITH_ORCS),
-            QuestModule::Requires(&LEVEL_2),
+            QuestModule::Shown { condition: &NOT_SIDED_WITH_ORCS },
+            QuestModule::Requires { condition: &LEVEL_2 },
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::OrcTusk, 5))),
             QuestModule::Objective(Objective::Defeat { npc: NpcId::OrcChief, count: 1 }),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::OrcTusk, 5)]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 35), ItemStack::new(ItemId::GreaterHealthPotion, 2)]),
-            QuestModule::PickOne(&[
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::OrcTusk, 5)] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::Gold, 35), ItemStack::new(ItemId::GreaterHealthPotion, 2)] },
+            QuestModule::PickOne { items: &[
                 ItemStack::new(ItemId::RustySword, 1),
                 ItemStack::new(ItemId::BoneShield, 1),
                 ItemStack::new(ItemId::TribalHelmet, 1),
-            ]),
+            ] },
         ],
     },
     ShamansPlea: QuestDef {
@@ -57,7 +57,7 @@ crate::table! {
         xp: 80,
         reveal: &[],
         modules: &[
-            QuestModule::Shown(&ON_TUSKS),
+            QuestModule::Shown { condition: &ON_TUSKS },
             QuestModule::Objective(Objective::Decide {
                 label: "Answer Ugra",
                 paths: &[
@@ -84,11 +84,11 @@ crate::table! {
         xp: 80,
         reveal: &[Costs],
         modules: &[
-            QuestModule::Shown(&SIDED_WITH_ORCS),
+            QuestModule::Shown { condition: &SIDED_WITH_ORCS },
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::Bone, 8))),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::Bone, 8)]),
-            QuestModule::HandOver(&[plain("Here are their bones.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::GreaterHealthPotion, 2)]),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::Bone, 8)] },
+            QuestModule::HandOver { text: &[plain("Here are their bones.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::GreaterHealthPotion, 2)] },
         ],
     },
     LetterForTheCaptain: QuestDef {
@@ -98,11 +98,11 @@ crate::table! {
         xp: 40,
         reveal: &[],
         modules: &[
-            QuestModule::Grants(&[ItemStack::new(ItemId::TobbsLetter, 1)]),
-            QuestModule::Objective(Objective::Deliver(ItemId::TobbsLetter)),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::TobbsLetter, 1)]),
-            QuestModule::HandOver(&[plain("Tobb asked me to bring you this.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 10)]),
+            QuestModule::Grants { items: &[ItemStack::new(ItemId::TobbsLetter, 1)] },
+            QuestModule::Objective(Objective::Deliver { item: ItemId::TobbsLetter }),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::TobbsLetter, 1)] },
+            QuestModule::HandOver { text: &[plain("Tobb asked me to bring you this.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::Gold, 10)] },
         ],
     },
     BatsInTheBelfry: QuestDef {
@@ -112,12 +112,12 @@ crate::table! {
         xp: 150,
         reveal: &[Needs, Gains],
         modules: &[
-            QuestModule::Requires(&BATS_REQUIRES),
+            QuestModule::Requires { condition: &BATS_REQUIRES },
             QuestModule::Objective(Objective::Defeat { npc: NpcId::VampireBat, count: 4 }),
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::BelfryKey, 1))),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::BelfryKey, 1)]),
-            QuestModule::HandOver(&[plain("Here's your key.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 25), ItemStack::new(ItemId::HealthPotion, 2)]),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::BelfryKey, 1)] },
+            QuestModule::HandOver { text: &[plain("Here's your key.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::Gold, 25), ItemStack::new(ItemId::HealthPotion, 2)] },
             QuestModule::Drop(QuestDrop {
                 from: NpcId::VampireBat,
                 item: ItemId::BelfryKey,
@@ -134,10 +134,10 @@ crate::table! {
         reveal: &[Costs, Gains],
         modules: &[
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::FishSteak, 3))),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::FishSteak, 3)]),
-            QuestModule::HandOver(&[plain("Here are the steaks.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 15), ItemStack::new(ItemId::FishingBait, 5)]),
-            QuestModule::TimeLimit(Seconds(600.0)),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::FishSteak, 3)] },
+            QuestModule::HandOver { text: &[plain("Here are the steaks.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::Gold, 15), ItemStack::new(ItemId::FishingBait, 5)] },
+            QuestModule::TimeLimit { seconds: Seconds(600.0) },
         ],
     },
     BoneTithe: QuestDef {
@@ -148,9 +148,9 @@ crate::table! {
         reveal: &[Costs, Gains],
         modules: &[
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::Bone, 10))),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::Bone, 10)]),
-            QuestModule::HandOver(&[plain("Here are today's bones.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::BoneToken, 6)]),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::Bone, 10)] },
+            QuestModule::HandOver { text: &[plain("Here are today's bones.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::BoneToken, 6)] },
             QuestModule::Daily,
         ],
     },
@@ -162,9 +162,9 @@ crate::table! {
         reveal: &[],
         modules: &[
             QuestModule::Objective(Objective::Task { task: "find_stone", label: "Find the standing stone" }),
-            QuestModule::HandIn(&[ItemStack::new(ItemId::TatteredMap, 1)]),
-            QuestModule::HandOver(&[plain("Dig where the cross says.")]),
-            QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 30), ItemStack::new(ItemId::CorsairCutlass, 1)]),
+            QuestModule::HandIn { items: &[ItemStack::new(ItemId::TatteredMap, 1)] },
+            QuestModule::HandOver { text: &[plain("Dig where the cross says.")] },
+            QuestModule::Reward { items: &[ItemStack::new(ItemId::Gold, 30), ItemStack::new(ItemId::CorsairCutlass, 1)] },
         ],
     },
 }

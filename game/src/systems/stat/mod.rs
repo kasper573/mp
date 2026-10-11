@@ -13,8 +13,19 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::systems::effect::{self, EffectContext};
 
 #[derive(
-    Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, VariantArray, IntoStaticStr,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    VariantArray,
+    IntoStaticStr,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum StatKind {
     Health,
     MaxHealth,
@@ -33,8 +44,15 @@ impl StatKind {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Stat {
+    #[serde(rename = "stat")]
     pub kind: StatKind,
     pub value: f32,
+}
+
+pub fn stats_map<S: serde::Serializer>(stats: &[Stat], serializer: S) -> Result<S::Ok, S::Error> {
+    let sorted: std::collections::BTreeMap<StatKind, f32> =
+        stats.iter().map(|stat| (stat.kind, stat.value)).collect();
+    sorted.serialize(serializer)
 }
 
 impl Stat {

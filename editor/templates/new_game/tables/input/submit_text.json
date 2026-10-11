@@ -1,0 +1,9 @@
+{
+  "label": "Send what you typed",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Enter"
+    }
+  ]
+}

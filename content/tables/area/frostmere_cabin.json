@@ -1,0 +1,281 @@
+{
+  "name": "The huntress's cabin",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 16,
+      "height": 12
+    },
+    "tile": 16,
+    "ground": [
+      "floor",
+      "walls",
+      "rug",
+      "decor"
+    ]
+  },
+  "modules": [
+    {
+      "type": "object",
+      "name": "front-door",
+      "shape": {
+        "type": "rect",
+        "x": 6.5,
+        "y": 9.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "frostmere",
+              "x": 35.5,
+              "y": 20.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "resident",
+      "npc": "huntress",
+      "at": [
+        3.0,
+        7.0
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 0.5,
+        "y": 1.5,
+        "w": 7.0,
+        "h": 5.0
+      },
+      "emit": 3.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/campfire.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_70",
+      "at": {
+        "x": -1.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_68",
+      "at": {
+        "x": 0.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_66",
+      "at": {
+        "x": 3.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_113",
+      "at": {
+        "x": 10.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_82",
+      "at": {
+        "x": -1.0,
+        "y": 1.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_64",
+      "at": {
+        "x": 9.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_89",
+      "at": {
+        "x": 12.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_64",
+      "at": {
+        "x": 7.0,
+        "y": 3.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_81",
+      "at": {
+        "x": -1.0,
+        "y": 3.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_65",
+      "at": {
+        "x": 12.0,
+        "y": 3.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_99",
+      "at": {
+        "x": 12.0,
+        "y": 4.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_86",
+      "at": {
+        "x": 1.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_79",
+      "at": {
+        "x": 4.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_67",
+      "at": {
+        "x": 7.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_101",
+      "at": {
+        "x": 8.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_71",
+      "at": {
+        "x": 12.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "frostmere_cabin_props_89",
+      "at": {
+        "x": 11.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.5,
+        "y": 1.5
+      },
+      "tileset": "frostmere_cabin_furniture",
+      "tiles": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 12.5,
+        "y": 1.5
+      },
+      "tileset": "frostmere_cabin_furniture",
+      "tiles": [
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 8.5,
+        "y": 4.5
+      },
+      "tileset": "frostmere_cabin_furniture",
+      "tiles": [
+        [
+          8,
+          9
+        ],
+        [
+          10,
+          11
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.5,
+        "y": 7.5
+      },
+      "tileset": "frostmere_cabin_furniture",
+      "tiles": [
+        [
+          28,
+          29
+        ],
+        [
+          30,
+          31
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "emberfall_props",
+      "tiles": [
+        [
+          62
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

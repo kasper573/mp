@@ -1,0 +1,10 @@
+{
+  "kind": {
+    "type": "narration",
+    "label": "Gulls",
+    "sfx": "gull_cries"
+  },
+  "text": [
+    "Gulls squabble over a fish head at the end of the pier."
+  ]
+}

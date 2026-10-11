@@ -9,7 +9,8 @@ pub mod value;
 use std::fmt;
 
 use bevy_ecs::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, Reveal, SpokenValues};
@@ -19,7 +20,7 @@ pub use node::{Assignment, Node, Target};
 pub use run::{Answer, BoxEnding, FlowCx, FlowKey, Instances, Locals, Owner, Pause};
 pub use value::{Value, ValueType};
 
-use crate::core::content::{ContentId, ContentRow};
+use crate::core::content::{ContentId, ContentRow, serial};
 
 pub type Name = &'static str;
 pub type Arrow = Option<Name>;
@@ -111,12 +112,28 @@ pub trait EffectDef<V: Vocabulary> {
     fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(bound(
+    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
+))]
 pub struct ScriptDef<V: Vocabulary> {
     pub owner: OwnerKind,
+    #[serde(
+        serialize_with = "serial::pairs_map",
+        skip_serializing_if = "serial::is_empty"
+    )]
     pub variables: &'static [(Name, Variable<V>)],
+    #[serde(
+        serialize_with = "serial::pairs_map",
+        skip_serializing_if = "serial::is_empty"
+    )]
     pub state: &'static [(Name, ValueType)],
+    #[serde(
+        serialize_with = "serial::pairs_map",
+        skip_serializing_if = "serial::is_empty"
+    )]
     pub locals: &'static [(Name, ValueType)],
+    #[serde(serialize_with = "serial::pairs_map")]
     pub nodes: &'static [(Name, Node<V>)],
 }
 
@@ -126,19 +143,41 @@ impl<V: Vocabulary> ContentRow for ScriptDef<V> {
 
 pub type ScriptId<V> = ContentId<ScriptDef<V>>;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(bound(
+    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
+))]
 pub struct InlineScript<V: Vocabulary> {
+    #[serde(
+        serialize_with = "serial::pairs_map",
+        skip_serializing_if = "serial::is_empty"
+    )]
     pub state: &'static [(Name, ValueType)],
+    #[serde(
+        serialize_with = "serial::pairs_map",
+        skip_serializing_if = "serial::is_empty"
+    )]
     pub locals: &'static [(Name, ValueType)],
+    #[serde(serialize_with = "serial::pairs_map")]
     pub nodes: &'static [(Name, Node<V>)],
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(bound(
+    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
+))]
 pub enum ScriptModule<V: Vocabulary> {
+    #[serde(rename = "shared_script")]
     Shared {
         script: ScriptId<V>,
+        #[serde(
+            serialize_with = "serial::pairs_map",
+            skip_serializing_if = "serial::is_empty"
+        )]
         values: &'static [(Name, VarValue<V>)],
     },
+    #[serde(rename = "inline_script")]
     Inline(InlineScript<V>),
 }
 
@@ -156,13 +195,22 @@ pub enum VariableType {
     Condition,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(bound(
+    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
+))]
 pub struct Variable<V: Vocabulary> {
+    #[serde(rename = "type")]
     pub ty: VariableType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<VarValue<V>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(untagged)]
+#[serde(bound(
+    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
+))]
 pub enum VarValue<V: Vocabulary> {
     Integer(i64),
     Number(f64),
@@ -195,6 +243,19 @@ impl<V: Vocabulary> VarValue<V> {
 pub enum Fill<T: 'static> {
     Const(T),
     Var(Name),
+}
+
+impl<T: Serialize> Serialize for Fill<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Fill::Const(value) => value.serialize(serializer),
+            Fill::Var(name) => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("var", name)?;
+                map.end()
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

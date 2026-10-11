@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use bevy::color::Color;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use ui::tokens::palette;
 use ui::{RichPiece, RichSpan, RichText, TextMotion, TextVoice};
 
@@ -21,6 +22,38 @@ pub enum Span {
         value: &'static Expr<RiftScripting>,
         fx: &'static [Fx],
     },
+}
+
+impl Serialize for Span {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (text, value, fx) = match *self {
+            Span::Text { text, fx: &[] } => return serializer.serialize_str(text),
+            Span::Text { text, fx } => (Some(text), None, fx),
+            Span::Value { value, fx } => (None, Some(value), fx),
+            Span::Input(action) => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("input", &action)?;
+                return map.end();
+            }
+        };
+        let mut map = serializer.serialize_map(None)?;
+        if let Some(text) = text {
+            map.serialize_entry("text", text)?;
+        }
+        if let Some(value) = value {
+            map.serialize_entry("value", value)?;
+        }
+        for fx in fx {
+            match fx {
+                Fx::Ink(ink) => map.serialize_entry("ink", ink)?,
+                Fx::Voice(voice) => map.serialize_entry("voice", voice)?,
+                Fx::Motion(motion) => map.serialize_entry("motion", motion)?,
+                Fx::Slow => map.serialize_entry("slow", &true)?,
+                Fx::PauseAfter(millis) => map.serialize_entry("pause_after", millis)?,
+            }
+        }
+        map.end()
+    }
 }
 
 pub const fn plain(text: &'static str) -> Span {
@@ -59,6 +92,7 @@ pub enum Fx {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Ink {
     Danger,
     Item,
@@ -68,12 +102,14 @@ pub enum Ink {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Voice {
     Whisper,
     Shout,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Motion {
     Wave,
     Shake,

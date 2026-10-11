@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "amberwood_cabin_props",
+      "tiles": [
+        [
+          64
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

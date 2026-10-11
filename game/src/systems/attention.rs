@@ -26,7 +26,7 @@ pub fn register(app: &mut App) {
         .init_resource::<BadgeSources>();
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct AttentionDef {
     pub icon: AssetRef,
 }

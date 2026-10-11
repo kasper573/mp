@@ -54,19 +54,26 @@ impl crate::core::content::ContentRow for AreaDef {
     const TABLE: &'static str = "area";
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum AreaModule {
     Object(ObjectDef),
     Population {
         npc: data::npc::Id,
         count: u32,
+        #[serde(
+            serialize_with = "crate::core::content::serial::opt_rect",
+            skip_serializing_if = "Option::is_none"
+        )]
         roams: Option<Rect<Tiles>>,
     },
     Resident {
         npc: data::npc::Id,
         at: Pos<Tiles>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         shown: Option<&'static Condition>,
     },
+    #[serde(untagged)]
     Script(ScriptModule),
 }
 

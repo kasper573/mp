@@ -1,0 +1,9 @@
+{
+  "label": "Move to the previous choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "ArrowUp"
+    }
+  ]
+}

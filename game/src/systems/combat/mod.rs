@@ -26,6 +26,7 @@ pub fn register(app: &mut App) {
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Attitude {
     Friendly,
     Hostile,
@@ -74,7 +75,7 @@ pub struct Swing {
     pub struck: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct HealthRegen {
     pub every: Seconds,
     pub health: f32,

@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "gloomhollow_chapel_props",
+      "tiles": [
+        [
+          211
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

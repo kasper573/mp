@@ -1,0 +1,13 @@
+{
+  "kind": {
+    "type": "speech",
+    "speaker": "orc_chief"
+  },
+  "text": [
+    {
+      "text": "WHO DARES STEAL TUSKS FROM MY CLAN?!",
+      "voice": "shout",
+      "motion": "shake"
+    }
+  ]
+}

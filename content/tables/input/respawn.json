@@ -1,0 +1,8 @@
+{
+  "label": "Get back up after dying",
+  "bindings": [
+    {
+      "type": "any_key"
+    }
+  ]
+}

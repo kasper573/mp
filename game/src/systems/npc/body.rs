@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use serde::Serialize;
 
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
@@ -306,53 +307,65 @@ pub fn moving(world: &World, npc: Entity) -> bool {
     world.get::<MoveTarget>(npc).is_some() || world.get::<Path>(npc).is_some()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Wander {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub leash: Option<&'static Condition>,
     pub priority: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct WalkTo {
     pub to: WalkTarget,
     pub within: &'static Condition,
     pub priority: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub arrived: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub interrupted: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(untagged)]
 pub enum WalkTarget {
     Place(Place),
     Object(Name),
     Actor(&'static Condition),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Attack {
     pub target: &'static Condition,
     pub within: &'static Condition,
     pub priority: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub defeated: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lost: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub interrupted: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Stop {
     pub priority: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Face {
     pub toward: FaceTarget,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(untagged)]
 pub enum FaceTarget {
     Place(Place),
     Actor(&'static Condition),

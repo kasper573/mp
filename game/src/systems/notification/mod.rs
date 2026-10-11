@@ -218,11 +218,63 @@ impl Notification {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct NotificationDef {
+    #[serde(serialize_with = "notification_kind")]
     pub kind: NotificationKind,
     pub text: &'static [Span],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub lasts: Option<Seconds>,
+}
+
+fn notification_kind<S: serde::Serializer>(
+    kind: &NotificationKind,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(None)?;
+    match kind {
+        NotificationKind::Speech { speaker } => {
+            map.serialize_entry("type", "speech")?;
+            map.serialize_entry("speaker", speaker)?;
+        }
+        NotificationKind::Narration { label, sfx } => {
+            map.serialize_entry("type", "narration")?;
+            map.serialize_entry("label", label)?;
+            if let Some(sfx) = sfx {
+                map.serialize_entry("sfx", sfx)?;
+            }
+        }
+        NotificationKind::Intro {
+            title,
+            appearance,
+            sfx,
+        } => {
+            map.serialize_entry("type", "intro")?;
+            map.serialize_entry("title", title)?;
+            if let Some(tint) = appearance.tint {
+                map.serialize_entry("tint", &tint.0.to_be_bytes())?;
+            }
+            if let Some(motion) = appearance.motion {
+                map.serialize_entry("motion", &motion)?;
+            }
+            if let Some(emblem) = &appearance.emblem {
+                map.serialize_entry("emblem", emblem)?;
+            }
+            if let Some(sfx) = sfx {
+                map.serialize_entry("sfx", sfx)?;
+            }
+        }
+        NotificationKind::Alert { .. }
+        | NotificationKind::Error { .. }
+        | NotificationKind::Milestone { .. }
+        | NotificationKind::Feed { .. } => {
+            return Err(serde::ser::Error::custom(
+                "only speech, narration and intro notifications are content",
+            ));
+        }
+    }
+    map.end()
 }
 
 impl crate::core::content::ContentRow for NotificationDef {
@@ -246,10 +298,12 @@ impl NotificationDef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Notify {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub notification: NotificationId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

@@ -1,7 +1,9 @@
 use bevy_ecs::prelude::*;
 use bevy_terminal::TerminalInbox;
+use serde::Serialize;
 
 use crate::core::content::Content;
+use crate::core::content::serial;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
 };
@@ -36,10 +38,13 @@ pub fn rebroadcast(world: &mut World) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Say {
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub text: &'static [Span],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub within: Option<&'static Condition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

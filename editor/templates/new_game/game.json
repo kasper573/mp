@@ -1,0 +1,11 @@
+{
+  "name": "New Game",
+  "content_version": "00000000",
+  "spawn": {
+    "area": "start",
+    "x": 8.0,
+    "y": 6.0
+  },
+  "player": "adventurer",
+  "bench": "start"
+}

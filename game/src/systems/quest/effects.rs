@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
@@ -13,52 +14,69 @@ use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
 use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::text::LineText;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct OfferQuest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub accepted: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub declined: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct AcceptQuest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct TurnIn {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cancelled: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct FailQuest {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct CompleteTask {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
     pub task: Name,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Decide {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub quest: QuestId,
     pub path: Name,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

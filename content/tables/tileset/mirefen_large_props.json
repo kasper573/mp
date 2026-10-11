@@ -1,0 +1,9 @@
+{
+  "image": "tilesets/mirefen-large-props.png",
+  "tile": 128,
+  "tiles": {
+    "0": {
+      "walk": "walkable"
+    }
+  }
+}

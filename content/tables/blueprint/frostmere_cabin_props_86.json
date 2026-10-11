@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "frostmere_cabin_props",
+      "tiles": [
+        [
+          86
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

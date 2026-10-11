@@ -1,0 +1,8 @@
+{
+  "file": "audio/buffs/heal01.wav",
+  "volume": {
+    "min": 0.18,
+    "max": 0.22
+  },
+  "pitch": 1.0
+}

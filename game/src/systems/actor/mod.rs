@@ -83,9 +83,14 @@ impl Action {
 )]
 pub struct Rgba(pub u32);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Tint {
+    #[serde(serialize_with = "rgba_bytes")]
     pub rgba: Rgba,
+}
+
+fn rgba_bytes<S: serde::Serializer>(rgba: &Rgba, serializer: S) -> Result<S::Ok, S::Error> {
+    rgba.0.to_be_bytes().serialize(serializer)
 }
 
 impl Rgba {

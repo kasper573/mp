@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          123
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

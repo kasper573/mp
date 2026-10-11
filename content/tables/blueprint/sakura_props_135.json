@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          135
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

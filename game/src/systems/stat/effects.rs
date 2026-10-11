@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use serde::Serialize;
 
 use super::{Stat, StatKind};
 use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
@@ -9,10 +10,12 @@ use crate::systems::npc::Npc;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
 use crate::systems::script::{Condition, Reach, RiftScripting};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Heal {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub by: HealBy,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
@@ -22,25 +25,40 @@ pub enum HealBy {
     Full,
 }
 
-#[derive(Clone)]
+impl Serialize for HealBy {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            HealBy::Amount(amount) => amount.serialize(serializer),
+            HealBy::Full => serializer.serialize_str("full"),
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
 pub struct Damage {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub by: &'static Condition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Buff {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub stat: StatKind,
     pub by: &'static Condition,
     pub seconds: &'static Condition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ClearBuffs {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

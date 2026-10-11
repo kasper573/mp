@@ -1,0 +1,10 @@
+{
+  "image": "tilesets/beach-tileset.png",
+  "tile": 16,
+  "tiles": {
+    "338": {
+      "walk": "walkable",
+      "surface": "sand"
+    }
+  }
+}

@@ -41,13 +41,13 @@ crate::table! {
                 requires: Some(&NOT_SIDED_WITH_ORCS),
             }),
             ShopModule::Buys(ShopBuys {
-                what: Buys::Item(ItemId::OrcTusk),
+                what: Buys::Item { item: ItemId::OrcTusk },
                 pays: &[ItemStack::new(ItemId::Gold, 1)],
                 requires: Some(&NOT_SIDED_WITH_ORCS),
             }),
-            ShopModule::Buys(ShopBuys { what: Buys::Category(ItemCategory::Consumable), pays: &[ItemStack::new(ItemId::Gold, 2)], requires: None }),
-            ShopModule::Buys(ShopBuys { what: Buys::Category(ItemCategory::Equipment), pays: &[ItemStack::new(ItemId::Gold, 6)], requires: None }),
-            ShopModule::Buys(ShopBuys { what: Buys::Category(ItemCategory::Material), pays: &[ItemStack::new(ItemId::Gold, 1)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Category { category: ItemCategory::Consumable }, pays: &[ItemStack::new(ItemId::Gold, 2)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Category { category: ItemCategory::Equipment }, pays: &[ItemStack::new(ItemId::Gold, 6)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Category { category: ItemCategory::Material }, pays: &[ItemStack::new(ItemId::Gold, 1)], requires: None }),
             ShopModule::Reactions(ShopReactions {
                 bought: &[
                     Line { by: Npc(NpcId::Mara), face: Some(Generic(Happy)), text: &[plain("A fine choice. You won't find better this side of the strait.")] },
@@ -75,8 +75,8 @@ crate::table! {
                 stock: Stock::Limited { count: 1, restock: Seconds(3600.0) },
                 requires: None,
             }),
-            ShopModule::Buys(ShopBuys { what: Buys::Item(ItemId::Bone), pays: &[ItemStack::new(ItemId::BoneToken, 1)], requires: None }),
-            ShopModule::Buys(ShopBuys { what: Buys::Item(ItemId::BatWing), pays: &[ItemStack::new(ItemId::BoneToken, 1)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Item { item: ItemId::Bone }, pays: &[ItemStack::new(ItemId::BoneToken, 1)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Item { item: ItemId::BatWing }, pays: &[ItemStack::new(ItemId::BoneToken, 1)], requires: None }),
         ],
     },
     HonestyBox: ShopDef {
@@ -110,7 +110,7 @@ crate::table! {
                 stock: Stock::Limited { count: 1, restock: Seconds(3600.0) },
                 requires: None,
             }),
-            ShopModule::Buys(ShopBuys { what: Buys::Item(ItemId::OrcTusk), pays: &[ItemStack::new(ItemId::Gold, 2)], requires: None }),
+            ShopModule::Buys(ShopBuys { what: Buys::Item { item: ItemId::OrcTusk }, pays: &[ItemStack::new(ItemId::Gold, 2)], requires: None }),
         ],
     },
 }

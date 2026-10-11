@@ -1,0 +1,9 @@
+{
+  "label": "Carry an item out of your bag",
+  "bindings": [
+    {
+      "type": "drag",
+      "button": "Left"
+    }
+  ]
+}

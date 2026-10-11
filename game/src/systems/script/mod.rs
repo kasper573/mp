@@ -49,13 +49,25 @@ pub type Procedure = script::Procedure<RiftScripting>;
 pub type MayDo = script::MayDo<RiftScripting>;
 pub type Fill<T> = script::Fill<T>;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Place {
     pub area: data::area::Id,
     pub at: Pos<Tiles>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+impl Serialize for Place {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("area", &self.area)?;
+        map.serialize_entry("x", &self.at.x)?;
+        map.serialize_entry("y", &self.at.y)?;
+        map.end()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
 pub enum RowRef {
     Area(data::area::Id),
     Item(data::item::Id),
@@ -72,6 +84,38 @@ pub struct Line {
     pub by: Speaker,
     pub face: Option<Face>,
     pub text: &'static [Span],
+}
+
+impl Serialize for Line {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(2))?;
+        map.serialize_entry("by", &SpeakerRow(self.by, self.face))?;
+        map.serialize_entry("text", self.text)?;
+        map.end()
+    }
+}
+
+struct SpeakerRow(Speaker, Option<Face>);
+
+impl Serialize for SpeakerRow {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(None)?;
+        match self.0 {
+            Speaker::Npc(npc) => {
+                map.serialize_entry("type", "npc")?;
+                map.serialize_entry("npc", &npc)?;
+                if let Some(face) = self.1 {
+                    map.serialize_entry("face", &face)?;
+                }
+            }
+            Speaker::Object => map.serialize_entry("type", "object")?,
+            Speaker::Narrator => map.serialize_entry("type", "narrator")?,
+            Speaker::Player => map.serialize_entry("type", "player")?,
+        }
+        map.end()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]

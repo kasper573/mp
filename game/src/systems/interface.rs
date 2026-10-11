@@ -1,10 +1,11 @@
+use serde::Serialize;
 use strum::VariantArray;
 
 use crate::core::assets::{AssetRef, AssetService};
 use crate::core::audio::playback::SfxDef;
 use crate::core::content::{Content, ContentRow, Fixture};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct CursorDef {
     pub image: AssetRef,
     pub hotspot: Hotspot,
@@ -14,7 +15,7 @@ impl ContentRow for CursorDef {
     const TABLE: &'static str = "cursor";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Hotspot {
     pub x: u16,
     pub y: u16,
@@ -42,7 +43,7 @@ impl Fixture for CursorShape {
     type Row = CursorDef;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct InterfaceIconDef {
     pub image: AssetRef,
 }
@@ -75,7 +76,7 @@ impl Fixture for InterfaceIcon {
     type Row = InterfaceIconDef;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct FontDef {
     pub file: AssetRef,
 }

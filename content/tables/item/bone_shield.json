@@ -1,0 +1,31 @@
+{
+  "name": "Bone Shield",
+  "icon": "icons/weapon_and_tool/wooden_shield.png",
+  "sfx": {
+    "pickup": "pickup_bone",
+    "trade": "trade_bone",
+    "drop": "block01"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "offhand",
+    "requires": {
+      "type": "at_least",
+      "a": {
+        "type": "level"
+      },
+      "b": 2
+    }
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Ribs lashed to a plank. It creaks when struck, but it holds."
+    },
+    {
+      "type": "stat",
+      "stat": "max_health",
+      "value": 5.0
+    }
+  ]
+}

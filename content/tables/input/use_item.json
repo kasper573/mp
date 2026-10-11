@@ -1,0 +1,10 @@
+{
+  "label": "Use, wear or take off an item",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 2
+    }
+  ]
+}

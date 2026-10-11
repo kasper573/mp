@@ -1,3 +1,6 @@
+use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
+
 use super::{Name, Vocabulary};
 
 #[derive(Clone)]
@@ -28,6 +31,63 @@ pub enum Expr<V: Vocabulary> {
     Max(&'static Expr<V>, &'static Expr<V>),
     Round(&'static Expr<V>),
     Join(&'static [Expr<V>]),
+}
+
+impl<V: Vocabulary> Serialize for Expr<V>
+where
+    V::Query: Serialize,
+{
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Expr::Bool(value) => serializer.serialize_bool(*value),
+            Expr::Int(value) => serializer.serialize_i64(*value),
+            Expr::Num(value) => serializer.serialize_f64(*value),
+            Expr::Text(value) => serializer.serialize_str(value),
+            Expr::Var(name) => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("var", name)?;
+                map.end()
+            }
+            Expr::Local(name) => tagged(serializer, "local", "local", name),
+            Expr::State(name) => tagged(serializer, "state", "state", name),
+            Expr::Event(name) => tagged(serializer, "event", "event", name),
+            Expr::Query(query) => query.serialize(serializer),
+            Expr::All(list) | Expr::Any(list) | Expr::Join(list) => {
+                tagged(serializer, self.kind(), "of", list)
+            }
+            Expr::Not(of) | Expr::Round(of) => tagged(serializer, self.kind(), "of", of),
+            Expr::Equal(a, b)
+            | Expr::NotEqual(a, b)
+            | Expr::Less(a, b)
+            | Expr::AtMost(a, b)
+            | Expr::More(a, b)
+            | Expr::AtLeast(a, b)
+            | Expr::Add(a, b)
+            | Expr::Subtract(a, b)
+            | Expr::Multiply(a, b)
+            | Expr::Divide(a, b)
+            | Expr::Min(a, b)
+            | Expr::Max(a, b) => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("type", self.kind())?;
+                map.serialize_entry("a", a)?;
+                map.serialize_entry("b", b)?;
+                map.end()
+            }
+        }
+    }
+}
+
+fn tagged<S: Serializer, T: Serialize + ?Sized>(
+    serializer: S,
+    kind: &str,
+    field: &str,
+    value: &T,
+) -> Result<S::Ok, S::Error> {
+    let mut map = serializer.serialize_map(Some(2))?;
+    map.serialize_entry("type", kind)?;
+    map.serialize_entry(field, value)?;
+    map.end()
 }
 
 pub const MAX_DEPTH: usize = 16;

@@ -88,11 +88,13 @@ pub struct DeadAt {
 #[derive(Component, Default)]
 pub struct Near(Vec<Entity>);
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct NpcDef {
     pub name: &'static str,
     pub model: data::model::Id,
+    #[serde(serialize_with = "crate::systems::stat::stats_map")]
     pub stats: &'static [Stat],
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub modules: &'static [NpcModule],
 }
 
@@ -115,41 +117,46 @@ impl ModuleSet for NpcDef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum NpcModule {
     Nameplate(Nameplate),
     Tint(Tint),
     Voice(Voice),
     Respawn(Respawn),
     Loot(Loot),
+    #[serde(untagged)]
     Script(ScriptModule),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Nameplate {
     pub role: &'static str,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Voice {
     pub babble: BabbleId,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Respawn {
     pub after: Seconds,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Loot {
     pub xp: u32,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub items: &'static [LootItem],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct LootItem {
     pub item: data::item::Id,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_one")]
     pub amount: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub chance: Option<f32>,
 }
 

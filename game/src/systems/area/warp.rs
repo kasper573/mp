@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use serde::Serialize;
 
 use super::AreaTag;
 use super::transition::Crossing;
@@ -11,10 +12,12 @@ use crate::systems::reach;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
 use crate::systems::script::{Fill, Place, Reach, RiftScripting};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Warp {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub to: Fill<Place>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

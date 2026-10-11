@@ -1,0 +1,10 @@
+{
+  "label": "Sell an item to the open shop",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Right",
+      "times": 1
+    }
+  ]
+}

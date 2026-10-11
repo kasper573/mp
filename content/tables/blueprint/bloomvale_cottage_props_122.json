@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "bloomvale_cottage_props",
+      "tiles": [
+        [
+          122
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

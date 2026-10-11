@@ -52,13 +52,15 @@ pub fn register(app: &mut App) {
     attention::mark_source(app, marks);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct QuestDef {
     pub title: &'static str,
     pub category: &'static str,
     pub blurb: &'static str,
     pub xp: u32,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub reveal: &'static [ChoiceReveal],
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub modules: &'static [QuestModule],
 }
 
@@ -83,33 +85,52 @@ impl ModuleSet for QuestDef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum QuestModule {
-    Shown(&'static Condition),
-    Requires(&'static Condition),
-    Grants(&'static [ItemStack]),
-    Objective(Objective),
-    HandIn(&'static [ItemStack]),
-    HandOver(&'static [Span]),
-    Reward(&'static [ItemStack]),
-    PickOne(&'static [ItemStack]),
+    Shown {
+        condition: &'static Condition,
+    },
+    Requires {
+        condition: &'static Condition,
+    },
+    Grants {
+        items: &'static [ItemStack],
+    },
+    HandIn {
+        items: &'static [ItemStack],
+    },
+    HandOver {
+        text: &'static [Span],
+    },
+    Reward {
+        items: &'static [ItemStack],
+    },
+    PickOne {
+        items: &'static [ItemStack],
+    },
     Daily,
-    TimeLimit(Seconds),
+    TimeLimit {
+        seconds: Seconds,
+    },
     Drop(QuestDrop),
+    #[serde(untagged)]
+    Objective(Objective),
+    #[serde(untagged)]
     Script(ScriptModule),
 }
 
 impl QuestDef {
     pub fn shown(&self) -> Option<&'static Condition> {
         self.modules.iter().find_map(|module| match module {
-            QuestModule::Shown(shown) => Some(*shown),
+            QuestModule::Shown { condition } => Some(*condition),
             _ => None,
         })
     }
 
     pub fn requires(&self) -> Option<&'static Condition> {
         self.modules.iter().find_map(|module| match module {
-            QuestModule::Requires(requires) => Some(*requires),
+            QuestModule::Requires { condition } => Some(*condition),
             _ => None,
         })
     }
@@ -125,7 +146,7 @@ impl QuestDef {
 
     pub fn grants(&self) -> &'static [ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::Grants(items) => Some(*items),
+            QuestModule::Grants { items } => Some(*items),
             _ => None,
         })
     }
@@ -139,7 +160,7 @@ impl QuestDef {
 
     pub fn hand_in(&self) -> &'static [ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::HandIn(items) => Some(*items),
+            QuestModule::HandIn { items } => Some(*items),
             _ => None,
         })
     }
@@ -148,7 +169,7 @@ impl QuestDef {
         self.modules
             .iter()
             .find_map(|module| match module {
-                QuestModule::HandOver(text) => Some(*text),
+                QuestModule::HandOver { text } => Some(*text),
                 _ => None,
             })
             .unwrap_or(&[])
@@ -156,14 +177,14 @@ impl QuestDef {
 
     pub fn rewards(&self) -> &'static [ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::Reward(items) => Some(*items),
+            QuestModule::Reward { items } => Some(*items),
             _ => None,
         })
     }
 
     pub fn pick_one(&self) -> &'static [ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::PickOne(items) => Some(*items),
+            QuestModule::PickOne { items } => Some(*items),
             _ => None,
         })
     }
@@ -176,7 +197,7 @@ impl QuestDef {
 
     pub fn time_limit(&self) -> Option<Seconds> {
         self.modules.iter().find_map(|module| match module {
-            QuestModule::TimeLimit(limit) => Some(*limit),
+            QuestModule::TimeLimit { seconds } => Some(*seconds),
             _ => None,
         })
     }
@@ -206,7 +227,8 @@ impl QuestDef {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Objective {
     Hold(ItemStack),
     Defeat {
@@ -217,7 +239,9 @@ pub enum Objective {
         task: Name,
         label: &'static str,
     },
-    Deliver(ItemId),
+    Deliver {
+        item: ItemId,
+    },
     Decide {
         label: &'static str,
         paths: &'static [DecisionPath],
@@ -230,19 +254,19 @@ impl Objective {
             Objective::Hold(stack) => stack.item.get(content).icon,
             Objective::Defeat { .. } => InterfaceIcon::ObjectiveDefeat.get(content).image,
             Objective::Task { .. } => InterfaceIcon::ObjectiveTask.get(content).image,
-            Objective::Deliver(item) => item.get(content).icon,
+            Objective::Deliver { item } => item.get(content).icon,
             Objective::Decide { .. } => InterfaceIcon::ObjectiveDecide.get(content).image,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct DecisionPath {
     pub choice: &'static str,
     pub means: &'static [&'static str],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct QuestDrop {
     pub from: NpcId,
     pub item: ItemId,
@@ -414,7 +438,7 @@ impl QuestDef {
                 format!("Defeat the {}", npc.get(content).name)
             }
             Objective::Task { label, .. } | Objective::Decide { label, .. } => (*label).to_owned(),
-            Objective::Deliver(item) => format!(
+            Objective::Deliver { item } => format!(
                 "Bring {} to {}",
                 item.get(content).name,
                 parties
@@ -442,7 +466,7 @@ impl QuestDef {
                     }
                     Objective::Defeat { count, .. } => (counted.min(*count), *count, true),
                     Objective::Task { .. } => (counted.min(1), 1, true),
-                    Objective::Deliver(item) => (held(*item).min(1), 1, false),
+                    Objective::Deliver { item } => (held(*item).min(1), 1, false),
                     Objective::Decide { .. } => (0, 1, false),
                 };
                 Progress {
@@ -476,7 +500,7 @@ impl QuestDef {
                 Objective::Hold(_) => "collect",
                 Objective::Defeat { .. } => "defeat",
                 Objective::Task { .. } => "explore",
-                Objective::Deliver(_) => "deliver",
+                Objective::Deliver { item: _ } => "deliver",
                 Objective::Decide { .. } => "choice",
             };
             if !kinds.contains(&kind) {
@@ -1157,7 +1181,7 @@ fn still_needs(def: &QuestDef, item: ItemId, inventory: Option<&Inventory>) -> b
     let held = inventory.map_or(0, |inventory| inventory.count(item));
     def.objectives().any(|objective| match objective {
         Objective::Hold(stack) => stack.item == item && held < stack.count,
-        Objective::Deliver(wanted) => *wanted == item && held == 0,
+        Objective::Deliver { item: wanted } => *wanted == item && held == 0,
         _ => false,
     })
 }

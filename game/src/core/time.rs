@@ -36,7 +36,7 @@ pub struct Millis(pub f32);
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct PlaybackRate(pub f32);
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Hertz(pub f32);
 
 impl Hertz {

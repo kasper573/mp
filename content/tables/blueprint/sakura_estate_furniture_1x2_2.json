@@ -1,0 +1,21 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "sakura_estate_furniture",
+      "tiles": [
+        [
+          348
+        ],
+        [
+          349
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

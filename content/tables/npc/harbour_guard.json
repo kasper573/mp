@@ -1,0 +1,30 @@
+{
+  "name": "Harbour Guard",
+  "model": "guard",
+  "stats": {
+    "health": 30.0,
+    "max_health": 30.0,
+    "damage": 3.0,
+    "attack_speed": 1.0,
+    "attack_delay": 500.0,
+    "movement_speed": 1.1,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "nameplate",
+      "role": "Town Watch"
+    },
+    {
+      "type": "loot",
+      "xp": 10
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 10.0
+      }
+    }
+  ]
+}

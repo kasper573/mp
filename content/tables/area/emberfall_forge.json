@@ -1,0 +1,469 @@
+{
+  "name": "The forge",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 25,
+      "height": 15
+    },
+    "tile": 16,
+    "ground": [
+      "floor",
+      "walls",
+      "rug",
+      "decor"
+    ]
+  },
+  "modules": [
+    {
+      "type": "object",
+      "name": "home-door",
+      "shape": {
+        "type": "rect",
+        "x": 5.5,
+        "y": 12.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "emberfall",
+              "x": 23.0,
+              "y": 30.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "forge-door",
+      "shape": {
+        "type": "rect",
+        "x": 16.5,
+        "y": 12.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "emberfall",
+              "x": 26.0,
+              "y": 30.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "resident",
+      "npc": "blacksmith",
+      "at": [
+        18.0,
+        8.0
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 14.5,
+        "y": 2.5,
+        "w": 9.0,
+        "h": 4.0
+      },
+      "emit": 3.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/campfire.flac",
+          "volume": 0.32
+        }
+      ]
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_105",
+      "at": {
+        "x": 10.0,
+        "y": 1.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_16",
+      "at": {
+        "x": 10.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_72",
+      "at": {
+        "x": -1.0,
+        "y": 7.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_123",
+      "at": {
+        "x": 19.0,
+        "y": 8.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_121",
+      "at": {
+        "x": 18.0,
+        "y": 8.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_71",
+      "at": {
+        "x": -1.0,
+        "y": 8.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_props_73",
+      "at": {
+        "x": 0.0,
+        "y": 8.375
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          102,
+          103
+        ],
+        [
+          104,
+          105
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          236,
+          237
+        ],
+        [
+          238,
+          239
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 10.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          451,
+          452
+        ],
+        [
+          453,
+          454
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 15.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          28,
+          29
+        ],
+        [
+          30,
+          31
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 17.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 21.5,
+        "y": 2.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          162,
+          163
+        ],
+        [
+          164,
+          165
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 19.5,
+        "y": 3.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          329,
+          330
+        ]
+      ],
+      "sort": 0.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 14.5,
+        "y": 4.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          188,
+          189
+        ],
+        [
+          190,
+          191
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 17.5,
+        "y": 5.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          7
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 20.5,
+        "y": 5.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          12,
+          13
+        ],
+        [
+          14,
+          15
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_furniture_4x1",
+      "at": {
+        "x": 2.5,
+        "y": 6.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.5,
+        "y": 7.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          423,
+          424,
+          423,
+          424
+        ],
+        [
+          425,
+          426,
+          425,
+          426
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 8.5,
+        "y": 7.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          90,
+          91
+        ],
+        [
+          92,
+          93
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 14.5,
+        "y": 8.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          16,
+          17
+        ],
+        [
+          18,
+          19
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 21.5,
+        "y": 8.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          8,
+          9
+        ],
+        [
+          10,
+          11
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "emberfall_forge_furniture_4x1",
+      "at": {
+        "x": 2.5,
+        "y": 9.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 8.5,
+        "y": 10.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          106,
+          107
+        ],
+        [
+          108,
+          109
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 14.5,
+        "y": 10.5
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          180,
+          181
+        ],
+        [
+          182,
+          183
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

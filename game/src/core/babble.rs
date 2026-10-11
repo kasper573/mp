@@ -28,7 +28,7 @@ const EXCLAIMED_LOUDNESS: f32 = 1.2;
 const SHOUT_LOUDNESS: f32 = 1.35;
 const WHISPER_LOUDNESS: f32 = 0.6;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct BabbleDef {
     pub babble_bank: BabbleBankId,
     pub pitch: PlaybackRate,
@@ -40,7 +40,7 @@ impl crate::core::content::ContentRow for BabbleDef {
     const TABLE: &'static str = "babble";
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct BabbleBankDef {
     pub letters: AssetRef,
     pub volume: f32,
@@ -50,7 +50,7 @@ impl crate::core::content::ContentRow for BabbleBankDef {
     const TABLE: &'static str = "babble_bank";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add, Serialize, Deserialize)]
 pub struct Semitones(pub f32);
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

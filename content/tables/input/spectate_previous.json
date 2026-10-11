@@ -1,0 +1,9 @@
+{
+  "label": "Watch the previous player",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "ArrowLeft"
+    }
+  ]
+}

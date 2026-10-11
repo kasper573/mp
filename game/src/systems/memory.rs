@@ -4,6 +4,7 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
+use crate::core::content::serial;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, Value, ValueType,
 };
@@ -13,9 +14,10 @@ use crate::systems::player::conn_player;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
 use crate::systems::script::{Condition, Reach, RiftScripting};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct MemoryDef {
     pub label: &'static str,
+    #[serde(rename = "type")]
     pub ty: ValueType,
     pub resets: Resets,
 }
@@ -119,18 +121,24 @@ pub fn forget(world: &mut World, player: Entity, key: Id) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Remember {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub memory: Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<&'static Condition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Forget {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
+    #[serde(skip_serializing_if = "serial::is_empty")]
     pub memories: &'static [Id],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

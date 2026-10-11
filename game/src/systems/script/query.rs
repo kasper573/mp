@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::Has;
+use serde::Serialize;
 
 use super::{Condition, RiftScripting};
 use crate::core::assets::AssetService;
@@ -154,7 +155,8 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
     roster.areas = areas;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Among {
     Characters,
     Npcs,
@@ -166,83 +168,103 @@ pub enum Among {
 type Of = Option<&'static Condition>;
 type Actor = &'static Condition;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum RiftQuery {
     Level {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
     },
     IsJob {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         job: data::job::Id,
     },
     Stat {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         stat: StatKind,
     },
     Buffed {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         stat: StatKind,
     },
     Holding {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         item: data::item::Id,
     },
     FreeSlots {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
     },
     Wearing {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         item: data::item::Id,
     },
     Memory {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         memory: data::memory::Id,
     },
     SetWithin {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         memory: data::memory::Id,
         seconds: Actor,
     },
     OnQuest {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         quest: data::quest::Id,
     },
     QuestDone {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         quest: data::quest::Id,
     },
     QuestCooling {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         quest: data::quest::Id,
     },
     TaskDone {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         quest: data::quest::Id,
         task: Name,
     },
     QuestResetsIn {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         quest: data::quest::Id,
     },
     Inside {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         object: Name,
     },
     InArea {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         area: data::area::Id,
     },
     KnowsArea {
+        #[serde(skip_serializing_if = "Option::is_none")]
         of: Of,
         area: data::area::Id,
     },
     Nearest {
         among: Among,
+        #[serde(skip_serializing_if = "Option::is_none")]
         npc: Option<data::npc::Id>,
         within: Actor,
     },
     Count {
         among: Among,
+        #[serde(skip_serializing_if = "Option::is_none")]
         npc: Option<data::npc::Id>,
         within: Actor,
     },
@@ -268,6 +290,7 @@ pub enum RiftQuery {
     },
     GroundItems {
         item: data::item::Id,
+        #[serde(skip_serializing_if = "Option::is_none")]
         at: Option<Actor>,
         within: Actor,
     },

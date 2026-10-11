@@ -1,0 +1,9 @@
+{
+  "label": "Pick the fifth choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Digit5"
+    }
+  ]
+}

@@ -139,6 +139,7 @@ pub struct UnknownRow {
 pub struct ContentScope {
     keys: HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>,
     unknown: Vec<UnknownRow>,
+    content: Option<Content>,
 }
 
 impl ContentScope {
@@ -146,11 +147,13 @@ impl ContentScope {
         ContentScope {
             keys: HashMap::default(),
             unknown: Vec::new(),
+            content: None,
         }
     }
 
     pub fn of(content: &Content) -> ContentScope {
         let mut scope = ContentScope::new();
+        scope.content = Some(*content);
         for (type_id, table) in content.tables() {
             scope
                 .keys
@@ -200,6 +203,10 @@ impl Default for ContentScope {
 
 thread_local! {
     static SCOPE: RefCell<Option<ContentScope>> = const { RefCell::new(None) };
+}
+
+pub fn scope_content() -> Option<Content> {
+    SCOPE.with(|scope| scope.borrow().as_ref().and_then(|scope| scope.content))
 }
 
 pub fn with_content<T>(scope: ContentScope, f: impl FnOnce() -> T) -> (T, ContentScope) {

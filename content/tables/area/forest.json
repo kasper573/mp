@@ -1,0 +1,717 @@
+{
+  "name": "The forest",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 45,
+      "height": 31
+    },
+    "tile": 16,
+    "ground": [
+      "background",
+      "upper"
+    ]
+  },
+  "modules": [
+    {
+      "type": "object",
+      "name": "island-road",
+      "shape": {
+        "type": "rect",
+        "x": 2.5,
+        "y": 20.5,
+        "w": 1.0,
+        "h": 1.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "island",
+              "x": 39.0,
+              "y": 28.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "bloomvale-road",
+      "shape": {
+        "type": "rect",
+        "x": 41.5,
+        "y": 5.5,
+        "w": 3.0,
+        "h": 3.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "bloomvale",
+              "x": 2.5,
+              "y": 32.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "standing-stone",
+      "label": "Standing stone",
+      "shape": {
+        "type": "point",
+        "x": 36.0,
+        "y": 6.0
+      },
+      "look": "icons/misc/rune_stone.png",
+      "scripts": [
+        {
+          "type": "inline_script",
+          "nodes": {
+            "found": {
+              "type": "complete_task",
+              "quest": "x_marks_the_spot",
+              "task": "find_stone",
+              "next": "matches"
+            },
+            "interacted": {
+              "type": "on",
+              "event": "interacted",
+              "verb": "use",
+              "reach": 1.5,
+              "next": "on_quest"
+            },
+            "look": {
+              "type": "dialogue",
+              "lines": [
+                {
+                  "by": {
+                    "type": "narrator"
+                  },
+                  "text": [
+                    "Moss has crept over the runes. Whoever carved them wanted them found, then forgot why."
+                  ]
+                }
+              ],
+              "choices": [
+                {
+                  "label": [
+                    "Step away."
+                  ]
+                }
+              ]
+            },
+            "matches": {
+              "type": "dialogue",
+              "lines": [
+                {
+                  "by": {
+                    "type": "narrator"
+                  },
+                  "text": [
+                    "The stone matches the drawing, down to the crack in its side."
+                  ]
+                }
+              ],
+              "next": "turn_in"
+            },
+            "on_quest": {
+              "type": "if",
+              "test": {
+                "type": "on_quest",
+                "quest": "x_marks_the_spot"
+              },
+              "yes": "found",
+              "no": "look"
+            },
+            "turn_in": {
+              "type": "turn_in",
+              "quest": "x_marks_the_spot"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "inline_script",
+      "nodes": {
+        "discovered": {
+          "type": "on",
+          "event": "discovered",
+          "next": "intro"
+        },
+        "intro": {
+          "type": "notify",
+          "notification": "forest_intro"
+        }
+      }
+    },
+    {
+      "type": "population",
+      "npc": "orc",
+      "count": 8
+    },
+    {
+      "type": "population",
+      "npc": "orc_chief",
+      "count": 3
+    },
+    {
+      "type": "population",
+      "npc": "skeleton",
+      "count": 5
+    },
+    {
+      "type": "population",
+      "npc": "bat",
+      "count": 6
+    },
+    {
+      "type": "resident",
+      "npc": "ugra",
+      "at": [
+        11.0,
+        15.0
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": -0.5,
+        "y": -0.5,
+        "w": 45.0,
+        "h": 31.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 1,
+          "file": "audio/music/forest.flac",
+          "volume": 0.25
+        },
+        {
+          "channel": 2,
+          "file": "audio/ambient/forest_air.flac",
+          "volume": 0.28
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "ellipse",
+        "x": 7.5,
+        "y": 12.0,
+        "w": 7.0,
+        "h": 6.0
+      },
+      "emit": 2.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/campfire.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "ellipse",
+        "x": 32.5,
+        "y": 2.5,
+        "w": 7.0,
+        "h": 7.0
+      },
+      "emit": 4.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/stone_hum.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 16.5,
+        "y": 14.5,
+        "w": 19.0,
+        "h": 12.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 4,
+          "file": "audio/ambient/lake.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 25.333,
+        "y": 12.583
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 25.854,
+        "y": 12.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 26.938,
+        "y": 13.208
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": -0.188,
+        "y": 2.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": -0.729,
+        "y": 3.521
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_282",
+      "at": {
+        "x": 33.125,
+        "y": 24.646
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_282",
+      "at": {
+        "x": 24.979,
+        "y": 27.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_282",
+      "at": {
+        "x": 25.563,
+        "y": 28.104
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_282",
+      "at": {
+        "x": 24.667,
+        "y": 27.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 43.208,
+        "y": 14.781
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 42.76,
+        "y": 15.323
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 43.354,
+        "y": 13.99
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 42.531,
+        "y": 13.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 41.406,
+        "y": 14.969
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 42.0,
+        "y": 16.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 39.74,
+        "y": 16.229
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 3.464,
+        "y": 22.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 0.068,
+        "y": 20.76
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 0.245,
+        "y": 22.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 2.891,
+        "y": 22.156
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 0.651,
+        "y": 21.281
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_281",
+      "at": {
+        "x": 3.099,
+        "y": 22.427
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_256",
+      "at": {
+        "x": 41.417,
+        "y": 3.938
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 40.5,
+        "y": 0.5
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          259,
+          260,
+          null,
+          null
+        ],
+        [
+          283,
+          284,
+          259,
+          260
+        ],
+        [
+          null,
+          null,
+          283,
+          284
+        ]
+      ],
+      "sort": 2.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.5,
+        "y": 1.5
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          21
+        ],
+        [
+          45
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2",
+      "at": {
+        "x": 8.5,
+        "y": 2.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4",
+      "at": {
+        "x": 10.5,
+        "y": 2.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 12.5,
+        "y": 6.5
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          157,
+          158
+        ],
+        [
+          181,
+          182
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2",
+      "at": {
+        "x": 21.5,
+        "y": 6.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4_2",
+      "at": {
+        "x": 22.5,
+        "y": 8.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4_2",
+      "at": {
+        "x": 39.5,
+        "y": 9.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4",
+      "at": {
+        "x": 35.5,
+        "y": 14.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2",
+      "at": {
+        "x": 39.5,
+        "y": 17.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 29.5,
+        "y": 20.5
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          {
+            "tile": 166,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 165,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 164,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 163,
+            "flip": "horizontal"
+          }
+        ],
+        [
+          {
+            "tile": 190,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 189,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 188,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 187,
+            "flip": "horizontal"
+          }
+        ],
+        [
+          {
+            "tile": 214,
+            "flip": "horizontal"
+          },
+          212,
+          213,
+          {
+            "tile": 211,
+            "flip": "horizontal"
+          }
+        ],
+        [
+          {
+            "tile": 238,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 237,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 236,
+            "flip": "horizontal"
+          },
+          {
+            "tile": 235,
+            "flip": "horizontal"
+          }
+        ]
+      ],
+      "sort": 3.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4_3",
+      "at": {
+        "x": 21.5,
+        "y": 23.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2_2",
+      "at": {
+        "x": 33.5,
+        "y": 23.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_4x4_3",
+      "at": {
+        "x": 32.5,
+        "y": 25.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 26.5,
+        "y": 27.5
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          163,
+          164,
+          165,
+          166
+        ],
+        [
+          187,
+          188,
+          189,
+          190
+        ],
+        [
+          211,
+          212,
+          213,
+          214
+        ]
+      ],
+      "sort": 2.0
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2_2",
+      "at": {
+        "x": 20.5,
+        "y": 28.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "forest_tileset_2x2_2",
+      "at": {
+        "x": 36.5,
+        "y": 28.5
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "file": "audio/movement/step_rock01.wav",
+  "volume": {
+    "min": 0.79,
+    "max": 0.99
+  },
+  "pitch": {
+    "min": 0.8,
+    "max": 1.2
+  }
+}

@@ -51,6 +51,7 @@ pub struct UnequipRequest {
     VariantArray,
     IntoStaticStr,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum EquipmentSlot {
     #[default]
     Weapon,

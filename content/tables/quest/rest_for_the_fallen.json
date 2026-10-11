@@ -1,0 +1,47 @@
+{
+  "title": "Rest for the Fallen",
+  "category": "Orc Trouble",
+  "blurb": "The skeletons on the shore were warriors once. Bring me their bones, and I will sing them to sleep.",
+  "xp": 80,
+  "reveal": [
+    "costs"
+  ],
+  "modules": [
+    {
+      "type": "shown",
+      "condition": {
+        "type": "memory",
+        "memory": "sided_with_orcs"
+      }
+    },
+    {
+      "type": "hold",
+      "item": "bone",
+      "count": 8
+    },
+    {
+      "type": "hand_in",
+      "items": [
+        {
+          "item": "bone",
+          "count": 8
+        }
+      ]
+    },
+    {
+      "type": "hand_over",
+      "text": [
+        "Here are their bones."
+      ]
+    },
+    {
+      "type": "reward",
+      "items": [
+        {
+          "item": "greater_health_potion",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

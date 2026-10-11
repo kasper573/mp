@@ -27,6 +27,7 @@ pub fn register(app: &mut App) {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Verb {
     Talk,
     Use,

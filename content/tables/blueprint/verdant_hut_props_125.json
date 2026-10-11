@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          125
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

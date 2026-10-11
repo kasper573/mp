@@ -1,0 +1,18 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "bloomvale_mill_props",
+      "tiles": [
+        [
+          74
+        ]
+      ],
+      "sort": 3.5
+    }
+  ]
+}

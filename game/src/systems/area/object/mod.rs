@@ -27,20 +27,49 @@ pub fn register(app: &mut App) {
     app.replicate::<AreaObject>();
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ObjectDef {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<Name>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<&'static str>,
     pub shape: ObjectShape,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub look: Option<AssetRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shown: Option<&'static Condition>,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub scripts: &'static [ScriptModule],
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ObjectShape {
     Point(Pos<Tiles>),
     Rect(Rect<Tiles>),
+}
+
+impl Serialize for ObjectShape {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        match self {
+            ObjectShape::Point(point) => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("type", "point")?;
+                map.serialize_entry("x", &point.x)?;
+                map.serialize_entry("y", &point.y)?;
+                map.end()
+            }
+            ObjectShape::Rect(rect) => {
+                let mut map = serializer.serialize_map(Some(5))?;
+                map.serialize_entry("type", "rect")?;
+                map.serialize_entry("x", &rect.origin.x)?;
+                map.serialize_entry("y", &rect.origin.y)?;
+                map.serialize_entry("w", &rect.size.width)?;
+                map.serialize_entry("h", &rect.size.height)?;
+                map.end()
+            }
+        }
+    }
 }
 
 impl ObjectShape {

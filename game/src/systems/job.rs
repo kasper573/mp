@@ -24,7 +24,7 @@ pub struct Job {
     pub def: data::job::Id,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct JobDef {
     pub name: &'static str,
     pub levels: &'static [JobLevel],
@@ -34,10 +34,12 @@ impl crate::core::content::ContentRow for JobDef {
     const TABLE: &'static str = "job";
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct JobLevel {
     pub xp: u32,
+    #[serde(serialize_with = "crate::systems::stat::stats_map")]
     pub stats: &'static [Stat],
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_false")]
     pub chasing: bool,
 }
 
@@ -95,17 +97,21 @@ pub fn grant_xp(world: &mut World, entity: Entity, amount: u32) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct GrantXp {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub xp: &'static Condition,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct SetJob {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub job: data::job::Id,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 

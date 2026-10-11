@@ -9,7 +9,7 @@ use bevy_ecs::prelude::Resource;
 
 use crate::core::content::Content;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct AssetRef(pub &'static str);
 
 pub trait AssetSource: Send + Sync {

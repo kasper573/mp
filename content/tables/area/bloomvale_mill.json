@@ -1,0 +1,281 @@
+{
+  "name": "The windmill",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 14,
+      "height": 12
+    },
+    "tile": 16,
+    "ground": [
+      "floor",
+      "walls",
+      "rug",
+      "decor"
+    ]
+  },
+  "modules": [
+    {
+      "type": "object",
+      "name": "front-door",
+      "shape": {
+        "type": "rect",
+        "x": 5.5,
+        "y": 9.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "bloomvale",
+              "x": 20.0,
+              "y": 22.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "resident",
+      "npc": "miller",
+      "at": [
+        7.0,
+        7.0
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 0.5,
+        "y": 2.5,
+        "w": 12.0,
+        "h": 7.0
+      },
+      "emit": 3.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/timbers.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_104",
+      "at": {
+        "x": -1.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_79",
+      "at": {
+        "x": 0.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_67",
+      "at": {
+        "x": 2.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_77",
+      "at": {
+        "x": 6.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_76",
+      "at": {
+        "x": 10.0,
+        "y": -0.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_72",
+      "at": {
+        "x": -1.0,
+        "y": 1.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_106",
+      "at": {
+        "x": 0.0,
+        "y": 1.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_64",
+      "at": {
+        "x": 10.0,
+        "y": 1.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_126",
+      "at": {
+        "x": 3.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_74",
+      "at": {
+        "x": 4.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_82",
+      "at": {
+        "x": 5.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_72",
+      "at": {
+        "x": -1.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_112",
+      "at": {
+        "x": 10.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_64",
+      "at": {
+        "x": 9.0,
+        "y": 2.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_127",
+      "at": {
+        "x": 10.0,
+        "y": 3.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_65",
+      "at": {
+        "x": -1.0,
+        "y": 4.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_70",
+      "at": {
+        "x": 0.0,
+        "y": 4.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_80",
+      "at": {
+        "x": 8.0,
+        "y": 4.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_95",
+      "at": {
+        "x": 1.0,
+        "y": 4.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_75",
+      "at": {
+        "x": 1.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_78",
+      "at": {
+        "x": 7.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "bloomvale_mill_props_125",
+      "at": {
+        "x": 10.0,
+        "y": 5.375
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 10.5,
+        "y": 1.5
+      },
+      "tileset": "bloomvale_mill_furniture",
+      "tiles": [
+        [
+          16
+        ],
+        [
+          17
+        ]
+      ],
+      "sort": 1.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 5.5,
+        "y": 3.5
+      },
+      "tileset": "bloomvale_mill_furniture",
+      "tiles": [
+        [
+          26,
+          27
+        ],
+        [
+          28,
+          29
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

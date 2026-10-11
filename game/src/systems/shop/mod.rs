@@ -39,10 +39,11 @@ pub fn register(app: &mut App) {
     attention::mark_source(app, marks);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct ShopDef {
     pub title: &'static str,
     pub mark: AttentionId,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub modules: &'static [ShopModule],
 }
 
@@ -67,11 +68,13 @@ impl ModuleSet for ShopDef {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ShopModule {
     Sells(ShopOffer),
     Buys(ShopBuys),
     Reactions(ShopReactions),
+    #[serde(untagged)]
     Script(script::ScriptModule),
 }
 
@@ -108,45 +111,54 @@ impl ShopDef {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct ShopOffer {
     pub item: ItemId,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_one")]
     pub count: u32,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub price: &'static [ItemStack],
     pub stock: Stock,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub requires: Option<&'static Condition>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Stock {
     Unlimited,
     Limited { count: u32, restock: Seconds },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct ShopBuys {
     pub what: Buys,
+    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
     pub pays: &'static [ItemStack],
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub requires: Option<&'static Condition>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Buys {
-    Item(ItemId),
-    Category(ItemCategory),
+    Item { item: ItemId },
+    Category { category: ItemCategory },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct ShopReactions {
     pub bought: &'static [Line],
     pub sold: &'static [Line],
     pub cant_afford: &'static [Line],
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct OpenShop {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub shop: ShopId,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub closed: Arrow,
 }
 
@@ -273,8 +285,8 @@ impl ShopDef {
             .buys()
             .enumerate()
             .find(|(_, rule)| match rule.what {
-                Buys::Item(wanted) => wanted == item,
-                Buys::Category(category) => def.category() == category,
+                Buys::Item { item: wanted } => wanted == item,
+                Buys::Category { category } => def.category() == category,
             })
             .ok_or_else(|| format!("{} won't buy {}", self.title, def.name))?;
         if declined.contains(&(index as u32)) {
@@ -286,8 +298,8 @@ impl ShopDef {
     pub fn wants(&self, content: &Content) -> Vec<String> {
         self.buys()
             .map(|rule| match rule.what {
-                Buys::Item(item) => item.get(content).name.to_owned(),
-                Buys::Category(category) => category.plural().to_owned(),
+                Buys::Item { item } => item.get(content).name.to_owned(),
+                Buys::Category { category } => category.plural().to_owned(),
             })
             .collect()
     }

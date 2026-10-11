@@ -1,0 +1,9 @@
+{
+  "label": "Move to the next choice",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "ArrowDown"
+    }
+  ]
+}

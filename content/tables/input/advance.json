@@ -1,0 +1,18 @@
+{
+  "label": "Finish or continue a line",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "Space"
+    },
+    {
+      "type": "key",
+      "key": "Enter"
+    },
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

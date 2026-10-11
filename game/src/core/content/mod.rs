@@ -1,6 +1,7 @@
 pub mod fixture;
 pub mod id;
 pub mod key;
+pub mod serial;
 pub mod table;
 
 pub use fixture::Fixture;

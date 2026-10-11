@@ -1173,6 +1173,7 @@ dependencies = [
  "bevy_reflect",
  "derive_more",
  "log",
+ "serde",
  "smol_str",
  "thiserror 2.0.18",
 ]
@@ -8251,6 +8252,7 @@ dependencies = [
  "bevy_ui",
  "bevy_ui_widgets",
  "bevy_window",
+ "serde",
 ]
 
 [[package]]

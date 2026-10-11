@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use bevy_color::{Alpha, Color};
@@ -102,9 +103,10 @@ impl CatalogInput<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KeyGesture {
     pub key: KeyCode,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
@@ -122,10 +124,11 @@ impl KeyGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ClickGesture {
     pub button: MouseButton,
     pub times: u8,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
@@ -137,9 +140,10 @@ impl ClickGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DragGesture {
     pub button: MouseButton,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
@@ -149,12 +153,21 @@ impl DragGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
 pub struct KeyModifiers {
+    #[serde(skip_serializing_if = "is_false")]
     pub ctrl: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub shift: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub alt: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub super_key: bool,
+}
+
+fn is_false(flag: &bool) -> bool {
+    !*flag
 }
 
 impl KeyModifiers {
