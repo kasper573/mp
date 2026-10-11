@@ -125,11 +125,10 @@ test(
       await talkTo(page, "bram");
       await readToChoices(page, 600);
       await pick(page, "A Letter for the Captain");
-      await onStage(page, "letter_thanks");
-      await readToChoices(page, 1200);
       await caption(page, "Nobody named Bram's pay, so the choice keeps it to itself", { at: "top" });
       await page.waitForTimeout(2000);
       await pick(page, "Tobb asked me to bring you this.");
+      await onStage(page, "letter_thanks");
       await waitFor(page, (snapshot) => finished(snapshot, "letter_for_the_captain") === "Completed", "never delivered");
       await waitFor(page, ({ feed }) => feed.includes("+10 Gold"), "the pay never showed in the feed");
       await caption(page, "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle", {
@@ -183,8 +182,6 @@ test(
       await talkTo(page, "mara");
       await readToChoices(page, 600);
       await pick(page, "Tusks for the Chief");
-      await onStage(page, "tusks_thanks");
-      await readToChoices(page, 1000);
       await caption(page, "With a full bag the pick is refused with an error — space is counted after the tusks are handed in", {
         at: "top",
       });
@@ -211,10 +208,9 @@ test(
       await talkTo(page, "mara");
       await readToChoices(page, 600);
       await pick(page, "Tusks for the Chief");
-      await onStage(page, "tusks_thanks");
-      await readToChoices(page, 800);
       await caption(page, "Now there's room for the pick", { at: "top" });
       await pick(page, "I'll take the Bone Shield.");
+      await onStage(page, "tusks_thanks");
       await waitFor(page, (snapshot) => finished(snapshot, "tusks_for_the_chief") === "Completed", "never handed in");
       await page.waitForTimeout(2500);
 
@@ -241,7 +237,7 @@ async function hearOutTobb(page: Page): Promise<void> {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     const { stage } = await probe(page);
-    if (stage?.node === "tobb_news") {
+    if (stage?.node === "news") {
       await readToChoices(page, 1200);
       await focusGame(page);
       await page.keyboard.press("Digit1");

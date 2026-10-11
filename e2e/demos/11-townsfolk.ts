@@ -41,11 +41,11 @@ test(
       await caption(page, "An icon over a head is the most important thing they have for you");
       await page.waitForTimeout(3500);
       await caption(page, "Things on the map can be used too: a notice board, a chest by the tide");
-      await walkBelow(page, (snapshot) => fixture(snapshot, "tide_chest")?.at);
-      const chest = await waitFor(page, (snapshot) => fixture(snapshot, "tide_chest"), "no tide chest");
+      await walkBelow(page, (snapshot) => fixture(snapshot, "tide-chest")?.at);
+      const chest = await waitFor(page, (snapshot) => fixture(snapshot, "tide-chest"), "no tide chest");
       await hoverTile(page, chest.aim);
       await page.waitForTimeout(2200);
-      const board = await waitFor(page, (snapshot) => fixture(snapshot, "harbour_board"), "no notice board");
+      const board = await waitFor(page, (snapshot) => fixture(snapshot, "notice-board"), "no notice board");
       await walkBelow(page, () => board.at);
       await hoverTile(page, board.aim);
       await page.waitForTimeout(2500);

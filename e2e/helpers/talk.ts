@@ -18,8 +18,8 @@ export function townsperson(snapshot: Snapshot, npc: string): Body | undefined {
   return snapshot.actors.find((actor) => actor.npc === npc);
 }
 
-export function fixture(snapshot: Snapshot, prop: string): Fixture | undefined {
-  return snapshot.props.find((candidate) => candidate.prop === prop);
+export function fixture(snapshot: Snapshot, name: string): Fixture | undefined {
+  return snapshot.props.find((candidate) => candidate.name === name);
 }
 
 export async function talkTo(page: Page, npc: string, travel = travelTo): Promise<Stage> {
@@ -32,23 +32,23 @@ export async function talkTo(page: Page, npc: string, travel = travelTo): Promis
   );
 }
 
-export async function interactWith(page: Page, prop: string, travel = travelTo): Promise<Stage> {
+export async function interactWith(page: Page, name: string, travel = travelTo): Promise<Stage> {
   return reachUntil(
     page,
     travel,
-    (snapshot) => fixture(snapshot, prop)?.aim,
-    (snapshot) => snapshot.stage?.with === fixture(snapshot, prop)?.id && snapshot.stage,
-    `interacting with ${prop} never opened a conversation`,
+    (snapshot) => fixture(snapshot, name)?.aim,
+    (snapshot) => snapshot.stage?.with === fixture(snapshot, name)?.id && snapshot.stage,
+    `interacting with ${name} never opened a conversation`,
   );
 }
 
-export async function shopAt(page: Page, prop: string, travel = travelTo): Promise<Shop> {
+export async function shopAt(page: Page, name: string, travel = travelTo): Promise<Shop> {
   return reachUntil(
     page,
     travel,
-    (snapshot) => fixture(snapshot, prop)?.aim,
+    (snapshot) => fixture(snapshot, name)?.aim,
     ({ shop }) => shop,
-    `using ${prop} never opened a shop`,
+    `using ${name} never opened a shop`,
   );
 }
 

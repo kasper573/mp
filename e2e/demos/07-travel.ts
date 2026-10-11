@@ -19,7 +19,7 @@ import {
   walkTo,
 } from "../helpers/game";
 import { loadReference } from "../helpers/image";
-import { conversationOver, onStage, pick, readToChoices } from "../helpers/talk";
+import { conversationOver, onStage, pick, readToChoices, talkTo } from "../helpers/talk";
 
 test(
   "Travel",
@@ -32,21 +32,22 @@ test(
       await admin(page, [["/give gold,20", /gave 20 Gold/]]);
     },
     play: async (page) => {
-      await caption(page, "Warps lead to other areas — click one to cross");
+      await caption(page, "Warps lead to other areas — step onto one to cross");
       const { area: home, portals } = await probe(page);
       const road = portals.find((portal) => portal.name === "forest-road")!;
       await travelTo(page, road.at);
-      await onStage(page, "ilsa_halt");
+      await waitFor(page, ({ history }) => history.records.some((record) => record.by === "Ilsa" && record.text.startsWith("Halt!")), "Ilsa never called out");
       await caption(page, "The forest road is locked without a pass: you just stand on it, and its warden calls out", {
         at: "top",
       });
-      await readToChoices(page, 1200);
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(2500);
       await caption(page, "Twenty Gold buys a pass", { at: "top" });
+      await talkTo(page, "ilsa");
+      await readToChoices(page, 1200);
       await hoverUi(page, "Here, for your trouble.");
       await page.waitForTimeout(1500);
       await pick(page, "Here, for your trouble.");
-      await onStage(page, "ilsa_bribed");
+      await onStage(page, "bribed");
       await readToChoices(page, 1200);
       await pick(page, "Goodbye.");
       await conversationOver(page);

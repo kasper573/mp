@@ -86,7 +86,7 @@ test(
 
         await caption(page, "Pell holds a grudge now, and settles it himself");
         await talkTo(page, "pell");
-        await onStage(page, "pell_grudging");
+        await onStage(page, "grudging");
         await readToChoices(page, 1000);
         await hoverUi(page, "Then let's settle this.");
         await page.waitForTimeout(2000);
@@ -122,15 +122,15 @@ async function leave(page: Page): Promise<void> {
 async function loseAtDice(page: Page): Promise<void> {
   for (let roll = 0; roll < 20; roll++) {
     const before = await probe(page);
-    if (before.stage?.node === "pell_wins") return;
+    if (before.stage?.node === "wins") return;
     const gold = holding(before, "gold");
-    await pick(page, before.stage?.node === "pell_hello" ? "Roll the dice." : "Roll again.");
+    await pick(page, before.stage?.node === "hello" ? "Roll the dice." : "Roll again.");
     const landed = await waitFor(
       page,
       (snapshot) => holding(snapshot, "gold") !== gold && snapshot.stage && !snapshot.stage.typing && snapshot.stage,
       "the dice never landed",
     );
-    if (landed.node === "pell_loses") {
+    if (landed.node === "loses") {
       await caption(page, "A win pays twenty. Again!", { at: "top" });
     }
     await page.waitForTimeout(1500);

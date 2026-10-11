@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
 import { admin } from "../helpers/admin";
-import { captureScene, clickUi, leaveConversation, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
+import { captureScene, clickUi, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
 import { loadReference, resemblance } from "../helpers/image";
 import { travel } from "./travel";
 
@@ -16,14 +16,16 @@ test("the forest road holds you without a pass and crosses with one", async ({ p
   expect(road, "the island has a forest road").toBeDefined();
 
   await travel(page, road!.at);
-  const held = await waitFor(page, ({ stage }) => stage, "Ilsa never halted you on the road");
-  expect(held.node).toBe("ilsa_halt");
-  expect((await probe(page)).area).toBe("island");
-  await leaveConversation(page);
+  await waitFor(page, ({ history }) => history.records.some((record) => record.by === "Ilsa" && record.text.startsWith("Halt!")), "Ilsa never called out as you came near");
+  await page.waitForTimeout(2000);
+  const standing = await probe(page);
+  expect(standing.area).toBe("island");
+  expect(standing.stage).toBeNull();
 
   await admin(page, [["/give road_pass,1", /gave 1 Road Pass/]]);
-  // Re-click the warp until the forest renders. Repeats just re-issue the (deterministic) crossing;
-  // the long timeout is only room for a slow renderer.
+  // A warp takes whoever steps into it, so step off and back on until the forest renders. Repeats just
+  // re-issue the (deterministic) crossing; the long timeout is only room for a slow renderer.
+  const beside: [number, number] = [road!.at[0], road!.at[1] + 2];
   await expect
     .poll(
       async () => {
@@ -31,7 +33,10 @@ test("the forest road holds you without a pass and crosses with one", async ({ p
         if (resemblance(scene, forest) >= MAP_MATCH) {
           return true;
         }
-        if ((await probe(page)).area === "island") await travel(page, road!.at);
+        if ((await probe(page)).area === "island") {
+          await travel(page, beside);
+          await travel(page, road!.at);
+        }
         return false;
       },
       { message: "with a pass, clicking the warp should cross into the forest", timeout: 120_000, intervals: [1000] },

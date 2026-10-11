@@ -36,7 +36,8 @@ export interface Body {
 
 export interface Fixture {
   id: string;
-  prop: string;
+  name: string | null;
+  label: string | null;
   at: Tile;
   aim: Tile;
   hitbox: TileRect;
@@ -389,7 +390,11 @@ export async function travelTo(
       continue;
     }
     const tile = locate(snapshot);
-    if (!tile) throw new Error("the travel target is gone");
+    if (!tile) {
+      if (Date.now() > deadline) throw new Error("the travel target is gone");
+      await page.waitForTimeout(500);
+      continue;
+    }
     const size = await canvasSize(page);
     if (clickable(snapshot, tile, size)) {
       await waitUntilStill(page);
@@ -407,7 +412,10 @@ export async function travelTo(
       ),
       tile,
     );
-    if (!hop) throw new Error("no walkable tile on screen");
+    if (!hop) {
+      await page.waitForTimeout(500);
+      continue;
+    }
     await clickTile(page, hop);
     await page.waitForTimeout(1200);
   }

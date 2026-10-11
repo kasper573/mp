@@ -16,6 +16,7 @@ import {
   travelTo,
   waitFor,
   waitForWorld,
+  walkInto,
 } from "../helpers/game";
 import { loadReference } from "../helpers/image";
 import { conversationOver, interactWith, onStage, pick, readToChoices, talkTo } from "../helpers/talk";
@@ -39,8 +40,8 @@ test(
     },
     play: async (page) => {
       await caption(page, "The tide chest hides more than gold");
-      await interactWith(page, "tide_chest");
-      await onStage(page, "tide_chest_map");
+      await interactWith(page, "tide-chest");
+      await onStage(page, "map");
       await readToChoices(page, 1400);
       await pick(page, "Close the lid.");
       await conversationOver(page);
@@ -52,11 +53,11 @@ test(
       await hoverUi(page, MAP);
       await page.waitForTimeout(2500);
       await doubleClickUi(page, MAP);
-      await onStage(page, "x_marks_offer");
+      await onStage(page, "offer");
       await caption(page, "No one to talk to: just you, and the map", { at: "top" });
       await readToChoices(page, 1400);
       await page.waitForTimeout(1500);
-      await pick(page, "Follow the map.");
+      await pick(page, "Accept");
       await waitFor(page, (snapshot) => onQuest(snapshot, "x_marks_the_spot"), "the map's quest never started");
       await focusGame(page);
       await page.keyboard.press("KeyI");
@@ -69,11 +70,9 @@ test(
 
       await caption(page, "Finding the standing stone completes the objective");
       await travelTo(page, ({ markers }) => markers.find((marker) => marker.name === "standing-stone")?.at, 120_000);
-      await interactWith(page, "standing_stone");
+      await interactWith(page, "standing-stone");
       await waitFor(page, (snapshot) => onQuest(snapshot, "x_marks_the_spot")?.ready, "the stone was never found");
-      await readToChoices(page, 1000);
-      await pick(page, "X Marks the Spot");
-      await onStage(page, "x_marks_thanks");
+      await onStage(page, "matches");
       await caption(page, "A map object takes the hand-in, like any townsperson", { at: "top" });
       await readToChoices(page, 1200);
       await page.waitForTimeout(1500);
@@ -82,7 +81,7 @@ test(
       await page.waitForTimeout(2500);
 
       await caption(page, "Ugra, the clan's shaman, knows about Mara's errand");
-      await travelTo(page, ({ markers }) => markers.find((marker) => marker.name === "ugra-camp")?.at, 120_000);
+      await walkInto(page, "ugra", 3);
       await talkTo(page, "ugra");
       await readToChoices(page, 1000);
       await pick(page, "The Shaman's Plea");
@@ -97,7 +96,7 @@ test(
       await hoverUi(page, "Give her the tusks.");
       await page.waitForTimeout(4000);
       await pick(page, "Give her the tusks.");
-      await onStage(page, "ugra_grateful");
+      await onStage(page, "grateful");
       await waitFor(page, (snapshot) => finished(snapshot, "tusks_for_the_chief") === "Failed", "Mara's quest held");
       await waitFor(
         page,
@@ -111,7 +110,7 @@ test(
 
       await caption(page, "Now Ugra greets a friend of the clan, with work and remedies of her own");
       await talkTo(page, "ugra");
-      await onStage(page, "ugra_friend");
+      await onStage(page, "friend");
       await readToChoices(page, 1000);
       await page.waitForTimeout(3500);
       await focusGame(page);

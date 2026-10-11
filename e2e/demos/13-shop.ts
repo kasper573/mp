@@ -132,7 +132,7 @@ test(
       await page.keyboard.press("KeyI");
 
       await caption(page, "Even a box on the pier can keep a shop, inside a conversation of its own");
-      await shopAt(page, "honesty_box");
+      await shopAt(page, "honesty-box");
       await page.waitForTimeout(1500);
       await clickUi(page, "Fish Steak");
       await page.waitForTimeout(800);

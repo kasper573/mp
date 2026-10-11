@@ -38,7 +38,11 @@ export async function travel(
       continue;
     }
     const tile = locate(snapshot);
-    if (!tile) throw new Error("the travel target is gone");
+    if (!tile) {
+      if (Date.now() > deadline) throw new Error("the travel target is gone");
+      await page.waitForTimeout(500);
+      continue;
+    }
     if (clickable(snapshot, tile, await canvasSize(page))) {
       await clickTile(page, tile);
       return;
@@ -48,7 +52,11 @@ export async function travel(
     const nearer = (step: Tile) => !me || distance(step, tile) < distance(me, tile) - 0.5;
     const ground = await openGround(page, snapshot);
     const hop = closestTile(ground.filter((step) => nearer(step) && !inWarp(snapshot, step)), tile);
-    if (!hop) throw new Error(`no open ground on screen leads toward ${tile}`);
+    if (!hop) {
+      if (Date.now() > deadline) throw new Error(`no open ground on screen leads toward ${tile}`);
+      await page.waitForTimeout(500);
+      continue;
+    }
     await clickTile(page, hop);
   }
 }
@@ -88,7 +96,7 @@ function clickable(snapshot: Snapshot, tile: Tile, size: { width: number; height
   return x > 0 && y > 0 && x < size.width && y < size.height && !snapshot.covered.some(under);
 }
 
-// A click inside a warp takes it; walking across one on the way elsewhere doesn't.
+// Stepping into a warp takes it, so a hop keeps clear of them.
 function inWarp(snapshot: Snapshot, tile: Tile): boolean {
   return snapshot.portals.some((portal) => within(portal.rect, tile));
 }

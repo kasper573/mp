@@ -32,22 +32,25 @@ test(
       await talkTo(page, "wren");
       await readToChoices(page, 900);
       await pick(page, "Bone Tithe");
-      await onStage(page, "tithe_thanks");
       await readToChoices(page, 1200);
       await caption(page, "She named her price and her pay, so the hand-in shows both", { at: "top" });
       await page.waitForTimeout(2500);
       await pick(page, "Here are today's bones.");
+      await onStage(page, "tithe_thanks");
       await waitFor(page, (snapshot) => finished(snapshot, "bone_tithe") === "Completed", "the tithe was never paid");
       await waitFor(page, ({ feed }) => feed.includes("+6 Bone Token"), "the tokens never showed in the feed");
       await caption(page, "Bones out, tokens in, and the day's tithe is done", { at: "top" });
       await page.waitForTimeout(3000);
+      await readToChoices(page, 900);
+      await pick(page, "Goodbye.");
+      await conversationOver(page);
 
       await caption(page, "Once it's done for the day, she answers a different question");
       await talkTo(page, "wren");
       await readToChoices(page, 900);
       await page.waitForTimeout(1500);
       await pick(page, "When can I bring more bones?");
-      await onStage(page, "tithe_tomorrow");
+      await onStage(page, "tomorrow");
       await waitFor(page, ({ stage }) => stage?.text?.includes("Come back in") && !stage.typing, "she never said when");
       await caption(page, "She works out the time left as she says it, in the words anyone would use", { at: "top" });
       await page.waitForTimeout(3500);
