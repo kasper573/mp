@@ -1,9 +1,9 @@
 use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::id::ContentId;
 use bevy_ecs::prelude::Resource;
+use bevy_platform::collections::HashMap;
+use bevy_platform::hash::NoOpHash;
 
 pub trait ContentRow: Send + Sync + 'static {
     const TABLE: &'static str;
@@ -108,8 +108,8 @@ impl<Row: ContentRow> AnyTable for Table<Row> {
     }
 }
 
-#[derive(Resource, Clone)]
-pub struct Content(Arc<HashMap<TypeId, Box<dyn AnyTable>>>);
+#[derive(Resource, Clone, Copy)]
+pub struct Content(&'static HashMap<TypeId, Box<dyn AnyTable>, NoOpHash>);
 
 impl Content {
     pub fn table<Row: ContentRow>(&self) -> &Table<Row> {
@@ -138,7 +138,7 @@ impl Content {
 
 #[derive(Default)]
 pub struct ContentBuilder {
-    tables: HashMap<TypeId, Box<dyn AnyTable>>,
+    tables: HashMap<TypeId, Box<dyn AnyTable>, NoOpHash>,
 }
 
 impl ContentBuilder {
@@ -149,6 +149,6 @@ impl ContentBuilder {
     }
 
     pub fn build(self) -> Content {
-        Content(Arc::new(self.tables))
+        Content(Box::leak(Box::new(self.tables)))
     }
 }

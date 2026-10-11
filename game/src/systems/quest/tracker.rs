@@ -6,7 +6,7 @@ use ui::tokens::{palette, spacing, typography};
 use ui::{DragHandle, DragRoot, OnSettle, component};
 
 use super::card::{Countdown, icon, live_text};
-use super::{QuestId, QuestLog, QuestResult};
+use super::{Parties, QuestId, QuestLog, QuestResult};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::systems::attention::AttentionMark;
@@ -151,6 +151,7 @@ fn sync_tracker(world: &mut World) {
 
 fn entries(world: &World) -> Vec<Entry> {
     let content = world.resource::<Content>();
+    let parties = world.resource::<Parties>();
     let seen = world.resource::<Viewpoint>().0;
     let Some(log) = seen.and_then(|seen| world.get::<QuestLog>(seen)) else {
         return Vec::new();
@@ -174,13 +175,13 @@ fn entries(world: &World) -> Vec<Entry> {
                         mark: Some(mark.get(content).icon),
                         timed,
                         rows: vec![(
-                            def.hand_in_hint(content),
+                            def.hand_in_hint(parties, quest),
                             Count::Fixed(String::new()),
                             Tone::Next,
                         )],
                     });
                 }
-                let progress = def.progress(content, active, inventory);
+                let progress = def.progress(content, parties, active, inventory);
                 let next = progress.iter().position(|progress| !progress.done());
                 let rows = progress
                     .into_iter()
@@ -217,7 +218,7 @@ fn entries(world: &World) -> Vec<Entry> {
                 QuestResult::Failed => vec![
                     ("Failed".to_owned(), Count::Fixed(String::new()), Tone::Bad),
                     (
-                        def.retry_hint(content),
+                        def.retry_hint(parties, quest),
                         Count::Fixed(String::new()),
                         Tone::Plain,
                     ),

@@ -7,6 +7,7 @@ pub mod math;
 pub mod net;
 pub mod platform;
 pub mod render;
+pub mod script;
 pub mod table;
 pub mod tiling;
 pub mod time;

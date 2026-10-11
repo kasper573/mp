@@ -22,12 +22,11 @@ pub mod movement;
 pub mod notification;
 pub mod npc;
 pub mod player;
-pub mod prop;
 pub mod quest;
 pub mod reach;
 pub mod rewards;
-pub mod rule;
 pub mod scene;
+pub mod script;
 pub mod settings;
 pub mod shop;
 pub mod spectate;
@@ -88,7 +87,6 @@ pub fn protocol(app: &mut App) {
     movement::register(app);
     interact::register(app);
     npc::register(app);
-    prop::register(app);
     shop::register(app);
     quest::register(app);
     player::register(app);
@@ -141,8 +139,12 @@ pub fn server_app(
     app.insert_resource(WorldArea(area));
     app.insert_resource(crate::data::settings());
     app.insert_resource(clock);
-    app.insert_resource(assets.content().clone());
+    app.insert_resource(*assets.content());
     app.insert_resource(assets.clone());
+    let scripts = script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
+    app.insert_resource(quest::Parties::of(assets.content(), &scripts));
+    app.insert_resource(scripts);
+    app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     app.add_plugins(
         bevy_app::PluginGroup::build(bevy_replicon::prelude::RepliconPlugins)
@@ -169,7 +171,15 @@ pub fn server_app(
         .add_observer(player::greet)
         .add_observer(player::client_left)
         .add_observer(spectate::client_left)
-        .add_systems(Startup, (npc::spawn_all, prop::spawn_all))
+        .add_systems(
+            Startup,
+            (
+                script::spawn_stateless,
+                area::object::spawn_all,
+                npc::spawn_all,
+            )
+                .chain(),
+        )
         .add_systems(First, advance_replication_clock)
         .add_systems(
             PostUpdate,
@@ -184,9 +194,7 @@ pub fn server_app(
                 (
                     actor::reset,
                     combat::regen,
-                    npc::run_ai,
                     movement::move_request,
-                    movement::move_to_portal,
                     combat::request,
                     item::use_item,
                     item::drop_item,
@@ -202,12 +210,18 @@ pub fn server_app(
                     .chain(),
                 (
                     (rewards::grant, quest::credit, npc::defeated).chain(),
+                    (
+                        script::query::index_actors,
+                        (area::object::track, npc::approach)
+                            .chain()
+                            .run_if(on_replication_tick),
+                    )
+                        .chain(),
+                    script::run_tick,
+                    npc::body::drive,
                     movement::advance,
                     item::pickups,
                     interact::interactions,
-                    (npc::observe, area::zone::enter_zones)
-                        .chain()
-                        .run_if(on_replication_tick),
                     (
                         dialogue::hold,
                         dialogue::refresh.run_if(on_replication_tick),
@@ -220,6 +234,9 @@ pub fn server_app(
                     player::respawn,
                     spectate::requests,
                     (npc::run_respawn, npc::dismiss).chain(),
+                )
+                    .chain(),
+                (
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,
                     chat::rebroadcast,
@@ -268,19 +285,15 @@ pub fn check_content(assets: &crate::core::assets::AssetService) {
     actor::check(assets);
     area::check(assets);
     npc::check(assets);
-    let content = assets.content();
-    dialogue::check(
-        assets,
-        npc::conversation_starts(content)
-            .into_iter()
-            .chain(area::conversation_starts(content))
-            .chain(prop::conversation_starts(content))
-            .chain(shop::conversation_starts(content))
-            .chain(quest::conversation_starts(content)),
-    );
     shop::check(assets);
     quest::check(assets);
     notification::check(assets);
+    let scripts = script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
+    quest::check_parties(
+        assets.content(),
+        &quest::Parties::of(assets.content(), &scripts),
+    );
+    script::check(assets, &scripts);
 }
 
 fn check_fixtures(content: &crate::core::content::Content) {

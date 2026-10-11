@@ -262,6 +262,14 @@ pub fn join(world: &mut World) {
     }
 }
 
+pub fn spawned(world: &mut World, player: Entity) {
+    crate::systems::area::transition::raise_area(
+        world,
+        crate::systems::script::EventKind::Entered,
+        player,
+    );
+}
+
 fn spawn_position(
     world: &mut World,
     policy: SpawnPolicy,
@@ -307,9 +315,9 @@ fn spawn_player(
     name: String,
     immortal: Immortal,
 ) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let def = def(&content);
-    place(
+    let entity = place(
         world,
         client,
         zone,
@@ -331,6 +339,7 @@ fn spawn_player(
             history: History::default(),
         },
     );
+    spawned(world, entity);
 }
 
 pub fn player_stats(def: &PlayerDef, immortal: Immortal) -> Stats {
@@ -354,7 +363,7 @@ pub(crate) fn place(
     at: Pos<Tiles>,
     state: CharacterState,
 ) -> Entity {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let def = def(&content);
     let model = def.model;
     let assets = world.resource::<AssetService>().clone();
@@ -400,7 +409,7 @@ pub(crate) fn place(
 }
 
 pub fn respawn(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     for request in crate::systems::requests::<RespawnRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;

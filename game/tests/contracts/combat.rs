@@ -13,6 +13,7 @@ fn an_attack_walks_into_range_and_strikes() {
     let start = position(sim.world(), player).expect("position");
     let spot = sim.walkable_near(start, Tiles(3.0), Tiles(5.0));
     let orc = npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX));
+    sim.tick();
     let full = stat::effective(sim.world(), orc, StatKind::Health);
 
     sim.send(1, AttackRequest { target: orc });

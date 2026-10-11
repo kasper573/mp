@@ -3,10 +3,14 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
+use crate::core::script::{
+    Compiler, EffectCall, EffectDef, EffectStep, Name, Owner, OwnerKind, ValueType,
+};
 use crate::data;
 use crate::systems::effect::{self, Effect};
 use crate::systems::player::Xp;
-use crate::systems::rule::Requirement;
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
+use crate::systems::script::{Condition, EventKind, Reach, RiftInstances, RiftScripting};
 use crate::systems::stat::Stat;
 
 pub fn register(app: &mut App) {
@@ -75,33 +79,89 @@ fn level_effects(world: &World, entity: Entity) -> Vec<Effect> {
         .collect()
 }
 
-#[derive(Clone, Copy)]
-pub struct MinLevel(pub u32);
-
-impl Requirement for MinLevel {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        level(world, player) >= self.0
+pub fn grant_xp(world: &mut World, entity: Entity, amount: u32) {
+    let before = level(world, entity);
+    if let Some(mut xp) = world.get_mut::<Xp>(entity) {
+        xp.gain(amount);
     }
-
-    fn describe(&self, _content: &Content) -> String {
-        format!("Level {}", self.0)
-    }
-
-    fn min_level(&self) -> Option<u32> {
-        Some(self.0)
+    if level(world, entity) > before {
+        world.resource_mut::<RiftInstances>().raise(
+            Owner::Area,
+            EventKind::LeveledUp,
+            Some(entity),
+            Vec::new(),
+            |_| true,
+        );
     }
 }
 
-pub struct IsJob(pub data::job::Id);
+#[derive(Clone)]
+pub struct GrantXp {
+    pub who: Aim,
+    pub xp: &'static Condition,
+    pub next: Arrow,
+}
 
-impl Requirement for IsJob {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        world
-            .get::<Job>(player)
-            .is_some_and(|job| job.def == self.0)
+#[derive(Clone)]
+pub struct SetJob {
+    pub who: Aim,
+    pub job: data::job::Id,
+    pub next: Arrow,
+}
+
+impl EffectDef<RiftScripting> for GrantXp {
+    fn owners(&self) -> &'static [OwnerKind] {
+        ANY_OWNER
     }
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&self) -> Vec<(Name, Arrow)> {
+        vec![("next", self.next)]
+    }
+    fn pauses(&self) -> bool {
+        false
+    }
+    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, self.who)?;
+        let xp = cx.expr(self.xp, ValueType::Integer).map_err(effects::bad)?;
+        Ok(Box::new(move |world, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                let amount = xp(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
+                grant_xp(world, player, amount);
+            }
+            EffectStep::Output(0)
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::GrantsXp]
+    }
+}
 
-    fn describe(&self, content: &Content) -> String {
-        self.0.get(content).name.to_owned()
+impl EffectDef<RiftScripting> for SetJob {
+    fn owners(&self) -> &'static [OwnerKind] {
+        ANY_OWNER
+    }
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&self) -> Vec<(Name, Arrow)> {
+        vec![("next", self.next)]
+    }
+    fn pauses(&self) -> bool {
+        false
+    }
+    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, self.who)?;
+        let job = self.job;
+        Ok(Box::new(move |world, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                world.entity_mut(player).insert(Job { def: job });
+            }
+            EffectStep::Output(0)
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::SetsJob(self.job)]
     }
 }

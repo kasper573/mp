@@ -1,29 +1,30 @@
 use bevy_ecs::prelude::*;
 use bevy_terminal::TerminalInput;
 use game::core::content::Fixture;
-use game::core::math::Offset;
+use game::core::math::{Offset, Pos};
+use game::core::tiling::Tiles;
 use game::core::time::Seconds;
 use game::data;
 use game::data::quest::Id as QuestId;
 use game::systems::account::identity::Identity;
 use game::systems::account::role::Role;
-use game::systems::area::MarkerName;
+use game::systems::area::AreaObject;
 use game::systems::area::transition::{self, Crossing};
 use game::systems::dialogue::Conversation;
 use game::systems::history::{History, HistoryTopic};
 use game::systems::input::map::InputMap;
 use game::systems::interface::InterfaceSound;
-use game::systems::memory;
 use game::systems::movement::{Position, position};
 use game::systems::notification::{self, Notification, NotificationKind, NotificationSent};
-use game::systems::npc::{self, Npc, Pack};
+use game::systems::npc::{self, Pack};
 use game::systems::player::{Xp, commands_locked};
-use game::systems::quest::{self, AcceptQuest};
-use game::systems::rule::{Encounter, Terms};
+use game::systems::quest;
 use game::systems::terminal::TerminalKind as TerminalId;
 use game::systems::text::LineText;
 
-use crate::support::{Sim, content, later, row, settle, spawn_area, spoken};
+use crate::support::{
+    Sim, content, later, object, remembered, row, settle, spawn_area, spoken, townsperson,
+};
 
 fn told(sim: &Sim, client: u32) -> Vec<Notification> {
     sim.notified(client)
@@ -58,6 +59,15 @@ fn narration(label: &'static str, text: String) -> Notification {
     )
 }
 
+fn object_center(sim: &mut Sim, name: &str) -> Pos<Tiles> {
+    let entity = object(sim, name);
+    sim.world()
+        .get::<AreaObject>(entity)
+        .expect("an area object")
+        .shape
+        .center()
+}
+
 fn travel(from: &mut Sim, player: Entity, to: data::area::Id) -> (Sim, Entity) {
     let mut there = Sim::area(to);
     there.connect(1);
@@ -85,11 +95,7 @@ fn stepping_onto_the_pier_narrates_the_gulls_once() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let start = position(sim.world(), player).expect("position");
-    let pier = sim
-        .map()
-        .marker(MarkerName("ferry-pier"))
-        .expect("a pier on the map")
-        .center();
+    let pier = object_center(&mut sim, "ferry-pier");
 
     sim.world()
         .entity_mut(player)
@@ -109,7 +115,7 @@ fn stepping_onto_the_pier_narrates_the_gulls_once() {
         .insert(Position { pos: pier });
     settle(&mut sim);
     assert_eq!(told(&sim, 1), Vec::new());
-    assert!(memory::recall(sim.world(), player, row("HeardGulls")).is_some());
+    assert!(remembered(&mut sim, player, row("HeardGulls")));
 }
 
 #[test]
@@ -139,19 +145,12 @@ fn every_notification_is_recorded_when_it_is_raised() {
 
 #[test]
 fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
-    let accept = AcceptQuest(row("TusksForTheChief"));
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let bystander = sim.join(2);
     sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
     settle(&mut sim);
-    Terms {
-        requires: &[],
-        costs: &[],
-        outcomes: &[&accept],
-    }
-    .settle(sim.world(), player, Encounter::default())
-    .expect("accepted");
+    quest::accept(sim.world(), player, row("TusksForTheChief")).expect("accepted");
     let at = position(sim.world(), player).expect("position");
     sim.world()
         .entity_mut(bystander)
@@ -192,13 +191,7 @@ fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
 fn speech_names_no_body_when_the_speaker_is_someone_else() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    let tobb = sim
-        .world()
-        .query::<(Entity, &Npc)>()
-        .iter(sim.world())
-        .find(|(_, npc)| npc.def == row("Tobb"))
-        .map(|(entity, _)| entity)
-        .expect("Tobb on the pier");
+    let tobb = townsperson(&mut sim, row("Tobb"));
 
     notification::notify_from(
         sim.world(),
@@ -241,18 +234,11 @@ fn an_area_intro_plays_on_the_first_arrival_only_and_never_for_the_start_zone() 
 
 #[test]
 fn completing_a_quest_and_reaching_a_level_are_milestones() {
-    let accept = AcceptQuest(row("TusksForTheChief"));
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
     settle(&mut sim);
-    Terms {
-        requires: &[],
-        costs: &[],
-        outcomes: &[&accept],
-    }
-    .settle(sim.world(), player, Encounter::default())
-    .expect("accepted");
+    quest::accept(sim.world(), player, row("TusksForTheChief")).expect("accepted");
 
     quest::complete(sim.world(), player, row("TusksForTheChief"));
     settle(&mut sim);

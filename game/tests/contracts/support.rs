@@ -11,6 +11,7 @@ use bevy_time::TimeUpdateStrategy;
 use game::core::assets::{AssetService, FilesystemSource};
 use game::core::content::{Content, ContentId, ContentRow, key_of};
 use game::core::math::{Pos, Rng};
+use game::core::script::Value;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::Seconds;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
@@ -18,20 +19,18 @@ use game::data;
 use game::data::item::Id as ItemId;
 use game::data::notification::Id as NotificationId;
 use game::data::npc::Id as NpcId;
-use game::data::prop::Id as PropId;
 use game::systems::TICK_HZ;
-use game::systems::area::{self, Area};
+use game::systems::area::{self, Area, AreaObject};
 use game::systems::combat::Died;
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::interact::InteractRequest;
 use game::systems::item::{self, Inventory, ItemStack};
-use game::systems::memory::Memory;
+use game::systems::memory;
 use game::systems::movement::position;
 use game::systems::notification::{Notification, NotificationKind, NotificationSent};
 use game::systems::npc::{self, Npc, Pack};
 use game::systems::player::{ClientId, Immortal, JoinRequest, Players};
-use game::systems::prop::Prop;
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
@@ -66,7 +65,7 @@ pub fn spawn_area() -> data::area::Id {
 pub fn assets() -> AssetService {
     AssetService::new(
         FilesystemSource(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets")),
-        content().clone(),
+        *content(),
     )
 }
 
@@ -202,14 +201,29 @@ pub fn townsperson(sim: &mut Sim, who: NpcId) -> Entity {
         .expect("a resident")
 }
 
-pub fn prop(sim: &mut Sim, which: PropId) -> Entity {
+pub fn object(sim: &mut Sim, name: &str) -> Entity {
     let world = sim.world();
     world
-        .query::<(Entity, &Prop)>()
+        .query::<(Entity, &AreaObject)>()
         .iter(world)
-        .find(|(_, prop)| prop.def == which)
+        .find(|(_, object)| object.name.as_deref() == Some(name))
         .map(|(entity, _)| entity)
-        .expect("a fixture on the map")
+        .expect("an object on the map")
+}
+
+pub fn remember(sim: &mut Sim, player: Entity, key: data::memory::Id) {
+    memory::set(sim.world(), player, key, Value::Bool(true));
+}
+
+pub fn remembered(sim: &mut Sim, player: Entity, key: data::memory::Id) -> bool {
+    memory::get(sim.world(), player, key).truthy()
+}
+
+pub fn counted(sim: &mut Sim, player: Entity, key: data::memory::Id) -> i64 {
+    match memory::get(sim.world(), player, key) {
+        Value::Int(count) => count,
+        other => panic!("{key:?} holds {other:?}, not a count"),
+    }
 }
 
 pub fn open_with(sim: &mut Sim, client: u32, player: Entity, target: Entity) -> Conversation {
@@ -229,11 +243,7 @@ pub fn talk(sim: &mut Sim, client: u32, player: Entity, who: NpcId) -> Conversat
 }
 
 pub fn heard_the_news(sim: &mut Sim, player: Entity) {
-    let clock = *sim.world().resource::<WallClock>();
-    sim.world()
-        .get_mut::<Memory>(player)
-        .expect("memory")
-        .remember(content(), row("TobbNewsToday"), clock);
+    remember(sim, player, row("TobbNewsToday"));
 }
 
 pub fn conversation(sim: &mut Sim, player: Entity) -> Option<Conversation> {
@@ -352,7 +362,7 @@ pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
     item::reserve(world, victim, player, Seconds(0.0));
     world.write_message(Died {
         entity: victim,
-        killer: player,
+        killer: Some(player),
     });
     sim.run_until(0.2, |_| false);
 }

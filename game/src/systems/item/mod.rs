@@ -1,4 +1,5 @@
 pub mod card;
+pub mod effects;
 pub mod render;
 pub mod widget;
 
@@ -16,6 +17,7 @@ use crate::core::assets::{AssetRef, AssetService};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Offset, Pos};
+use crate::core::script::{Owner as ScriptOwner, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
 use crate::data::item::Id;
@@ -27,7 +29,8 @@ use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
 use crate::systems::player::{ClientId, Owner, commands_locked, conn_player, sender_player};
 use crate::systems::reach::{self, Pursuit, ReachAct};
-use crate::systems::rule::{Encounter, Outcome, Requirement, RuleContext, Terms};
+use crate::systems::script::ScriptModule;
+use crate::systems::script::{Condition, EventKind, RiftInstances};
 use crate::systems::stat::{self, Stat};
 use crate::systems::text::LineText;
 use crate::systems::visibility::{self, Presence, seen_by};
@@ -222,6 +225,9 @@ impl Reservation {
     }
 }
 
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct DropLife(pub Seconds);
+
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DroppedItem {
     pub item: Id,
@@ -286,7 +292,7 @@ impl ModuleSet for ItemDef {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
@@ -295,6 +301,7 @@ pub enum ItemModule {
     QuestItem,
     Bound,
     Currency,
+    Script(ScriptModule),
 }
 
 #[derive(Clone, Copy)]
@@ -343,6 +350,16 @@ impl ItemCategory {
 }
 
 impl ItemDef {
+    pub fn scripts(&self) -> Vec<ScriptModule> {
+        self.modules
+            .iter()
+            .filter_map(|module| match module {
+                ItemModule::Script(script) => Some(script.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn flavor(&self) -> Option<&'static str> {
         self.modules.iter().find_map(|module| match module {
             ItemModule::Flavor(flavor) => Some(flavor.text),
@@ -397,30 +414,12 @@ impl ItemDef {
         match self.kind {
             ItemKind::Consumable { .. } => ItemCategory::Consumable,
             ItemKind::Equipment { .. } => ItemCategory::Equipment,
-            ItemKind::Resource | ItemKind::Usable { .. } => ItemCategory::Material,
-        }
-    }
-
-    fn use_from(&self, ctx: &mut UseCtx) {
-        match &self.kind {
-            ItemKind::Consumable {
-                health_bonus,
-                lasts,
-            } => {
-                ctx.heal(*health_bonus);
-                ctx.consume();
-                ctx.apply_effects(*lasts);
-            }
-            ItemKind::Equipment { slot, requires } => {
-                ctx.equip(*slot, requires);
-            }
-            ItemKind::Usable { then } => ctx.settle(then),
-            ItemKind::Resource => {}
+            ItemKind::Resource | ItemKind::Usable => ItemCategory::Material,
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum ItemKind {
     Consumable {
         health_bonus: f32,
@@ -428,11 +427,9 @@ pub enum ItemKind {
     },
     Equipment {
         slot: equipment::EquipmentSlot,
-        requires: &'static [&'static dyn Requirement],
+        requires: Option<&'static Condition>,
     },
-    Usable {
-        then: &'static [&'static dyn Outcome],
-    },
+    Usable,
     Resource,
 }
 
@@ -450,52 +447,7 @@ pub struct ItemSfx {
     pub on_use: Option<SfxId>,
 }
 
-pub struct UseCtx<'a> {
-    world: &'a mut World,
-    actor: Entity,
-    slot: usize,
-    item: Id,
-}
-
-impl UseCtx<'_> {
-    pub fn heal(&mut self, amount: f32) {
-        stat::heal(self.world, self.actor, amount);
-    }
-    pub fn consume(&mut self) {
-        consume_slot(self.world, self.actor, self.slot);
-        announce_consumed(self.world, self.actor, self.item);
-    }
-    pub fn apply_effects(&mut self, duration: Seconds) {
-        instantiate_effects(self.world, self.actor, self.item, duration);
-    }
-    pub fn settle(&mut self, then: &'static [&'static dyn Outcome]) {
-        let terms = Terms {
-            requires: &[],
-            costs: &[],
-            outcomes: then,
-        };
-        if let Err(refusal) = terms.settle(self.world, self.actor, Encounter::default()) {
-            notification::notify(
-                self.world,
-                self.actor,
-                Notification::new(
-                    NotificationKind::error(self.world.resource::<Content>()),
-                    LineText::plain(refusal.0),
-                ),
-            );
-        }
-    }
-    pub fn equip(
-        &mut self,
-        into: equipment::EquipmentSlot,
-        requirements: &'static [&'static dyn Requirement],
-    ) {
-        equipment::equip(self.world, self.actor, self.slot, into, requirements);
-    }
-}
-
 pub fn use_item(world: &mut World) {
-    let content = world.resource::<Content>().clone();
     for request in crate::systems::requests::<UseItemRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
@@ -503,24 +455,70 @@ pub fn use_item(world: &mut World) {
         if stat::is_dead(world, entity) {
             continue;
         }
-        let slot = request.message.slot as usize;
-        let Some(item) = world
-            .get::<Inventory>(entity)
-            .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
-        else {
-            continue;
-        };
-        item.get(&content).use_from(&mut UseCtx {
-            world,
-            actor: entity,
-            slot,
-            item,
-        });
+        if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
+            notification::notify(
+                world,
+                entity,
+                Notification::new(
+                    NotificationKind::error(world.resource::<Content>()),
+                    LineText::plain(refusal),
+                ),
+            );
+        }
     }
 }
 
+pub fn use_held(world: &mut World, actor: Entity, item: Id) -> Result<(), String> {
+    let slot = world
+        .get::<Inventory>(actor)
+        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
+        .ok_or_else(|| {
+            format!(
+                "{} is not in the bag",
+                item.get(world.resource::<Content>()).name
+            )
+        })?;
+    use_slot(world, actor, slot)
+}
+
+fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String> {
+    let content = *world.resource::<Content>();
+    let item = world
+        .get::<Inventory>(actor)
+        .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
+        .ok_or_else(|| "Nothing there".to_owned())?;
+    match item.get(&content).kind {
+        ItemKind::Consumable {
+            health_bonus,
+            lasts,
+        } => {
+            stat::heal(world, actor, health_bonus);
+            consume_slot(world, actor, slot);
+            announce_consumed(world, actor, item);
+            instantiate_effects(world, actor, item, lasts);
+            Ok(())
+        }
+        ItemKind::Equipment { .. } => equipment::equip(world, actor, slot),
+        ItemKind::Usable => {
+            raise(world, item, EventKind::Used, actor);
+            Ok(())
+        }
+        ItemKind::Resource => Ok(()),
+    }
+}
+
+fn raise(world: &mut World, item: Id, kind: EventKind, actor: Entity) {
+    world.resource_mut::<RiftInstances>().raise(
+        ScriptOwner::Row(OwnerKind::Item, item.raw()),
+        kind,
+        Some(actor),
+        Vec::new(),
+        |_| true,
+    );
+}
+
 pub fn drop_item(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     for request in crate::systems::requests::<DropItemRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
@@ -602,7 +600,12 @@ pub fn expire_drops(
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let stale: Vec<Entity> = drops
         .iter(world)
-        .filter(|(_, reservation)| now - reservation.at >= DROP_TTL)
+        .filter(|(entity, reservation)| {
+            let ttl = world
+                .get::<DropLife>(*entity)
+                .map_or(DROP_TTL, |life| life.0);
+            now - reservation.at >= ttl
+        })
         .map(|(entity, _)| entity)
         .collect();
     for entity in stale {
@@ -638,15 +641,27 @@ pub fn scatter_drop(
     reserved_by: ReservedBy,
     presence: Option<Presence>,
 ) {
-    if drops.is_empty() {
-        return;
-    }
     let Some(from) = position(world, source) else {
         return;
     };
     let Some(area_id) = world.get::<AreaTag>(source).map(|tag| tag.area) else {
         return;
     };
+    scatter_at(world, from, area_id, drops, reserved_by, presence, None);
+}
+
+pub fn scatter_at(
+    world: &mut World,
+    from: Pos<Tiles>,
+    area_id: area::Id,
+    drops: &[(Id, u32)],
+    reserved_by: ReservedBy,
+    presence: Option<Presence>,
+    life: Option<Seconds>,
+) {
+    if drops.is_empty() {
+        return;
+    }
     let area = area::load(world.resource::<AssetService>(), area_id);
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let count = drops.len();
@@ -665,8 +680,11 @@ pub fn scatter_drop(
                 },
             ))
             .id();
-        if let Some(presence) = presence {
-            world.entity_mut(entity).insert(presence);
+        if let Some(presence) = &presence {
+            world.entity_mut(entity).insert(presence.clone());
+        }
+        if let Some(life) = life {
+            world.entity_mut(entity).insert(DropLife(life));
         }
         items.push(entity);
     }
@@ -728,7 +746,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     if !reserved.allows(account) {
         return;
     }
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let collected = world
         .get_mut::<Inventory>(player)
         .is_some_and(|mut inventory| {
@@ -738,11 +756,12 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
         });
     if collected {
         world.entity_mut(item).despawn();
+        raise(world, drop.item, EventKind::PickedUp, player);
     }
 }
 
 fn instantiate_effects(world: &mut World, actor: Entity, item: Id, duration: Seconds) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let until = world.resource::<WallClock>().now.after(duration);
     let entries = item
         .get(&content)
@@ -770,47 +789,6 @@ fn scatter_pos(from: Pos<Tiles>, index: usize, count: usize, area: &area::Area) 
     area.grid.nearest_walkable(spread).unwrap_or(rest)
 }
 
-pub struct Holding(pub ItemStack);
-
-impl Requirement for Holding {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        world
-            .get::<Inventory>(player)
-            .is_some_and(|inventory| inventory.count(self.0.item) >= self.0.count)
-    }
-
-    fn describe(&self, content: &Content) -> String {
-        self.0.describe(content)
-    }
-}
-
-pub struct FreeSlots(pub u32);
-
-impl Requirement for FreeSlots {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        world
-            .get::<Inventory>(player)
-            .is_some_and(|inventory| inventory.free_slots() >= self.0)
-    }
-
-    fn describe(&self, _content: &Content) -> String {
-        match self.0 {
-            1 => "1 free slot".to_owned(),
-            slots => format!("{slots} free slots"),
-        }
-    }
-}
-
-pub struct GiveItems(pub &'static [ItemStack]);
-
-impl Outcome for GiveItems {
-    fn apply(&self, _ctx: &mut RuleContext) {}
-
-    fn gives(&self, _content: &Content) -> Vec<ItemStack> {
-        self.0.to_vec()
-    }
-}
-
 /// Give items to a player.
 #[bevy_terminal::command(name = "give", access = crate::systems::account::role::is_admin)]
 fn give(
@@ -826,7 +804,7 @@ fn give(
         None => conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?,
     };
     let item = crate::core::content::named::<ItemDef>(world, &item)?;
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let stack = ItemStack::new(item, count.unwrap_or(1));
     let mut inventory = world
         .get_mut::<Inventory>(target)

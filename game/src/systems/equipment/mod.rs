@@ -8,12 +8,15 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
+use crate::core::script::{Owner, OwnerKind};
 use crate::data;
 use crate::systems::effect::{self, Effect};
+use crate::systems::item::ItemKind;
 use crate::systems::item::{Inventory, ItemStack};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::sender_player;
-use crate::systems::rule::Requirement;
+use crate::systems::script::condition;
+use crate::systems::script::{EventKind, RiftInstances};
 use crate::systems::text::LineText;
 
 pub fn register(app: &mut App) {
@@ -65,38 +68,42 @@ impl EquipmentSlot {
     }
 }
 
-pub fn equip(
-    world: &mut World,
-    player: Entity,
-    inv_slot: usize,
-    into: EquipmentSlot,
-    requirements: &'static [&'static dyn Requirement],
-) {
-    let content = world.resource::<Content>().clone();
-    let Some(item) = world
+pub fn equip_held(world: &mut World, player: Entity, item: data::item::Id) -> Result<(), String> {
+    let slot = world
+        .get::<Inventory>(player)
+        .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
+        .ok_or_else(|| {
+            format!(
+                "{} is not in your bag",
+                item.get(world.resource::<Content>()).name
+            )
+        })?;
+    equip(world, player, slot)
+}
+
+pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), String> {
+    let content = *world.resource::<Content>();
+    let item = world
         .get::<Inventory>(player)
         .and_then(|inventory| inventory.slots.get(inv_slot).map(|slot| slot.item))
+        .ok_or_else(|| "Nothing there".to_owned())?;
+    let ItemKind::Equipment {
+        slot: into,
+        requires,
+    } = item.get(&content).kind
     else {
-        return;
+        return Err(format!("{} can't be worn", item.get(&content).name));
     };
-    if let Some(unmet) = requirements
-        .iter()
-        .find(|requirement| !requirement.met(world, player))
+    if let Some(requires) = requires
+        && let Some(unmet) = condition::parts(requires)
+            .into_iter()
+            .find(|part| !condition::holds(world, player, part))
     {
-        let refusal = format!(
+        return Err(format!(
             "{} needs {}",
             item.get(&content).name,
-            unmet.describe(&content)
-        );
-        notification::notify(
-            world,
-            player,
-            Notification::new(
-                NotificationKind::error(world.resource::<Content>()),
-                LineText::plain(refusal),
-            ),
-        );
-        return;
+            condition::describe(&content, unmet)
+        ));
     }
     let occupant = world
         .get::<Equipment>(player)
@@ -112,41 +119,58 @@ pub fn equip(
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.insert(into, item);
     }
+    if let Some(occupant) = occupant {
+        raise(world, occupant, EventKind::Unequipped, player);
+    }
+    raise(world, item, EventKind::Equipped, player);
+    Ok(())
+}
+
+pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> Result<(), String> {
+    let content = *world.resource::<Content>();
+    let item = world
+        .get::<Equipment>(player)
+        .and_then(|equipment| equipment.slots.get(&slot).copied())
+        .ok_or_else(|| format!("Nothing worn as {}", slot.label()))?;
+    let mut inventory = world
+        .get_mut::<Inventory>(player)
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    inventory
+        .exchange(&content, &[], &[ItemStack::new(item, 1)])
+        .map_err(|refusal| refusal.describe(&content))?;
+    if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
+        equipment.slots.remove(&slot);
+    }
+    raise(world, item, EventKind::Unequipped, player);
+    Ok(())
 }
 
 pub fn unequip(world: &mut World) {
-    let content = world.resource::<Content>().clone();
     for request in crate::systems::requests::<UnequipRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
-        let slot = request.message.slot;
-        let Some(item) = world
-            .get::<Equipment>(player)
-            .and_then(|equipment| equipment.slots.get(&slot).copied())
-        else {
-            continue;
-        };
-        let stored = world
-            .get_mut::<Inventory>(player)
-            .map(|mut inventory| inventory.exchange(&content, &[], &[ItemStack::new(item, 1)]));
-        match stored {
-            Some(Ok(())) => {
-                if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
-                    equipment.slots.remove(&slot);
-                }
-            }
-            Some(Err(refusal)) => notification::notify(
+        if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
+            notification::notify(
                 world,
                 player,
                 Notification::new(
                     NotificationKind::error(world.resource::<Content>()),
-                    LineText::plain(refusal.describe(&content)),
+                    LineText::plain(refusal),
                 ),
-            ),
-            None => {}
+            );
         }
     }
+}
+
+fn raise(world: &mut World, item: data::item::Id, kind: EventKind, player: Entity) {
+    world.resource_mut::<RiftInstances>().raise(
+        Owner::Row(OwnerKind::Item, item.raw()),
+        kind,
+        Some(player),
+        Vec::new(),
+        |_| true,
+    );
 }
 
 fn equipped(world: &World, entity: Entity) -> Vec<Effect> {
@@ -161,18 +185,4 @@ fn equipped(world: &World, entity: Entity) -> Vec<Effect> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-pub struct Wearing(pub data::item::Id);
-
-impl Requirement for Wearing {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        world
-            .get::<Equipment>(player)
-            .is_some_and(|equipment| equipment.slots.values().any(|&item| item == self.0))
-    }
-
-    fn describe(&self, content: &Content) -> String {
-        format!("{} worn", self.0.get(content).name)
-    }
 }

@@ -1,12 +1,22 @@
 use crate::core::assets::AssetRef;
+use crate::core::script::Expr;
 use crate::core::time::Seconds;
 use crate::data::quest::Id as QuestId;
 use crate::data::sfx::Id as SfxId;
 use crate::systems::equipment::EquipmentSlot;
 use crate::systems::item::{Flavor, ItemDef, ItemKind, ItemModule, ItemSfx, Stack};
-use crate::systems::job::MinLevel;
-use crate::systems::quest::OfferQuest;
+use crate::systems::quest::effects::OfferQuest;
+use crate::systems::script::Speaker::Narrator;
+use crate::systems::script::{
+    Choice, Condition, DialogueNode, InlineScript, Line, Node, RiftEffect, RiftEvent, RiftQuery,
+    ScriptModule,
+};
 use crate::systems::stat::{Stat, StatKind};
+use crate::systems::text::{Fx, Ink, plain, styled};
+
+const LEVEL: Condition = Expr::Query(RiftQuery::Level { of: None });
+const LEVEL_2: Condition = Expr::AtLeast(&LEVEL, &Expr::Int(2));
+const LEVEL_3: Condition = Expr::AtLeast(&LEVEL, &Expr::Int(3));
 
 crate::table! {
     Gold: ItemDef {
@@ -87,7 +97,7 @@ crate::table! {
         name: "Rusty Sword",
         icon: AssetRef("icons/weapon_and_tool/iron_sword.png"),
         sfx: ItemSfx { pickup: SfxId::PickupBlade, trade: SfxId::TradeBlade, drop: SfxId::Block01, on_use: None },
-        kind: ItemKind::Equipment { slot: EquipmentSlot::Weapon, requires: &[] },
+        kind: ItemKind::Equipment { slot: EquipmentSlot::Weapon, requires: None },
         modules: &[
             ItemModule::Flavor(Flavor { text: "More rust than sword, but the edge still bites." }),
             ItemModule::Stat(Stat { kind: StatKind::Damage, value: 3.0 }),
@@ -99,7 +109,7 @@ crate::table! {
         sfx: ItemSfx { pickup: SfxId::PickupBone, trade: SfxId::TradeBone, drop: SfxId::Block01, on_use: None },
         kind: ItemKind::Equipment {
             slot: EquipmentSlot::Offhand,
-            requires: &[&MinLevel(2)],
+            requires: Some(&LEVEL_2),
         },
         modules: &[
             ItemModule::Flavor(Flavor { text: "Ribs lashed to a plank. It creaks when struck, but it holds." }),
@@ -112,7 +122,7 @@ crate::table! {
         sfx: ItemSfx { pickup: SfxId::PickupBone, trade: SfxId::TradeBone, drop: SfxId::Block01, on_use: None },
         kind: ItemKind::Equipment {
             slot: EquipmentSlot::Head,
-            requires: &[&MinLevel(3)],
+            requires: Some(&LEVEL_3),
         },
         modules: &[
             ItemModule::Flavor(Flavor { text: "The bone helmet of an orc chief. It earns you odd looks on the road." }),
@@ -126,7 +136,7 @@ crate::table! {
         sfx: ItemSfx { pickup: SfxId::PickupStone, trade: SfxId::TradeStone, drop: SfxId::Block01, on_use: None },
         kind: ItemKind::Equipment {
             slot: EquipmentSlot::Head,
-            requires: &[],
+            requires: None,
         },
         modules: &[
             ItemModule::Flavor(Flavor { text: "It's a rock. Wearing it on your head was your idea." }),
@@ -176,10 +186,11 @@ crate::table! {
         name: "Tattered Map",
         icon: AssetRef("icons/misc/map.png"),
         sfx: ItemSfx { pickup: SfxId::PickupPaper, trade: SfxId::TradePaper, drop: SfxId::Landing01, on_use: Some(SfxId::UiPage) },
-        kind: ItemKind::Usable { then: &[&OfferQuest(QuestId::XMarksTheSpot)] },
+        kind: ItemKind::Usable,
         modules: &[
             ItemModule::Flavor(Flavor { text: "Wrapped in oilcloth and left by the tide. Someone inked a cross deep in the forest." }),
             ItemModule::QuestItem,
+            ItemModule::Script(ScriptModule::Inline(TATTERED_MAP)),
         ],
     },
     BelfryKey: ItemDef {
@@ -208,7 +219,7 @@ crate::table! {
         sfx: ItemSfx { pickup: SfxId::PickupBlade, trade: SfxId::TradeBlade, drop: SfxId::Block01, on_use: None },
         kind: ItemKind::Equipment {
             slot: EquipmentSlot::Weapon,
-            requires: &[&MinLevel(3)],
+            requires: Some(&LEVEL_3),
         },
         modules: &[
             ItemModule::Flavor(Flavor { text: "A gilded blade from a ship nobody remembers. Worth following the cross for." }),
@@ -216,3 +227,87 @@ crate::table! {
         ],
     },
 }
+
+const TATTERED_MAP: InlineScript = InlineScript {
+    state: &[],
+    locals: &[],
+    nodes: &[
+        (
+            "used",
+            Node::On {
+                event: RiftEvent::Used,
+                next: Some("read"),
+            },
+        ),
+        (
+            "read",
+            Node::If {
+                test: Expr::Query(RiftQuery::OnQuest {
+                    of: None,
+                    quest: QuestId::XMarksTheSpot,
+                }),
+                yes: Some("waiting"),
+                no: Some("offer"),
+            },
+        ),
+        (
+            "offer",
+            Node::Dialogue(DialogueNode {
+                lines: &[
+                    Line {
+                        by: Narrator,
+                        face: None,
+                        text: &[
+                            plain("Salt has eaten most of the ink. A cross is scrawled beside a "),
+                            styled("standing stone", &[Fx::Ink(Ink::Place)]),
+                            plain(" in the "),
+                            styled("Forest", &[Fx::Ink(Ink::Place)]),
+                            plain("."),
+                        ],
+                    },
+                    Line {
+                        by: Narrator,
+                        face: None,
+                        text: &[plain("Someone buried something there.")],
+                    },
+                ],
+                choices: &[],
+                next: Some("card"),
+                left: None,
+            }),
+        ),
+        (
+            "card",
+            Node::Effect(RiftEffect::OfferQuest(OfferQuest {
+                who: None,
+                quest: QuestId::XMarksTheSpot,
+                accepted: None,
+                declined: None,
+                refused: None,
+            })),
+        ),
+        (
+            "waiting",
+            Node::Dialogue(DialogueNode {
+                lines: &[Line {
+                    by: Narrator,
+                    face: None,
+                    text: &[
+                        plain("The cross sits beside a standing stone, somewhere in the "),
+                        styled("Forest", &[Fx::Ink(Ink::Place)]),
+                        plain("."),
+                    ],
+                }],
+                choices: &[Choice {
+                    label: &[plain("Fold it away.")],
+                    requires: None,
+                    reveal: &[],
+                    warn: None,
+                    to: None,
+                }],
+                next: None,
+                left: None,
+            }),
+        ),
+    ],
+};

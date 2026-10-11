@@ -1,0 +1,737 @@
+use bevy_ecs::prelude::*;
+use bevy_ecs::query::Has;
+
+use super::{Condition, RiftScripting};
+use crate::core::assets::AssetService;
+use crate::core::content::Content;
+use crate::core::math::Pos;
+use crate::core::script::{Compiler, Eval, FlowCx, Name, QueryDef, Value, ValueType};
+use crate::core::tiling::{TilePos, Tiles};
+use crate::core::time::{Seconds, WallClock};
+use crate::data;
+use crate::systems::area::transition::Discovered;
+use crate::systems::area::{self, Area, AreaTag, object};
+use crate::systems::combat::{Attackers, Attitude};
+use crate::systems::effect::{self, Effect};
+use crate::systems::equipment::Equipment;
+use crate::systems::item::{DroppedItem, Inventory};
+use crate::systems::job::{self, Job};
+use crate::systems::memory;
+use crate::systems::movement::{self, Position};
+use crate::systems::npc::{Npc, Pack, body};
+use crate::systems::player::Owner as PlayerOwner;
+use crate::systems::quest::{self, Objective};
+use crate::systems::stat::{self, StatKind, Stats};
+use crate::systems::visibility;
+use crate::systems::visibility::Presence;
+
+#[derive(Resource, Default)]
+pub struct ActorRoster {
+    listed: Vec<Listed>,
+    characters: usize,
+    character_bounds: Option<Bounds>,
+    npc_bounds: Option<Bounds>,
+    areas: Vec<(area::Id, &'static Area)>,
+}
+
+#[derive(Clone, Copy)]
+struct Bounds {
+    min: Pos<Tiles>,
+    max: Pos<Tiles>,
+}
+
+impl Bounds {
+    fn around(listed: &[Listed]) -> Option<Bounds> {
+        let mut entries = listed.iter();
+        let first = entries.next()?.at;
+        Some(entries.fold(
+            Bounds {
+                min: first,
+                max: first,
+            },
+            |bounds, entry| Bounds {
+                min: Pos::new(bounds.min.x.min(entry.at.x), bounds.min.y.min(entry.at.y)),
+                max: Pos::new(bounds.max.x.max(entry.at.x), bounds.max.y.max(entry.at.y)),
+            },
+        ))
+    }
+
+    fn reaches(self, from: Pos<Tiles>, within: Tiles) -> bool {
+        from.x + within.0 >= self.min.x
+            && from.x - within.0 <= self.max.x
+            && from.y + within.0 >= self.min.y
+            && from.y - within.0 <= self.max.y
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Listed {
+    pub entity: Entity,
+    pub at: Pos<Tiles>,
+    pub area: area::Id,
+    pub npc: Option<data::npc::Id>,
+    pub character: bool,
+    pub dead: bool,
+    pub presence: bool,
+}
+
+impl ActorRoster {
+    pub fn iter(&self) -> impl Iterator<Item = &Listed> {
+        self.listed.iter()
+    }
+
+    pub fn among(&self, among: Among) -> &[Listed] {
+        match among {
+            Among::Characters => &self.listed[..self.characters],
+            Among::Npcs => &self.listed[self.characters..],
+            Among::Anyone | Among::Attackers | Among::PackAttackers => &self.listed,
+        }
+    }
+
+    fn area(&self, id: area::Id) -> Option<&'static Area> {
+        self.areas
+            .iter()
+            .find(|(known, _)| *known == id)
+            .map(|(_, area)| *area)
+    }
+
+    fn may_reach(&self, among: Among, from: Pos<Tiles>, within: Tiles) -> bool {
+        let reaches =
+            |bounds: Option<Bounds>| bounds.is_some_and(|bounds| bounds.reaches(from, within));
+        match among {
+            Among::Characters => reaches(self.character_bounds),
+            Among::Npcs => reaches(self.npc_bounds),
+            Among::Anyone | Among::Attackers | Among::PackAttackers => {
+                reaches(self.character_bounds) || reaches(self.npc_bounds)
+            }
+        }
+    }
+}
+
+type RosterQuery = QueryState<
+    (
+        Entity,
+        &'static Position,
+        &'static AreaTag,
+        Option<&'static Npc>,
+        Option<&'static Stats>,
+        Has<PlayerOwner>,
+        Has<Presence>,
+    ),
+    Or<(With<PlayerOwner>, With<Npc>)>,
+>;
+
+pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
+    let mut listed = std::mem::take(&mut world.get_resource_or_init::<ActorRoster>().listed);
+    listed.clear();
+    listed.extend(
+        query.iter(world).map(
+            |(entity, at, tag, npc, stats, character, presence)| Listed {
+                entity,
+                at: at.pos,
+                area: tag.area,
+                npc: npc.map(|npc| npc.def),
+                character,
+                dead: stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0),
+                presence,
+            },
+        ),
+    );
+    let mut areas = std::mem::take(&mut world.resource_mut::<ActorRoster>().areas);
+    let assets = world.resource::<AssetService>();
+    for entry in &listed {
+        if !areas.iter().any(|(id, _)| *id == entry.area) {
+            areas.push((entry.area, area::load(assets, entry.area)));
+        }
+    }
+    listed.sort_by_key(|entry| !entry.character);
+    let characters = listed.iter().take_while(|entry| entry.character).count();
+    let mut roster = world.resource_mut::<ActorRoster>();
+    roster.character_bounds = Bounds::around(&listed[..characters]);
+    roster.npc_bounds = Bounds::around(&listed[characters..]);
+    roster.listed = listed;
+    roster.characters = characters;
+    roster.areas = areas;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Among {
+    Characters,
+    Npcs,
+    Attackers,
+    PackAttackers,
+    Anyone,
+}
+
+type Of = Option<&'static Condition>;
+type Actor = &'static Condition;
+
+#[derive(Clone)]
+pub enum RiftQuery {
+    Level {
+        of: Of,
+    },
+    IsJob {
+        of: Of,
+        job: data::job::Id,
+    },
+    Stat {
+        of: Of,
+        stat: StatKind,
+    },
+    Buffed {
+        of: Of,
+        stat: StatKind,
+    },
+    Holding {
+        of: Of,
+        item: data::item::Id,
+    },
+    FreeSlots {
+        of: Of,
+    },
+    Wearing {
+        of: Of,
+        item: data::item::Id,
+    },
+    Memory {
+        of: Of,
+        memory: data::memory::Id,
+    },
+    SetWithin {
+        of: Of,
+        memory: data::memory::Id,
+        seconds: Actor,
+    },
+    OnQuest {
+        of: Of,
+        quest: data::quest::Id,
+    },
+    QuestDone {
+        of: Of,
+        quest: data::quest::Id,
+    },
+    QuestCooling {
+        of: Of,
+        quest: data::quest::Id,
+    },
+    TaskDone {
+        of: Of,
+        quest: data::quest::Id,
+        task: Name,
+    },
+    QuestResetsIn {
+        of: Of,
+        quest: data::quest::Id,
+    },
+    Inside {
+        of: Of,
+        object: Name,
+    },
+    InArea {
+        of: Of,
+        area: data::area::Id,
+    },
+    KnowsArea {
+        of: Of,
+        area: data::area::Id,
+    },
+    Nearest {
+        among: Among,
+        npc: Option<data::npc::Id>,
+        within: Actor,
+    },
+    Count {
+        among: Among,
+        npc: Option<data::npc::Id>,
+        within: Actor,
+    },
+    Present {
+        actor: Actor,
+    },
+    Distance {
+        actor: Actor,
+    },
+    Health {
+        actor: Actor,
+    },
+    IsNpc {
+        actor: Actor,
+    },
+    Subject,
+    Target,
+    Walking {
+        actor: Actor,
+    },
+    Hostile {
+        actor: Actor,
+    },
+    GroundItems {
+        item: data::item::Id,
+        at: Option<Actor>,
+        within: Actor,
+    },
+}
+
+impl QueryDef<RiftScripting> for RiftQuery {
+    fn value_type(&self, cx: &Compiler<RiftScripting>) -> Result<ValueType, String> {
+        Ok(match self {
+            RiftQuery::Level { .. } | RiftQuery::Holding { .. } | RiftQuery::FreeSlots { .. } => {
+                ValueType::Integer
+            }
+            RiftQuery::Count { .. } | RiftQuery::GroundItems { .. } => ValueType::Integer,
+            RiftQuery::Stat { .. } | RiftQuery::Distance { .. } | RiftQuery::Health { .. } => {
+                ValueType::Number
+            }
+            RiftQuery::Memory { memory, .. } => memory.get(cx.content).ty,
+            RiftQuery::QuestResetsIn { .. } => ValueType::Text,
+            RiftQuery::Nearest { .. } | RiftQuery::Target => ValueType::Actor,
+            RiftQuery::Subject => ValueType::Actor,
+            _ => ValueType::Boolean,
+        })
+    }
+
+    fn reads_subject(&self) -> bool {
+        match self {
+            RiftQuery::Level { of }
+            | RiftQuery::IsJob { of, .. }
+            | RiftQuery::Stat { of, .. }
+            | RiftQuery::Buffed { of, .. }
+            | RiftQuery::Holding { of, .. }
+            | RiftQuery::FreeSlots { of }
+            | RiftQuery::Wearing { of, .. }
+            | RiftQuery::Memory { of, .. }
+            | RiftQuery::SetWithin { of, .. }
+            | RiftQuery::OnQuest { of, .. }
+            | RiftQuery::QuestDone { of, .. }
+            | RiftQuery::QuestCooling { of, .. }
+            | RiftQuery::TaskDone { of, .. }
+            | RiftQuery::QuestResetsIn { of, .. }
+            | RiftQuery::Inside { of, .. }
+            | RiftQuery::InArea { of, .. }
+            | RiftQuery::KnowsArea { of, .. } => of.is_none(),
+            _ => false,
+        }
+    }
+
+    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, String> {
+        let bad = |e: (&str, String)| format!("{}: {}", e.0, e.1);
+        Ok(match self.clone() {
+            RiftQuery::Level { of } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Int(
+                        character(world, cx, &of)
+                            .map_or(0, |who| i64::from(job::level(world, who))),
+                    )
+                })
+            }
+            RiftQuery::IsJob { of, job } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        world.get::<Job>(who).is_some_and(|held| held.def == job)
+                    }))
+                })
+            }
+            RiftQuery::Stat { of, stat } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Num(
+                        character(world, cx, &of)
+                            .map_or(0.0, |who| f64::from(stat::effective(world, who, stat))),
+                    )
+                })
+            }
+            RiftQuery::Buffed { of, stat } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        world.get::<effect::TimedEffects>(who).is_some_and(|timed| {
+                            timed.0.iter().any(|buff| match buff.effect {
+                                Effect::StatModifier(modifier) => modifier.kind == stat,
+                                Effect::Chasing => stat == StatKind::MovementSpeed,
+                            })
+                        })
+                    }))
+                })
+            }
+            RiftQuery::Holding { of, item } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Int(character(world, cx, &of).map_or(0, |who| {
+                        world
+                            .get::<Inventory>(who)
+                            .map_or(0, |bag| i64::from(bag.count(item)))
+                    }))
+                })
+            }
+            RiftQuery::FreeSlots { of } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Int(character(world, cx, &of).map_or(0, |who| {
+                        world
+                            .get::<Inventory>(who)
+                            .map_or(0, |bag| i64::from(bag.free_slots()))
+                    }))
+                })
+            }
+            RiftQuery::Wearing { of, item } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        world
+                            .get::<Equipment>(who)
+                            .is_some_and(|worn| worn.slots.values().any(|worn| *worn == item))
+                    }))
+                })
+            }
+            RiftQuery::Memory { of, memory } => {
+                let of = cx.actor(of).map_err(bad)?;
+                let ty = memory.get(cx.content).ty;
+                Box::new(move |world, cx| {
+                    character(world, cx, &of)
+                        .map_or_else(|| ty.zero(), |who| memory::get(world, who, memory))
+                })
+            }
+            RiftQuery::SetWithin {
+                of,
+                memory,
+                seconds,
+            } => {
+                let of = cx.actor(of).map_err(bad)?;
+                let seconds = cx.expr(seconds, ValueType::Number).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        memory::set_within(
+                            world,
+                            who,
+                            memory,
+                            Seconds(seconds(world, cx).as_num() as f32),
+                        )
+                    }))
+                })
+            }
+            RiftQuery::OnQuest { of, quest } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        quest::log_of(world, who).is_some_and(|log| log.active(quest).is_some())
+                    }))
+                })
+            }
+            RiftQuery::QuestDone { of, quest } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        quest::log_of(world, who).is_some_and(|log| {
+                            log.finished(quest)
+                                .is_some_and(|done| done.result == quest::QuestResult::Completed)
+                        })
+                    }))
+                })
+            }
+            RiftQuery::QuestCooling { of, quest } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        let today = world.resource::<WallClock>().day();
+                        quest::log_of(world, who).is_some_and(|log| {
+                            quest.get(world.resource::<Content>()).daily()
+                                && log.done_for_now(world.resource::<Content>(), quest, today)
+                        })
+                    }))
+                })
+            }
+            RiftQuery::TaskDone { of, quest, task } => {
+                let of = cx.actor(of).map_err(bad)?;
+                let index = quest
+                    .get(cx.content)
+                    .objectives()
+                    .position(|objective| matches!(objective, Objective::Task { task: known, .. } if *known == task))
+                    .ok_or_else(|| format!("{} has no task {task}", quest.key(cx.content)))?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        quest::log_of(world, who).is_some_and(|log| {
+                            log.active(quest).is_some_and(|active| {
+                                active.counts.get(index).is_some_and(|count| *count > 0)
+                            })
+                        })
+                    }))
+                })
+            }
+            RiftQuery::QuestResetsIn { of, quest } => {
+                if !quest.get(cx.content).daily() {
+                    return Err(format!("{} never resets", quest.key(cx.content)));
+                }
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Text(
+                        character(world, cx, &of)
+                            .and_then(|who| quest::log_of(world, who))
+                            .and_then(|log| log.finished(quest))
+                            .and_then(|done| done.resets_in)
+                            .map(Seconds::in_words)
+                            .unwrap_or_default(),
+                    )
+                })
+            }
+            RiftQuery::Inside { of, object } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(
+                        actor(world, cx, &of).is_some_and(|who| object::inside(world, who, object)),
+                    )
+                })
+            }
+            RiftQuery::InArea { of, area } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(actor(world, cx, &of).is_some_and(|who| {
+                        world
+                            .get::<AreaTag>(who)
+                            .is_some_and(|tag| tag.area == area)
+                    }))
+                })
+            }
+            RiftQuery::KnowsArea { of, area } => {
+                let of = cx.actor(of).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
+                        world
+                            .get::<Discovered>(who)
+                            .is_some_and(|known| known.knows(area))
+                    }))
+                })
+            }
+            RiftQuery::Nearest { among, npc, within } => {
+                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    let within = Tiles(within(world, cx).as_num() as f32);
+                    Value::Actor(nearest(world, cx, among, npc, within))
+                })
+            }
+            RiftQuery::Count { among, npc, within } => {
+                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    let within = Tiles(within(world, cx).as_num() as f32);
+                    Value::Int(around(world, cx, among, npc, within).count() as i64)
+                })
+            }
+            RiftQuery::Present { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| Value::Bool(actor(world, cx, &who).is_some()))
+            }
+            RiftQuery::Distance { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    let distance = (|| {
+                        let who = actor(world, cx, &who)?;
+                        let from = movement::position(world, owner_entity(cx)?)?;
+                        let to = movement::position(world, who)?;
+                        Some(from.distance(to).0)
+                    })();
+                    Value::Num(f64::from(distance.unwrap_or(0.0)))
+                })
+            }
+            RiftQuery::Health { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Num(
+                        actor(world, cx, &who)
+                            .map_or(0.0, |who| f64::from(stat::current_health(world, who))),
+                    )
+                })
+            }
+            RiftQuery::IsNpc { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(
+                        actor(world, cx, &who).is_some_and(|who| world.get::<Npc>(who).is_some()),
+                    )
+                })
+            }
+            RiftQuery::Subject => Box::new(|_, cx| Value::Actor(cx.subject)),
+            RiftQuery::Target => Box::new(|world, cx| {
+                Value::Actor(owner_entity(cx).and_then(|owner| body::target(world, owner)))
+            }),
+            RiftQuery::Walking { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(
+                        actor(world, cx, &who).is_some_and(|who| movement::moving(world, who)),
+                    )
+                })
+            }
+            RiftQuery::Hostile { actor: who } => {
+                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    Value::Bool(
+                        actor(world, cx, &who).is_some_and(|who| {
+                            world.get::<Attitude>(who) == Some(&Attitude::Hostile)
+                        }),
+                    )
+                })
+            }
+            RiftQuery::GroundItems { item, at, within } => {
+                let at = cx.opt_expr(at, ValueType::Actor).map_err(bad)?;
+                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                Box::new(move |world, cx| {
+                    let within = Tiles(within(world, cx).as_num() as f32);
+                    let center = match &at {
+                        Some(at) => {
+                            actor(world, cx, at).and_then(|who| movement::position(world, who))
+                        }
+                        None => owner_entity(cx).and_then(|owner| movement::position(world, owner)),
+                    };
+                    let Some(center) = center else {
+                        return Value::Int(0);
+                    };
+                    let area = owner_entity(cx)
+                        .and_then(|owner| world.get::<AreaTag>(owner).map(|tag| tag.area));
+                    let mut count = 0;
+                    for entity in world.iter_entities() {
+                        let Some(drop) = entity.get::<DroppedItem>() else {
+                            continue;
+                        };
+                        if drop.item != item {
+                            continue;
+                        }
+                        if area.is_some() && entity.get::<AreaTag>().map(|tag| tag.area) != area {
+                            continue;
+                        }
+                        let Some(at) = entity.get::<Position>() else {
+                            continue;
+                        };
+                        if at.pos.distance(center) <= within {
+                            count += i64::from(drop.count);
+                        }
+                    }
+                    Value::Int(count)
+                })
+            }
+        })
+    }
+}
+
+pub fn owner_entity(cx: &FlowCx) -> Option<Entity> {
+    cx.owner.entity()
+}
+
+pub fn actor(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
+    let who = eval(world, cx).as_actor()?;
+    (world.get_entity(who).is_ok() && !stat::is_dead(world, who)).then_some(who)
+}
+
+pub fn character(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
+    actor(world, cx, eval).filter(|who| is_character(world, *who))
+}
+
+pub fn is_character(world: &World, who: Entity) -> bool {
+    world.get::<PlayerOwner>(who).is_some()
+}
+
+pub fn nearest(
+    world: &World,
+    cx: &FlowCx,
+    among: Among,
+    npc: Option<data::npc::Id>,
+    within: Tiles,
+) -> Option<Entity> {
+    around(world, cx, among, npc, within)
+        .min_by(|(a, da), (b, db)| da.0.total_cmp(&db.0).then(a.cmp(b)))
+        .map(|(entity, _)| entity)
+}
+
+pub fn around<'w>(
+    world: &'w World,
+    cx: &FlowCx,
+    among: Among,
+    npc: Option<data::npc::Id>,
+    within: Tiles,
+) -> impl Iterator<Item = (Entity, Tiles)> + 'w {
+    let scan = Scan::of(world, cx, among, within);
+    let candidates: &'w [Listed] = match &scan {
+        Some(scan) => scan.roster.among(among),
+        None => &[],
+    };
+    candidates.iter().filter_map(move |listed| {
+        let scan = scan.as_ref()?;
+        let fits = listed.entity != scan.owner
+            && listed.area == scan.area
+            && !listed.dead
+            && match among {
+                Among::Characters => listed.character,
+                Among::Npcs => listed.npc.is_some(),
+                Among::Anyone => true,
+                Among::Attackers | Among::PackAttackers => scan.attackers.contains(&listed.entity),
+            }
+            && npc.is_none_or(|npc| listed.npc == Some(npc));
+        if !fits {
+            return None;
+        }
+        let distance = scan.from.distance(listed.at);
+        if distance > within {
+            return None;
+        }
+        let seen = !(scan.owner_presence || listed.presence)
+            || visibility::coexist(world, scan.owner, listed.entity);
+        let exposed = scan.shelter.is_none_or(|area| !area.safe(listed.at));
+        (seen && exposed).then_some((listed.entity, distance))
+    })
+}
+
+struct Scan<'w> {
+    roster: &'w ActorRoster,
+    owner: Entity,
+    from: Pos<Tiles>,
+    area: area::Id,
+    shelter: Option<&'static Area>,
+    attackers: Vec<Entity>,
+    owner_presence: bool,
+}
+
+impl<'w> Scan<'w> {
+    fn of(world: &'w World, cx: &FlowCx, among: Among, within: Tiles) -> Option<Scan<'w>> {
+        let owner = owner_entity(cx)?;
+        let from = movement::position(world, owner)?;
+        let area = world.get::<AreaTag>(owner)?.area;
+        let roster = world.get_resource::<ActorRoster>()?;
+        if !roster.may_reach(among, from, within) {
+            return None;
+        }
+        let shelter = area::wild(world, owner)
+            .then(|| roster.area(area))
+            .flatten();
+        let attackers: Vec<Entity> = match among {
+            Among::Attackers => world
+                .get::<Attackers>(owner)
+                .map(|attackers| attackers.ids.clone())
+                .unwrap_or_default(),
+            Among::PackAttackers => {
+                let pack = world.get::<Pack>(owner).copied();
+                roster
+                    .iter()
+                    .filter(|listed| listed.npc.is_some() && listed.area == area)
+                    .filter(|listed| world.get::<Pack>(listed.entity).copied() == pack)
+                    .flat_map(|listed| {
+                        world
+                            .get::<Attackers>(listed.entity)
+                            .map(|attackers| attackers.ids.clone())
+                            .unwrap_or_default()
+                    })
+                    .collect()
+            }
+            _ => Vec::new(),
+        };
+        Some(Scan {
+            roster,
+            owner,
+            from,
+            area,
+            shelter,
+            attackers,
+            owner_presence: world.get::<Presence>(owner).is_some(),
+        })
+    }
+}

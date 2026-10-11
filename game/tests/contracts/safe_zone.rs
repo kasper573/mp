@@ -4,11 +4,10 @@ use game::core::tiling::{TilePos, Tiles};
 use game::data::npc::Id as NpcId;
 use game::systems::area::{self, Area, Wild};
 use game::systems::movement::{self, MoveRequest, Position, position};
-use game::systems::npc::{self, Pack, ShownFor, SpawnNear, SpawnNpcs, Summoned};
+use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct};
-use game::systems::rule::{Encounter, Terms};
 
-use crate::support::{Sim, row, spawn_area};
+use crate::support::{Sim, content, row, spawn_area};
 
 struct Edge {
     lair: Pos<Tiles>,
@@ -59,26 +58,17 @@ fn wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
     monster
 }
 
+fn unscripted_wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
+    let monster = npc::spawn_actor(sim.world(), what.get(content()), at, spawn_area());
+    sim.world().entity_mut(monster).insert(Wild);
+    monster
+}
+
 fn summon(sim: &mut Sim, player: Entity, what: NpcId) -> Entity {
-    let spawn = SpawnNpcs {
-        npc: what,
-        count: 1,
-        near: SpawnNear::Player,
-        shown: ShownFor::Everyone,
-    };
-    let terms = Terms {
-        requires: &[],
-        costs: &[],
-        outcomes: &[&spawn],
-    };
-    terms
-        .settle(sim.world(), player, Encounter::default())
-        .expect("summoned");
-    let world = sim.world();
-    world
-        .query_filtered::<Entity, With<Summoned>>()
-        .single(world)
-        .expect("one summon")
+    npc::summon(sim.world(), what, 1, player, None, Some(player))
+        .first()
+        .copied()
+        .expect("summoned")
 }
 
 fn hunted_by(sim: &mut Sim, hunter: Entity, player: Entity) -> bool {
@@ -159,7 +149,7 @@ fn a_wild_flyer_flies_around_a_safe_zone_instead_of_over_it() {
         .filter(|&(a, b)| map.safe(a.lerp(b, 0.5)))
         .min_by(|(a, b), (c, d)| a.distance(*b).0.total_cmp(&c.distance(*d).0))
         .expect("two points whose straight line crosses a safe zone");
-    let bat = wild(&mut sim, row("Bat"), from);
+    let bat = unscripted_wild(&mut sim, row("Bat"), from);
 
     movement::goto(sim.world(), bat, to);
     let mut trespassed = false;

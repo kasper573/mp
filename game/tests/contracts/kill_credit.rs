@@ -18,7 +18,7 @@ fn orc(sim: &mut Sim, near: Entity) -> Entity {
 fn kill(sim: &mut Sim, victim: Entity, killer: Entity) {
     sim.world().write_message(Died {
         entity: victim,
-        killer,
+        killer: Some(killer),
     });
 }
 

@@ -10,7 +10,8 @@ use super::card::{
     steady, tag,
 };
 use super::{
-    ActiveQuest, FinishedQuest, Giver, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest, QuestResult,
+    ActiveQuest, FinishedQuest, Parties, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest,
+    QuestResult,
 };
 use crate::core::content::{Content, Fixture};
 use crate::systems::dialogue::ChoiceReveal;
@@ -121,6 +122,7 @@ struct QuestLogBody {
 }
 
 struct Page {
+    parties: Parties,
     tab: LogTab,
     log: QuestLog,
     inventory: Inventory,
@@ -153,6 +155,7 @@ fn sync_bodies(world: &mut World) {
     let playing = *world.resource::<Mode>() == Mode::Play;
     for (entity, body) in bodies {
         let page = Page {
+            parties: world.resource::<Parties>().clone(),
             tab: body.tab,
             selected: world.resource::<Browse>().of(body.tab),
             log: log.clone(),
@@ -353,7 +356,7 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> Box<dyn Scene> {
             return live(Countdown::Left, palette::AMBER_80);
         }
         let counted = def
-            .progress(content, active, Some(&page.inventory))
+            .progress(content, &page.parties, active, Some(&page.inventory))
             .into_iter()
             .find(|progress| progress.counted && !progress.done())
             .map(|progress| format!("{}/{}", progress.have, progress.need))
@@ -386,7 +389,7 @@ fn detail(
                 {EntityScene(tag(&def.kinds(), palette::AMBER_70))},
             ]
         }),
-        Box::new(caption(def.meta(content))),
+        Box::new(caption(def.meta(&page.parties, quest))),
     ];
     if page
         .active(quest)
@@ -402,6 +405,7 @@ fn detail(
     parts.push(Box::new(section("Objectives")));
     let progress = def.progress(
         content,
+        &page.parties,
         page.active(quest)
             .unwrap_or(&ActiveQuest::fresh(content, quest)),
         Some(&page.inventory),
@@ -441,7 +445,7 @@ fn detail(
     if def.time_limit().is_some() {
         parts.push(Box::new(section("If time runs out")));
         parts.push(Box::new(ui::styled_text(
-            format!("The quest fails. {}.", def.retry_hint(content)),
+            format!("The quest fails. {}.", def.retry_hint(&page.parties, quest)),
             ink,
             typography::BODY,
         )));
@@ -461,7 +465,7 @@ fn detail(
                 typography::LABEL,
             )),
             QuestResult::Failed if finished.offered_again => Box::new(ui::styled_text(
-                format!("Failed · {}", def.retry_hint(content)),
+                format!("Failed · {}", def.retry_hint(&page.parties, quest)),
                 palette::CRIMSON_80,
                 typography::LABEL,
             )),
@@ -559,15 +563,18 @@ fn footer(page: &Page, quest: QuestId) -> impl Scene + use<> {
 }
 
 fn confirm_abandon(world: &mut World, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let def = quest.get(&content);
     let taken = def
         .grants()
         .iter()
         .map(|stack| format!("{} is taken from your bag.", stack.item.get(&content).name));
-    let again = match def.giver {
-        Giver::Item(item) => format!("Use the {} to start it again.", item.get(&content).name),
-        giver => format!("{} will offer the quest again.", giver.name(&content)),
+    let again = match world.resource::<Parties>().giver(quest) {
+        Some(party) if party.item.is_some() => {
+            format!("Use the {} to start it again.", party.name)
+        }
+        Some(party) => format!("{} will offer the quest again.", party.name),
+        None => "Nobody offers it again.".to_owned(),
     };
     let body = taken
         .chain(["Your progress is lost.".to_owned(), again])
@@ -588,12 +595,12 @@ fn confirm_abandon(world: &mut World, quest: QuestId) {
 
 fn quest_note(world: &World, stack: ItemStack) -> Option<String> {
     let content = world.resource::<Content>();
-    if content
-        .table::<QuestDef>()
-        .rows()
-        .iter()
-        .any(|quest| quest.giver == Giver::Item(stack.item))
-    {
+    let parties = world.resource::<Parties>();
+    if content.table::<QuestDef>().ids().any(|quest| {
+        parties
+            .giver(quest)
+            .is_some_and(|party| party.item == Some(stack.item))
+    }) {
         return Some("begins a quest · use to read it".to_owned());
     }
     if !stack.item.get(content).has(ItemFlag::Quest) {

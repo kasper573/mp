@@ -1,41 +1,74 @@
-use bevy_app::App;
 use bevy_ecs::prelude::*;
 
-use super::{Id, MarkerName, Portal};
-use crate::core::assets::AssetService;
-use crate::systems::rule::{self, Requirement};
+use super::AreaTag;
+use super::transition::Crossing;
+use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
+use crate::systems::dialogue;
+use crate::systems::movement;
+use crate::systems::npc::Npc;
+use crate::systems::player::SpawnPoint;
+use crate::systems::reach;
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
+use crate::systems::script::{Fill, Place, Reach, RiftScripting};
 
-#[derive(Clone, Copy)]
-pub struct WarpLock {
-    pub area: Id,
-    pub warp: MarkerName,
-    pub requires: &'static [&'static dyn Requirement],
+#[derive(Clone)]
+pub struct Warp {
+    pub who: Aim,
+    pub to: Fill<Place>,
+    pub next: Arrow,
 }
 
-#[derive(Resource, Default)]
-pub struct WarpLocks(Vec<WarpLock>);
-
-pub fn lock_warps(app: &mut App, locks: impl IntoIterator<Item = WarpLock>) {
-    app.world_mut().resource_mut::<WarpLocks>().0.extend(locks);
-}
-
-pub fn passable(world: &World, traveller: Entity, area: Id, portal: &Portal) -> bool {
-    world
-        .resource::<WarpLocks>()
-        .0
-        .iter()
-        .filter(|lock| lock.area == area && lock.warp.0 == portal.name)
-        .all(|lock| rule::met(world, traveller, lock.requires))
-}
-
-impl WarpLock {
-    pub fn check(&self, assets: &AssetService) {
-        let map = super::load(assets, self.area);
-        if !map.portals.iter().any(|portal| portal.name == self.warp.0) {
-            panic!(
-                "area {:?}: a lock guards warp '{}', which the map lacks",
-                self.area, self.warp.0
-            );
-        }
+impl EffectDef<RiftScripting> for Warp {
+    fn owners(&self) -> &'static [OwnerKind] {
+        ANY_OWNER
     }
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&self) -> Vec<(Name, Arrow)> {
+        vec![("next", self.next)]
+    }
+    fn pauses(&self) -> bool {
+        false
+    }
+    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, self.who)?;
+        let to = cx.place(&self.to).map_err(effects::bad)?;
+        Ok(Box::new(move |world, cx| {
+            match effects::aimed(world, cx, &who) {
+                Some(actor) => {
+                    if let Err(reason) = warp(world, actor, to) {
+                        effects::refuse(world, cx, None, reason);
+                    }
+                }
+                None => effects::refuse(world, cx, None, "Nobody to warp"),
+            }
+            EffectStep::Output(0)
+        }))
+    }
+    fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        cx.peek_place(&self.to)
+            .map(Reach::Warp)
+            .into_iter()
+            .collect()
+    }
+}
+
+pub fn warp(world: &mut World, actor: Entity, to: Place) -> Result<(), &'static str> {
+    let here = world.get::<AreaTag>(actor).map(|tag| tag.area);
+    if here != Some(to.area) && world.get::<Npc>(actor).is_some() {
+        return Err("Npcs stay in their area");
+    }
+    dialogue::close_for(world, actor);
+    reach::forget(world, actor);
+    world.entity_mut(actor).insert(SpawnPoint(to.at));
+    if here == Some(to.area) {
+        movement::relocate(world, actor, to.at);
+    } else {
+        world.entity_mut(actor).insert(Crossing {
+            dest_area: to.area,
+            dest: to.at,
+        });
+    }
+    Ok(())
 }

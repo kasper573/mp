@@ -14,10 +14,11 @@ use game::core::content::{Content, ContentScope, with_content};
 use game::core::math::{Offset, Pos, Rect, Size};
 use game::core::render::tile_to_window;
 use game::core::render::transition::ScreenTransitionPhase;
+use game::core::script::{OwnerKind, OwnerRow};
 use game::core::tiling::{TilePos, Tiles};
 use game::data;
 use game::systems::actor::{self, Actor, Hitbox};
-use game::systems::area::{self, AreaTag};
+use game::systems::area::{self, AreaModule, AreaObject, AreaTag};
 use game::systems::attention::{Attention, StatusBadges};
 use game::systems::combat::{self, Attitude};
 use game::systems::dialogue::stage;
@@ -33,8 +34,8 @@ use game::systems::notification::{
 };
 use game::systems::npc::Npc;
 use game::systems::player::{Owner, commands_locked, session};
-use game::systems::prop::Prop;
-use game::systems::quest::{QuestLog, QuestResult};
+use game::systems::quest::{Parties, QuestLog, QuestResult};
+use game::systems::script::{Reach, RiftScripts};
 use game::systems::shop;
 use game::systems::stat::{StatKind, Stats};
 use serde::Serialize;
@@ -165,7 +166,7 @@ struct Stack {
 
 #[derive(Serialize)]
 struct Stage {
-    node: data::dialogue::Id,
+    node: String,
     with: Option<String>,
     line: usize,
     lines: usize,
@@ -301,7 +302,8 @@ struct Body {
 #[derive(Serialize)]
 struct Fixture {
     id: String,
-    prop: data::prop::Id,
+    name: Option<String>,
+    label: Option<String>,
     at: Pos<Tiles>,
     aim: Pos<Tiles>,
     hitbox: Rect<Tiles>,
@@ -368,7 +370,7 @@ fn publish(world: &mut World) {
 }
 
 fn snapshot(world: &mut World) -> Snapshot {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let me = session::my_character(world).map(|me| me.id());
     let viewpoint = world.resource::<session::Viewpoint>().0;
     let area = viewpoint
@@ -467,8 +469,8 @@ fn snapshot(world: &mut World) -> Snapshot {
         actors: actors(world, me, area),
         props: props(world, area),
         items: items(world, area),
-        portals: portals(world, me),
-        markers: markers(world, me),
+        portals: portals(world, area),
+        markers: markers(world, area),
         walkable: walkable(world, me, view),
         area_size: me.and_then(|me| area::of(world, me)).map(|area| area.size),
         safe_zones: me
@@ -538,7 +540,7 @@ fn quests(world: &World, seen: Entity) -> Option<Quests> {
                 progress: active
                     .quest
                     .get(content)
-                    .progress(content, active, inventory)
+                    .progress(content, world.resource::<Parties>(), active, inventory)
                     .iter()
                     .map(|progress| [progress.have, progress.need])
                     .collect(),
@@ -630,14 +632,16 @@ fn props(world: &mut World, area: Option<area::Id>) -> Vec<Fixture> {
         .and_then(|viewer| world.get::<Attention>(viewer))
         .cloned();
     let fixtures: Vec<(Entity, Fixture)> = world
-        .query::<(Entity, &Prop, &Position, &Hitbox, &AreaTag)>()
+        .query::<(Entity, &AreaObject, &Position, &Hitbox, &AreaTag)>()
         .iter(world)
         .filter(|(.., tag)| area.is_none_or(|area| tag.area == area))
-        .map(|(entity, prop, at, hitbox, _)| {
+        .filter(|(_, object, ..)| object.look.is_some())
+        .map(|(entity, object, at, hitbox, _)| {
             let hitbox = at.pos.hitbox(hitbox.size);
             let fixture = Fixture {
                 id: entity.to_string(),
-                prop: prop.def,
+                name: object.name.clone(),
+                label: object.label.clone(),
                 at: at.pos,
                 aim: hitbox.center(),
                 hitbox,
@@ -701,34 +705,61 @@ fn items(world: &mut World, area: Option<area::Id>) -> Vec<GroundItem> {
         .collect()
 }
 
-fn portals(world: &World, me: Option<Entity>) -> Vec<Exit> {
-    me.and_then(|me| area::of(world, me))
-        .map(|area| {
-            area.portals
-                .iter()
-                .map(|portal| Exit {
-                    name: portal.name.clone(),
-                    to: portal.dest_area,
-                    at: portal.rect.center(),
-                    rect: portal.rect,
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn markers(world: &World, me: Option<Entity>) -> Vec<Marker> {
-    let Some(area) = me.and_then(|me| area::of(world, me)) else {
+fn portals(world: &World, area: Option<area::Id>) -> Vec<Exit> {
+    let Some(area) = area else {
         return Vec::new();
     };
-    let mut markers: Vec<Marker> = area
-        .markers
-        .iter()
-        .map(|(name, marker)| Marker {
-            name: name.clone(),
-            at: marker.center(),
+    let content = world.resource::<Content>();
+    let scripts = world.resource::<RiftScripts>();
+    let mut exits: Vec<Exit> = area
+        .get(content)
+        .objects()
+        .filter_map(|(index, object)| {
+            let owner = OwnerRow {
+                kind: OwnerKind::Object,
+                row: area.raw(),
+                object: Some(index),
+            };
+            let warp = scripts
+                .may_do(owner)
+                .reaches
+                .iter()
+                .find_map(|reach| match reach {
+                    Reach::Warp(place) => Some(*place),
+                    _ => None,
+                })?;
+            Some(Exit {
+                name: object.name.map(str::to_owned).unwrap_or_default(),
+                to: warp.area,
+                at: object.shape.center(),
+                rect: object.shape.bounds(),
+            })
         })
         .collect();
+    exits.sort_by(|a, b| a.name.cmp(&b.name));
+    exits
+}
+
+fn markers(world: &World, area: Option<area::Id>) -> Vec<Marker> {
+    let Some(area) = area else {
+        return Vec::new();
+    };
+    let content = world.resource::<Content>();
+    let def = area.get(content);
+    let objects = def.objects().filter_map(|(_, object)| {
+        Some(Marker {
+            name: object.name?.to_owned(),
+            at: object.shape.center(),
+        })
+    });
+    let residents = def.modules.iter().filter_map(|module| match module {
+        AreaModule::Resident { npc, at, .. } => Some(Marker {
+            name: npc.key(content).to_owned(),
+            at: *at,
+        }),
+        _ => None,
+    });
+    let mut markers: Vec<Marker> = objects.chain(residents).collect();
     markers.sort_by(|a, b| a.name.cmp(&b.name));
     markers
 }
@@ -841,7 +872,7 @@ fn choice_rows(world: &mut World) -> HashMap<usize, Cover> {
 }
 
 fn notifications(world: &mut World) -> Notifications {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let bubbles = bubble::shown(world)
         .into_iter()
         .map(|shown| BubbleView {

@@ -15,6 +15,7 @@ use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemDef, ItemFlag, ItemKind};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
+use crate::systems::script::condition;
 use crate::systems::stat::Stat;
 
 const WINDOW_ID: &str = "Item";
@@ -82,7 +83,7 @@ pub fn inspect_hint() -> Vec<RichPiece> {
 
 pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     match def.kind {
-        ItemKind::Consumable { .. } | ItemKind::Usable { .. } => Some("use"),
+        ItemKind::Consumable { .. } | ItemKind::Usable => Some("use"),
         ItemKind::Equipment { .. } => Some("wear"),
         ItemKind::Resource => None,
     }
@@ -156,7 +157,7 @@ fn forget(mut card: ResMut<ItemCard>) {
 }
 
 fn show_card(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let wanted = world.resource::<ItemCard>().0;
     let shown = world
         .query::<(Entity, &ItemCardWindow)>()
@@ -245,15 +246,19 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color)> {
             facts.extend(modifiers(def).map(|stat| plain(modifier(stat))));
             let viewer = world.resource::<Viewpoint>().0;
             facts.extend(requires.iter().map(|requirement| {
-                let color = match viewer.map(|viewer| requirement.met(world, viewer)) {
+                let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
+                {
                     Some(true) => palette::EMERALD_80,
                     Some(false) => palette::CRIMSON_80,
                     None => ink,
                 };
-                (format!("Requires {}", requirement.describe(content)), color)
+                (
+                    format!("Requires {}", condition::describe(content, requirement)),
+                    color,
+                )
             }));
         }
-        ItemKind::Usable { .. } => facts.push(plain("Can be used".to_owned())),
+        ItemKind::Usable => facts.push(plain("Can be used".to_owned())),
         ItemKind::Resource => facts
             .extend(modifiers(def).map(|stat| plain(format!("{} while carried", modifier(stat))))),
     }

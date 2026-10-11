@@ -1,3 +1,4 @@
+pub mod effects;
 pub mod widget;
 
 mod health;
@@ -9,9 +10,7 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::content::Content;
 use crate::systems::effect::{self, EffectContext};
-use crate::systems::rule::{Outcome, Requirement, RuleContext};
 
 #[derive(
     Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, VariantArray, IntoStaticStr,
@@ -102,33 +101,4 @@ pub fn effective_all(world: &World, entity: Entity) -> Stats {
             .map(|&kind| kind.of(effective(world, entity, kind)))
             .collect(),
     )
-}
-
-pub struct MinStat {
-    pub stat: StatKind,
-    pub min: f32,
-}
-
-impl Requirement for MinStat {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        effective(world, player, self.stat) >= self.min
-    }
-
-    fn describe(&self, _content: &Content) -> String {
-        format!("{} {}", self.min, self.stat.of(self.min).label())
-    }
-}
-
-pub enum Heal {
-    By(f32),
-    Fully,
-}
-
-impl Outcome for Heal {
-    fn apply(&self, ctx: &mut RuleContext) {
-        match self {
-            Heal::By(amount) => heal(ctx.world, ctx.player, *amount),
-            Heal::Fully => refill(ctx.world, ctx.player),
-        }
-    }
 }

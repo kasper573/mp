@@ -24,8 +24,7 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
     app.replicate::<Position>()
-        .add_client_message::<MoveRequest>(Channel::Ordered)
-        .add_client_message::<MoveToPortal>(Channel::Ordered);
+        .add_client_message::<MoveRequest>(Channel::Ordered);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -36,12 +35,6 @@ pub struct Position {
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MoveRequest {
     pub pos: Pos<Tiles>,
-}
-
-#[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct MoveToPortal {
-    pub pos: Pos<Tiles>,
-    pub portal: u32,
 }
 
 pub fn position(world: &World, entity: Entity) -> Option<Pos<Tiles>> {
@@ -97,32 +90,21 @@ pub struct MoveTarget {
     pub pos: Pos<Tiles>,
 }
 
-#[derive(Component, Clone, Debug, PartialEq)]
-pub struct DesiredPortal {
-    pub index: u32,
-}
-
 pub fn move_request(world: &mut World) {
     for request in crate::systems::requests::<MoveRequest>(world) {
-        if let Some(entity) = retarget(world, request.client_id, request.message.pos) {
-            world.entity_mut(entity).remove::<DesiredPortal>();
-        }
-    }
-}
-
-pub fn move_to_portal(world: &mut World) {
-    for request in crate::systems::requests::<MoveToPortal>(world) {
-        if let Some(entity) = retarget(world, request.client_id, request.message.pos) {
-            world.entity_mut(entity).insert(DesiredPortal {
-                index: request.message.portal,
-            });
-        }
+        retarget(world, request.client_id, request.message.pos);
     }
 }
 
 pub fn forget(world: &mut World, entity: Entity) {
-    world.entity_mut(entity).remove::<DesiredPortal>();
     halt(world, entity);
+}
+
+pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
+    forget(world, entity);
+    if let Some(mut position) = world.get_mut::<Position>(entity) {
+        position.pos = pos;
+    }
 }
 
 pub fn halt(world: &mut World, entity: Entity) {
@@ -304,7 +286,6 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
         if arrived {
             world.entity_mut(id).remove::<(MoveTarget, Path)>();
         }
-        cross_portal(world, id);
     }
 }
 
@@ -320,45 +301,6 @@ fn route(world: &World, entity: Entity, goal: Pos<Tiles>) -> Option<Vec<CellPos>
     }
     path.reverse();
     Some(path)
-}
-
-fn cross_portal(world: &mut World, entity: Entity) {
-    let Some(want) = world.get::<DesiredPortal>(entity).map(|d| d.index as usize) else {
-        return;
-    };
-    let Some(area_id) = world.get::<area::AreaTag>(entity).map(|tag| tag.area) else {
-        return;
-    };
-    let area = area::load(world.resource::<AssetService>(), area_id);
-    let Some(portal) = area.portals.get(want) else {
-        world.entity_mut(entity).remove::<DesiredPortal>();
-        return;
-    };
-    let Some(at) = position(world, entity) else {
-        return;
-    };
-    if !portal.rect.contains(at) {
-        return;
-    }
-    if !area::warp::passable(world, entity, area_id, portal) {
-        world.entity_mut(entity).remove::<DesiredPortal>();
-        return;
-    }
-    relocate(world, entity, portal.dest_area, portal.dest);
-}
-
-fn relocate(world: &mut World, entity: Entity, dest_area: area::Id, dest: Pos<Tiles>) {
-    let current = world.get::<area::AreaTag>(entity).map(|tag| tag.area);
-    if current == Some(dest_area) {
-        if let Some(mut position) = world.get_mut::<Position>(entity) {
-            position.pos = dest;
-        }
-    } else {
-        world
-            .entity_mut(entity)
-            .insert(crate::systems::area::transition::Crossing { dest_area, dest });
-    }
-    reach::forget(world, entity);
 }
 
 /// Teleport a player.
@@ -392,7 +334,14 @@ fn teleport(
             size.width, size.height
         ));
     }
-    relocate(world, target, dest_area, Pos::new(x, y));
+    crate::systems::area::warp::warp(
+        world,
+        target,
+        crate::systems::script::Place {
+            area: dest_area,
+            at: Pos::new(x, y),
+        },
+    )?;
     Ok(format!("teleported to {x},{y} in {dest_area:?}"))
 }
 

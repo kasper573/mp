@@ -63,7 +63,7 @@ pub struct Attackers {
 #[derive(Message, Clone, Debug, PartialEq)]
 pub struct Died {
     pub entity: Entity,
-    pub killer: Entity,
+    pub killer: Option<Entity>,
 }
 
 #[derive(Component, Clone, Debug, PartialEq)]
@@ -130,12 +130,34 @@ pub fn combat(
     swings: &mut QueryState<Entity, With<Swing>>,
 ) {
     let time = Seconds(world.resource::<Time>().elapsed_secs());
-    let mut deaths = Vec::new();
     engage(world, time, intents);
-    progress_swings(world, time, &mut deaths, swings);
-    for (entity, killer) in deaths {
-        world.write_message(Died { entity, killer });
+    progress_swings(world, time, swings);
+}
+
+pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) -> bool {
+    if world.get_entity(target).is_err() || stat::is_dead(world, target) {
+        return false;
     }
+    let time = Seconds(world.resource::<Time>().elapsed_secs());
+    if let Some(attacker) = attacker {
+        add_attacker(world, target, attacker);
+        crate::systems::item::reserve(world, target, attacker, time);
+        crate::systems::npc::attacked(world, target, attacker);
+    }
+    stat::apply_damage(world, target, damage);
+    if !stat::is_dead(world, target) {
+        return false;
+    }
+    if let Some(mut actor) = world.get_mut::<Actor>(target) {
+        set_action(&mut actor, Action::Dead);
+    }
+    reach::forget(world, target);
+    world.entity_mut(target).remove::<Attackers>();
+    world.write_message(Died {
+        entity: target,
+        killer: attacker,
+    });
+    true
 }
 
 fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
@@ -184,12 +206,7 @@ fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
     }
 }
 
-fn progress_swings(
-    world: &mut World,
-    time: Seconds,
-    deaths: &mut Vec<(Entity, Entity)>,
-    swings: &mut QueryState<Entity, With<Swing>>,
-) {
+fn progress_swings(world: &mut World, time: Seconds, swings: &mut QueryState<Entity, With<Swing>>) {
     let ids: Vec<Entity> = swings.iter(world).collect();
     for id in ids {
         if stat::is_dead(world, id)
@@ -206,7 +223,7 @@ fn progress_swings(
             continue;
         };
         if !swing.struck && time >= swing.hit_at {
-            strike(world, id, swing.target, deaths, time);
+            strike(world, id, swing.target);
             if let Some(mut swing) = world.get_mut::<Swing>(id) {
                 swing.struck = true;
             }
@@ -222,30 +239,14 @@ fn progress_swings(
     }
 }
 
-fn strike(
-    world: &mut World,
-    attacker: Entity,
-    target: Entity,
-    deaths: &mut Vec<(Entity, Entity)>,
-    time: Seconds,
-) {
+fn strike(world: &mut World, attacker: Entity, target: Entity) {
     let same_area = world.get::<AreaTag>(attacker).map(|t| t.area)
         == world.get::<AreaTag>(target).map(|t| t.area);
-    if world.get_entity(target).is_err() || stat::is_dead(world, target) || !same_area {
+    if !same_area {
         return;
     }
     let damage = stat::effective(world, attacker, StatKind::Damage);
-    add_attacker(world, target, attacker);
-    crate::systems::item::reserve(world, target, attacker, time);
-    stat::apply_damage(world, target, damage);
-    if stat::is_dead(world, target) {
-        if let Some(mut actor) = world.get_mut::<Actor>(target) {
-            set_action(&mut actor, Action::Dead);
-        }
-        reach::forget(world, target);
-        world.entity_mut(target).remove::<Attackers>();
-        deaths.push((target, attacker));
-    }
+    inflict(world, target, Some(attacker), damage);
 }
 
 fn attack_timing(world: &World, entity: Entity, dir: Direction) -> crate::systems::actor::Timing {

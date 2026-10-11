@@ -33,7 +33,14 @@ fn boot() {
     let mut app = App::new();
     let assets = crate::assets::service();
     let fonts = systems::interface::font_files(assets.content());
-    app.insert_resource(assets.content().clone());
+    let scripts =
+        game::systems::script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
+    app.insert_resource(game::systems::quest::Parties::of(
+        assets.content(),
+        &scripts,
+    ));
+    app.insert_resource(scripts);
+    app.insert_resource(*assets.content());
     app.insert_resource(assets);
     app.insert_resource(game::data::settings());
     app.insert_resource(Rng::from_entropy());
@@ -75,7 +82,7 @@ fn boot() {
             systems::movement::MovementPlugin,
             systems::combat::render::CombatPlugin,
             systems::item::render::ItemsPlugin,
-            systems::prop::render::PropPlugin,
+            systems::area::object::render::ObjectPlugin,
             systems::view::ViewPlugin,
             systems::player::session::ClientSessionPlugin,
             systems::input::InputPlugin,

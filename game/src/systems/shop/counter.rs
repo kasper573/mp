@@ -97,7 +97,7 @@ fn forget(mut browse: ResMut<Browse>) {
 }
 
 fn show_counter(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let shop = view(world).map(|shown| shown.shop);
     let panel = world
         .query_filtered::<Entity, With<CounterPanel>>()
@@ -174,7 +174,7 @@ fn counter(playing: bool) -> Box<dyn Scene> {
 }
 
 fn sync_counter(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(shown) = view(world).cloned() else {
         return;
     };
@@ -708,7 +708,7 @@ fn selling(world: &World) -> bool {
 }
 
 fn request_sale(world: &mut World, slot: u32) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     if *world.resource::<Mode>() != Mode::Play {
         return;
     }
@@ -733,7 +733,7 @@ fn request_sale(world: &mut World, slot: u32) {
 }
 
 fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemStack], slot: u32) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let name = stack.item.get(&content).name;
     let dialog = ui::confirm_dialog(ConfirmOptions {
         title: format!("Sell {name}?"),

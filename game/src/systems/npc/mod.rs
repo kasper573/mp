@@ -1,22 +1,7 @@
-mod aggressive;
-mod defensive;
-mod observation;
-mod pacifist;
-mod protective;
-mod stands;
-mod strolls;
-mod summon;
+pub mod body;
+pub mod summon;
 
-pub use aggressive::Aggressive;
-pub use defensive::Defensive;
-pub use observation::{Observation, Observed, observe};
-pub use pacifist::Pacifist;
-pub use protective::Protective;
-pub use stands::Stands;
-pub use strolls::Strolls;
-pub use summon::{ShownFor, SpawnNear, SpawnNpcs, Summoned, TurnHostile, dismiss};
-
-use std::collections::HashMap;
+pub use summon::{Despawn, SetAttitude, ShownFor, SpawnNear, SpawnNpcs, Summoned, dismiss, summon};
 
 use bevy_app::App;
 use bevy_ecs::message::{MessageCursor, Messages};
@@ -30,113 +15,45 @@ use crate::core::assets::AssetService;
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{Content, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rect, Rng};
+use crate::core::script::{Owner, OwnerKind, OwnerRow};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::data;
 use crate::systems::actor::{self, Action, Actor, Hitbox, Rgba, Tint, set_action};
-use crate::systems::area::{self, AreaTag, Wild};
-use crate::systems::combat::{Attackers, Attitude};
+use crate::systems::area::{self, AreaModule, AreaTag, Wild};
+use crate::systems::combat::{Attitude, Died};
+use crate::systems::dialogue;
 use crate::systems::effect::{self, Effect, TimedEffects};
-use crate::systems::interact::{self, Counterpart, Interaction, Interactive};
+use crate::systems::interact::{self, Interactive};
 use crate::systems::item::Reservation;
-use crate::systems::movement::{Grid, MoveTarget, Path, Position, position};
+use crate::systems::movement::{Position, position};
 use crate::systems::player::Players;
 use crate::systems::reach::{self, ReachAct};
-use crate::systems::rewards::KillCredited;
-use crate::systems::rule::{Encounter, Outcome, Terms};
+use crate::systems::script::condition::CompiledCondition;
+use crate::systems::script::query::ActorRoster;
+use crate::systems::script::{
+    self, EventKind, RiftEvent, RiftInstances, RiftScripts, ScriptModule,
+};
 use crate::systems::stat::{self, Stat, StatKind, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
 const CORPSE_LINGER: Seconds = Seconds(5.0);
-const LEASH_TRIES: u32 = 16;
+pub const FARTHEST_NEAR: Tiles = Tiles(32.0);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Npc>();
     effect::source(app, chase);
-    interact::interaction_source(app, interaction);
-    let content = app.world().resource::<Content>().clone();
-    area::lock_warps(
-        app,
-        content
-            .table::<NpcDef>()
-            .rows()
-            .iter()
-            .flat_map(|def| def.guards.iter().copied()),
-    );
-}
-
-pub fn conversation_starts(content: &Content) -> Vec<data::dialogue::Id> {
-    let npcs = content.table::<NpcDef>().rows();
-    npcs.iter()
-        .flat_map(|def| {
-            def.interaction
-                .iter()
-                .flat_map(|interaction| interact::conversation_starts(content, interaction))
-        })
-        .chain(observation::starts(content))
-        .chain(
-            npcs.iter()
-                .flat_map(|def| def.on_defeat)
-                .flat_map(|outcome| outcome.leads_to(content)),
-        )
-        .collect()
 }
 
 pub fn check(assets: &AssetService) {
     let content = assets.content();
-    let npcs = content.table::<NpcDef>().rows();
-    let outcomes = npcs.iter().flat_map(|def| {
-        def.interaction
-            .iter()
-            .flat_map(|interaction| interaction.responses)
-            .flat_map(|response| response.then)
-            .chain(
-                def.observations
-                    .iter()
-                    .flat_map(|observation| observation.then),
-            )
-            .chain(def.on_defeat)
-    });
-    for outcome in outcomes {
-        outcome.check(assets);
-    }
-    for lock in npcs.iter().flat_map(|def| def.guards) {
-        lock.check(assets);
-    }
     for speaker in crate::systems::notification::speakers(content) {
         if speaker.get(content).voice().is_none() {
             panic!("notification speaker {speaker:?} has no babble");
         }
     }
-}
-
-pub fn defeated(world: &mut World, mut credits: Local<MessageCursor<KillCredited>>) {
-    let content = world.resource::<Content>().clone();
-    let credits: Vec<KillCredited> = credits
-        .read(world.resource::<Messages<KillCredited>>())
-        .copied()
-        .collect();
-    for credit in credits {
-        let terms = Terms {
-            requires: &[],
-            costs: &[],
-            outcomes: credit.npc.get(&content).on_defeat,
-        };
-        let encounter = Encounter {
-            with: Some(credit.victim),
-            tether: None,
-        };
-        terms.settle(world, credit.credited, encounter).ok();
-    }
-}
-
-fn interaction(world: &World, entity: Entity) -> Option<Interaction> {
-    let content = world.resource::<Content>();
-    let def = world.get::<Npc>(entity)?.def.get(content);
-    let friendly = world.get::<Attitude>(entity) == Some(&Attitude::Friendly);
-    def.interaction.filter(|_| friendly)
 }
 
 pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
@@ -168,19 +85,15 @@ pub struct DeadAt {
     pub at: Seconds,
 }
 
+#[derive(Component, Default)]
+pub struct Near(Vec<Entity>);
+
 #[derive(Clone)]
 pub struct NpcDef {
     pub name: &'static str,
     pub model: data::model::Id,
     pub stats: &'static [Stat],
     pub modules: &'static [NpcModule],
-    pub attitude: Attitude,
-    pub ai: &'static dyn Ai,
-    pub aggro: Tiles,
-    pub interaction: Option<Interaction>,
-    pub observations: &'static [Observation],
-    pub guards: &'static [area::WarpLock],
-    pub on_defeat: &'static [&'static dyn Outcome],
 }
 
 impl ContentRow for NpcDef {
@@ -194,18 +107,22 @@ impl ModuleSet for NpcDef {
         self.modules
     }
 
-    fn rule(_: &NpcModule) -> ModuleRule {
-        ModuleRule::AtMostOne
+    fn rule(module: &NpcModule) -> ModuleRule {
+        match module {
+            NpcModule::Script(_) => ModuleRule::AnyNumber,
+            _ => ModuleRule::AtMostOne,
+        }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum NpcModule {
     Nameplate(Nameplate),
     Tint(Tint),
     Voice(Voice),
     Respawn(Respawn),
     Loot(Loot),
+    Script(ScriptModule),
 }
 
 #[derive(Clone, Copy)]
@@ -274,6 +191,16 @@ impl NpcDef {
             _ => None,
         })
     }
+
+    pub fn scripts(&self) -> Vec<ScriptModule> {
+        self.modules
+            .iter()
+            .filter_map(|module| match module {
+                NpcModule::Script(script) => Some(script.clone()),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 #[derive(Resource, Default)]
@@ -286,31 +213,28 @@ pub fn next_pack(world: &mut World) -> Pack {
 }
 
 pub fn spawn_all(world: &mut World) {
-    let content = world.resource::<Content>().clone();
-    let area_id = world.resource::<crate::systems::WorldArea>().0;
+    let content = *world.resource::<Content>();
+    let area_id = world.resource::<WorldArea>().0;
     let assets = world.resource::<AssetService>().clone();
     let def = area_id.get(&content);
-    world.resource_scope(|world, mut rng: Mut<Rng>| {
-        for population in def.populations {
-            let pack = next_pack(world);
-            for _ in 0..population.count {
-                spawn_wild(world, &assets, &mut rng, area_id, population, pack);
+    for module in def.modules {
+        match module {
+            AreaModule::Population { npc, count, roams } => {
+                let pack = next_pack(world);
+                for _ in 0..*count {
+                    spawn_wild(world, &assets, area_id, *npc, *roams, pack);
+                }
             }
-        }
-    });
-    let area = area::load(&assets, area_id);
-    for resident in def.residents {
-        let at = area
-            .marker(resident.at)
-            .expect("validated at startup: residents stand on markers")
-            .center();
-        let pack = next_pack(world);
-        let entity = spawn(world, resident.npc, at, area_id, pack);
-        world.entity_mut(entity).insert(Home(at));
-        if !resident.shown.is_empty() {
-            world
-                .entity_mut(entity)
-                .insert(Presence::When(resident.shown));
+            AreaModule::Resident { npc, at, shown } => {
+                let pack = next_pack(world);
+                let entity = spawn(world, *npc, *at, area_id, pack);
+                world.entity_mut(entity).insert(Home(*at));
+                if let Some(shown) = shown {
+                    let shown = CompiledCondition::new(world.resource::<Content>(), shown);
+                    world.entity_mut(entity).insert(Presence::When(shown));
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -318,21 +242,23 @@ pub fn spawn_all(world: &mut World) {
 fn spawn_wild(
     world: &mut World,
     assets: &AssetService,
-    rng: &mut Rng,
     area_id: area::Id,
-    population: &area::Population,
+    npc: data::npc::Id,
+    roams: Option<Rect<Tiles>>,
     pack: Pack,
 ) {
     let area = area::load(assets, area_id);
-    let range = population.roams.and_then(|name| area.range(name));
-    let at = match range {
-        Some(bounds) => area.wild_grid.random_node_within(rng, bounds),
-        None => area.wild_grid.random_node(rng),
+    let at = {
+        let mut rng = world.resource_mut::<Rng>();
+        match roams {
+            Some(bounds) => area.wild_grid.random_node_within(&mut rng, bounds),
+            None => area.wild_grid.random_node(&mut rng),
+        }
     }
     .expect("validated at startup: populations have ground outside the safe zones");
-    let entity = spawn(world, population.npc, at, area_id, pack);
+    let entity = spawn(world, npc, at, area_id, pack);
     world.entity_mut(entity).insert(Wild);
-    if let Some(bounds) = range {
+    if let Some(bounds) = roams {
         world.entity_mut(entity).insert(Roams(bounds));
     }
 }
@@ -351,24 +277,170 @@ pub fn spawn(
     area: area::Id,
     pack: Pack,
 ) -> Entity {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let entity = spawn_actor(world, def.get(&content), at, area);
     world.entity_mut(entity).insert((
         Npc { def },
-        Counterpart::Npc(def),
         pack,
-        def.get(&content).attitude,
+        Attitude::Friendly,
+        body::Body::default(),
         actor::Name {
             name: def.get(&content).name.to_owned(),
         },
     ));
-    if def.get(&content).interaction.is_some() {
-        world.entity_mut(entity).insert(Interactive);
-    }
     if let Some(babble) = def.get(&content).voice() {
         world.entity_mut(entity).insert(Babbler(babble));
     }
+    start_scripts(world, entity, def);
     entity
+}
+
+pub fn despawn(world: &mut World, npc: Entity) {
+    world
+        .resource_mut::<RiftInstances>()
+        .remove_owner(Owner::Entity(OwnerKind::Npc, npc));
+    world.despawn(npc);
+}
+
+pub fn attacked(world: &mut World, target: Entity, attacker: Entity) {
+    if world.get::<Npc>(target).is_none() {
+        return;
+    }
+    world.resource_mut::<RiftInstances>().raise(
+        Owner::Entity(OwnerKind::Npc, target),
+        EventKind::Attacked,
+        Some(attacker),
+        Vec::new(),
+        |_| true,
+    );
+}
+
+pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    let deaths: Vec<Died> = deaths
+        .read(world.resource::<Messages<Died>>())
+        .cloned()
+        .collect();
+    for died in deaths {
+        let is_npc = world.get::<Npc>(died.entity).is_some();
+        world.resource_mut::<RiftInstances>().raise(
+            Owner::Area,
+            EventKind::Died,
+            Some(died.entity),
+            Vec::new(),
+            move |event| match event {
+                RiftEvent::Died { by } => by.admits(is_npc),
+                _ => false,
+            },
+        );
+        if !is_npc {
+            continue;
+        }
+        let credited = match world.get::<Reservation>(died.entity) {
+            Some(reservation) if !reservation.expired(now) => match reservation.by {
+                crate::systems::item::ReservedBy::Account(client) => {
+                    world.resource::<Players>().0.get(&client).copied()
+                }
+                crate::systems::item::ReservedBy::None => None,
+            },
+            _ => None,
+        };
+        world.resource_mut::<RiftInstances>().raise(
+            Owner::Entity(OwnerKind::Npc, died.entity),
+            EventKind::Defeated,
+            credited,
+            Vec::new(),
+            |_| true,
+        );
+    }
+}
+
+type Listens = Vec<(Tiles, script::Who, Option<data::npc::Id>)>;
+type Watcher = (Entity, Pos<Tiles>, area::Id, Listens);
+
+pub fn approach(world: &mut World) {
+    let Some(roster) = world.get_resource::<ActorRoster>() else {
+        return;
+    };
+    let instances = world.resource::<RiftInstances>();
+    let watchers: Vec<Watcher> = instances
+        .owners_answering(EventKind::CameNear)
+        .iter()
+        .filter_map(|&owner| {
+            let Owner::Entity(OwnerKind::Npc, npc) = owner else {
+                return None;
+            };
+            let listed = roster.iter().find(|listed| listed.entity == npc)?;
+            if listed.dead {
+                return None;
+            }
+            let listens: Vec<_> = instances
+                .entries(owner, EventKind::CameNear)
+                .filter_map(|event| match event {
+                    RiftEvent::CameNear { within, by, npc } => Some((*within, *by, *npc)),
+                    _ => None,
+                })
+                .collect();
+            Some((npc, listed.at, listed.area, listens))
+        })
+        .collect();
+    if watchers.is_empty() {
+        return;
+    }
+    let approached: Vec<(Watcher, Vec<Entity>)> = watchers
+        .into_iter()
+        .map(|watcher| {
+            let (npc, at, area, ref listens) = watcher;
+            let farthest = listens
+                .iter()
+                .map(|(within, ..)| within.0)
+                .fold(0.0, f32::max);
+            let mut now: Vec<Entity> = roster
+                .iter()
+                .filter(|listed| {
+                    listed.entity != npc
+                        && listed.area == area
+                        && !listed.dead
+                        && listed.at.distance(at) <= Tiles(farthest)
+                        && visibility::coexist(world, npc, listed.entity)
+                        && !dialogue::in_conversation(world, listed.entity)
+                })
+                .map(|listed| listed.entity)
+                .collect();
+            now.sort_unstable();
+            (watcher, now)
+        })
+        .collect();
+    for ((npc, at, ..), now) in approached {
+        let before: Vec<Entity> = world
+            .get::<Near>(npc)
+            .map(|near| near.0.clone())
+            .unwrap_or_default();
+        if now == before {
+            continue;
+        }
+        for &other in now.iter().filter(|other| !before.contains(other)) {
+            let is_npc = world.get::<Npc>(other).is_some();
+            let def = world.get::<Npc>(other).map(|npc| npc.def);
+            let distance =
+                position(world, other).map_or(Tiles(f32::MAX), |there| there.distance(at));
+            world.resource_mut::<RiftInstances>().raise(
+                Owner::Entity(OwnerKind::Npc, npc),
+                EventKind::CameNear,
+                Some(other),
+                Vec::new(),
+                move |event| match event {
+                    RiftEvent::CameNear { within, by, npc } => {
+                        distance <= *within
+                            && by.admits(is_npc)
+                            && npc.is_none_or(|npc| Some(npc) == def)
+                    }
+                    _ => false,
+                },
+            );
+        }
+        world.entity_mut(npc).insert(Near(now));
+    }
 }
 
 fn character(assets: &AssetService, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Character {
@@ -389,167 +461,43 @@ fn character(assets: &AssetService, def: &NpcDef, at: Pos<Tiles>, area: area::Id
     }
 }
 
-pub trait Ai: Send + Sync {
-    fn wanders(&self, rng: &mut Rng) -> bool;
-    fn target(&self, hunt: &Hunt) -> Option<Entity>;
-    fn leash(&self) -> Option<Tiles> {
-        None
-    }
-}
-
-pub struct Hunt<'a> {
-    pub world: &'a World,
-    pub players: &'a [Entity],
-    pub enemies_by_pack: &'a HashMap<Pack, Vec<Entity>>,
-    pub id: Entity,
-    pub pack: Pack,
-    pub at: Pos<Tiles>,
-    pub area: area::Id,
-    pub shelter: Option<&'a area::Area>,
-    pub aggro: Tiles,
-}
-
-impl Hunt<'_> {
-    pub fn nearest(
-        &self,
-        candidates: &[Entity],
-        accept: impl Fn(Entity) -> bool,
-    ) -> Option<Entity> {
-        let mut best: Option<(Entity, Tiles)> = None;
-        for &candidate in candidates {
-            if stat::is_dead(self.world, candidate)
-                || self.world.get::<AreaTag>(candidate).map(|t| t.area) != Some(self.area)
-                || !visibility::coexist(self.world, self.id, candidate)
-                || !accept(candidate)
-            {
-                continue;
-            }
-            if let Some(at) = position(self.world, candidate) {
-                let distance = self.at.distance(at);
-                if distance <= self.aggro
-                    && best.is_none_or(|(_, best)| distance < best)
-                    && !self.shelter.is_some_and(|region| region.safe(at))
-                {
-                    best = Some((candidate, distance));
-                }
-            }
+fn start_scripts(world: &mut World, entity: Entity, def: data::npc::Id) {
+    let procedures = world
+        .resource::<RiftScripts>()
+        .of(OwnerRow {
+            kind: OwnerKind::Npc,
+            row: def.raw(),
+            object: None,
+        })
+        .to_vec();
+    let owner = Owner::Entity(OwnerKind::Npc, entity);
+    let interactive = procedures
+        .iter()
+        .flat_map(|procedure| procedure.entry(EventKind::Interacted))
+        .find_map(|(_, event)| match event {
+            RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
+                verb: *verb,
+                reach: *reach,
+            }),
+            _ => None,
+        });
+    match interactive {
+        Some(interactive) => {
+            world.entity_mut(entity).insert(interactive);
         }
-        best.map(|(entity, _)| entity)
+        None => {
+            world.entity_mut(entity).remove::<Interactive>();
+        }
     }
+    let mut instances = world.resource_mut::<RiftInstances>();
+    instances.spawn_owner(owner, procedures);
+    instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
 }
 
 type NpcIds = QueryState<Entity, With<Npc>>;
-type PackEnemies = QueryState<(&'static Pack, &'static Attackers)>;
-
-pub fn run_ai(world: &mut World, npcs: &mut NpcIds, enemies: &mut PackEnemies) {
-    let content = world.resource::<Content>().clone();
-    let players: Vec<Entity> = world.resource::<Players>().0.values().copied().collect();
-    let assets = world.resource::<AssetService>().clone();
-    let enemies_by_pack = enemies_by_pack(world, enemies);
-    let region = area::load(&assets, world.resource::<WorldArea>().0);
-    let ids: Vec<Entity> = npcs.iter(world).collect();
-    world.resource_scope(|world, mut rng: Mut<Rng>| {
-        for id in ids {
-            if stat::is_dead(world, id) {
-                reach::forget(world, id);
-                continue;
-            }
-            let (Some(npc), Some(&pack)) = (world.get::<Npc>(id).copied(), world.get::<Pack>(id))
-            else {
-                continue;
-            };
-            let Some(at) = position(world, id) else {
-                continue;
-            };
-            let def = npc.def.get(&content);
-            let Some(area) = world.get::<AreaTag>(id).map(|tag| tag.area) else {
-                continue;
-            };
-            let wild = area::wild(world, id);
-            let shelter = wild.then_some(region);
-
-            if let Some(target) = reach::intent(world, id, ReachAct::Attack) {
-                if in_aggro(world, target, at, area, def.aggro)
-                    && !sheltered(world, shelter, target)
-                {
-                    continue;
-                }
-                reach::forget(world, id);
-            }
-            let target = {
-                let hunt = Hunt {
-                    world,
-                    players: &players,
-                    enemies_by_pack: &enemies_by_pack,
-                    id,
-                    pack,
-                    at,
-                    area,
-                    shelter,
-                    aggro: def.aggro,
-                };
-                def.ai.target(&hunt)
-            };
-            if let Some(target) = target {
-                reach::intend(world, id, target, ReachAct::Attack);
-                continue;
-            }
-            idle_wander(world, &mut rng, id, def, region.grid_for(wild));
-        }
-    });
-}
-
-fn idle_wander(world: &mut World, rng: &mut Rng, id: Entity, def: &NpcDef, grid: &Grid) {
-    if world.get::<MoveTarget>(id).is_some() || world.get::<Path>(id).is_some() {
-        return;
-    }
-    if !def.ai.wanders(rng) {
-        return;
-    }
-    let Some(at) = position(world, id) else {
-        return;
-    };
-    let node = match (
-        def.ai.leash(),
-        world.get::<Home>(id),
-        world.get::<Roams>(id),
-    ) {
-        (Some(leash), Some(&Home(home)), _) => (0..LEASH_TRIES)
-            .filter_map(|_| grid.random_reachable(rng, at))
-            .find(|node| node.distance(home) <= leash),
-        (_, _, Some(&Roams(bounds))) => grid.random_reachable_within(rng, at, bounds),
-        _ => grid.random_reachable(rng, at),
-    };
-    if let Some(node) = node {
-        world.entity_mut(id).insert(MoveTarget { pos: node });
-    }
-}
-
-fn enemies_by_pack(world: &mut World, query: &mut PackEnemies) -> HashMap<Pack, Vec<Entity>> {
-    let mut by_pack: HashMap<Pack, Vec<Entity>> = HashMap::new();
-    for (&pack, attackers) in query.iter(world) {
-        let list = by_pack.entry(pack).or_default();
-        for attacker in &attackers.ids {
-            if !list.contains(attacker) {
-                list.push(*attacker);
-            }
-        }
-    }
-    by_pack
-}
-
-fn sheltered(world: &World, shelter: Option<&area::Area>, target: Entity) -> bool {
-    shelter.is_some_and(|region| position(world, target).is_some_and(|at| region.safe(at)))
-}
-
-fn in_aggro(world: &World, target: Entity, at: Pos<Tiles>, area: area::Id, aggro: Tiles) -> bool {
-    !stat::is_dead(world, target)
-        && world.get::<AreaTag>(target).map(|t| t.area) == Some(area)
-        && position(world, target).is_some_and(|p| at.distance(p) <= aggro)
-}
 
 pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let time = Seconds(world.resource::<Time>().elapsed_secs());
     let ids: Vec<Entity> = npcs.iter(world).collect();
     world.resource_scope(|world, mut rng: Mut<Rng>| {
@@ -562,15 +510,19 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 Some(dead) => dead.at,
                 None => {
                     world.entity_mut(id).insert(DeadAt { at: time });
+                    world
+                        .resource_mut::<RiftInstances>()
+                        .remove_owner(Owner::Entity(OwnerKind::Npc, id));
                     time
                 }
             };
-            let Some(def) = world.get::<Npc>(id).map(|npc| npc.def.get(&content)) else {
+            let Some(npc) = world.get::<Npc>(id).map(|npc| npc.def) else {
                 continue;
             };
+            let def = npc.get(&content);
             let Some(delay) = def.respawn() else {
                 if time - since >= CORPSE_LINGER {
-                    world.entity_mut(id).despawn();
+                    world.despawn(id);
                 }
                 continue;
             };
@@ -595,12 +547,17 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
             }
             world
                 .entity_mut(id)
-                .insert(def.attitude)
+                .insert((Attitude::Friendly, body::Body::default(), Near::default()))
                 .remove::<DeadAt>()
                 .remove::<Reservation>()
                 .remove::<TimedEffects>();
             stat::refill(world, id);
             reach::forget(world, id);
+            start_scripts(world, id, npc);
         }
     });
+}
+
+pub fn interaction_of(world: &World, entity: Entity) -> Option<Interactive> {
+    interact::interaction_of(world, entity)
 }

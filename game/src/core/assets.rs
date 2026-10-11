@@ -1,4 +1,5 @@
 use std::any::{Any, TypeId};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
@@ -26,6 +27,12 @@ impl AssetSource for FilesystemSource {
 }
 
 type Cache = Mutex<HashMap<(AssetRef, TypeId), &'static (dyn Any + Send + Sync)>>;
+
+type Built = &'static (dyn Any + Send + Sync);
+
+thread_local! {
+    static MEMO: RefCell<HashMap<(usize, AssetRef, TypeId), Built>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Resource, Clone)]
 pub struct AssetService {
@@ -60,7 +67,17 @@ impl AssetService {
         build: impl FnOnce(&AssetService, AssetRef) -> T,
     ) -> &'static T {
         let slot = (asset_ref, TypeId::of::<T>());
-        if let Some(&cached) = self.cache.lock().expect("asset cache").get(&slot) {
+        let memo_slot = (
+            Arc::as_ptr(&self.cache) as usize,
+            asset_ref,
+            TypeId::of::<T>(),
+        );
+        let memoed = MEMO.with(|memo| memo.borrow().get(&memo_slot).copied());
+        let cached = memoed.or_else(|| self.cache.lock().expect("asset cache").get(&slot).copied());
+        if let Some(cached) = cached {
+            if memoed.is_none() {
+                MEMO.with(|memo| memo.borrow_mut().insert(memo_slot, cached));
+            }
             return cached
                 .downcast_ref::<T>()
                 .expect("asset resolved under one type");

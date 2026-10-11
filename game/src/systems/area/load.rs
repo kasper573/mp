@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use tiled::{LayerType, PropertyValue};
 
-use super::{Area, Group, MapMarker, Portal, RenderLayer, TileRef, cell_overlap};
+use super::{Area, Group, RenderLayer, TileRef, cell_overlap};
 use crate::core::assets::{AssetRef, AssetService};
 use crate::core::audio::playback::{SfxDef, SfxId};
 use crate::core::audio::soundscape::{SoundscapeChannel, SoundscapeShape, SoundscapeZone};
@@ -24,13 +24,11 @@ fn build_from_map(content: &Content, name: &str, map: tiled::Map) -> Area {
     let tiling = PixelsPerTile::new(Size::new(map.tile_width as f32, map.tile_height as f32));
     let size = Size::new(map.width as f32, map.height as f32);
 
-    let mut tiles = TilePalette::new(content.clone());
+    let mut tiles = TilePalette::new(*content);
     let mut layers = Vec::new();
     let mut start = None;
-    let mut portals = Vec::new();
     let mut obscuring_rects = Vec::new();
     let mut safe_zones = Vec::new();
-    let mut markers = HashMap::new();
     let mut soundscape = Vec::new();
 
     for layer in map.layers() {
@@ -67,40 +65,6 @@ fn build_from_map(content: &Content, name: &str, map: tiled::Map) -> Area {
                     }
                     match object.user_type.as_str() {
                         "start" => start = Some(tiling.tile_center(pos)),
-                        "warp" => {
-                            let goto = match object.properties.get("goto") {
-                                Some(PropertyValue::StringValue(goto)) => goto,
-                                _ => panic!(
-                                    "map '{name}': warp {} lacks a goto property",
-                                    object.id()
-                                ),
-                            };
-                            if object.name.is_empty() {
-                                panic!("map '{name}': warp {} needs a name", object.id());
-                            }
-                            let warp = portal(
-                                content,
-                                name,
-                                &object.name,
-                                goto,
-                                pos,
-                                &object.shape,
-                                tiling,
-                            );
-                            mark(&mut markers, name, &object.name, MapMarker::Rect(warp.rect));
-                            portals.push(warp);
-                        }
-                        "marker" => {
-                            let marker = match object.shape {
-                                tiled::ObjectShape::Point(..) => {
-                                    MapMarker::Point(tiling.tile_center(pos))
-                                }
-                                _ => MapMarker::Rect(
-                                    tiling.rect(Rect::new(pos, shape_size(&object.shape))),
-                                ),
-                            };
-                            mark(&mut markers, name, &object.name, marker);
-                        }
                         "safe-zone" => {
                             safe_zones.push(tiling.rect(Rect::new(pos, shape_size(&object.shape))))
                         }
@@ -131,6 +95,7 @@ fn build_from_map(content: &Content, name: &str, map: tiled::Map) -> Area {
     let grid = movement::Grid::new(size.grid(), walkable);
     let wild_grid = movement::Grid::new(size.grid(), wild_walkable);
     let airspace = movement::Grid::new(size.grid(), vec![true; outside_safe_zones.len()]);
+    let safe_cells = outside_safe_zones.iter().map(|outside| !outside).collect();
     let wild_airspace = movement::Grid::new(size.grid(), outside_safe_zones);
     let (groups, grouped_cells) = compute_groups(&layers, &tiles);
     let tile_sfx = tile_sfx(size, &layers, &tiles);
@@ -142,14 +107,13 @@ fn build_from_map(content: &Content, name: &str, map: tiled::Map) -> Area {
         airspace,
         wild_airspace,
         safe_zones,
+        safe_cells,
         tile_sfx,
         spawn,
-        portals,
         obscuring_rects,
         groups,
         grouped_cells,
         layers,
-        markers,
         soundscape,
         map: std::sync::Arc::new(map),
     }
@@ -236,12 +200,6 @@ fn shape_size(shape: &tiled::ObjectShape) -> Size<WorldPx> {
     }
 }
 
-fn mark(markers: &mut HashMap<String, MapMarker>, map: &str, name: &str, marker: MapMarker) {
-    if markers.insert(name.to_owned(), marker).is_some() {
-        panic!("map '{map}': '{name}' is placed twice");
-    }
-}
-
 fn soundscape_zone(map: &str, object: &tiled::Object, tiling: PixelsPerTile) -> SoundscapeZone {
     let id = object.id();
     let bounds = tiling.rect(Rect::new(
@@ -288,35 +246,6 @@ fn soundscape_zone(map: &str, object: &tiled::Object, tiling: PixelsPerTile) -> 
         shape,
         emit,
         channels,
-    }
-}
-
-fn portal(
-    content: &Content,
-    name: &str,
-    warp: &str,
-    goto: &str,
-    pos: Pos<WorldPx>,
-    shape: &tiled::ObjectShape,
-    tiling: PixelsPerTile,
-) -> Portal {
-    let malformed = || -> ! { panic!("map '{name}': goto '{goto}' must be '<area>, x, y'") };
-    let mut parts = goto.split(',');
-    let dest = parts.next().unwrap_or_else(|| malformed()).trim();
-    let dest_area = content
-        .by_key::<super::AreaDef>(key_of(dest).as_str())
-        .unwrap_or_else(|| panic!("map '{name}': goto '{dest}' is not a known area"));
-    let mut coord = || -> f32 {
-        parts
-            .next()
-            .and_then(|part| part.trim().parse().ok())
-            .unwrap_or_else(|| malformed())
-    };
-    Portal {
-        name: warp.to_owned(),
-        rect: tiling.rect(Rect::new(pos, shape_size(shape))),
-        dest_area,
-        dest: Pos::new(coord(), coord()),
     }
 }
 

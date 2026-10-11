@@ -1,75 +1,75 @@
-use crate::core::time::Seconds;
-use crate::systems::memory::{MemoryDef, MemoryKind, Resets};
+use crate::core::script::ValueType;
+use crate::systems::memory::{MemoryDef, Resets};
 
 crate::table! {
     TobbVisits: MemoryDef {
         label: "Visits to Tobb",
-        kind: MemoryKind::Counter { step_every: Seconds(600.0) },
+        ty: ValueType::Integer,
         resets: Resets::Never,
     },
     TobbGaveLure: MemoryDef {
         label: "Tobb's lucky lure",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     TobbNewsToday: MemoryDef {
         label: "Heard Tobb's news today",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Daily,
     },
     TideChestLooted: MemoryDef {
         label: "Emptied the tide chest today",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Daily,
     },
     InnFavour: MemoryDef {
         label: "Favour at the inn",
-        kind: MemoryKind::Counter { step_every: Seconds(300.0) },
+        ty: ValueType::Integer,
         resets: Resets::Never,
     },
     PellGrudge: MemoryDef {
         label: "Pell's grudge",
-        kind: MemoryKind::Timer(Seconds(1_800.0)),
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     PellFighting: MemoryDef {
         label: "Fighting Pell",
-        kind: MemoryKind::Flag,
-        resets: Resets::OnLeavingArea,
+        ty: ValueType::Boolean,
+        resets: Resets::LeavingArea,
     },
     PellDead: MemoryDef {
         label: "Pell defeated",
-        kind: MemoryKind::Timer(Seconds(1_800.0)),
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     BribedIlsa: MemoryDef {
         label: "Bribed Ilsa",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     SidedWithOrcs: MemoryDef {
         label: "Sided with the orcs",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     FoundTatteredMap: MemoryDef {
         label: "Found the tattered map",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     SpurnedUgra: MemoryDef {
         label: "Turned Ugra away",
-        kind: MemoryKind::Flag,
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     HeardGulls: MemoryDef {
         label: "Heard the gulls",
-        kind: MemoryKind::Timer(Seconds(600.0)),
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
     ChiefTauntedYou: MemoryDef {
         label: "Taunted by an Orc Chief",
-        kind: MemoryKind::Timer(Seconds(120.0)),
+        ty: ValueType::Boolean,
         resets: Resets::Never,
     },
 }

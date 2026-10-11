@@ -6,11 +6,12 @@ use ui::tokens::{palette, spacing, typography};
 use ui::{ChipOptions, Family, component};
 
 use super::{
-    ActiveQuest, Objective, Progress, QuestDef, QuestId, QuestLog, clock_label, resets_label,
+    ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
+    resets_label,
 };
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
-use crate::systems::dialogue::{ChoiceReveal, Conversation, stage};
+use crate::systems::dialogue::{ChoiceReveal, Conversation, ConversationPanel, stage};
 use crate::systems::item::{self, Inventory, ItemStack};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
@@ -56,7 +57,8 @@ fn show_card(world: &mut World) {
     let seen = world.resource::<Viewpoint>().0;
     let moment = seen
         .and_then(|seen| world.get::<Conversation>(seen))
-        .and_then(|conversation| moment_of(world.resource::<Content>(), conversation.node));
+        .and_then(|conversation| conversation.panel.as_ref())
+        .map(moment_of);
     if world.resource::<ShownCard>().0 != moment {
         world.resource_mut::<ShownCard>().0 = moment;
         let shown: Vec<Entity> = world
@@ -100,7 +102,13 @@ fn show_card(world: &mut World) {
         let content = world.resource::<Content>();
         let assets = world.resource::<AssetServer>();
         let parts = match moment {
-            Moment::Offer => offer(content, assets, quest, &inventory),
+            Moment::Offer => offer(
+                content,
+                world.resource::<Parties>(),
+                assets,
+                quest,
+                &inventory,
+            ),
             Moment::TurnIn => turn_in(content, assets, quest, &inventory),
             Moment::Decision => decision(content, quest),
         };
@@ -121,22 +129,17 @@ impl Moment {
     }
 }
 
-fn moment_of(content: &Content, node: crate::data::dialogue::Id) -> Option<(QuestId, Moment)> {
-    content.table::<QuestDef>().iter().find_map(|(quest, def)| {
-        if node == def.offer {
-            Some((quest, Moment::Offer))
-        } else if node == def.thanks && def.decision().is_some() {
-            Some((quest, Moment::Decision))
-        } else if node == def.thanks {
-            Some((quest, Moment::TurnIn))
-        } else {
-            None
-        }
-    })
+fn moment_of(panel: &ConversationPanel) -> (QuestId, Moment) {
+    match *panel {
+        ConversationPanel::QuestOffer(quest) => (quest, Moment::Offer),
+        ConversationPanel::QuestTurnIn(quest) => (quest, Moment::TurnIn),
+        ConversationPanel::QuestDecision(quest) => (quest, Moment::Decision),
+    }
 }
 
 fn offer(
     content: &Content,
+    parties: &Parties,
     assets: &AssetServer,
     quest: QuestId,
     inventory: &Inventory,
@@ -145,12 +148,17 @@ fn offer(
     let ink = ui::theme::theme().surface_floating.on;
     let progress = def.progress(
         content,
+        parties,
         &ActiveQuest::fresh(content, quest),
         Some(inventory),
     );
     let mut parts: Vec<Box<dyn Scene>> = vec![
         Box::new(head(content, assets, def)),
-        Box::new(caption(format!("{} · {}", def.kinds(), def.meta(content)))),
+        Box::new(caption(format!(
+            "{} · {}",
+            def.kinds(),
+            def.meta(parties, quest)
+        ))),
         Box::new(section("Objectives")),
     ];
     parts.extend(
@@ -471,7 +479,7 @@ fn remaining(content: &Content, log: &QuestLog, quest: QuestId) -> (f32, f32) {
 }
 
 fn tick_clocks(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(log) = world
         .resource::<Viewpoint>()
         .0

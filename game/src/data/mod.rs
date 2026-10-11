@@ -3,7 +3,6 @@ pub mod attention;
 pub mod babble;
 pub mod babble_bank;
 pub mod cursor;
-pub mod dialogue;
 pub mod expression;
 pub mod font;
 pub mod input;
@@ -15,8 +14,8 @@ pub mod model;
 pub mod notification;
 pub mod npc;
 pub mod player;
-pub mod prop;
 pub mod quest;
+pub mod script;
 pub mod sfx;
 pub mod shop;
 
@@ -29,7 +28,7 @@ pub fn settings() -> GameSettings {
         name: "Rift",
         spawn: SpawnPlace {
             area: area::Id::Island,
-            at: Pos::new(39.5, 29.75),
+            at: Pos::new(39.0, 29.0),
         },
         player: player::Id::Adventurer,
         bench: area::Id::Island,
@@ -44,7 +43,6 @@ pub fn build() -> Content {
         .table(babble::rows())
         .table(babble_bank::rows())
         .table(cursor::rows())
-        .table(dialogue::rows())
         .table(expression::rows())
         .table(font::rows())
         .table(input::rows())
@@ -56,8 +54,8 @@ pub fn build() -> Content {
         .table(notification::rows())
         .table(npc::rows())
         .table(player::rows())
-        .table(prop::rows())
         .table(quest::rows())
+        .table(script::rows())
         .table(sfx::rows())
         .table(shop::rows());
     tables.build()

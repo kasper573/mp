@@ -10,12 +10,11 @@ use super::{ClientId, JoinRequest, Owner, RespawnRequest, Welcome};
 use crate::core::math::Pos;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::tiling::Tiles;
-use crate::systems::area;
 use crate::systems::combat::AttackRequest;
 use crate::systems::equipment::{EquipmentSlot, UnequipRequest};
 use crate::systems::interact::InteractRequest;
 use crate::systems::item::{DropItemRequest, PickupRequest, UseItemRequest};
-use crate::systems::movement::{MoveRequest, MoveToPortal};
+use crate::systems::movement::MoveRequest;
 use crate::systems::spectate::{SpectateRequest, Spectating};
 
 pub struct ClientSessionPlugin;
@@ -123,25 +122,7 @@ pub fn unequip(world: &mut World, slot: EquipmentSlot) {
 }
 
 pub fn move_to(world: &mut World, pos: Pos<Tiles>) {
-    let portal = my_character(world)
-        .map(|entity| entity.id())
-        .and_then(|entity| area::of(world, entity))
-        .and_then(|area| {
-            area.portals
-                .iter()
-                .position(|portal| portal.rect.contains(pos))
-        });
-    match portal {
-        Some(index) => {
-            world.write_message(MoveToPortal {
-                pos,
-                portal: index as u32,
-            });
-        }
-        None => {
-            world.write_message(MoveRequest { pos });
-        }
-    }
+    world.write_message(MoveRequest { pos });
 }
 
 fn record_welcome(mut welcomes: MessageReader<Welcome>, mut me: ResMut<MyClient>) {

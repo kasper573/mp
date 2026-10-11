@@ -18,7 +18,7 @@ use crate::systems::item::Inventory;
 use crate::systems::movement::{Position, position};
 use crate::systems::player::{ClientId, CommandLock, Owner, Players};
 use crate::systems::quest::QuestLog;
-use crate::systems::rule::{self, Requirement};
+use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
 use crate::systems::spectate::Spectators;
 
@@ -36,10 +36,10 @@ pub fn register(app: &mut App) {
     app.add_observer(reveal_to_all);
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone)]
 pub enum Presence {
     For(ClientId),
-    When(&'static [&'static dyn Requirement]),
+    When(CompiledCondition),
 }
 
 pub fn present(world: &World, subject: Entity, viewer: Entity) -> bool {
@@ -48,7 +48,7 @@ pub fn present(world: &World, subject: Entity, viewer: Entity) -> bool {
         Some(Presence::For(client)) => world
             .get::<Owner>(viewer)
             .is_some_and(|owner| owner.client == *client),
-        Some(Presence::When(requires)) => rule::met(world, viewer, requires),
+        Some(Presence::When(shown)) => shown.holds(world, viewer),
     }
 }
 
@@ -65,7 +65,7 @@ pub struct PrivateSight {
 
 type Clients = QueryState<(Entity, &'static ClientId)>;
 type Subjects = QueryState<(Entity, &'static Position, Option<&'static AreaTag>), With<Replicated>>;
-type Presences = QueryState<Entity, With<Presence>>;
+type Presences = QueryState<Entity, (With<Presence>, With<Replicated>)>;
 
 pub fn update(
     world: &mut World,

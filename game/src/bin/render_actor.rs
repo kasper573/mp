@@ -153,7 +153,7 @@ fn main() {
             }),
     )
     .insert_resource(ClearColor(Color::srgb_u8(0x24, 0x27, 0x2e)))
-    .insert_resource(service.content().clone())
+    .insert_resource(*service.content())
     .insert_resource(service)
     .insert_resource(Sink::spawn(&out, layout.width, layout.height))
     .add_systems(Update, advance);

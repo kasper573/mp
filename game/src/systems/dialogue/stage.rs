@@ -9,8 +9,8 @@ use ui::{
 };
 
 use super::{
-    ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, DialogueId,
-    RefusedPick, Speaker, SpokenLine,
+    ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, RefusedPick,
+    Speaker, SpokenLine,
 };
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
@@ -72,7 +72,7 @@ impl Plugin for StagePlugin {
 }
 
 pub struct StageView {
-    pub node: DialogueId,
+    pub node: String,
     pub with: Option<Entity>,
     pub line: usize,
     pub lines: usize,
@@ -90,7 +90,7 @@ pub struct StageChoice {
 pub fn view(world: &World) -> Option<StageView> {
     let shown = world.resource::<Stage>().shown.as_ref()?;
     Some(StageView {
-        node: shown.node,
+        node: shown.node.clone(),
         with: shown.with,
         line: shown.line,
         lines: shown.lines.len(),
@@ -167,7 +167,7 @@ struct Stage {
 
 struct Shown {
     step: ConversationStep,
-    node: DialogueId,
+    node: String,
     with: Option<Entity>,
     line: usize,
     lines: Vec<SpokenLine>,
@@ -255,12 +255,17 @@ fn follow_conversation(world: &mut World) {
             chime(world, InterfaceSound::UiOpen);
             show_line(world);
         }
-        Some(shown) if shown.step != now.step => {
+        Some(shown) if shown.step != now.step && shown.lines != now.lines => {
             let faces = std::mem::take(&mut shown.faces);
             stage.shown = Some(Shown::of(now, faces));
             show_line(world);
         }
         Some(shown) => {
+            if shown.step != now.step {
+                shown.step = now.step;
+                shown.node = now.node.clone();
+                shown.picked = false;
+            }
             if shown.choices != now.choices {
                 shown.stale = true;
             }
@@ -581,7 +586,7 @@ fn box_options(world: &World, typed: bool) -> Option<DialogueBoxOptions> {
 }
 
 fn babble_along(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(by) = world
         .resource::<Stage>()
         .shown
@@ -598,7 +603,7 @@ fn babble_along(world: &mut World) {
             .0
             .and_then(|seen| world.get::<Babbler>(seen))
             .map(|babbler| babbler.0),
-        Speaker::Prop(_) | Speaker::Narrator => None,
+        Speaker::Object | Speaker::Narrator => None,
     };
     if let (Some(babble), Some(line)) = (babble, typing_line(world)) {
         world.entity_mut(line).insert(Babbling {
@@ -774,7 +779,7 @@ fn busts_of(content: &Content, who: Speaker) -> Option<&Busts> {
     match who {
         Speaker::Npc(npc) => npc.get(content).model.get(content).busts(),
         Speaker::Player => player::def(content).model.get(content).busts(),
-        Speaker::Prop(_) | Speaker::Narrator => None,
+        Speaker::Object | Speaker::Narrator => None,
     }
 }
 
@@ -782,7 +787,13 @@ fn speaker_name(world: &World, who: Speaker) -> Option<String> {
     let content = world.resource::<Content>();
     match who {
         Speaker::Npc(npc) => Some(npc.get(content).name.to_owned()),
-        Speaker::Prop(prop) => Some(prop.get(content).name.to_owned()),
+        Speaker::Object => world
+            .resource::<Stage>()
+            .shown
+            .as_ref()
+            .and_then(|shown| shown.with)
+            .and_then(|with| world.get::<Name>(with))
+            .map(|name| name.name.clone()),
         Speaker::Player => world
             .resource::<Viewpoint>()
             .0
@@ -795,7 +806,7 @@ fn speaker_name(world: &World, who: Speaker) -> Option<String> {
 fn side_of(who: Speaker) -> Side {
     match who {
         Speaker::Player => Side::Left,
-        Speaker::Npc(_) | Speaker::Prop(_) | Speaker::Narrator => Side::Right,
+        Speaker::Npc(_) | Speaker::Object | Speaker::Narrator => Side::Right,
     }
 }
 
@@ -804,7 +815,7 @@ fn cast_key(who: Speaker) -> u64 {
         Speaker::Player => 0,
         Speaker::Narrator => 1,
         Speaker::Npc(npc) => 2 + npc.index() as u64,
-        Speaker::Prop(prop) => 10_000 + prop.index() as u64,
+        Speaker::Object => 10_000,
     }
 }
 

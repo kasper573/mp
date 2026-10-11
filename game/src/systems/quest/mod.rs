@@ -1,7 +1,9 @@
 pub mod card;
+pub mod effects;
 pub mod log;
 pub mod tracker;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bevy_app::App;
@@ -11,47 +13,42 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::{AssetRef, AssetService};
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentRow, Fixture, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentId, ContentRow, Fixture, ModuleRule, ModuleSet};
 use crate::core::math::{Percent, Rng};
-use crate::core::tiling::{TilePos, Tiles};
+use crate::core::script::{Name, Owner as ScriptOwner, OwnerKind, OwnerRow};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::data::area::Id as AreaId;
 use crate::data::attention::Id as AttentionId;
-use crate::data::dialogue::Id as DialogueId;
 use crate::data::item::Id as ItemId;
 use crate::data::npc::Id as NpcId;
-use crate::data::prop::Id as PropId;
 use crate::systems::area::AreaDef;
-use crate::systems::area::{self, AreaTag, MarkerName};
 use crate::systems::attention;
 use crate::systems::attention::AttentionMark;
-use crate::systems::dialogue::{
-    self, Asked, ChoiceReveal, ChoiceTag, GotoNode, Offer, Revealable, StartConversation, Then,
-};
+use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::history::{HistoryTopic, RecordTally};
-use crate::systems::interact::Counterpart;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::{
-    GiveItems, INVENTORY_MAX, Inventory, ItemFlag, ItemStack, ReservedBy, scatter_drop,
+    INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, ReservedBy, scatter_drop,
 };
-use crate::systems::movement::position;
+use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::player::{Owner, Xp, conn_player, sender_player};
+use crate::systems::player::{Owner, conn_player, sender_player};
 use crate::systems::rewards::KillCredited;
-use crate::systems::rule::{self, Outcome, Requirement, RuleContext};
-use crate::systems::text::{LineText, Span, TextFill};
+use crate::systems::script::condition;
+use crate::systems::script::condition::CompiledCondition;
+use crate::systems::script::{
+    self, Condition, EventKind, Reach, RiftInstances, RiftScripts, ScriptModule,
+};
+use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
 
 pub use crate::data::quest::Id as QuestId;
 
 pub const QUEST_LOG_CAP: usize = 20;
-const FOUND_WITHIN: Tiles = Tiles(3.0);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<QuestLog>()
         .add_client_message::<QuestRequest>(Channel::Ordered);
-    dialogue::topic_source(app, topics);
     attention::mark_source(app, marks);
 }
 
@@ -63,11 +60,6 @@ pub struct QuestDef {
     pub xp: u32,
     pub reveal: &'static [ChoiceReveal],
     pub modules: &'static [QuestModule],
-    pub giver: Giver,
-    pub turn_in: Counterpart,
-    pub offer: DialogueId,
-    pub waiting: DialogueId,
-    pub thanks: DialogueId,
 }
 
 impl ContentRow for QuestDef {
@@ -83,16 +75,18 @@ impl ModuleSet for QuestDef {
 
     fn rule(module: &QuestModule) -> ModuleRule {
         match module {
-            QuestModule::Objective(_) | QuestModule::Drop(_) => ModuleRule::AnyNumber,
+            QuestModule::Objective(_) | QuestModule::Drop(_) | QuestModule::Script(_) => {
+                ModuleRule::AnyNumber
+            }
             _ => ModuleRule::AtMostOne,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum QuestModule {
-    Shown(&'static [&'static dyn Requirement]),
-    Requires(&'static [&'static dyn Requirement]),
+    Shown(&'static Condition),
+    Requires(&'static Condition),
     Grants(&'static [ItemStack]),
     Objective(Objective),
     HandIn(&'static [ItemStack]),
@@ -102,33 +96,29 @@ pub enum QuestModule {
     Daily,
     TimeLimit(Seconds),
     Drop(QuestDrop),
+    Script(ScriptModule),
 }
 
 impl QuestDef {
-    pub fn shown(&self) -> &'static [&'static dyn Requirement] {
-        self.modules
-            .iter()
-            .find_map(|module| match module {
-                QuestModule::Shown(shown) => Some(*shown),
-                _ => None,
-            })
-            .unwrap_or(&[])
+    pub fn shown(&self) -> Option<&'static Condition> {
+        self.modules.iter().find_map(|module| match module {
+            QuestModule::Shown(shown) => Some(*shown),
+            _ => None,
+        })
     }
 
-    pub fn requires(&self) -> &'static [&'static dyn Requirement] {
-        self.modules
-            .iter()
-            .find_map(|module| match module {
-                QuestModule::Requires(requires) => Some(*requires),
-                _ => None,
-            })
-            .unwrap_or(&[])
+    pub fn requires(&self) -> Option<&'static Condition> {
+        self.modules.iter().find_map(|module| match module {
+            QuestModule::Requires(requires) => Some(*requires),
+            _ => None,
+        })
     }
 
     pub fn min_level(&self) -> u32 {
         self.requires()
-            .iter()
-            .filter_map(|requirement| requirement.min_level())
+            .into_iter()
+            .flat_map(condition::parts)
+            .filter_map(condition::min_level)
             .max()
             .unwrap_or(1)
     }
@@ -198,36 +188,21 @@ impl QuestDef {
         })
     }
 
+    pub fn scripts(&self) -> Vec<ScriptModule> {
+        self.modules
+            .iter()
+            .filter_map(|module| match module {
+                QuestModule::Script(script) => Some(script.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
     fn stacks(
         &self,
         pick: fn(&QuestModule) -> Option<&'static [ItemStack]>,
     ) -> &'static [ItemStack] {
         self.modules.iter().find_map(pick).unwrap_or(&[])
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Giver {
-    Npc(NpcId),
-    Prop(PropId),
-    Item(ItemId),
-}
-
-impl Giver {
-    pub fn counterpart(self) -> Option<Counterpart> {
-        match self {
-            Giver::Npc(npc) => Some(Counterpart::Npc(npc)),
-            Giver::Prop(prop) => Some(Counterpart::Prop(prop)),
-            Giver::Item(_) => None,
-        }
-    }
-
-    pub fn name(self, content: &Content) -> &'static str {
-        match self {
-            Giver::Npc(npc) => npc.get(content).name,
-            Giver::Prop(prop) => prop.get(content).name,
-            Giver::Item(item) => item.get(content).name,
-        }
     }
 }
 
@@ -238,9 +213,8 @@ pub enum Objective {
         npc: NpcId,
         count: u32,
     },
-    Explore {
-        area: AreaId,
-        at: MarkerName,
+    Task {
+        task: Name,
         label: &'static str,
     },
     Deliver(ItemId),
@@ -255,7 +229,7 @@ impl Objective {
         match self {
             Objective::Hold(stack) => stack.item.get(content).icon,
             Objective::Defeat { .. } => InterfaceIcon::ObjectiveDefeat.get(content).image,
-            Objective::Explore { .. } => InterfaceIcon::ObjectiveTask.get(content).image,
+            Objective::Task { .. } => InterfaceIcon::ObjectiveTask.get(content).image,
             Objective::Deliver(item) => item.get(content).icon,
             Objective::Decide { .. } => InterfaceIcon::ObjectiveDecide.get(content).image,
         }
@@ -290,6 +264,103 @@ impl Progress {
     }
 }
 
+#[derive(Resource, Clone, Debug, Default, PartialEq)]
+pub struct Parties(Arc<HashMap<QuestId, QuestParties>>);
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct QuestParties {
+    pub givers: Vec<Party>,
+    pub turn_ins: Vec<Party>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Party {
+    pub name: String,
+    pub item: Option<ItemId>,
+}
+
+impl Parties {
+    pub fn of(content: &Content, scripts: &RiftScripts) -> Parties {
+        let mut parties: HashMap<QuestId, QuestParties> = HashMap::new();
+        for (owner, _) in scripts.owners() {
+            let Some(party) = party_name(content, *owner) else {
+                continue;
+            };
+            for reach in scripts.may_do(*owner).reaches {
+                match reach {
+                    Reach::Offers(quest) | Reach::Accepts(quest) => {
+                        let parties = parties.entry(quest).or_default();
+                        if !parties.givers.contains(&party) {
+                            parties.givers.push(party.clone());
+                        }
+                    }
+                    Reach::TurnsIn(quest) => {
+                        let parties = parties.entry(quest).or_default();
+                        if !parties.turn_ins.contains(&party) {
+                            parties.turn_ins.push(party.clone());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Parties(Arc::new(parties))
+    }
+
+    pub fn get(&self, quest: QuestId) -> Option<&QuestParties> {
+        self.0.get(&quest)
+    }
+
+    pub fn giver(&self, quest: QuestId) -> Option<&Party> {
+        self.get(quest).and_then(|parties| parties.givers.first())
+    }
+
+    pub fn turn_in(&self, quest: QuestId) -> Option<&Party> {
+        self.get(quest).and_then(|parties| parties.turn_ins.first())
+    }
+}
+
+fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
+    let placed = |npc: NpcId| {
+        content
+            .table::<AreaDef>()
+            .rows()
+            .iter()
+            .any(|area| area.residents().any(|resident| resident == npc))
+    };
+    Some(match owner.kind {
+        OwnerKind::Npc => {
+            let npc: NpcId = ContentId::new(owner.row);
+            if !placed(npc) {
+                return None;
+            }
+            Party {
+                name: npc.get(content).name.to_owned(),
+                item: None,
+            }
+        }
+        OwnerKind::Object => {
+            let area: ContentId<AreaDef> = ContentId::new(owner.row);
+            let (_, object) = area
+                .get(content)
+                .objects()
+                .find(|(index, _)| Some(*index) == owner.object)?;
+            Party {
+                name: object.label.or(object.name)?.to_owned(),
+                item: None,
+            }
+        }
+        OwnerKind::Item => {
+            let item: ContentId<ItemDef> = ContentId::new(owner.row);
+            Party {
+                name: item.get(content).name.to_owned(),
+                item: Some(item),
+            }
+        }
+        _ => return None,
+    })
+}
+
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct QuestLog {
     pub active: Vec<ActiveQuest>,
@@ -305,6 +376,7 @@ pub struct ActiveQuest {
     pub left: Option<Seconds>,
     pub ready: bool,
     pub dry_kills: u32,
+    pub decided: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -329,19 +401,25 @@ pub enum QuestRequest {
 }
 
 impl QuestDef {
-    pub fn objective_label(&self, content: &Content, objective: &Objective) -> String {
+    pub fn objective_label(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        quest: QuestId,
+        objective: &Objective,
+    ) -> String {
         match objective {
             Objective::Hold(stack) => stack.item.get(content).name.to_owned(),
             Objective::Defeat { npc, .. } => {
                 format!("Defeat the {}", npc.get(content).name)
             }
-            Objective::Explore { label, .. } | Objective::Decide { label, .. } => {
-                (*label).to_owned()
-            }
+            Objective::Task { label, .. } | Objective::Decide { label, .. } => (*label).to_owned(),
             Objective::Deliver(item) => format!(
                 "Bring {} to {}",
                 item.get(content).name,
-                self.turn_in.name(content)
+                parties
+                    .turn_in(quest)
+                    .map_or("its taker", |party| party.name.as_str())
             ),
         }
     }
@@ -349,6 +427,7 @@ impl QuestDef {
     pub fn progress(
         &self,
         content: &Content,
+        parties: &Parties,
         active: &ActiveQuest,
         inventory: Option<&Inventory>,
     ) -> Vec<Progress> {
@@ -362,12 +441,12 @@ impl QuestDef {
                         (held(stack.item).min(stack.count), stack.count, true)
                     }
                     Objective::Defeat { count, .. } => (counted.min(*count), *count, true),
-                    Objective::Explore { .. } => (counted.min(1), 1, true),
+                    Objective::Task { .. } => (counted.min(1), 1, true),
                     Objective::Deliver(item) => (held(*item).min(1), 1, false),
                     Objective::Decide { .. } => (0, 1, false),
                 };
                 Progress {
-                    label: self.objective_label(content, objective),
+                    label: self.objective_label(content, parties, active.quest, objective),
                     have,
                     need,
                     counted: shown,
@@ -379,11 +458,12 @@ impl QuestDef {
     pub fn complete(
         &self,
         content: &Content,
+        parties: &Parties,
         active: &ActiveQuest,
         inventory: Option<&Inventory>,
     ) -> bool {
         self.objectives()
-            .zip(self.progress(content, active, inventory))
+            .zip(self.progress(content, parties, active, inventory))
             .all(|(objective, progress)| {
                 matches!(objective, Objective::Decide { .. }) || progress.done()
             })
@@ -395,7 +475,7 @@ impl QuestDef {
             let kind = match objective {
                 Objective::Hold(_) => "collect",
                 Objective::Defeat { .. } => "defeat",
-                Objective::Explore { .. } => "explore",
+                Objective::Task { .. } => "explore",
                 Objective::Deliver(_) => "deliver",
                 Objective::Decide { .. } => "choice",
             };
@@ -416,12 +496,14 @@ impl QuestDef {
         }
     }
 
-    pub fn meta(&self, content: &Content) -> String {
+    pub fn meta(&self, parties: &Parties, quest: QuestId) -> String {
         format!(
             "{} · Level {} · from {}",
             self.category,
             self.min_level(),
-            self.giver.name(content)
+            parties
+                .giver(quest)
+                .map_or("nobody", |party| party.name.as_str())
         )
     }
 
@@ -439,23 +521,24 @@ impl QuestDef {
             })
     }
 
-    pub fn hand_in_hint(&self, content: &Content) -> String {
-        let verb = match self.giver.counterpart() == Some(self.turn_in) {
+    pub fn hand_in_hint(&self, parties: &Parties, quest: QuestId) -> String {
+        let giver = parties.giver(quest);
+        let taker = parties.turn_in(quest);
+        let verb = match giver == taker {
             true => "Return",
             false => "Go",
         };
-        match self.turn_in {
-            Counterpart::Npc(npc) => format!("{verb} to {}", npc.get(content).name),
-            Counterpart::Prop(prop) => {
-                format!("{verb} to the {}", prop.get(content).name.to_lowercase())
-            }
+        match taker {
+            Some(party) => format!("{verb} to {}", party.name),
+            None => format!("{verb} and hand it in"),
         }
     }
 
-    pub fn retry_hint(&self, content: &Content) -> String {
-        match self.giver {
-            Giver::Item(item) => format!("Use the {} to try again", item.get(content).name),
-            giver => format!("Talk to {} to try again", giver.name(content)),
+    pub fn retry_hint(&self, parties: &Parties, quest: QuestId) -> String {
+        match parties.giver(quest) {
+            Some(party) if party.item.is_some() => format!("Use the {} to try again", party.name),
+            Some(party) => format!("Talk to {} to try again", party.name),
+            None => "Try again".to_owned(),
         }
     }
 
@@ -480,6 +563,7 @@ impl ActiveQuest {
             left: None,
             ready: false,
             dry_kills: 0,
+            decided: None,
         }
     }
 }
@@ -525,126 +609,6 @@ impl QuestLog {
     }
 }
 
-pub struct OnQuest(pub QuestId);
-
-impl Requirement for OnQuest {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        log_of(world, player).is_some_and(|log| log.active(self.0).is_some())
-    }
-
-    fn describe(&self, content: &Content) -> String {
-        format!("On {}", self.0.get(content).title)
-    }
-}
-
-pub struct QuestDone(pub QuestId);
-
-impl Requirement for QuestDone {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        log_of(world, player)
-            .and_then(|log| log.finished(self.0))
-            .is_some_and(|finished| finished.result == QuestResult::Completed)
-    }
-
-    fn describe(&self, content: &Content) -> String {
-        self.0.get(content).title.to_owned()
-    }
-}
-
-pub struct QuestOnCooldown(pub QuestId);
-
-impl Requirement for QuestOnCooldown {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        let content = world.resource::<Content>();
-        let today = world.resource::<WallClock>().day();
-        self.0.get(content).daily()
-            && log_of(world, player).is_some_and(|log| log.done_for_now(content, self.0, today))
-    }
-
-    fn describe(&self, content: &Content) -> String {
-        format!("{} done for today", self.0.get(content).title)
-    }
-}
-
-pub struct QuestResetsIn(pub QuestId);
-
-impl TextFill for QuestResetsIn {
-    fn text(&self, world: &World, _player: Entity) -> String {
-        world.resource::<WallClock>().until_next_day().in_words()
-    }
-
-    fn check(&self, content: &Content) {
-        if !self.0.get(content).daily() {
-            panic!("QuestResetsIn({:?}) never resets", self.0);
-        }
-    }
-}
-
-pub struct AcceptQuest(pub QuestId);
-
-impl Outcome for AcceptQuest {
-    fn apply(&self, ctx: &mut RuleContext) {
-        accept(ctx.world, ctx.player, self.0);
-    }
-
-    fn blocked(&self, world: &World, player: Entity) -> Option<String> {
-        accept_refusal(world, player, self.0)
-    }
-
-    fn gives(&self, content: &Content) -> Vec<ItemStack> {
-        self.0.get(content).grants().to_vec()
-    }
-}
-
-pub struct TurnIn(pub QuestId);
-
-impl Outcome for TurnIn {
-    fn apply(&self, ctx: &mut RuleContext) {
-        complete(ctx.world, ctx.player, self.0);
-    }
-
-    fn blocked(&self, world: &World, player: Entity) -> Option<String> {
-        let content = world.resource::<Content>();
-        (!ready_to_hand_in(world, player, self.0))
-            .then(|| format!("{} isn't ready to hand in", self.0.get(content).title))
-    }
-
-    fn takes(&self, content: &Content) -> Vec<ItemStack> {
-        self.0.get(content).hand_in().to_vec()
-    }
-
-    fn gives(&self, content: &Content) -> Vec<ItemStack> {
-        self.0.get(content).rewards().to_vec()
-    }
-}
-
-pub struct FailQuest(pub QuestId);
-
-impl Outcome for FailQuest {
-    fn apply(&self, ctx: &mut RuleContext) {
-        fail(ctx.world, ctx.player, self.0);
-    }
-}
-
-pub struct OfferQuest(pub QuestId);
-
-impl Outcome for OfferQuest {
-    fn apply(&self, ctx: &mut RuleContext) {
-        let content = ctx.world.resource::<Content>().clone();
-        let def = self.0.get(&content);
-        let node = match log_of(ctx.world, ctx.player).and_then(|log| log.active(self.0)) {
-            Some(_) => def.waiting,
-            None if offerable(ctx.world, ctx.player, self.0) => def.offer,
-            None => return,
-        };
-        StartConversation { node }.apply(ctx);
-    }
-
-    fn leads_to(&self, content: &Content) -> Vec<DialogueId> {
-        vec![self.0.get(content).offer]
-    }
-}
-
 pub fn clock_label(left: Seconds) -> String {
     let seconds = left.0.max(0.0).ceil() as u32;
     format!("{:02}:{:02}", seconds / 60, seconds % 60)
@@ -664,25 +628,32 @@ pub fn log_of(world: &World, player: Entity) -> Option<&QuestLog> {
 
 pub fn ready_to_hand_in(world: &World, player: Entity, quest: QuestId) -> bool {
     let content = world.resource::<Content>();
+    let parties = world.resource::<Parties>();
     log_of(world, player)
         .and_then(|log| log.active(quest))
         .is_some_and(|active| {
             quest
                 .get(content)
-                .complete(content, active, world.get::<Inventory>(player))
+                .complete(content, parties, active, world.get::<Inventory>(player))
         })
 }
 
-pub fn accept(world: &mut World, player: Entity, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), String> {
+    if let Some(refusal) = accept_refusal(world, player, quest) {
+        return Err(refusal);
+    }
+    let content = *world.resource::<Content>();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
-    let Some(mut log) = world.get_mut::<QuestLog>(player) else {
-        return;
-    };
-    if log.active(quest).is_some() {
-        return;
-    }
+    let mut inventory = world
+        .get_mut::<Inventory>(player)
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    inventory
+        .exchange(&content, &[], def.grants())
+        .map_err(|refusal| refusal.describe(&content))?;
+    let mut log = world
+        .get_mut::<QuestLog>(player)
+        .ok_or_else(|| "Has no quest log".to_owned())?;
     log.finished
         .retain(|finished| finished.quest != quest || finished.result == QuestResult::Completed);
     log.active.push(ActiveQuest {
@@ -700,11 +671,35 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) {
         offered_mark(def).get(&content).icon,
         Some(InterfaceSound::QuestAccepted.id(&content)),
     );
+    raise(world, quest, EventKind::Accepted, player);
     refresh_log(world, player, clock);
+    Ok(())
+}
+
+pub fn turn_in(
+    world: &mut World,
+    player: Entity,
+    quest: QuestId,
+    pick: Option<ItemStack>,
+) -> Result<(), String> {
+    let content = *world.resource::<Content>();
+    let def = quest.get(&content);
+    if !ready_to_hand_in(world, player, quest) {
+        return Err(format!("{} isn't ready to hand in", def.title));
+    }
+    let gives: Vec<ItemStack> = def.rewards().iter().copied().chain(pick).collect();
+    let mut inventory = world
+        .get_mut::<Inventory>(player)
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    inventory
+        .exchange(&content, def.hand_in(), &gives)
+        .map_err(|refusal| refusal.describe(&content))?;
+    complete(world, player, quest);
+    Ok(())
 }
 
 pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
@@ -717,9 +712,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
     if !def.daily() {
         log.tracked.retain(|&tracked| tracked != quest);
     }
-    if let Some(mut xp) = world.get_mut::<Xp>(player) {
-        xp.gain(def.xp);
-    }
+    job::grant_xp(world, player, def.xp);
     notification::notify(
         world,
         player,
@@ -732,11 +725,12 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
             LineText::plain(def.title),
         ),
     );
+    raise(world, quest, EventKind::Completed, player);
     refresh_log(world, player, clock);
 }
 
 pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let clock = *world.resource::<WallClock>();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
@@ -757,10 +751,11 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
         LineText::plain(format!("Quest failed · {}", quest.get(&content).title)),
     );
     notification::notify(world, player, failed);
+    raise(world, quest, EventKind::Failed, player);
 }
 
 pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -776,6 +771,59 @@ pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
         format!("Quest abandoned · {}", quest.get(&content).title),
         AttentionMark::QuestInProgress.get(&content).icon,
         Some(InterfaceSound::QuestAbandoned.id(&content)),
+    );
+    raise(world, quest, EventKind::Failed, player);
+}
+
+pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: usize) {
+    let content = *world.resource::<Content>();
+    let clock = *world.resource::<WallClock>();
+    let done = world.get_mut::<QuestLog>(player).is_some_and(|mut log| {
+        log.active
+            .iter_mut()
+            .find(|active| active.quest == quest)
+            .and_then(|active| active.counts.get_mut(index))
+            .is_some_and(|count| {
+                let fresh = *count == 0;
+                *count = 1;
+                fresh
+            })
+    });
+    if !done {
+        return;
+    }
+    let def = quest.get(&content);
+    if let Some(objective) = def.objectives().nth(index) {
+        let parties = world.resource::<Parties>().clone();
+        tell(
+            world,
+            player,
+            format!(
+                "Objective done · {}",
+                def.objective_label(&content, &parties, quest, objective)
+            ),
+            objective.icon(&content),
+            Some(InterfaceSound::TallyTick.id(&content)),
+        );
+    }
+    refresh_log(world, player, clock);
+}
+
+pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: Name) {
+    if let Some(mut log) = world.get_mut::<QuestLog>(player)
+        && let Some(active) = log.active.iter_mut().find(|active| active.quest == quest)
+    {
+        active.decided = Some(path.to_owned());
+    }
+}
+
+fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
+    world.resource_mut::<RiftInstances>().raise(
+        ScriptOwner::Row(OwnerKind::Quest, quest.raw()),
+        kind,
+        Some(player),
+        Vec::new(),
+        |_| true,
     );
 }
 
@@ -823,37 +871,12 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
     }
 }
 
-pub fn conversation_starts(content: &Content) -> Vec<DialogueId> {
-    content
-        .table::<QuestDef>()
-        .rows()
-        .iter()
-        .flat_map(|quest| [quest.offer, quest.waiting, quest.thanks])
-        .collect()
-}
-
 pub fn check(assets: &AssetService) {
     let content = assets.content();
-    let places: Vec<Counterpart> = content
-        .table::<AreaDef>()
-        .rows()
-        .iter()
-        .flat_map(|area| {
-            area.residents
-                .iter()
-                .map(|resident| Counterpart::Npc(resident.npc))
-                .chain(
-                    area.props
-                        .iter()
-                        .map(|fixture| Counterpart::Prop(fixture.prop)),
-                )
-        })
-        .collect();
     for (id, quest) in content.table::<QuestDef>().iter() {
-        let parties = quest.giver.counterpart().into_iter().chain([quest.turn_in]);
-        for party in parties {
-            if !places.contains(&party) {
-                panic!("quest {id:?}: {party:?} lives nowhere");
+        for condition in quest.shown().into_iter().chain(quest.requires()) {
+            if let Err(error) = condition::check(content, condition) {
+                panic!("quest {id:?}: {error}");
             }
         }
         for stack in quest.grants() {
@@ -872,6 +895,9 @@ pub fn check(assets: &AssetService) {
                 );
             }
         }
+        if quest.objectives().next().is_none() {
+            panic!("quest {id:?}: no objective");
+        }
         let slots = quest.rewards().len() + usize::from(!quest.pick_one().is_empty());
         if slots > INVENTORY_MAX as usize {
             panic!("quest {id:?}: its rewards can never fit in a bag");
@@ -883,27 +909,34 @@ pub fn check(assets: &AssetService) {
         {
             panic!("quest {id:?}: nothing to say when handing it in");
         }
-        dialogue::check_reveal(
+        crate::systems::dialogue::check_reveal(
             &format!("quest {id:?}"),
             quest.reveal,
-            Revealable {
-                needs: !quest.requires().is_empty(),
+            crate::systems::dialogue::Revealable {
+                needs: quest.requires().is_some(),
                 costs: !quest.hand_in().is_empty(),
                 gains: !quest.rewards().is_empty() || !quest.pick_one().is_empty() || quest.xp > 0,
             },
         );
-        for objective in quest.objectives() {
-            if let Objective::Explore { area, at, .. } = objective
-                && area::load(assets, *area).marker(*at).is_none()
-            {
-                panic!("quest {id:?}: {area:?} has no marker {:?}", at.0);
-            }
+    }
+}
+
+pub fn check_parties(content: &Content, parties: &Parties) {
+    for (id, _) in content.table::<QuestDef>().iter() {
+        let Some(found) = parties.get(id) else {
+            panic!("quest {id:?}: nobody offers it and nobody takes it in");
+        };
+        if found.givers.is_empty() {
+            panic!("quest {id:?}: nobody offers it");
+        }
+        if found.turn_ins.is_empty() {
+            panic!("quest {id:?}: nobody takes it in");
         }
     }
 }
 
 fn track(world: &mut World, player: Entity, quest: QuestId, tracked: bool) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -914,7 +947,7 @@ fn track(world: &mut World, player: Entity, quest: QuestId, tracked: bool) {
     }
 }
 
-fn accept_refusal(world: &World, player: Entity, quest: QuestId) -> Option<String> {
+pub fn offer_refusal(world: &World, player: Entity, quest: QuestId) -> Option<String> {
     let content = world.resource::<Content>();
     let log = log_of(world, player)?;
     let def = quest.get(content);
@@ -927,42 +960,41 @@ fn accept_refusal(world: &World, player: Entity, quest: QuestId) -> Option<Strin
     if log.active.len() >= QUEST_LOG_CAP {
         return Some(format!("Your quest log is full ({QUEST_LOG_CAP})"));
     }
-    def.requires()
-        .iter()
-        .copied()
-        .chain(def.shown().iter().copied())
-        .find(|requirement| !requirement.met(world, player))
-        .map(|unmet| format!("Needs {}", unmet.describe(content)))
+    None
 }
 
-fn offerable(world: &World, player: Entity, quest: QuestId) -> bool {
-    log_of(world, player).is_some_and(|log| {
-        let today = world.resource::<WallClock>().day();
-        offerable_in(world, player, log, today, quest)
-    })
-}
-
-fn offerable_in(
-    world: &World,
-    player: Entity,
-    log: &QuestLog,
-    today: GameDay,
-    quest: QuestId,
-) -> bool {
-    let content = world.resource::<Content>();
-    log.active(quest).is_none()
-        && !log.done_for_now(content, quest, today)
-        && rule::met(world, player, quest.get(content).shown())
-}
-
-fn open_to(world: &World, player: Entity, quest: QuestId) -> bool {
+fn accept_refusal(world: &World, player: Entity, quest: QuestId) -> Option<String> {
+    if let Some(refusal) = offer_refusal(world, player, quest) {
+        return Some(refusal);
+    }
     let content = world.resource::<Content>();
     let def = quest.get(content);
-    rule::met(world, player, def.requires())
+    def.requires()
+        .into_iter()
+        .chain(def.shown())
+        .flat_map(condition::parts)
+        .find(|part| !condition::holds(world, player, part))
+        .map(|unmet| format!("Needs {}", condition::describe(content, unmet)))
+}
+
+pub fn open_to(world: &World, player: Entity, quest: QuestId) -> bool {
+    let content = world.resource::<Content>();
+    quest
+        .get(content)
+        .requires()
+        .is_none_or(|requires| condition::holds(world, player, requires))
+}
+
+fn shown_to(world: &World, player: Entity, quest: QuestId) -> bool {
+    let content = world.resource::<Content>();
+    quest
+        .get(content)
+        .shown()
+        .is_none_or(|shown| condition::holds(world, player, shown))
 }
 
 fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(mut inventory) = world.get_mut::<Inventory>(player) else {
         return;
     };
@@ -975,7 +1007,8 @@ fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
 }
 
 fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
+    let parties = world.resource::<Parties>().clone();
     let Some(log) = log_of(world, player) else {
         return;
     };
@@ -995,7 +1028,6 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
     for quest in expired {
         fail(world, player, quest);
     }
-    let found = explored(world, player);
     let inventory = world.get::<Inventory>(player).cloned();
     let Some(mut log) = log_of(world, player).cloned() else {
         return;
@@ -1003,27 +1035,13 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
     let mut told: Vec<(String, AssetRef, Option<SfxId>)> = Vec::new();
     for active in &mut log.active {
         let def = active.quest.get(&content);
-        for &(quest, index) in &found {
-            if quest == active.quest && active.counts[index] == 0 {
-                active.counts[index] = 1;
-                let objective = &def.objectives().nth(index).expect("an objective per count");
-                told.push((
-                    format!(
-                        "Objective done · {}",
-                        def.objective_label(&content, objective)
-                    ),
-                    objective.icon(&content),
-                    Some(InterfaceSound::TallyTick.id(&content)),
-                ));
-            }
-        }
         active.left = active
             .deadline
             .map(|deadline| Seconds(deadline.since(clock.now).0.ceil()));
-        let ready = def.complete(&content, active, inventory.as_ref());
+        let ready = def.complete(&content, &parties, active, inventory.as_ref());
         if ready && !active.ready {
             told.push((
-                format!("Quest ready · {}", def.hand_in_hint(&content)),
+                format!("Quest ready · {}", def.hand_in_hint(&parties, active.quest)),
                 ready_mark(def).get(&content).icon,
                 Some(InterfaceSound::UiChime.id(&content)),
             ));
@@ -1047,7 +1065,7 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
             Seconds(minutes * 60.0)
         });
         finished.offered_again =
-            finished.result == QuestResult::Failed && rule::met(world, player, def.shown());
+            finished.result == QuestResult::Failed && shown_to(world, player, finished.quest);
     }
     let trackable: Vec<QuestId> = log
         .tracked
@@ -1064,42 +1082,9 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
     }
 }
 
-fn explored(world: &World, player: Entity) -> Vec<(QuestId, usize)> {
-    let content = world.resource::<Content>();
-    let (Some(log), Some(at), Some(here)) = (
-        log_of(world, player),
-        position(world, player),
-        world.get::<AreaTag>(player).map(|tag| tag.area),
-    ) else {
-        return Vec::new();
-    };
-    let assets = world.resource::<AssetService>();
-    log.active
-        .iter()
-        .flat_map(|active| {
-            active
-                .quest
-                .get(content)
-                .objectives()
-                .enumerate()
-                .filter_map(move |(index, objective)| match objective {
-                    Objective::Explore {
-                        area, at: marker, ..
-                    } if *area == here => Some((active.quest, index, *area, *marker)),
-                    _ => None,
-                })
-        })
-        .filter(|&(_, _, area, marker)| {
-            area::load(assets, area)
-                .marker(marker)
-                .is_some_and(|spot| at.distance(spot.center()) <= FOUND_WITHIN)
-        })
-        .map(|(quest, index, ..)| (quest, index))
-        .collect()
-}
-
 fn credit_kill(world: &mut World, kill: KillCredited) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
+    let parties = world.resource::<Parties>().clone();
     let player = kill.credited;
     let Some(mut log) = log_of(world, player).cloned() else {
         return;
@@ -1127,7 +1112,12 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
                             failure: false,
                             sfx: None,
                         },
-                        LineText::plain(def.objective_label(&content, objective)),
+                        LineText::plain(def.objective_label(
+                            &content,
+                            &parties,
+                            active.quest,
+                            objective,
+                        )),
                     ));
                 }
             }
@@ -1172,166 +1162,107 @@ fn still_needs(def: &QuestDef, item: ItemId, inventory: Option<&Inventory>) -> b
     })
 }
 
-fn topics(world: &World, asked: &Asked) -> Vec<Offer> {
-    let mut offers = hand_ins(world, asked);
-    if let Some(&counterpart) = asked
-        .greeting(world.resource::<Content>())
-        .and_then(|with| world.get::<Counterpart>(with))
-    {
-        offers.extend(
-            world
-                .resource::<Content>()
-                .ids::<QuestDef>()
-                .filter_map(|quest| greeting_topic(world, asked.player, counterpart, quest)),
-        );
-    }
-    offers
-}
-
-fn hand_ins(world: &World, asked: &Asked) -> Vec<Offer> {
-    let content = world.resource::<Content>();
-    let Some((quest, def)) = content
-        .table::<QuestDef>()
-        .iter()
-        .find(|(_, def)| def.thanks == asked.node)
-    else {
-        return Vec::new();
-    };
-    if def.decision().is_some() || !ready_to_hand_in(world, asked.player, quest) {
-        return Vec::new();
-    }
-    if def.pick_one().is_empty() {
-        return vec![quest_offer(
-            def,
-            LineText::spoken(def.hand_over(), world, asked.player),
-            None,
-            Vec::new(),
-            vec![Arc::new(TurnIn(quest))],
-        )];
-    }
-    def.pick_one()
-        .iter()
-        .map(|pick| {
-            quest_offer(
-                def,
-                LineText::plain(pick_label(content, *pick)),
-                Some(pick.item.get(content).icon),
-                Vec::new(),
-                vec![
-                    Arc::new(TurnIn(quest)),
-                    Arc::new(GiveItems(std::slice::from_ref(pick))),
-                ],
-            )
-        })
-        .collect()
-}
-
-fn pick_label(content: &Content, pick: ItemStack) -> String {
+pub fn pick_label(content: &Content, pick: ItemStack) -> String {
     match pick.count {
         1 => format!("I'll take the {}.", pick.item.get(content).name),
         _ => format!("I'll take {}.", pick.describe(content)),
     }
 }
 
-fn greeting_topic(
+fn marks(
     world: &World,
-    player: Entity,
-    counterpart: Counterpart,
-    quest: QuestId,
-) -> Option<Offer> {
-    let content = world.resource::<Content>();
-    let def = quest.get(content);
-    let log = log_of(world, player)?;
-    let gives = def.giver.counterpart() == Some(counterpart);
-    let takes = def.turn_in == counterpart;
-    let label = || LineText::plain(def.title);
-    match log.active(quest) {
-        Some(active) if takes && active.ready => Some(quest_offer(
-            def,
-            label(),
-            Some(ready_mark(def).get(content).icon),
-            Vec::new(),
-            vec![Arc::new(GotoNode(def.thanks))],
-        )),
-        Some(_) if gives => Some(quest_offer(
-            def,
-            label(),
-            Some(AttentionMark::QuestInProgress.get(content).icon),
-            Vec::new(),
-            vec![Arc::new(GotoNode(def.waiting))],
-        )),
-        Some(_) => None,
-        None if gives && offerable(world, player, quest) => Some(quest_offer(
-            def,
-            label(),
-            Some(offered_mark(def).get(content).icon),
-            def.requires()
-                .iter()
-                .map(|&requirement| Arc::new(requirement) as Arc<dyn Requirement>)
-                .collect(),
-            vec![Arc::new(GotoNode(def.offer))],
-        )),
-        None => None,
-    }
-}
-
-fn quest_offer(
-    def: &QuestDef,
-    label: LineText,
-    icon: Option<AssetRef>,
-    requires: Vec<Arc<dyn Requirement>>,
-    then: Vec<Arc<dyn Outcome>>,
-) -> Offer {
-    Offer {
-        label,
-        tag: ChoiceTag::Quest,
-        icon,
-        requires,
-        costs: &[],
-        then: Then::Made(then),
-        reveal: def.reveal,
-        warn: None,
-    }
-}
-
-fn marks(world: &World, player: Entity, target: Entity) -> Vec<AttentionId> {
-    let Some(&counterpart) = world.get::<Counterpart>(target) else {
-        return Vec::new();
+    target: Entity,
+    viewers: &[Entity],
+    out: &mut dyn FnMut(Entity, AttentionId),
+) {
+    let Some(owner) = script::owner_of(world, target) else {
+        return;
     };
-    let Some(log) = log_of(world, player) else {
-        return Vec::new();
+    let Some(may_do) = world.resource::<RiftInstances>().may_do(owner) else {
+        return;
     };
+    let mut quests: Vec<(QuestId, bool, bool)> = Vec::new();
+    for reach in &may_do.reaches {
+        let (quest, gives, takes) = match reach {
+            Reach::Offers(quest) | Reach::Accepts(quest) => (*quest, true, false),
+            Reach::TurnsIn(quest) => (*quest, false, true),
+            _ => continue,
+        };
+        match quests.iter_mut().find(|(known, ..)| *known == quest) {
+            Some(known) => {
+                known.1 |= gives;
+                known.2 |= takes;
+            }
+            None => quests.push((quest, gives, takes)),
+        }
+    }
+    if quests.is_empty() {
+        return;
+    }
     let today = world.resource::<WallClock>().day();
     let content = world.resource::<Content>();
-    content
-        .table::<QuestDef>()
-        .iter()
-        .filter_map(|(quest, def)| {
-            let gives = def.giver.counterpart() == Some(counterpart);
-            if !gives && def.turn_in != counterpart {
-                return None;
+    let checks: Vec<QuestCheck> = quests
+        .into_iter()
+        .map(|(quest, gives, takes)| {
+            let def = quest.get(content);
+            QuestCheck {
+                quest,
+                gives,
+                takes,
+                shown: def
+                    .shown()
+                    .map(|shown| CompiledCondition::new(content, shown)),
+                requires: def
+                    .requires()
+                    .map(|requires| CompiledCondition::new(content, requires)),
             }
-            let kind = match log.active(quest) {
-                Some(active) if def.turn_in == counterpart && active.ready => ready_mark(def),
-                Some(_) if def.turn_in == counterpart => AttentionMark::QuestInProgress,
-                Some(_) => return None,
-                None if gives && offerable_in(world, player, log, today, quest) => {
-                    if open_to(world, player, quest) {
+        })
+        .collect();
+    for &player in viewers {
+        let Some(log) = log_of(world, player) else {
+            continue;
+        };
+        for check in &checks {
+            let def = check.quest.get(content);
+            let kind = match log.active(check.quest) {
+                Some(active) if check.takes && active.ready => ready_mark(def),
+                Some(_) if check.takes => AttentionMark::QuestInProgress,
+                Some(_) => continue,
+                None if check.gives
+                    && !log.done_for_now(content, check.quest, today)
+                    && check
+                        .shown
+                        .as_ref()
+                        .is_none_or(|shown| shown.holds(world, player)) =>
+                {
+                    let open = check
+                        .requires
+                        .as_ref()
+                        .is_none_or(|requires| requires.holds(world, player));
+                    if open {
                         offered_mark(def)
                     } else if def.reveals(ChoiceReveal::Locked) {
                         AttentionMark::QuestLocked
                     } else {
-                        return None;
+                        continue;
                     }
                 }
-                None => return None,
+                None => continue,
             };
-            Some(kind.id(content))
-        })
-        .collect()
+            out(player, kind.id(content));
+        }
+    }
 }
 
-fn ready_mark(def: &QuestDef) -> AttentionMark {
+struct QuestCheck {
+    quest: QuestId,
+    gives: bool,
+    takes: bool,
+    shown: Option<CompiledCondition>,
+    requires: Option<CompiledCondition>,
+}
+
+pub fn ready_mark(def: &QuestDef) -> AttentionMark {
     if def.daily() {
         AttentionMark::RepeatableReady
     } else {
@@ -1339,7 +1270,7 @@ fn ready_mark(def: &QuestDef) -> AttentionMark {
     }
 }
 
-fn offered_mark(def: &QuestDef) -> AttentionMark {
+pub fn offered_mark(def: &QuestDef) -> AttentionMark {
     if def.daily() {
         AttentionMark::RepeatableOffered
     } else {
@@ -1378,12 +1309,17 @@ fn quest_command(
     step: QuestStep,
 ) -> Result<String, String> {
     let quest = crate::core::content::named::<QuestDef>(world, &quest)?;
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
     match step {
-        QuestStep::Accept => accept(world, player, quest),
+        QuestStep::Accept => accept(world, player, quest)?,
         QuestStep::Ready => {
-            accept(world, player, quest);
+            let on_it = world
+                .get::<QuestLog>(player)
+                .is_some_and(|log| log.active(quest).is_some());
+            if !on_it {
+                accept(world, player, quest)?;
+            }
             if let Some(mut log) = world.get_mut::<QuestLog>(player)
                 && let Some(active) = log.active.iter_mut().find(|active| active.quest == quest)
             {

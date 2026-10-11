@@ -1,22 +1,33 @@
 use crate::core::math::Percent;
+use crate::core::script::Expr;
 use crate::core::time::Seconds;
-use crate::data::area::Id as AreaId;
-use crate::data::dialogue::Id as DialogueId;
 use crate::data::item::Id as ItemId;
 use crate::data::memory::Id as MemoryId;
 use crate::data::npc::Id as NpcId;
-use crate::data::prop::Id as PropId;
-use crate::systems::area::MarkerName;
 use crate::systems::dialogue::ChoiceReveal::{Costs, Gains, Locked, Needs};
-use crate::systems::interact::Counterpart;
 use crate::systems::item::ItemStack;
-use crate::systems::job::MinLevel;
-use crate::systems::memory::Remembers;
-use crate::systems::quest::{
-    DecisionPath, Giver, Objective, OnQuest, QuestDef, QuestDone, QuestDrop, QuestModule,
-};
-use crate::systems::rule::Not;
+use crate::systems::quest::{DecisionPath, Objective, QuestDef, QuestDrop, QuestModule};
+use crate::systems::script::{Condition, RiftQuery};
 use crate::systems::text::plain;
+
+const LEVEL: Condition = Expr::Query(RiftQuery::Level { of: None });
+const SIDED_WITH_ORCS: Condition = Expr::Query(RiftQuery::Memory {
+    of: None,
+    memory: MemoryId::SidedWithOrcs,
+});
+const NOT_SIDED_WITH_ORCS: Condition = Expr::Not(&SIDED_WITH_ORCS);
+const LEVEL_2: Condition = Expr::AtLeast(&LEVEL, &Expr::Int(2));
+const ON_TUSKS: Condition = Expr::Query(RiftQuery::OnQuest {
+    of: None,
+    quest: Id::TusksForTheChief,
+});
+const BATS_REQUIRES: Condition = Expr::All(&[
+    Expr::AtLeast(&LEVEL, &Expr::Int(3)),
+    Expr::Query(RiftQuery::QuestDone {
+        of: None,
+        quest: Id::LetterForTheCaptain,
+    }),
+]);
 
 crate::table! {
     TusksForTheChief: QuestDef {
@@ -26,23 +37,18 @@ crate::table! {
         xp: 120,
         reveal: &[Locked, Needs, Costs, Gains],
         modules: &[
-            QuestModule::Shown(&[&Not(&Remembers(MemoryId::SidedWithOrcs))]),
-            QuestModule::Requires(&[&MinLevel(2)]),
+            QuestModule::Shown(&NOT_SIDED_WITH_ORCS),
+            QuestModule::Requires(&LEVEL_2),
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::OrcTusk, 5))),
             QuestModule::Objective(Objective::Defeat { npc: NpcId::OrcChief, count: 1 }),
             QuestModule::HandIn(&[ItemStack::new(ItemId::OrcTusk, 5)]),
             QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 35), ItemStack::new(ItemId::GreaterHealthPotion, 2)]),
             QuestModule::PickOne(&[
-            ItemStack::new(ItemId::RustySword, 1),
-            ItemStack::new(ItemId::BoneShield, 1),
-            ItemStack::new(ItemId::TribalHelmet, 1),
-        ]),
+                ItemStack::new(ItemId::RustySword, 1),
+                ItemStack::new(ItemId::BoneShield, 1),
+                ItemStack::new(ItemId::TribalHelmet, 1),
+            ]),
         ],
-        giver: Giver::Npc(NpcId::Mara),
-        turn_in: Counterpart::Npc(NpcId::Mara),
-        offer: DialogueId::TusksOffer,
-        waiting: DialogueId::TusksNotYet,
-        thanks: DialogueId::TusksThanks,
     },
     ShamansPlea: QuestDef {
         title: "The Shaman's Plea",
@@ -51,30 +57,25 @@ crate::table! {
         xp: 80,
         reveal: &[],
         modules: &[
-            QuestModule::Shown(&[&OnQuest(Id::TusksForTheChief)]),
+            QuestModule::Shown(&ON_TUSKS),
             QuestModule::Objective(Objective::Decide {
-            label: "Answer Ugra",
-            paths: &[
-                DecisionPath {
-                    choice: "Give the tusks",
-                    means: &[
-                        "Tusks for the Chief fails",
-                        "Ugra becomes a friend, with quests and goods of her own",
-                        "Mara greets you coldly and won't buy orc goods",
-                    ],
-                },
-                DecisionPath {
-                    choice: "Keep them",
-                    means: &["Tusks for the Chief continues", "Ugra never speaks to you again"],
-                },
-            ],
-        }),
+                label: "Answer Ugra",
+                paths: &[
+                    DecisionPath {
+                        choice: "Give the tusks",
+                        means: &[
+                            "Tusks for the Chief fails",
+                            "Ugra becomes a friend, with quests and goods of her own",
+                            "Mara greets you coldly and won't buy orc goods",
+                        ],
+                    },
+                    DecisionPath {
+                        choice: "Keep them",
+                        means: &["Tusks for the Chief continues", "Ugra never speaks to you again"],
+                    },
+                ],
+            }),
         ],
-        giver: Giver::Npc(NpcId::Ugra),
-        turn_in: Counterpart::Npc(NpcId::Ugra),
-        offer: DialogueId::PleaOffer,
-        waiting: DialogueId::PleaWaiting,
-        thanks: DialogueId::PleaAnswer,
     },
     RestForTheFallen: QuestDef {
         title: "Rest for the Fallen",
@@ -83,17 +84,12 @@ crate::table! {
         xp: 80,
         reveal: &[Costs],
         modules: &[
-            QuestModule::Shown(&[&Remembers(MemoryId::SidedWithOrcs)]),
+            QuestModule::Shown(&SIDED_WITH_ORCS),
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::Bone, 8))),
             QuestModule::HandIn(&[ItemStack::new(ItemId::Bone, 8)]),
             QuestModule::HandOver(&[plain("Here are their bones.")]),
             QuestModule::Reward(&[ItemStack::new(ItemId::GreaterHealthPotion, 2)]),
         ],
-        giver: Giver::Npc(NpcId::Ugra),
-        turn_in: Counterpart::Npc(NpcId::Ugra),
-        offer: DialogueId::FallenOffer,
-        waiting: DialogueId::FallenWaiting,
-        thanks: DialogueId::FallenThanks,
     },
     LetterForTheCaptain: QuestDef {
         title: "A Letter for the Captain",
@@ -108,11 +104,6 @@ crate::table! {
             QuestModule::HandOver(&[plain("Tobb asked me to bring you this.")]),
             QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 10)]),
         ],
-        giver: Giver::Npc(NpcId::Tobb),
-        turn_in: Counterpart::Npc(NpcId::Bram),
-        offer: DialogueId::LetterOffer,
-        waiting: DialogueId::LetterWaiting,
-        thanks: DialogueId::LetterThanks,
     },
     BatsInTheBelfry: QuestDef {
         title: "Bats in the Belfry",
@@ -121,24 +112,19 @@ crate::table! {
         xp: 150,
         reveal: &[Needs, Gains],
         modules: &[
-            QuestModule::Requires(&[&MinLevel(3), &QuestDone(Id::LetterForTheCaptain)]),
+            QuestModule::Requires(&BATS_REQUIRES),
             QuestModule::Objective(Objective::Defeat { npc: NpcId::VampireBat, count: 4 }),
             QuestModule::Objective(Objective::Hold(ItemStack::new(ItemId::BelfryKey, 1))),
             QuestModule::HandIn(&[ItemStack::new(ItemId::BelfryKey, 1)]),
             QuestModule::HandOver(&[plain("Here's your key.")]),
             QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 25), ItemStack::new(ItemId::HealthPotion, 2)]),
             QuestModule::Drop(QuestDrop {
-            from: NpcId::VampireBat,
-            item: ItemId::BelfryKey,
-            chance: Percent(10.0),
-            grows: Percent(15.0),
-        }),
+                from: NpcId::VampireBat,
+                item: ItemId::BelfryKey,
+                chance: Percent(10.0),
+                grows: Percent(15.0),
+            }),
         ],
-        giver: Giver::Npc(NpcId::Bram),
-        turn_in: Counterpart::Npc(NpcId::Bram),
-        offer: DialogueId::BatsOffer,
-        waiting: DialogueId::BatsWaiting,
-        thanks: DialogueId::BatsThanks,
     },
     LowTide: QuestDef {
         title: "Low Tide",
@@ -153,11 +139,6 @@ crate::table! {
             QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 15), ItemStack::new(ItemId::FishingBait, 5)]),
             QuestModule::TimeLimit(Seconds(600.0)),
         ],
-        giver: Giver::Npc(NpcId::Tobb),
-        turn_in: Counterpart::Npc(NpcId::Tobb),
-        offer: DialogueId::LowTideOffer,
-        waiting: DialogueId::LowTideWaiting,
-        thanks: DialogueId::LowTideThanks,
     },
     BoneTithe: QuestDef {
         title: "Bone Tithe",
@@ -172,11 +153,6 @@ crate::table! {
             QuestModule::Reward(&[ItemStack::new(ItemId::BoneToken, 6)]),
             QuestModule::Daily,
         ],
-        giver: Giver::Npc(NpcId::Wren),
-        turn_in: Counterpart::Npc(NpcId::Wren),
-        offer: DialogueId::TitheOffer,
-        waiting: DialogueId::TitheWaiting,
-        thanks: DialogueId::TitheThanks,
     },
     XMarksTheSpot: QuestDef {
         title: "X Marks the Spot",
@@ -185,19 +161,10 @@ crate::table! {
         xp: 100,
         reveal: &[],
         modules: &[
-            QuestModule::Objective(Objective::Explore {
-            area: AreaId::Forest,
-            at: MarkerName("standing-stone"),
-            label: "Find the standing stone",
-        }),
+            QuestModule::Objective(Objective::Task { task: "find_stone", label: "Find the standing stone" }),
             QuestModule::HandIn(&[ItemStack::new(ItemId::TatteredMap, 1)]),
             QuestModule::HandOver(&[plain("Dig where the cross says.")]),
             QuestModule::Reward(&[ItemStack::new(ItemId::Gold, 30), ItemStack::new(ItemId::CorsairCutlass, 1)]),
         ],
-        giver: Giver::Item(ItemId::TatteredMap),
-        turn_in: Counterpart::Prop(PropId::StandingStone),
-        offer: DialogueId::XMarksOffer,
-        waiting: DialogueId::XMarksWaiting,
-        thanks: DialogueId::XMarksThanks,
     },
 }

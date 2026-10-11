@@ -9,7 +9,7 @@ use crate::data;
 use crate::systems::combat::Died;
 use crate::systems::item::{Reservation, ReservedBy, scatter_drop};
 use crate::systems::npc::Npc;
-use crate::systems::player::{Players, Xp};
+use crate::systems::player::Players;
 use crate::systems::visibility::Presence;
 
 #[derive(Message, Clone, Copy, Debug, PartialEq)]
@@ -20,7 +20,7 @@ pub struct KillCredited {
 }
 
 pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let deaths: Vec<Died> = deaths
         .read(world.resource::<Messages<Died>>())
@@ -49,10 +49,8 @@ pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
             let Some(loot) = npc.get(&content).loot() else {
                 continue;
             };
-            if let Some(entity) = rewardee
-                && let Some(mut xp) = world.get_mut::<Xp>(entity)
-            {
-                xp.gain(loot.xp);
+            if let Some(entity) = rewardee {
+                crate::systems::job::grant_xp(world, entity, loot.xp);
             }
             let drops: Vec<(data::item::Id, u32)> = loot
                 .items
@@ -63,7 +61,7 @@ pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
                 })
                 .map(|drop| (drop.item, drop.amount))
                 .collect();
-            let presence = world.get::<Presence>(died.entity).copied();
+            let presence = world.get::<Presence>(died.entity).cloned();
             scatter_drop(world, died.entity, &drops, reserved_by, presence);
         }
     });

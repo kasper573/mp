@@ -1,13 +1,14 @@
 use std::time::Duration;
 
 use bevy::color::Color;
-use bevy::prelude::{Entity, World};
 use serde::{Deserialize, Serialize};
 use ui::tokens::palette;
 use ui::{RichPiece, RichSpan, RichText, TextMotion, TextVoice};
 
+use crate::core::script::{Expr, Value};
 use crate::core::time::Millis;
 use crate::systems::input::map::{self, InputAction, InputMap};
+use crate::systems::script::RiftScripting;
 
 #[derive(Clone, Copy)]
 pub enum Span {
@@ -16,16 +17,10 @@ pub enum Span {
         fx: &'static [Fx],
     },
     Input(InputAction),
-    Fill {
-        fill: &'static dyn TextFill,
+    Value {
+        value: &'static Expr<RiftScripting>,
         fx: &'static [Fx],
     },
-}
-
-pub trait TextFill: Send + Sync {
-    fn text(&self, world: &World, player: Entity) -> String;
-
-    fn check(&self, _content: &crate::core::content::Content) {}
 }
 
 pub const fn plain(text: &'static str) -> Span {
@@ -40,15 +35,18 @@ pub const fn input(action: InputAction) -> Span {
     Span::Input(action)
 }
 
-pub const fn fill(fill: &'static dyn TextFill) -> Span {
-    Span::Fill { fill, fx: &[] }
+pub const fn value(value: &'static Expr<RiftScripting>) -> Span {
+    Span::Value { value, fx: &[] }
 }
 
-pub fn fills(spans: &[Span]) -> impl Iterator<Item = &'static dyn TextFill> + '_ {
-    spans.iter().filter_map(|span| match *span {
-        Span::Fill { fill, .. } => Some(fill),
-        Span::Text { .. } | Span::Input(_) => None,
-    })
+pub fn values(spans: &[Span]) -> Vec<&'static Expr<RiftScripting>> {
+    spans
+        .iter()
+        .filter_map(|span| match *span {
+            Span::Value { value, .. } => Some(value),
+            Span::Text { .. } | Span::Input(_) => None,
+        })
+        .collect()
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -92,7 +90,8 @@ pub enum SpanText {
 }
 
 impl LineText {
-    pub fn spoken(spans: &[Span], world: &World, player: Entity) -> LineText {
+    pub fn spoken(spans: &[Span], values: &[Value]) -> LineText {
+        let mut values = values.iter();
         LineText(
             spans
                 .iter()
@@ -101,14 +100,18 @@ impl LineText {
                         text: text.to_owned(),
                         fx: fx.to_vec(),
                     },
-                    Span::Fill { fill, fx } => SpanText::Text {
-                        text: fill.text(world, player),
+                    Span::Value { fx, .. } => SpanText::Text {
+                        text: values.next().map(Value::as_text).unwrap_or_default(),
                         fx: fx.to_vec(),
                     },
                     Span::Input(action) => SpanText::Input(action),
                 })
                 .collect(),
         )
+    }
+
+    pub fn of(spans: &[Span]) -> LineText {
+        LineText::spoken(spans, &[])
     }
 
     pub fn plain(text: impl Into<String>) -> LineText {

@@ -1,6 +1,7 @@
+use bevy_platform::collections::HashMap;
+use bevy_platform::hash::NoOpHash;
 use std::any::TypeId;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -136,14 +137,14 @@ pub struct UnknownRow {
 /// Collects the unknown rows met while reading, so one parse reports every dangling reference
 /// instead of stopping at the first.
 pub struct ContentScope {
-    keys: HashMap<TypeId, (&'static str, Vec<String>)>,
+    keys: HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>,
     unknown: Vec<UnknownRow>,
 }
 
 impl ContentScope {
     pub fn new() -> ContentScope {
         ContentScope {
-            keys: HashMap::new(),
+            keys: HashMap::default(),
             unknown: Vec::new(),
         }
     }

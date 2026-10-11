@@ -1,14 +1,12 @@
 pub mod load;
+pub mod object;
 pub mod transition;
 pub mod warp;
-pub mod zone;
 
 pub use load::build_area;
-pub use transition::Travel;
-pub use warp::{WarpLock, lock_warps};
-pub use zone::Zone;
+pub use object::{AreaObject, ObjectDef, ObjectShape};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bevy_app::App;
 use bevy_ecs::component::Component;
@@ -19,20 +17,18 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::{AssetRef, AssetService};
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::SoundscapeZone;
-use crate::core::content::Content;
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileSize, Tiles};
 use crate::data;
 use crate::systems::movement;
-use crate::systems::notification::NotificationId;
-use crate::systems::rule::Requirement;
+use crate::systems::script::{Condition, ScriptModule};
 
 pub use crate::data::area::Id;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<AreaTag>()
-        .init_resource::<warp::WarpLocks>();
+    app.replicate::<AreaTag>();
+    object::register(app);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -51,69 +47,55 @@ pub fn wild(world: &World, entity: Entity) -> bool {
 pub struct AreaDef {
     pub name: &'static str,
     pub map: AssetRef,
-    pub populations: &'static [Population],
-    pub residents: &'static [Resident],
-    pub props: &'static [crate::systems::prop::Fixture],
-    pub zones: &'static [Zone],
-    pub intro: Option<NotificationId>,
+    pub modules: &'static [AreaModule],
 }
 
 impl crate::core::content::ContentRow for AreaDef {
     const TABLE: &'static str = "area";
 }
 
-pub struct Population {
-    pub npc: data::npc::Id,
-    pub count: u32,
-    pub roams: Option<MarkerName>,
+#[derive(Clone)]
+pub enum AreaModule {
+    Object(ObjectDef),
+    Population {
+        npc: data::npc::Id,
+        count: u32,
+        roams: Option<Rect<Tiles>>,
+    },
+    Resident {
+        npc: data::npc::Id,
+        at: Pos<Tiles>,
+        shown: Option<&'static Condition>,
+    },
+    Script(ScriptModule),
 }
 
-pub struct Resident {
-    pub npc: data::npc::Id,
-    pub at: MarkerName,
-    pub shown: &'static [&'static dyn Requirement],
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct MarkerName(pub &'static str);
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MapMarker {
-    Point(Pos<Tiles>),
-    Rect(Rect<Tiles>),
-}
-
-impl MapMarker {
-    pub fn center(self) -> Pos<Tiles> {
-        match self {
-            MapMarker::Point(at) => at,
-            MapMarker::Rect(rect) => rect.center(),
-        }
+impl AreaDef {
+    pub fn objects(&self) -> impl Iterator<Item = (u32, &ObjectDef)> {
+        self.modules
+            .iter()
+            .enumerate()
+            .filter_map(|(index, module)| match module {
+                AreaModule::Object(object) => Some((index as u32, object)),
+                _ => None,
+            })
     }
 
-    pub fn covers(self, at: Pos<Tiles>) -> bool {
-        match self {
-            MapMarker::Point(point) => point.cell() == at.cell(),
-            MapMarker::Rect(rect) => rect.contains(at),
-        }
-    }
-}
-
-pub struct StandingOn(pub MarkerName);
-
-impl Requirement for StandingOn {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        let Some(at) = movement::position(world, player) else {
-            return false;
-        };
-        !movement::moving(world, player)
-            && of(world, player)
-                .and_then(|area| area.marker(self.0))
-                .is_some_and(|marker| marker.covers(at))
+    pub fn residents(&self) -> impl Iterator<Item = data::npc::Id> + '_ {
+        self.modules.iter().filter_map(|module| match module {
+            AreaModule::Resident { npc, .. } => Some(*npc),
+            _ => None,
+        })
     }
 
-    fn describe(&self, _content: &Content) -> String {
-        format!("Standing on {}", self.0.0)
+    pub fn scripts(&self) -> Vec<ScriptModule> {
+        self.modules
+            .iter()
+            .filter_map(|module| match module {
+                AreaModule::Script(script) => Some(script.clone()),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -122,14 +104,6 @@ pub fn walkable(world: &World, tile: Pos<Tiles>) -> bool {
         .map(|me| me.id())
         .and_then(|entity| of(world, entity))
         .is_some_and(|area| area.grid.walkable(tile))
-}
-
-#[derive(Clone)]
-pub struct Portal {
-    pub name: String,
-    pub rect: Rect<Tiles>,
-    pub dest_area: Id,
-    pub dest: Pos<Tiles>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -178,32 +152,21 @@ pub struct Area {
     pub airspace: movement::Grid,
     pub wild_airspace: movement::Grid,
     pub safe_zones: Vec<Rect<Tiles>>,
+    pub safe_cells: Vec<bool>,
     pub spawn: Pos<Tiles>,
-    pub portals: Vec<Portal>,
     pub obscuring_rects: Vec<Rect<Tiles>>,
     pub groups: Vec<Group>,
     pub grouped_cells: HashSet<CellPos>,
     pub layers: Vec<RenderLayer>,
-    pub markers: HashMap<String, MapMarker>,
     pub soundscape: Vec<SoundscapeZone>,
     pub map: std::sync::Arc<tiled::Map>,
 }
 
 impl Area {
-    pub fn marker(&self, name: MarkerName) -> Option<MapMarker> {
-        self.markers.get(name.0).copied()
-    }
-
-    pub fn range(&self, name: MarkerName) -> Option<Rect<Tiles>> {
-        match self.marker(name)? {
-            MapMarker::Rect(rect) => Some(rect),
-            MapMarker::Point(_) => None,
-        }
-    }
-
     pub fn safe(&self, at: Pos<Tiles>) -> bool {
-        let center = at.cell().center();
-        self.safe_zones.iter().any(|zone| zone.contains(center))
+        at.cell()
+            .index(self.size.grid())
+            .is_some_and(|index| self.safe_cells[index])
     }
 
     pub fn grid_for(&self, wild: bool) -> &movement::Grid {
@@ -244,61 +207,36 @@ pub fn check(assets: &AssetService) {
     let areas = assets.resolve_all(table.rows().iter().map(|def| def.map), build_area);
     for (id, area) in table.ids().zip(areas) {
         let def = id.get(content);
-        if !def.populations.is_empty() && area.wild_grid.nodes().is_empty() {
-            panic!("area {id:?}: its populations have no ground outside the safe zones");
-        }
-        for population in def.populations {
-            let Some(name) = population.roams else {
-                continue;
-            };
-            let Some(bounds) = area.range(name) else {
-                panic!(
-                    "area {id:?}: {:?} roams '{}', which the map lacks as an area marker",
-                    population.npc, name.0
-                );
-            };
-            if !area
-                .wild_grid
-                .nodes()
-                .iter()
-                .any(|&node| bounds.contains(node))
-            {
-                panic!(
-                    "area {id:?}: {:?} roams '{}', which has no ground outside the safe zones",
-                    population.npc, name.0
-                );
-            }
-        }
-        for resident in def.residents {
-            if area.marker(resident.at).is_none() {
-                panic!(
-                    "area {id:?}: {:?} stands on marker '{}', which the map lacks",
-                    resident.npc, resident.at.0
-                );
-            }
-        }
-        for fixture in def.props {
-            if area.marker(fixture.at).is_none() {
-                panic!(
-                    "area {id:?}: {:?} stands on marker '{}', which the map lacks",
-                    fixture.prop, fixture.at.0
-                );
-            }
-        }
-        for zone in def.zones {
-            if area.marker(zone.at).is_none() {
-                panic!(
-                    "area {id:?}: a zone covers marker '{}', which the map lacks",
-                    zone.at.0
-                );
-            }
-            if let Some(npc) = zone.with
-                && !def.residents.iter().any(|resident| resident.npc == npc)
-            {
-                panic!("area {id:?}: a zone speaks for {npc:?}, who doesn't live here");
-            }
-            for outcome in zone.then {
-                outcome.check(assets);
+        for module in def.modules {
+            match module {
+                AreaModule::Population { npc, roams, .. } => {
+                    let ground = area.wild_grid.nodes();
+                    let has_ground = match roams {
+                        Some(bounds) => ground.iter().any(|&node| bounds.contains(node)),
+                        None => !ground.is_empty(),
+                    };
+                    if !has_ground {
+                        panic!("area {id:?}: {npc:?} roams ground that lies inside the safe zones");
+                    }
+                }
+                AreaModule::Resident { npc, at, shown } => {
+                    if !area.grid.walkable(*at) {
+                        panic!("area {id:?}: {npc:?} stands at {at:?}, which isn't walkable");
+                    }
+                    if let Some(shown) = shown
+                        && let Err(error) = crate::systems::script::condition::check(content, shown)
+                    {
+                        panic!("area {id:?}: {npc:?} shown: {error}");
+                    }
+                }
+                AreaModule::Object(object) => {
+                    if let Some(shown) = object.shown
+                        && let Err(error) = crate::systems::script::condition::check(content, shown)
+                    {
+                        panic!("area {id:?}: object {:?} shown: {error}", object.name);
+                    }
+                }
+                AreaModule::Script(_) => {}
             }
         }
         for layer in area
@@ -313,25 +251,8 @@ pub fn check(assets: &AssetService) {
     }
 }
 
-pub fn conversation_starts(content: &Content) -> Vec<data::dialogue::Id> {
-    content
-        .table::<AreaDef>()
-        .rows()
-        .iter()
-        .flat_map(|def| def.zones)
-        .flat_map(|zone| zone.then)
-        .flat_map(|outcome| outcome.leads_to(content))
-        .collect()
-}
-
 pub fn load(assets: &AssetService, area: Id) -> &'static Area {
     assets.resolve(area.get(assets.content()).map, build_area)
-}
-
-pub fn destination(assets: &AssetService, area: Id, at: MarkerName) -> Option<Pos<Tiles>> {
-    let map = load(assets, area);
-    let spot = map.marker(at)?.center();
-    map.grid.walkable(spot).then_some(spot)
 }
 
 pub fn of(world: &World, entity: Entity) -> Option<&'static Area> {

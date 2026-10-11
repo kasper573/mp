@@ -14,21 +14,30 @@ use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
 use bevy::scene::EntityScene;
+use bevy_replicon::prelude::{SendTargets, ToClients};
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetService;
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
+use crate::core::math::Pos;
 use crate::core::platform::ClientPlatform;
+use crate::core::script::{
+    Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
+};
+use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::data::npc::Id as NpcId;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
+use crate::systems::movement::position;
 use crate::systems::npc::Npc;
 use crate::systems::player::Players;
-use crate::systems::rule::{Outcome, RuleContext};
 use crate::systems::scene::Scene as GameScene;
+use crate::systems::script::condition;
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
+use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::text::{self, LineText, Span, SpanText};
 use crate::systems::visibility;
 
@@ -47,6 +56,7 @@ const LONGEST_NOTIFY_CHARS: usize = 160;
 pub fn register(app: &mut bevy_app::App) {
     use bevy_replicon::prelude::*;
     app.add_mapped_server_message::<NotificationSent>(Channel::Ordered)
+        .add_server_message::<SoundPlayed>(Channel::Ordered)
         .init_resource::<Broadcasts>();
 }
 
@@ -223,7 +233,7 @@ impl NotificationDef {
     pub fn for_player(&self, world: &World, player: Entity) -> Notification {
         Notification {
             kind: self.kind.clone(),
-            text: LineText::spoken(self.text, world, player),
+            text: condition::spoken(world, player, self.text),
             lasts: self.lasts,
         }
     }
@@ -236,13 +246,79 @@ impl NotificationDef {
     }
 }
 
-pub struct Notify(pub NotificationId);
+#[derive(Clone)]
+pub struct Notify {
+    pub who: Aim,
+    pub notification: NotificationId,
+    pub next: Arrow,
+}
 
-impl Outcome for Notify {
-    fn apply(&self, ctx: &mut RuleContext) {
-        let content = ctx.world.resource::<Content>().clone();
-        let notification = self.0.get(&content).for_player(ctx.world, ctx.player);
-        notify_from(ctx.world, ctx.player, ctx.encounter.with, notification);
+impl EffectDef<RiftScripting> for Notify {
+    fn owners(&self) -> &'static [OwnerKind] {
+        ANY_OWNER
+    }
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&self) -> Vec<(Name, Arrow)> {
+        vec![("next", self.next)]
+    }
+    fn pauses(&self) -> bool {
+        false
+    }
+    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, self.who)?;
+        let def = self.notification.get(cx.content).clone();
+        let values = text::values(def.text)
+            .into_iter()
+            .map(|value| cx.expr(value, ValueType::Text).map_err(effects::bad))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Box::new(move |world, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
+                let notification = Notification {
+                    kind: def.kind.clone(),
+                    text: LineText::spoken(def.text, &spoken),
+                    lasts: def.lasts,
+                };
+                notify_from(world, player, cx.owner.entity(), notification);
+            }
+            EffectStep::Output(0)
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::Notifies(self.notification)]
+    }
+}
+
+#[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct SoundPlayed {
+    pub sfx: SfxId,
+    pub at: Option<Pos<Tiles>>,
+}
+
+pub fn play_sound(
+    world: &mut World,
+    owner: Option<Entity>,
+    subject: Option<Entity>,
+    sfx: SfxId,
+    everyone: bool,
+) {
+    let source = owner.or(subject);
+    let at = source.and_then(|source| position(world, source));
+    let played = SoundPlayed { sfx, at };
+    if everyone {
+        let Some(source) = source else {
+            return;
+        };
+        for client in visibility::seen_by(world, source) {
+            world.write_message(ToClients {
+                targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
+                message: played,
+            });
+        }
+    } else if let Some(subject) = subject {
+        visibility::send_private(world, subject, played);
     }
 }
 
@@ -257,15 +333,17 @@ pub fn speakers(content: &Content) -> impl Iterator<Item = NpcId> + '_ {
 pub fn check(assets: &AssetService) {
     let content = assets.content();
     for (id, def) in content.table::<NotificationDef>().iter() {
-        for fill in text::fills(def.text) {
-            fill.check(content);
+        for value in text::values(def.text) {
+            if let Err(error) = condition::check_value(content, value) {
+                panic!("notification {id:?}: {error}");
+            }
         }
         let words: usize = def
             .text
             .iter()
             .map(|span| match span {
                 Span::Text { text, .. } => text.split_whitespace().count(),
-                Span::Input(_) | Span::Fill { .. } => 1,
+                Span::Input(_) | Span::Value { .. } => 1,
             })
             .sum();
         if words > LONGEST_ROW_WORDS {
@@ -346,7 +424,10 @@ impl Plugin for NotificationPlugin {
             OnExit(GameScene::Area),
             crate::systems::scene::despawn_all::<PlacesRoot>,
         )
-        .add_systems(Update, deliver.run_if(in_state(GameScene::Area)));
+        .add_systems(
+            Update,
+            (deliver, deliver_sounds).run_if(in_state(GameScene::Area)),
+        );
     }
 }
 
@@ -417,6 +498,15 @@ fn deliver(world: &mut World, mut cursor: Local<MessageCursor<NotificationSent>>
             continue;
         }
         show(world, notification_sent);
+    }
+}
+
+fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter<PlaySfx>) {
+    for sound in played.read() {
+        sfx.write(PlaySfx {
+            id: sound.sfx,
+            place: sound.at.map_or(SfxPlace::Interface, SfxPlace::World),
+        });
     }
 }
 

@@ -11,6 +11,7 @@ use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::render::{WorldToWindow, tile_to_window};
 use crate::data::attention::Id as AttentionId;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
+use crate::systems::area::AreaObject;
 use crate::systems::attention;
 use crate::systems::combat::Attitude;
 use crate::systems::hud::reconcile_children;
@@ -18,7 +19,6 @@ use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::prop::Prop;
 use crate::systems::scene::Scene as GameScene;
 use bevy::ecs::query::QueryData;
 
@@ -55,10 +55,10 @@ type Labelled = (
     Option<&'static Npc>,
     Option<&'static Owner>,
     Option<&'static Attitude>,
-    Has<Prop>,
+    Has<AreaObject>,
 );
 
-type Plated = Or<(With<Actor>, With<Prop>)>;
+type Plated = Or<(With<Actor>, With<AreaObject>)>;
 
 struct Label {
     name: Option<String>,
@@ -68,9 +68,9 @@ struct Label {
 
 fn label(
     content: &Content,
-    (_, name, npc, owner, attitude, prop): <Labelled as QueryData>::Item<'_, '_>,
+    (_, name, npc, owner, attitude, object): <Labelled as QueryData>::Item<'_, '_>,
 ) -> Option<Label> {
-    if prop {
+    if object {
         return Some(Label {
             name: None,
             role: None,
@@ -192,7 +192,7 @@ fn place_plates(
 }
 
 fn sync_plate_icons(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let viewer = world.resource::<Viewpoint>().0;
     let plates: Vec<(Entity, Entity)> = world
         .resource::<Plates>()

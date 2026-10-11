@@ -6,6 +6,7 @@ use game::core::assets::AssetService;
 use game::core::content::Content;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::data;
+use game::systems::area::AreaModule;
 use game::systems::player::{ClientId, JoinRequest, SpawnPolicy};
 
 pub const PLAYERS_PER_AREA: usize = 25;
@@ -54,12 +55,14 @@ impl Layout {
 /// The NPCs each bench area spawns, read from the content layer (the same area the bench instances).
 pub fn npcs_per_area(content: &Content) -> usize {
     let area = data::settings().bench.get(content);
-    let populations: usize = area
-        .populations
+    area.modules
         .iter()
-        .map(|population| population.count as usize)
-        .sum();
-    populations + area.residents.len()
+        .map(|module| match module {
+            AreaModule::Population { count, .. } => *count as usize,
+            AreaModule::Resident { .. } => 1,
+            _ => 0,
+        })
+        .sum()
 }
 
 /// Exactly `areas` instances of the benchmark area, each populated with its NPCs and players, plus

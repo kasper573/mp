@@ -247,7 +247,7 @@ fn forget(mut bubbles: ResMut<Bubbles>) {
 }
 
 fn place_bubbles(world: &mut World) {
-    let content = world.resource::<Content>().clone();
+    let content = *world.resource::<Content>();
     let Some(window) = window_size(world) else {
         return;
     };
