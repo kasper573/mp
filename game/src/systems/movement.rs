@@ -4,7 +4,6 @@ use bevy_ecs::query::QueryState;
 use bevy_time::Time;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetService;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::{Direction, Offset, Pos, Rect, Rng};
 use crate::core::tiling::{
@@ -327,7 +326,7 @@ fn teleport(
         .map(|tag| tag.area)
         .ok_or_else(|| "target has no area".to_owned())?;
     let dest_area = area.unwrap_or(current);
-    let size = area::load(world.resource::<AssetService>(), dest_area).size;
+    let size = area::load(world.resource::<crate::core::content::Content>(), dest_area).size;
     if !(0.0..=size.width).contains(&x) || !(0.0..=size.height).contains(&y) {
         return Err(format!(
             "({x},{y}) is outside {dest_area:?} ({}x{} tiles)",
@@ -496,10 +495,10 @@ impl Navigator {
 }
 
 fn airborne(world: &World, entity: Entity) -> bool {
-    let assets = world.resource::<AssetService>();
+    let content = world.resource::<crate::core::content::Content>();
     world
         .get::<Actor>(entity)
-        .is_some_and(|actor| crate::systems::actor::model(assets, actor.model).airborne)
+        .is_some_and(|actor| crate::systems::actor::model(content, actor.model).airborne())
 }
 
 fn within(nodes: &[Pos<Tiles>], bounds: Rect<Tiles>) -> Vec<Pos<Tiles>> {

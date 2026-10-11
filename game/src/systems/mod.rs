@@ -36,6 +36,7 @@ pub mod text;
 pub mod view;
 pub mod visibility;
 
+use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -44,6 +45,8 @@ use bevy_ecs::message::{Message, Messages};
 use bevy_ecs::prelude::{Bundle, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
 use bevy_terminal::Terminal;
+
+use crate::core::content::{Content, ContentFolder, ContentRegistry, LoadReport};
 use terminal::TerminalKind;
 
 use actor::{Actor, Hitbox};
@@ -97,18 +100,14 @@ pub fn protocol(app: &mut App) {
 #[derive(Resource, Clone, Copy)]
 pub struct WorldArea(pub area::Id);
 
-#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Resource, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GameSettings {
-    pub name: &'static str,
-    pub spawn: SpawnPlace,
-    pub player: crate::data::player::Id,
+    pub name: String,
+    pub content_version: crate::core::content::ContentVersion,
+    pub spawn: script::Place,
+    pub player: player::Id,
     pub bench: area::Id,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SpawnPlace {
-    pub area: area::Id,
-    pub at: crate::core::math::Pos<crate::core::tiling::Tiles>,
 }
 
 #[derive(Bundle)]
@@ -127,7 +126,7 @@ pub fn server_app(
     area: area::Id,
     ordinal: u64,
     clock: crate::core::time::WallClock,
-    assets: &crate::core::assets::AssetService,
+    assets: &Content,
 ) -> App {
     use bevy_app::{First, PostUpdate, Startup, Update};
     use bevy_ecs::schedule::{IntoScheduleConfigs, Schedules, SingleThreadedExecutor};
@@ -137,13 +136,11 @@ pub fn server_app(
 
     let mut app = App::new();
     app.insert_resource(WorldArea(area));
-    app.insert_resource(crate::data::settings());
+    app.insert_resource(assets.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(*assets.content());
-    app.insert_resource(assets.clone());
-    let scripts = script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
-    app.insert_resource(quest::Parties::of(assets.content(), &scripts));
-    app.insert_resource(scripts);
+    app.insert_resource(*assets);
+    app.insert_resource(assets.built::<quest::Parties>().clone());
+    app.insert_resource(assets.built::<script::RiftScripts>().clone());
     app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     app.add_plugins(
@@ -279,42 +276,81 @@ pub fn step_areas(apps: &mut [App], clock: crate::core::time::WallClock) {
         });
 }
 
-pub fn check_content(assets: &crate::core::assets::AssetService) {
-    check_fixtures(assets.content());
-    interface::check(assets);
-    actor::check(assets);
-    area::check(assets);
-    npc::check(assets);
-    shop::check(assets);
-    quest::check(assets);
-    notification::check(assets);
-    let scripts = script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
-    quest::check_parties(
-        assets.content(),
-        &quest::Parties::of(assets.content(), &scripts),
-    );
-    script::check(assets, &scripts);
+pub fn load_content(
+    folder: std::sync::Arc<dyn ContentFolder>,
+    outcome: &str,
+) -> Result<Content, LoadReport> {
+    crate::core::content::load(
+        &registry(),
+        folder,
+        crate::core::content::version::build(),
+        outcome,
+    )
 }
 
-fn check_fixtures(content: &crate::core::content::Content) {
-    use crate::core::content::{ContentRow, Fixture};
-    fn missing<F: Fixture>(content: &crate::core::content::Content) -> Vec<String> {
-        F::missing(content)
-            .into_iter()
-            .map(|key| format!("{}/{key}", F::Row::TABLE))
-            .collect()
+pub fn registry() -> ContentRegistry {
+    use crate::core::content::LoadStep;
+    let mut registry = ContentRegistry::default();
+    registry
+        .row::<crate::core::audio::playback::SfxDef>()
+        .row::<attention::AttentionDef>()
+        .row::<input::map::InputDef>()
+        .row::<interface::CursorDef>()
+        .row::<interface::FontDef>()
+        .row::<interface::InterfaceIconDef>()
+        .row::<item::ItemDef>()
+        .modules::<item::ItemDef>()
+        .row::<job::JobDef>()
+        .row::<memory::MemoryDef>()
+        .row::<notification::NotificationDef>()
+        .row::<npc::NpcDef>()
+        .modules::<npc::NpcDef>()
+        .row::<player::PlayerDef>()
+        .modules::<player::PlayerDef>()
+        .row::<quest::QuestDef>()
+        .modules::<quest::QuestDef>()
+        .row::<script::ScriptDef>()
+        .row::<shop::ShopDef>()
+        .modules::<shop::ShopDef>()
+        .fixture::<input::map::InputAction>()
+        .fixture::<attention::AttentionMark>()
+        .fixture::<interface::InterfaceSound>()
+        .fixture::<interface::CursorShape>()
+        .fixture::<interface::InterfaceIcon>()
+        .fixture::<interface::FontFace>()
+        .settings::<GameSettings>()
+        .hook(LoadStep::Files, crate::core::content::media::check_media);
+    crate::core::babble::content(&mut registry);
+    actor::content(&mut registry);
+    area::content(&mut registry);
+    registry
+        .hook(LoadStep::Blueprints, script::build_all)
+        .hook(LoadStep::Across, shop::check_all)
+        .hook(LoadStep::Across, quest::check_all)
+        .hook(LoadStep::Across, notification::check_all)
+        .hook(LoadStep::Across, script::check_all)
+        .hook(LoadStep::Settings, check_settings);
+    registry
+}
+
+impl crate::core::content::Settings for GameSettings {
+    fn content_version(&self) -> &crate::core::content::ContentVersion {
+        &self.content_version
     }
-    let missing: Vec<String> = [
-        missing::<input::map::InputAction>(content),
-        missing::<attention::AttentionMark>(content),
-        missing::<interface::InterfaceSound>(content),
-        missing::<interface::CursorShape>(content),
-        missing::<interface::InterfaceIcon>(content),
-        missing::<interface::FontFace>(content),
-    ]
-    .concat();
-    if !missing.is_empty() {
-        panic!("missing fixture rows: {}", missing.join(", "));
+}
+
+fn check_settings(loading: &mut crate::core::content::Loading) {
+    let content = loading.content();
+    let settings = content.built::<GameSettings>();
+    if let Err(problem) = area::check_place(&content, settings.spawn) {
+        loading.json_error(
+            "game.json",
+            "/spawn",
+            problem.rule,
+            problem.found,
+            problem.expected,
+            problem.nearest,
+        );
     }
 }
 

@@ -92,7 +92,8 @@ fn presence_by_condition_follows_the_players_memory() {
         of: None,
         memory: row("PellDead"),
     })));
-    let pell_alive: &'static Condition = Box::leak(Box::new(Expr::Not(pell_dead)));
+    let pell_alive: &'static Condition =
+        Box::leak(Box::new(Expr::Not(Box::new(pell_dead.clone()))));
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let orc = orc_near(&mut sim, player);

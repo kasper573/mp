@@ -965,8 +965,8 @@ fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, mut flow: Flow<V>, c
                         label: &choice.label,
                         locked: !met,
                         requires: choice.requires.as_ref(),
-                        reveal: choice.reveal,
-                        warn: choice.warn,
+                        reveal: choice.reveal.as_slice(),
+                        warn: choice.warn.as_deref(),
                         leads,
                     });
                 }

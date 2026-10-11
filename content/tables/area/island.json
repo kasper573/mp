@@ -439,50 +439,50 @@
     {
       "type": "resident",
       "npc": "grisha",
-      "at": [
-        34.0,
-        27.0
-      ]
+      "at": {
+        "x": 34.0,
+        "y": 27.0
+      }
     },
     {
       "type": "resident",
       "npc": "mara",
-      "at": [
-        43.0,
-        21.0
-      ]
+      "at": {
+        "x": 43.0,
+        "y": 21.0
+      }
     },
     {
       "type": "resident",
       "npc": "tobb",
-      "at": [
-        50.0,
-        26.0
-      ]
+      "at": {
+        "x": 50.0,
+        "y": 26.0
+      }
     },
     {
       "type": "resident",
       "npc": "bram",
-      "at": [
-        44.0,
-        28.0
-      ]
+      "at": {
+        "x": 44.0,
+        "y": 28.0
+      }
     },
     {
       "type": "resident",
       "npc": "wren",
-      "at": [
-        33.0,
-        29.0
-      ]
+      "at": {
+        "x": 33.0,
+        "y": 29.0
+      }
     },
     {
       "type": "resident",
       "npc": "pell",
-      "at": [
-        43.0,
-        30.0
-      ],
+      "at": {
+        "x": 43.0,
+        "y": 30.0
+      },
       "shown": {
         "type": "all",
         "of": [
@@ -507,10 +507,10 @@
     {
       "type": "resident",
       "npc": "ilsa",
-      "at": [
-        36.0,
-        25.0
-      ]
+      "at": {
+        "x": 36.0,
+        "y": 25.0
+      }
     },
     {
       "type": "safe_zone",

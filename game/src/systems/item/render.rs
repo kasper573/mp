@@ -1,4 +1,3 @@
-use crate::core::assets::AssetService;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::math::{Pos, WorldPx};
@@ -87,7 +86,7 @@ fn attach_drop_sprite(
     let Ok(dropped) = drops.get(add.entity) else {
         return;
     };
-    let image = assets.load(dropped.item.get(&content).icon.0);
+    let image = assets.load(dropped.item.get(&content).icon.path());
     commands.entity(add.entity).insert((
         Sprite {
             image,
@@ -139,7 +138,7 @@ fn start_drops(
 }
 
 fn place_drops(
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut drops: Query<(&Position, &AreaTag, &mut Transform), With<DroppedItem>>,
 ) {
     for (position, tag, mut transform) in &mut drops {
@@ -149,7 +148,7 @@ fn place_drops(
 
 fn animate_drops(
     time: Res<Time>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut drops: Query<(Entity, &Position, &AreaTag, &mut DropAnim, &mut Transform)>,
     mut play: MessageWriter<PlaySfx>,
     mut commands: Commands,
@@ -177,9 +176,9 @@ fn animate_drops(
     }
 }
 
-fn drop_z(service: &AssetService, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
+fn drop_z(service: &Content, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
     let area = area::load(service, tag.area);
-    dynamic_z(area.size.height, area.dynamic_layer() as f32, Tiles(pos.y))
+    dynamic_z(area.size.height, area.sort_base(), Tiles(pos.y))
 }
 
 fn ease_out(t: f32) -> f32 {

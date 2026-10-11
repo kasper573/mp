@@ -29,10 +29,11 @@ test(
         await page.waitForTimeout(300);
       }
       const { soundscape, me } = await probe(page);
-      const zone = (name: string) => soundscape.zones.find((zone) => zone.name === name)!;
-      const town = zone("harbour-town");
-      const grove = zone("palm-grove");
-      const jetty = zone("jetty");
+      const zone = (track: string) =>
+        soundscape.zones.find((zone) => zone.tracks.some((played) => played.src.endsWith(track)))!;
+      const town = zone("harbour.flac");
+      const grove = zone("lagoon.flac");
+      const jetty = zone("timbers.flac");
       const home = me!.at;
 
       await caption(page, "Soundscape zones lay music and ambience over the map, each track on a numbered channel, fading out past their edges");

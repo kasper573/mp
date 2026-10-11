@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
-use game::data::item::Id as ItemId;
 use game::systems::dialogue::{ConversationPanel, ConversationRequest};
+use game::systems::item::Id as ItemId;
 use game::systems::item::{
     DropItemRequest, DroppedItem, INVENTORY_MAX, Inventory, ItemStack, UseItemRequest,
 };

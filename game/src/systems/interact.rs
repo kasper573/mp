@@ -1,14 +1,15 @@
 use bevy_app::App;
 use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::script::Owner;
 use crate::core::tiling::Tiles;
-use crate::data::attention::Id as AttentionId;
 use crate::systems::actor;
+use crate::systems::attention::Id as AttentionId;
 use crate::systems::attention::{self, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
@@ -26,7 +27,7 @@ pub fn register(app: &mut App) {
     attention::mark_source(app, marks);
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Verb {
     Talk,

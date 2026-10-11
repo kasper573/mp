@@ -8,6 +8,7 @@ authors = ["kasper573"]
 
 [dependencies]
 serde.workspace = true
+schemars = "1"
 bevy_app = { workspace = true }
 bevy_ecs = { workspace = true }
 bevy_ui = { workspace = true }

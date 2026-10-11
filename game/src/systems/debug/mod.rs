@@ -1,6 +1,6 @@
 mod soundscape;
 
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::math::{Offset, Rect};
 use crate::core::tiling::{self, Cell, TilePos, Tiles};
 use crate::systems::actor::{Actor, Hitbox};
@@ -43,7 +43,6 @@ enum DebugMode {
     #[default]
     Off,
     Nodes,
-    Obscured,
     SafeZones,
     Soundscapes,
 }
@@ -52,8 +51,7 @@ fn cycle(input: ActionInput, mut mode: ResMut<DebugMode>) {
     if input.just_pressed(InputAction::CycleDebugView) {
         *mode = match *mode {
             DebugMode::Off => DebugMode::Nodes,
-            DebugMode::Nodes => DebugMode::Obscured,
-            DebugMode::Obscured => DebugMode::SafeZones,
+            DebugMode::Nodes => DebugMode::SafeZones,
             DebugMode::SafeZones => DebugMode::Soundscapes,
             DebugMode::Soundscapes => DebugMode::Off,
         };
@@ -63,7 +61,7 @@ fn cycle(input: ActionInput, mut mode: ResMut<DebugMode>) {
 fn draw(
     mode: Res<DebugMode>,
     viewpoint: Res<Viewpoint>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     areas: Query<&AreaTag>,
     mut gizmos: Gizmos,
 ) {
@@ -88,11 +86,6 @@ fn draw(
                         gizmos.line_2d(node.to_screen(), neighbor.to_screen(), red);
                     }
                 }
-            }
-        }
-        DebugMode::Obscured => {
-            for rect in &area.obscuring_rects {
-                outline(&mut gizmos, *rect, red);
             }
         }
         DebugMode::SafeZones => {

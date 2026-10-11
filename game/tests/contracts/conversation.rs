@@ -3,7 +3,7 @@ use game::core::content::Fixture;
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::data::attention::Id as AttentionId;
+use game::systems::attention::Id as AttentionId;
 use game::systems::attention::{Attention, AttentionMark};
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;

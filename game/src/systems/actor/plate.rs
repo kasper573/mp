@@ -9,10 +9,10 @@ use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::render::{WorldToWindow, tile_to_window};
-use crate::data::attention::Id as AttentionId;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
 use crate::systems::area::AreaObject;
 use crate::systems::attention;
+use crate::systems::attention::Id as AttentionId;
 use crate::systems::combat::Attitude;
 use crate::systems::hud::reconcile_children;
 use crate::systems::movement::{Position, RenderPosition};
@@ -213,7 +213,7 @@ fn sync_plate_icons(world: &mut World) {
             let assets = world.resource::<AssetServer>();
             marks
                 .iter()
-                .map(|mark| assets.load(mark.get(&content).icon.0))
+                .map(|mark| assets.load(mark.get(&content).icon.path()))
                 .collect()
         };
         reconcile_children(world, row, &keys, |_, index| {

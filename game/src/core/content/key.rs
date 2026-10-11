@@ -36,26 +36,3 @@ pub const fn key_of(ident: &str) -> KeyBuf {
     }
     KeyBuf { bytes, len }
 }
-
-pub const fn sorted_index(keys: &[KeyBuf], key: &KeyBuf) -> u32 {
-    let mut before = 0;
-    let mut i = 0;
-    while i < keys.len() {
-        if less(keys[i].bytes(), key.bytes()) {
-            before += 1;
-        }
-        i += 1;
-    }
-    before
-}
-
-const fn less(a: &[u8], b: &[u8]) -> bool {
-    let mut i = 0;
-    while i < a.len() && i < b.len() {
-        if a[i] != b[i] {
-            return a[i] < b[i];
-        }
-        i += 1;
-    }
-    a.len() < b.len()
-}

@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use bevy_ecs::prelude::*;
 
 use crate::core::content::{Content, Fixture};
-use crate::data::item::Id as ItemId;
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
+use crate::systems::item::Id as ItemId;
 use crate::systems::item::Inventory;
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
@@ -138,12 +138,12 @@ fn item_row(content: &Content, item: ItemId, change: i32) -> Notification {
     Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Item,
-            icon: Some(item.get(content).icon.0.to_owned()),
+            icon: Some(item.get(content).icon.path()),
             tally: Some(RecordTally::Change(change)),
             failure: false,
             sfx: Some(sfx),
         },
-        LineText::plain(item.get(content).name),
+        LineText::plain(&*item.get(content).name),
     )
 }
 
@@ -151,7 +151,7 @@ fn worn_row(content: &Content, text: String, item: ItemId) -> Notification {
     Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Item,
-            icon: Some(item.get(content).icon.0.to_owned()),
+            icon: Some(item.get(content).icon.path()),
             tally: None,
             failure: false,
             sfx: Some(item.get(content).sfx.trade),

@@ -16,10 +16,11 @@ use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ConnectedClient, RepliconChannels, ServerState};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use bevy_state::prelude::NextState;
-use game::core::assets::{AssetService, FilesystemSource};
-use game::core::content::Content;
+use game::core::content::sync::{ServedContent, well_formed_hash};
+use game::core::content::{Content, FilesystemFolder, version};
 use game::core::net::channels::RenetChannelsExt;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
+use game::systems::GameSettings;
 use game::systems::account::Identity;
 use game::systems::area::AreaDef;
 use game::systems::area::transition;
@@ -41,7 +42,7 @@ struct Config {
     ws_port: u16,
     max_clients: usize,
     areas: Areas,
-    assets_dir: PathBuf,
+    content_dir: PathBuf,
     player_spawn_type: SpawnPolicy,
     player_immortal: bool,
     daily_reset_utc_hour: UtcHour,
@@ -75,6 +76,10 @@ impl<'de> serde::Deserialize<'de> for Areas {
 }
 
 fn main() {
+    if std::env::args().any(|arg| arg == "--build-info") {
+        println!("{}", build_info());
+        return;
+    }
     let config: Config = envy::prefixed("RIFT_GAME_SERVER_")
         .from_env()
         .expect("RIFT_GAME_SERVER_* environment");
@@ -94,14 +99,39 @@ fn main() {
     // accept/read/write tasks; it outlives `main` because `simulate` never returns.
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
+    let content = game::systems::load_content(
+        Arc::new(FilesystemFolder(config.content_dir.clone())),
+        "the server did not start",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    });
+    let settings = content.built::<GameSettings>();
+    let served = ServedContent::new(
+        &content,
+        &FilesystemFolder(config.content_dir.clone()),
+        version::build(),
+        &settings.name,
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("{}: {error}", config.content_dir.display());
+        std::process::exit(2);
+    });
+
     let metrics = service::recorder();
     let sessions = Sessions::default();
     let http = Http {
         sessions: sessions.clone(),
         verifier: verifier(),
         allow_fake_users: config.allow_fake_users,
+        served: Arc::new(served),
     };
-    let api = serve_http(http_bind, http, metrics);
+    let listener = runtime
+        .block_on(tokio::net::TcpListener::bind(http_bind))
+        .unwrap_or_else(|error| panic!("cannot bind {http_bind}: {error}"));
+    let http_addr = listener.local_addr().expect("bound http address");
+    let api = serve_http(listener, http, metrics);
 
     let settings = Settings {
         areas: config.areas,
@@ -110,16 +140,23 @@ fn main() {
         immortal: Immortal(config.player_immortal),
         reset: config.daily_reset_utc_hour,
     };
-    let assets = AssetService::new(FilesystemSource(config.assets_dir), game::data::build());
-    game::systems::check_content(&assets);
     simulate(
         ws_bind,
+        http_addr,
         sessions,
         runtime.handle().clone(),
-        assets,
+        content,
         settings,
         api,
     );
+}
+
+fn build_info() -> String {
+    serde_json::json!({
+        "build": version::build(),
+        "content_version": game::systems::registry().version().0,
+    })
+    .to_string()
 }
 
 struct Settings {
@@ -132,9 +169,10 @@ struct Settings {
 
 fn simulate(
     ws_bind: SocketAddr,
+    http_addr: SocketAddr,
     sessions: Sessions,
     runtime: tokio::runtime::Handle,
-    assets: AssetService,
+    assets: Content,
     settings: Settings,
     api: impl Future<Output = ()> + Send + 'static,
 ) {
@@ -145,10 +183,10 @@ fn simulate(
         immortal,
         reset,
     } = settings;
-    let area_ids = select_areas(assets.content(), areas);
+    let area_ids = select_areas(&assets, areas);
     let spawn = area_ids
         .iter()
-        .position(|id| *id == game::data::settings().spawn.area)
+        .position(|id| *id == assets.built::<GameSettings>().spawn.area)
         .unwrap_or(0);
     let mut worlds: Vec<App> = area_ids
         .iter()
@@ -177,8 +215,15 @@ fn simulate(
     runtime.spawn(api);
 
     println!(
-        "mmo server listening: websocket {ws_bind} ({} area worlds)",
-        worlds.len()
+        "{}",
+        serde_json::json!({
+            "ready": {
+                "build": version::build(),
+                "content_version": assets.built::<GameSettings>().content_version.0,
+                "http": http_addr.port(),
+                "ws": transport.local_addr().port(),
+            }
+        })
     );
 
     let mut conns: HashMap<u64, Conn> = HashMap::new();
@@ -376,18 +421,18 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, areas: Areas) -> Vec<game::data::area::Id> {
+fn select_areas(content: &Content, areas: Areas) -> Vec<game::systems::area::Id> {
     match areas {
         Areas::Real => content.ids::<AreaDef>().collect(),
         // The bench area is one template instanced `count` times; the count is bounded only by the
         // machine, not by how many area rows the content table happens to define.
-        Areas::Bench(count) => vec![game::data::settings().bench; count],
+        Areas::Bench(count) => vec![content.built::<GameSettings>().bench; count],
     }
 }
 
 fn build_world(
     area: game::systems::area::Id,
-    assets: &AssetService,
+    assets: &Content,
     spawn_policy: SpawnPolicy,
     immortal: Immortal,
     ordinal: u64,
@@ -557,22 +602,56 @@ struct Http {
     sessions: Sessions,
     verifier: Arc<Mutex<auth::Verifier>>,
     allow_fake_users: bool,
+    served: Arc<ServedContent>,
 }
 
-async fn serve_http(addr: SocketAddr, http: Http, metrics: service::PrometheusHandle) {
+async fn serve_http(
+    listener: tokio::net::TcpListener,
+    http: Http,
+    metrics: service::PrometheusHandle,
+) {
     let router = service::track(
         axum::Router::new()
             .route("/session", post(session))
             .route("/health", get(health))
+            .route("/content/manifest", get(manifest))
+            .route("/content/files/{hash}", get(content_file))
             .with_state(http),
         metrics,
     );
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .unwrap_or_else(|error| panic!("cannot bind {addr}: {error}"));
-    println!("http listening on {addr}");
     ctrlc::set_handler(|| std::process::exit(0)).expect("install stop handler");
     axum::serve(listener, router).await.expect("axum serves");
+}
+
+async fn manifest(State(http): State<Http>) -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        serde_json::to_string(&http.served.manifest).expect("manifest serializes"),
+    )
+        .into_response()
+}
+
+async fn content_file(
+    State(http): State<Http>,
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> Response {
+    if !well_formed_hash(&hash) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    match http.served.file(&hash) {
+        Some(bytes) => (
+            [
+                (header::CONTENT_TYPE, "application/octet-stream"),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+            ],
+            bytes.to_vec(),
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {

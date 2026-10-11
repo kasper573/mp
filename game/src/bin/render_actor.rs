@@ -14,12 +14,10 @@ use bevy::render::settings::{Backends, RenderCreation, WgpuSettings};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use bevy::window::ExitCondition;
 
-use game::core::assets::{AssetService, FilesystemSource};
-use game::core::content::Content;
+use game::core::content::{Content, FilesystemFolder};
 use game::core::math::{Direction, Size, WorldPx};
 use game::core::time::{PlaybackRate, Seconds};
-use game::data::model;
-use game::systems::actor::bust::ModelDef;
+use game::systems::actor::bust::{self as model, ModelDef};
 use game::systems::actor::render::{ACTOR_ANCHOR, draw_actor_frame};
 use game::systems::actor::{self, Action, ActorModel};
 
@@ -43,7 +41,7 @@ const COLUMNS: [(Direction, &str); 8] = [
 
 #[derive(serde::Deserialize)]
 struct Config {
-    assets_dir: PathBuf,
+    content_dir: PathBuf,
 }
 
 struct Clip {
@@ -94,16 +92,23 @@ fn main() {
     let config: Config = envy::prefixed("RIFT_RENDER_")
         .from_env()
         .expect("RIFT_RENDER_* environment");
-    let assets_dir = std::fs::canonicalize(&config.assets_dir)
-        .unwrap_or_else(|error| fail(&format!("{}: {error}", config.assets_dir.display())));
+    let content_dir = std::fs::canonicalize(&config.content_dir)
+        .unwrap_or_else(|error| fail(&format!("{}: {error}", config.content_dir.display())));
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [names, animations, loops, out] = args.as_slice() else {
         fail("usage: render-actor <names|\"\"> <animations|\"\"> <loops> <out.mp4>");
     };
     let out = PathBuf::from(out);
 
-    let service = AssetService::new(FilesystemSource(assets_dir.clone()), game::data::build());
-    let models = select_models(service.content(), names);
+    let service = game::systems::load_content(
+        std::sync::Arc::new(FilesystemFolder(content_dir.clone())),
+        "the program stopped",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    });
+    let models = select_models(&service, names);
     let loops: usize = loops
         .parse()
         .ok()
@@ -134,7 +139,7 @@ fn main() {
                 ..default()
             })
             .set(AssetPlugin {
-                file_path: assets_dir.to_string_lossy().into_owned(),
+                file_path: content_dir.to_string_lossy().into_owned(),
                 ..default()
             })
             .set(ImagePlugin::default_nearest())
@@ -153,7 +158,6 @@ fn main() {
             }),
     )
     .insert_resource(ClearColor(Color::srgb_u8(0x24, 0x27, 0x2e)))
-    .insert_resource(*service.content())
     .insert_resource(service)
     .insert_resource(Sink::spawn(&out, layout.width, layout.height))
     .add_systems(Update, advance);
@@ -201,7 +205,7 @@ fn select_models(content: &Content, names: &str) -> Vec<model::Id> {
         .collect()
 }
 
-fn plan(service: &AssetService, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
+fn plan(service: &Content, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
     let wanted: Vec<Action> = split(animations)
         .into_iter()
         .map(|name| {
@@ -244,7 +248,7 @@ fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     ((length.0 * FPS).round() as usize).max(1)
 }
 
-fn layout(service: &AssetService, models: &[model::Id]) -> Layout {
+fn layout(service: &Content, models: &[model::Id]) -> Layout {
     let drawn = models
         .iter()
         .map(|&id| {
@@ -269,12 +273,12 @@ fn layout(service: &AssetService, models: &[model::Id]) -> Layout {
 }
 
 fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
-    let service = world.resource::<AssetService>().clone();
+    let service = *world.resource::<Content>();
     let assets = world.resource::<AssetServer>().clone();
     let sheets: BTreeMap<model::Id, Handle<Image>> = clips
         .iter()
         .map(|clip| {
-            let sheet = resolve(&service, clip.model).sheet().to_owned();
+            let sheet = resolve(&service, clip.model).sheet().path();
             (clip.model, assets.load(sheet))
         })
         .collect();
@@ -371,7 +375,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
 fn advance(
     mut commands: Commands,
     mut reel: ResMut<Reel>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     assets: Res<AssetServer>,
     mut slots: Query<(&Slot, &mut Sprite, &mut Visibility)>,
     mut caption: Single<&mut Text, With<Caption>>,
@@ -436,7 +440,7 @@ fn locate(clips: &[Clip], mut index: usize) -> (&Clip, usize) {
     unreachable!("frame index past the last clip")
 }
 
-fn resolve(service: &AssetService, id: model::Id) -> &'static ActorModel {
+fn resolve(service: &Content, id: model::Id) -> &'static ActorModel {
     actor::model(service, id)
 }
 

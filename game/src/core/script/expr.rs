@@ -1,42 +1,41 @@
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
+use std::borrow::Cow;
 
-use super::{Name, Vocabulary};
+use super::Vocabulary;
 
 #[derive(Clone)]
 pub enum Expr<V: Vocabulary> {
     Bool(bool),
     Int(i64),
     Num(f64),
-    Text(Name),
-    Var(Name),
-    Local(Name),
-    State(Name),
-    Event(Name),
+    Text(String),
+    Var(String),
+    Local(String),
+    State(String),
+    Event(String),
     Query(V::Query),
-    All(&'static [Expr<V>]),
-    Any(&'static [Expr<V>]),
-    Not(&'static Expr<V>),
-    Equal(&'static Expr<V>, &'static Expr<V>),
-    NotEqual(&'static Expr<V>, &'static Expr<V>),
-    Less(&'static Expr<V>, &'static Expr<V>),
-    AtMost(&'static Expr<V>, &'static Expr<V>),
-    More(&'static Expr<V>, &'static Expr<V>),
-    AtLeast(&'static Expr<V>, &'static Expr<V>),
-    Add(&'static Expr<V>, &'static Expr<V>),
-    Subtract(&'static Expr<V>, &'static Expr<V>),
-    Multiply(&'static Expr<V>, &'static Expr<V>),
-    Divide(&'static Expr<V>, &'static Expr<V>),
-    Min(&'static Expr<V>, &'static Expr<V>),
-    Max(&'static Expr<V>, &'static Expr<V>),
-    Round(&'static Expr<V>),
-    Join(&'static [Expr<V>]),
+    All(Vec<Expr<V>>),
+    Any(Vec<Expr<V>>),
+    Not(Box<Expr<V>>),
+    Equal(Box<Expr<V>>, Box<Expr<V>>),
+    NotEqual(Box<Expr<V>>, Box<Expr<V>>),
+    Less(Box<Expr<V>>, Box<Expr<V>>),
+    AtMost(Box<Expr<V>>, Box<Expr<V>>),
+    More(Box<Expr<V>>, Box<Expr<V>>),
+    AtLeast(Box<Expr<V>>, Box<Expr<V>>),
+    Add(Box<Expr<V>>, Box<Expr<V>>),
+    Subtract(Box<Expr<V>>, Box<Expr<V>>),
+    Multiply(Box<Expr<V>>, Box<Expr<V>>),
+    Divide(Box<Expr<V>>, Box<Expr<V>>),
+    Min(Box<Expr<V>>, Box<Expr<V>>),
+    Max(Box<Expr<V>>, Box<Expr<V>>),
+    Round(Box<Expr<V>>),
+    Join(Vec<Expr<V>>),
 }
 
-impl<V: Vocabulary> Serialize for Expr<V>
-where
-    V::Query: Serialize,
-{
+impl<V: Vocabulary> Serialize for Expr<V> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
             Expr::Bool(value) => serializer.serialize_bool(*value),
@@ -88,6 +87,143 @@ fn tagged<S: Serializer, T: Serialize + ?Sized>(
     map.serialize_entry("type", kind)?;
     map.serialize_entry(field, value)?;
     map.end()
+}
+
+impl<V: Vocabulary> JsonSchema for Expr<V> {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("Expr")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        ExprRow::<V>::json_schema(generator)
+    }
+}
+
+impl<'de, V: Vocabulary> Deserialize<'de> for Expr<V> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Expr<V>, D::Error> {
+        Ok(match ExprRow::<V>::deserialize(deserializer)? {
+            ExprRow::Bool(value) => Expr::Bool(value),
+            ExprRow::Int(value) => Expr::Int(value),
+            ExprRow::Num(value) => Expr::Num(value),
+            ExprRow::Text(value) => Expr::Text(value),
+            ExprRow::Var { var } => Expr::Var(var),
+            ExprRow::Tagged(tagged) => match tagged {
+                Tagged::Local { local } => Expr::Local(local),
+                Tagged::State { state } => Expr::State(state),
+                Tagged::Event { event } => Expr::Event(event),
+                Tagged::All { of } => Expr::All(of),
+                Tagged::Any { of } => Expr::Any(of),
+                Tagged::Join { of } => Expr::Join(of),
+                Tagged::Not { of } => Expr::Not(of),
+                Tagged::Round { of } => Expr::Round(of),
+                Tagged::Equal { a, b } => Expr::Equal(a, b),
+                Tagged::NotEqual { a, b } => Expr::NotEqual(a, b),
+                Tagged::Less { a, b } => Expr::Less(a, b),
+                Tagged::AtMost { a, b } => Expr::AtMost(a, b),
+                Tagged::More { a, b } => Expr::More(a, b),
+                Tagged::AtLeast { a, b } => Expr::AtLeast(a, b),
+                Tagged::Add { a, b } => Expr::Add(a, b),
+                Tagged::Subtract { a, b } => Expr::Subtract(a, b),
+                Tagged::Multiply { a, b } => Expr::Multiply(a, b),
+                Tagged::Divide { a, b } => Expr::Divide(a, b),
+                Tagged::Min { a, b } => Expr::Min(a, b),
+                Tagged::Max { a, b } => Expr::Max(a, b),
+                Tagged::Query(query) => Expr::Query(query),
+            },
+        })
+    }
+}
+
+#[derive(JsonSchema, Deserialize)]
+#[serde(untagged, bound = "")]
+#[schemars(bound = "")]
+enum ExprRow<V: Vocabulary> {
+    Bool(bool),
+    Int(i64),
+    Num(f64),
+    Text(String),
+    Var { var: String },
+    Tagged(Tagged<V>),
+}
+
+#[derive(JsonSchema, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", bound = "")]
+#[schemars(bound = "")]
+enum Tagged<V: Vocabulary> {
+    Local {
+        local: String,
+    },
+    State {
+        state: String,
+    },
+    Event {
+        event: String,
+    },
+    All {
+        of: Vec<Expr<V>>,
+    },
+    Any {
+        of: Vec<Expr<V>>,
+    },
+    Join {
+        of: Vec<Expr<V>>,
+    },
+    Not {
+        of: Box<Expr<V>>,
+    },
+    Round {
+        of: Box<Expr<V>>,
+    },
+    Equal {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    NotEqual {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Less {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    AtMost {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    More {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    AtLeast {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Add {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Subtract {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Multiply {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Divide {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Min {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    Max {
+        a: Box<Expr<V>>,
+        b: Box<Expr<V>>,
+    },
+    #[serde(untagged)]
+    Query(V::Query),
 }
 
 pub const MAX_DEPTH: usize = 16;
@@ -156,11 +292,11 @@ impl<V: Vocabulary> Expr<V> {
         found
     }
 
-    pub fn vars(&self) -> Vec<Name> {
+    pub fn vars(&self) -> Vec<&str> {
         let mut found = Vec::new();
         self.visit(&mut |expr| {
             if let Expr::Var(name) = expr {
-                found.push(*name);
+                found.push(name.as_str());
             }
         });
         found

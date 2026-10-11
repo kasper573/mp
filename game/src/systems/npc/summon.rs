@@ -1,17 +1,17 @@
 use bevy_ecs::prelude::*;
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
-use crate::data;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::position;
 use crate::systems::npc::NpcDef;
 use crate::systems::player::{ClientId, Owner};
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
@@ -22,44 +22,44 @@ const RING: Tiles = Tiles(1.5);
 const MAX_SPAWNED: u32 = 20;
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SetAttitude {
     pub attitude: Attitude,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SpawnNpcs {
-    pub npc: data::npc::Id,
+    pub npc: crate::systems::npc::Id,
     pub count: u32,
     pub near: SpawnNear,
     pub shown: ShownFor,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SpawnNear {
     Owner,
     Subject,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ShownFor {
     Subject,
     Everyone,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Despawn {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refused: Arrow,
 }
 
@@ -75,13 +75,13 @@ impl EffectDef<RiftScripting> for SetAttitude {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let attitude = self.attitude;
         Ok(Box::new(move |world, cx| {
             if let Some(npc) = cx.owner.entity()
@@ -107,13 +107,13 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
             return Err(format!("count {} is not 1 to {MAX_SPAWNED}", self.count));
         }
@@ -156,15 +156,18 @@ impl EffectDef<RiftScripting> for Despawn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("done", self.done), ("refused", self.refused)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![
+            ("done", self.done.as_deref()),
+            ("refused", self.refused.as_deref()),
+        ]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let who = effects::aim(cx, self.who)?;
-        let refused = self.refused;
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, &self.who)?;
+        let refused = self.refused.as_deref();
         Ok(Box::new(move |world, cx| {
             let Some(npc) = effects::aimed(world, cx, &who) else {
                 effects::refuse(world, cx, refused, "Nobody there to send away");
@@ -185,7 +188,7 @@ impl EffectDef<RiftScripting> for Despawn {
 
 pub fn summon(
     world: &mut World,
-    npc: data::npc::Id,
+    npc: crate::systems::npc::Id,
     count: u32,
     beside: Entity,
     only_for: Option<ClientId>,

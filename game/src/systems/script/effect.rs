@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
@@ -24,12 +25,13 @@ use crate::systems::shop::OpenShop;
 use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
 use crate::systems::text::LineText;
 
-pub type Arrow = Option<Name>;
-pub type Aim = Option<&'static Condition>;
+pub type Arrow = crate::core::script::Arrow;
+pub type Link = crate::core::script::Link;
+pub type Aim = Option<Condition>;
 
 macro_rules! effects {
     ($($variant:ident($ty:ty)),* $(,)?) => {
-        #[derive(Clone, Serialize)]
+        #[derive(JsonSchema, Clone, Serialize, Deserialize)]
         #[serde(tag = "type", rename_all = "snake_case")]
         pub enum RiftEffect {
             $($variant($ty),)*
@@ -42,7 +44,7 @@ macro_rules! effects {
             fn needs_subject(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.needs_subject(),)* }
             }
-            fn outputs(&self) -> Vec<(Name, Arrow)> {
+            fn outputs(&'static self) -> Vec<(Name, Link)> {
                 match self { $(RiftEffect::$variant(e) => e.outputs(),)* }
             }
             fn pauses(&self) -> bool {
@@ -51,7 +53,7 @@ macro_rules! effects {
             fn keeps_box(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.keeps_box(),)* }
             }
-            fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+            fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
                 match self { $(RiftEffect::$variant(e) => e.compile(cx),)* }
             }
             fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -120,8 +122,8 @@ pub fn bad(e: (&str, String)) -> String {
     format!("{}: {}", e.0, e.1)
 }
 
-pub fn aim(cx: &mut Compiler<RiftScripting>, who: Aim) -> Result<Eval, String> {
-    cx.actor(who).map_err(bad)
+pub fn aim(cx: &mut Compiler<RiftScripting>, who: &'static Aim) -> Result<Eval, String> {
+    cx.actor(who.as_ref()).map_err(bad)
 }
 
 pub fn aimed(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity> {
@@ -132,7 +134,7 @@ pub fn aimed_character(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity>
     super::query::character(world, cx, who)
 }
 
-pub fn refuse(world: &mut World, cx: &FlowCx, wired: Arrow, reason: impl Into<String>) {
+pub fn refuse(world: &mut World, cx: &FlowCx, wired: Link, reason: impl Into<String>) {
     if wired.is_some() {
         return;
     }
@@ -152,12 +154,18 @@ pub fn refuse(world: &mut World, cx: &FlowCx, wired: Arrow, reason: impl Into<St
     );
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PlaySound {
     pub sfx: super::Fill<SfxId>,
-    #[serde(rename = "for", serialize_with = "play_sound_for")]
+    #[schemars(with = "PlaySoundFor")]
+    #[serde(
+        rename = "for",
+        serialize_with = "play_sound_for",
+        deserialize_with = "play_sound_for_from"
+    )]
     pub for_everyone: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
@@ -168,13 +176,13 @@ impl EffectDef<RiftScripting> for PlaySound {
     fn needs_subject(&self) -> bool {
         !self.for_everyone
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let sfx = cx.audio(&self.sfx).map_err(bad)?;
         let everyone = self.for_everyone;
         Ok(Box::new(move |world, cx| {
@@ -192,6 +200,22 @@ impl EffectDef<RiftScripting> for PlaySound {
 
 fn play_sound_for<S: serde::Serializer>(everyone: &bool, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(if *everyone { "everyone" } else { "subject" })
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+enum PlaySoundFor {
+    Everyone,
+    Subject,
+}
+
+fn play_sound_for_from<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<bool, D::Error> {
+    Ok(matches!(
+        PlaySoundFor::deserialize(deserializer)?,
+        PlaySoundFor::Everyone
+    ))
 }
 
 pub fn interface_sound(

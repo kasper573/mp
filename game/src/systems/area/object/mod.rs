@@ -1,16 +1,18 @@
+use std::borrow::Cow;
 pub mod render;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
-use crate::core::script::{Name, Owner, OwnerKind};
+use crate::core::script::{Owner, OwnerKind};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
 use crate::systems::actor::{Hitbox, Name as ActorName};
-use crate::systems::area::{self, AreaModule, AreaTag};
+use crate::systems::area::{self, AreaTag};
 use crate::systems::dialogue;
 use crate::systems::interact::Interactive;
 use crate::systems::movement::Position;
@@ -27,47 +29,111 @@ pub fn register(app: &mut App) {
     app.replicate::<AreaObject>();
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ObjectDef {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<Name>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<&'static str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     pub shape: ObjectShape,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<AssetRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub shown: Option<&'static Condition>,
-    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
-    pub scripts: &'static [ScriptModule],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shown: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scripts: Vec<ScriptModule>,
 }
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ObjectShape {
     Point(Pos<Tiles>),
     Rect(Rect<Tiles>),
 }
 
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum ShapeRow {
+    Point { x: f32, y: f32 },
+    Rect { x: f32, y: f32, w: f32, h: f32 },
+}
+
+/// The wire form: externally tagged, so a binary format needs no self-description to read it.
+#[derive(Serialize, Deserialize)]
+enum ShapeWire {
+    Point(f32, f32),
+    Rect(f32, f32, f32, f32),
+}
+
 impl Serialize for ObjectShape {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        match self {
-            ObjectShape::Point(point) => {
-                let mut map = serializer.serialize_map(Some(3))?;
-                map.serialize_entry("type", "point")?;
-                map.serialize_entry("x", &point.x)?;
-                map.serialize_entry("y", &point.y)?;
-                map.end()
+        if serializer.is_human_readable() {
+            return ShapeRow::from(*self).serialize(serializer);
+        }
+        match *self {
+            ObjectShape::Point(point) => ShapeWire::Point(point.x, point.y),
+            ObjectShape::Rect(rect) => ShapeWire::Rect(
+                rect.origin.x,
+                rect.origin.y,
+                rect.size.width,
+                rect.size.height,
+            ),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ObjectShape {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<ObjectShape, D::Error> {
+        if deserializer.is_human_readable() {
+            return ShapeRow::deserialize(deserializer).map(ObjectShape::from);
+        }
+        Ok(match ShapeWire::deserialize(deserializer)? {
+            ShapeWire::Point(x, y) => ObjectShape::Point(Pos::new(x, y)),
+            ShapeWire::Rect(x, y, w, h) => {
+                ObjectShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
             }
-            ObjectShape::Rect(rect) => {
-                let mut map = serializer.serialize_map(Some(5))?;
-                map.serialize_entry("type", "rect")?;
-                map.serialize_entry("x", &rect.origin.x)?;
-                map.serialize_entry("y", &rect.origin.y)?;
-                map.serialize_entry("w", &rect.size.width)?;
-                map.serialize_entry("h", &rect.size.height)?;
-                map.end()
+        })
+    }
+}
+
+impl JsonSchema for ObjectShape {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ObjectShape")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        ShapeRow::json_schema(generator)
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
+}
+
+impl From<ShapeRow> for ObjectShape {
+    fn from(row: ShapeRow) -> ObjectShape {
+        match row {
+            ShapeRow::Point { x, y } => ObjectShape::Point(Pos::new(x, y)),
+            ShapeRow::Rect { x, y, w, h } => {
+                ObjectShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
             }
+        }
+    }
+}
+
+impl From<ObjectShape> for ShapeRow {
+    fn from(shape: ObjectShape) -> ShapeRow {
+        match shape {
+            ObjectShape::Point(point) => ShapeRow::Point {
+                x: point.x,
+                y: point.y,
+            },
+            ObjectShape::Rect(rect) => ShapeRow::Rect {
+                x: rect.origin.x,
+                y: rect.origin.y,
+                w: rect.size.width,
+                h: rect.size.height,
+            },
         }
     }
 }
@@ -134,11 +200,8 @@ pub fn spawn_all(world: &mut World) {
     let zone = world.resource::<crate::systems::WorldArea>().0;
     let content = *world.resource::<Content>();
     let scripts = world.resource::<script::RiftScripts>().clone();
-    let def = zone.get(&content);
-    for (index, module) in def.modules.iter().enumerate() {
-        let AreaModule::Object(object) = module else {
-            continue;
-        };
+    for (index, object) in area::objects(area::placed(&content, zone)) {
+        let index = index as usize;
         let owner_row = crate::core::script::OwnerRow {
             kind: OwnerKind::Object,
             row: zone.raw(),
@@ -174,10 +237,10 @@ pub fn spawn_all(world: &mut World) {
             AreaTag { area: zone },
             AreaObject {
                 index: index as u32,
-                name: object.name.map(str::to_owned),
-                label: object.label.map(str::to_owned),
+                name: object.name.clone(),
+                label: object.label.clone(),
                 shape: object.shape,
-                look: object.look.map(|look| look.0.to_owned()),
+                look: object.look.as_ref().map(|look| look.path()),
                 warp,
             },
         ));
@@ -189,15 +252,15 @@ pub fn spawn_all(world: &mut World) {
                 size: Size::new(bounds.size.width, bounds.size.height),
             });
         }
-        if let Some(label) = object.label {
+        if let Some(label) = &object.label {
             entity.insert(ActorName {
-                name: label.to_owned(),
+                name: label.clone(),
             });
         }
         if let Some(interactive) = interactive {
             entity.insert(interactive);
         }
-        if let Some(shown) = object.shown {
+        if let Some(shown) = &object.shown {
             entity.insert(Presence::When(CompiledCondition::new(&content, shown)));
         }
         let id = entity.id();

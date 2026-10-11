@@ -1,11 +1,14 @@
 use bevy_platform::collections::HashMap;
 use bevy_platform::hash::NoOpHash;
 use std::any::TypeId;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::sync::Arc;
 
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -30,11 +33,11 @@ impl<Row> ContentId<Row> {
 }
 
 impl<Row: ContentRow> ContentId<Row> {
-    pub fn get(self, content: &Content) -> &Row {
+    pub fn get(self, content: &Content) -> &'static Row {
         content.table::<Row>().row(self)
     }
 
-    pub fn key(self, content: &Content) -> &str {
+    pub fn key(self, content: &Content) -> &'static str {
         content.table::<Row>().key(self)
     }
 }
@@ -87,6 +90,20 @@ impl<Row: ContentRow> fmt::Debug for ContentId<Row> {
     }
 }
 
+impl<Row: ContentRow> JsonSchema for ContentId<Row> {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("Key")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        String::json_schema(generator)
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
+}
+
 impl<Row: ContentRow> Serialize for ContentId<Row> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if !serializer.is_human_readable() {
@@ -134,19 +151,43 @@ pub struct UnknownRow {
     pub nearest: Option<String>,
 }
 
-/// Collects the unknown rows met while reading, so one parse reports every dangling reference
-/// instead of stopping at the first.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Leaf {
+    pub kind: LeafKind,
+    pub value: String,
+    pub problem: Option<LeafProblem>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeafKind {
+    Row(&'static str),
+    Asset,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LeafProblem {
+    Unknown { nearest: Option<String> },
+    Unsafe,
+}
+
+/// Resolves keys while reading and collects every reference it met, so one parse reports every
+/// dangling reference instead of stopping at the first.
+type ScopeKeys = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
+
+#[derive(Clone)]
 pub struct ContentScope {
-    keys: HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>,
-    unknown: Vec<UnknownRow>,
+    keys: Arc<ScopeKeys>,
+    assets: Option<Arc<Vec<String>>>,
+    leaves: Vec<Leaf>,
     content: Option<Content>,
 }
 
 impl ContentScope {
     pub fn new() -> ContentScope {
         ContentScope {
-            keys: HashMap::default(),
-            unknown: Vec::new(),
+            keys: Arc::new(HashMap::default()),
+            assets: None,
+            leaves: Vec::new(),
             content: None,
         }
     }
@@ -155,19 +196,70 @@ impl ContentScope {
         let mut scope = ContentScope::new();
         scope.content = Some(*content);
         for (type_id, table) in content.tables() {
-            scope
-                .keys
-                .insert(type_id, (table.name(), table.keys().to_vec()));
+            Arc::make_mut(&mut scope.keys).insert(type_id, (table.name(), table.keys().to_vec()));
         }
         scope
     }
 
     pub fn table<Row: ContentRow>(&mut self, keys: Vec<String>) {
-        self.keys.insert(TypeId::of::<Row>(), (Row::TABLE, keys));
+        Arc::make_mut(&mut self.keys).insert(TypeId::of::<Row>(), (Row::TABLE, keys));
     }
 
-    pub fn unknown(&self) -> &[UnknownRow] {
-        &self.unknown
+    pub fn table_by_type(&mut self, type_id: TypeId, name: &'static str, keys: Vec<String>) {
+        Arc::make_mut(&mut self.keys).insert(type_id, (name, keys));
+    }
+
+    /// The files under `assets/`, sorted; when set, every asset path read is checked against them.
+    pub fn assets(&mut self, mut files: Vec<String>) {
+        files.sort_unstable();
+        self.assets = Some(Arc::new(files));
+    }
+
+    pub fn leaves(&self) -> &[Leaf] {
+        &self.leaves
+    }
+
+    pub fn unknown(&self) -> impl Iterator<Item = UnknownRow> + '_ {
+        self.leaves
+            .iter()
+            .filter_map(|leaf| match (&leaf.kind, &leaf.problem) {
+                (LeafKind::Row(table), Some(LeafProblem::Unknown { nearest })) => {
+                    Some(UnknownRow {
+                        table,
+                        key: leaf.value.clone(),
+                        nearest: nearest.clone(),
+                    })
+                }
+                _ => None,
+            })
+    }
+
+    pub fn has_problems(&self) -> bool {
+        self.leaves.iter().any(|leaf| leaf.problem.is_some())
+    }
+
+    pub fn asset(&mut self, path: &str) {
+        let unsafe_path = path.starts_with('/')
+            || path.contains('\\')
+            || path.split('/').any(|part| part == ".." || part.is_empty())
+            || path.chars().nth(1) == Some(':');
+        let problem = if unsafe_path {
+            Some(LeafProblem::Unsafe)
+        } else {
+            match &self.assets {
+                Some(files) if files.binary_search_by(|f| f.as_str().cmp(path)).is_err() => {
+                    Some(LeafProblem::Unknown {
+                        nearest: nearest(files.as_slice(), path),
+                    })
+                }
+                _ => None,
+            }
+        };
+        self.leaves.push(Leaf {
+            kind: LeafKind::Asset,
+            value: path.to_owned(),
+            problem,
+        });
     }
 
     fn key<Row: ContentRow>(&self, index: u32) -> Option<String> {
@@ -180,18 +272,21 @@ impl ContentScope {
 
     fn resolve<Row: ContentRow>(&mut self, key: String) -> ContentId<Row> {
         let keys = self.keys.get(&TypeId::of::<Row>()).map(|(_, keys)| keys);
-        match keys.and_then(|keys| keys.binary_search(&key).ok()) {
-            Some(index) => ContentId::new(index as u32),
-            None => {
-                let nearest = keys.and_then(|keys| nearest(keys, &key));
-                self.unknown.push(UnknownRow {
-                    table: Row::TABLE,
-                    key,
-                    nearest,
-                });
-                ContentId::new(u32::MAX)
-            }
-        }
+        let (id, problem) = match keys.and_then(|keys| keys.binary_search(&key).ok()) {
+            Some(index) => (ContentId::new(index as u32), None),
+            None => (
+                ContentId::new(u32::MAX),
+                Some(LeafProblem::Unknown {
+                    nearest: keys.and_then(|keys| nearest(keys, &key)),
+                }),
+            ),
+        };
+        self.leaves.push(Leaf {
+            kind: LeafKind::Row(Row::TABLE),
+            value: key,
+            problem,
+        });
+        id
     }
 }
 
@@ -207,6 +302,14 @@ thread_local! {
 
 pub fn scope_content() -> Option<Content> {
     SCOPE.with(|scope| scope.borrow().as_ref().and_then(|scope| scope.content))
+}
+
+pub fn scope_asset(path: &str) {
+    SCOPE.with(|scope| {
+        if let Some(scope) = scope.borrow_mut().as_mut() {
+            scope.asset(path);
+        }
+    });
 }
 
 pub fn with_content<T>(scope: ContentScope, f: impl FnOnce() -> T) -> (T, ContentScope) {

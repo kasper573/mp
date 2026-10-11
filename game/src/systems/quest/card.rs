@@ -234,14 +234,14 @@ fn decision(content: &Content, quest: QuestId) -> Vec<Box<dyn Scene>> {
             Box::new(bsn! {
                 Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}), flex_basis: Val::Px(0.0), flex_grow: 1.0 }
                 Children [
-                    {EntityScene(ui::styled_text(path.choice, ink, typography::LABEL))},
+                    {EntityScene(ui::styled_text(path.choice.as_str(), ink, typography::LABEL))},
                     {means},
                 ]
             })
         })
         .collect();
     vec![
-        Box::new(ui::styled_text(def.title, ink, typography::NAME)),
+        Box::new(ui::styled_text(def.title.as_str(), ink, typography::NAME)),
         Box::new(bsn! {
             Node { column_gap: Val::Px({spacing::XL}), width: Val::Percent(100.0) }
             Children [ {paths} ]
@@ -249,13 +249,13 @@ fn decision(content: &Content, quest: QuestId) -> Vec<Box<dyn Scene>> {
     ]
 }
 
-fn head(content: &Content, assets: &AssetServer, def: &QuestDef) -> impl Scene + use<> {
+fn head(content: &Content, assets: &AssetServer, def: &'static QuestDef) -> impl Scene + use<> {
     let ink = ui::theme::theme().surface_floating.on;
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
         Children [
             {EntityScene(icon(assets, def.icon(content), PICK))},
-            {EntityScene(ui::styled_text(def.title, ink, typography::NAME))},
+            {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::NAME))},
         ]
     }
 }
@@ -276,7 +276,7 @@ fn hand_in_row(
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
             {EntityScene(caption("Hand in"))},
-            {EntityScene(icon(assets, stack.item.get(content).icon, ICON))},
+            {EntityScene(icon(assets, &stack.item.get(content).icon, ICON))},
             ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(counted(content, stack), ink, typography::BODY))} ] ),
             {EntityScene(ui::styled_text(format!("{held} in your bag"), held_color, typography::CAPTION))},
         ]
@@ -286,7 +286,7 @@ fn hand_in_row(
 pub(super) fn objective_row(
     content: &Content,
     assets: &AssetServer,
-    objective: &Objective,
+    objective: &'static Objective,
     progress: &Progress,
     color: Color,
 ) -> impl Scene + use<> {
@@ -328,7 +328,7 @@ pub(super) fn reward_chips(
         .map(|&stack| -> Box<dyn Scene> {
             ui::chip(ChipOptions {
                 label: counted(content, stack),
-                icon: Some(assets.load(stack.item.get(content).icon.0)),
+                icon: Some(assets.load(stack.item.get(content).icon.path())),
                 family: Family::outline(ink),
                 inspect: Some(item::card::inspectable(content, stack.item)),
             })
@@ -349,7 +349,7 @@ pub(super) fn picks(content: &Content, assets: &AssetServer, def: &QuestDef) -> 
                 template_value(crate::systems::hud::slot_node())
                 BackgroundColor({crate::systems::hud::SLOT_BG})
                 component(BorderColor::all(crate::systems::hud::SLOT_BORDER))
-                Children [ {EntityScene(icon(assets, stack.item.get(content).icon, PICK))} ]
+                Children [ {EntityScene(icon(assets, &stack.item.get(content).icon, PICK))} ]
             };
             Box::new(ui::inspectable(
                 item::card::inspectable(content, stack.item),
@@ -382,16 +382,16 @@ pub(super) fn caption(text: impl Into<String>) -> impl Scene {
     ui::styled_text(text.into(), ink.with_alpha(0.6), typography::CAPTION)
 }
 
-pub(super) fn icon(assets: &AssetServer, icon: AssetRef, size: f32) -> impl Scene + use<> {
+pub(super) fn icon(assets: &AssetServer, icon: &AssetRef, size: f32) -> impl Scene + use<> {
     bsn! {
         Node { width: Val::Px({size}), height: Val::Px({size}), flex_shrink: 0.0 }
-        component(ImageNode::new(assets.load(icon.0)))
+        component(ImageNode::new(assets.load(icon.path())))
         Pickable::IGNORE
     }
 }
 
 pub(super) fn counted(content: &Content, stack: ItemStack) -> String {
-    let name = stack.item.get(content).name;
+    let name = &stack.item.get(content).name;
     match stack.count {
         1 => name.to_owned(),
         count => format!("{name} ×{count}"),

@@ -33,7 +33,7 @@
             "to": {
               "area": "sunscar_adobe",
               "x": 7.0,
-              "y": 11.5
+              "y": 11.0
             }
           }
         }
@@ -56,8 +56,8 @@
           "values": {
             "to": {
               "area": "sunscar_adobe",
-              "x": 17.0,
-              "y": 11.5
+              "x": 18.0,
+              "y": 11.0
             }
           }
         }
@@ -80,8 +80,8 @@
           "values": {
             "to": {
               "area": "sunscar_pavilion",
-              "x": 8.0,
-              "y": 11.5
+              "x": 9.0,
+              "y": 11.0
             }
           }
         }
@@ -104,7 +104,7 @@
           "values": {
             "to": {
               "area": "verdant",
-              "x": 16.5,
+              "x": 17.5,
               "y": 81.5
             }
           }
@@ -171,10 +171,10 @@
     {
       "type": "resident",
       "npc": "nomad_merchant",
-      "at": [
-        27.0,
-        24.0
-      ]
+      "at": {
+        "x": 27.0,
+        "y": 24.0
+      }
     },
     {
       "type": "safe_zone",
@@ -272,609 +272,1605 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 56.875,
-        "y": -4.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 59.5,
-        "y": -4.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 51.125,
-        "y": -4.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 57.625,
-        "y": -4.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 71.125,
-        "y": -4.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
-      "at": {
-        "x": 3.25,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
-      "at": {
-        "x": 15.25,
-        "y": -4.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
-      "at": {
-        "x": 23.563,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
-      "at": {
-        "x": 29.438,
-        "y": -4.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
-      "at": {
-        "x": 30.5,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 32.813,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 8.0,
-        "y": -4.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
-      "at": {
-        "x": 25.063,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
-      "at": {
-        "x": 10.188,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 28.688,
-        "y": -4.063
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 39.688,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
-      "at": {
-        "x": 38.563,
-        "y": -4.063
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 43.688,
-        "y": -4.063
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 45.0,
-        "y": -4.063
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 0.125,
-        "y": -4.0
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
-      "at": {
-        "x": 61.25,
-        "y": -3.938
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 41.5,
-        "y": -3.625
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
-      "at": {
-        "x": 69.375,
-        "y": -3.625
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
-      "at": {
-        "x": 2.563,
-        "y": -3.5
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
-      "at": {
-        "x": 62.563,
-        "y": -3.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
-      "at": {
-        "x": 52.875,
-        "y": -3.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 58.0,
         "y": -2.875
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 62.063,
         "y": -2.813
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 31.438,
         "y": -2.688
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 33.563,
         "y": -2.625
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 40.375,
         "y": -2.625
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 64.188,
         "y": -2.625
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 65.625,
         "y": -2.563
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 28.0,
         "y": -2.5
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 50.688,
         "y": -2.5
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 48.813,
         "y": -2.438
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 65.938,
         "y": -2.438
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 12.125,
         "y": -2.188
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 31.125,
         "y": -2.188
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 11.188,
         "y": -2.125
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 19.125,
         "y": -2.063
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 42.938,
         "y": -2.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 32.438,
         "y": -1.938
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 2.063,
         "y": -1.813
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 3.813,
         "y": -1.75
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          320,
+          321,
+          322,
+          323
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 47.25,
         "y": -1.75
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 3.375,
         "y": -1.688
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 52.875,
         "y": -1.688
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 45.875,
         "y": -1.625
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          320,
+          321,
+          322,
+          323
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 24.938,
         "y": -1.563
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 56.375,
         "y": -1.563
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 11.063,
         "y": -1.188
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 21.813,
         "y": -1.125
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": -2.25,
         "y": -1.063
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          1351
+        ],
+        [
+          null,
+          null,
+          null,
+          1383
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 43.063,
         "y": -1.063
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 49.938,
         "y": -1.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 51.375,
         "y": -1.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 19.625,
         "y": -0.938
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 11.938,
         "y": -0.813
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 49.938,
         "y": -0.813
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 71.063,
         "y": -0.688
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 10.063,
         "y": -0.563
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          288,
+          289,
+          290,
+          291
+        ],
+        [
+          320,
+          321,
+          322,
+          323
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 53.813,
         "y": -0.563
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 38.938,
         "y": -0.5
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 62.75,
         "y": -0.438
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 4.5,
         "y": -0.375
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 68.813,
         "y": -0.313
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1316,
+          1317,
+          1318,
+          1319
+        ],
+        [
+          1348,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          1380,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 37.563,
         "y": -0.25
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          184,
+          185,
+          186,
+          187
+        ],
+        [
+          216,
+          217,
+          218,
+          219
+        ],
+        [
+          248,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 33.938,
         "y": -0.188
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 59.125,
         "y": -0.188
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          288,
+          289,
+          290,
+          291
+        ],
+        [
+          320,
+          321,
+          322,
+          323
+        ],
+        [
+          352,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 64.75,
         "y": -0.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -971,12 +1967,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": -0.1,
         "y": 1.5
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1163,12 +2186,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": -0.875,
         "y": 5.0
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          25,
+          26,
+          27
+        ],
+        [
+          null,
+          57,
+          58,
+          59
+        ],
+        [
+          null,
+          89,
+          90,
+          91
+        ],
+        [
+          null,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1213,12 +2263,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 1.938,
         "y": 6.875
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          1284,
+          null,
+          null,
+          null
+        ],
+        [
+          1316,
+          null,
+          null,
+          null
+        ],
+        [
+          1348,
+          null,
+          null,
+          null
+        ],
+        [
+          1380,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1256,12 +2333,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.875,
         "y": 8.375
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1354,12 +2458,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 1.688,
         "y": 10.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          152,
+          null,
+          null,
+          null
+        ],
+        [
+          184,
+          null,
+          null,
+          null
+        ],
+        [
+          216,
+          null,
+          null,
+          null
+        ],
+        [
+          248,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1518,12 +2649,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 73.063,
         "y": 11.375
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          153,
+          154,
+          155
+        ],
+        [
+          null,
+          185,
+          186,
+          187
+        ],
+        [
+          null,
+          217,
+          218,
+          219
+        ],
+        [
+          null,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1544,12 +2702,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 2.5,
         "y": 11.563
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          152,
+          153,
+          null,
+          null
+        ],
+        [
+          184,
+          185,
+          null,
+          null
+        ],
+        [
+          216,
+          217,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1603,12 +2788,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": -0.75,
         "y": 12.813
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1661,12 +2873,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 73.0,
         "y": 13.5
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          257,
+          258,
+          259
+        ],
+        [
+          null,
+          289,
+          290,
+          291
+        ],
+        [
+          null,
+          321,
+          322,
+          323
+        ],
+        [
+          null,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1678,12 +2917,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.063,
         "y": 13.688
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1710,12 +2976,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.563,
         "y": 14.875
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1743,21 +3036,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 3.813,
         "y": 16.0
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          256,
+          257,
+          258,
+          null
+        ],
+        [
+          288,
+          289,
+          290,
+          null
+        ],
+        [
+          320,
+          321,
+          322,
+          null
+        ],
+        [
+          352,
+          353,
+          354,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": -2.688,
         "y": 16.25
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          155
+        ],
+        [
+          null,
+          null,
+          null,
+          187
+        ],
+        [
+          null,
+          null,
+          null,
+          219
+        ],
+        [
+          null,
+          null,
+          null,
+          251
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1786,12 +3133,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.188,
         "y": 17.625
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1859,12 +3233,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": 2.0,
         "y": 19.375
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          152,
+          153,
+          null,
+          null
+        ],
+        [
+          184,
+          185,
+          null,
+          null
+        ],
+        [
+          216,
+          217,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1901,12 +3302,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 73.125,
         "y": 21.0
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          257,
+          258,
+          259
+        ],
+        [
+          null,
+          289,
+          290,
+          291
+        ],
+        [
+          null,
+          321,
+          322,
+          323
+        ],
+        [
+          null,
+          353,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1934,12 +3362,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_14",
+      "type": "scenery",
       "at": {
         "x": -0.438,
         "y": 22.688
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          153,
+          154,
+          155
+        ],
+        [
+          null,
+          185,
+          186,
+          187
+        ],
+        [
+          null,
+          217,
+          218,
+          219
+        ],
+        [
+          null,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1950,12 +3405,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": -2.25,
         "y": 23.563
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          19
+        ],
+        [
+          null,
+          null,
+          null,
+          51
+        ],
+        [
+          null,
+          null,
+          null,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2014,12 +3496,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 1.5,
         "y": 29.625
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          16,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2088,20 +3597,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 69.25,
         "y": 31.875
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 72.563,
         "y": 33.0
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2138,12 +3701,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": -2.25,
         "y": 33.813
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          63
+        ],
+        [
+          null,
+          null,
+          null,
+          95
+        ],
+        [
+          null,
+          null,
+          null,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2197,12 +3787,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 69.438,
         "y": 35.563
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2246,12 +3863,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.438,
         "y": 36.25
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2263,21 +3907,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.75,
         "y": 36.875
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 68.625,
         "y": 37.125
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          28,
+          29,
+          30,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2305,12 +4003,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 3.938,
         "y": 38.063
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2389,12 +4114,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 2.375,
         "y": 40.5
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          1284,
+          1285,
+          null,
+          null
+        ],
+        [
+          1316,
+          1317,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          null,
+          null
+        ],
+        [
+          1380,
+          1381,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2490,12 +4242,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 2.875,
         "y": 42.438
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          1284,
+          1285,
+          null,
+          null
+        ],
+        [
+          1316,
+          1317,
+          null,
+          null
+        ],
+        [
+          1348,
+          1349,
+          null,
+          null
+        ],
+        [
+          1380,
+          1381,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2532,12 +4311,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": -1.688,
         "y": 43.875
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          26,
+          27
+        ],
+        [
+          null,
+          null,
+          58,
+          59
+        ],
+        [
+          null,
+          null,
+          90,
+          91
+        ],
+        [
+          null,
+          null,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2548,12 +4354,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 72.563,
         "y": 44.0
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2600,21 +4433,75 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": 72.625,
         "y": 45.438
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          1285,
+          1286,
+          1287
+        ],
+        [
+          null,
+          1317,
+          1318,
+          1319
+        ],
+        [
+          null,
+          1349,
+          1350,
+          1351
+        ],
+        [
+          null,
+          1381,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": -0.938,
         "y": 46.0
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2642,12 +4529,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_81",
+      "type": "scenery",
       "at": {
         "x": -1.813,
         "y": 46.875
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          1286,
+          1287
+        ],
+        [
+          null,
+          null,
+          1318,
+          1319
+        ],
+        [
+          null,
+          null,
+          1350,
+          1351
+        ],
+        [
+          null,
+          null,
+          1382,
+          1383
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2727,12 +4641,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": -1.313,
         "y": 48.75
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          null,
+          null,
+          258,
+          259
+        ],
+        [
+          null,
+          null,
+          290,
+          291
+        ],
+        [
+          null,
+          null,
+          322,
+          323
+        ],
+        [
+          null,
+          null,
+          354,
+          355
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2785,12 +4726,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_16",
+      "type": "scenery",
       "at": {
         "x": 68.625,
         "y": 49.25
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          256,
+          257,
+          258,
+          null
+        ],
+        [
+          288,
+          289,
+          290,
+          null
+        ],
+        [
+          320,
+          321,
+          322,
+          null
+        ],
+        [
+          352,
+          353,
+          354,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2850,12 +4818,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 2.438,
         "y": 50.125
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          16,
+          17,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3219,12 +5214,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 2.563,
         "y": 52.375
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          24,
+          25,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          null,
+          null
+        ],
+        [
+          88,
+          89,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3237,46 +5259,181 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_4",
+      "type": "scenery",
       "at": {
         "x": 42.75,
         "y": 52.563
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          19
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 13.75,
         "y": 52.75
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          11
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_7",
+      "type": "scenery",
       "at": {
         "x": 18.438,
         "y": 52.75
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          28,
+          29,
+          30,
+          31
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_6",
+      "type": "scenery",
       "at": {
         "x": 22.625,
         "y": 52.875
-      }
+      },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          27
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sunscar_props_2",
+      "type": "scenery",
       "at": {
         "x": 64.75,
         "y": 52.875
       },
+      "tileset": "sunscar_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          11
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {

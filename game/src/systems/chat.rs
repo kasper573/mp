@@ -1,9 +1,9 @@
 use bevy_ecs::prelude::*;
 use bevy_terminal::TerminalInbox;
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
-use crate::core::content::serial;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
 };
@@ -14,7 +14,7 @@ use crate::systems::movement::position;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Players};
-use crate::systems::script::effect::{self as effects, Arrow};
+use crate::systems::script::effect::{self as effects, Arrow, Link};
 use crate::systems::script::{Condition, Reach, RiftScripting};
 use crate::systems::terminal::TerminalKind;
 use crate::systems::text::{self, LineText, Span};
@@ -38,13 +38,13 @@ pub fn rebroadcast(world: &mut World) {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Say {
-    #[serde(skip_serializing_if = "serial::is_empty")]
-    pub text: &'static [Span],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub within: Option<&'static Condition>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub text: Vec<Span>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub within: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
@@ -55,21 +55,21 @@ impl EffectDef<RiftScripting> for Say {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let values = text::values(self.text)
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let values = text::values(&self.text)
             .into_iter()
             .map(|value| cx.expr(value, ValueType::Text).map_err(effects::bad))
             .collect::<Result<Vec<_>, _>>()?;
         let within = cx
-            .opt_expr(self.within, ValueType::Number)
+            .opt_expr(self.within.as_ref(), ValueType::Number)
             .map_err(effects::bad)?;
-        let spans = self.text;
+        let spans = self.text.as_slice();
         Ok(Box::new(move |world, cx| {
             let Some(speaker) = cx.owner.entity() else {
                 return EffectStep::Output(0);

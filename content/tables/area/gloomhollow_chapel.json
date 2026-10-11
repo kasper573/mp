@@ -66,18 +66,18 @@
     {
       "type": "resident",
       "npc": "gravedigger",
-      "at": [
-        12.0,
-        12.0
-      ]
+      "at": {
+        "x": 12.0,
+        "y": 12.0
+      }
     },
     {
       "type": "resident",
       "npc": "priest",
-      "at": [
-        19.0,
-        8.0
-      ]
+      "at": {
+        "x": 19.0,
+        "y": 8.0
+      }
     },
     {
       "type": "safe_zone",

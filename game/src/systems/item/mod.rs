@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 pub mod card;
 pub mod effects;
 pub mod render;
@@ -11,16 +12,16 @@ use bevy_ecs::query::{QueryState, With};
 use bevy_ecs::world::World;
 use bevy_replicon::prelude::{Replicated, SendTargets, ToClients};
 use bevy_time::Time;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::{AssetRef, AssetService};
+use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentRow, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Owner as ScriptOwner, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
-use crate::data::item::Id;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
 use crate::systems::equipment;
@@ -61,18 +62,61 @@ pub struct Inventory {
     pub max: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ItemStack {
     pub item: Id,
-    #[serde(
-        default = "one",
-        skip_serializing_if = "crate::core::content::serial::is_one"
-    )]
     pub count: u32,
 }
 
-fn one() -> u32 {
-    1
+/// The file form leaves a count of one out; the wire form always carries it, as a binary format
+/// cannot tell an omitted field from a missing one.
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ItemStackRow {
+    item: Id,
+    #[serde(
+        default = "crate::core::content::serial::one",
+        skip_serializing_if = "crate::core::content::serial::is_one"
+    )]
+    count: u32,
+}
+
+impl Serialize for ItemStack {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            return ItemStackRow {
+                item: self.item,
+                count: self.count,
+            }
+            .serialize(serializer);
+        }
+        (self.item, self.count).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ItemStack {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<ItemStack, D::Error> {
+        if deserializer.is_human_readable() {
+            let ItemStackRow { item, count } = ItemStackRow::deserialize(deserializer)?;
+            return Ok(ItemStack { item, count });
+        }
+        let (item, count) = <(Id, u32)>::deserialize(deserializer)?;
+        Ok(ItemStack { item, count })
+    }
+}
+
+impl JsonSchema for ItemStack {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ItemStack")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        ItemStackRow::json_schema(generator)
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
 }
 
 impl ItemStack {
@@ -272,14 +316,16 @@ pub struct ItemsDropped {
     pub from: Pos<Tiles>,
 }
 
-#[derive(Clone, Serialize)]
+pub type Id = ContentId<ItemDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ItemDef {
-    pub name: &'static str,
+    pub name: String,
     pub icon: AssetRef,
     pub sfx: ItemSfx,
     pub kind: ItemKind,
-    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
-    pub modules: &'static [ItemModule],
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<ItemModule>,
 }
 
 impl ContentRow for ItemDef {
@@ -290,7 +336,7 @@ impl ModuleSet for ItemDef {
     type Module = ItemModule;
 
     fn modules(&self) -> &[ItemModule] {
-        self.modules
+        &self.modules
     }
 
     fn rule(module: &ItemModule) -> ModuleRule {
@@ -301,7 +347,7 @@ impl ModuleSet for ItemDef {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemModule {
     Flavor(Flavor),
@@ -315,12 +361,12 @@ pub enum ItemModule {
     Script(ScriptModule),
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Flavor {
-    pub text: &'static str,
+    pub text: String,
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct Stack {
     pub max: u32,
 }
@@ -332,7 +378,7 @@ pub enum ItemFlag {
     Currency,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemCategory {
     Consumable,
@@ -362,19 +408,20 @@ impl ItemCategory {
 }
 
 impl ItemDef {
-    pub fn scripts(&self) -> Vec<ScriptModule> {
+    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
         self.modules
             .iter()
-            .filter_map(|module| match module {
-                ItemModule::Script(script) => Some(script.clone()),
+            .enumerate()
+            .filter_map(|(index, module)| match module {
+                ItemModule::Script(script) => Some((index, script)),
                 _ => None,
             })
             .collect()
     }
 
-    pub fn flavor(&self) -> Option<&'static str> {
+    pub fn flavor(&self) -> Option<&str> {
         self.modules.iter().find_map(|module| match module {
-            ItemModule::Flavor(flavor) => Some(flavor.text),
+            ItemModule::Flavor(flavor) => Some(flavor.text.as_str()),
             _ => None,
         })
     }
@@ -431,7 +478,7 @@ impl ItemDef {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemKind {
     Consumable {
@@ -440,8 +487,8 @@ pub enum ItemKind {
     },
     Equipment {
         slot: equipment::EquipmentSlot,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        requires: Option<&'static Condition>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        requires: Option<Condition>,
     },
     Usable,
     Resource,
@@ -453,12 +500,12 @@ impl ItemKind {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ItemSfx {
     pub pickup: SfxId,
     pub trade: SfxId,
     pub drop: SfxId,
-    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "use", default, skip_serializing_if = "Option::is_none")]
     pub on_use: Option<SfxId>,
 }
 
@@ -677,7 +724,7 @@ pub fn scatter_at(
     if drops.is_empty() {
         return;
     }
-    let area = area::load(world.resource::<AssetService>(), area_id);
+    let area = area::load(world.resource::<Content>(), area_id);
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let count = drops.len();
     let mut items = Vec::with_capacity(count);

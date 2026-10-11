@@ -1,3 +1,4 @@
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -103,8 +104,9 @@ impl CatalogInput<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct KeyGesture {
+    #[schemars(schema_with = "key_code_schema")]
     pub key: KeyCode,
     #[serde(flatten)]
     pub modifiers: KeyModifiers,
@@ -124,8 +126,9 @@ impl KeyGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ClickGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
     pub button: MouseButton,
     pub times: u8,
     #[serde(flatten)]
@@ -140,8 +143,9 @@ impl ClickGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct DragGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
     pub button: MouseButton,
     #[serde(flatten)]
     pub modifiers: KeyModifiers,
@@ -153,7 +157,7 @@ impl DragGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct KeyModifiers {
     #[serde(skip_serializing_if = "is_false")]
@@ -164,6 +168,14 @@ pub struct KeyModifiers {
     pub alt: bool,
     #[serde(skip_serializing_if = "is_false")]
     pub super_key: bool,
+}
+
+pub fn key_code_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::keyboard::KeyCode", "type": ["string", "object"] })
+}
+
+pub fn mouse_button_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::mouse::MouseButton", "type": ["string", "object"] })
 }
 
 fn is_false(flag: &bool) -> bool {

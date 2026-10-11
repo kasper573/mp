@@ -1,22 +1,23 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::Content;
-use crate::core::content::serial;
+use crate::core::content::{Content, ContentId};
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, Value, ValueType,
 };
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::data::memory::Id;
 use crate::systems::player::conn_player;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow};
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Condition, Reach, RiftScripting};
 
-#[derive(Clone, Serialize)]
+pub type Id = ContentId<MemoryDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct MemoryDef {
-    pub label: &'static str,
+    pub label: String,
     #[serde(rename = "type")]
     pub ty: ValueType,
     pub resets: Resets,
@@ -26,7 +27,7 @@ impl crate::core::content::ContentRow for MemoryDef {
     const TABLE: &'static str = "memory";
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Resets {
     Never,
@@ -121,24 +122,24 @@ pub fn forget(world: &mut World, player: Entity, key: Id) {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Remember {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub memory: Id,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to: Option<&'static Condition>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Forget {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    #[serde(skip_serializing_if = "serial::is_empty")]
-    pub memories: &'static [Id],
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memories: Vec<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
@@ -149,16 +150,16 @@ impl EffectDef<RiftScripting> for Remember {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let who = effects::aim(cx, self.who)?;
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, &self.who)?;
         let ty = self.memory.get(cx.content).ty;
-        let to = cx.opt_expr(self.to, ty).map_err(effects::bad)?;
+        let to = cx.opt_expr(self.to.as_ref(), ty).map_err(effects::bad)?;
         let memory = self.memory;
         Ok(Box::new(move |world, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
@@ -183,15 +184,15 @@ impl EffectDef<RiftScripting> for Forget {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let who = effects::aim(cx, self.who)?;
-        let memories = self.memories;
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+        let who = effects::aim(cx, &self.who)?;
+        let memories = self.memories.as_slice();
         Ok(Box::new(move |world, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 for &memory in memories {

@@ -86,7 +86,7 @@ enum Tone {
 #[derive(Debug, Hash)]
 struct Entry {
     quest: QuestId,
-    mark: Option<AssetRef>,
+    mark: Option<&'static AssetRef>,
     timed: bool,
     rows: Vec<(String, Count, Tone)>,
 }
@@ -172,7 +172,7 @@ fn entries(world: &World) -> Vec<Entry> {
                     .id(content);
                     return Some(Entry {
                         quest,
-                        mark: Some(mark.get(content).icon),
+                        mark: Some(&mark.get(content).icon),
                         timed,
                         rows: vec![(
                             def.hand_in_hint(parties, quest),
@@ -277,7 +277,7 @@ fn entry_scene(
             Box::new(bsn! {
                 Node { column_gap: Val::Px({spacing::S}), align_items: AlignItems::Center }
                 Children [
-                    {EntityScene(icon(assets, InterfaceIcon::Timed.get(content).image, 12.0))},
+                    {EntityScene(icon(assets, &InterfaceIcon::Timed.get(content).image, 12.0))},
                     {EntityScene(live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION))},
                 ]
             })
@@ -318,7 +318,7 @@ fn entry_scene(
             })
         })
         .collect();
-    let title = quest.get(content).title;
+    let title = quest.get(content).title.as_str();
     Box::new(bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(1.0), width: Val::Percent(100.0) }
         Pickable::IGNORE

@@ -4,9 +4,9 @@ use bevy_app::App;
 use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
 use bevy_time::Time;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetService;
 use crate::core::content::Content;
 use crate::core::math::{Direction, Pos};
 use crate::core::tiling::Tiles;
@@ -25,7 +25,7 @@ pub fn register(app: &mut App) {
         .replicate::<Attitude>();
 }
 
-#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Attitude {
     Friendly,
@@ -75,7 +75,7 @@ pub struct Swing {
     pub struck: bool,
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct HealthRegen {
     pub every: Seconds,
     pub health: f32,
@@ -251,10 +251,10 @@ fn strike(world: &mut World, attacker: Entity, target: Entity) {
 }
 
 fn attack_timing(world: &World, entity: Entity, dir: Direction) -> crate::systems::actor::Timing {
-    let assets = world.resource::<AssetService>();
+    let content = world.resource::<crate::core::content::Content>();
     world
         .get::<Actor>(entity)
-        .map(|a| actor::model(assets, a.model).timing(Action::Attack, dir))
+        .map(|a| actor::model(content, a.model).timing(Action::Attack, dir))
         .unwrap_or_default()
 }
 

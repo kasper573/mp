@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "old_woodsman",
-      "at": [
-        5.0,
-        7.0
-      ]
+      "at": {
+        "x": 5.0,
+        "y": 7.0
+      }
     },
     {
       "type": "soundscape",

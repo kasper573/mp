@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "fire_priestess",
-      "at": [
-        9.0,
-        6.0
-      ]
+      "at": {
+        "x": 9.0,
+        "y": 6.0
+      }
     },
     {
       "type": "soundscape",

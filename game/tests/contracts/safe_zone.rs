@@ -1,9 +1,9 @@
 use bevy_ecs::prelude::*;
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
-use game::data::npc::Id as NpcId;
 use game::systems::area::{self, Area, Wild};
 use game::systems::movement::{self, MoveRequest, Position, position};
+use game::systems::npc::Id as NpcId;
 use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct};
 

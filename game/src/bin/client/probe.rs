@@ -6,7 +6,6 @@ use bevy::prelude::*;
 use bevy::text::EditableText;
 use bevy::ui::ComputedNode;
 use bevy::window::PrimaryWindow;
-use game::core::assets::AssetService;
 use game::core::audio::mix::AudioCategory;
 use game::core::audio::playback::Listener;
 use game::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
@@ -16,7 +15,6 @@ use game::core::render::tile_to_window;
 use game::core::render::transition::ScreenTransitionPhase;
 use game::core::script::{OwnerKind, OwnerRow};
 use game::core::tiling::{TilePos, Tiles};
-use game::data;
 use game::systems::actor::{self, Actor, Hitbox};
 use game::systems::area::{self, AreaModule, AreaObject, AreaTag};
 use game::systems::attention::{Attention, StatusBadges};
@@ -86,7 +84,6 @@ struct Soundscape {
 
 #[derive(Serialize)]
 struct SoundZone {
-    name: String,
     bounds: Rect<Tiles>,
     ellipse: bool,
     reach: f32,
@@ -112,12 +109,12 @@ struct Voice {
 struct Quests {
     active: Vec<QuestEntry>,
     finished: Vec<FinishedEntry>,
-    tracked: Vec<data::quest::Id>,
+    tracked: Vec<game::systems::quest::Id>,
 }
 
 #[derive(Serialize)]
 struct QuestEntry {
-    quest: data::quest::Id,
+    quest: game::systems::quest::Id,
     ready: bool,
     left: Option<f32>,
     progress: Vec<[u32; 2]>,
@@ -125,7 +122,7 @@ struct QuestEntry {
 
 #[derive(Serialize)]
 struct FinishedEntry {
-    quest: data::quest::Id,
+    quest: game::systems::quest::Id,
     result: QuestResult,
 }
 
@@ -139,20 +136,20 @@ struct Cover {
 
 #[derive(Serialize)]
 struct ItemCard {
-    item: data::item::Id,
+    item: game::systems::item::Id,
     rect: Cover,
 }
 
 #[derive(Serialize)]
 struct Shop {
-    shop: data::shop::Id,
+    shop: game::systems::shop::Id,
     offers: Vec<Offer>,
     buyback: Vec<Stack>,
 }
 
 #[derive(Serialize)]
 struct Offer {
-    item: data::item::Id,
+    item: game::systems::item::Id,
     count: u32,
     left: Option<u32>,
     refusal: Option<String>,
@@ -160,7 +157,7 @@ struct Offer {
 
 #[derive(Serialize)]
 struct Stack {
-    item: data::item::Id,
+    item: game::systems::item::Id,
     count: u32,
 }
 
@@ -190,7 +187,7 @@ struct Notifications {
 #[derive(Serialize)]
 struct BubbleView {
     speaker: String,
-    npc: data::npc::Id,
+    npc: game::systems::npc::Id,
     body: Option<String>,
     replaced: u32,
     lines: Vec<String>,
@@ -283,7 +280,7 @@ struct View {
 struct Body {
     id: String,
     name: String,
-    model: data::model::Id,
+    model: game::systems::actor::bust::Id,
     flies: bool,
     player: bool,
     at: Pos<Tiles>,
@@ -291,12 +288,12 @@ struct Body {
     hitbox: Rect<Tiles>,
     health: f32,
     max_health: f32,
-    npc: Option<data::npc::Id>,
+    npc: Option<game::systems::npc::Id>,
     role: Option<&'static str>,
     friendly: bool,
     locked: bool,
-    marks: Vec<data::attention::Id>,
-    badges: Vec<data::attention::Id>,
+    marks: Vec<game::systems::attention::Id>,
+    badges: Vec<game::systems::attention::Id>,
 }
 
 #[derive(Serialize)]
@@ -307,12 +304,12 @@ struct Fixture {
     at: Pos<Tiles>,
     aim: Pos<Tiles>,
     hitbox: Rect<Tiles>,
-    marks: Vec<data::attention::Id>,
+    marks: Vec<game::systems::attention::Id>,
 }
 
 #[derive(Serialize)]
 struct GroundItem {
-    item: data::item::Id,
+    item: game::systems::item::Id,
     count: u32,
     at: Pos<Tiles>,
 }
@@ -494,7 +491,6 @@ fn soundscape(world: &World) -> Soundscape {
             .0
             .iter()
             .map(|zone| SoundZone {
-                name: zone.name.clone(),
                 bounds: zone.shape.bounds(),
                 ellipse: matches!(zone.shape, SoundscapeShape::Ellipse(_)),
                 reach: zone.reach().0,
@@ -506,7 +502,7 @@ fn soundscape(world: &World) -> Soundscape {
                     .iter()
                     .map(|(channel, layer)| Track {
                         channel: channel.0,
-                        src: layer.src.clone(),
+                        src: layer.src.as_str().to_owned(),
                     })
                     .collect(),
             })
@@ -579,7 +575,7 @@ fn body(world: &World, entity: Entity) -> Option<Body> {
     let at = entity.get::<Position>()?.pos;
     let hitbox = at.hitbox(entity.get::<Hitbox>()?.size);
     let model = entity.get::<Actor>()?.model;
-    let flies = actor::model(world.resource::<AssetService>(), model).airborne;
+    let flies = actor::model(world.resource::<Content>(), model).airborne();
     let stat = |kind| entity.get::<Stats>().map_or(0.0, |stats| stats.get(kind));
     Some(Body {
         id: entity.id().to_string(),
@@ -711,9 +707,7 @@ fn portals(world: &World, area: Option<area::Id>) -> Vec<Exit> {
     };
     let content = world.resource::<Content>();
     let scripts = world.resource::<RiftScripts>();
-    let mut exits: Vec<Exit> = area
-        .get(content)
-        .objects()
+    let mut exits: Vec<Exit> = area::objects(area::placed(content, area))
         .filter_map(|(index, object)| {
             let owner = OwnerRow {
                 kind: OwnerKind::Object,
@@ -729,7 +723,7 @@ fn portals(world: &World, area: Option<area::Id>) -> Vec<Exit> {
                     _ => None,
                 })?;
             Some(Exit {
-                name: object.name.map(str::to_owned).unwrap_or_default(),
+                name: object.name.clone().unwrap_or_default(),
                 to: warp.area,
                 at: object.shape.center(),
                 rect: object.shape.bounds(),
@@ -745,17 +739,17 @@ fn markers(world: &World, area: Option<area::Id>) -> Vec<Marker> {
         return Vec::new();
     };
     let content = world.resource::<Content>();
-    let def = area.get(content);
-    let objects = def.objects().filter_map(|(_, object)| {
+    let placed = area::placed(content, area);
+    let objects = area::objects(placed).filter_map(|(_, object)| {
         Some(Marker {
-            name: object.name?.to_owned(),
+            name: object.name.clone()?,
             at: object.shape.center(),
         })
     });
-    let residents = def.modules.iter().filter_map(|module| match module {
-        AreaModule::Resident { npc, at, .. } => Some(Marker {
-            name: npc.key(content).to_owned(),
-            at: *at,
+    let residents = area::modules(content, area).filter_map(|module| match module {
+        AreaModule::Resident(resident) => Some(Marker {
+            name: resident.npc.key(content).to_owned(),
+            at: resident.at,
         }),
         _ => None,
     });
@@ -831,7 +825,11 @@ fn ui(world: &mut World) -> Vec<UiElement> {
                     .filter(|text: &String| !text.is_empty());
                 let image = image
                     .and_then(|image| assets.get_path(image.image.id()))
-                    .map(|path| path.to_string());
+                    .map(|path| path.to_string())
+                    .map(|path| {
+                        path.strip_prefix("assets/")
+                            .map_or(path.clone(), str::to_owned)
+                    });
                 let slider = thumb
                     .then(|| {
                         std::iter::successors(Some(entity), |&up| {

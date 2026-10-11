@@ -32,6 +32,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(15);
 /// accept loop and per-connection reader/writer tasks run on the shared tokio runtime and reach the
 /// single-threaded game loop only through these channels, so the loop never blocks on IO.
 pub struct WsTransport {
+    local_addr: SocketAddr,
     events: mpsc::UnboundedReceiver<Event>,
     senders: HashMap<u64, mpsc::UnboundedSender<Vec<u8>>>,
     identities: HashMap<u64, Identity>,
@@ -63,15 +64,20 @@ impl WsTransport {
         let listener = runtime
             .block_on(TcpListener::bind(addr))
             .unwrap_or_else(|error| panic!("cannot bind websocket {addr}: {error}"));
-        println!("websocket transport listening on {addr}");
+        let local_addr = listener.local_addr().expect("bound websocket address");
         let (events_tx, events) = mpsc::unbounded_channel();
         runtime.spawn(accept(listener, sessions, events_tx));
         WsTransport {
+            local_addr,
             events,
             senders: HashMap::new(),
             identities: HashMap::new(),
             max_clients,
         }
+    }
+
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
     }
 
     /// Applies every connect, packet, and disconnect that arrived since the last tick to the renet

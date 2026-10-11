@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "crypt_keeper",
-      "at": [
-        9.0,
-        8.0
-      ]
+      "at": {
+        "x": 9.0,
+        "y": 8.0
+      }
     },
     {
       "type": "safe_zone",
@@ -93,20 +93,74 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "gloomhollow_crypt_props_4",
+      "type": "scenery",
       "at": {
         "x": 2.0,
         "y": -0.6
-      }
+      },
+      "tileset": "gloomhollow_crypt_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "gloomhollow_crypt_props_4",
+      "type": "scenery",
       "at": {
         "x": 7.0,
         "y": -0.6
-      }
+      },
+      "tileset": "gloomhollow_crypt_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -133,12 +187,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "gloomhollow_crypt_props_28",
+      "type": "scenery",
       "at": {
         "x": -0.5,
         "y": 3.4
-      }
+      },
+      "tileset": "gloomhollow_crypt_props",
+      "tiles": [
+        [
+          null,
+          401,
+          402,
+          403
+        ],
+        [
+          null,
+          433,
+          434,
+          435
+        ],
+        [
+          null,
+          465,
+          466,
+          467
+        ],
+        [
+          null,
+          497,
+          498,
+          499
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

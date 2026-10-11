@@ -1,12 +1,15 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 
 use bevy_ecs::prelude::Resource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct WorldPx(pub f32);
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd, Default,
+)]
 pub struct Percent(pub f32);
 
 impl Percent {
@@ -28,7 +31,7 @@ pub type Offset<U> = euclid::Vector2D<f32, U>;
 pub type Size<U> = euclid::Size2D<f32, U>;
 pub type Rect<U> = euclid::Rect<f32, U>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Direction {
     S = 0,
     SW = 1,

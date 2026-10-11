@@ -137,7 +137,7 @@ fn apply_cursor(world: &mut World, cursor: Option<CursorIcon>) {
 pub(crate) fn content_cursor(world: &World, shape: CursorShape) -> CursorIcon {
     let cursor = shape.get(world.resource::<Content>());
     CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
-        handle: world.resource::<AssetServer>().load(cursor.image.0),
+        handle: world.resource::<AssetServer>().load(cursor.image.path()),
         texture_atlas: None,
         flip_x: false,
         flip_y: false,

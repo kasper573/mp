@@ -4,10 +4,11 @@ mod search;
 mod sim;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use bevy_app::App;
-use game::core::assets::{AssetService, FilesystemSource};
+use game::core::content::{Content, FilesystemFolder};
 
 const BUDGET_MS: f64 = 40.0;
 // Must exceed the budget crossover (and the probe that overshoots it) but stay within RAM: the bench
@@ -18,7 +19,7 @@ const MEASURE: usize = 200;
 
 #[derive(serde::Deserialize)]
 struct Config {
-    assets_dir: PathBuf,
+    content_dir: PathBuf,
     a: Option<Vec<usize>>,
 }
 
@@ -41,13 +42,13 @@ fn main() {
             .find(|arg| arg != "profile" && arg != "dist")
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().expect("cwd"));
-        profiling::run(&out, layout, service(&config.assets_dir));
+        profiling::run(&out, layout, service(&config.content_dir));
         return;
     }
 
     if let Some(probes) = config.a {
         for a in probes {
-            let p = point(a, layout, &config.assets_dir);
+            let p = point(a, layout, &config.content_dir);
             println!(
                 "[bench]   A={a:<4} full={:6.2}ms sim={:6.2}ms repl={:6.2}ms p99={:6.2}ms  {}",
                 p.full,
@@ -71,7 +72,7 @@ fn main() {
     let mut previous: Option<(usize, f64)> = None;
     let mut next = Some(1usize);
     while let Some(areas) = next {
-        let p = point(areas, layout, &config.assets_dir);
+        let p = point(areas, layout, &config.content_dir);
         let mean = p.full;
         println!(
             "[bench]   A={areas:<4} mean={mean:6.2}ms  {}",
@@ -90,8 +91,8 @@ fn main() {
         previous = Some(last);
     }
 
-    let (areas, r) = best.unwrap_or_else(|| (1, point(1, layout, &config.assets_dir)));
-    let npcs = sim::npcs_per_area(service(&config.assets_dir).content()) * areas;
+    let (areas, r) = best.unwrap_or_else(|| (1, point(1, layout, &config.content_dir)));
+    let npcs = sim::npcs_per_area(&service(&config.content_dir)) * areas;
     let players = sim::PLAYERS_PER_AREA * areas;
     println!("\n[bench] areas,npcs,players,clients,mean_ms,p50_ms,p99_ms,max_ms,sim_ms,repl_ms");
     println!(
@@ -113,11 +114,15 @@ fn main() {
     );
 }
 
-fn service(assets_dir: &Path) -> AssetService {
-    AssetService::new(
-        FilesystemSource(assets_dir.to_path_buf()),
-        game::data::build(),
+fn service(content_dir: &Path) -> Content {
+    game::systems::load_content(
+        Arc::new(FilesystemFolder(content_dir.to_path_buf())),
+        "the program stopped",
     )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    })
 }
 
 fn verdict(mean: f64) -> &'static str {
@@ -132,8 +137,8 @@ struct Point {
     max: f64,
 }
 
-fn point(areas: usize, layout: sim::Layout, assets_dir: &Path) -> Point {
-    let assets = service(assets_dir);
+fn point(areas: usize, layout: sim::Layout, content_dir: &Path) -> Point {
+    let assets = service(content_dir);
     let (mut worlds, rosters) = sim::worlds(areas, layout, &assets);
 
     let baseline = measure(&mut worlds);

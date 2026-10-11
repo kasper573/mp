@@ -55,7 +55,7 @@ fn content() -> Box<dyn Scene> {
 
 struct CellData {
     slot: EquipmentSlot,
-    item: Option<crate::data::item::Id>,
+    item: Option<crate::systems::item::Id>,
     icon: Option<Handle<Image>>,
 }
 
@@ -87,7 +87,7 @@ fn equipment_cells(world: &World) -> Vec<CellData> {
             CellData {
                 slot,
                 item,
-                icon: item.map(|item| assets.load(item.get(content).icon.0)),
+                icon: item.map(|item| assets.load(item.get(content).icon.path())),
             }
         })
         .collect()
@@ -128,7 +128,7 @@ fn empty_slot(slot: EquipmentSlot) -> impl Scene {
 fn worn_slot(
     content: &Content,
     slot: EquipmentSlot,
-    item: crate::data::item::Id,
+    item: crate::systems::item::Id,
     icon: Handle<Image>,
 ) -> impl Scene {
     let def = item.get(content);

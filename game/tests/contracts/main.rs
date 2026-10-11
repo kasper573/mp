@@ -15,4 +15,5 @@ mod safe_zone;
 mod shop;
 mod summon;
 mod support;
+mod templates;
 mod travel;

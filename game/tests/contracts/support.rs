@@ -8,27 +8,26 @@ use bevy_replicon::prelude::{ClientId as Sender, FromClient, SendTargets, Server
 use bevy_replicon::server::ServerSystems;
 use bevy_state::prelude::NextState;
 use bevy_time::TimeUpdateStrategy;
-use game::core::assets::{AssetService, FilesystemSource};
 use game::core::content::{Content, ContentId, ContentRow, key_of};
 use game::core::math::{Pos, Rng};
 use game::core::script::Value;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::Seconds;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::data;
-use game::data::item::Id as ItemId;
-use game::data::notification::Id as NotificationId;
-use game::data::npc::Id as NpcId;
+use game::systems::GameSettings;
 use game::systems::TICK_HZ;
 use game::systems::area::{self, Area, AreaObject};
 use game::systems::combat::Died;
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::interact::InteractRequest;
+use game::systems::item::Id as ItemId;
 use game::systems::item::{self, Inventory, ItemStack};
 use game::systems::memory;
 use game::systems::movement::position;
+use game::systems::notification::Id as NotificationId;
 use game::systems::notification::{Notification, NotificationKind, NotificationSent};
+use game::systems::npc::Id as NpcId;
 use game::systems::npc::{self, Npc, Pack};
 use game::systems::player::{ClientId, Immortal, JoinRequest, Players};
 
@@ -38,7 +37,15 @@ pub const CLOCK: WallClock = WallClock {
 };
 
 pub fn content() -> &'static Content {
-    static CONTENT: LazyLock<Content> = LazyLock::new(game::data::build);
+    static CONTENT: LazyLock<Content> = LazyLock::new(|| {
+        game::systems::load_content(
+            std::sync::Arc::new(game::core::content::FilesystemFolder(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
+            )),
+            "cargo test failed",
+        )
+        .unwrap_or_else(|report| panic!("{report}"))
+    });
     &CONTENT
 }
 
@@ -58,26 +65,19 @@ pub fn row<Id: Named>(name: &str) -> Id {
     Id::named(name)
 }
 
-pub fn spawn_area() -> data::area::Id {
-    data::settings().spawn.area
-}
-
-pub fn assets() -> AssetService {
-    AssetService::new(
-        FilesystemSource(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets")),
-        *content(),
-    )
+pub fn spawn_area() -> game::systems::area::Id {
+    content().built::<GameSettings>().spawn.area
 }
 
 pub struct Sim {
     pub app: App,
-    area: data::area::Id,
+    area: game::systems::area::Id,
     conns: HashMap<u32, Entity>,
 }
 
 impl Sim {
-    pub fn area(area: data::area::Id) -> Sim {
-        let mut app = game::systems::server_app(area, 0, CLOCK, &assets());
+    pub fn area(area: game::systems::area::Id) -> Sim {
+        let mut app = game::systems::server_app(area, 0, CLOCK, content());
         app.insert_resource(Rng::new(1));
         app.insert_resource(Immortal(true));
         app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
@@ -103,7 +103,7 @@ impl Sim {
     }
 
     pub fn map(&self) -> &'static Area {
-        let assets = self.app.world().resource::<AssetService>().clone();
+        let assets = *self.app.world().resource::<Content>();
         area::load(&assets, self.area)
     }
 
@@ -211,15 +211,15 @@ pub fn object(sim: &mut Sim, name: &str) -> Entity {
         .expect("an object on the map")
 }
 
-pub fn remember(sim: &mut Sim, player: Entity, key: data::memory::Id) {
+pub fn remember(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) {
     memory::set(sim.world(), player, key, Value::Bool(true));
 }
 
-pub fn remembered(sim: &mut Sim, player: Entity, key: data::memory::Id) -> bool {
+pub fn remembered(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) -> bool {
     memory::get(sim.world(), player, key).truthy()
 }
 
-pub fn counted(sim: &mut Sim, player: Entity, key: data::memory::Id) -> i64 {
+pub fn counted(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) -> i64 {
     match memory::get(sim.world(), player, key) {
         Value::Int(count) => count,
         other => panic!("{key:?} holds {other:?}, not a count"),

@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "baker",
-      "at": [
-        5.0,
-        8.0
-      ]
+      "at": {
+        "x": 5.0,
+        "y": 8.0
+      }
     },
     {
       "type": "soundscape",
@@ -66,20 +66,74 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_cottage_props_71",
+      "type": "scenery",
       "at": {
         "x": 5.0,
         "y": -0.625
-      }
+      },
+      "tileset": "bloomvale_cottage_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1084,
+          1085,
+          1086,
+          1087
+        ],
+        [
+          1116,
+          1117,
+          1118,
+          1119
+        ],
+        [
+          1148,
+          1149,
+          1150,
+          1151
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_cottage_props_122",
+      "type": "scenery",
       "at": {
         "x": 8.0,
         "y": -0.625
-      }
+      },
+      "tileset": "bloomvale_cottage_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1960,
+          1961,
+          1962,
+          1963
+        ],
+        [
+          1992,
+          1993,
+          1994,
+          1995
+        ],
+        [
+          2024,
+          2025,
+          2026,
+          2027
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

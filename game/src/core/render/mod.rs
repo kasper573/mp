@@ -43,6 +43,12 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
+        bevy::asset::load_internal_asset!(
+            app,
+            present::PRESENT_SHADER,
+            "present.wgsl",
+            bevy::shader::Shader::from_wgsl
+        );
         app.add_plugins(Material2dPlugin::<present::Present>::default())
             .init_resource::<Animator>()
             .init_resource::<present::ScreenTint>()

@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "druid",
-      "at": [
-        5.0,
-        7.0
-      ]
+      "at": {
+        "x": 5.0,
+        "y": 7.0
+      }
     },
     {
       "type": "soundscape",
@@ -82,12 +82,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_tree_props_98",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 6.375
-      }
+      },
+      "tileset": "glimmercap_tree_props",
+      "tiles": [
+        [
+          null,
+          1545,
+          1546,
+          1547
+        ],
+        [
+          null,
+          1577,
+          1578,
+          1579
+        ],
+        [
+          null,
+          1609,
+          1610,
+          1611
+        ],
+        [
+          null,
+          1641,
+          1642,
+          1643
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -106,12 +133,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_tree_props_112",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 7.375
-      }
+      },
+      "tileset": "glimmercap_tree_props",
+      "tiles": [
+        [
+          null,
+          1793,
+          1794,
+          1795
+        ],
+        [
+          null,
+          1825,
+          1826,
+          1827
+        ],
+        [
+          null,
+          1857,
+          1858,
+          1859
+        ],
+        [
+          null,
+          1889,
+          1890,
+          1891
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

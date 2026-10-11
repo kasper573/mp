@@ -6,11 +6,13 @@ pub mod node;
 pub mod run;
 pub mod value;
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use bevy_ecs::prelude::*;
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, Reveal, SpokenValues};
@@ -20,12 +22,13 @@ pub use node::{Assignment, Node, Target};
 pub use run::{Answer, BoxEnding, FlowCx, FlowKey, Instances, Locals, Owner, Pause};
 pub use value::{Value, ValueType};
 
-use crate::core::content::{ContentId, ContentRow, serial};
+use crate::core::content::{Content, ContentId, ContentRow};
 
 pub type Name = &'static str;
-pub type Arrow = Option<Name>;
+pub type Arrow = Option<String>;
+pub type Link = Option<Name>;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum OwnerKind {
     Object,
@@ -65,16 +68,39 @@ impl OwnerKind {
 }
 
 pub trait Vocabulary: Sized + Send + Sync + 'static {
-    type Event: EventDef + Clone + Send + Sync + 'static;
-    type Query: QueryDef<Self> + Clone + Send + Sync + 'static;
-    type Effect: EffectDef<Self> + Clone + Send + Sync + 'static;
-    type Line: LineDef<Self> + Clone + Send + Sync + 'static;
-    type Text: Clone + Send + Sync + 'static;
-    type Place: Clone + Send + Sync + 'static;
+    type Event: EventDef + Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
+    type Query: QueryDef<Self>
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + JsonSchema
+        + Send
+        + Sync
+        + 'static;
+    type Effect: EffectDef<Self>
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + JsonSchema
+        + Send
+        + Sync
+        + 'static;
+    type Line: LineDef<Self>
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + JsonSchema
+        + Send
+        + Sync
+        + 'static;
+    type Text: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
+    type Place: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
     type Row: Clone + Send + Sync + 'static;
-    type Audio: Clone + Send + Sync + 'static;
+    type Audio: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
     type Reach: Clone + Send + Sync + 'static;
 
+    fn row_value(content: &Content, table: &str, key: &str) -> Option<Self::Row>;
+    fn audio_value(content: &Content, key: &str) -> Option<Self::Audio>;
     fn show_dialogue(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<Self>);
     fn close_dialogue(world: &mut World, flow: FlowKey, subject: Entity, ending: BoxEnding);
     fn log_dropped_flow(world: &World, owner: &Owner, why: &str);
@@ -91,50 +117,39 @@ pub trait EventDef: Clone {
 }
 
 pub trait LineDef<V: Vocabulary> {
-    fn values(&self) -> Vec<&'static Expr<V>>;
+    fn values(&'static self) -> Vec<&'static Expr<V>>;
 }
 
 pub trait QueryDef<V: Vocabulary> {
     fn value_type(&self, cx: &Compiler<V>) -> Result<ValueType, String>;
     fn reads_subject(&self) -> bool;
-    fn compile(&self, cx: &mut Compiler<V>) -> Result<Eval, String>;
+    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<Eval, String>;
 }
 
 pub trait EffectDef<V: Vocabulary> {
     fn owners(&self) -> &'static [OwnerKind];
     fn needs_subject(&self) -> bool;
-    fn outputs(&self) -> Vec<(Name, Arrow)>;
+    fn outputs(&'static self) -> Vec<(Name, Link)>;
     fn pauses(&self) -> bool;
     fn keeps_box(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<V>) -> Result<EffectCall, String>;
+    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<EffectCall, String>;
     fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
 }
 
-#[derive(Clone, Serialize)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(bound = "", deny_unknown_fields)]
+#[schemars(bound = "")]
 pub struct ScriptDef<V: Vocabulary> {
     pub owner: OwnerKind,
-    #[serde(
-        serialize_with = "serial::pairs_map",
-        skip_serializing_if = "serial::is_empty"
-    )]
-    pub variables: &'static [(Name, Variable<V>)],
-    #[serde(
-        serialize_with = "serial::pairs_map",
-        skip_serializing_if = "serial::is_empty"
-    )]
-    pub state: &'static [(Name, ValueType)],
-    #[serde(
-        serialize_with = "serial::pairs_map",
-        skip_serializing_if = "serial::is_empty"
-    )]
-    pub locals: &'static [(Name, ValueType)],
-    #[serde(serialize_with = "serial::pairs_map")]
-    pub nodes: &'static [(Name, Node<V>)],
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub variables: BTreeMap<String, Variable<V>>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub state: BTreeMap<String, ValueType>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub locals: BTreeMap<String, ValueType>,
+    pub nodes: BTreeMap<String, Node<V>>,
 }
 
 impl<V: Vocabulary> ContentRow for ScriptDef<V> {
@@ -143,45 +158,32 @@ impl<V: Vocabulary> ContentRow for ScriptDef<V> {
 
 pub type ScriptId<V> = ContentId<ScriptDef<V>>;
 
-#[derive(Clone, Serialize)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(bound = "", deny_unknown_fields)]
+#[schemars(bound = "")]
 pub struct InlineScript<V: Vocabulary> {
-    #[serde(
-        serialize_with = "serial::pairs_map",
-        skip_serializing_if = "serial::is_empty"
-    )]
-    pub state: &'static [(Name, ValueType)],
-    #[serde(
-        serialize_with = "serial::pairs_map",
-        skip_serializing_if = "serial::is_empty"
-    )]
-    pub locals: &'static [(Name, ValueType)],
-    #[serde(serialize_with = "serial::pairs_map")]
-    pub nodes: &'static [(Name, Node<V>)],
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub state: BTreeMap<String, ValueType>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub locals: BTreeMap<String, ValueType>,
+    pub nodes: BTreeMap<String, Node<V>>,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", bound = "")]
+#[schemars(bound = "")]
 pub enum ScriptModule<V: Vocabulary> {
     #[serde(rename = "shared_script")]
     Shared {
         script: ScriptId<V>,
-        #[serde(
-            serialize_with = "serial::pairs_map",
-            skip_serializing_if = "serial::is_empty"
-        )]
-        values: &'static [(Name, VarValue<V>)],
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        values: BTreeMap<String, VarValue<V>>,
     },
     #[serde(rename = "inline_script")]
     Inline(InlineScript<V>),
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum VariableType {
     Integer,
@@ -195,67 +197,64 @@ pub enum VariableType {
     Condition,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+impl VariableType {
+    pub fn name(self) -> &'static str {
+        match self {
+            VariableType::Integer => "integer",
+            VariableType::Number => "number",
+            VariableType::Boolean => "boolean",
+            VariableType::Text => "text",
+            VariableType::Name => "name",
+            VariableType::Place => "place",
+            VariableType::Row => "row",
+            VariableType::Audio => "audio",
+            VariableType::Condition => "condition",
+        }
+    }
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(bound = "", deny_unknown_fields)]
+#[schemars(bound = "")]
 pub struct Variable<V: Vocabulary> {
     #[serde(rename = "type")]
     pub ty: VariableType,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub table: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<VarValue<V>>,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(untagged)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(untagged, bound = "")]
+#[schemars(bound = "")]
 pub enum VarValue<V: Vocabulary> {
     Integer(i64),
     Number(f64),
     Boolean(bool),
-    Text(Name),
-    Name(Name),
+    Str(String),
     Place(V::Place),
-    Row(V::Row),
-    Audio(V::Audio),
-    Condition(&'static Expr<V>),
+    Condition(Expr<V>),
 }
 
 impl<V: Vocabulary> VarValue<V> {
-    pub fn variable_type(&self) -> VariableType {
+    pub fn kind(&self) -> &'static str {
         match self {
-            VarValue::Integer(_) => VariableType::Integer,
-            VarValue::Number(_) => VariableType::Number,
-            VarValue::Boolean(_) => VariableType::Boolean,
-            VarValue::Text(_) => VariableType::Text,
-            VarValue::Name(_) => VariableType::Name,
-            VarValue::Place(_) => VariableType::Place,
-            VarValue::Row(_) => VariableType::Row,
-            VarValue::Audio(_) => VariableType::Audio,
-            VarValue::Condition(_) => VariableType::Condition,
+            VarValue::Integer(_) => "an integer",
+            VarValue::Number(_) => "a number",
+            VarValue::Boolean(_) => "a boolean",
+            VarValue::Str(_) => "a string",
+            VarValue::Place(_) => "a place",
+            VarValue::Condition(_) => "a condition",
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Fill<T: 'static> {
+#[derive(JsonSchema, Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Fill<T> {
+    Var { var: String },
     Const(T),
-    Var(Name),
-}
-
-impl<T: Serialize> Serialize for Fill<T> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Fill::Const(value) => value.serialize(serializer),
-            Fill::Var(name) => {
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("var", name)?;
-                map.end()
-            }
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -264,6 +263,8 @@ pub struct ScriptError {
     pub owner: String,
     pub node: Option<String>,
     pub expected: String,
+    /// The shared script the error lies in, when it is the script's own and not its caller's.
+    pub script: Option<String>,
 }
 
 impl fmt::Display for ScriptError {

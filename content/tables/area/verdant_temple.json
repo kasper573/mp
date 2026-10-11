@@ -43,10 +43,10 @@
     {
       "type": "resident",
       "npc": "archaeologist",
-      "at": [
-        6.0,
-        13.0
-      ]
+      "at": {
+        "x": 6.0,
+        "y": 13.0
+      }
     },
     {
       "type": "soundscape",

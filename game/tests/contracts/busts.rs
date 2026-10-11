@@ -10,17 +10,12 @@ const CAST_BUDGET_BYTES: u64 = 3 * 1024 * 1024;
 
 #[test]
 fn every_bust_fits_the_download_budget() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../content/assets");
     let arts: HashSet<&str> = content()
         .table::<ModelDef>()
         .rows()
-        .iter()
-        .flat_map(|def| {
-            def.busts()
-                .into_iter()
-                .flat_map(|busts| busts.all(content()))
-        })
-        .map(|bust| bust.0)
+        .flat_map(|def| def.busts().into_iter().flat_map(|busts| busts.all()))
+        .map(|bust| bust.as_str())
         .collect();
     let mut total = 0;
     for art in arts {

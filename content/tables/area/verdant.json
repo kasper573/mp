@@ -32,8 +32,8 @@
           "values": {
             "to": {
               "area": "verdant_hut",
-              "x": 8.0,
-              "y": 9.5
+              "x": 9.0,
+              "y": 9.0
             }
           }
         }
@@ -56,8 +56,8 @@
           "values": {
             "to": {
               "area": "verdant_temple",
-              "x": 9.0,
-              "y": 15.5
+              "x": 10.0,
+              "y": 15.0
             }
           }
         }
@@ -80,7 +80,7 @@
           "values": {
             "to": {
               "area": "mirefen",
-              "x": 61.0,
+              "x": 61.5,
               "y": 55.5
             }
           }
@@ -136,10 +136,10 @@
     {
       "type": "resident",
       "npc": "explorer",
-      "at": [
-        24.0,
-        69.0
-      ]
+      "at": {
+        "x": 24.0,
+        "y": 69.0
+      }
     },
     {
       "type": "safe_zone",
@@ -228,327 +228,712 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
-      "at": {
-        "x": 5.25,
-        "y": -4.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 57.438,
-        "y": -4.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 11.25,
-        "y": -4.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 27.5,
-        "y": -4.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 12.875,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 2.438,
-        "y": -4.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
-      "at": {
-        "x": 44.813,
-        "y": -4.188
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
-      "at": {
-        "x": 18.75,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 30.25,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
-      "at": {
-        "x": 10.438,
-        "y": -3.938
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 52.188,
-        "y": -3.813
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
-      "at": {
-        "x": 34.625,
-        "y": -3.75
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 23.188,
-        "y": -3.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 2.188,
-        "y": -3.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 53.375,
-        "y": -3.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
-      "at": {
-        "x": 47.688,
-        "y": -3.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
-      "at": {
-        "x": 44.688,
-        "y": -3.313
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
-      "at": {
-        "x": 5.5,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": 11.625,
         "y": -2.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 42.438,
         "y": -2.75
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 46.938,
         "y": -2.625
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 6.5,
         "y": -2.438
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          244,
+          245,
+          246,
+          247
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 44.5,
         "y": -2.438
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 13.5,
         "y": -2.375
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 21.5,
         "y": -1.563
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_0",
+      "type": "scenery",
       "at": {
         "x": -0.3,
         "y": -0.8
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_4",
+      "type": "scenery",
       "at": {
         "x": 7.7,
         "y": -0.8
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_15",
+      "type": "scenery",
       "at": {
         "x": 7.7,
         "y": -0.8
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          188,
+          189,
+          190,
+          191
+        ],
+        [
+          220,
+          221,
+          222,
+          223
+        ],
+        [
+          252,
+          253,
+          254,
+          255
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_0",
+      "type": "scenery",
       "at": {
         "x": 15.7,
         "y": -0.8
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_4",
+      "type": "scenery",
       "at": {
         "x": 24.7,
         "y": -0.8
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_15",
+      "type": "scenery",
       "at": {
         "x": 32.7,
         "y": -0.8
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          188,
+          189,
+          190,
+          191
+        ],
+        [
+          220,
+          221,
+          222,
+          223
+        ],
+        [
+          252,
+          253,
+          254,
+          255
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_0",
+      "type": "scenery",
       "at": {
         "x": 32.5,
         "y": -0.8
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_4",
+      "type": "scenery",
       "at": {
         "x": 46.1,
         "y": -0.8
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_15",
+      "type": "scenery",
       "at": {
         "x": 46.1,
         "y": -0.8
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          188,
+          189,
+          190,
+          191
+        ],
+        [
+          220,
+          221,
+          222,
+          223
+        ],
+        [
+          252,
+          253,
+          254,
+          255
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_0",
+      "type": "scenery",
       "at": {
         "x": 54.3,
         "y": -0.8
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": 20.063,
         "y": -0.75
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 41.25,
         "y": -0.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          444,
+          445,
+          446,
+          447
+        ],
+        [
+          476,
+          477,
+          478,
+          479
+        ],
+        [
+          508,
+          509,
+          510,
+          511
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 13.375,
         "y": -0.063
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          688,
+          689,
+          690,
+          691
+        ],
+        [
+          720,
+          721,
+          722,
+          723
+        ],
+        [
+          752,
+          753,
+          754,
+          755
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -560,12 +945,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": 52.625,
         "y": 1.063
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -627,12 +1039,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 56.938,
         "y": 2.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -644,12 +1083,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 1.125,
         "y": 3.188
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          null,
+          null,
+          null
+        ],
+        [
+          444,
+          null,
+          null,
+          null
+        ],
+        [
+          476,
+          null,
+          null,
+          null
+        ],
+        [
+          508,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -671,12 +1137,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -0.5,
         "y": 3.563
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -714,12 +1207,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -0.625,
         "y": 4.0
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -849,15 +1369,6 @@
     },
     {
       "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 0.875,
-        "y": 6.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
       "blueprint": "verdant_props_85",
       "at": {
         "x": 14.5,
@@ -923,12 +1434,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.125,
         "y": 7.688
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1016,12 +1554,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.5,
         "y": 10.063
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1066,12 +1631,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.75,
         "y": 11.188
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1100,12 +1692,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 56.688,
         "y": 11.688
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          149,
+          150,
+          151
+        ],
+        [
+          null,
+          181,
+          182,
+          183
+        ],
+        [
+          null,
+          213,
+          214,
+          215
+        ],
+        [
+          null,
+          245,
+          246,
+          247
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1192,21 +1811,75 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": 56.875,
         "y": 12.625
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.438,
         "y": 12.688
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1235,12 +1908,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 1.813,
         "y": 13.563
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1320,12 +2020,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.25,
         "y": 15.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1361,12 +2088,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 1.438,
         "y": 15.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          148,
+          null,
+          null,
+          null
+        ],
+        [
+          180,
+          null,
+          null,
+          null
+        ],
+        [
+          212,
+          null,
+          null,
+          null
+        ],
+        [
+          244,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1387,12 +2141,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 57.5,
         "y": 16.438
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1412,12 +2193,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.688,
         "y": 17.625
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1493,12 +2301,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -2.75,
         "y": 19.688
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          11
+        ],
+        [
+          null,
+          null,
+          null,
+          43
+        ],
+        [
+          null,
+          null,
+          null,
+          75
+        ],
+        [
+          null,
+          null,
+          null,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1509,12 +2344,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 56.5,
         "y": 19.938
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1558,12 +2420,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 21.625
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          656,
+          657,
+          658,
+          null
+        ],
+        [
+          688,
+          689,
+          690,
+          null
+        ],
+        [
+          720,
+          721,
+          722,
+          null
+        ],
+        [
+          752,
+          753,
+          754,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1624,12 +2513,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 53.375,
         "y": 23.063
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1689,12 +2605,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 1.438,
         "y": 23.688
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          148,
+          null,
+          null,
+          null
+        ],
+        [
+          180,
+          null,
+          null,
+          null
+        ],
+        [
+          212,
+          null,
+          null,
+          null
+        ],
+        [
+          244,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1739,12 +2682,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 52.625,
         "y": 25.625
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          413,
+          414,
+          null
+        ],
+        [
+          444,
+          445,
+          446,
+          null
+        ],
+        [
+          476,
+          477,
+          478,
+          null
+        ],
+        [
+          508,
+          509,
+          510,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1782,15 +2752,6 @@
     },
     {
       "type": "blueprint",
-      "blueprint": "verdant_props_3",
-      "at": {
-        "x": 0.938,
-        "y": 26.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
       "blueprint": "verdant_props_18",
       "at": {
         "x": 12.5,
@@ -1807,12 +2768,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 52.563,
         "y": 27.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1831,12 +2819,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 56.75,
         "y": 27.813
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          657,
+          658,
+          659
+        ],
+        [
+          null,
+          689,
+          690,
+          691
+        ],
+        [
+          null,
+          721,
+          722,
+          723
+        ],
+        [
+          null,
+          753,
+          754,
+          755
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1873,12 +2888,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -0.5,
         "y": 28.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1955,12 +2997,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -0.25,
         "y": 29.563
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1980,12 +3049,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 1.375,
         "y": 30.188
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          null,
+          null,
+          null
+        ],
+        [
+          444,
+          null,
+          null,
+          null
+        ],
+        [
+          476,
+          null,
+          null,
+          null
+        ],
+        [
+          508,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1997,12 +3093,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 53.25,
         "y": 30.25
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2070,12 +3193,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 2.313,
         "y": 31.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          413,
+          null,
+          null
+        ],
+        [
+          444,
+          445,
+          null,
+          null
+        ],
+        [
+          476,
+          477,
+          null,
+          null
+        ],
+        [
+          508,
+          509,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2197,12 +3347,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.438,
         "y": 33.938
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2256,12 +3433,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.688,
         "y": 35.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2349,12 +3553,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -0.25,
         "y": 36.938
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2375,12 +3606,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": -2.25,
         "y": 37.375
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          151
+        ],
+        [
+          null,
+          null,
+          null,
+          183
+        ],
+        [
+          null,
+          null,
+          null,
+          215
+        ],
+        [
+          null,
+          null,
+          null,
+          247
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2496,12 +3754,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 3.938,
         "y": 38.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2547,12 +3832,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 57.375,
         "y": 39.938
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2657,12 +3969,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 1.25,
         "y": 40.813
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2734,12 +4073,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.063,
         "y": 42.188
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2778,12 +4144,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 56.563,
         "y": 43.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          149,
+          150,
+          151
+        ],
+        [
+          null,
+          181,
+          182,
+          183
+        ],
+        [
+          null,
+          213,
+          214,
+          215
+        ],
+        [
+          null,
+          245,
+          246,
+          247
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2846,12 +4239,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 1.25,
         "y": 44.0
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2914,12 +4334,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": 3.313,
         "y": 45.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3063,20 +4510,74 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.438,
         "y": 47.063
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
+      "type": "scenery",
       "at": {
         "x": 53.188,
         "y": 47.25
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          140,
+          141,
+          142,
+          null
+        ],
+        [
+          172,
+          173,
+          174,
+          null
+        ],
+        [
+          204,
+          205,
+          206,
+          null
+        ],
+        [
+          236,
+          237,
+          238,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3244,12 +4745,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
+      "type": "scenery",
       "at": {
         "x": -1.75,
         "y": 51.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          142,
+          143
+        ],
+        [
+          null,
+          null,
+          174,
+          175
+        ],
+        [
+          null,
+          null,
+          206,
+          207
+        ],
+        [
+          null,
+          null,
+          238,
+          239
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3260,12 +4788,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.688,
         "y": 51.563
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3385,12 +4940,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 53.688
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3467,12 +5049,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
+      "type": "scenery",
       "at": {
         "x": 2.625,
         "y": 55.875
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          140,
+          141,
+          null,
+          null
+        ],
+        [
+          172,
+          173,
+          null,
+          null
+        ],
+        [
+          204,
+          205,
+          null,
+          null
+        ],
+        [
+          236,
+          237,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3542,12 +5151,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 1.938,
         "y": 57.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          656,
+          null,
+          null,
+          null
+        ],
+        [
+          688,
+          null,
+          null,
+          null
+        ],
+        [
+          720,
+          null,
+          null,
+          null
+        ],
+        [
+          752,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3583,12 +5219,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 53.375,
         "y": 57.625
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          413,
+          414,
+          null
+        ],
+        [
+          444,
+          445,
+          446,
+          null
+        ],
+        [
+          476,
+          477,
+          478,
+          null
+        ],
+        [
+          508,
+          509,
+          510,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3623,12 +5286,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": -0.688,
         "y": 59.25
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          413,
+          414,
+          415
+        ],
+        [
+          null,
+          445,
+          446,
+          447
+        ],
+        [
+          null,
+          477,
+          478,
+          479
+        ],
+        [
+          null,
+          509,
+          510,
+          511
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3656,12 +5346,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_80",
+      "type": "scenery",
       "at": {
         "x": 52.938,
         "y": 60.438
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          1280,
+          1281,
+          1282,
+          null
+        ],
+        [
+          1312,
+          1313,
+          1314,
+          null
+        ],
+        [
+          1344,
+          1345,
+          1346,
+          null
+        ],
+        [
+          1376,
+          1377,
+          1378,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3712,12 +5429,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 1.563,
         "y": 61.188
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          null,
+          null,
+          null
+        ],
+        [
+          444,
+          null,
+          null,
+          null
+        ],
+        [
+          476,
+          null,
+          null,
+          null
+        ],
+        [
+          508,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3772,12 +5516,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.375,
         "y": 62.25
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3855,12 +5626,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 3.875,
         "y": 64.625
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          656,
+          657,
+          658,
+          null
+        ],
+        [
+          688,
+          689,
+          690,
+          null
+        ],
+        [
+          720,
+          721,
+          722,
+          null
+        ],
+        [
+          752,
+          753,
+          754,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3872,12 +5670,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_44",
+      "type": "scenery",
       "at": {
         "x": 2.125,
         "y": 64.75
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          656,
+          657,
+          null,
+          null
+        ],
+        [
+          688,
+          689,
+          null,
+          null
+        ],
+        [
+          720,
+          721,
+          null,
+          null
+        ],
+        [
+          752,
+          753,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3915,12 +5740,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.563,
         "y": 66.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3999,12 +5851,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_13",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 67.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          148,
+          149,
+          null,
+          null
+        ],
+        [
+          180,
+          181,
+          null,
+          null
+        ],
+        [
+          212,
+          213,
+          null,
+          null
+        ],
+        [
+          244,
+          245,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4083,12 +5962,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.25,
         "y": 68.75
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4168,12 +6074,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_11",
+      "type": "scenery",
       "at": {
         "x": -0.625,
         "y": 70.25
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          141,
+          142,
+          143
+        ],
+        [
+          null,
+          173,
+          174,
+          175
+        ],
+        [
+          null,
+          205,
+          206,
+          207
+        ],
+        [
+          null,
+          237,
+          238,
+          239
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4184,12 +6117,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_3",
+      "type": "scenery",
       "at": {
         "x": -2.688,
         "y": 70.563
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          15
+        ],
+        [
+          null,
+          null,
+          null,
+          47
+        ],
+        [
+          null,
+          null,
+          null,
+          79
+        ],
+        [
+          null,
+          null,
+          null,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4398,15 +6358,6 @@
     },
     {
       "type": "blueprint",
-      "blueprint": "verdant_props_31",
-      "at": {
-        "x": 0.875,
-        "y": 74.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
       "blueprint": "verdant_props_44",
       "at": {
         "x": 41.125,
@@ -4483,12 +6434,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.563,
         "y": 76.125
       },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4661,12 +6639,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": -1.938,
         "y": 77.938
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          414,
+          415
+        ],
+        [
+          null,
+          null,
+          446,
+          447
+        ],
+        [
+          null,
+          null,
+          478,
+          479
+        ],
+        [
+          null,
+          null,
+          510,
+          511
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4775,12 +6780,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_41",
+      "type": "scenery",
       "at": {
         "x": -1.313,
         "y": 79.125
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          null,
+          646,
+          647
+        ],
+        [
+          null,
+          null,
+          678,
+          679
+        ],
+        [
+          null,
+          null,
+          710,
+          711
+        ],
+        [
+          null,
+          null,
+          742,
+          743
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4842,20 +6874,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_31",
+      "type": "scenery",
       "at": {
         "x": 53.063,
         "y": 79.625
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          412,
+          413,
+          414,
+          null
+        ],
+        [
+          444,
+          445,
+          446,
+          null
+        ],
+        [
+          476,
+          477,
+          478,
+          null
+        ],
+        [
+          508,
+          509,
+          510,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_props_6",
+      "type": "scenery",
       "at": {
         "x": -0.438,
         "y": 79.688
-      }
+      },
+      "tileset": "verdant_props",
+      "tiles": [
+        [
+          null,
+          25,
+          26,
+          27
+        ],
+        [
+          null,
+          57,
+          58,
+          59
+        ],
+        [
+          null,
+          89,
+          90,
+          91
+        ],
+        [
+          null,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

@@ -66,10 +66,10 @@
     {
       "type": "resident",
       "npc": "potter",
-      "at": [
-        17.0,
-        10.0
-      ]
+      "at": {
+        "x": 17.0,
+        "y": 10.0
+      }
     },
     {
       "type": "soundscape",

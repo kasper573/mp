@@ -33,7 +33,7 @@
             "to": {
               "area": "amberwood_barn",
               "x": 8.0,
-              "y": 11.5
+              "y": 11.0
             }
           }
         }
@@ -57,7 +57,7 @@
             "to": {
               "area": "amberwood_barn",
               "x": 18.0,
-              "y": 11.5
+              "y": 11.0
             }
           }
         }
@@ -81,7 +81,7 @@
             "to": {
               "area": "amberwood_cabin",
               "x": 8.0,
-              "y": 9.5
+              "y": 9.0
             }
           }
         }
@@ -160,10 +160,10 @@
     {
       "type": "resident",
       "npc": "lumberjack",
-      "at": [
-        44.0,
-        44.0
-      ]
+      "at": {
+        "x": 44.0,
+        "y": 44.0
+      }
     },
     {
       "type": "safe_zone",
@@ -252,509 +252,1319 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
-      "at": {
-        "x": 16.75,
-        "y": -4.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
-      "at": {
-        "x": 3.0,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
-      "at": {
-        "x": 14.688,
-        "y": -4.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 7.625,
-        "y": -4.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 43.688,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
-      "at": {
-        "x": 9.813,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 0.063,
-        "y": -4.0
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
-      "at": {
-        "x": 31.125,
-        "y": -3.938
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 19.5,
-        "y": -3.875
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": 25.25,
-        "y": -3.813
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": 52.313,
-        "y": -3.813
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": 33.5,
-        "y": -3.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
-      "at": {
-        "x": 2.563,
-        "y": -3.5
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 14.313,
-        "y": -3.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
-      "at": {
-        "x": 17.0,
-        "y": -3.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": 31.25,
-        "y": -3.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
-      "at": {
-        "x": 25.0,
-        "y": -3.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
-      "at": {
-        "x": 40.75,
-        "y": -3.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
-      "at": {
-        "x": 46.813,
-        "y": -3.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
-      "at": {
-        "x": 50.688,
-        "y": -3.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
-      "at": {
-        "x": 41.375,
-        "y": -3.313
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": 38.875,
-        "y": -3.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 48.0,
         "y": -2.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 3.0,
         "y": -2.813
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 19.75,
         "y": -2.813
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 11.688,
         "y": -2.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 31.625,
         "y": -2.563
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 35.313,
         "y": -2.5
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 4.688,
         "y": -2.438
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 16.375,
         "y": -2.438
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 45.625,
         "y": -2.438
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          736,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 10.813,
         "y": -2.188
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 22.063,
         "y": -2.125
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 29.563,
         "y": -2.125
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 41.5,
         "y": -2.125
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 14.5,
         "y": -2.063
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 17.313,
         "y": -1.938
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          707
+        ],
+        [
+          736,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 28.0,
         "y": -1.938
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          707
+        ],
+        [
+          736,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 22.313,
         "y": -1.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 44.875,
         "y": -1.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.438,
         "y": -1.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 47.313,
         "y": -1.563
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_4",
+      "type": "scenery",
       "at": {
         "x": 36.938,
         "y": -1.563
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 13.313,
         "y": -1.125
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 17.75,
         "y": -1.125
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          707
+        ],
+        [
+          736,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 4.313,
         "y": -1.063
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 28.75,
         "y": -0.938
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 45.125,
         "y": -0.75
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 11.313,
         "y": -0.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 17.938,
         "y": -0.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 47.75,
         "y": -0.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.313,
         "y": -0.625
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 19.0,
         "y": -0.5
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          672,
+          673,
+          674,
+          675
+        ],
+        [
+          704,
+          705,
+          706,
+          707
+        ],
+        [
+          736,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 21.0,
         "y": -0.438
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 38.125,
         "y": -0.438
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 29.5,
         "y": -0.313
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_97",
+      "type": "scenery",
       "at": {
         "x": 20.625,
         "y": -0.25
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1572,
+          1573,
+          1574,
+          1575
+        ],
+        [
+          1604,
+          1605,
+          1606,
+          1607
+        ],
+        [
+          1636,
+          1637,
+          1638,
+          1639
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 31.063,
         "y": -0.125
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_4",
+      "type": "scenery",
       "at": {
         "x": 46.938,
         "y": -0.125
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -884,12 +1694,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 48.938,
         "y": 1.5
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          641,
+          642,
+          null
+        ],
+        [
+          672,
+          673,
+          674,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          null
+        ],
+        [
+          736,
+          737,
+          738,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -942,12 +1779,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.063,
         "y": 1.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1025,12 +1889,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -2.438,
         "y": 3.0
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1128,12 +2019,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.313,
         "y": 4.375
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1286,12 +2204,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.875,
         "y": 6.375
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1411,21 +2356,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.563,
         "y": 8.313
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 8.313
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1460,14 +2459,6 @@
       "at": {
         "x": 43.3,
         "y": 9.1
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
-      "at": {
-        "x": -3.188,
-        "y": 9.5
       }
     },
     {
@@ -1522,12 +2513,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 53.125,
         "y": 10.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1674,12 +2692,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.438,
         "y": 13.438
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1800,12 +2845,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.313,
         "y": 14.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1925,12 +2997,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 53.313,
         "y": 16.063
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          641,
+          642,
+          643
+        ],
+        [
+          null,
+          673,
+          674,
+          675
+        ],
+        [
+          null,
+          705,
+          706,
+          707
+        ],
+        [
+          null,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1983,15 +3082,6 @@
         "x": 35.75,
         "y": 16.563
       }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
-      "at": {
-        "x": 0.875,
-        "y": 16.813
-      },
-      "flip": "horizontal"
     },
     {
       "type": "blueprint",
@@ -2114,12 +3204,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": -1.75,
         "y": 18.125
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          26,
+          27
+        ],
+        [
+          null,
+          null,
+          58,
+          59
+        ],
+        [
+          null,
+          null,
+          90,
+          91
+        ],
+        [
+          null,
+          null,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2274,12 +3391,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -2.688,
         "y": 20.125
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2481,12 +3625,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": -1.5,
         "y": 22.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          642,
+          643
+        ],
+        [
+          null,
+          null,
+          674,
+          675
+        ],
+        [
+          null,
+          null,
+          706,
+          707
+        ],
+        [
+          null,
+          null,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2611,12 +3782,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.313,
         "y": 23.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2669,12 +3867,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.875,
         "y": 24.813
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2763,21 +3988,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.375,
         "y": 26.625
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
-      "at": {
-        "x": 0.938,
-        "y": 26.688
       },
-      "flip": "horizontal"
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2857,12 +4100,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 28.188
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2931,12 +4201,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.938,
         "y": 30.313
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3022,12 +4319,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 32.188
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3049,20 +4373,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 32.938
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 49.188,
         "y": 33.5
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3114,12 +4492,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 2.375,
         "y": 34.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          641,
+          null,
+          null
+        ],
+        [
+          672,
+          673,
+          null,
+          null
+        ],
+        [
+          704,
+          705,
+          null,
+          null
+        ],
+        [
+          736,
+          737,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3147,12 +4552,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 48.5,
         "y": 35.125
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          641,
+          642,
+          null
+        ],
+        [
+          672,
+          673,
+          674,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          null
+        ],
+        [
+          736,
+          737,
+          738,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3196,20 +4628,74 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": -2.938,
         "y": 36.438
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          27
+        ],
+        [
+          null,
+          null,
+          null,
+          59
+        ],
+        [
+          null,
+          null,
+          null,
+          91
+        ],
+        [
+          null,
+          null,
+          null,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.938,
         "y": 36.438
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3320,12 +4806,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.188,
         "y": 40.063
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3403,12 +4916,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.25,
         "y": 42.0
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3468,12 +5008,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.438,
         "y": 43.375
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3486,20 +5053,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 43.563
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          643
+        ],
+        [
+          null,
+          null,
+          null,
+          675
+        ],
+        [
+          null,
+          null,
+          null,
+          707
+        ],
+        [
+          null,
+          null,
+          null,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 53.125,
         "y": 43.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3536,12 +5157,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.188,
         "y": 44.75
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3613,12 +5261,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 53.313,
         "y": 46.563
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3631,12 +5306,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 1.813,
         "y": 46.875
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          24,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          null,
+          null,
+          null
+        ],
+        [
+          88,
+          null,
+          null,
+          null
+        ],
+        [
+          120,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3906,12 +5608,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.188,
         "y": 50.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4108,12 +5837,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": -2.0,
         "y": 53.625
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          642,
+          643
+        ],
+        [
+          null,
+          null,
+          674,
+          675
+        ],
+        [
+          null,
+          null,
+          706,
+          707
+        ],
+        [
+          null,
+          null,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4199,12 +5955,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": -0.313,
         "y": 56.188
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4231,12 +6014,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.438,
         "y": 56.875
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4307,12 +6117,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.5,
         "y": 59.375
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4366,12 +6203,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 2.688,
         "y": 60.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          641,
+          null,
+          null
+        ],
+        [
+          672,
+          673,
+          null,
+          null
+        ],
+        [
+          704,
+          705,
+          null,
+          null
+        ],
+        [
+          736,
+          737,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4432,21 +6296,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 61.75
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          24,
+          25,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          null,
+          null
+        ],
+        [
+          88,
+          89,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 49.25,
         "y": 61.75
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4569,12 +6487,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -2.0,
         "y": 64.188
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4610,12 +6555,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.75,
         "y": 65.188
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4643,12 +6615,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 53.188,
         "y": 66.063
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4826,12 +6825,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 49.438,
         "y": 68.563
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4899,12 +6925,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 3.563,
         "y": 69.75
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          641,
+          642,
+          null
+        ],
+        [
+          672,
+          673,
+          674,
+          null
+        ],
+        [
+          704,
+          705,
+          706,
+          null
+        ],
+        [
+          736,
+          737,
+          738,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5018,12 +7071,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_2",
+      "type": "scenery",
       "at": {
         "x": 49.0,
         "y": 71.25
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5034,12 +7114,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.188,
         "y": 71.313
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5184,12 +7291,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 3.75,
         "y": 73.0
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5227,12 +7361,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": 1.063,
         "y": 73.688
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          640,
+          null,
+          null,
+          null
+        ],
+        [
+          672,
+          null,
+          null,
+          null
+        ],
+        [
+          704,
+          null,
+          null,
+          null
+        ],
+        [
+          736,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5319,12 +7480,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 74.438
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5426,12 +7614,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_40",
+      "type": "scenery",
       "at": {
         "x": -0.25,
         "y": 75.438
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          641,
+          642,
+          643
+        ],
+        [
+          null,
+          673,
+          674,
+          675
+        ],
+        [
+          null,
+          705,
+          706,
+          707
+        ],
+        [
+          null,
+          737,
+          738,
+          739
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5452,12 +7667,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_1",
+      "type": "scenery",
       "at": {
         "x": 52.813,
         "y": 75.625
       },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5600,12 +7842,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_6",
+      "type": "scenery",
       "at": {
         "x": -2.063,
         "y": 77.625
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          27
+        ],
+        [
+          null,
+          null,
+          null,
+          59
+        ],
+        [
+          null,
+          null,
+          null,
+          91
+        ],
+        [
+          null,
+          null,
+          null,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5760,20 +8029,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": -2.0,
         "y": 79.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "amberwood_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.188,
         "y": 79.688
-      }
+      },
+      "tileset": "amberwood_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

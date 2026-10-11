@@ -2,10 +2,9 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ClientId as Sender, ConnectedClient, FromClient, ServerState};
 use bevy_state::prelude::NextState;
-use game::core::assets::AssetService;
 use game::core::content::Content;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::data;
+use game::systems::GameSettings;
 use game::systems::area::AreaModule;
 use game::systems::player::{ClientId, JoinRequest, SpawnPolicy};
 
@@ -54,12 +53,12 @@ impl Layout {
 
 /// The NPCs each bench area spawns, read from the content layer (the same area the bench instances).
 pub fn npcs_per_area(content: &Content) -> usize {
-    let area = data::settings().bench.get(content);
+    let area = content.built::<GameSettings>().bench.get(content);
     area.modules
         .iter()
         .map(|module| match module {
-            AreaModule::Population { count, .. } => *count as usize,
-            AreaModule::Resident { .. } => 1,
+            AreaModule::Population(population) => population.count as usize,
+            AreaModule::Resident(_) => 1,
             _ => 0,
         })
         .sum()
@@ -68,7 +67,7 @@ pub fn npcs_per_area(content: &Content) -> usize {
 /// Exactly `areas` instances of the benchmark area, each populated with its NPCs and players, plus
 /// each world's roster of connection entities. The area count is a pure runtime parameter — every
 /// world is an instance of the one area template, so the count built always equals the count asked for.
-pub fn worlds(areas: usize, layout: Layout, assets: &AssetService) -> (Vec<App>, Vec<Roster>) {
+pub fn worlds(areas: usize, layout: Layout, assets: &Content) -> (Vec<App>, Vec<Roster>) {
     let mut worlds = Vec::with_capacity(areas);
     let mut rosters = Vec::with_capacity(areas);
     for ordinal in 0..areas {
@@ -107,8 +106,9 @@ pub fn step_single_threaded(worlds: &mut [App]) {
     }
 }
 
-fn build_world(layout: Layout, assets: &AssetService, ordinal: u64) -> (App, Roster) {
-    let mut app = game::systems::server_app(game::data::settings().bench, ordinal, CLOCK, assets);
+fn build_world(layout: Layout, assets: &Content, ordinal: u64) -> (App, Roster) {
+    let mut app =
+        game::systems::server_app(assets.built::<GameSettings>().bench, ordinal, CLOCK, assets);
     app.insert_resource(game::core::math::Rng::from_entropy());
     app.insert_resource(layout.spawn_policy());
     app.finish();

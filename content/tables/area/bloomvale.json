@@ -32,8 +32,8 @@
           "values": {
             "to": {
               "area": "bloomvale_inn",
-              "x": 15.0,
-              "y": 19.5
+              "x": 16.0,
+              "y": 19.0
             }
           }
         }
@@ -57,7 +57,7 @@
             "to": {
               "area": "bloomvale_inn",
               "x": 28.0,
-              "y": 19.5
+              "y": 19.0
             }
           }
         }
@@ -80,8 +80,8 @@
           "values": {
             "to": {
               "area": "bloomvale_inn",
-              "x": 36.0,
-              "y": 19.5
+              "x": 37.0,
+              "y": 19.0
             }
           }
         }
@@ -104,8 +104,8 @@
           "values": {
             "to": {
               "area": "bloomvale_mill",
-              "x": 7.0,
-              "y": 9.5
+              "x": 8.0,
+              "y": 9.0
             }
           }
         }
@@ -129,7 +129,7 @@
             "to": {
               "area": "bloomvale_cottage",
               "x": 9.0,
-              "y": 10.5
+              "y": 10.0
             }
           }
         }
@@ -153,7 +153,7 @@
             "to": {
               "area": "forest",
               "x": 41.5,
-              "y": 7.5
+              "y": 8.5
             }
           }
         }
@@ -176,7 +176,7 @@
           "values": {
             "to": {
               "area": "amberwood",
-              "x": 31.5,
+              "x": 32.5,
               "y": 81.5
             }
           }
@@ -256,10 +256,10 @@
     {
       "type": "resident",
       "npc": "farmer_girl",
-      "at": [
-        27.0,
-        37.0
-      ]
+      "at": {
+        "x": 27.0,
+        "y": 37.0
+      }
     },
     {
       "type": "safe_zone",
@@ -357,674 +357,1671 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
-      "at": {
-        "x": 5.25,
-        "y": -4.625
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
-      "at": {
-        "x": 61.125,
-        "y": -4.625
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 44.813,
-        "y": -4.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 20.938,
-        "y": -4.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 11.25,
-        "y": -4.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 43.625,
-        "y": -4.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 67.438,
-        "y": -4.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 2.438,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 12.875,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
-      "at": {
-        "x": 57.75,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
-      "at": {
-        "x": 72.063,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
-      "at": {
-        "x": 18.75,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 84.0,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 73.063,
-        "y": -4.0
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
-      "at": {
-        "x": 78.438,
-        "y": -4.0
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 10.438,
-        "y": -3.938
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 71.5,
-        "y": -3.875
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 26.563,
-        "y": -3.75
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 32.125,
-        "y": -3.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 47.75,
-        "y": -3.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 34.75,
-        "y": -3.625
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 78.563,
-        "y": -3.625
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 51.5,
-        "y": -3.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 60.813,
-        "y": -3.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 55.438,
-        "y": -3.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
-      "at": {
-        "x": 24.625,
-        "y": -3.438
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 87.813,
-        "y": -3.438
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 17.375,
-        "y": -3.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 37.063,
-        "y": -3.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
-      "at": {
-        "x": 2.188,
-        "y": -3.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 49.563,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
-      "at": {
-        "x": 5.5,
-        "y": -3.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 0.938,
         "y": -2.75
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 23.938,
         "y": -2.75
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 4.688,
         "y": -2.688
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 48.313,
         "y": -2.625
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
+      "type": "scenery",
       "at": {
         "x": 86.625,
         "y": -2.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 15.875,
         "y": -2.563
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 12.563,
         "y": -2.438
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 47.5,
         "y": -2.438
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 55.125,
         "y": -2.375
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 76.125,
         "y": -2.188
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 15.125,
         "y": -2.063
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 62.188,
         "y": -2.063
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 74.938,
         "y": -2.063
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 15.938,
         "y": -2.0
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 40.0,
         "y": -2.0
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 47.188,
         "y": -2.0
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 87.438,
         "y": -2.0
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 26.938,
         "y": -1.938
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 43.063,
         "y": -1.875
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 68.938,
         "y": -1.875
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 65.75,
         "y": -1.75
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 21.938,
         "y": -1.688
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 23.313,
         "y": -1.688
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 61.188,
         "y": -1.688
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 42.0,
         "y": -1.625
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 80.375,
         "y": -1.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 35.0,
         "y": -1.563
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 58.0,
         "y": -1.563
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 10.688,
         "y": -1.5
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.313,
         "y": -1.438
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 67.125,
         "y": -1.375
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 79.75,
         "y": -1.375
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 0.313,
         "y": -1.0
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": -0.938
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 11.938,
         "y": -0.813
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 16.25,
         "y": -0.75
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 18.875,
         "y": -0.688
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 21.938,
         "y": -0.688
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 79.625,
         "y": -0.688
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 32.438,
         "y": -0.563
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 8.813,
         "y": -0.438
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 75.875,
         "y": -0.375
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
+      "type": "scenery",
       "at": {
         "x": 34.625,
         "y": -0.25
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 86.688,
         "y": -0.188
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 12.938,
         "y": -0.125
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 80.313,
         "y": -0.125
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 13.688,
         "y": -0.063
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1044,12 +2041,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 85.313,
         "y": 0.063
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1136,20 +2160,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.125,
         "y": 2.0
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 1.813,
         "y": 2.813
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          16,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1230,21 +2308,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 88.813,
         "y": 4.375
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.063,
         "y": 4.688
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1364,12 +2496,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.375,
         "y": 6.5
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1382,12 +2541,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.25,
         "y": 6.938
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1408,12 +2594,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 84.938,
         "y": 7.125
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1514,12 +2727,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.625,
         "y": 8.5
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1608,12 +2848,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 84.938,
         "y": 9.938
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1680,12 +2947,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 1.875,
         "y": 11.0
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1721,12 +3015,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.375,
         "y": 11.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1911,12 +3232,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 1.438,
         "y": 14.25
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1929,12 +3277,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 88.938,
         "y": 14.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1946,12 +3321,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.813,
         "y": 15.25
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2035,12 +3437,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.188,
         "y": 17.063
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2093,12 +3522,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.75,
         "y": 19.188
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2591,12 +4047,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 32.563
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          19
+        ],
+        [
+          null,
+          null,
+          null,
+          51
+        ],
+        [
+          null,
+          null,
+          null,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2753,12 +4236,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": -1.313,
         "y": 33.875
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          2,
+          3
+        ],
+        [
+          null,
+          null,
+          34,
+          35
+        ],
+        [
+          null,
+          null,
+          66,
+          67
+        ],
+        [
+          null,
+          null,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2785,12 +4295,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 85.125,
         "y": 34.25
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2907,12 +4444,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": -1.813,
         "y": 35.438
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          2,
+          3
+        ],
+        [
+          null,
+          null,
+          34,
+          35
+        ],
+        [
+          null,
+          null,
+          66,
+          67
+        ],
+        [
+          null,
+          null,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3103,12 +4667,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 37.813
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          16,
+          17,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3138,28 +4729,109 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 85.375,
         "y": 40.0
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_144",
+      "type": "scenery",
       "at": {
         "x": -2.0,
         "y": 40.45
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          2306,
+          2307
+        ],
+        [
+          null,
+          null,
+          2338,
+          2339
+        ],
+        [
+          null,
+          null,
+          2370,
+          2371
+        ],
+        [
+          null,
+          null,
+          2402,
+          2403
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_144",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 40.45
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          2305,
+          2306,
+          2307
+        ],
+        [
+          null,
+          2337,
+          2338,
+          2339
+        ],
+        [
+          null,
+          2369,
+          2370,
+          2371
+        ],
+        [
+          null,
+          2401,
+          2402,
+          2403
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3558,12 +5230,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": -1.063,
         "y": 44.375
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          18,
+          19
+        ],
+        [
+          null,
+          null,
+          50,
+          51
+        ],
+        [
+          null,
+          null,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3609,12 +5308,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 88.625,
         "y": 44.875
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3769,12 +5495,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 1.25,
         "y": 46.375
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3873,12 +5626,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 88.688,
         "y": 48.25
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3898,12 +5678,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.438,
         "y": 48.438
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3965,12 +5772,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_6",
+      "type": "scenery",
       "at": {
         "x": 89.25,
         "y": 49.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          25,
+          26,
+          27
+        ],
+        [
+          null,
+          57,
+          58,
+          59
+        ],
+        [
+          null,
+          89,
+          90,
+          91
+        ],
+        [
+          null,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4059,12 +5893,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 1.938,
         "y": 50.688
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4206,12 +6067,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 3.563,
         "y": 52.875
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4372,12 +6260,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.188,
         "y": 54.375
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4531,12 +6446,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 84.625,
         "y": 56.063
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4548,12 +6490,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": -0.875,
         "y": 56.188
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4592,12 +6561,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_4",
+      "type": "scenery",
       "at": {
         "x": 89.188,
         "y": 56.625
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4697,12 +6693,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.438,
         "y": 57.438
       },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4715,12 +6738,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_2",
+      "type": "scenery",
       "at": {
         "x": -2.313,
         "y": 57.563
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          11
+        ],
+        [
+          null,
+          null,
+          null,
+          43
+        ],
+        [
+          null,
+          null,
+          null,
+          75
+        ],
+        [
+          null,
+          null,
+          null,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4963,12 +7013,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "bloomvale_props_0",
+      "type": "scenery",
       "at": {
         "x": -1.813,
         "y": 59.625
-      }
+      },
+      "tileset": "bloomvale_props",
+      "tiles": [
+        [
+          null,
+          null,
+          2,
+          3
+        ],
+        [
+          null,
+          null,
+          34,
+          35
+        ],
+        [
+          null,
+          null,
+          66,
+          67
+        ],
+        [
+          null,
+          null,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

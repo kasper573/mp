@@ -1,0 +1,36 @@
+not loaded · 6 errors in 5 files · cargo test failed
+
+## Errors by rule
+missing file  1    missing fixture  1    not walkable  1
+palette out of range  1    unknown row  1    wrong type  1
+
+## Errors, by file and line
+game.json:4:12  /spawn
+  rule      not walkable
+  found     start 40, 40
+  expected  a place on a walkable cell of start, outside every warp object
+  nearest   15, 11
+game.json:9:13  /player
+  rule      unknown row
+  found     "adventurr"
+  expected  the key of a player row
+  nearest   "adventurer"
+tables/area/cove/ground.csv:2:3  row 2, column 3
+  rule      palette out of range
+  found     "7"
+  expected  0 to 0, an index into the area's 1 palette entries
+tables/input/interact.json  whole file
+  rule      missing fixture
+  found     no such file
+  expected  one row for every input fixture the engine requires
+tables/job/apprentice.json:1:11  /name
+  rule      wrong type
+  found     integer `3`
+  expected  a string
+tables/sfx/splash.json:1:9  /file
+  rule      missing file
+  found     "audio/combat/splash.wav"
+  expected  a file under assets/
+  nearest   "audio/combat/slash03.wav"
+
+## End · 6 errors

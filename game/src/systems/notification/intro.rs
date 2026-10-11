@@ -1,19 +1,20 @@
-use std::borrow::Cow;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{NotificationKind, NotificationSent};
+use crate::core::assets::AssetRef;
 use crate::systems::actor::Rgba;
 use crate::systems::scene::Scene as GameScene;
 use crate::systems::text::Motion;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct IntroAppearance {
     pub tint: Option<Rgba>,
     pub motion: Option<Motion>,
-    pub emblem: Option<Cow<'static, str>>,
+    pub emblem: Option<AssetRef>,
 }
 
 impl IntroAppearance {
@@ -127,7 +128,7 @@ fn show_intro(world: &mut World) {
     let emblem = appearance
         .emblem
         .as_ref()
-        .map(|emblem| world.resource::<AssetServer>().load(emblem.to_string()));
+        .map(|emblem| world.resource::<AssetServer>().load(emblem.path()));
     let intro = ui::Intro {
         title: title.to_string(),
         text: text.rich(),

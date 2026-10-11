@@ -1,17 +1,18 @@
 use std::collections::HashSet;
 
-use crate::core::assets::AssetService;
 use crate::core::audio::soundscape::Soundscape;
+use crate::core::content::Content;
+use crate::core::content::media::ImageSizes;
 use crate::core::math::{Direction, Pos};
+use crate::core::render::TILE;
 use crate::core::render::transition::{self, WorldViewSystems};
-use crate::core::tiling::{CellPos, TileSize, Tiles};
+use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{self, AreaTag, tileset};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::session::{self, Viewpoint};
-use bevy::asset::AssetPath;
 use bevy::prelude::*;
 use bevy::scene::EntityScene;
 use ui::{RichPiece, RichText};
@@ -26,7 +27,7 @@ impl Plugin for AreaPlugin {
         app.init_resource::<SpawnedArea>()
             .init_resource::<Crossing>()
             .init_resource::<RetainedImages>()
-            .add_plugins(bevy_tiled::TileAnimationPlugin)
+            .add_plugins(bevy_tilemap::TilemapPlugin)
             .add_systems(
                 Update,
                 (
@@ -213,12 +214,12 @@ fn spawn_area_tiles(
     viewpoint: Res<Viewpoint>,
     areas: Query<&AreaTag>,
     assets: Res<AssetServer>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut spawned: ResMut<SpawnedArea>,
-    tiles: Query<Entity, With<bevy_tiled::MapTile>>,
+    tiles: Query<Entity, With<bevy_tilemap::MapTile>>,
     mut images: ResMut<bevy::asset::Assets<Image>>,
     mut meshes: ResMut<bevy::asset::Assets<Mesh>>,
-    mut tilemaps: ResMut<bevy::asset::Assets<bevy_tiled::TilemapMaterial>>,
+    mut materials: ResMut<bevy::asset::Assets<bevy_tilemap::TilemapMaterial>>,
     mut commands: Commands,
 ) {
     let Some(area_id) = viewpoint
@@ -234,28 +235,94 @@ fn spawn_area_tiles(
     for tile in &tiles {
         commands.entity(tile).despawn();
     }
-    let area = area::load(&service, area_id);
-    let mut hooks = AreaHooks::new(area, assets.clone());
-    let origin = area.size.bounds().min().to_screen();
-    bevy_tiled::spawn_map(
-        &mut commands,
-        &mut images,
-        &mut meshes,
-        &mut tilemaps,
-        &area.map,
-        &mut hooks,
-        origin,
-    );
+    let content = &service;
+    let area = area::load(content, area_id);
+    let origin = Pos::<Tiles>::new(0.0, 0.0).to_screen();
+    let sheets = AreaSheets::new(content, area, &assets);
+    let grids = area.grids;
+    let size = grids.size;
+    for (index, layer) in grids.ground.iter().enumerate() {
+        let cells: Vec<Option<bevy_tilemap::GridCell>> = layer
+            .cells
+            .iter()
+            .map(|cell| {
+                let entry = grids.entry(*cell)?;
+                Some(bevy_tilemap::GridCell {
+                    sheet: sheets.index(entry.tileset)?,
+                    tile: entry.tile,
+                    flip_x: entry.flip.horizontal(),
+                    flip_y: entry.flip.vertical(),
+                })
+            })
+            .collect();
+        bevy_tilemap::spawn_grid_layer(
+            &mut commands,
+            &mut images,
+            &mut meshes,
+            &mut materials,
+            &sheets.sheets,
+            &bevy_tilemap::GridLayer {
+                width: size.width,
+                height: size.height,
+                cells: &cells,
+            },
+            bevy_tilemap::LayerPlacement {
+                origin,
+                tile_px: TILE.0,
+                z: index as f32,
+            },
+        );
+    }
+    let flat_count = area
+        .scenery
+        .iter()
+        .filter(|s| s.sort_line().is_none())
+        .count();
+    let mut flat_index = 0;
+    for scenery in &area.scenery {
+        let Some(sheet) = sheets.index(scenery.tileset) else {
+            continue;
+        };
+        let z = match scenery.sort_line() {
+            Some(line) => dynamic_z(area.size.height, area.sort_base(), line),
+            None => {
+                flat_index += 1;
+                area.sort_base() - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
+            }
+        };
+        for (row, tiles) in scenery.tiles.iter().enumerate() {
+            for (column, tile) in tiles.iter().enumerate() {
+                let Some(tile) = tile else {
+                    continue;
+                };
+                let square = area::walk::tile_square(scenery, column, row);
+                let flip = tile.flip.compose(scenery.flip);
+                bevy_tilemap::spawn_tile_sprite(
+                    &mut commands,
+                    &sheets.sheets,
+                    bevy_tilemap::TileSprite {
+                        sheet,
+                        tile: tile.tile,
+                        flip_x: flip.horizontal(),
+                        flip_y: flip.vertical(),
+                        at: square.max().to_screen().with_x(square.min().to_screen().x),
+                        z,
+                    },
+                    TILE.0,
+                );
+            }
+        }
+    }
     *spawned = SpawnedArea {
         area: Some(area_id),
-        images: hooks.images,
+        images: sheets.images,
     };
 }
 
 fn play_area_soundscape(
     viewpoint: Res<Viewpoint>,
     areas: Query<&AreaTag>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut soundscape: ResMut<Soundscape>,
 ) {
     let Some(area_id) = viewpoint
@@ -275,61 +342,62 @@ fn silence_soundscape(mut soundscape: ResMut<Soundscape>) {
     soundscape.0 = &[];
 }
 
-struct AreaHooks {
-    assets: AssetServer,
+struct AreaSheets {
+    tilesets: Vec<tileset::Id>,
+    sheets: Vec<bevy_tilemap::TileSheet>,
     images: Vec<Handle<Image>>,
-    dynamic_layer: usize,
-    height: f32,
-    group_z: std::collections::HashMap<CellPos, f32>,
 }
 
-impl AreaHooks {
-    fn new(area: &area::Area, assets: AssetServer) -> Self {
-        let mut group_z = std::collections::HashMap::new();
-        let dynamic_layer = area.dynamic_layer();
-        for group in &area.groups {
-            let z = dynamic_z(area.size.height, dynamic_layer as f32, group.bottom);
-            for &cell in &group.tiles {
-                group_z.insert(cell, z);
-            }
+impl AreaSheets {
+    fn new(content: &Content, area: &area::Area, assets: &AssetServer) -> AreaSheets {
+        let sizes = content.built::<ImageSizes>();
+        let mut tilesets: Vec<tileset::Id> = area
+            .grids
+            .palette
+            .iter()
+            .map(|entry| entry.tileset)
+            .chain(area.scenery.iter().map(|scenery| scenery.tileset))
+            .collect();
+        tilesets.sort_by_key(|id| id.index());
+        tilesets.dedup();
+        let mut sheets = Vec::new();
+        let mut images = Vec::new();
+        for &id in &tilesets {
+            let def = id.get(content);
+            let image = assets.load(def.image.path());
+            images.push(image.clone());
+            let (width, height) = sizes.0.get(def.image.as_str()).copied().unwrap_or((0, 0));
+            let grid = def.grid(width, height);
+            sheets.push(bevy_tilemap::TileSheet {
+                image,
+                size: Vec2::new(width as f32, height as f32),
+                tile: Vec2::splat(def.tile as f32),
+                animations: (0..grid.count())
+                    .filter_map(|tile| {
+                        let frames = def.animation(tile);
+                        (!frames.is_empty()).then(|| bevy_tilemap::TileAnimation {
+                            tile,
+                            frames: frames
+                                .iter()
+                                .map(|frame| bevy_tilemap::TileAnimationFrame {
+                                    tile: frame.tile,
+                                    seconds: frame.ms as f32 / 1000.0,
+                                })
+                                .collect(),
+                        })
+                    })
+                    .collect(),
+            });
         }
-        AreaHooks {
-            assets,
-            images: Vec::new(),
-            dynamic_layer,
-            height: area.size.height,
-            group_z,
+        AreaSheets {
+            tilesets,
+            sheets,
+            images,
         }
     }
-}
 
-impl bevy_tiled::MapHooks for AreaHooks {
-    fn image(
-        &mut self,
-        tileset: &tiled::Tileset,
-        _images: &mut bevy::asset::Assets<Image>,
-    ) -> Option<Handle<Image>> {
-        let source = tileset.image.as_ref()?.source.to_str()?;
-        let image = self
-            .assets
-            .load(AssetPath::from("").resolve(&AssetPath::parse(source)));
-        self.images.push(image.clone());
-        Some(image)
-    }
-
-    fn tile_z(&mut self, layer: usize, x: i32, y: i32) -> Option<f32> {
-        if layer == self.dynamic_layer {
-            return self.group_z.get(&CellPos::new(x, y)).copied();
-        }
-        None
-    }
-
-    fn object_z(&mut self, _above: usize, _x: f32, y: f32, _map_height: f32) -> f32 {
-        dynamic_z(
-            self.height,
-            self.dynamic_layer as f32,
-            crate::core::tiling::Tiles(y / bevy_tiled::TILE - 0.5),
-        )
+    fn index(&self, tileset: tileset::Id) -> Option<usize> {
+        self.tilesets.iter().position(|&id| id == tileset)
     }
 }
 

@@ -3,34 +3,37 @@ pub mod effects;
 pub mod log;
 pub mod tracker;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use bevy_app::App;
 use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::{AssetRef, AssetService};
+use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, Fixture, ModuleRule, ModuleSet};
+use crate::core::content::{
+    Content, ContentId, ContentRow, Fixture, Loading, ModuleRule, ModuleSet, RowCheck,
+};
 use crate::core::math::{Percent, Rng};
 use crate::core::script::{Name, Owner as ScriptOwner, OwnerKind, OwnerRow};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::data::attention::Id as AttentionId;
-use crate::data::item::Id as ItemId;
-use crate::data::npc::Id as NpcId;
 use crate::systems::area::AreaDef;
 use crate::systems::attention;
+use crate::systems::attention::AttentionId;
 use crate::systems::attention::AttentionMark;
 use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
+use crate::systems::item::Id as ItemId;
 use crate::systems::item::{
     INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, ReservedBy, scatter_drop,
 };
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
+use crate::systems::npc::Id as NpcId;
 use crate::systems::player::{Owner, conn_player, sender_player};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition;
@@ -41,7 +44,8 @@ use crate::systems::script::{
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
 
-pub use crate::data::quest::Id as QuestId;
+pub type QuestId = ContentId<QuestDef>;
+pub type Id = QuestId;
 
 pub const QUEST_LOG_CAP: usize = 20;
 
@@ -52,16 +56,16 @@ pub fn register(app: &mut App) {
     attention::mark_source(app, marks);
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct QuestDef {
-    pub title: &'static str,
-    pub category: &'static str,
-    pub blurb: &'static str,
+    pub title: String,
+    pub category: String,
+    pub blurb: String,
     pub xp: u32,
-    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
-    pub reveal: &'static [ChoiceReveal],
-    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
-    pub modules: &'static [QuestModule],
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reveal: Vec<ChoiceReveal>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<QuestModule>,
 }
 
 impl ContentRow for QuestDef {
@@ -72,7 +76,7 @@ impl ModuleSet for QuestDef {
     type Module = QuestModule;
 
     fn modules(&self) -> &[QuestModule] {
-        self.modules
+        &self.modules
     }
 
     fn rule(module: &QuestModule) -> ModuleRule {
@@ -85,29 +89,29 @@ impl ModuleSet for QuestDef {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum QuestModule {
     Shown {
-        condition: &'static Condition,
+        condition: Condition,
     },
     Requires {
-        condition: &'static Condition,
+        condition: Condition,
     },
     Grants {
-        items: &'static [ItemStack],
+        items: Vec<ItemStack>,
     },
     HandIn {
-        items: &'static [ItemStack],
+        items: Vec<ItemStack>,
     },
     HandOver {
-        text: &'static [Span],
+        text: Vec<Span>,
     },
     Reward {
-        items: &'static [ItemStack],
+        items: Vec<ItemStack>,
     },
     PickOne {
-        items: &'static [ItemStack],
+        items: Vec<ItemStack>,
     },
     Daily,
     TimeLimit {
@@ -121,21 +125,21 @@ pub enum QuestModule {
 }
 
 impl QuestDef {
-    pub fn shown(&self) -> Option<&'static Condition> {
+    pub fn shown(&self) -> Option<&Condition> {
         self.modules.iter().find_map(|module| match module {
-            QuestModule::Shown { condition } => Some(*condition),
+            QuestModule::Shown { condition } => Some(condition),
             _ => None,
         })
     }
 
-    pub fn requires(&self) -> Option<&'static Condition> {
+    pub fn requires(&self) -> Option<&Condition> {
         self.modules.iter().find_map(|module| match module {
-            QuestModule::Requires { condition } => Some(*condition),
+            QuestModule::Requires { condition } => Some(condition),
             _ => None,
         })
     }
 
-    pub fn min_level(&self) -> u32 {
+    pub fn min_level(&'static self) -> u32 {
         self.requires()
             .into_iter()
             .flat_map(condition::parts)
@@ -144,9 +148,9 @@ impl QuestDef {
             .unwrap_or(1)
     }
 
-    pub fn grants(&self) -> &'static [ItemStack] {
+    pub fn grants(&self) -> &[ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::Grants { items } => Some(*items),
+            QuestModule::Grants { items } => Some(items),
             _ => None,
         })
     }
@@ -158,33 +162,33 @@ impl QuestDef {
         })
     }
 
-    pub fn hand_in(&self) -> &'static [ItemStack] {
+    pub fn hand_in(&self) -> &[ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::HandIn { items } => Some(*items),
+            QuestModule::HandIn { items } => Some(items),
             _ => None,
         })
     }
 
-    pub fn hand_over(&self) -> &'static [Span] {
+    pub fn hand_over(&self) -> &[Span] {
         self.modules
             .iter()
             .find_map(|module| match module {
-                QuestModule::HandOver { text } => Some(*text),
+                QuestModule::HandOver { text } => Some(text.as_slice()),
                 _ => None,
             })
             .unwrap_or(&[])
     }
 
-    pub fn rewards(&self) -> &'static [ItemStack] {
+    pub fn rewards(&self) -> &[ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::Reward { items } => Some(*items),
+            QuestModule::Reward { items } => Some(items),
             _ => None,
         })
     }
 
-    pub fn pick_one(&self) -> &'static [ItemStack] {
+    pub fn pick_one(&self) -> &[ItemStack] {
         self.stacks(|module| match module {
-            QuestModule::PickOne { items } => Some(*items),
+            QuestModule::PickOne { items } => Some(items),
             _ => None,
         })
     }
@@ -209,25 +213,26 @@ impl QuestDef {
         })
     }
 
-    pub fn scripts(&self) -> Vec<ScriptModule> {
+    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
         self.modules
             .iter()
-            .filter_map(|module| match module {
-                QuestModule::Script(script) => Some(script.clone()),
+            .enumerate()
+            .filter_map(|(index, module)| match module {
+                QuestModule::Script(script) => Some((index, script)),
                 _ => None,
             })
             .collect()
     }
 
-    fn stacks(
-        &self,
-        pick: fn(&QuestModule) -> Option<&'static [ItemStack]>,
-    ) -> &'static [ItemStack] {
-        self.modules.iter().find_map(pick).unwrap_or(&[])
+    fn stacks(&self, pick: fn(&QuestModule) -> Option<&Vec<ItemStack>>) -> &[ItemStack] {
+        self.modules
+            .iter()
+            .find_map(pick)
+            .map_or(&[], Vec::as_slice)
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Objective {
     Hold(ItemStack),
@@ -236,37 +241,37 @@ pub enum Objective {
         count: u32,
     },
     Task {
-        task: Name,
-        label: &'static str,
+        task: String,
+        label: String,
     },
     Deliver {
         item: ItemId,
     },
     Decide {
-        label: &'static str,
-        paths: &'static [DecisionPath],
+        label: String,
+        paths: Vec<DecisionPath>,
     },
 }
 
 impl Objective {
-    pub fn icon(&self, content: &Content) -> AssetRef {
+    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
         match self {
-            Objective::Hold(stack) => stack.item.get(content).icon,
-            Objective::Defeat { .. } => InterfaceIcon::ObjectiveDefeat.get(content).image,
-            Objective::Task { .. } => InterfaceIcon::ObjectiveTask.get(content).image,
-            Objective::Deliver { item } => item.get(content).icon,
-            Objective::Decide { .. } => InterfaceIcon::ObjectiveDecide.get(content).image,
+            Objective::Hold(stack) => &stack.item.get(content).icon,
+            Objective::Defeat { .. } => &InterfaceIcon::ObjectiveDefeat.get(content).image,
+            Objective::Task { .. } => &InterfaceIcon::ObjectiveTask.get(content).image,
+            Objective::Deliver { item } => &item.get(content).icon,
+            Objective::Decide { .. } => &InterfaceIcon::ObjectiveDecide.get(content).image,
         }
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct DecisionPath {
-    pub choice: &'static str,
-    pub means: &'static [&'static str],
+    pub choice: String,
+    pub means: Vec<String>,
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct QuestDrop {
     pub from: NpcId,
     pub item: ItemId,
@@ -346,11 +351,10 @@ impl Parties {
 
 fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
     let placed = |npc: NpcId| {
-        content
-            .table::<AreaDef>()
-            .rows()
-            .iter()
-            .any(|area| area.residents().any(|resident| resident == npc))
+        content.ids::<AreaDef>().any(|area| {
+            crate::systems::area::residents(crate::systems::area::placed(content, area))
+                .any(|resident| resident == npc)
+        })
     };
     Some(match owner.kind {
         OwnerKind::Npc => {
@@ -365,12 +369,11 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
         }
         OwnerKind::Object => {
             let area: ContentId<AreaDef> = ContentId::new(owner.row);
-            let (_, object) = area
-                .get(content)
-                .objects()
-                .find(|(index, _)| Some(*index) == owner.object)?;
+            let (_, object) =
+                crate::systems::area::objects(crate::systems::area::placed(content, area))
+                    .find(|(index, _)| Some(*index) == owner.object)?;
             Party {
-                name: object.label.or(object.name)?.to_owned(),
+                name: object.label.clone().or_else(|| object.name.clone())?,
                 item: None,
             }
         }
@@ -520,7 +523,7 @@ impl QuestDef {
         }
     }
 
-    pub fn meta(&self, parties: &Parties, quest: QuestId) -> String {
+    pub fn meta(&'static self, parties: &Parties, quest: QuestId) -> String {
         format!(
             "{} · Level {} · from {}",
             self.category,
@@ -531,18 +534,17 @@ impl QuestDef {
         )
     }
 
-    pub fn icon(&self, content: &Content) -> AssetRef {
+    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
         if self.time_limit().is_some() {
-            return InterfaceIcon::Timed.get(content).image;
+            return &InterfaceIcon::Timed.get(content).image;
         }
         if self.daily() {
-            return AttentionMark::RepeatableOffered.get(content).icon;
+            return &AttentionMark::RepeatableOffered.get(content).icon;
         }
-        self.objectives()
-            .next()
-            .map_or(AttentionMark::QuestOffered.get(content).icon, |objective| {
-                objective.icon(content)
-            })
+        self.objectives().next().map_or(
+            &AttentionMark::QuestOffered.get(content).icon,
+            |objective| objective.icon(content),
+        )
     }
 
     pub fn hand_in_hint(&self, parties: &Parties, quest: QuestId) -> String {
@@ -570,9 +572,9 @@ impl QuestDef {
         self.reveal.contains(&reveal)
     }
 
-    pub fn decision(&self) -> Option<&'static [DecisionPath]> {
+    pub fn decision(&self) -> Option<&[DecisionPath]> {
         self.objectives().find_map(|objective| match objective {
-            Objective::Decide { paths, .. } => Some(*paths),
+            Objective::Decide { paths, .. } => Some(paths.as_slice()),
             _ => None,
         })
     }
@@ -692,7 +694,7 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         world,
         player,
         format!("Quest accepted · {}", def.title),
-        offered_mark(def).get(&content).icon,
+        &offered_mark(def).get(&content).icon,
         Some(InterfaceSound::QuestAccepted.id(&content)),
     );
     raise(world, quest, EventKind::Accepted, player);
@@ -746,7 +748,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
                 topic: HistoryTopic::Quest,
                 sfx: Some(InterfaceSound::QuestCompleted.id(&content)),
             },
-            LineText::plain(def.title),
+            LineText::plain(def.title.as_str()),
         ),
     );
     raise(world, quest, EventKind::Completed, player);
@@ -793,7 +795,7 @@ pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
         world,
         player,
         format!("Quest abandoned · {}", quest.get(&content).title),
-        AttentionMark::QuestInProgress.get(&content).icon,
+        &AttentionMark::QuestInProgress.get(&content).icon,
         Some(InterfaceSound::QuestAbandoned.id(&content)),
     );
     raise(world, quest, EventKind::Failed, player);
@@ -851,11 +853,11 @@ fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
     );
 }
 
-fn tell(world: &mut World, player: Entity, text: String, icon: AssetRef, sfx: Option<SfxId>) {
+fn tell(world: &mut World, player: Entity, text: String, icon: &AssetRef, sfx: Option<SfxId>) {
     let told = Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Quest,
-            icon: Some(icon.0.to_owned()),
+            icon: Some(icon.path()),
             tally: None,
             failure: false,
             sfx,
@@ -895,66 +897,168 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
     }
 }
 
-pub fn check(assets: &AssetService) {
-    let content = assets.content();
-    for (id, quest) in content.table::<QuestDef>().iter() {
-        for condition in quest.shown().into_iter().chain(quest.requires()) {
-            if let Err(error) = condition::check(content, condition) {
-                panic!("quest {id:?}: {error}");
-            }
-        }
-        for stack in quest.grants() {
-            if !stack.item.get(content).has(ItemFlag::Quest) {
-                panic!(
-                    "quest {id:?}: grants {:?}, which isn't a quest item",
-                    stack.item
-                );
-            }
-        }
-        for drop in quest.drops() {
-            if !drop.item.get(content).has(ItemFlag::Quest) {
-                panic!(
-                    "quest {id:?}: drops {:?}, which isn't a quest item",
-                    drop.item
-                );
+pub fn check_all(loading: &mut Loading) {
+    let content = loading.content();
+    for (id, quest) in loading.rows::<QuestDef>() {
+        let key = id.key(&content);
+        let mut check = RowCheck::default();
+        let item_rows = |stacks: &[ItemStack]| -> Vec<ItemId> {
+            stacks
+                .iter()
+                .filter(|stack| content.table::<ItemDef>().get(stack.item).is_some())
+                .map(|stack| stack.item)
+                .collect()
+        };
+        for (index, module) in quest.modules.iter().enumerate() {
+            match module {
+                QuestModule::Shown { condition } | QuestModule::Requires { condition } => {
+                    if let Err((rule, expected)) = condition::check(&content, condition) {
+                        check.error(
+                            format!("/modules/{index}/condition"),
+                            rule,
+                            "the condition",
+                            expected,
+                        );
+                    }
+                }
+                QuestModule::Grants { items } => {
+                    for (at, item) in item_rows(items).into_iter().enumerate() {
+                        if !item.get(&content).has(ItemFlag::Quest) {
+                            check.error(
+                                format!("/modules/{index}/items/{at}/item"),
+                                "not a quest item",
+                                format!("grants {}", item.key(&content)),
+                                "an item with quest_item",
+                            );
+                        }
+                    }
+                }
+                QuestModule::Drop(drop)
+                    if content.table::<ItemDef>().get(drop.item).is_some()
+                        && !drop.item.get(&content).has(ItemFlag::Quest) =>
+                {
+                    check.error(
+                        format!("/modules/{index}/item"),
+                        "not a quest item",
+                        format!("drops {}", drop.item.key(&content)),
+                        "an item with quest_item",
+                    );
+                }
+                _ => {}
             }
         }
         if quest.objectives().next().is_none() {
-            panic!("quest {id:?}: no objective");
+            check.error(
+                "/modules",
+                "no objective",
+                key,
+                "at least one objective module",
+            );
         }
         let slots = quest.rewards().len() + usize::from(!quest.pick_one().is_empty());
         if slots > INVENTORY_MAX as usize {
-            panic!("quest {id:?}: its rewards can never fit in a bag");
+            check.error(
+                "/modules",
+                "rewards don't fit",
+                format!("{slots} slots"),
+                format!("at most {INVENTORY_MAX} slots of rewards, a pick counting as one"),
+            );
         }
         if quest.decision().is_some() && !quest.pick_one().is_empty() {
-            panic!("quest {id:?}: a decision settles itself, so it offers no pick");
+            check.error(
+                "/modules",
+                "decision and pick",
+                key,
+                "a decide objective settles the quest, so no pick_one",
+            );
         }
         if quest.decision().is_none() && quest.pick_one().is_empty() && quest.hand_over().is_empty()
         {
-            panic!("quest {id:?}: nothing to say when handing it in");
+            check.error(
+                "/modules",
+                "nothing to say",
+                key,
+                "a decision, a pick_one or a hand_over line",
+            );
         }
-        crate::systems::dialogue::check_reveal(
-            &format!("quest {id:?}"),
-            quest.reveal,
+        if let Err((rule, found)) = crate::systems::dialogue::check_reveal(
+            &quest.reveal,
             crate::systems::dialogue::Revealable {
                 needs: quest.requires().is_some(),
                 costs: !quest.hand_in().is_empty(),
                 gains: !quest.rewards().is_empty() || !quest.pick_one().is_empty() || quest.xp > 0,
             },
-        );
+        ) {
+            check.error(
+                "/reveal",
+                rule,
+                found,
+                "reveal only what the quest has, once",
+            );
+        }
+        loading.row_errors(id, check);
     }
 }
 
-pub fn check_parties(content: &Content, parties: &Parties) {
-    for (id, _) in content.table::<QuestDef>().iter() {
-        let Some(found) = parties.get(id) else {
-            panic!("quest {id:?}: nobody offers it and nobody takes it in");
-        };
-        if found.givers.is_empty() {
-            panic!("quest {id:?}: nobody offers it");
+pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Parties) {
+    let content = loading.content();
+    let mut offered = HashSet::new();
+    let mut turned_in = HashSet::new();
+    for (owner, _) in scripts.owners() {
+        for reach in scripts.may_do(*owner).reaches {
+            match reach {
+                Reach::Offers(quest) | Reach::Accepts(quest) => {
+                    offered.insert(quest);
+                }
+                Reach::TurnsIn(quest) => {
+                    turned_in.insert(quest);
+                }
+                _ => {}
+            }
         }
-        if found.turn_ins.is_empty() {
-            panic!("quest {id:?}: nobody takes it in");
+    }
+    for (id, _) in loading.rows::<QuestDef>() {
+        let key = id.key(&content);
+        let found = parties.get(id);
+        let givers = found.is_some_and(|found| !found.givers.is_empty());
+        let turn_ins = found.is_some_and(|found| !found.turn_ins.is_empty());
+        if !offered.contains(&id) {
+            loading.row_error(
+                id,
+                "",
+                "never offered",
+                key,
+                "a script that may reach offer_quest or accept_quest for it",
+                None,
+            );
+        } else if !givers {
+            loading.row_error(
+                id,
+                "",
+                "lives nowhere",
+                key,
+                "an owner placed in an area that may offer it",
+                None,
+            );
+        }
+        if !turned_in.contains(&id) {
+            loading.row_error(
+                id,
+                "",
+                "never turned in",
+                key,
+                "a script that may reach turn_in for it",
+                None,
+            );
+        } else if !turn_ins {
+            loading.row_error(
+                id,
+                "",
+                "lives nowhere",
+                key,
+                "an owner placed in an area that may turn it in",
+                None,
+            );
         }
     }
 }
@@ -1056,7 +1160,7 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
     let Some(mut log) = log_of(world, player).cloned() else {
         return;
     };
-    let mut told: Vec<(String, AssetRef, Option<SfxId>)> = Vec::new();
+    let mut told: Vec<(String, &AssetRef, Option<SfxId>)> = Vec::new();
     for active in &mut log.active {
         let def = active.quest.get(&content);
         active.left = active
@@ -1066,7 +1170,7 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
         if ready && !active.ready {
             told.push((
                 format!("Quest ready · {}", def.hand_in_hint(&parties, active.quest)),
-                ready_mark(def).get(&content).icon,
+                &ready_mark(def).get(&content).icon,
                 Some(InterfaceSound::UiChime.id(&content)),
             ));
         }
@@ -1080,7 +1184,7 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
         if finished.resets_in.is_some() && !resets {
             told.push((
                 format!("{} is open again", def.title),
-                AttentionMark::RepeatableOffered.get(&content).icon,
+                &AttentionMark::RepeatableOffered.get(&content).icon,
                 Some(InterfaceSound::UiPage.id(&content)),
             ));
         }

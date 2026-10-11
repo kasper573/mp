@@ -529,7 +529,7 @@ fn launcher(
     bsn! {
         {widget(ui::WidgetOptions {
             pos,
-            icon: assets.load(def.icon().get(content).image.0),
+            icon: assets.load(def.icon().get(content).image.path()),
             badge: Some(def.toggle().into()),
             tooltip: def.title().to_owned(),
             on_tap: OnTap::new(move |world| open_window(world, window)),

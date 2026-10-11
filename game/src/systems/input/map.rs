@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::ecs::system::SystemParam;
 use bevy::picking::events::{Click, Pointer};
 use bevy::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 use ui::{
@@ -13,6 +14,7 @@ use ui::{
 use crate::core::content::{Content, Fixture};
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -67,22 +69,23 @@ impl Fixture for InputAction {
     type Row = InputDef;
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct InputDef {
-    pub label: &'static str,
-    pub bindings: &'static [InputBinding],
+    pub label: String,
+    pub bindings: Vec<InputBinding>,
 }
 
 impl crate::core::content::ContentRow for InputDef {
     const TABLE: &'static str = "input";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputBinding {
     Key(KeyGesture),
     AnyKey,
     Mouse {
+        #[schemars(schema_with = "ui::mouse_button_schema")]
         button: MouseButton,
         #[serde(flatten)]
         modifiers: KeyModifiers,

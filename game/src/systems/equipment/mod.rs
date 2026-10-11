@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
 use crate::core::script::{Owner, OwnerKind};
-use crate::data;
 use crate::systems::effect::{self, Effect};
 use crate::systems::item::ItemKind;
 use crate::systems::item::{Inventory, ItemStack};
@@ -28,7 +28,7 @@ pub fn register(app: &mut App) {
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Equipment {
-    pub slots: BTreeMap<EquipmentSlot, data::item::Id>,
+    pub slots: BTreeMap<EquipmentSlot, crate::systems::item::Id>,
 }
 
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -37,6 +37,7 @@ pub struct UnequipRequest {
 }
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -69,7 +70,11 @@ impl EquipmentSlot {
     }
 }
 
-pub fn equip_held(world: &mut World, player: Entity, item: data::item::Id) -> Result<(), String> {
+pub fn equip_held(
+    world: &mut World,
+    player: Entity,
+    item: crate::systems::item::Id,
+) -> Result<(), String> {
     let slot = world
         .get::<Inventory>(player)
         .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
@@ -91,7 +96,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     let ItemKind::Equipment {
         slot: into,
         requires,
-    } = item.get(&content).kind
+    } = &item.get(&content).kind
     else {
         return Err(format!("{} can't be worn", item.get(&content).name));
     };
@@ -108,7 +113,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     }
     let occupant = world
         .get::<Equipment>(player)
-        .and_then(|equipment| equipment.slots.get(&into).copied());
+        .and_then(|equipment| equipment.slots.get(into).copied());
     if let Some(mut inventory) = world.get_mut::<Inventory>(player) {
         inventory.slots.remove(inv_slot);
         if let Some(occupant) = occupant {
@@ -118,7 +123,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
         }
     }
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
-        equipment.slots.insert(into, item);
+        equipment.slots.insert(*into, item);
     }
     if let Some(occupant) = occupant {
         raise(world, occupant, EventKind::Unequipped, player);
@@ -164,7 +169,7 @@ pub fn unequip(world: &mut World) {
     }
 }
 
-fn raise(world: &mut World, item: data::item::Id, kind: EventKind, player: Entity) {
+fn raise(world: &mut World, item: crate::systems::item::Id, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
         Owner::Row(OwnerKind::Item, item.raw()),
         kind,

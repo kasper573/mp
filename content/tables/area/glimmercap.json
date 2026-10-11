@@ -33,7 +33,7 @@
             "to": {
               "area": "glimmercap_tree",
               "x": 9.0,
-              "y": 11.5
+              "y": 11.0
             }
           }
         }
@@ -56,8 +56,8 @@
           "values": {
             "to": {
               "area": "glimmercap_mushroom",
-              "x": 8.0,
-              "y": 10.5
+              "x": 9.0,
+              "y": 10.0
             }
           }
         }
@@ -80,7 +80,7 @@
           "values": {
             "to": {
               "area": "gloomhollow",
-              "x": 27.5,
+              "x": 28.5,
               "y": 69.5
             }
           }
@@ -105,7 +105,7 @@
             "to": {
               "area": "sakura",
               "x": 53.5,
-              "y": 46.0
+              "y": 46.5
             }
           }
         }
@@ -136,10 +136,10 @@
     {
       "type": "resident",
       "npc": "gnome_alchemist",
-      "at": [
-        38.0,
-        41.0
-      ]
+      "at": {
+        "x": 38.0,
+        "y": 41.0
+      }
     },
     {
       "type": "safe_zone",
@@ -246,623 +246,1671 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 5.125,
-        "y": -4.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 58.563,
-        "y": -4.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 42.938,
-        "y": -4.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 10.875,
-        "y": -4.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 26.313,
-        "y": -4.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 41.938,
-        "y": -4.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 12.313,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 31.375,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 64.813,
-        "y": -4.25
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 2.25,
-        "y": -4.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 55.5,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 18.063,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 29.125,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 9.938,
-        "y": -3.938
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 33.313,
-        "y": -3.75
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 33.313,
-        "y": -3.688
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 45.938,
-        "y": -3.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 49.5,
-        "y": -3.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 53.125,
-        "y": -3.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 58.438,
-        "y": -3.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 35.5,
-        "y": -3.438
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 2.188,
-        "y": -3.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
-      "at": {
-        "x": 16.625,
-        "y": -3.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
-      "at": {
-        "x": 66.375,
-        "y": -3.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 5.188,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
-      "at": {
-        "x": 47.5,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_0",
+      "type": "scenery",
       "at": {
         "x": 30.688,
         "y": -2.875
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 28.5,
         "y": -2.813
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 63.0,
         "y": -2.75
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 58.063,
         "y": -2.688
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 43.125,
         "y": -2.625
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 7.25,
         "y": -2.563
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 14.125,
         "y": -2.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 55.625,
         "y": -2.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 37.125,
         "y": -2.438
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 0.063,
         "y": -2.25
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 17.75,
         "y": -2.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 20.875,
         "y": -2.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 31.25,
         "y": -2.125
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 60.438,
         "y": -2.125
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 33.375,
         "y": -2.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 43.813,
         "y": -2.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 48.5,
         "y": -2.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.375,
         "y": -1.875
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 50.75,
         "y": -1.875
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 24.0,
         "y": -1.813
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 38.125,
         "y": -1.813
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 64.563,
         "y": -1.813
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 39.5,
         "y": -1.688
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 3.688,
         "y": -1.625
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 13.0,
         "y": -1.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 38.625,
         "y": -1.125
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 3.125,
         "y": -1.063
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_13",
+      "type": "scenery",
       "at": {
         "x": 34.0,
         "y": -1.0
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          180,
+          181,
+          182,
+          183
+        ],
+        [
+          212,
+          213,
+          214,
+          215
+        ],
+        [
+          244,
+          245,
+          246,
+          247
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 47.5,
         "y": -1.0
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 4.563,
         "y": -0.938
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 9.063,
         "y": -0.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 15.0,
         "y": -0.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 51.5,
         "y": -0.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 38.813,
         "y": -0.875
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 54.063,
         "y": -0.875
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 56.938,
         "y": -0.875
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 6.813,
         "y": -0.813
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 67.188,
         "y": -0.75
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 5.5,
         "y": -0.688
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 17.0,
         "y": -0.688
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 44.563,
         "y": -0.625
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 34.813,
         "y": -0.375
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 48.313,
         "y": -0.313
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 49.188,
         "y": -0.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 61.0,
         "y": -0.125
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          63
+        ],
+        [
+          92,
+          93,
+          94,
+          95
+        ],
+        [
+          124,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 28.063,
         "y": -0.063
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -3.0,
         "y": 0.063
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1161,12 +2209,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.875,
         "y": 2.625
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1323,12 +2398,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.688,
         "y": 4.0
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1561,12 +2663,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 1.875,
         "y": 5.813
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          28,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1646,12 +2775,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 67.0,
         "y": 6.313
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1864,12 +3020,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 2.313,
         "y": 8.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          28,
+          29,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2011,12 +3194,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.625,
         "y": 9.438
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2198,12 +3408,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.875,
         "y": 11.313
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2437,12 +3674,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.125,
         "y": 13.438
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2527,12 +3791,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.688,
         "y": 14.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2642,12 +3933,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_0",
+      "type": "scenery",
       "at": {
         "x": -2.938,
         "y": 16.313
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null,
+          35
+        ],
+        [
+          null,
+          null,
+          null,
+          67
+        ],
+        [
+          null,
+          null,
+          null,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2753,12 +4071,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.125,
         "y": 17.75
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2881,12 +4226,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": -1.438,
         "y": 19.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          30,
+          31
+        ],
+        [
+          null,
+          null,
+          62,
+          63
+        ],
+        [
+          null,
+          null,
+          94,
+          95
+        ],
+        [
+          null,
+          null,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3041,12 +4413,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_0",
+      "type": "scenery",
       "at": {
         "x": 62.813,
         "y": 22.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3073,21 +4472,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.625,
         "y": 22.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -2.75,
         "y": 22.625
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3274,12 +4727,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_80",
+      "type": "scenery",
       "at": {
         "x": 62.75,
         "y": 26.5
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          1280,
+          1281,
+          1282,
+          null
+        ],
+        [
+          1312,
+          1313,
+          1314,
+          null
+        ],
+        [
+          1344,
+          1345,
+          1346,
+          null
+        ],
+        [
+          1376,
+          1377,
+          1378,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3333,12 +4813,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 3.938,
         "y": 28.375
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3415,12 +4922,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 1.938,
         "y": 30.375
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3432,12 +4966,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 30.5
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          28,
+          29,
+          30,
+          null
+        ],
+        [
+          60,
+          61,
+          62,
+          null
+        ],
+        [
+          92,
+          93,
+          94,
+          null
+        ],
+        [
+          124,
+          125,
+          126,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3491,12 +5052,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 31.25
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3574,12 +5162,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 1.875,
         "y": 33.313
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          28,
+          null,
+          null,
+          null
+        ],
+        [
+          60,
+          null,
+          null,
+          null
+        ],
+        [
+          92,
+          null,
+          null,
+          null
+        ],
+        [
+          124,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3664,12 +5279,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.938,
         "y": 35.313
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3688,12 +5330,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_25",
+      "type": "scenery",
       "at": {
         "x": 67.063,
         "y": 35.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          389,
+          390,
+          391
+        ],
+        [
+          null,
+          421,
+          422,
+          423
+        ],
+        [
+          null,
+          453,
+          454,
+          455
+        ],
+        [
+          null,
+          485,
+          486,
+          487
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3747,28 +5416,109 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": -0.75,
         "y": 37.125
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": -2.438,
         "y": 37.375
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          63
+        ],
+        [
+          null,
+          null,
+          null,
+          95
+        ],
+        [
+          null,
+          null,
+          null,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 66.563,
         "y": 38.313
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3799,12 +5549,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_13",
+      "type": "scenery",
       "at": {
         "x": -0.313,
         "y": 38.625
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          149,
+          150,
+          151
+        ],
+        [
+          null,
+          181,
+          182,
+          183
+        ],
+        [
+          null,
+          213,
+          214,
+          215
+        ],
+        [
+          null,
+          245,
+          246,
+          247
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3855,12 +5632,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 66.75,
         "y": 39.875
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3873,12 +5677,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 40.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          63
+        ],
+        [
+          null,
+          null,
+          null,
+          95
+        ],
+        [
+          null,
+          null,
+          null,
+          127
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3984,12 +5815,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 42.25
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4122,12 +5980,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.25,
         "y": 43.938
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4140,12 +6025,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 44.125
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4284,12 +6196,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 3.063,
         "y": 45.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4301,12 +6240,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 62.563,
         "y": 45.625
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          8,
+          9,
+          10,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4342,12 +6308,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.625,
         "y": 46.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          8,
+          9,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4530,12 +6523,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.875,
         "y": 48.688
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4653,12 +6673,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 50.188
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4824,12 +6871,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.438,
         "y": 52.188
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4949,12 +7023,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 67.063,
         "y": 53.563
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          61,
+          62,
+          63
+        ],
+        [
+          null,
+          93,
+          94,
+          95
+        ],
+        [
+          null,
+          125,
+          126,
+          127
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5051,12 +7152,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_7",
+      "type": "scenery",
       "at": {
         "x": 2.938,
         "y": 54.125
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          28,
+          29,
+          null,
+          null
+        ],
+        [
+          60,
+          61,
+          null,
+          null
+        ],
+        [
+          92,
+          93,
+          null,
+          null
+        ],
+        [
+          124,
+          125,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5254,12 +7382,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.125,
         "y": 55.938
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5352,21 +7507,75 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 1.563,
         "y": 57.0
       },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "glimmercap_props_1",
+      "type": "scenery",
       "at": {
         "x": 63.375,
         "y": 57.0
-      }
+      },
+      "tileset": "glimmercap_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

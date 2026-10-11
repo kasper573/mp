@@ -8,10 +8,10 @@ use ui::{TooltipText, component};
 
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
-use crate::data::item::Id as ItemId;
 use crate::systems::hud;
 use crate::systems::input::map::{InputAction, input};
 use crate::systems::interface::InterfaceSound;
+use crate::systems::item::Id as ItemId;
 use crate::systems::item::{ItemDef, ItemFlag, ItemKind};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
@@ -65,8 +65,8 @@ pub fn inspectable(content: &Content, item: ItemId) -> InspectableOptions {
 
 pub fn overview(def: &ItemDef) -> String {
     let category = def.category().label();
-    match def.kind {
-        ItemKind::Consumable { health_bonus, .. } if health_bonus > 0.0 => {
+    match &def.kind {
+        ItemKind::Consumable { health_bonus, .. } if *health_bonus > 0.0 => {
             format!("{category} · restores {health_bonus} health")
         }
         ItemKind::Equipment { slot, .. } => format!("{category} · {}", slot.label()),
@@ -131,12 +131,12 @@ pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
                 Children [
                     (
                         Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                        component(ImageNode::new(assets.load(def.icon.0)))
+                        component(ImageNode::new(assets.load(def.icon.path())))
                     ),
                     (
                         Node { flex_direction: FlexDirection::Column }
                         Children [
-                            {EntityScene(ui::styled_text(def.name, ink, typography::NAME))},
+                            {EntityScene(ui::styled_text(def.name.as_str(), ink, typography::NAME))},
                             {EntityScene(ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION))},
                         ]
                     ),
@@ -190,7 +190,7 @@ fn show_card(world: &mut World) {
             close(world);
         }),
         hud::single_tab(
-            item.get(&content).name,
+            item.get(&content).name.as_str(),
             ui::scrolled(Box::new(padded(sheet(world, item)))),
         ),
         0,
@@ -221,17 +221,17 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Color)> {
     .collect()
 }
 
-fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color)> {
+fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
     let content = world.resource::<Content>();
     let ink = ui::theme::theme().surface_floating.on;
     let plain = |fact: String| (fact, ink);
     let mut facts = Vec::new();
-    match def.kind {
+    match &def.kind {
         ItemKind::Consumable {
             health_bonus,
             lasts,
         } => {
-            if health_bonus > 0.0 {
+            if *health_bonus > 0.0 {
                 facts.push(plain(format!("Restores {health_bonus} health")));
             }
             facts.extend(

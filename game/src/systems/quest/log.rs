@@ -201,10 +201,9 @@ impl Page {
             content
                 .table::<QuestDef>()
                 .rows()
-                .iter()
                 .position(|quest| quest.category == category)
         };
-        quests.sort_by_key(|quest| (first_seen(quest.get(content).category), quest.index()));
+        quests.sort_by_key(|quest| (first_seen(&quest.get(content).category), quest.index()));
         quests
     }
 
@@ -239,9 +238,9 @@ fn contents(world: &World, page: &Page) -> Box<dyn Scene> {
     let mut category = None;
     for &quest in &listed {
         let def = quest.get(content);
-        if category != Some(def.category) {
-            category = Some(def.category);
-            rows.push(Box::new(group(def.category)));
+        if category != Some(&def.category) {
+            category = Some(&def.category);
+            rows.push(Box::new(group(&def.category)));
         }
         rows.push(row(content, assets, page, quest, shown == Some(quest)));
     }
@@ -294,7 +293,7 @@ fn row(
         .then(|| -> Box<dyn Scene> {
             Box::new(icon(
                 assets,
-                InterfaceIcon::Tracked.get(content).image,
+                &InterfaceIcon::Tracked.get(content).image,
                 14.0,
             ))
         })
@@ -323,7 +322,7 @@ fn row(
         })
         Children [
             {EntityScene(icon(assets, def.icon(content), ROW_ICON))},
-            ( Node { flex_grow: 1.0 } Pickable::IGNORE Children [ {EntityScene(ui::styled_text(def.title, ink, typography::LABEL))} ] ),
+            ( Node { flex_grow: 1.0 } Pickable::IGNORE Children [ {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::LABEL))} ] ),
             {status},
             {tracked},
         ]
@@ -385,7 +384,7 @@ fn detail(
         Box::new(bsn! {
             Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, flex_wrap: FlexWrap::Wrap }
             Children [
-                {EntityScene(ui::styled_text(def.title, ink, typography::NAME))},
+                {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::NAME))},
                 {EntityScene(tag(&def.kinds(), palette::AMBER_70))},
             ]
         }),
@@ -499,7 +498,7 @@ fn timer(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(icon(assets, InterfaceIcon::Timed.get(content).image, 16.0))},
+            {EntityScene(icon(assets, &InterfaceIcon::Timed.get(content).image, 16.0))},
             {EntityScene(live_text(log, quest, Countdown::LeftDetail, palette::AMBER_80, typography::LABEL))},
             ( Node { flex_grow: 1.0 } Children [ {EntityScene(live_bar(content, log, quest))} ] ),
         ]
@@ -620,7 +619,7 @@ fn quest_note(world: &World, stack: ItemStack) -> Option<String> {
                     .any(|grant| grant.item == stack.item)
             })
         })
-        .map(|active| active.quest.get(content).title);
+        .map(|active| active.quest.get(content).title.as_str());
     Some(match granted_by {
         Some(title) => {
             format!("quest item · can't be sold or dropped · taken back if you abandon {title}")

@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "shaman",
-      "at": [
-        7.0,
-        5.0
-      ]
+      "at": {
+        "x": 7.0,
+        "y": 5.0
+      }
     },
     {
       "type": "soundscape",
@@ -66,44 +66,179 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_38",
+      "type": "scenery",
       "at": {
         "x": 4.0,
         "y": -0.625
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          568,
+          569,
+          570,
+          571
+        ],
+        [
+          600,
+          601,
+          602,
+          603
+        ],
+        [
+          632,
+          633,
+          634,
+          635
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_38",
+      "type": "scenery",
       "at": {
         "x": 7.0,
         "y": -0.625
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          568,
+          569,
+          570,
+          571
+        ],
+        [
+          600,
+          601,
+          602,
+          603
+        ],
+        [
+          632,
+          633,
+          634,
+          635
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_125",
+      "type": "scenery",
       "at": {
         "x": 3.0,
         "y": -0.625
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1972,
+          1973,
+          1974,
+          1975
+        ],
+        [
+          2004,
+          2005,
+          2006,
+          2007
+        ],
+        [
+          2036,
+          2037,
+          2038,
+          2039
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_68",
+      "type": "scenery",
       "at": {
         "x": 10.0,
         "y": -0.625
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1072,
+          1073,
+          1074,
+          1075
+        ],
+        [
+          1104,
+          1105,
+          1106,
+          1107
+        ],
+        [
+          1136,
+          1137,
+          1138,
+          1139
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_73",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 1.375
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          1157,
+          1158,
+          1159
+        ],
+        [
+          null,
+          1189,
+          1190,
+          1191
+        ],
+        [
+          null,
+          1221,
+          1222,
+          1223
+        ],
+        [
+          null,
+          1253,
+          1254,
+          1255
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -114,12 +249,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "verdant_hut_props_93",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 2.375
-      }
+      },
+      "tileset": "verdant_hut_props",
+      "tiles": [
+        [
+          null,
+          1429,
+          1430,
+          1431
+        ],
+        [
+          null,
+          1461,
+          1462,
+          1463
+        ],
+        [
+          null,
+          1493,
+          1494,
+          1495
+        ],
+        [
+          null,
+          1525,
+          1526,
+          1527
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

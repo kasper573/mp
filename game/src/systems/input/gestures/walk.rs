@@ -55,10 +55,10 @@ impl Gesture for WalkGesture {
 
     fn tile_highlight(&self, world: &mut World) -> Option<ActiveTileHighlight> {
         let pos = target(world)?;
-        let target = InterfaceIcon::WalkTarget
+        let target = &InterfaceIcon::WalkTarget
             .get(world.resource::<Content>())
             .image;
-        let image = world.resource::<AssetServer>().load(target.0);
+        let image = world.resource::<AssetServer>().load(target.path());
         Some(ActiveTileHighlight { pos, image })
     }
 }

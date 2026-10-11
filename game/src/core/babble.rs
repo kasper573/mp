@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::AudioSource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ui::{RichPiece, RichText, TextVoice, Typewriter, TypewriterReveal};
 
@@ -10,8 +11,8 @@ use crate::core::content::Content;
 use crate::core::math::Rng;
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
-pub use crate::data::babble::Id as BabbleId;
-pub use crate::data::babble_bank::Id as BabbleBankId;
+pub type BabbleId = crate::core::content::ContentId<BabbleDef>;
+pub type BabbleBankId = crate::core::content::ContentId<BabbleBankDef>;
 
 const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
 const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
@@ -28,7 +29,7 @@ const EXCLAIMED_LOUDNESS: f32 = 1.2;
 const SHOUT_LOUDNESS: f32 = 1.35;
 const WHISPER_LOUDNESS: f32 = 0.6;
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct BabbleDef {
     pub babble_bank: BabbleBankId,
     pub pitch: PlaybackRate,
@@ -40,17 +41,50 @@ impl crate::core::content::ContentRow for BabbleDef {
     const TABLE: &'static str = "babble";
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct BabbleBankDef {
-    pub letters: AssetRef,
+    pub letters: String,
     pub volume: f32,
+}
+
+pub fn content(registry: &mut crate::core::content::ContentRegistry) {
+    registry
+        .row::<BabbleDef>()
+        .row::<BabbleBankDef>()
+        .hook(crate::core::content::LoadStep::Files, check_banks);
+}
+
+fn check_banks(loading: &mut crate::core::content::Loading) {
+    let content = loading.content();
+    for (id, bank) in loading.rows::<BabbleBankDef>() {
+        let mut check = crate::core::content::RowCheck::default();
+        check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
+        for letter in letter_files(bank) {
+            if !loading.has_asset(letter.as_str()) {
+                check.error(
+                    "/letters",
+                    "missing file",
+                    format!("{:?}", letter.as_str()),
+                    "a folder under assets/ with a.wav to z.wav",
+                );
+                break;
+            }
+        }
+        if !check.is_empty() {
+            loading.row_errors(id, check);
+            loading.fail(id);
+        }
+        let _ = &content;
+    }
 }
 
 impl crate::core::content::ContentRow for BabbleBankDef {
     const TABLE: &'static str = "babble_bank";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add, Serialize, Deserialize)]
+#[derive(
+    JsonSchema, Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add, Serialize, Deserialize,
+)]
 pub struct Semitones(pub f32);
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -85,10 +119,10 @@ impl Plugin for BabblePlugin {
     }
 }
 
-pub fn letter_clips(bank: &BabbleBankDef) -> impl Iterator<Item = String> + '_ {
+pub fn letter_files(bank: &BabbleBankDef) -> impl Iterator<Item = AssetRef> + '_ {
     LETTERS
         .chars()
-        .map(move |letter| format!("{}/{letter}.wav", bank.letters.0))
+        .map(move |letter| AssetRef::new(format!("{}/{letter}.wav", bank.letters)))
 }
 
 #[derive(Resource, Default)]
@@ -105,8 +139,11 @@ fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut
     clips.0 = content
         .table::<BabbleBankDef>()
         .rows()
-        .iter()
-        .map(|bank| letter_clips(bank).map(|path| assets.load(path)).collect())
+        .map(|bank| {
+            letter_files(bank)
+                .map(|file| assets.load(file.path()))
+                .collect()
+        })
         .collect();
 }
 

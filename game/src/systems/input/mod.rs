@@ -2,7 +2,7 @@ mod escape;
 pub mod gestures;
 pub mod map;
 
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 use crate::systems::area::{self, AreaTag};
@@ -60,7 +60,7 @@ fn setup_highlight(mut commands: Commands) {
 fn update_tile_highlight(
     highlight: Option<Res<ActiveTileHighlight>>,
     viewpoint: Res<Viewpoint>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     areas: Query<&AreaTag>,
     mut sprite: Query<(&mut Sprite, &mut Transform, &mut Visibility), With<TileHighlight>>,
 ) {
@@ -80,13 +80,9 @@ fn update_tile_highlight(
     transform.translation = highlight.pos.to_screen().extend(z);
 }
 
-fn highlight_z(
-    service: &AssetService,
-    viewpoint: &Viewpoint,
-    areas: &Query<&AreaTag>,
-) -> Option<f32> {
+fn highlight_z(service: &Content, viewpoint: &Viewpoint, areas: &Query<&AreaTag>) -> Option<f32> {
     let tag = areas.get(viewpoint.0?).ok()?;
-    Some(area::load(service, tag.area).dynamic_layer() as f32)
+    Some(area::load(service, tag.area).sort_base())
 }
 
 fn touch_as_mouse(

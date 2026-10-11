@@ -1,9 +1,10 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::serial;
 use crate::core::script::{EventDef, Name, OwnerKind, ValueType};
 use crate::core::tiling::Tiles;
-use crate::data;
+use crate::systems::attention::Id as AttentionId;
 use crate::systems::interact::Verb;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -31,7 +32,7 @@ pub enum EventKind {
     Sold,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Who {
     Characters,
@@ -39,7 +40,7 @@ pub enum Who {
     Anyone,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(JsonSchema, Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum RiftEvent {
     Started,
@@ -58,20 +59,20 @@ pub enum RiftEvent {
     Interacted {
         verb: Verb,
         reach: Tiles,
-        #[serde(skip_serializing_if = "serial::is_empty")]
-        marks: &'static [data::attention::Id],
-        #[serde(skip_serializing_if = "serial::is_false")]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        marks: Vec<AttentionId>,
+        #[serde(default, skip_serializing_if = "serial::is_false")]
         news: bool,
     },
     Heard {
-        words: &'static [Name],
+        words: Vec<String>,
         within: Tiles,
     },
     CameNear {
         within: Tiles,
         by: Who,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        npc: Option<data::npc::Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        npc: Option<crate::systems::npc::Id>,
     },
     Attacked,
     Defeated,
@@ -83,12 +84,12 @@ pub enum RiftEvent {
     Completed,
     Failed,
     Bought {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        item: Option<data::item::Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item: Option<crate::systems::item::Id>,
     },
     Sold {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        item: Option<data::item::Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item: Option<crate::systems::item::Id>,
     },
 }
 

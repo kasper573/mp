@@ -1,6 +1,6 @@
 use crate::core::content::Content;
-use crate::data::item::Id as ItemId;
 use crate::systems::interface::InterfaceIcon;
+use crate::systems::item::Id as ItemId;
 use crate::systems::item::{INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, card};
 use crate::systems::player::session;
 use bevy::prelude::*;
@@ -154,7 +154,7 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
                     Filled {
                         item: stack.item,
                         hints: hints(map, &takeovers, def),
-                        icon: assets.load(def.icon.0),
+                        icon: assets.load(def.icon.path()),
                         count: stack.count,
                         notes: bound_note(def)
                             .into_iter()

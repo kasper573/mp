@@ -11,12 +11,11 @@ use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::script::{self, Answer, BoxEnding, ChoiceOffer, DialogueView, FlowKey, Reveal};
 use crate::core::tiling::Tiles;
-use crate::data;
-use crate::data::attention::Id as AttentionId;
 use crate::systems::actor::Name;
 use crate::systems::actor::bust::Face;
 use crate::systems::attention;
 use crate::systems::attention::AttentionMark;
+use crate::systems::attention::Id as AttentionId;
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::interface::InterfaceSound;
@@ -66,9 +65,9 @@ pub struct Conversation {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConversationPanel {
-    QuestOffer(data::quest::Id),
-    QuestTurnIn(data::quest::Id),
-    QuestDecision(data::quest::Id),
+    QuestOffer(crate::systems::quest::Id),
+    QuestTurnIn(crate::systems::quest::Id),
+    QuestDecision(crate::systems::quest::Id),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -107,12 +106,12 @@ pub enum ChoiceChip {
         met: bool,
     },
     Pays {
-        item: data::item::Id,
+        item: crate::systems::item::Id,
         count: u32,
         have: u32,
     },
     Gets {
-        item: data::item::Id,
+        item: crate::systems::item::Id,
         count: u32,
     },
 }
@@ -128,7 +127,7 @@ pub type CardPick = Arc<dyn Fn(&mut World, Entity) -> Result<Answer, String> + S
 pub struct CardOffer {
     pub label: LineText,
     pub tag: ChoiceTag,
-    pub icon: Option<AssetRef>,
+    pub icon: Option<&'static AssetRef>,
     pub chips: Vec<ChoiceChip>,
     pub locked: bool,
     pub warn: Option<String>,
@@ -158,23 +157,30 @@ pub struct Revealable {
     pub gains: bool,
 }
 
-pub fn check_reveal(what: &str, reveal: &[Reveal], revealable: Revealable) {
+pub fn check_reveal(
+    reveal: &[Reveal],
+    revealable: Revealable,
+) -> Result<(), (&'static str, String)> {
     for kind in reveal {
-        let present = match kind {
-            Reveal::Locked | Reveal::Needs => revealable.needs,
-            Reveal::Costs => revealable.costs,
-            Reveal::Gains => revealable.gains,
+        let (present, what) = match kind {
+            Reveal::Locked | Reveal::Needs => (revealable.needs, "needs"),
+            Reveal::Costs => (revealable.costs, "costs"),
+            Reveal::Gains => (revealable.gains, "gains"),
         };
         if !present {
-            panic!("{what}: reveals {kind:?}, but has nothing of the kind");
+            return Err((
+                "nothing to reveal",
+                format!("reveals {}, {what} nothing", kind.name()),
+            ));
         }
     }
     let mut seen = HashSet::new();
     for kind in reveal {
         if !seen.insert(*kind) {
-            panic!("{what}: reveals {kind:?} twice");
+            return Err(("revealed twice", format!("{} twice", kind.name())));
         }
     }
+    Ok(())
 }
 
 pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<RiftScripting>) {
@@ -194,8 +200,8 @@ pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueVie
         .iter()
         .map(|(line, values)| SpokenLine {
             by: line.by,
-            face: line.face,
-            text: LineText::spoken(line.text, values),
+            face: line.face.clone(),
+            text: LineText::spoken(&line.text, values),
         })
         .collect();
     for line in &lines {
@@ -257,7 +263,7 @@ pub fn card(
                 view: ChoiceView {
                     label: offer.label,
                     tag: offer.tag,
-                    icon: offer.icon.map(|icon| icon.0.to_owned()),
+                    icon: offer.icon.map(|icon| icon.path()),
                     chips: offer.chips,
                     locked: offer.locked,
                     warn: offer.warn,
@@ -300,8 +306,8 @@ pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
     let nth = session.remark.as_ref().map_or(0, |remark| remark.nth) + 1;
     let line = SpokenLine {
         by: line.by,
-        face: line.face,
-        text: LineText::of(line.text),
+        face: line.face.clone(),
+        text: LineText::of(&line.text),
     };
     record_line(world, player, &line);
     if let Some(mut session) = world.get_mut::<ConversationSession>(player) {
@@ -560,7 +566,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
     });
     if let Some(items) = items {
         if choice.reveal.contains(&Reveal::Costs) {
-            for stack in items.take {
+            for stack in &items.take {
                 chips.push(ChoiceChip::Pays {
                     item: stack.item,
                     count: stack.count,
@@ -569,7 +575,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
             }
         }
         if choice.reveal.contains(&Reveal::Gains) {
-            for stack in items.give {
+            for stack in &items.give {
                 chips.push(ChoiceChip::Gets {
                     item: stack.item,
                     count: stack.count,

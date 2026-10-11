@@ -3,27 +3,21 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use game::core::math::{Pos, Rng};
 use game::core::script::compile::compile_owner;
-use game::core::script::{Assignment, Expr, Owner, OwnerKind, Target, ValueType};
+use game::core::script::{Owner, OwnerKind};
 use game::core::tiling::{TilePos, Tiles};
-use game::data::npc::Id as NpcId;
 use game::systems::combat::{AttackRequest, Attitude};
 use game::systems::movement::{Position, position};
-use game::systems::npc::body::{self, Attack, Wander};
-use game::systems::npc::summon::SetAttitude;
+use game::systems::npc::Id as NpcId;
+use game::systems::npc::body;
 use game::systems::npc::{self, Pack};
-use game::systems::script::query::Among;
-use game::systems::script::{
-    Condition, EventKind, InlineScript, Node, Procedure, RiftEffect, RiftEvent, RiftInstances,
-    RiftQuery, ScriptModule,
-};
+use game::systems::script::{EventKind, Procedure, RiftInstances};
 use game::systems::stat::{self, StatKind};
+use serde_json::json;
 
+use crate::json::inline_with;
 use crate::support::{Sim, content, row, spawn_area, townsperson};
 
 const SEED: u64 = 7;
-
-const TEN: Condition = Expr::Num(10.0);
-const TARGET: Condition = Expr::Local("target");
 
 fn sim() -> (Sim, Entity, Pos<Tiles>) {
     let mut sim = Sim::area(spawn_area());
@@ -133,84 +127,40 @@ fn idle_stroll_keeps_its_leash() {
     );
 }
 
-const BRAWLER: InlineScript = InlineScript {
-    state: &[],
-    locals: &[("target", ValueType::Actor)],
-    nodes: &[
-        (
-            "spawned",
-            Node::On {
-                event: RiftEvent::Started,
-                next: Some("hostile"),
-            },
-        ),
-        (
-            "hostile",
-            Node::Effect(RiftEffect::SetAttitude(SetAttitude {
-                attitude: Attitude::Hostile,
-                next: Some("look"),
-            })),
-        ),
-        (
-            "look",
-            Node::Set {
-                values: &[Assignment {
-                    target: Target::Local("target"),
-                    to: Expr::Query(RiftQuery::Nearest {
-                        among: Among::Npcs,
-                        npc: None,
-                        within: &TEN,
-                    }),
-                }],
-                next: Some("found"),
-            },
-        ),
-        (
-            "found",
-            Node::If {
-                test: Expr::Query(RiftQuery::Present { actor: &TARGET }),
-                yes: Some("fight"),
-                no: Some("roam"),
-            },
-        ),
-        (
-            "fight",
-            Node::Effect(RiftEffect::Attack(Attack {
-                target: &TARGET,
-                within: &TEN,
-                priority: 5,
-                defeated: Some("look"),
-                lost: Some("look"),
-                interrupted: Some("look"),
-            })),
-        ),
-        (
-            "roam",
-            Node::Effect(RiftEffect::Wander(Wander {
-                leash: None,
-                priority: 1,
-                next: Some("tick"),
-            })),
-        ),
-        (
-            "tick",
-            Node::Wait {
-                seconds: Expr::Int(0),
-                at_most: 1.0,
-                next: Some("look"),
-            },
-        ),
-    ],
-};
-
 fn brawler() -> Vec<Arc<Procedure>> {
-    compile_owner(
-        content(),
-        OwnerKind::Npc,
-        "test/brawler",
-        &[ScriptModule::Inline(BRAWLER)],
-    )
-    .expect("compiles")
+    let script = inline_with(
+        json!({ "target": "actor" }),
+        json!({
+            "spawned": { "type": "on", "event": "started", "next": "hostile" },
+            "hostile": { "type": "set_attitude", "attitude": "hostile", "next": "look" },
+            "look": {
+                "type": "set",
+                "values": [{
+                    "local": "target",
+                    "to": { "type": "nearest", "among": "npcs", "within": 10.0 }
+                }],
+                "next": "found"
+            },
+            "found": {
+                "type": "if",
+                "test": { "type": "present", "actor": { "type": "local", "local": "target" } },
+                "yes": "fight",
+                "no": "roam"
+            },
+            "fight": {
+                "type": "attack",
+                "target": { "type": "local", "local": "target" },
+                "within": 10.0,
+                "priority": 5,
+                "defeated": "look",
+                "lost": "look",
+                "interrupted": "look"
+            },
+            "roam": { "type": "wander", "priority": 1, "next": "tick" },
+            "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
+        }),
+    );
+    compile_owner(content(), OwnerKind::Npc, "test/brawler", &[script]).expect("compiles")
 }
 
 fn brawling_npc(sim: &mut Sim, near: Pos<Tiles>, pack: u32) -> Entity {

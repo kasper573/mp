@@ -8,9 +8,9 @@ use bevy::window::PrimaryWindow;
 use ui::tokens::typography;
 
 use super::{DebugMode, outline as outline_rect};
-use crate::core::assets::AssetService;
 use crate::core::audio::playback::Listener;
 use crate::core::audio::soundscape::{SoundscapeShape, SoundscapeZone};
+use crate::core::content::Content;
 use crate::core::math::{Offset, Rect};
 use crate::core::render::cursor_tile;
 use crate::core::render::screen::ToScreen;
@@ -43,7 +43,7 @@ pub(super) fn show(
     mode: Res<DebugMode>,
     viewpoint: Res<Viewpoint>,
     areas: Query<&AreaTag>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut shown: ResMut<ShownSoundscape>,
     overlays: Query<Entity, With<ZoneOverlay>>,
     mut images: ResMut<Assets<Image>>,
@@ -228,13 +228,11 @@ fn readout(zones: &[SoundscapeZone]) -> impl Scene + use<> {
 }
 
 fn label(index: usize, zone: &SoundscapeZone) -> impl Scene + use<> {
-    let name = (!zone.name.is_empty()).then(|| {
-        EntityScene(ui::styled_text(
-            zone.name.clone(),
-            zone_color(index),
-            typography::LABEL,
-        ))
-    });
+    let name = EntityScene(ui::styled_text(
+        format!("zone {index}"),
+        zone_color(index),
+        typography::LABEL,
+    ));
     let channels = zone
         .channels
         .iter()
@@ -242,7 +240,7 @@ fn label(index: usize, zone: &SoundscapeZone) -> impl Scene + use<> {
             format!(
                 "channel {}: {} ({:?}, volume {}, pan {})",
                 channel.0,
-                layer.src,
+                layer.src.as_str(),
                 channel.category(),
                 layer.volume,
                 layer.pan

@@ -1,13 +1,13 @@
 use bevy_app::App;
 use bevy_ecs::entity::{EntityMapper, MapEntities};
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
-use crate::core::content::Fixture;
+use crate::core::content::{ContentId, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
-use crate::data::attention::Id as AttentionId;
 use crate::systems::area::AreaTag;
 use crate::systems::interact::{self, Interactive};
 use crate::systems::movement::Position;
@@ -26,7 +26,10 @@ pub fn register(app: &mut App) {
         .init_resource::<BadgeSources>();
 }
 
-#[derive(Clone, Serialize)]
+pub type AttentionId = ContentId<AttentionDef>;
+pub type Id = AttentionId;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct AttentionDef {
     pub icon: AssetRef,
 }

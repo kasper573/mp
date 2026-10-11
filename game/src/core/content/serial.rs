@@ -1,25 +1,30 @@
-use std::collections::BTreeMap;
+use schemars::JsonSchema;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use serde::ser::SerializeMap;
-use serde::{Serialize, Serializer};
+use crate::core::math::{Pos, Rect, Size};
 
-use crate::core::math::Rect;
-
-pub fn pairs_map<K: Serialize + Ord, T: Serialize, S: Serializer>(
-    pairs: &[(K, T)],
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let sorted: BTreeMap<&K, &T> = pairs.iter().map(|(key, value)| (key, value)).collect();
-    sorted.serialize(serializer)
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RectRow {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
 }
 
 pub fn rect<U, S: Serializer>(rect: &Rect<U>, serializer: S) -> Result<S::Ok, S::Error> {
-    let mut map = serializer.serialize_map(Some(4))?;
-    map.serialize_entry("x", &rect.origin.x)?;
-    map.serialize_entry("y", &rect.origin.y)?;
-    map.serialize_entry("w", &rect.size.width)?;
-    map.serialize_entry("h", &rect.size.height)?;
-    map.end()
+    RectRow {
+        x: rect.origin.x,
+        y: rect.origin.y,
+        w: rect.size.width,
+        h: rect.size.height,
+    }
+    .serialize(serializer)
+}
+
+pub fn rect_from<'de, U, D: Deserializer<'de>>(deserializer: D) -> Result<Rect<U>, D::Error> {
+    let RectRow { x, y, w, h } = RectRow::deserialize(deserializer)?;
+    Ok(Rect::new(Pos::new(x, y), Size::new(w, h)))
 }
 
 pub fn opt_rect<U, S: Serializer>(
@@ -32,10 +37,14 @@ pub fn opt_rect<U, S: Serializer>(
     }
 }
 
-pub fn with_scope_content<T>(f: impl FnOnce(&super::Content) -> T) -> T {
-    let content = super::id::scope_content()
-        .expect("rows that name other rows' files are written only inside with_content");
-    f(&content)
+pub fn opt_rect_from<'de, U, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Rect<U>>, D::Error> {
+    rect_from(deserializer).map(Some)
+}
+
+pub fn one() -> u32 {
+    1
 }
 
 pub fn is_one(count: &u32) -> bool {
@@ -46,6 +55,34 @@ pub fn is_false(flag: &bool) -> bool {
     !*flag
 }
 
-pub fn is_empty<T>(list: &&[T]) -> bool {
+pub fn is_empty<T>(list: &[T]) -> bool {
     list.is_empty()
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PosRow {
+    x: f32,
+    y: f32,
+}
+
+pub fn pos<U, S: Serializer>(pos: &Pos<U>, serializer: S) -> Result<S::Ok, S::Error> {
+    PosRow { x: pos.x, y: pos.y }.serialize(serializer)
+}
+
+pub fn pos_from<'de, U, D: Deserializer<'de>>(deserializer: D) -> Result<Pos<U>, D::Error> {
+    let PosRow { x, y } = PosRow::deserialize(deserializer)?;
+    Ok(Pos::new(x, y))
+}
+
+pub fn one_f32() -> f32 {
+    1.0
+}
+
+pub fn is_one_f32(value: &f32) -> bool {
+    *value == 1.0
+}
+
+pub fn is_zero_f32(value: &f32) -> bool {
+    *value == 0.0
 }

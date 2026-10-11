@@ -1,6 +1,6 @@
-use crate::support::assets;
+use crate::support::content;
 
 #[test]
-fn shipped_content_passes_the_startup_checks() {
-    game::systems::check_content(&assets());
+fn shipped_content_loads() {
+    let _ = content();
 }

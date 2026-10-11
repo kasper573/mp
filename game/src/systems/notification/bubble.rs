@@ -13,12 +13,12 @@ use crate::core::math::Pos;
 use crate::core::render::tile_to_window;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
-use crate::data::npc::Id as NpcId;
 use crate::systems::actor::{Action, Actor, plate};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
 use crate::systems::hud;
 use crate::systems::movement::{Position, RenderPosition};
+use crate::systems::npc::Id as NpcId;
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
 

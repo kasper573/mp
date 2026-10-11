@@ -4,14 +4,13 @@ pub mod widget;
 use bevy_app::App;
 use bevy_ecs::component::Component;
 use bevy_ecs::message::Message;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetService;
-use crate::core::content::{Content, ContentRow, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::PlaybackRate;
-use crate::data;
 use crate::systems::Character;
 use crate::systems::GameSettings;
 use crate::systems::account::identity::Identity;
@@ -32,7 +31,7 @@ use crate::systems::movement::Position;
 use crate::systems::quest::QuestLog;
 use crate::systems::shop::ShopLedger;
 use crate::systems::spectate::Spectators;
-use crate::systems::stat::{self, Stat, StatKind, Stats};
+use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility::OwnedBy;
 use bevy_ecs::lifecycle::{Add, Remove};
 use bevy_ecs::observer::On;
@@ -102,14 +101,15 @@ pub struct Welcome {
 /// grind it down, so test/dev sessions never die to NPCs.
 const IMMORTAL_HEALTH: f32 = 9999.0;
 
-#[derive(Clone, Serialize)]
+pub type Id = ContentId<PlayerDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
-    pub model: data::model::Id,
-    pub job: data::job::Id,
-    #[serde(serialize_with = "crate::systems::stat::stats_map")]
-    pub stats: &'static [Stat],
-    #[serde(skip_serializing_if = "crate::core::content::serial::is_empty")]
-    pub modules: &'static [PlayerModule],
+    pub model: crate::systems::actor::bust::Id,
+    pub job: crate::systems::job::Id,
+    pub stats: crate::systems::stat::StatMap,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<PlayerModule>,
 }
 
 impl ContentRow for PlayerDef {
@@ -120,7 +120,7 @@ impl ModuleSet for PlayerDef {
     type Module = PlayerModule;
 
     fn modules(&self) -> &[PlayerModule] {
-        self.modules
+        &self.modules
     }
 
     fn rule(_: &PlayerModule) -> ModuleRule {
@@ -128,7 +128,7 @@ impl ModuleSet for PlayerDef {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PlayerModule {
     Tint(Tint),
@@ -154,8 +154,8 @@ impl PlayerDef {
     }
 }
 
-pub fn def(content: &Content) -> &PlayerDef {
-    data::settings().player.get(content)
+pub fn def(content: &Content) -> &'static PlayerDef {
+    content.built::<GameSettings>().player.get(content)
 }
 
 #[derive(Resource, Default)]
@@ -235,7 +235,7 @@ pub struct Immortal(pub bool);
 
 pub fn join(world: &mut World) {
     let zone = world.resource::<crate::systems::WorldArea>().0;
-    let assets = world.resource::<AssetService>().clone();
+    let assets = *world.resource::<Content>();
     let area = area::load(&assets, zone);
     let policy = world
         .get_resource::<SpawnPolicy>()
@@ -280,13 +280,14 @@ fn spawn_position(
     area: &area::Area,
 ) -> Pos<Tiles> {
     let spawn = world.resource::<GameSettings>().spawn;
+    let fallback = || area.fallback_spawn();
     match policy {
         SpawnPolicy::Map if spawn.area == zone => spawn.at,
-        SpawnPolicy::Map => area.spawn,
+        SpawnPolicy::Map => fallback(),
         SpawnPolicy::Dist => area
             .grid
             .random_node(&mut world.resource_mut::<Rng>())
-            .unwrap_or(area.spawn),
+            .unwrap_or_else(fallback),
     }
 }
 
@@ -347,9 +348,8 @@ fn spawn_player(
 
 pub fn player_stats(def: &PlayerDef, immortal: Immortal) -> Stats {
     Stats(
-        def.stats
-            .iter()
-            .map(|&stat| match stat.kind {
+        stat::listed(&def.stats)
+            .map(|stat| match stat.kind {
                 StatKind::Health | StatKind::MaxHealth if immortal.0 => {
                     stat.kind.of(IMMORTAL_HEALTH)
                 }
@@ -369,7 +369,7 @@ pub(crate) fn place(
     let content = *world.resource::<Content>();
     let def = def(&content);
     let model = def.model;
-    let assets = world.resource::<AssetService>().clone();
+    let assets = *world.resource::<Content>();
     let entity = world
         .spawn((
             Character {
@@ -380,7 +380,7 @@ pub(crate) fn place(
                     dir: Direction::S,
                     action: Action::Idle,
                     model,
-                    attack_rate: PlaybackRate(stat::value(def.stats, StatKind::AttackSpeed)),
+                    attack_rate: PlaybackRate(stat::of_map(&def.stats, StatKind::AttackSpeed)),
                 },
                 hitbox: Hitbox {
                     size: actor::model(&assets, model).hitbox(),

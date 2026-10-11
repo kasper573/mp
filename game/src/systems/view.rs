@@ -1,4 +1,4 @@
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, TileSize, Tiles};
 use crate::core::time::Seconds;
@@ -43,7 +43,7 @@ struct FollowCenter(Option<Pos<Tiles>>);
 fn track_player(
     time: Res<Time>,
     viewpoint: Res<Viewpoint>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     characters: Query<(&RenderPosition, &AreaTag)>,
     window: Single<&Window, With<PrimaryWindow>>,
     mut camera: Query<&mut Transform, With<WorldCamera>>,
@@ -74,7 +74,7 @@ fn track_player(
 }
 
 fn camera_center(
-    service: &AssetService,
+    service: &Content,
     at: Pos<Tiles>,
     area_id: crate::systems::area::Id,
     half: Vec2,

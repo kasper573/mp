@@ -1,11 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
 use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioInstance, AudioSource, AudioTween};
-use serde::Deserialize;
 
+use crate::core::assets::AssetRef;
 use crate::core::audio::decibels;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::playback::{Listener, PositionalAudio};
@@ -36,7 +35,6 @@ pub struct Soundscape(pub &'static [SoundscapeZone]);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeZone {
-    pub name: String,
     pub shape: SoundscapeShape,
     pub emit: Tiles,
     pub channels: BTreeMap<SoundscapeChannel, SoundscapeLayer>,
@@ -51,13 +49,10 @@ pub enum SoundscapeShape {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SoundscapeChannel(pub u32);
 
-/// Maps write a layer as comma separated values in field order, and may leave off those after `src`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeLayer {
-    pub src: String,
-    #[serde(default = "full_volume")]
+    pub src: AssetRef,
     pub volume: f32,
-    #[serde(default)]
     pub pan: f32,
 }
 
@@ -116,28 +111,6 @@ impl SoundscapeShape {
                 bounds.center() + edge.component_mul(bounds.size.to_vector() / 2.0)
             }
         }
-    }
-}
-
-impl FromStr for SoundscapeLayer {
-    type Err = String;
-
-    fn from_str(values: &str) -> Result<SoundscapeLayer, String> {
-        let layer: SoundscapeLayer = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .trim(csv::Trim::All)
-            .from_reader(values.as_bytes())
-            .deserialize()
-            .next()
-            .ok_or("has no values")?
-            .map_err(|error| error.to_string())?;
-        if layer.volume < 0.0 {
-            return Err(format!("volume {} is below 0", layer.volume));
-        }
-        if !(-1.0..=1.0).contains(&layer.pan) {
-            return Err(format!("pan {} is outside -1..1", layer.pan));
-        }
-        Ok(layer)
     }
 }
 
@@ -210,7 +183,7 @@ fn load_sources(
         .0
         .iter()
         .flat_map(|zone| zone.channels.values())
-        .map(|layer| (layer.src.as_str(), assets.load(layer.src.as_str())))
+        .map(|layer| (layer.src.as_str(), assets.load(layer.src.path())))
         .collect();
 }
 
@@ -289,12 +262,12 @@ fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
             let pan = (layer.pan + heard.pan).clamp(-1.0, 1.0);
             match wanted
                 .iter_mut()
-                .find(|wanted| wanted.channel == channel && wanted.src == layer.src)
+                .find(|wanted| wanted.channel == channel && wanted.src == layer.src.as_str())
             {
                 Some(wanted) => wanted.blend(power, layer, pan),
                 None => wanted.push(WantedLayer {
                     channel,
-                    src: &layer.src,
+                    src: layer.src.as_str(),
                     share: power,
                     volume: layer.volume,
                     pan,
@@ -319,8 +292,4 @@ fn unit_circle(bounds: Rect<Tiles>, at: Pos<Tiles>) -> euclid::Vector2D<f32, Til
 
 fn toward(from: f32, to: f32, step: f32) -> f32 {
     from + (to - from).clamp(-step, step)
-}
-
-fn full_volume() -> f32 {
-    1.0
 }

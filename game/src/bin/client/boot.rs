@@ -31,18 +31,12 @@ fn boot() {
     });
 
     let mut app = App::new();
-    let assets = crate::assets::service();
-    let fonts = systems::interface::font_files(assets.content());
-    let scripts =
-        game::systems::script::build(assets.content()).unwrap_or_else(|error| panic!("{error}"));
-    app.insert_resource(game::systems::quest::Parties::of(
-        assets.content(),
-        &scripts,
-    ));
-    app.insert_resource(scripts);
-    app.insert_resource(*assets.content());
-    app.insert_resource(assets);
-    app.insert_resource(game::data::settings());
+    let content = crate::assets::content();
+    let fonts = systems::interface::font_files(&content);
+    app.insert_resource(content.built::<systems::quest::Parties>().clone());
+    app.insert_resource(content.built::<systems::script::RiftScripts>().clone());
+    app.insert_resource(content.built::<systems::GameSettings>().clone());
+    app.insert_resource(content);
     app.insert_resource(Rng::from_entropy());
     app.register_asset_source(AssetSourceId::Default, crate::assets::bevy_source())
         .add_plugins(

@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "swamp_witch",
-      "at": [
-        11.0,
-        8.0
-      ]
+      "at": {
+        "x": 11.0,
+        "y": 8.0
+      }
     },
     {
       "type": "soundscape",

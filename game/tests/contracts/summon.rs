@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
-use game::data::npc::Id as NpcId;
 use game::systems::combat::{self, AttackRequest, Attitude};
+use game::systems::npc::Id as NpcId;
 use game::systems::npc::{Summoned, summon};
 use game::systems::player::ClientId;
 use game::systems::stat::{self, StatKind};

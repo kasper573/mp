@@ -1,4 +1,6 @@
-use serde::Serialize;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::core::assets::AssetRef;
@@ -33,9 +35,9 @@ impl Plugin for SfxPlugin {
     }
 }
 
-pub use crate::data::sfx::Id as SfxId;
+pub type SfxId = crate::core::content::ContentId<SfxDef>;
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
     pub file: AssetRef,
     pub volume: SfxScalar,
@@ -50,6 +52,36 @@ impl crate::core::content::ContentRow for SfxDef {
 pub enum SfxScalar {
     Fixed(f32),
     Random(f32, f32),
+}
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(untagged)]
+enum SfxScalarRow {
+    Fixed(f32),
+    Random { min: f32, max: f32 },
+}
+
+impl<'de> Deserialize<'de> for SfxScalar {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<SfxScalar, D::Error> {
+        Ok(match SfxScalarRow::deserialize(deserializer)? {
+            SfxScalarRow::Fixed(value) => SfxScalar::Fixed(value),
+            SfxScalarRow::Random { min, max } => SfxScalar::Random(min, max),
+        })
+    }
+}
+
+impl JsonSchema for SfxScalar {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("SfxScalar")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        SfxScalarRow::json_schema(generator)
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
 }
 
 impl Serialize for SfxScalar {
@@ -163,9 +195,8 @@ fn load(assets: Res<AssetServer>, content: Res<Content>, mut catalog: ResMut<Cat
     catalog.0 = content
         .table::<SfxDef>()
         .rows()
-        .iter()
         .map(|def| Sound {
-            handle: assets.load(def.file.0),
+            handle: assets.load(def.file.path()),
             volume: def.volume,
             pitch: def.pitch,
         })

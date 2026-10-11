@@ -2,6 +2,7 @@ pub mod widget;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::time::{UnixMillis, WallClock};
@@ -22,7 +23,7 @@ pub struct EffectContext<'a> {
     pub target: Entity,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum Effect {
     StatModifier(Stat),
     Chasing,

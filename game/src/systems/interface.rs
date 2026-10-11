@@ -1,11 +1,12 @@
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
-use crate::core::assets::{AssetRef, AssetService};
+use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxDef;
 use crate::core::content::{Content, ContentRow, Fixture};
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct CursorDef {
     pub image: AssetRef,
     pub hotspot: Hotspot,
@@ -15,7 +16,7 @@ impl ContentRow for CursorDef {
     const TABLE: &'static str = "cursor";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hotspot {
     pub x: u16,
     pub y: u16,
@@ -43,7 +44,7 @@ impl Fixture for CursorShape {
     type Row = CursorDef;
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct InterfaceIconDef {
     pub image: AssetRef,
 }
@@ -76,7 +77,7 @@ impl Fixture for InterfaceIcon {
     type Row = InterfaceIconDef;
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct FontDef {
     pub file: AssetRef,
 }
@@ -110,7 +111,7 @@ impl Fixture for FontFace {
 pub fn font_files(content: &Content) -> Vec<String> {
     FontFace::VARIANTS
         .iter()
-        .map(|face| face.get(content).file.0.to_owned())
+        .map(|face| face.get(content).file.path())
         .collect()
 }
 
@@ -134,32 +135,4 @@ pub enum InterfaceSound {
 
 impl Fixture for InterfaceSound {
     type Row = SfxDef;
-}
-
-pub fn check(assets: &AssetService) {
-    let content = assets.content();
-    let images = content
-        .table::<CursorDef>()
-        .rows()
-        .iter()
-        .map(|cursor| cursor.image)
-        .chain(
-            content
-                .table::<InterfaceIconDef>()
-                .rows()
-                .iter()
-                .map(|icon| icon.image),
-        )
-        .chain(
-            content
-                .table::<FontDef>()
-                .rows()
-                .iter()
-                .map(|font| font.file),
-        );
-    for file in images {
-        if let Err(error) = assets.open(std::path::Path::new(file.0)) {
-            panic!("{}: {error}", file.0);
-        }
-    }
 }

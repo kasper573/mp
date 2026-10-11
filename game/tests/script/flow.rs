@@ -2,108 +2,60 @@ use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
 use game::core::script::compile::compile_owner;
-use game::core::script::{Expr, Owner, OwnerKind, ValueType};
+use game::core::script::{Owner, OwnerKind};
 use game::core::tiling::Tiles;
-use game::data::item::Id as ItemId;
-use game::data::memory::Id as MemoryId;
-use game::data::notification::Id as NotificationId;
-use game::data::npc::Id as NpcId;
 use game::systems::dialogue::Conversation;
-use game::systems::interact::Verb;
-use game::systems::item::ItemStack;
-use game::systems::item::effects::Items;
-use game::systems::memory::Remember;
+use game::systems::item::Id as ItemId;
 use game::systems::movement::{Position, position};
-use game::systems::notification::Notify;
-use game::systems::npc::body::{self, Act, Attack, Priority};
-use game::systems::npc::summon::Despawn;
+use game::systems::notification::Id as NotificationId;
+use game::systems::npc::Id as NpcId;
+use game::systems::npc::body::{self, Act, Priority};
 use game::systems::npc::{self, Pack};
-use game::systems::script::{
-    Condition, DialogueNode, EventKind, InlineScript, Line, Node, Procedure, RiftEffect, RiftEvent,
-    RiftInstances, RiftQuery, ScriptModule, Speaker, Who, choice,
-};
-use game::systems::stat::effects::{Heal, HealBy};
+use game::systems::script::{EventKind, Procedure, RiftInstances, ScriptModule};
 use game::systems::stat::{self, StatKind};
-use game::systems::text::{Span, plain};
+use serde_json::{Value, json};
 
+use crate::json::{inline, inline_with};
 use crate::support::{
     Sim, content, conversation, count, errors, give, later, leave, pick, remembered, row,
     spawn_area, spoken,
 };
 
-type Name = &'static str;
-
-static TEN: Condition = Expr::Num(10.0);
-static SUBJECT: Condition = Expr::Query(RiftQuery::Subject);
-static NOBODY: Condition = Expr::Local("nobody");
-
-fn spans(text: &'static str) -> &'static [Span] {
-    Box::leak(vec![plain(text)].into_boxed_slice())
-}
-
-fn narrator(text: &'static str) -> &'static [Line] {
-    Box::leak(
-        vec![Line {
-            by: Speaker::Narrator,
-            face: None,
-            text: spans(text),
-        }]
-        .into_boxed_slice(),
-    )
-}
-
-fn say(text: &'static str, choices: Vec<(&'static str, Option<Name>)>) -> Node {
-    Node::Dialogue(DialogueNode {
-        lines: narrator(text),
-        choices: Box::leak(
-            choices
-                .into_iter()
-                .map(|(label, to)| choice(spans(label), to))
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        ),
-        next: None,
-        left: None,
+fn say(text: &str, choices: Vec<(&str, Option<&str>)>) -> Value {
+    let choices: Vec<Value> = choices
+        .into_iter()
+        .map(|(label, to)| match to {
+            Some(to) => json!({ "label": [label], "to": to }),
+            None => json!({ "label": [label] }),
+        })
+        .collect();
+    json!({
+        "type": "dialogue",
+        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
+        "choices": choices,
     })
 }
 
-fn interacted(next: Name) -> (Name, Node) {
-    (
-        "interacted",
-        Node::On {
-            event: RiftEvent::Interacted {
-                verb: Verb::Talk,
-                reach: Tiles(2.0),
-                marks: &[],
-                news: false,
-            },
-            next: Some(next),
-        },
-    )
+fn interacted(next: &str) -> Value {
+    json!({ "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next })
 }
 
-fn remember(key: &str, next: Option<Name>) -> Node {
-    Node::Effect(RiftEffect::Remember(Remember {
-        who: None,
-        memory: row::<MemoryId>(key),
-        to: None,
-        next,
-    }))
+fn remember(key: &str, next: Option<&str>) -> Value {
+    match next {
+        Some(next) => json!({ "type": "remember", "memory": key, "next": next }),
+        None => json!({ "type": "remember", "memory": key }),
+    }
 }
 
-fn inline(locals: &'static [(Name, ValueType)], nodes: Vec<(Name, Node)>) -> ScriptModule {
-    ScriptModule::Inline(InlineScript {
-        state: &[],
-        locals,
-        nodes: Box::leak(nodes.into_boxed_slice()),
-    })
-}
-
-fn compiled(modules: &[ScriptModule]) -> Vec<Arc<Procedure>> {
+fn compiled(modules: &[&'static ScriptModule]) -> Vec<Arc<Procedure>> {
     compile_owner(content(), OwnerKind::Npc, "test/npc", modules).expect("compiles")
 }
 
-fn scripted_npc(sim: &mut Sim, beside: Entity, modules: &[ScriptModule]) -> (Entity, Owner) {
+fn scripted_npc(
+    sim: &mut Sim,
+    beside: Entity,
+    modules: &[&'static ScriptModule],
+) -> (Entity, Owner) {
     let at = position(sim.world(), beside).expect("position");
     let spot = sim.walkable_near(at, Tiles(1.0), Tiles(1.5));
     let npc = npc::spawn(
@@ -153,33 +105,19 @@ fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let gold: ItemId = row("Gold");
-    let script = inline(
-        &[],
-        vec![
-            interacted("wait"),
-            (
-                "wait",
-                Node::Wait {
-                    seconds: Expr::Int(1),
-                    at_most: 5.0,
-                    next: Some("hello"),
-                },
-            ),
-            ("hello", say("Pay up.", vec![("Pay.", Some("pay"))])),
-            (
-                "pay",
-                Node::Effect(RiftEffect::Items(Items {
-                    who: None,
-                    take: Box::leak(vec![ItemStack::new(gold, 5)].into_boxed_slice()),
-                    give: &[],
-                    done: Some("paid"),
-                    refused: Some("broke"),
-                })),
-            ),
-            ("paid", say("Thanks.", vec![("Bye.", None)])),
-            ("broke", say("No coin?", vec![("Bye.", None)])),
-        ],
-    );
+    let script = inline(json!({
+        "interacted": interacted("wait"),
+        "wait": { "type": "wait", "seconds": 1, "at_most": 5.0, "next": "hello" },
+        "hello": say("Pay up.", vec![("Pay.", Some("pay"))]),
+        "pay": {
+            "type": "items",
+            "take": [{ "item": "gold", "count": 5 }],
+            "done": "paid",
+            "refused": "broke"
+        },
+        "paid": say("Thanks.", vec![("Bye.", None)]),
+        "broke": say("No coin?", vec![("Bye.", None)]),
+    }));
     let (_, owner) = scripted_npc(&mut sim, player, &[script]);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
@@ -208,39 +146,14 @@ fn flows_run_in_the_order_their_events_were_raised() {
     let player = sim.join(1);
     let gulls: NotificationId = row("Gulls");
     let sails: NotificationId = row("GullSails");
-    let script = inline(
-        &[],
-        vec![
-            interacted("first"),
-            (
-                "first",
-                Node::Effect(RiftEffect::Notify(Notify {
-                    who: None,
-                    notification: gulls,
-                    next: None,
-                })),
-            ),
-            (
-                "came_near",
-                Node::On {
-                    event: RiftEvent::CameNear {
-                        within: Tiles(3.0),
-                        by: Who::Characters,
-                        npc: None,
-                    },
-                    next: Some("second"),
-                },
-            ),
-            (
-                "second",
-                Node::Effect(RiftEffect::Notify(Notify {
-                    who: None,
-                    notification: sails,
-                    next: None,
-                })),
-            ),
-        ],
-    );
+    let script = inline(json!({
+        "interacted": interacted("first"),
+        "first": { "type": "notify", "notification": "gulls" },
+        "came_near": {
+            "type": "on", "event": "came_near", "within": 3.0, "by": "characters", "next": "second"
+        },
+        "second": { "type": "notify", "notification": "gull_sails" },
+    }));
     let (_, owner) = scripted_npc(&mut sim, player, &[script]);
     sim.forget_notified();
 
@@ -261,25 +174,19 @@ fn flows_run_in_the_order_their_events_were_raised() {
 fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    let script = inline(
-        &[],
-        vec![
-            interacted("attack"),
-            (
-                "attack",
-                Node::Effect(RiftEffect::Attack(Attack {
-                    target: &SUBJECT,
-                    within: &TEN,
-                    priority: 5,
-                    defeated: None,
-                    lost: Some("lost"),
-                    interrupted: Some("stopped"),
-                })),
-            ),
-            ("stopped", remember("BribedIlsa", None)),
-            ("lost", remember("SidedWithOrcs", None)),
-        ],
-    );
+    let script = inline(json!({
+        "interacted": interacted("attack"),
+        "attack": {
+            "type": "attack",
+            "target": { "type": "subject" },
+            "within": 10.0,
+            "priority": 5,
+            "lost": "lost",
+            "interrupted": "stopped"
+        },
+        "stopped": remember("bribed_ilsa", None),
+        "lost": remember("sided_with_orcs", None),
+    }));
     let (npc, owner) = scripted_npc(&mut sim, player, &[script]);
     let full = health(&mut sim, player);
 
@@ -314,24 +221,17 @@ fn a_lower_priority_act_waits_while_an_equal_one_interrupts() {
 fn an_attack_loses_a_target_that_leaves_its_range() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    let script = inline(
-        &[],
-        vec![
-            interacted("attack"),
-            (
-                "attack",
-                Node::Effect(RiftEffect::Attack(Attack {
-                    target: &SUBJECT,
-                    within: &TEN,
-                    priority: 5,
-                    defeated: None,
-                    lost: Some("lost"),
-                    interrupted: None,
-                })),
-            ),
-            ("lost", remember("SidedWithOrcs", None)),
-        ],
-    );
+    let script = inline(json!({
+        "interacted": interacted("attack"),
+        "attack": {
+            "type": "attack",
+            "target": { "type": "subject" },
+            "within": 10.0,
+            "priority": 5,
+            "lost": "lost"
+        },
+        "lost": remember("sided_with_orcs", None),
+    }));
     let (npc, owner) = scripted_npc(&mut sim, player, &[script]);
 
     raise(&mut sim, owner, EventKind::Interacted, player);
@@ -350,40 +250,24 @@ fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let gold: ItemId = row("Gold");
-    let script = inline(
-        &[("nobody", ValueType::Actor)],
-        vec![
-            interacted("give"),
-            (
-                "give",
-                Node::Effect(RiftEffect::Items(Items {
-                    who: Some(&NOBODY),
-                    take: &[],
-                    give: Box::leak(vec![ItemStack::new(gold, 1)].into_boxed_slice()),
-                    done: Some("gave"),
-                    refused: Some("refused"),
-                })),
-            ),
-            ("gave", remember("SidedWithOrcs", None)),
-            ("refused", remember("BribedIlsa", Some("heal"))),
-            (
-                "heal",
-                Node::Effect(RiftEffect::Heal(Heal {
-                    who: Some(&NOBODY),
-                    by: HealBy::Full,
-                    next: Some("despawn"),
-                })),
-            ),
-            (
-                "despawn",
-                Node::Effect(RiftEffect::Despawn(Despawn {
-                    who: Some(&NOBODY),
-                    done: Some("gone"),
-                    refused: None,
-                })),
-            ),
-            ("gone", remember("TideChestLooted", None)),
-        ],
+    let nobody = json!({ "type": "local", "local": "nobody" });
+    let script = inline_with(
+        json!({ "nobody": "actor" }),
+        json!({
+            "interacted": interacted("give"),
+            "give": {
+                "type": "items",
+                "who": nobody,
+                "give": [{ "item": "gold" }],
+                "done": "gave",
+                "refused": "refused"
+            },
+            "gave": remember("sided_with_orcs", None),
+            "refused": remember("bribed_ilsa", Some("heal")),
+            "heal": { "type": "heal", "who": nobody, "by": "full", "next": "despawn" },
+            "despawn": { "type": "despawn", "who": nobody, "done": "gone" },
+            "gone": remember("tide_chest_looted", None),
+        }),
     );
     let (_, owner) = scripted_npc(&mut sim, player, &[script]);
     stat::apply_damage(sim.world(), player, 1.0);
@@ -407,30 +291,10 @@ fn a_capability_aimed_at_nobody_takes_refused_or_tells_the_subject_why() {
 fn an_npc_can_be_the_subject_of_a_flow() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    let script = inline(
-        &[],
-        vec![
-            (
-                "came_near",
-                Node::On {
-                    event: RiftEvent::CameNear {
-                        within: Tiles(3.0),
-                        by: Who::Npcs,
-                        npc: None,
-                    },
-                    next: Some("heal"),
-                },
-            ),
-            (
-                "heal",
-                Node::Effect(RiftEffect::Heal(Heal {
-                    who: None,
-                    by: HealBy::Full,
-                    next: None,
-                })),
-            ),
-        ],
-    );
+    let script = inline(json!({
+        "came_near": { "type": "on", "event": "came_near", "within": 3.0, "by": "npcs", "next": "heal" },
+        "heal": { "type": "heal", "by": "full" },
+    }));
     let (_, healer) = scripted_npc(&mut sim, player, &[script]);
     let here = position(sim.world(), player).expect("position");
     let spot = sim.walkable_near(here, Tiles(1.0), Tiles(2.0));

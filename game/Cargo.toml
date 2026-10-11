@@ -69,7 +69,7 @@ bevy = { workspace = true, features = [
     "web",
 ] }
 ui = { path = "../ui" }
-bevy_tiled = { path = "../bevy/tiled" }
+bevy_tilemap = { path = "../bevy/tilemap" }
 bevy_terminal = { path = "../bevy/terminal" }
 bevy_app.workspace = true
 bevy_ecs.workspace = true
@@ -101,7 +101,12 @@ strum = { workspace = true, features = ["derive"] }
 renet2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tiled = { version = "0.15", default-features = false }
+serde_path_to_error = "0.1"
+blake3 = "1"
+schemars = "1"
+png = "0.17"
+tar = "0.4"
+flate2 = "1"
 postcard = { version = "1", features = ["alloc"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"

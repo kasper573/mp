@@ -27,7 +27,7 @@ fn an_attack_walks_into_range_and_strikes() {
 #[test]
 fn an_attacked_monster_is_fought_until_it_falls() {
     use bevy_ecs::prelude::*;
-    use game::core::assets::AssetService;
+    use game::core::content::Content;
     use game::core::tiling::TilePos;
     use game::systems::actor::{self, Actor};
     use game::systems::combat::Attitude;
@@ -41,10 +41,10 @@ fn an_attacked_monster_is_fought_until_it_falls() {
         sim.run_until(2.0, |_| false);
         let at = position(sim.world(), player).expect("position");
         let world = sim.world();
-        let assets = world.resource::<AssetService>().clone();
+        let assets = *world.resource::<Content>();
         let walks = |world: &World, npc: Entity| {
             let model = world.get::<Actor>(npc).expect("actor").model;
-            !actor::model(&assets, model).airborne
+            !actor::model(&assets, model).airborne()
         };
         let foe = world
             .query_filtered::<Entity, With<Npc>>()

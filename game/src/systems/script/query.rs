@@ -1,15 +1,14 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::Has;
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::{Condition, RiftScripting};
-use crate::core::assets::AssetService;
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{Compiler, Eval, FlowCx, Name, QueryDef, Value, ValueType};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
-use crate::data;
 use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, Area, AreaTag, object};
 use crate::systems::combat::{Attackers, Attitude};
@@ -70,7 +69,7 @@ pub struct Listed {
     pub entity: Entity,
     pub at: Pos<Tiles>,
     pub area: area::Id,
-    pub npc: Option<data::npc::Id>,
+    pub npc: Option<crate::systems::npc::Id>,
     pub character: bool,
     pub dead: bool,
     pub presence: bool,
@@ -139,7 +138,7 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
         ),
     );
     let mut areas = std::mem::take(&mut world.resource_mut::<ActorRoster>().areas);
-    let assets = world.resource::<AssetService>();
+    let assets = world.resource::<Content>();
     for entry in &listed {
         if !areas.iter().any(|(id, _)| *id == entry.area) {
             areas.push((entry.area, area::load(assets, entry.area)));
@@ -155,7 +154,7 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
     roster.areas = areas;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Among {
     Characters,
@@ -165,107 +164,107 @@ pub enum Among {
     Anyone,
 }
 
-type Of = Option<&'static Condition>;
-type Actor = &'static Condition;
+type Of = Option<Box<Condition>>;
+type Actor = Box<Condition>;
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RiftQuery {
     Level {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
     },
     IsJob {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        job: data::job::Id,
+        job: crate::systems::job::Id,
     },
     Stat {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
         stat: StatKind,
     },
     Buffed {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
         stat: StatKind,
     },
     Holding {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        item: data::item::Id,
+        item: crate::systems::item::Id,
     },
     FreeSlots {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
     },
     Wearing {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        item: data::item::Id,
+        item: crate::systems::item::Id,
     },
     Memory {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        memory: data::memory::Id,
+        memory: crate::systems::memory::Id,
     },
     SetWithin {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        memory: data::memory::Id,
+        memory: crate::systems::memory::Id,
         seconds: Actor,
     },
     OnQuest {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: data::quest::Id,
+        quest: crate::systems::quest::Id,
     },
     QuestDone {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: data::quest::Id,
+        quest: crate::systems::quest::Id,
     },
     QuestCooling {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: data::quest::Id,
+        quest: crate::systems::quest::Id,
     },
     TaskDone {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: data::quest::Id,
-        task: Name,
+        quest: crate::systems::quest::Id,
+        task: String,
     },
     QuestResetsIn {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: data::quest::Id,
+        quest: crate::systems::quest::Id,
     },
     Inside {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        object: Name,
+        object: String,
     },
     InArea {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        area: data::area::Id,
+        area: area::Id,
     },
     KnowsArea {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        area: data::area::Id,
+        area: area::Id,
     },
     Nearest {
         among: Among,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        npc: Option<data::npc::Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        npc: Option<crate::systems::npc::Id>,
         within: Actor,
     },
     Count {
         among: Among,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        npc: Option<data::npc::Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        npc: Option<crate::systems::npc::Id>,
         within: Actor,
     },
     Present {
@@ -289,8 +288,8 @@ pub enum RiftQuery {
         actor: Actor,
     },
     GroundItems {
-        item: data::item::Id,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        item: crate::systems::item::Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         at: Option<Actor>,
         within: Actor,
     },
@@ -337,11 +336,11 @@ impl QueryDef<RiftScripting> for RiftQuery {
         }
     }
 
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, String> {
         let bad = |e: (&str, String)| format!("{}: {}", e.0, e.1);
-        Ok(match self.clone() {
+        Ok(match self {
             RiftQuery::Level { of } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Int(
                         character(world, cx, &of)
@@ -350,7 +349,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::IsJob { of, job } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let job = *job;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world.get::<Job>(who).is_some_and(|held| held.def == job)
@@ -358,7 +358,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Stat { of, stat } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let stat = *stat;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Num(
                         character(world, cx, &of)
@@ -367,7 +368,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Buffed { of, stat } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let stat = *stat;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world.get::<effect::TimedEffects>(who).is_some_and(|timed| {
@@ -380,7 +382,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Holding { of, item } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let item = *item;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Int(character(world, cx, &of).map_or(0, |who| {
                         world
@@ -390,7 +393,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::FreeSlots { of } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Int(character(world, cx, &of).map_or(0, |who| {
                         world
@@ -400,7 +403,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Wearing { of, item } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let item = *item;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world
@@ -410,7 +414,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Memory { of, memory } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let memory = *memory;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 let ty = memory.get(cx.content).ty;
                 Box::new(move |world, cx| {
                     character(world, cx, &of)
@@ -422,7 +427,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 memory,
                 seconds,
             } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let memory = *memory;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 let seconds = cx.expr(seconds, ValueType::Number).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
@@ -436,7 +442,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::OnQuest { of, quest } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let quest = *quest;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         quest::log_of(world, who).is_some_and(|log| log.active(quest).is_some())
@@ -444,7 +451,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::QuestDone { of, quest } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let quest = *quest;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         quest::log_of(world, who).is_some_and(|log| {
@@ -455,7 +463,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::QuestCooling { of, quest } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let quest = *quest;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         let today = world.resource::<WallClock>().day();
@@ -467,11 +476,12 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::TaskDone { of, quest, task } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let quest = *quest;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 let index = quest
                     .get(cx.content)
                     .objectives()
-                    .position(|objective| matches!(objective, Objective::Task { task: known, .. } if *known == task))
+                    .position(|objective| matches!(objective, Objective::Task { task: known, .. } if known == task))
                     .ok_or_else(|| format!("{} has no task {task}", quest.key(cx.content)))?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
@@ -484,10 +494,11 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::QuestResetsIn { of, quest } => {
+                let quest = *quest;
                 if !quest.get(cx.content).daily() {
                     return Err(format!("{} never resets", quest.key(cx.content)));
                 }
-                let of = cx.actor(of).map_err(bad)?;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Text(
                         character(world, cx, &of)
@@ -500,7 +511,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Inside { of, object } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let object: Name = object;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(
                         actor(world, cx, &of).is_some_and(|who| object::inside(world, who, object)),
@@ -508,7 +520,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::InArea { of, area } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let area = *area;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(actor(world, cx, &of).is_some_and(|who| {
                         world
@@ -518,7 +531,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::KnowsArea { of, area } => {
-                let of = cx.actor(of).map_err(bad)?;
+                let area = *area;
+                let of = cx.actor(of.as_deref()).map_err(bad)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world
@@ -528,6 +542,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Nearest { among, npc, within } => {
+                let (among, npc) = (*among, *npc);
                 let within = cx.expr(within, ValueType::Number).map_err(bad)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
@@ -535,6 +550,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Count { among, npc, within } => {
+                let (among, npc) = (*among, *npc);
                 let within = cx.expr(within, ValueType::Number).map_err(bad)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
@@ -597,7 +613,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::GroundItems { item, at, within } => {
-                let at = cx.opt_expr(at, ValueType::Actor).map_err(bad)?;
+                let item = *item;
+                let at = cx.opt_expr(at.as_deref(), ValueType::Actor).map_err(bad)?;
                 let within = cx.expr(within, ValueType::Number).map_err(bad)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
@@ -658,7 +675,7 @@ pub fn nearest(
     world: &World,
     cx: &FlowCx,
     among: Among,
-    npc: Option<data::npc::Id>,
+    npc: Option<crate::systems::npc::Id>,
     within: Tiles,
 ) -> Option<Entity> {
     around(world, cx, among, npc, within)
@@ -670,7 +687,7 @@ pub fn around<'w>(
     world: &'w World,
     cx: &FlowCx,
     among: Among,
-    npc: Option<data::npc::Id>,
+    npc: Option<crate::systems::npc::Id>,
     within: Tiles,
 ) -> impl Iterator<Item = (Entity, Tiles)> + 'w {
     let scan = Scan::of(world, cx, among, within);

@@ -7,12 +7,14 @@ pub use health::{apply_damage, current_health, fraction, heal, is_dead, max_heal
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::systems::effect::{self, EffectContext};
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -42,17 +44,21 @@ impl StatKind {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Stat {
     #[serde(rename = "stat")]
     pub kind: StatKind,
     pub value: f32,
 }
 
-pub fn stats_map<S: serde::Serializer>(stats: &[Stat], serializer: S) -> Result<S::Ok, S::Error> {
-    let sorted: std::collections::BTreeMap<StatKind, f32> =
-        stats.iter().map(|stat| (stat.kind, stat.value)).collect();
-    sorted.serialize(serializer)
+pub type StatMap = std::collections::BTreeMap<StatKind, f32>;
+
+pub fn listed(stats: &StatMap) -> impl Iterator<Item = Stat> + '_ {
+    stats.iter().map(|(&kind, &value)| kind.of(value))
+}
+
+pub fn of_map(stats: &StatMap, kind: StatKind) -> f32 {
+    stats.get(&kind).copied().unwrap_or(0.0)
 }
 
 impl Stat {

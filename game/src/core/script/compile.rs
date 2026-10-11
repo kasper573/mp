@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -13,7 +13,7 @@ use super::node::{
 use super::run::FlowCx;
 use super::value::{Value, ValueType};
 use super::{
-    EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKind, QueryDef, ScriptDef,
+    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKind, QueryDef, ScriptDef,
     ScriptError, ScriptId, ScriptModule, VarValue, Variable, VariableType, Vocabulary,
 };
 use crate::core::content::Content;
@@ -160,44 +160,100 @@ impl<V: Vocabulary> Procedure<V> {
     }
 }
 
-pub struct Binding<'a, V: Vocabulary> {
+#[derive(Clone, Copy)]
+pub enum Call<V: Vocabulary> {
+    Shared {
+        script: ScriptId<V>,
+        values: &'static BTreeMap<String, VarValue<V>>,
+    },
+    Inline(&'static InlineScript<V>),
+}
+
+impl<V: Vocabulary> Call<V> {
+    pub fn of(module: &'static ScriptModule<V>) -> Call<V> {
+        match module {
+            ScriptModule::Shared { script, values } => Call::Shared {
+                script: *script,
+                values,
+            },
+            ScriptModule::Inline(inline) => Call::Inline(inline),
+        }
+    }
+}
+
+pub struct Binding<V: Vocabulary> {
     pub owner: OwnerKind,
     pub label: String,
-    pub module: &'a ScriptModule<V>,
+    pub call: Call<V>,
 }
+
+#[derive(Clone)]
+pub enum Bound<V: Vocabulary> {
+    Integer(i64),
+    Number(f64),
+    Boolean(bool),
+    Text(&'static str),
+    Name(&'static str),
+    Place(V::Place),
+    Row(V::Row),
+    Audio(V::Audio),
+    Condition(&'static Expr<V>),
+}
+
+pub type ModuleErrors = Vec<(usize, ScriptError)>;
+type ValuesOf<V> = Option<&'static BTreeMap<String, VarValue<V>>>;
+type DeclaredOf<V> = Option<&'static BTreeMap<String, Variable<V>>>;
 
 pub fn compile_owner<V: Vocabulary>(
     content: &Content,
     owner: OwnerKind,
     label: &str,
-    modules: &[ScriptModule<V>],
-) -> Result<Vec<Arc<Procedure<V>>>, ScriptError> {
+    modules: &[&'static ScriptModule<V>],
+) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
     let mut procedures = Vec::new();
+    let mut errors = Vec::new();
     let mut answered: HashMap<<V::Event as EventDef>::Kind, Vec<Name>> = HashMap::new();
-    for module in modules {
-        let procedure = compile_binding(
+    for (index, module) in modules.iter().enumerate() {
+        let procedure = match compile_binding(
             content,
             &Binding {
                 owner,
                 label: label.to_owned(),
-                module,
+                call: Call::of(module),
             },
-        )?;
+        ) {
+            Ok(procedure) => procedure,
+            Err(error) => {
+                errors.push((index, error));
+                continue;
+            }
+        };
         for (node, event) in &procedure.entries {
             let twice = answered.entry(event.kind()).or_default();
-            if !twice.is_empty() {
-                return Err(ScriptError {
-                    rule: "answered twice",
-                    owner: label.to_owned(),
-                    node: Some(procedure.names[*node].to_owned()),
-                    expected: format!("one answer to {:?} per owner", event.kind()),
-                });
+            if let Some(first) = twice.first() {
+                errors.push((
+                    index,
+                    ScriptError {
+                        rule: "answered twice",
+                        owner: label.to_owned(),
+                        node: Some(procedure.names[*node].to_owned()),
+                        expected: format!(
+                            "one answer to {:?} per owner; {first} answers it too",
+                            event.kind()
+                        ),
+                        script: None,
+                    },
+                ));
             }
             twice.push(procedure.names[*node]);
         }
         procedures.push(procedure);
     }
-    Ok(procedures)
+    if errors.is_empty() {
+        Ok(procedures)
+    } else {
+        Err(errors)
+    }
 }
 
 pub fn compile_binding<V: Vocabulary>(
@@ -207,32 +263,88 @@ pub fn compile_binding<V: Vocabulary>(
     compile_source(content, binding, &[])
 }
 
-type Bound<V> = (
-    Source<V>,
-    &'static [(Name, VarValue<V>)],
-    &'static [(Name, Variable<V>)],
-);
+fn slots(declared: &'static BTreeMap<String, ValueType>) -> Vec<(Name, ValueType)> {
+    declared
+        .iter()
+        .map(|(name, ty)| (name.as_str(), *ty))
+        .collect()
+}
+
+fn resolve_value<V: Vocabulary>(
+    content: &Content,
+    name: &str,
+    declared: &'static Variable<V>,
+    value: &'static VarValue<V>,
+) -> Result<Bound<V>, ExprError> {
+    let mismatch = || {
+        (
+            "wrong type",
+            format!("{name} is a {:?}, given {}", declared.ty, value.kind()),
+        )
+    };
+    Ok(match (declared.ty, value) {
+        (VariableType::Integer, VarValue::Integer(value)) => Bound::Integer(*value),
+        (VariableType::Number, VarValue::Integer(value)) => Bound::Number(*value as f64),
+        (VariableType::Number, VarValue::Number(value)) => Bound::Number(*value),
+        (VariableType::Boolean, VarValue::Boolean(value)) => Bound::Boolean(*value),
+        (VariableType::Text, VarValue::Str(value)) => Bound::Text(value),
+        (VariableType::Name, VarValue::Str(value)) => Bound::Name(value),
+        (VariableType::Place, VarValue::Place(place)) => Bound::Place(place.clone()),
+        (VariableType::Row, VarValue::Str(key)) => {
+            let table = declared.table.as_deref().ok_or_else(|| {
+                (
+                    "wrong type",
+                    format!("{name} is a row variable that names no table"),
+                )
+            })?;
+            Bound::Row(V::row_value(content, table, key).ok_or_else(|| {
+                (
+                    "unknown row",
+                    format!("{key:?} is not the key of a {table} row"),
+                )
+            })?)
+        }
+        (VariableType::Audio, VarValue::Str(key)) => Bound::Audio(
+            V::audio_value(content, key)
+                .ok_or_else(|| ("unknown row", format!("{key:?} is not the key of a sound")))?,
+        ),
+        (VariableType::Condition, VarValue::Condition(expr)) => Bound::Condition(expr),
+        (VariableType::Condition, VarValue::Boolean(value)) => Bound::Boolean(*value),
+        _ => return Err(mismatch()),
+    })
+}
 
 fn compile_source<V: Vocabulary>(
     content: &Content,
     binding: &Binding<V>,
     stack: &[ScriptId<V>],
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
+    let shared = match binding.call {
+        Call::Shared { script, .. } => Some(script.key(content).to_owned()),
+        Call::Inline(_) => None,
+    };
     let fail = |rule: &'static str, node: Option<Name>, expected: String| ScriptError {
         rule,
         owner: binding.label.clone(),
         node: node.map(str::to_owned),
         expected,
+        script: shared.clone(),
     };
-    let (source, values, declared): Bound<V> = match binding.module {
-        ScriptModule::Shared { script, values } => {
+    let at_call = |rule: &'static str, expected: String| ScriptError {
+        rule,
+        owner: binding.label.clone(),
+        node: None,
+        expected,
+        script: None,
+    };
+    let (source, values, declared): (Source<V>, ValuesOf<V>, DeclaredOf<V>) = match binding.call {
+        Call::Shared { script, values } => {
             let def = script.get(content);
             let called = !stack.is_empty();
             if called {
                 if def.owner != OwnerKind::Any && def.owner != binding.owner {
-                    return Err(fail(
+                    return Err(at_call(
                         "owners of another kind",
-                        None,
                         format!(
                             "script/{} is {}'s, run by {}",
                             script.key(content),
@@ -242,36 +354,31 @@ fn compile_source<V: Vocabulary>(
                     ));
                 }
             } else if def.owner != binding.owner {
-                return Err(fail(
+                return Err(at_call(
                     "owners of another kind",
-                    None,
                     format!("script/{} is {}'s", script.key(content), def.owner.name()),
                 ));
             }
             (
                 Source {
-                    state: def.state,
-                    locals: def.locals,
-                    nodes: def.nodes,
+                    state: slots(&def.state),
+                    locals: slots(&def.locals),
+                    nodes: &def.nodes,
                     label: format!("script/{}", script.key(content)),
                 },
-                values,
-                def.variables,
+                Some(values),
+                Some(&def.variables),
             )
         }
-        ScriptModule::Inline(InlineScript {
-            state,
-            locals,
-            nodes,
-        }) => (
+        Call::Inline(inline) => (
             Source {
-                state,
-                locals,
-                nodes,
+                state: slots(&inline.state),
+                locals: slots(&inline.locals),
+                nodes: &inline.nodes,
                 label: binding.label.clone(),
             },
-            &[],
-            &[],
+            None,
+            None,
         ),
     };
     if source.nodes.len() > MAX_NODES {
@@ -282,7 +389,7 @@ fn compile_source<V: Vocabulary>(
         ));
     }
     for (what, count) in [
-        ("variables", declared.len()),
+        ("variables", declared.map_or(0, BTreeMap::len)),
         ("locals", source.locals.len()),
         ("state", source.state.len()),
     ] {
@@ -305,41 +412,48 @@ fn compile_source<V: Vocabulary>(
             ),
         ));
     }
-    let mut variables: HashMap<Name, (VariableType, Option<&VarValue<V>>)> = HashMap::new();
-    for (name, variable) in declared {
-        variables.insert(*name, (variable.ty, variable.default.as_ref()));
+    let mut variables: HashMap<Name, (VariableType, Option<Bound<V>>)> = HashMap::new();
+    if let Some(declared) = declared {
+        for (name, variable) in declared {
+            let default = match &variable.default {
+                Some(default) => Some(
+                    resolve_value(content, name, variable, default)
+                        .map_err(|(rule, expected)| fail(rule, None, expected))?,
+                ),
+                None => None,
+            };
+            variables.insert(name.as_str(), (variable.ty, default));
+        }
     }
-    for (name, value) in values {
-        let Some(slot) = variables.get_mut(name) else {
-            return Err(fail(
+    for (name, value) in values.into_iter().flatten() {
+        let Some(variable) = declared.and_then(|declared| declared.get(name)) else {
+            return Err(at_call(
                 "unknown variable",
-                None,
                 format!(
                     "{name} is not a variable of {}{}",
                     source.label,
-                    nearest(name, declared.iter().map(|(name, _)| *name))
+                    nearest(
+                        name,
+                        declared
+                            .into_iter()
+                            .flat_map(|declared| declared.keys().map(String::as_str))
+                    )
                 ),
             ));
         };
-        if value.variable_type() != slot.0 {
-            return Err(fail(
-                "wrong type",
-                None,
-                format!("{name} is a {:?}", slot.0),
-            ));
-        }
-        slot.1 = Some(value);
+        let bound = resolve_value(content, name, variable, value)
+            .map_err(|(rule, expected)| at_call(rule, expected))?;
+        variables.get_mut(name.as_str()).expect("declared above").1 = Some(bound);
     }
     for (name, (_, value)) in &variables {
         if value.is_none() {
-            return Err(fail(
+            return Err(at_call(
                 "missing value",
-                None,
                 format!("{name} has no default and no value"),
             ));
         }
     }
-    let names: Vec<Name> = source.nodes.iter().map(|(name, _)| *name).collect();
+    let names: Vec<Name> = source.nodes.keys().map(String::as_str).collect();
     let mut seen = HashSet::new();
     for name in &names {
         if !seen.insert(name.to_ascii_lowercase()) {
@@ -350,9 +464,9 @@ fn compile_source<V: Vocabulary>(
             ));
         }
     }
-    let index_of = |name: Name| names.iter().position(|known| *known == name);
-    let arrow = |arrow: super::Arrow, at: Name| -> Result<Next, ScriptError> {
-        match arrow {
+    let index_of = |name: &str| names.iter().position(|known| *known == name);
+    let arrow = |arrow: &'static Arrow, at: Name| -> Result<Next, ScriptError> {
+        match arrow.as_deref() {
             None => Ok(None),
             Some(name) => index_of(name).map(Some).ok_or_else(|| {
                 fail(
@@ -368,8 +482,8 @@ fn compile_source<V: Vocabulary>(
         owner: binding.owner,
         label: source.label.clone(),
         variables,
-        state: source.state,
-        locals: source.locals,
+        state: source.state.clone(),
+        locals: source.locals.clone(),
         node: None,
         has_subject: true,
         used_vars: HashSet::new(),
@@ -382,8 +496,8 @@ fn compile_source<V: Vocabulary>(
     let mut entries = Vec::new();
     cx.event_fields = source
         .nodes
-        .iter()
-        .find_map(|(_, node)| match node {
+        .values()
+        .find_map(|node| match node {
             Node::On { event, .. } if !event.fields().is_empty() => Some(event.fields()),
             _ => None,
         })
@@ -392,6 +506,7 @@ fn compile_source<V: Vocabulary>(
     let mut needs_subject = vec![false; names.len()];
     let mut returns = Vec::new();
     for (index, (name, node)) in source.nodes.iter().enumerate() {
+        let name: Name = name.as_str();
         cx.node = Some(name);
         let node_fail = |rule: &'static str, expected: String| fail(rule, Some(name), expected);
         let step = match node {
@@ -417,7 +532,7 @@ fn compile_source<V: Vocabulary>(
                 entries.push((index, event.clone()));
                 may_do.answers.push(event.kind());
                 Step::On {
-                    next: arrow(*next, name)?,
+                    next: arrow(next, name)?,
                 }
             }
             Node::If { test, yes, no } => {
@@ -427,8 +542,8 @@ fn compile_source<V: Vocabulary>(
                 needs_subject[index] |= uses;
                 Step::If {
                     test,
-                    yes: arrow(*yes, name)?,
-                    no: arrow(*no, name)?,
+                    yes: arrow(yes, name)?,
+                    no: arrow(no, name)?,
                 }
             }
             Node::Random { weights, outputs } => {
@@ -442,10 +557,10 @@ fn compile_source<V: Vocabulary>(
                     return Err(node_fail("out of range", "weights 1 to 1,000".to_owned()));
                 }
                 Step::Random {
-                    weights: weights.to_vec(),
+                    weights: weights.clone(),
                     outputs: outputs
                         .iter()
-                        .map(|output| arrow(*output, name))
+                        .map(|output| arrow(output, name))
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -468,8 +583,8 @@ fn compile_source<V: Vocabulary>(
                 Step::Repeat {
                     times,
                     at_most: *at_most,
-                    each: arrow(*each, name)?,
-                    then: arrow(*then, name)?,
+                    each: arrow(each, name)?,
+                    then: arrow(then, name)?,
                 }
             }
             Node::Wait {
@@ -491,13 +606,13 @@ fn compile_source<V: Vocabulary>(
                 Step::Wait {
                     seconds,
                     at_most: *at_most,
-                    next: arrow(*next, name)?,
+                    next: arrow(next, name)?,
                 }
             }
             Node::Set { values, next } => {
                 let mut compiled = Vec::new();
                 for assignment in values.iter() {
-                    let (slot, ty) = match assignment.target {
+                    let (slot, ty) = match &assignment.target {
                         Target::Local(local) => {
                             cx.local(local).map(|(index, ty)| (Slot::Local(index), ty))
                         }
@@ -516,7 +631,7 @@ fn compile_source<V: Vocabulary>(
                 }
                 Step::Set {
                     values: compiled,
-                    next: arrow(*next, name)?,
+                    next: arrow(next, name)?,
                 }
             }
             Node::Run {
@@ -537,10 +652,6 @@ fn compile_source<V: Vocabulary>(
                         format!("calls nest past {MAX_CALL_DEPTH}"),
                     ));
                 }
-                let module = ScriptModule::Shared {
-                    script: *script,
-                    values,
-                };
                 let mut deeper = cx.stack.clone();
                 deeper.push(*script);
                 let callee = compile_source(
@@ -548,7 +659,10 @@ fn compile_source<V: Vocabulary>(
                     &Binding {
                         owner: binding.owner,
                         label: format!("{} › script/{}", source.label, script.key(content)),
-                        module: &module,
+                        call: Call::Shared {
+                            script: *script,
+                            values,
+                        },
                     },
                     &deeper,
                 )?;
@@ -587,7 +701,7 @@ fn compile_source<V: Vocabulary>(
                     callee,
                     entry,
                     into,
-                    next: arrow(*next, name)?,
+                    next: arrow(next, name)?,
                 }
             }
             Node::Return { value } => {
@@ -628,7 +742,7 @@ fn compile_source<V: Vocabulary>(
                 needs_subject[index] = true;
                 may_do.dialogue.push(name);
                 let mut values = Vec::new();
-                for line in dialogue.lines {
+                for line in &dialogue.lines {
                     let mut evals = Vec::new();
                     for value in line.values() {
                         evals.push(cx.typed(value).map_err(|e| node_fail(e.0, e.1))?.0);
@@ -637,9 +751,13 @@ fn compile_source<V: Vocabulary>(
                 }
                 let mut requires = Vec::new();
                 let mut choices = Vec::new();
-                for choice in dialogue.choices {
-                    check_reveal(choice.reveal).map_err(|e| node_fail(e.0, e.1))?;
-                    if choice.warn.is_some_and(|warn| warn.chars().count() > 60) {
+                for choice in &dialogue.choices {
+                    check_reveal(&choice.reveal).map_err(|e| node_fail(e.0, e.1))?;
+                    if choice
+                        .warn
+                        .as_ref()
+                        .is_some_and(|warn| warn.chars().count() > 60)
+                    {
                         return Err(node_fail(
                             "out of range",
                             "warn at most 60 characters".to_owned(),
@@ -652,15 +770,15 @@ fn compile_source<V: Vocabulary>(
                         ),
                         None => None,
                     });
-                    choices.push(arrow(choice.to, name)?);
+                    choices.push(arrow(&choice.to, name)?);
                 }
                 Step::Dialogue {
                     node: dialogue,
                     values,
                     requires,
                     choices,
-                    next: arrow(dialogue.next, name)?,
-                    left: arrow(dialogue.left, name)?,
+                    next: arrow(&dialogue.next, name)?,
+                    left: arrow(&dialogue.left, name)?,
                 }
             }
             Node::Effect(effect) => {
@@ -679,7 +797,15 @@ fn compile_source<V: Vocabulary>(
                 let outputs = effect
                     .outputs()
                     .into_iter()
-                    .map(|(_, to)| arrow(to, name))
+                    .map(|(_, to)| match to {
+                        None => Ok(None),
+                        Some(to) => index_of(to).map(Some).ok_or_else(|| {
+                            node_fail(
+                                "unknown node",
+                                format!("{to:?}{}", nearest(to, names.iter().copied())),
+                            )
+                        }),
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 Step::Effect {
                     def: effect,
@@ -764,8 +890,8 @@ fn compile_source<V: Vocabulary>(
         names,
         steps,
         entries,
-        state: source.state.to_vec(),
-        locals: source.locals.to_vec(),
+        state: source.state,
+        locals: source.locals,
         may_do,
         returns,
         needs_subject: any_needs_subject,
@@ -775,9 +901,9 @@ fn compile_source<V: Vocabulary>(
 static NEXT_PROCEDURE: AtomicU64 = AtomicU64::new(1);
 
 struct Source<V: Vocabulary> {
-    state: &'static [(Name, ValueType)],
-    locals: &'static [(Name, ValueType)],
-    nodes: &'static [(Name, Node<V>)],
+    state: Vec<(Name, ValueType)>,
+    locals: Vec<(Name, ValueType)>,
+    nodes: &'static BTreeMap<String, Node<V>>,
     label: String,
 }
 
@@ -910,7 +1036,7 @@ fn check_reveal(reveal: &[super::Reveal]) -> Result<(), (&'static str, String)> 
     let mut seen = HashSet::new();
     for kind in reveal {
         if !seen.insert(*kind) {
-            return Err(("revealed twice", format!("{kind:?} twice")));
+            return Err(("revealed twice", format!("{} twice", kind.name())));
         }
     }
     Ok(())
@@ -927,9 +1053,9 @@ pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
     owner: OwnerKind,
     label: String,
-    variables: HashMap<Name, (VariableType, Option<&'c VarValue<V>>)>,
-    state: &'static [(Name, ValueType)],
-    locals: &'static [(Name, ValueType)],
+    variables: HashMap<Name, (VariableType, Option<Bound<V>>)>,
+    state: Vec<(Name, ValueType)>,
+    locals: Vec<(Name, ValueType)>,
     node: Option<Name>,
     has_subject: bool,
     used_vars: HashSet<Name>,
@@ -948,8 +1074,8 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             owner: OwnerKind::Any,
             label: "condition".to_owned(),
             variables: HashMap::new(),
-            state: &[],
-            locals: &[],
+            state: Vec::new(),
+            locals: Vec::new(),
             node: None,
             has_subject: true,
             used_vars: HashSet::new(),
@@ -1013,13 +1139,13 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         &mut self,
         fill: &Fill<T>,
         ty: VariableType,
-        extract: impl Fn(&VarValue<V>) -> Option<T>,
+        extract: impl Fn(&Bound<V>) -> Option<T>,
     ) -> Result<T, ExprError> {
         match fill {
             Fill::Const(value) => Ok(value.clone()),
-            Fill::Var(name) => {
-                let value = self.var(name)?;
-                extract(value).ok_or_else(|| ("wrong type", format!("{name} is not a {ty:?}")))
+            Fill::Var { var } => {
+                let value = self.var(var)?;
+                extract(value).ok_or_else(|| ("wrong type", format!("{var} is not a {ty:?}")))
             }
         }
     }
@@ -1027,75 +1153,72 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
     pub fn peek<T: Clone>(
         &self,
         fill: &Fill<T>,
-        extract: impl Fn(&VarValue<V>) -> Option<T>,
+        extract: impl Fn(&Bound<V>) -> Option<T>,
     ) -> Option<T> {
         match fill {
             Fill::Const(value) => Some(value.clone()),
-            Fill::Var(name) => self
+            Fill::Var { var } => self
                 .variables
-                .get(name)
-                .and_then(|(_, value)| value.and_then(extract)),
+                .get(var.as_str())
+                .and_then(|(_, value)| value.as_ref().and_then(extract)),
         }
     }
 
     pub fn peek_place(&self, fill: &Fill<V::Place>) -> Option<V::Place> {
         self.peek(fill, |value| match value {
-            VarValue::Place(place) => Some(place.clone()),
+            Bound::Place(place) => Some(place.clone()),
             _ => None,
         })
     }
 
     pub fn peek_row(&self, fill: &Fill<V::Row>) -> Option<V::Row> {
         self.peek(fill, |value| match value {
-            VarValue::Row(row) => Some(row.clone()),
+            Bound::Row(row) => Some(row.clone()),
             _ => None,
         })
     }
 
     pub fn peek_audio(&self, fill: &Fill<V::Audio>) -> Option<V::Audio> {
         self.peek(fill, |value| match value {
-            VarValue::Audio(audio) => Some(audio.clone()),
+            Bound::Audio(audio) => Some(audio.clone()),
             _ => None,
         })
     }
 
     pub fn place(&mut self, fill: &Fill<V::Place>) -> Result<V::Place, ExprError> {
         self.fill(fill, VariableType::Place, |value| match value {
-            VarValue::Place(place) => Some(place.clone()),
+            Bound::Place(place) => Some(place.clone()),
             _ => None,
         })
     }
 
     pub fn row(&mut self, fill: &Fill<V::Row>) -> Result<V::Row, ExprError> {
         self.fill(fill, VariableType::Row, |value| match value {
-            VarValue::Row(row) => Some(row.clone()),
+            Bound::Row(row) => Some(row.clone()),
             _ => None,
         })
     }
 
     pub fn audio(&mut self, fill: &Fill<V::Audio>) -> Result<V::Audio, ExprError> {
         self.fill(fill, VariableType::Audio, |value| match value {
-            VarValue::Audio(audio) => Some(audio.clone()),
+            Bound::Audio(audio) => Some(audio.clone()),
             _ => None,
         })
     }
 
-    pub fn name(&mut self, fill: &Fill<Name>) -> Result<Name, ExprError> {
-        self.fill(fill, VariableType::Name, |value| match value {
-            VarValue::Name(name) => Some(name),
-            _ => None,
-        })
-    }
-
-    pub fn var(&mut self, name: Name) -> Result<&'c VarValue<V>, ExprError> {
-        let Some((_, value)) = self.variables.get(name) else {
+    pub fn var(&mut self, name: &str) -> Result<&Bound<V>, ExprError> {
+        let Some((name, _)) = self.variables.get_key_value(name) else {
             return Err((
                 "unknown variable",
                 format!("{name}{}", nearest(name, self.variables.keys().copied())),
             ));
         };
+        let name: Name = name;
         self.used_vars.insert(name);
-        value.ok_or(("missing value", format!("{name} has no value")))
+        self.variables[name]
+            .1
+            .as_ref()
+            .ok_or(("missing value", format!("{name} has no value")))
     }
 
     fn expr_tracking(
@@ -1117,21 +1240,21 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         Ok((eval, ty, self.subject_read))
     }
 
-    fn event_field(&self, name: Name) -> Option<(usize, ValueType)> {
+    fn event_field(&self, name: &str) -> Option<(usize, ValueType)> {
         self.event_fields
             .iter()
             .position(|(known, _)| *known == name)
             .map(|index| (index, self.event_fields[index].1))
     }
 
-    fn local(&self, name: Name) -> Option<(usize, ValueType)> {
+    fn local(&self, name: &str) -> Option<(usize, ValueType)> {
         self.locals
             .iter()
             .position(|(known, _)| *known == name)
             .map(|index| (index, self.locals[index].1))
     }
 
-    fn state(&self, name: Name) -> Option<(usize, ValueType)> {
+    fn state(&self, name: &str) -> Option<(usize, ValueType)> {
         self.state
             .iter()
             .position(|(known, _)| *known == name)
@@ -1159,25 +1282,20 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             Expr::Bool(value) => (constant(Value::Bool(*value)), ValueType::Boolean),
             Expr::Int(value) => (constant(Value::Int(*value)), ValueType::Integer),
             Expr::Num(value) => (constant(Value::Num(*value)), ValueType::Number),
-            Expr::Text(value) => (constant(Value::Text((*value).to_owned())), ValueType::Text),
-            Expr::Var(name) => match self.var(name)? {
-                VarValue::Integer(value) => (constant(Value::Int(*value)), ValueType::Integer),
-                VarValue::Number(value) => (constant(Value::Num(*value)), ValueType::Number),
-                VarValue::Boolean(value) => (constant(Value::Bool(*value)), ValueType::Boolean),
-                VarValue::Text(value) => {
-                    (constant(Value::Text((*value).to_owned())), ValueType::Text)
-                }
-                VarValue::Condition(condition) => {
-                    let condition: &'static Expr<V> = condition;
-                    (
-                        self.expr(condition, ValueType::Boolean)?,
-                        ValueType::Boolean,
-                    )
-                }
-                other => {
+            Expr::Text(value) => (constant(Value::Text(value.clone())), ValueType::Text),
+            Expr::Var(name) => match *self.var(name)? {
+                Bound::Integer(value) => (constant(Value::Int(value)), ValueType::Integer),
+                Bound::Number(value) => (constant(Value::Num(value)), ValueType::Number),
+                Bound::Boolean(value) => (constant(Value::Bool(value)), ValueType::Boolean),
+                Bound::Text(value) => (constant(Value::Text(value.to_owned())), ValueType::Text),
+                Bound::Condition(condition) => (
+                    self.expr(condition, ValueType::Boolean)?,
+                    ValueType::Boolean,
+                ),
+                Bound::Name(_) | Bound::Place(_) | Bound::Row(_) | Bound::Audio(_) => {
                     return Err((
                         "wrong type",
-                        format!("{name} is a {:?}, not a value", other.variable_type()),
+                        format!("{name} is not a value an expression can read"),
                     ));
                 }
             },
@@ -1387,8 +1505,8 @@ pub fn script_def_check<V: Vocabulary>(def: &ScriptDef<V>) -> Result<(), String>
     if def.owner == OwnerKind::Any {
         let runs = def
             .nodes
-            .iter()
-            .filter(|(_, node)| matches!(node, Node::On { event, .. } if event.is_run()))
+            .values()
+            .filter(|node| matches!(node, Node::On { event, .. } if event.is_run()))
             .count();
         if runs != 1 {
             return Err("a function has exactly one run node".to_owned());

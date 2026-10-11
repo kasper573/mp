@@ -1,7 +1,9 @@
 use bevy_ecs::prelude::Resource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -18,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct Seconds(pub f32);
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -33,10 +36,12 @@ pub struct Seconds(pub f32);
 )]
 pub struct Millis(pub f32);
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd,
+)]
 pub struct PlaybackRate(pub f32);
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct Hertz(pub f32);
 
 impl Hertz {

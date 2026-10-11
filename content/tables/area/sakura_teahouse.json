@@ -42,10 +42,10 @@
     {
       "type": "resident",
       "npc": "tea_master",
-      "at": [
-        6.0,
-        5.0
-      ]
+      "at": {
+        "x": 6.0,
+        "y": 5.0
+      }
     },
     {
       "type": "soundscape",

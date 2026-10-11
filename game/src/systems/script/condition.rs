@@ -53,7 +53,7 @@ fn run(world: &World, subject: Entity, compiled: &Eval) -> Value {
     compiled(world, &cx)
 }
 
-pub fn spoken(world: &World, subject: Entity, spans: &[Span]) -> LineText {
+pub fn spoken(world: &World, subject: Entity, spans: &'static [Span]) -> LineText {
     let values: Vec<Value> = text::values(spans)
         .into_iter()
         .map(|value| eval_value(world, subject, value))
@@ -61,18 +61,22 @@ pub fn spoken(world: &World, subject: Entity, spans: &[Span]) -> LineText {
     LineText::spoken(spans, &values)
 }
 
-pub fn check(content: &Content, condition: &'static Condition) -> Result<(), String> {
+pub fn check(
+    content: &Content,
+    condition: &'static Condition,
+) -> Result<(), (&'static str, String)> {
     Compiler::<RiftScripting>::standalone(content)
         .expr(condition, ValueType::Boolean)
         .map(|_| ())
-        .map_err(|(rule, expected)| format!("{rule}: {expected}"))
 }
 
-pub fn check_value(content: &Content, value: &'static Condition) -> Result<(), String> {
+pub fn check_value(
+    content: &Content,
+    value: &'static Condition,
+) -> Result<(), (&'static str, String)> {
     Compiler::<RiftScripting>::standalone(content)
         .expr(value, ValueType::Text)
         .map(|_| ())
-        .map_err(|(rule, expected)| format!("{rule}: {expected}"))
 }
 
 pub fn min_level(part: &Condition) -> Option<u32> {

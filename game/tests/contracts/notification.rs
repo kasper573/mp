@@ -4,8 +4,6 @@ use game::core::content::Fixture;
 use game::core::math::{Offset, Pos};
 use game::core::tiling::Tiles;
 use game::core::time::Seconds;
-use game::data;
-use game::data::quest::Id as QuestId;
 use game::systems::account::identity::Identity;
 use game::systems::account::role::Role;
 use game::systems::area::AreaObject;
@@ -19,6 +17,7 @@ use game::systems::notification::{self, Notification, NotificationKind, Notifica
 use game::systems::npc::{self, Pack};
 use game::systems::player::{Xp, commands_locked};
 use game::systems::quest;
+use game::systems::quest::Id as QuestId;
 use game::systems::terminal::TerminalKind as TerminalId;
 use game::systems::text::LineText;
 
@@ -68,12 +67,12 @@ fn object_center(sim: &mut Sim, name: &str) -> Pos<Tiles> {
         .center()
 }
 
-fn travel(from: &mut Sim, player: Entity, to: data::area::Id) -> (Sim, Entity) {
+fn travel(from: &mut Sim, player: Entity, to: game::systems::area::Id) -> (Sim, Entity) {
     let mut there = Sim::area(to);
     there.connect(1);
     from.world().entity_mut(player).insert(Crossing {
         dest_area: to,
-        dest: there.map().spawn,
+        dest: there.map().fallback_spawn(),
     });
     let traveler = transition::departing(from.world())
         .pop()

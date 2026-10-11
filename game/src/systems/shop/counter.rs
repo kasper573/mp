@@ -8,11 +8,11 @@ use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap, compo
 use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
-use crate::data::item::Id as ItemId;
 use crate::systems::dialogue::stage;
 use crate::systems::hud;
 use crate::systems::input::map::{ActionInput, InputAction, input};
 use crate::systems::interface::InterfaceSound;
+use crate::systems::item::Id as ItemId;
 use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
 use crate::systems::item::{Inventory, ItemCategory, ItemStack, card};
 use crate::systems::player::session::Viewpoint;
@@ -460,7 +460,7 @@ fn row(
 ) -> Box<dyn Scene> {
     let ink = ui::theme::theme().surface_floating.on;
     let def = ware.item.get(content);
-    let name = counted(def.name, ware.count);
+    let name = counted(&def.name, ware.count);
     let note = unavailable(ware)
         .map(|reason| (reason, palette::CRIMSON_80))
         .or_else(|| ware.note.clone().map(|note| (note, ink.with_alpha(0.6))));
@@ -501,7 +501,7 @@ fn row(
         Children [
             (
                 Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                component(ImageNode::new(assets.load(def.icon.0)))
+                component(ImageNode::new(assets.load(def.icon.path())))
                 Pickable::IGNORE
             ),
             (
@@ -625,7 +625,7 @@ fn price_chip(
     let covered = inventory.count(stack.item) >= stack.count;
     ui::chip(ChipOptions {
         label: stack.count.to_string(),
-        icon: Some(assets.load(stack.item.get(content).icon.0)),
+        icon: Some(assets.load(stack.item.get(content).icon.path())),
         family: Family::outline(if covered {
             palette::AMBER_70
         } else {
@@ -657,7 +657,7 @@ fn cost_row(
         Children [
             (
                 Node { width: Val::Px(16.0), height: Val::Px(16.0) }
-                component(ImageNode::new(assets.load(stack.item.get(content).icon.0)))
+                component(ImageNode::new(assets.load(stack.item.get(content).icon.path())))
             ),
             {EntityScene(ui::styled_text(label, color, typography::BODY))},
         ]
@@ -734,7 +734,7 @@ fn request_sale(world: &mut World, slot: u32) {
 
 fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemStack], slot: u32) {
     let content = *world.resource::<Content>();
-    let name = stack.item.get(&content).name;
+    let name = &stack.item.get(&content).name;
     let dialog = ui::confirm_dialog(ConfirmOptions {
         title: format!("Sell {name}?"),
         body: vec![

@@ -176,10 +176,10 @@
     {
       "type": "resident",
       "npc": "ugra",
-      "at": [
-        11.0,
-        15.0
-      ]
+      "at": {
+        "x": 11.0,
+        "y": 15.0
+      }
     },
     {
       "type": "soundscape",
@@ -282,22 +282,6 @@
         "y": 13.208
       },
       "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "forest_tileset_281",
-      "at": {
-        "x": -0.188,
-        "y": 2.875
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "forest_tileset_281",
-      "at": {
-        "x": -0.729,
-        "y": 3.521
-      }
     },
     {
       "type": "blueprint",
@@ -424,15 +408,6 @@
       "type": "blueprint",
       "blueprint": "forest_tileset_281",
       "at": {
-        "x": 0.651,
-        "y": 21.281
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "forest_tileset_281",
-      "at": {
         "x": 3.099,
         "y": 22.427
       },
@@ -474,23 +449,6 @@
         ]
       ],
       "sort": 2.0
-    },
-    {
-      "type": "scenery",
-      "at": {
-        "x": -0.5,
-        "y": 1.5
-      },
-      "tileset": "forest_tileset",
-      "tiles": [
-        [
-          21
-        ],
-        [
-          45
-        ]
-      ],
-      "sort": 1.0
     },
     {
       "type": "blueprint",

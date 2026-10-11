@@ -121,7 +121,7 @@ pub fn arrive(world: &mut World, mut traveler: Traveler) -> Entity {
     );
     let arrived = HistoryEntry::of(
         HistoryTopic::Notification,
-        LineText::plain(traveler.dest_area.get(&content).name),
+        LineText::plain(&*traveler.dest_area.get(&content).name),
     )
     .mark(Some(HistoryMark::Arrived));
     history::record(world, entity, arrived);

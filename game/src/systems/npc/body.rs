@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::*;
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
@@ -12,7 +13,7 @@ use crate::systems::area::{self, AreaTag, object};
 use crate::systems::movement::{self, MoveTarget, Path};
 use crate::systems::npc::{Home, Roams};
 use crate::systems::reach::{self, ReachAct};
-use crate::systems::script::effect::{self as effects, Arrow};
+use crate::systems::script::effect::{self as effects, Arrow, Link};
 use crate::systems::script::query;
 use crate::systems::script::{Condition, Place, RiftInstances, RiftScripting};
 use crate::systems::stat;
@@ -307,68 +308,68 @@ pub fn moving(world: &World, npc: Entity) -> bool {
     world.get::<MoveTarget>(npc).is_some() || world.get::<Path>(npc).is_some()
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Wander {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub leash: Option<&'static Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leash: Option<Condition>,
     pub priority: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct WalkTo {
     pub to: WalkTarget,
-    pub within: &'static Condition,
+    pub within: Condition,
     pub priority: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arrived: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum WalkTarget {
     Place(Place),
-    Object(Name),
-    Actor(&'static Condition),
+    Object(String),
+    Actor(Condition),
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Attack {
-    pub target: &'static Condition,
-    pub within: &'static Condition,
+    pub target: Condition,
+    pub within: Condition,
     pub priority: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub defeated: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lost: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Stop {
     pub priority: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Face {
     pub toward: FaceTarget,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum FaceTarget {
     Place(Place),
-    Actor(&'static Condition),
+    Actor(Condition),
 }
 
 type Aimed<T> = Box<dyn Fn(&World, &crate::core::script::FlowCx) -> Option<T> + Send + Sync>;
@@ -382,16 +383,16 @@ impl EffectDef<RiftScripting> for Wander {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let priority = Priority::checked(self.priority)?;
         let leash = cx
-            .opt_expr(self.leash, ValueType::Number)
+            .opt_expr(self.leash.as_ref(), ValueType::Number)
             .map_err(effects::bad)?;
         Ok(Box::new(move |world, cx| {
             let leash = leash
@@ -415,20 +416,20 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![
-            ("arrived", self.arrived),
-            ("blocked", self.blocked),
-            ("interrupted", self.interrupted),
+            ("arrived", self.arrived.as_deref()),
+            ("blocked", self.blocked.as_deref()),
+            ("interrupted", self.interrupted.as_deref()),
         ]
     }
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let priority = Priority::checked(self.priority)?;
         let within = cx
-            .expr(self.within, ValueType::Number)
+            .expr(&self.within, ValueType::Number)
             .map_err(effects::bad)?;
         let to: Aimed<Destination> = match &self.to {
             WalkTarget::Place(place) => {
@@ -436,7 +437,7 @@ impl EffectDef<RiftScripting> for WalkTo {
                 Box::new(move |_, _| Some(Destination::Place(at)))
             }
             WalkTarget::Object(name) => {
-                let name = *name;
+                let name = name.as_str();
                 Box::new(move |world, cx| {
                     let area = cx
                         .owner
@@ -481,23 +482,23 @@ impl EffectDef<RiftScripting> for Attack {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![
-            ("defeated", self.defeated),
-            ("lost", self.lost),
-            ("interrupted", self.interrupted),
+            ("defeated", self.defeated.as_deref()),
+            ("lost", self.lost.as_deref()),
+            ("interrupted", self.interrupted.as_deref()),
         ]
     }
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let priority = Priority::checked(self.priority)?;
         let target = cx
-            .expr(self.target, ValueType::Actor)
+            .expr(&self.target, ValueType::Actor)
             .map_err(effects::bad)?;
         let within = cx
-            .expr(self.within, ValueType::Number)
+            .expr(&self.within, ValueType::Number)
             .map_err(effects::bad)?;
         Ok(Box::new(move |world, cx| {
             let Some(npc) = cx.owner.entity() else {
@@ -529,13 +530,13 @@ impl EffectDef<RiftScripting> for Stop {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let priority = Priority::checked(self.priority)?;
         Ok(Box::new(move |world, cx| {
             if let Some(npc) = cx.owner.entity() {
@@ -556,13 +557,13 @@ impl EffectDef<RiftScripting> for Face {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&self) -> Vec<(Name, Arrow)> {
-        vec![("next", self.next)]
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
     }
-    fn compile(&self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let toward: Aimed<Pos<Tiles>> = match &self.toward {
             FaceTarget::Place(place) => {
                 let at = place.at;

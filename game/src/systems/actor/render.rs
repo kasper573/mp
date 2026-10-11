@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::Direction;
 use crate::core::tiling::{TilePos, Tiles};
@@ -74,11 +74,11 @@ impl Interpolate for RenderActor {
 fn attach_sprites(
     actors: Query<(Entity, &Actor), Without<Sprite>>,
     assets: Res<AssetServer>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut commands: Commands,
 ) {
     for (entity, actor) in &actors {
-        let image = assets.load(actor::model(&service, actor.model).sheet().to_owned());
+        let image = assets.load(actor::model(&service, actor.model).sheet().path());
         commands.entity(entity).insert((
             Sprite { image, ..default() },
             ACTOR_ANCHOR,
@@ -101,7 +101,7 @@ type ActorView = (
 
 fn sync_actors(
     time: Res<Time>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut animator: ResMut<Animator>,
     mut actors: Query<ActorView>,
 ) {
@@ -124,7 +124,7 @@ fn sync_actors(
         let at = render.0;
         *transform = sprite_transform(
             at,
-            dynamic_z(area.size.height, area.dynamic_layer() as f32, Tiles(at.y)),
+            dynamic_z(area.size.height, area.sort_base(), Tiles(at.y)),
         );
         if *visibility == Visibility::Hidden {
             *visibility = Visibility::Inherited;
@@ -137,7 +137,7 @@ struct Seen(HashMap<Entity, (Action, Seconds)>);
 
 fn actor_cues(
     time: Res<Time>,
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut animator: ResMut<Animator>,
     mut seen: ResMut<Seen>,
     actors: Query<(Entity, &Actor, &RenderPosition, &RenderActor, &AreaTag)>,
@@ -160,7 +160,7 @@ fn actor_cues(
                 place: SfxPlace::World(at),
             });
         }
-        if stepped && let Some(id) = area::load(&service, tag.area).tile_sfx_at(at.cell()) {
+        if stepped && let Some(id) = area::load(&service, tag.area).footstep_at(at.cell()) {
             play.write(PlaySfx {
                 id: *id,
                 place: SfxPlace::World(at),

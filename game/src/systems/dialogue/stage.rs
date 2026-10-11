@@ -655,7 +655,7 @@ fn choice_options(
                         }
                         .get(content)
                         .image
-                        .0,
+                        .path(),
                     ),
                 ),
                 family: Family::outline(if *met {
@@ -667,7 +667,7 @@ fn choice_options(
             },
             ChoiceChip::Pays { item, count, have } => ChipOptions {
                 label: count.to_string(),
-                icon: Some(assets.load(item.get(content).icon.0)),
+                icon: Some(assets.load(item.get(content).icon.path())),
                 family: Family::outline(if have >= count {
                     palette::AMBER_70
                 } else {
@@ -677,7 +677,7 @@ fn choice_options(
             },
             ChoiceChip::Gets { item, count } => ChipOptions {
                 label: format!("+{count}"),
-                icon: Some(assets.load(item.get(content).icon.0)),
+                icon: Some(assets.load(item.get(content).icon.path())),
                 family: Family::outline(palette::EMERALD_70),
                 inspect: Some(card::inspectable(content, *item)),
             },
@@ -740,10 +740,10 @@ fn cast_members(world: &World) -> Vec<CastMember> {
             let face = shown
                 .faces
                 .get(&who)
-                .copied()
+                .cloned()
                 .unwrap_or(Face::Generic(GenericExpression::Neutral));
             let bust = busts
-                .face(content, face)
+                .face(&face)
                 .unwrap_or_else(|| busts.generic.of(GenericExpression::Neutral));
             let lit = who == current.by;
             Some(CastMember {
@@ -771,8 +771,8 @@ fn set_cast(world: &mut World, members: Vec<CastMember>) {
     }
 }
 
-fn bust_image(assets: &AssetServer, art: AssetRef) -> Handle<Image> {
-    assets.load(art.0)
+fn bust_image(assets: &AssetServer, art: &AssetRef) -> Handle<Image> {
+    assets.load(art.path())
 }
 
 fn busts_of(content: &Content, who: Speaker) -> Option<&Busts> {

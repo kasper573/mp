@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::AreaObject;
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::render::{TILE, dynamic_z, sprite_transform};
 use crate::core::tiling::{TilePos, Tiles};
@@ -49,16 +49,12 @@ fn attach_look(
 }
 
 fn place_objects(
-    service: Res<AssetService>,
+    service: Res<Content>,
     mut objects: Query<(&Position, &Hitbox, &AreaTag, &mut Transform), With<AreaObject>>,
 ) {
     for (position, hitbox, tag, mut transform) in &mut objects {
         let area = area::load(&service, tag.area);
-        let z = dynamic_z(
-            area.size.height,
-            area.dynamic_layer() as f32,
-            Tiles(position.pos.y),
-        );
+        let z = dynamic_z(area.size.height, area.sort_base(), Tiles(position.pos.y));
         let center = position.pos.hitbox(hitbox.size).center();
         *transform = sprite_transform(center, z);
     }

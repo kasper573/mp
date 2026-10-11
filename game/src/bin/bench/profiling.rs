@@ -9,7 +9,6 @@ use std::time::Instant;
 use bevy_app::App;
 use bevy_ecs::prelude::{Entity, With};
 use bevy_replicon::prelude::Replicated;
-use game::core::assets::AssetService;
 use game::systems::movement::Position;
 use game::systems::visibility::seen_by;
 
@@ -24,7 +23,7 @@ struct Env {
 /// Profiles a fixed `AREAS`-area workload with clients connected (the replication-heavy "full"
 /// config), writing a CPU flamegraph + pprof protobuf and reporting allocation churn per tick. Uses
 /// the exact same [`crate::sim`] world construction the benchmark does, so the two never diverge.
-pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: AssetService) {
+pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: Content) {
     let env: Env = envy::prefixed("RIFT_BENCH_")
         .from_env()
         .expect("RIFT_BENCH_* environment");

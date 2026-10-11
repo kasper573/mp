@@ -3,21 +3,19 @@ mod model;
 pub mod plate;
 pub mod render;
 
-use std::path::Path;
-
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::assets::AssetService;
+use crate::core::content::Content;
 use crate::core::math::{Direction, Pos, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
-use crate::data;
 use crate::systems::movement::Position;
 use crate::systems::stat::{self, StatKind, Stats};
 
-pub use model::{ActorModel, Timing, build_model};
+pub use model::{ActorModel, Timing};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -27,24 +25,18 @@ pub fn register(app: &mut App) {
         .replicate::<Name>();
 }
 
-pub fn model(assets: &AssetService, model: data::model::Id) -> &'static ActorModel {
-    assets.resolve(model.get(assets.content()).sheet, build_model)
+pub fn model(content: &Content, model: bust::Id) -> &'static ActorModel {
+    model::get(content, model)
 }
 
-pub fn check(assets: &AssetService) {
-    let content = assets.content();
-    let models = content.table::<bust::ModelDef>();
-    assets.resolve_all(models.rows().iter().map(|def| def.sheet), build_model);
-    for def in models.rows() {
-        for bust in def.busts().into_iter().flat_map(|busts| busts.all(content)) {
-            if let Err(error) = assets.open(Path::new(bust.0)) {
-                panic!("bust {}: {error}", bust.0);
-            }
-        }
-    }
+pub fn content(registry: &mut crate::core::content::ContentRegistry) {
+    registry
+        .row::<bust::ModelDef>()
+        .modules::<bust::ModelDef>()
+        .hook(crate::core::content::LoadStep::Files, model::build_all);
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum Action {
     #[default]
     Idle,
@@ -79,18 +71,35 @@ impl Action {
 }
 
 #[derive(
-    Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default,
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
 )]
 pub struct Rgba(pub u32);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Tint {
-    #[serde(serialize_with = "rgba_bytes")]
+    #[schemars(with = "[u8; 4]")]
+    #[serde(serialize_with = "rgba_bytes", deserialize_with = "rgba_from_bytes")]
     pub rgba: Rgba,
 }
 
 fn rgba_bytes<S: serde::Serializer>(rgba: &Rgba, serializer: S) -> Result<S::Ok, S::Error> {
     rgba.0.to_be_bytes().serialize(serializer)
+}
+
+fn rgba_from_bytes<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Rgba, D::Error> {
+    <[u8; 4]>::deserialize(deserializer).map(|bytes| Rgba(u32::from_be_bytes(bytes)))
 }
 
 impl Rgba {
@@ -107,7 +116,7 @@ pub struct Actor {
     pub color: Rgba,
     pub dir: Direction,
     pub action: Action,
-    pub model: data::model::Id,
+    pub model: crate::systems::actor::bust::Id,
     pub attack_rate: PlaybackRate,
 }
 

@@ -43,10 +43,10 @@
     {
       "type": "resident",
       "npc": "jarl",
-      "at": [
-        9.0,
-        4.0
-      ]
+      "at": {
+        "x": 9.0,
+        "y": 4.0
+      }
     },
     {
       "type": "soundscape",
@@ -67,20 +67,74 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "frostmere_longhouse_props_68",
+      "type": "scenery",
       "at": {
         "x": 6.0,
         "y": -0.625
-      }
+      },
+      "tileset": "frostmere_longhouse_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1072,
+          1073,
+          1074,
+          1075
+        ],
+        [
+          1104,
+          1105,
+          1106,
+          1107
+        ],
+        [
+          1136,
+          1137,
+          1138,
+          1139
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "frostmere_longhouse_props_68",
+      "type": "scenery",
       "at": {
         "x": 9.0,
         "y": -0.625
-      }
+      },
+      "tileset": "frostmere_longhouse_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          1072,
+          1073,
+          1074,
+          1075
+        ],
+        [
+          1104,
+          1105,
+          1106,
+          1107
+        ],
+        [
+          1136,
+          1137,
+          1138,
+          1139
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -107,12 +161,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "frostmere_longhouse_props_28",
+      "type": "scenery",
       "at": {
         "x": -0.5,
         "y": 3.4
-      }
+      },
+      "tileset": "frostmere_longhouse_props",
+      "tiles": [
+        [
+          null,
+          401,
+          402,
+          403
+        ],
+        [
+          null,
+          433,
+          434,
+          435
+        ],
+        [
+          null,
+          465,
+          466,
+          467
+        ],
+        [
+          null,
+          497,
+          498,
+          499
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

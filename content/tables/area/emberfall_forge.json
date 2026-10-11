@@ -66,10 +66,10 @@
     {
       "type": "resident",
       "npc": "blacksmith",
-      "at": [
-        18.0,
-        8.0
-      ]
+      "at": {
+        "x": 18.0,
+        "y": 8.0
+      }
     },
     {
       "type": "soundscape",
@@ -106,12 +106,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "emberfall_forge_props_72",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 7.375
-      }
+      },
+      "tileset": "emberfall_forge_props",
+      "tiles": [
+        [
+          null,
+          1153,
+          1154,
+          1155
+        ],
+        [
+          null,
+          1185,
+          1186,
+          1187
+        ],
+        [
+          null,
+          1217,
+          1218,
+          1219
+        ],
+        [
+          null,
+          1249,
+          1250,
+          1251
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -130,12 +157,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "emberfall_forge_props_71",
+      "type": "scenery",
       "at": {
         "x": -1.0,
         "y": 8.375
-      }
+      },
+      "tileset": "emberfall_forge_props",
+      "tiles": [
+        [
+          null,
+          1053,
+          1054,
+          1055
+        ],
+        [
+          null,
+          1085,
+          1086,
+          1087
+        ],
+        [
+          null,
+          1117,
+          1118,
+          1119
+        ],
+        [
+          null,
+          1149,
+          1150,
+          1151
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",

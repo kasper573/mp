@@ -33,7 +33,7 @@
             "to": {
               "area": "sakura_estate",
               "x": 14.0,
-              "y": 25.5
+              "y": 25.0
             }
           }
         }
@@ -56,8 +56,8 @@
           "values": {
             "to": {
               "area": "sakura_estate",
-              "x": 31.0,
-              "y": 25.5
+              "x": 32.0,
+              "y": 25.0
             }
           }
         }
@@ -81,7 +81,7 @@
             "to": {
               "area": "sakura_teahouse",
               "x": 9.0,
-              "y": 11.5
+              "y": 11.0
             }
           }
         }
@@ -104,8 +104,8 @@
           "values": {
             "to": {
               "area": "sakura_pagoda",
-              "x": 8.0,
-              "y": 11.5
+              "x": 9.0,
+              "y": 11.0
             }
           }
         }
@@ -129,7 +129,7 @@
             "to": {
               "area": "bloomvale",
               "x": 85.5,
-              "y": 27.5
+              "y": 28.5
             }
           }
         }
@@ -195,10 +195,10 @@
     {
       "type": "resident",
       "npc": "monk",
-      "at": [
-        46.0,
-        42.0
-      ]
+      "at": {
+        "x": 46.0,
+        "y": 42.0
+      }
     },
     {
       "type": "safe_zone",
@@ -287,512 +287,1352 @@
       ]
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
-      "at": {
-        "x": 5.125,
-        "y": -4.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 42.938,
-        "y": -4.5
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 10.875,
-        "y": -4.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 26.313,
-        "y": -4.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 41.938,
-        "y": -4.313
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 12.313,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 31.375,
-        "y": -4.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 2.25,
-        "y": -4.188
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
-      "at": {
-        "x": 55.5,
-        "y": -4.125
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
-      "at": {
-        "x": 18.063,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 29.125,
-        "y": -4.063
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
-      "at": {
-        "x": 9.938,
-        "y": -3.938
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
-      "at": {
-        "x": 33.313,
-        "y": -3.75
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
-      "at": {
-        "x": 33.313,
-        "y": -3.688
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 45.938,
-        "y": -3.688
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 49.5,
-        "y": -3.563
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 53.125,
-        "y": -3.563
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
-      "at": {
-        "x": 35.5,
-        "y": -3.438
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
-      "at": {
-        "x": 2.188,
-        "y": -3.375
-      },
-      "flip": "horizontal"
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
-      "at": {
-        "x": 16.625,
-        "y": -3.375
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
-      "at": {
-        "x": 5.188,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
-      "at": {
-        "x": 47.5,
-        "y": -3.25
-      }
-    },
-    {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 2.188,
         "y": -2.875
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 40.063,
         "y": -2.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 26.25,
         "y": -2.75
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 53.125,
         "y": -2.75
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 30.563,
         "y": -2.625
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 8.375,
         "y": -2.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 28.25,
         "y": -2.438
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 41.25,
         "y": -2.438
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 9.688,
         "y": -2.25
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 39.938,
         "y": -2.188
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 49.063,
         "y": -2.063
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 22.75,
         "y": -2.0
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.0,
         "y": -1.875
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 11.938,
         "y": -1.875
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 33.375,
         "y": -1.875
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 52.688,
         "y": -1.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 13.313,
         "y": -1.625
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 9.938,
         "y": -1.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 51.75,
         "y": -1.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 27.125,
         "y": -1.063
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 53.875,
         "y": -1.063
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 21.688,
         "y": -1.0
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 49.375,
         "y": -1.0
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 28.563,
         "y": -0.938
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 33.063,
         "y": -0.938
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 39.0,
         "y": -0.938
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 9.438,
         "y": -0.875
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59
+        ],
+        [
+          88,
+          89,
+          90,
+          91
+        ],
+        [
+          120,
+          121,
+          122,
+          123
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 16.375,
         "y": -0.875
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 30.813,
         "y": -0.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 29.5,
         "y": -0.688
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 41.0,
         "y": -0.688
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 47.563,
         "y": -0.625
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          76,
+          77,
+          78,
+          79
+        ],
+        [
+          108,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 10.938,
         "y": -0.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 53.25,
         "y": -0.563
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 1.25,
         "y": -0.375
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          44,
+          null,
+          null,
+          null
+        ],
+        [
+          76,
+          null,
+          null,
+          null
+        ],
+        [
+          108,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 4.625,
         "y": -0.313
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 13.125,
         "y": -0.25
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 17.813,
         "y": -0.188
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -963,12 +1803,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.5,
         "y": 1.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1083,12 +1950,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": -2.75,
         "y": 2.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          15
+        ],
+        [
+          null,
+          null,
+          null,
+          47
+        ],
+        [
+          null,
+          null,
+          null,
+          79
+        ],
+        [
+          null,
+          null,
+          null,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1210,12 +2104,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 2.438,
         "y": 4.125
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1361,12 +2282,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.625,
         "y": 5.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1509,12 +2457,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.563,
         "y": 6.875
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1583,12 +2558,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 3.625,
         "y": 7.875
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -1654,12 +2656,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": -2.625,
         "y": 9.313
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1712,12 +2741,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 53.125,
         "y": 9.688
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          24,
+          25,
+          26,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          null
+        ],
+        [
+          88,
+          89,
+          90,
+          null
+        ],
+        [
+          120,
+          121,
+          122,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1786,12 +2842,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.688,
         "y": 10.938
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -1931,12 +3014,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 2.25,
         "y": 12.563
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          24,
+          25,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          null,
+          null
+        ],
+        [
+          88,
+          89,
+          null,
+          null
+        ],
+        [
+          120,
+          121,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2048,12 +3158,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 3.875,
         "y": 13.75
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2107,12 +3244,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": -1.375,
         "y": 14.563
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          78,
+          79
+        ],
+        [
+          null,
+          null,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2251,12 +3415,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_6",
+      "type": "scenery",
       "at": {
         "x": 1.625,
         "y": 16.25
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          24,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          null,
+          null,
+          null
+        ],
+        [
+          88,
+          null,
+          null,
+          null
+        ],
+        [
+          120,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2310,12 +3501,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 53.063,
         "y": 16.563
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          12,
+          13,
+          14,
+          null
+        ],
+        [
+          44,
+          45,
+          46,
+          null
+        ],
+        [
+          76,
+          77,
+          78,
+          null
+        ],
+        [
+          108,
+          109,
+          110,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2362,12 +3580,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": -0.75,
         "y": 17.0
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          77,
+          78,
+          79
+        ],
+        [
+          null,
+          109,
+          110,
+          111
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2485,12 +3730,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_3",
+      "type": "scenery",
       "at": {
         "x": 2.875,
         "y": 18.438
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          12,
+          13,
+          null,
+          null
+        ],
+        [
+          44,
+          45,
+          null,
+          null
+        ],
+        [
+          76,
+          77,
+          null,
+          null
+        ],
+        [
+          108,
+          109,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2586,12 +3858,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": 56.75,
         "y": 19.688
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2613,12 +3912,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.688,
         "y": 19.938
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2674,12 +4000,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_2",
+      "type": "scenery",
       "at": {
         "x": -1.563,
         "y": 20.938
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          10,
+          11
+        ],
+        [
+          null,
+          null,
+          42,
+          43
+        ],
+        [
+          null,
+          null,
+          74,
+          75
+        ],
+        [
+          null,
+          null,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -2834,12 +4187,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 1.313,
         "y": 23.125
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          0,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -2892,12 +4272,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_0",
+      "type": "scenery",
       "at": {
         "x": 57.0,
         "y": 23.75
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3031,12 +4438,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 57.5,
         "y": 26.125
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3099,12 +4533,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": 2.25,
         "y": 28.813
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          4,
+          5,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -3165,12 +4626,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": -1.125,
         "y": 30.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3351,12 +4839,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_85",
+      "type": "scenery",
       "at": {
         "x": -0.3,
         "y": 38.1
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          1301,
+          1302,
+          1303
+        ],
+        [
+          null,
+          1333,
+          1334,
+          1335
+        ],
+        [
+          null,
+          1365,
+          1366,
+          1367
+        ],
+        [
+          null,
+          1397,
+          1398,
+          1399
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -3843,12 +5358,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_1",
+      "type": "scenery",
       "at": {
         "x": -0.3,
         "y": 51.1
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4098,12 +5640,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 53.063,
         "y": 57.813
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4293,12 +5862,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 57.063,
         "y": 60.688
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4352,12 +5948,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -0.438,
         "y": 61.063
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4385,12 +6008,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -2.438,
         "y": 61.563
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          19
+        ],
+        [
+          null,
+          null,
+          null,
+          51
+        ],
+        [
+          null,
+          null,
+          null,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -4565,12 +6215,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 3.75,
         "y": 63.125
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4872,12 +6549,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_21",
+      "type": "scenery",
       "at": {
         "x": 2.688,
         "y": 65.688
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          276,
+          277,
+          null,
+          null
+        ],
+        [
+          308,
+          309,
+          null,
+          null
+        ],
+        [
+          340,
+          341,
+          null,
+          null
+        ],
+        [
+          372,
+          373,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -4973,12 +6677,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_21",
+      "type": "scenery",
       "at": {
         "x": -1.75,
         "y": 66.75
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          278,
+          279
+        ],
+        [
+          null,
+          null,
+          310,
+          311
+        ],
+        [
+          null,
+          null,
+          342,
+          343
+        ],
+        [
+          null,
+          null,
+          374,
+          375
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5098,12 +6829,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_21",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 68.0
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          279
+        ],
+        [
+          null,
+          null,
+          null,
+          311
+        ],
+        [
+          null,
+          null,
+          null,
+          343
+        ],
+        [
+          null,
+          null,
+          null,
+          375
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5184,12 +6942,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 3.0,
         "y": 68.625
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          1794,
+          null
+        ],
+        [
+          1824,
+          1825,
+          1826,
+          null
+        ],
+        [
+          1856,
+          1857,
+          1858,
+          null
+        ],
+        [
+          1888,
+          1889,
+          1890,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5261,12 +7046,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 53.313,
         "y": 69.688
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5296,12 +7108,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_92",
+      "type": "scenery",
       "at": {
         "x": 2.813,
         "y": 69.938
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1424,
+          1425,
+          null,
+          null
+        ],
+        [
+          1456,
+          1457,
+          null,
+          null
+        ],
+        [
+          1488,
+          1489,
+          null,
+          null
+        ],
+        [
+          1520,
+          1521,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5407,12 +7246,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 3.5,
         "y": 71.188
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          1794,
+          null
+        ],
+        [
+          1824,
+          1825,
+          1826,
+          null
+        ],
+        [
+          1856,
+          1857,
+          1858,
+          null
+        ],
+        [
+          1888,
+          1889,
+          1890,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -5486,12 +7352,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -2.188,
         "y": 71.563
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          19
+        ],
+        [
+          null,
+          null,
+          null,
+          51
+        ],
+        [
+          null,
+          null,
+          null,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5659,12 +7552,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -0.5,
         "y": 72.875
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5734,20 +7654,74 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_21",
+      "type": "scenery",
       "at": {
         "x": 53.125,
         "y": 73.125
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          276,
+          277,
+          278,
+          null
+        ],
+        [
+          308,
+          309,
+          310,
+          null
+        ],
+        [
+          340,
+          341,
+          342,
+          null
+        ],
+        [
+          372,
+          373,
+          374,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -0.563,
         "y": 73.5
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -5899,12 +7873,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 2.0,
         "y": 74.188
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          null,
+          null
+        ],
+        [
+          1824,
+          1825,
+          null,
+          null
+        ],
+        [
+          1856,
+          1857,
+          null,
+          null
+        ],
+        [
+          1888,
+          1889,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -6028,12 +8029,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -1.625,
         "y": 75.625
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          18,
+          19
+        ],
+        [
+          null,
+          null,
+          50,
+          51
+        ],
+        [
+          null,
+          null,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -6087,12 +8115,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 52.625,
         "y": 75.75
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          1794,
+          null
+        ],
+        [
+          1824,
+          1825,
+          1826,
+          null
+        ],
+        [
+          1856,
+          1857,
+          1858,
+          null
+        ],
+        [
+          1888,
+          1889,
+          1890,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "blueprint",
@@ -6214,12 +8269,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_21",
+      "type": "scenery",
       "at": {
         "x": 1.125,
         "y": 76.688
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          276,
+          null,
+          null,
+          null
+        ],
+        [
+          308,
+          null,
+          null,
+          null
+        ],
+        [
+          340,
+          null,
+          null,
+          null
+        ],
+        [
+          372,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -6417,12 +8499,39 @@
       }
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 3.688,
         "y": 78.125
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -6646,12 +8755,39 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 3.563,
         "y": 79.875
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
@@ -6756,61 +8892,250 @@
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 21.625,
         "y": 80.5
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          19
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 30.25,
         "y": 80.5
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          19
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 33.25,
         "y": 80.5
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          1794,
+          1795
+        ],
+        [
+          1824,
+          1825,
+          1826,
+          1827
+        ],
+        [
+          1856,
+          1857,
+          1858,
+          1859
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_112",
+      "type": "scenery",
       "at": {
         "x": 40.0,
         "y": 80.5
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          1792,
+          1793,
+          1794,
+          1795
+        ],
+        [
+          1824,
+          1825,
+          1826,
+          1827
+        ],
+        [
+          1856,
+          1857,
+          1858,
+          1859
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 15.188,
         "y": 80.625
       },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          19
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
       "flip": "horizontal"
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": 49.938,
         "y": 80.625
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          19
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
-      "type": "blueprint",
-      "blueprint": "sakura_props_4",
+      "type": "scenery",
       "at": {
         "x": -1.25,
         "y": 80.688
-      }
+      },
+      "tileset": "sakura_props",
+      "tiles": [
+        [
+          null,
+          null,
+          18,
+          19
+        ],
+        [
+          null,
+          null,
+          50,
+          51
+        ],
+        [
+          null,
+          null,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5
     },
     {
       "type": "scenery",

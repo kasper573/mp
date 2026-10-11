@@ -172,7 +172,6 @@ export interface History {
 }
 
 export interface SoundZone {
-  name: string;
   bounds: TileRect;
   ellipse: boolean;
   reach: number;

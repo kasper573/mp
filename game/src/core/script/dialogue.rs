@@ -1,49 +1,58 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::expr::Expr;
 use super::{Arrow, Name, Vocabulary};
-use crate::core::content::serial;
 
 pub const MAX_LINES: usize = 16;
 pub const MAX_CHOICES: usize = 12;
 
-#[derive(Clone, Serialize)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(bound = "", deny_unknown_fields)]
+#[schemars(bound = "")]
 pub struct DialogueNode<V: Vocabulary> {
-    pub lines: &'static [V::Line],
-    #[serde(skip_serializing_if = "serial::is_empty")]
-    pub choices: &'static [Choice<V>],
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lines: Vec<V::Line>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<Choice<V>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub left: Arrow,
 }
 
-#[derive(Clone, Serialize)]
-#[serde(bound(
-    serialize = "V::Event: Serialize, V::Query: Serialize, V::Effect: Serialize, V::Line: Serialize, V::Text: Serialize, V::Place: Serialize, V::Row: Serialize, V::Audio: Serialize"
-))]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(bound = "", deny_unknown_fields)]
+#[schemars(bound = "")]
 pub struct Choice<V: Vocabulary> {
     pub label: V::Text,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Expr<V>>,
-    #[serde(skip_serializing_if = "serial::is_empty")]
-    pub reveal: &'static [Reveal],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub warn: Option<Name>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reveal: Vec<Reveal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warn: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Arrow,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum Reveal {
     Locked,
     Needs,
     Costs,
     Gains,
+}
+
+impl Reveal {
+    pub fn name(self) -> &'static str {
+        match self {
+            Reveal::Locked => "locked",
+            Reveal::Needs => "needs",
+            Reveal::Costs => "costs",
+            Reveal::Gains => "gains",
+        }
+    }
 }
 
 pub struct DialogueView<'a, V: Vocabulary> {

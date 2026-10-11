@@ -1,9 +1,11 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::math::{Offset, Pos, Rect, Size, WorldPx};
 use crate::core::time::Seconds;
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -33,7 +35,9 @@ pub const NEIGHBORS_8: [(i32, i32); 8] = [
     (-1, -1),
 ];
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd,
+)]
 pub struct TilesPerSec(pub Tiles);
 
 impl Tiles {
