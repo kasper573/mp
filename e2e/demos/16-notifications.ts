@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   arrivedIn,
@@ -33,15 +33,9 @@ test(
   chapter({
     summary: "Every notification where it belongs: bubbles, captions, alerts, errors, milestones and intros",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "forest_bound");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await admin(page, [
-        ["/give fish_steak,1", /gave 1 Fish Steak/],
-        ["/give tribal_helmet,1", /gave 1 Tribal Helmet/],
-        ["/give corsair_cutlass,1", /gave 1 Corsair's Cutlass/],
-        ["/xp 40", /granted 40 xp/],
-      ]);
     },
     play: async (page) => {
       await caption(page, "Some places speak up on their own: Ilsa watches the forest road");
@@ -132,41 +126,23 @@ test(
       await stroll(page, [-2, 2]);
       await page.waitForTimeout(3000);
 
-      await caption(page, "(Admin shortcut) An alert reaches every player, in a bar of its own");
-      await admin(page, [["/notify The last ferry back leaves at dusk.", /notified every area/]]);
-      await waitFor(page, ({ notifications }) => notifications.alerts.rows.length > 0, "the alert never arrived");
-      await page.waitForTimeout(2500);
-      await caption(page, "It stays until its time is up, or until you close it", { at: "top" });
-      await clickUi(page, "\u00d7");
-      await waitFor(page, ({ notifications }) => notifications.alerts.rows.length === 0, "the alert never closed");
-      await page.waitForTimeout(1200);
-
-      await caption(page, "(Admin shortcut: experience) A new level is a milestone, in the middle of the screen");
-      await admin(page, [["/xp 300", /granted 300 xp/]]);
-      await waitFor(
-        page,
-        ({ notifications }) => notifications.milestones.rows.some(({ label }) => label === "Level up"),
-        "the level never showed",
-      );
+      await caption(page, "The orcs here are worth experience, and one more brings a new level: a milestone, in the middle of the screen");
+      await fightUntil(page, "orc", (snapshot) => milestone(snapshot, "Level up"), 120_000);
       await page.waitForTimeout(3000);
 
-      await caption(page, "(Admin shortcut: on Mara's errand, with an Orc Chief close by)", { at: "top" });
-      await admin(page, [["/quest tusks_for_the_chief,accept", /tusks_for_the_chief: Accept/]]);
-      await waitFor(
-        page,
-        ({ feed }) => feed.includes("Quest accepted · Tusks for the Chief"),
-        "the accepted quest never showed in the feed",
-      );
-      await caption(page, "Your own news slides quietly into the corner");
-      await page.waitForTimeout(2500);
-      await admin(page, [["/spawn orc_chief", /spawned Orc Chief/]]);
-      await waitFor(
-        page,
-        ({ notifications }) => notifications.bubbles.some(({ npc }) => npc === "orc_chief"),
-        "the Orc Chief never yelled",
-      );
-      await caption(page, "Voices speak from where they stand: a bubble over the chief, in his own voice");
-      await page.waitForTimeout(2500);
+      await caption(page, "You're on Mara's errand, and the forest's chiefs know it: come near one and he has words for you", {
+        at: "top",
+      });
+      // A chief taunts once and then holds his tongue for a while, so one that wandered past earlier
+      // has already had his say; the bubble is captioned only while it is up.
+      const taunted = (snapshot: Snapshot) =>
+        yelled(snapshot, "orc_chief") || snapshot.history.records.some((record) => record.by === "Orc Chief");
+      await travelTo(page, (snapshot) => chief(snapshot)?.aim, 120_000, taunted);
+      await waitFor(page, taunted, "the Orc Chief never yelled");
+      if (yelled(await probe(page), "orc_chief")) {
+        await caption(page, "Voices speak from where they stand: a bubble over the chief, in his own voice");
+        await page.waitForTimeout(2500);
+      }
       await caption(page, "You keep fighting: no tether, no lock, and your foe's bubble stays up front");
       await fight(page, "orc_chief", 9000);
       await page.waitForTimeout(1500);
@@ -176,6 +152,30 @@ test(
 
 function captioned({ notifications }: Snapshot, label: string): boolean {
   return notifications.captions.rows.some((row) => row.label === label);
+}
+
+function milestone({ notifications }: Snapshot, label: string): boolean {
+  return notifications.milestones.rows.some((row) => row.label === label);
+}
+
+function yelled({ notifications }: Snapshot, npc: string): boolean {
+  return notifications.bubbles.some((bubble) => bubble.npc === npc);
+}
+
+function chief({ me, actors }: Snapshot) {
+  return me ? nearest(actors.filter((actor) => actor.npc === "orc_chief" && actor.health > 0), me.at) : undefined;
+}
+
+async function fightUntil(page: Page, npc: string, done: (snapshot: Snapshot) => boolean, forMs: number): Promise<void> {
+  const until = Date.now() + forMs;
+  while (Date.now() < until) {
+    if (done(await probe(page))) return;
+    const foe = ({ me, actors }: Snapshot) =>
+      me ? nearest(actors.filter((actor) => actor.npc === npc && actor.health > 0), me.at)?.aim : undefined;
+    await travelTo(page, foe, 10_000, done).catch(() => undefined);
+    await page.waitForTimeout(500);
+  }
+  throw new Error(`fighting ${npc} never got there`);
 }
 
 function refused({ notifications }: Snapshot, item: string): boolean {

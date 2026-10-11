@@ -1,24 +1,17 @@
 use bevy_ecs::prelude::*;
-use bevy_terminal::TerminalInput;
-use game::core::content::Fixture;
 use game::core::math::{Offset, Pos};
 use game::core::tiling::Tiles;
-use game::core::time::Seconds;
-use game::systems::account::identity::Identity;
-use game::systems::account::role::Role;
 use game::systems::area::AreaObject;
 use game::systems::area::transition::{self, Crossing};
 use game::systems::dialogue::Conversation;
 use game::systems::history::{History, HistoryTopic};
 use game::systems::input::map::InputMap;
-use game::systems::interface::InterfaceSound;
 use game::systems::movement::{Position, position};
 use game::systems::notification::{self, Notification, NotificationKind, NotificationSent};
 use game::systems::npc::{self, Pack};
 use game::systems::player::{AreaDrawn, Xp, commands_locked};
 use game::systems::quest;
 use game::systems::quest::Id as QuestId;
-use game::systems::terminal::TerminalKind as TerminalId;
 use game::systems::text::LineText;
 
 use crate::support::{
@@ -339,79 +332,4 @@ fn errors_and_feed_lines_answer_every_action() {
         notification::notify(sim.world(), player, refused.clone());
     }
     assert_eq!(told(&sim, 1), vec![refused; 20]);
-}
-
-fn notify_as(sim: &mut Sim, client: u32, terminal: TerminalId, message: &str) {
-    sim.send(
-        client,
-        TerminalInput {
-            terminal,
-            text: format!("/notify {message}"),
-        },
-    );
-    sim.tick();
-}
-
-fn make_admin(sim: &mut Sim, client: u32) {
-    let conn = sim.conn(client);
-    sim.world().entity_mut(conn).insert(Identity {
-        id: "admin".to_owned(),
-        name: "admin".to_owned(),
-        roles: vec![Role::Admin],
-    });
-}
-
-#[test]
-fn an_admin_alert_reaches_every_player_in_every_area_for_a_minute() {
-    let mut island = Sim::area(spawn_area());
-    let mut forest = Sim::area(row("Forest"));
-    island.join(1);
-    forest.join(2);
-    make_admin(&mut island, 1);
-    let message = "The server restarts in five minutes, so finish your fights.";
-
-    notify_as(&mut island, 1, TerminalId::Admin, message);
-    notification::relay(&mut [island.world(), forest.world()]);
-
-    let alert = Notification {
-        kind: NotificationKind::Alert {
-            label: "Server".into(),
-            sfx: Some(InterfaceSound::UiChime.id(content())),
-        },
-        text: LineText::plain(message),
-        lasts: Some(Seconds(60.0)),
-    };
-    assert!(told(&island, 1).contains(&alert));
-    assert!(told(&forest, 2).contains(&alert));
-}
-
-#[test]
-fn an_admin_alert_longer_than_a_line_is_refused() {
-    let mut island = Sim::area(spawn_area());
-    island.join(1);
-    make_admin(&mut island, 1);
-
-    notify_as(&mut island, 1, TerminalId::Admin, &"a".repeat(161));
-    notification::relay(&mut [island.world()]);
-
-    assert!(
-        !told(&island, 1)
-            .iter()
-            .any(|notification| matches!(notification.kind, NotificationKind::Alert { .. }))
-    );
-}
-
-#[test]
-fn players_without_the_admin_role_cannot_notify() {
-    let mut island = Sim::area(spawn_area());
-    island.join(1);
-
-    notify_as(&mut island, 1, TerminalId::Global, "Free gold at the pier!");
-    notification::relay(&mut [island.world()]);
-
-    assert!(
-        !told(&island, 1)
-            .iter()
-            .any(|notification| matches!(notification.kind, NotificationKind::Alert { .. }))
-    );
 }

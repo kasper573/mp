@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
-import { captureScene, clickUi, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
+import { playAs } from "../helpers/character";
+import { captureScene, holding, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
 import { loadReference, resemblance } from "../helpers/image";
+import { conversationOver, onStage, pick, readToChoices, talkTo } from "../helpers/talk";
 import { travel } from "./travel";
 
 test("the forest road holds you without a pass and crosses with one", async ({ page }) => {
-  await signIn(page, await provisionAccount(page, ["admin"]));
-  await clickUi(page, "Play");
+  await playAs(page, "forest_bound");
+  await signIn(page, await provisionAccount(page));
   const island = loadReference("island.png");
   const forest = loadReference("forest.png");
   await waitForWorld(page, island);
@@ -22,7 +23,15 @@ test("the forest road holds you without a pass and crosses with one", async ({ p
   expect(standing.area).toBe("island");
   expect(standing.stage).toBeNull();
 
-  await admin(page, [["/give road_pass,1", /gave 1 Road Pass/]]);
+  await talkTo(page, "ilsa", travel);
+  await readToChoices(page, 300);
+  await pick(page, "Would a fish change your mind?");
+  await onStage(page, "fish");
+  await readToChoices(page, 300);
+  await pick(page, "Enjoy it.");
+  await conversationOver(page);
+  await waitFor(page, (snapshot) => holding(snapshot, "road_pass") === 1, "Ilsa never handed over the pass");
+
   // A warp takes whoever steps into it, so step off and back on until the forest renders. Repeats just
   // re-issue the (deterministic) crossing; the long timeout is only room for a slow renderer.
   const beside: [number, number] = [road!.at[0], road!.at[1] + 2];

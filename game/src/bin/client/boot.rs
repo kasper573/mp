@@ -1,12 +1,5 @@
 use std::sync::Arc;
 
-use bevy::asset::AssetApp;
-use bevy::asset::io::AssetSourceId;
-use bevy::prelude::*;
-use game::core::assets::SyncedFiles;
-use game::core::math::Rng;
-use game::systems::account::Role;
-use game::{core, systems};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen(module = "/src/bin/client/audio-unlock.js")]
@@ -17,85 +10,12 @@ unsafe extern "C" {
 pub fn run() {
     console_error_panic_hook::set_once();
     audio_unlock();
-    boot();
-}
-
-fn boot() {
     let params = crate::platform::read_start_params();
-    let session = params
-        .access_token
-        .as_deref()
-        .map(core::net::auth::Session::from_access_token);
-    let spectator = session.as_ref().is_some_and(|session| {
-        session
-            .roles
-            .iter()
-            .any(|role| role.parse() == Ok(Role::Spectate))
-    });
-
-    let mut app = App::new();
-    let files = SyncedFiles::default();
-    app.insert_resource(files.clone());
-    app.insert_resource(Rng::from_entropy());
-    app.register_asset_source(AssetSourceId::Default, files.source())
-        .add_plugins(
-            DefaultPlugins
-                .set(bevy::log::LogPlugin {
-                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(crate::platform::primary_window()),
-                    ..default()
-                })
-                .set(ImagePlugin::default_nearest()),
-        );
-    if let Some(session) = session {
-        app.insert_resource(session);
-    }
-    app.insert_resource(params)
-        .insert_resource(core::platform::ClientPlatform(Arc::new(
-            crate::platform::WebPlatform,
-        )))
-        .add_plugins((
-            ui::UiPlugin,
-            core::net::transport::RepliconRenetClientPlugin,
-            core::interpolate::SnapshotPlugin {
-                period: systems::REPLICATION_PERIOD,
-            },
-            core::render::RenderPlugin,
-            core::audio::playback::SfxPlugin,
-            core::audio::soundscape::SoundscapePlugin,
-            core::babble::BabblePlugin,
-        ))
-        .add_plugins((
-            systems::scene::ScenePlugin { spectator },
-            systems::actor::render::ActorPlugin,
-            systems::actor::plate::PlatePlugin,
-            systems::movement::MovementPlugin,
-            systems::combat::render::CombatPlugin,
-            systems::item::render::ItemsPlugin,
-            systems::area::object::render::ObjectPlugin,
-            systems::view::ViewPlugin,
-            systems::player::session::ClientSessionPlugin,
-            systems::input::InputPlugin,
-            systems::debug::DebugPlugin,
-            crate::probe::ProbePlugin,
-        ))
-        .add_plugins((
-            systems::hud::HudPlugin,
-            systems::dialogue::stage::StagePlugin,
-            systems::notification::NotificationPlugin,
-            systems::history::widget::HistoryPlugin,
-            systems::shop::counter::ShopCounterPlugin,
-            systems::item::card::ItemCardPlugin,
-            systems::quest::card::QuestCardPlugin,
-            systems::quest::log::QuestLogPlugin,
-            systems::quest::tracker::QuestTrackerPlugin,
-            systems::spectate::widget::SpectatorPlugin,
-            systems::terminal::TerminalPlugin,
-            systems::fps::FpsPlugin,
-        ));
-    ui::theme::set_theme(ui::themes::dark::THEME);
-    app.run();
+    game::systems::client_app(
+        Arc::new(crate::platform::WebPlatform),
+        params,
+        crate::platform::primary_window(),
+    )
+    .add_plugins(crate::probe::ProbePlugin)
+    .run();
 }

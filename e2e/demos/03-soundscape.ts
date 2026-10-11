@@ -4,8 +4,6 @@ import { caption, chapter, soundscapeMixer } from "../helpers/demo";
 import {
   closestTile,
   distance,
-  focusGame,
-  hoverTile,
   leaveConversation,
   occupied,
   probe,
@@ -15,19 +13,12 @@ import {
   type Tile,
 } from "../helpers/game";
 
-const DEBUG_VIEWS_BEFORE_SOUNDSCAPES = 4;
-
 test(
   "Soundscape",
   chapter({
     summary: "Music and ambience laid over the map, mixed by where you stand",
     play: async (page) => {
       const hideMixer = await soundscapeMixer(page);
-      await focusGame(page);
-      for (let view = 0; view < DEBUG_VIEWS_BEFORE_SOUNDSCAPES; view++) {
-        await page.keyboard.press("F1");
-        await page.waitForTimeout(300);
-      }
       const { soundscape, me } = await probe(page);
       const zone = (track: string) =>
         soundscape.zones.find((zone) => zone.tracks.some((played) => played.src.endsWith(track)))!;
@@ -37,10 +28,6 @@ test(
       const home = me!.at;
 
       await caption(page, "Soundscape zones lay music and ambience over the map, each track on a numbered channel, fading out past their edges");
-      await page.waitForTimeout(6000);
-
-      await caption(page, "F1's soundscape view shades each zone by how loud it is heard; hover a spot to read what plays there");
-      await hoverTile(page, [home[0] + 2, home[1] - 1]);
       await page.waitForTimeout(6000);
 
       await caption(page, "Where two zones overlap they mix: both themes share channel 1, and the surf both play pools");

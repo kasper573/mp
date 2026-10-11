@@ -1,8 +1,9 @@
-not loaded · 6 errors in 5 files · cargo test failed
+not loaded · 8 errors in 6 files · cargo test failed
 
 ## Errors by rule
-missing file  1    missing fixture  1    not walkable  1
-palette out of range  1    unknown row  1    wrong type  1
+not walkable  2    missing file  1    missing fixture  1
+palette out of range  1    start not known  1    unknown row  1
+wrong type  1
 
 ## Errors, by file and line
 game.json:4:12  /spawn
@@ -32,5 +33,14 @@ tables/sfx/splash.json:1:9  /file
   found     "audio/combat/splash.wav"
   expected  a file under assets/
   nearest   "audio/combat/slash03.wav"
+tables/test_character/lost.json:4:18  /known_areas
+  rule      start not known
+  found     start
+  expected  the known areas to include the start's area
+tables/test_character/lost.json:7:12  /start
+  rule      not walkable
+  found     start 40, 40
+  expected  a place on a walkable cell of start, outside every warp object
+  nearest   15, 11
 
-## End · 6 errors
+## End · 8 errors

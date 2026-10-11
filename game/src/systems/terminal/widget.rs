@@ -53,7 +53,6 @@ struct TerminalLog {
 fn tab_title(terminal: TerminalKind) -> &'static str {
     match terminal {
         TerminalKind::Global => "Global",
-        TerminalKind::Admin => "Admin",
     }
 }
 

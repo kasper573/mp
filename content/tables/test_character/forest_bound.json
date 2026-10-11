@@ -1,0 +1,23 @@
+{
+  "name": "Forest Bound",
+  "job": "adventurer",
+  "xp": 80,
+  "bag": [
+    {
+      "item": "fish_steak"
+    },
+    {
+      "item": "tribal_helmet"
+    },
+    {
+      "item": "corsair_cutlass"
+    }
+  ],
+  "quests": [
+    {
+      "quest": "tusks_for_the_chief",
+      "state": "active"
+    }
+  ],
+  "start": "spawn"
+}

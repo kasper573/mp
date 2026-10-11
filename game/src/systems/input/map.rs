@@ -61,8 +61,6 @@ pub enum InputAction {
     ToggleHistory,
     SpectatePrevious,
     SpectateNext,
-    CycleDebugView,
-    ToggleHitboxes,
 }
 
 impl Fixture for InputAction {

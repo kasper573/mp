@@ -21,6 +21,10 @@ path = "src/bin/bench/loadtest.rs"
 name = "render-actor"
 path = "src/bin/render_actor.rs"
 
+[[bin]]
+name = "desktop-client"
+path = "src/bin/desktop_client/main.rs"
+
 [features]
 # Opt-in CPU (pprof flamegraph) + allocation profiling of a fixed workload.
 # Build with `--profile profiling --features profiling` for debug symbols.
@@ -142,7 +146,8 @@ rand = "0.9"
 service = { path = "../service" }
 tokio.workspace = true
 ureq = { workspace = true, features = ["rustls", "platform-verifier"] }
-tungstenite = "0.26"
+tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optional = true }
 cargo_metadata = "0.19"
 syn = { workspace = true, features = ["visit"] }

@@ -41,6 +41,16 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
         "tables/area/cove/walk.csv",
         "1,1,1,1\n1,1,1,1\n1,1,1,1\n1,1,1,1\n",
     );
+    folder.write(
+        "tables/test_character/lost.json",
+        &serde_json::to_string_pretty(&json!({
+            "name": "Lost",
+            "job": "adventurer",
+            "known_areas": ["cove"],
+            "start": { "area": "start", "x": 40.0, "y": 40.0 }
+        }))
+        .expect("json"),
+    );
 
     let report = load(&folder.0).err().expect("refused");
 

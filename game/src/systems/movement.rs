@@ -10,12 +10,10 @@ use crate::core::tiling::{
     Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, Tiles, TilesPerSec,
 };
 use crate::core::time::Seconds;
-use bevy_terminal::{CommandCtx, command};
 
-use crate::systems::account::role;
 use crate::systems::actor::{Action, Actor, set_facing};
 use crate::systems::area;
-use crate::systems::player::{commands_locked, conn_player, sender_player};
+use crate::systems::player::{commands_locked, sender_player};
 use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
 
@@ -300,48 +298,6 @@ fn route(world: &World, entity: Entity, goal: Pos<Tiles>) -> Option<Vec<CellPos>
     }
     path.reverse();
     Some(path)
-}
-
-/// Teleport a player.
-#[command(name = "tp", access = role::is_admin)]
-fn teleport(
-    world: &mut World,
-    ctx: &CommandCtx,
-    x: f32,
-    y: f32,
-    area: Option<String>,
-    user: Option<String>,
-) -> Result<String, String> {
-    let area = area
-        .map(|area| crate::core::content::named::<area::AreaDef>(world, &area))
-        .transpose()?;
-    let target = match &user {
-        Some(user) => crate::systems::player::by_user(world, user)
-            .ok_or_else(|| format!("no player with user id `{user}` in your area"))?,
-        None => conn_player(world, ctx.conn)
-            .ok_or_else(|| "you have no player to teleport".to_owned())?,
-    };
-    let current = world
-        .get::<area::AreaTag>(target)
-        .map(|tag| tag.area)
-        .ok_or_else(|| "target has no area".to_owned())?;
-    let dest_area = area.unwrap_or(current);
-    let size = area::load(world.resource::<crate::core::content::Content>(), dest_area).size;
-    if !(0.0..=size.width).contains(&x) || !(0.0..=size.height).contains(&y) {
-        return Err(format!(
-            "({x},{y}) is outside {dest_area:?} ({}x{} tiles)",
-            size.width, size.height
-        ));
-    }
-    crate::systems::area::warp::warp(
-        world,
-        target,
-        crate::systems::script::Place {
-            area: dest_area,
-            at: Pos::new(x, y),
-        },
-    )?;
-    Ok(format!("teleported to {x},{y} in {dest_area:?}"))
 }
 
 const ORTHOGONAL: u32 = 1000;

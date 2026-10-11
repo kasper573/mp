@@ -239,7 +239,8 @@ impl WareRefusal {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Sale {
     pub item: ItemId,
     pub count: u32,
@@ -256,6 +257,18 @@ pub struct ShopLedger {
 struct Restock {
     left: u32,
     full_at: UnixMillis,
+}
+
+impl ShopLedger {
+    pub fn stocked(&mut self, shop: ShopId, offer: u32, left: u32, full_at: UnixMillis) {
+        self.stock.insert((shop, offer), Restock { left, full_at });
+    }
+
+    pub fn sold(&mut self, shop: ShopId, sale: Sale) {
+        let sales = self.sales.entry(shop).or_default();
+        sales.push_back(sale);
+        sales.truncate(BUYBACK_KEPT);
+    }
 }
 
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

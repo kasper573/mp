@@ -2,7 +2,7 @@ mod auth;
 mod transport;
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
@@ -17,14 +17,17 @@ use bevy_replicon::prelude::{ConnectedClient, RepliconChannels, ServerState};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use bevy_state::prelude::NextState;
 use game::core::content::sync::{ServedContent, well_formed_hash};
-use game::core::content::{Content, FilesystemFolder, version};
+use game::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
 use game::core::net::channels::RenetChannelsExt;
+use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::GameSettings;
 use game::systems::account::Identity;
-use game::systems::area::AreaDef;
 use game::systems::area::transition;
+use game::systems::area::{self, AreaDef};
+use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use game::systems::player::{ClientId, Immortal, SpawnPolicy};
+use game::systems::script::Place;
 use game::systems::spectate::{self, SpectatorTransfer};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
@@ -38,6 +41,7 @@ const TOKEN_EXPIRE: Duration = Duration::from_secs(30);
 
 #[derive(serde::Deserialize)]
 struct Config {
+    bind: IpAddr,
     port: u16,
     ws_port: u16,
     max_clients: usize,
@@ -46,9 +50,25 @@ struct Config {
     player_spawn_type: SpawnPolicy,
     player_immortal: bool,
     daily_reset_utc_hour: UtcHour,
-    allow_fake_users: bool,
+    auth: AuthMode,
+    test_characters: Switch,
+    exit_on_stdin_eof: bool,
     pyroscope_enabled: bool,
     pyroscope_sample_hz: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum AuthMode {
+    Oidc,
+    Fake,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Switch {
+    On,
+    Off,
 }
 
 #[derive(Clone, Copy)]
@@ -77,7 +97,7 @@ impl<'de> serde::Deserialize<'de> for Areas {
 
 fn main() {
     if std::env::args().any(|arg| arg == "--build-info") {
-        println!("{}", build_info());
+        println!("{}", game::systems::build_info());
         return;
     }
     let config: Config = envy::prefixed("RIFT_GAME_SERVER_")
@@ -88,12 +108,11 @@ fn main() {
         config.pyroscope_enabled,
         config.pyroscope_sample_hz,
     );
-    let http_bind: SocketAddr = format!("0.0.0.0:{}", config.port)
-        .parse()
-        .expect("server bind address");
-    let ws_bind: SocketAddr = format!("0.0.0.0:{}", config.ws_port)
-        .parse()
-        .expect("websocket bind address");
+    if config.exit_on_stdin_eof {
+        exit_when_stdin_closes();
+    }
+    let http_bind = SocketAddr::new(config.bind, config.port);
+    let ws_bind = SocketAddr::new(config.bind, config.ws_port);
 
     // One multi-threaded tokio runtime backs both the HTTP API and the WebSocket transport's
     // accept/read/write tasks; it outlives `main` because `simulate` never returns.
@@ -121,29 +140,45 @@ fn main() {
 
     let metrics = service::recorder();
     let sessions = Sessions::default();
+    let online = Online::default();
+    let area_ids = select_areas(&content, config.areas);
     let http = Http {
         sessions: sessions.clone(),
-        verifier: verifier(),
-        allow_fake_users: config.allow_fake_users,
+        auth: match config.auth {
+            AuthMode::Oidc => Auth::Oidc(verifier()),
+            AuthMode::Fake => Auth::Fake,
+        },
+        test_characters: match config.test_characters {
+            Switch::On => Some(TestCharacters {
+                content,
+                areas: area_ids.clone(),
+                pending: Arc::default(),
+                online: online.clone(),
+            }),
+            Switch::Off => None,
+        },
         served: Arc::new(served),
     };
     let listener = runtime
         .block_on(tokio::net::TcpListener::bind(http_bind))
         .unwrap_or_else(|error| panic!("cannot bind {http_bind}: {error}"));
     let http_addr = listener.local_addr().expect("bound http address");
+    let test_characters = http.test_characters.clone();
     let api = serve_http(listener, http, metrics);
 
     let settings = Settings {
-        areas: config.areas,
+        area_ids,
         max_clients: config.max_clients,
         spawn_policy: config.player_spawn_type,
         immortal: Immortal(config.player_immortal),
         reset: config.daily_reset_utc_hour,
+        test_characters,
     };
     simulate(
         ws_bind,
         http_addr,
         sessions,
+        online,
         runtime.handle().clone(),
         content,
         settings,
@@ -151,39 +186,34 @@ fn main() {
     );
 }
 
-fn build_info() -> String {
-    serde_json::json!({
-        "build": version::build(),
-        "content_version": game::systems::registry().version().0,
-    })
-    .to_string()
-}
-
 struct Settings {
-    areas: Areas,
+    area_ids: Vec<area::Id>,
     max_clients: usize,
     spawn_policy: SpawnPolicy,
     immortal: Immortal,
     reset: UtcHour,
+    test_characters: Option<TestCharacters>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn simulate(
     ws_bind: SocketAddr,
     http_addr: SocketAddr,
     sessions: Sessions,
+    online: Online,
     runtime: tokio::runtime::Handle,
     assets: Content,
     settings: Settings,
     api: impl Future<Output = ()> + Send + 'static,
 ) {
     let Settings {
-        areas,
+        area_ids,
         max_clients,
         spawn_policy,
         immortal,
         reset,
+        test_characters,
     } = settings;
-    let area_ids = select_areas(&assets, areas);
     let spawn = area_ids
         .iter()
         .position(|id| *id == assets.built::<GameSettings>().spawn.area)
@@ -227,7 +257,6 @@ fn simulate(
     );
 
     let mut conns: HashMap<u64, Conn> = HashMap::new();
-    let mut accounts: HashMap<String, ClientId> = HashMap::new();
     let mut transfers: Vec<Transfer> = Vec::new();
     let mut next_client = 1u32;
     let mut next_area = 0usize;
@@ -249,6 +278,8 @@ fn simulate(
                     counter!("rift_client_connections_opened_total").increment(1);
                     let identity = transport.take_identity(client_id);
                     let account = identity.as_ref().map(|identity| identity.id.clone());
+                    let mut accounts = online.0.lock().expect("online lock");
+                    let mut join_as = None;
                     let (client, area) =
                         match account.as_ref().and_then(|account| accounts.get(account)) {
                             // Another tab of this account is already connected: share its player id and
@@ -264,21 +295,34 @@ fn simulate(
                             None => {
                                 let client = ClientId(next_client);
                                 next_client += 1;
+                                join_as = account.as_ref().and_then(|account| {
+                                    test_characters
+                                        .as_ref()
+                                        .and_then(|characters| characters.take(account))
+                                });
                                 if let Some(account) = account {
                                     accounts.insert(account, client);
                                 }
-                                let area = match spawn_policy {
-                                    SpawnPolicy::Dist => {
+                                let area = match (&join_as, spawn_policy) {
+                                    (Some(join_as), _) => area_ids
+                                        .iter()
+                                        .position(|&id| id == join_as.start.area)
+                                        .unwrap_or(spawn),
+                                    (None, SpawnPolicy::Dist) => {
                                         let area = next_area % worlds.len();
                                         next_area += 1;
                                         area
                                     }
-                                    SpawnPolicy::Map => spawn,
+                                    (None, SpawnPolicy::Map) => spawn,
                                 };
                                 (client, area)
                             }
                         };
+                    drop(accounts);
                     let entity = spawn_conn(&mut worlds[area], client, client_id, identity);
+                    if let Some(join_as) = join_as {
+                        worlds[area].world_mut().entity_mut(entity).insert(join_as);
+                    }
                     conns.insert(
                         client_id,
                         Conn {
@@ -294,7 +338,11 @@ fn simulate(
                     if let Some(conn) = conns.remove(&client_id) {
                         worlds[conn.area].world_mut().despawn(conn.entity);
                         if !conns.values().any(|other| other.client == conn.client) {
-                            accounts.retain(|_, &mut client| client != conn.client);
+                            online
+                                .0
+                                .lock()
+                                .expect("online lock")
+                                .retain(|_, &mut client| client != conn.client);
                         }
                     }
                 }
@@ -597,11 +645,34 @@ impl Sessions {
     }
 }
 
+#[derive(Clone, Default)]
+struct Online(Arc<Mutex<HashMap<String, ClientId>>>);
+
+#[derive(Clone)]
+struct TestCharacters {
+    content: Content,
+    areas: Vec<area::Id>,
+    pending: Arc<Mutex<HashMap<String, JoinAs>>>,
+    online: Online,
+}
+
+impl TestCharacters {
+    fn take(&self, account: &str) -> Option<JoinAs> {
+        self.pending.lock().expect("pending lock").remove(account)
+    }
+}
+
+#[derive(Clone)]
+enum Auth {
+    Oidc(Arc<Mutex<auth::Verifier>>),
+    Fake,
+}
+
 #[derive(Clone)]
 struct Http {
     sessions: Sessions,
-    verifier: Arc<Mutex<auth::Verifier>>,
-    allow_fake_users: bool,
+    auth: Auth,
+    test_characters: Option<TestCharacters>,
     served: Arc<ServedContent>,
 }
 
@@ -610,15 +681,15 @@ async fn serve_http(
     http: Http,
     metrics: service::PrometheusHandle,
 ) {
-    let router = service::track(
-        axum::Router::new()
-            .route("/session", post(session))
-            .route("/health", get(health))
-            .route("/content/manifest", get(manifest))
-            .route("/content/files/{hash}", get(content_file))
-            .with_state(http),
-        metrics,
-    );
+    let mut router = axum::Router::new()
+        .route("/session", post(session))
+        .route("/health", get(health))
+        .route("/content/manifest", get(manifest))
+        .route("/content/files/{hash}", get(content_file));
+    if http.test_characters.is_some() {
+        router = router.route("/test/character", post(test_character));
+    }
+    let router = service::track(router.with_state(http), metrics);
     ctrlc::set_handler(|| std::process::exit(0)).expect("install stop handler");
     axum::serve(listener, router).await.expect("axum serves");
 }
@@ -694,21 +765,108 @@ async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> 
         .into_response()
 }
 
-fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
-    if http.allow_fake_users
-        && let Some(id) = authorization.strip_prefix("fake:")
-    {
-        return Ok(Identity {
-            id: id.to_owned(),
-            name: id.to_owned(),
-            roles: Vec::new(),
-        });
+#[derive(serde::Deserialize)]
+struct TestCharacterRequest {
+    test_character: String,
+    #[serde(default)]
+    start: Option<Place>,
+}
+
+async fn test_character(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {
+    let Some(characters) = http.test_characters.as_ref() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let authorization = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    let identity = match resolve(&http, authorization) {
+        Ok(identity) => identity,
+        Err(status) => return status.into_response(),
+    };
+    let content = characters.content;
+    let (request, scope) = with_content(ContentScope::of(&content), || {
+        serde_json::from_str::<TestCharacterRequest>(&body)
+    });
+    let request = match request {
+        Ok(request) => request,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if let Some(unknown) = scope.unknown().next() {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("no {} `{}`", unknown.table, unknown.key),
+        )
+            .into_response();
     }
+    let Some(character) = content.by_key::<CharacterSnapshot>(&request.test_character) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("no test character `{}`", request.test_character),
+        )
+            .into_response();
+    };
+    let start = request
+        .start
+        .unwrap_or_else(|| snapshot::start_of(&content, character.get(&content)));
+    if let Err(problem) = area::check_place(&content, start) {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "bad start: {}, expected {}",
+                problem.found, problem.expected
+            ),
+        )
+            .into_response();
+    }
+    if !characters.areas.contains(&start.area) {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "bad start: this server runs no {}",
+                start.area.key(&content)
+            ),
+        )
+            .into_response();
+    }
+    if characters
+        .online
+        .0
+        .lock()
+        .expect("online lock")
+        .contains_key(&identity.id)
+    {
+        return (StatusCode::CONFLICT, "already in a world").into_response();
+    }
+    characters.pending.lock().expect("pending lock").insert(
+        identity.id,
+        JoinAs {
+            snapshot: character.get(&content).clone(),
+            start,
+        },
+    );
+    StatusCode::NO_CONTENT.into_response()
+}
+
+fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
     let token = authorization
         .strip_prefix("Bearer ")
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    let claims = http
-        .verifier
+        .unwrap_or(authorization);
+    let verifier = match &http.auth {
+        Auth::Oidc(verifier) => verifier,
+        Auth::Fake => {
+            let id = token.strip_prefix("fake:").unwrap_or(token);
+            if id.is_empty() {
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+            return Ok(Identity {
+                id: id.to_owned(),
+                name: id.to_owned(),
+                roles: Vec::new(),
+            });
+        }
+    };
+    let claims = verifier
         .lock()
         .expect("verifier lock")
         .verify(token)
@@ -725,7 +883,10 @@ fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
 }
 
 async fn health(State(http): State<Http>) -> Response {
-    let ready = http.verifier.lock().expect("verifier lock").ready();
+    let ready = match &http.auth {
+        Auth::Oidc(verifier) => verifier.lock().expect("verifier lock").ready(),
+        Auth::Fake => true,
+    };
     if ready {
         "ok".into_response()
     } else {

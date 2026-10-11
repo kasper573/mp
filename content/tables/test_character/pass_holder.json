@@ -1,0 +1,10 @@
+{
+  "name": "Pass Holder",
+  "job": "adventurer",
+  "bag": [
+    {
+      "item": "road_pass"
+    }
+  ],
+  "start": "spawn"
+}

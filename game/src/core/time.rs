@@ -170,6 +170,10 @@ impl UnixMillis {
         UnixMillis(self.0.saturating_add(duration.millis().0.max(0.0) as u64))
     }
 
+    pub fn before(self, duration: Seconds) -> UnixMillis {
+        UnixMillis(self.0.saturating_sub(duration.millis().0.max(0.0) as u64))
+    }
+
     pub fn since(self, earlier: UnixMillis) -> Seconds {
         Millis(self.0.saturating_sub(earlier.0) as f32).seconds()
     }

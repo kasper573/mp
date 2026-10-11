@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import { clickUi, finished, focusGame, historyTab, onQuest, waitFor, waitForWorld } from "../helpers/game";
 import { loadReference } from "../helpers/image";
@@ -12,10 +12,9 @@ test(
   chapter({
     summary: "Wren's daily tithe, and an answer that knows what time it is",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "tithe_payer");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [["bone", 10]]);
     },
     play: async (page) => {
       await caption(page, "Wren takes ten bones a day, and pays in tokens");

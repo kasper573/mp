@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   arrivedIn,
@@ -26,10 +26,9 @@ test(
   chapter({
     summary: "Everything said, shown and gained, kept in one place",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "pass_holder");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [["road_pass", 1]]);
     },
     play: async (page) => {
       await caption(page, "Everything you say, see and get is kept: a talk with Tobb, the gulls out on the pier…");

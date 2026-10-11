@@ -34,7 +34,7 @@ use crate::systems::item::{
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Id as NpcId;
-use crate::systems::player::{Owner, conn_player, sender_player};
+use crate::systems::player::{Owner, sender_player};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition;
 use crate::systems::script::condition::CompiledCondition;
@@ -1404,76 +1404,4 @@ pub fn offered_mark(def: &QuestDef) -> AttentionMark {
     } else {
         AttentionMark::QuestOffered
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::EnumString, strum::VariantNames)]
-#[strum(serialize_all = "lowercase")]
-enum QuestStep {
-    Accept,
-    Ready,
-    Fail,
-    Abandon,
-    Forget,
-}
-
-impl bevy_terminal::CommandArg for QuestStep {
-    fn parse(name: &str, raw: Option<&str>) -> Result<QuestStep, String> {
-        let raw = raw.ok_or_else(|| format!("missing {name}"))?;
-        raw.parse().map_err(|_| {
-            format!(
-                "{name} must be one of {}",
-                <QuestStep as strum::VariantNames>::VARIANTS.join(", ")
-            )
-        })
-    }
-}
-
-/// Move one of your quests along: accept, ready, fail, abandon or forget.
-#[bevy_terminal::command(name = "quest", access = crate::systems::account::role::is_admin)]
-fn quest_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    quest: String,
-    step: QuestStep,
-) -> Result<String, String> {
-    let quest = crate::core::content::named::<QuestDef>(world, &quest)?;
-    let content = *world.resource::<Content>();
-    let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
-    match step {
-        QuestStep::Accept => accept(world, player, quest)?,
-        QuestStep::Ready => {
-            let on_it = world
-                .get::<QuestLog>(player)
-                .is_some_and(|log| log.active(quest).is_some());
-            if !on_it {
-                accept(world, player, quest)?;
-            }
-            if let Some(mut log) = world.get_mut::<QuestLog>(player)
-                && let Some(active) = log.active.iter_mut().find(|active| active.quest == quest)
-            {
-                for (count, objective) in active
-                    .counts
-                    .iter_mut()
-                    .zip(quest.get(&content).objectives())
-                {
-                    *count = match objective {
-                        Objective::Defeat { count, .. } => *count,
-                        _ => 1,
-                    };
-                }
-            }
-            let clock = *world.resource::<WallClock>();
-            refresh_log(world, player, clock);
-        }
-        QuestStep::Fail => fail(world, player, quest),
-        QuestStep::Abandon => abandon(world, player, quest),
-        QuestStep::Forget => {
-            if let Some(mut log) = world.get_mut::<QuestLog>(player) {
-                log.active.retain(|active| active.quest != quest);
-                log.finished.retain(|finished| finished.quest != quest);
-                log.tracked.retain(|&tracked| tracked != quest);
-            }
-        }
-    }
-    Ok(format!("{}: {step:?}", quest.key(&content)))
 }

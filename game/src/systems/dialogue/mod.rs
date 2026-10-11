@@ -141,6 +141,10 @@ impl Heard {
     pub fn has(&self, script: &str, node: &str) -> bool {
         self.0.contains(&heard_key(script, node))
     }
+
+    pub fn hear(&mut self, script: &str, node: &str) {
+        self.0.insert(heard_key(script, node));
+    }
 }
 
 pub fn heard(world: &World, player: Entity, script: &str, node: &str) -> bool {

@@ -1,0 +1,13 @@
+{
+  "name": "Armed",
+  "job": "adventurer",
+  "bag": [
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "bone_shield"
+    }
+  ],
+  "start": "spawn"
+}

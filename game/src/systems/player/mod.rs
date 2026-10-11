@@ -1,4 +1,5 @@
 pub mod session;
+pub mod snapshot;
 pub mod widget;
 
 use bevy_app::App;
@@ -11,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
-use crate::core::time::{PlaybackRate, Seconds};
+use crate::core::time::{PlaybackRate, Seconds, WallClock};
 use crate::systems::Character;
 use crate::systems::GameSettings;
 use crate::systems::account::identity::Identity;
@@ -38,6 +39,7 @@ use bevy_ecs::lifecycle::{Add, Remove};
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{Replicated, SendTargets, ToClients};
+use snapshot::JoinAs;
 use std::collections::HashMap;
 
 pub fn register(app: &mut App) {
@@ -209,15 +211,6 @@ pub fn arrival_holds(world: &mut World) {
     }
 }
 
-pub fn by_user(world: &mut World, user: &str) -> Option<Entity> {
-    let client: ClientId = world
-        .query::<(&ClientId, &Identity)>()
-        .iter(world)
-        .find(|(_, identity)| identity.id == user)
-        .map(|(&client, _)| client)?;
-    world.resource::<Players>().0.get(&client).copied()
-}
-
 pub(crate) fn conn_player(world: &World, conn: Entity) -> Option<Entity> {
     let client = world.get::<ClientId>(conn)?;
     world.resource::<Players>().0.get(client).copied()
@@ -294,11 +287,22 @@ pub fn join(world: &mut World) {
         if playing || spectating {
             continue;
         }
-        let name = world
-            .get::<Identity>(client_entity)
-            .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
-        let at = spawn_position(world, policy, zone, area);
-        spawn_player(world, client, zone, at, name, immortal);
+        let clock = *world.resource::<WallClock>();
+        let (at, state) = match world.get::<JoinAs>(client_entity) {
+            Some(JoinAs { snapshot, start }) if start.area == zone => (
+                start.at,
+                snapshot::materialize(&assets, snapshot, *start, clock, immortal),
+            ),
+            _ => {
+                let name = world
+                    .get::<Identity>(client_entity)
+                    .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
+                let at = spawn_position(world, policy, zone, area);
+                (at, fresh_state(&assets, zone, at, name, immortal))
+            }
+        };
+        let entity = place(world, client, zone, at, state);
+        spawned(world, entity);
     }
 }
 
@@ -348,44 +352,35 @@ pub struct CharacterState {
     pub history: History,
 }
 
-fn spawn_player(
-    world: &mut World,
-    client: ClientId,
+fn fresh_state(
+    content: &Content,
     zone: area::Id,
     at: Pos<Tiles>,
     name: String,
     immortal: Immortal,
-) {
-    let content = *world.resource::<Content>();
-    let def = def(&content);
-    let entity = place(
-        world,
-        client,
-        zone,
-        at,
-        CharacterState {
-            name,
-            spawn: at,
-            discovered: Discovered::starting_in(zone),
-            stats: player_stats(def, immortal),
-            inventory: Inventory::empty(),
-            xp: Xp { amount: 0 },
-            equipment: Equipment::default(),
-            job: Job { def: def.job },
-            timed: TimedEffects::default(),
-            memory: Memory::default(),
-            heard: Heard::default(),
-            ledger: ShopLedger::default(),
-            quests: QuestLog::default(),
-            history: History::default(),
-        },
-    );
-    spawned(world, entity);
+) -> CharacterState {
+    let def = def(content);
+    CharacterState {
+        name,
+        spawn: at,
+        discovered: Discovered::starting_in(zone),
+        stats: player_stats(&def.stats, immortal),
+        inventory: Inventory::empty(),
+        xp: Xp { amount: 0 },
+        equipment: Equipment::default(),
+        job: Job { def: def.job },
+        timed: TimedEffects::default(),
+        memory: Memory::default(),
+        heard: Heard::default(),
+        ledger: ShopLedger::default(),
+        quests: QuestLog::default(),
+        history: History::default(),
+    }
 }
 
-pub fn player_stats(def: &PlayerDef, immortal: Immortal) -> Stats {
+pub fn player_stats(stats: &stat::StatMap, immortal: Immortal) -> Stats {
     Stats(
-        stat::listed(&def.stats)
+        stat::listed(stats)
             .map(|stat| match stat.kind {
                 StatKind::Health | StatKind::MaxHealth if immortal.0 => {
                     stat.kind.of(IMMORTAL_HEALTH)
@@ -478,24 +473,4 @@ pub fn respawn(world: &mut World) {
         }
         crate::systems::reach::forget(world, entity);
     }
-}
-
-/// Grant experience to a player.
-#[bevy_terminal::command(name = "xp", access = crate::systems::account::role::is_admin)]
-fn grant_xp(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    amount: u32,
-    user: Option<String>,
-) -> Result<String, String> {
-    let target = match &user {
-        Some(user) => by_user(world, user)
-            .ok_or_else(|| format!("no player with user id `{user}` in your area"))?,
-        None => conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?,
-    };
-    let mut xp = world
-        .get_mut::<Xp>(target)
-        .ok_or_else(|| "the player has no experience".to_owned())?;
-    xp.gain(amount);
-    Ok(format!("granted {amount} xp, now {}", xp.amount))
 }

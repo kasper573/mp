@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   clickUi,
@@ -23,15 +23,9 @@ test(
   chapter({
     summary: "Buy, sell and buy back — from the townsfolk, and from a box on the pier",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "shopper");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [
-        ["gold", 40],
-        ["orc_tusk", 2],
-        ["bone", 4],
-        ["rusty_sword", 1],
-      ]);
     },
     play: async (page) => {
       await caption(page, "Mara keeps a shop: ask, and her wares open above the conversation");

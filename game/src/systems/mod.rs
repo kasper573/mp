@@ -5,11 +5,9 @@ pub mod attention;
 pub mod belongings;
 pub mod chat;
 pub mod combat;
-pub mod debug;
 pub mod dialogue;
 pub mod effect;
 pub mod equipment;
-pub mod fps;
 pub mod history;
 pub mod hud;
 pub mod input;
@@ -49,6 +47,7 @@ use bevy_terminal::Terminal;
 use crate::core::assets::SyncedFiles;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{Content, ContentFolder, ContentRegistry, LoadReport};
+use crate::core::platform::{ClientPlatform, Platform, StartParams};
 use terminal::TerminalKind;
 
 use actor::{Actor, Hitbox};
@@ -259,6 +258,90 @@ pub fn server_app(
     app
 }
 
+pub fn client_app(
+    platform: std::sync::Arc<dyn Platform>,
+    params: StartParams,
+    window: bevy::window::Window,
+) -> App {
+    use bevy::prelude::*;
+
+    let session = params
+        .access_token
+        .as_deref()
+        .map(crate::core::net::auth::Session::from_access_token);
+    let spectator = session.as_ref().is_some_and(|session| {
+        session
+            .roles
+            .iter()
+            .any(|role| role.parse() == Ok(account::Role::Spectate))
+    });
+
+    let mut app = App::new();
+    let files = SyncedFiles::default();
+    app.insert_resource(files.clone());
+    app.insert_resource(crate::core::math::Rng::from_entropy());
+    bevy::asset::AssetApp::register_asset_source(
+        &mut app,
+        bevy::asset::io::AssetSourceId::Default,
+        files.source(),
+    )
+    .add_plugins(
+        DefaultPlugins
+            .set(bevy::log::LogPlugin {
+                filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
+                ..default()
+            })
+            .set(WindowPlugin {
+                primary_window: Some(window),
+                ..default()
+            })
+            .set(ImagePlugin::default_nearest()),
+    );
+    if let Some(session) = session {
+        app.insert_resource(session);
+    }
+    app.insert_resource(params)
+        .insert_resource(ClientPlatform(platform))
+        .add_plugins((
+            ui::UiPlugin,
+            crate::core::net::transport::RepliconRenetClientPlugin,
+            crate::core::interpolate::SnapshotPlugin {
+                period: REPLICATION_PERIOD,
+            },
+            crate::core::render::RenderPlugin,
+            crate::core::audio::playback::SfxPlugin,
+            crate::core::audio::soundscape::SoundscapePlugin,
+            crate::core::babble::BabblePlugin,
+        ))
+        .add_plugins((
+            scene::ScenePlugin { spectator },
+            actor::render::ActorPlugin,
+            actor::plate::PlatePlugin,
+            movement::MovementPlugin,
+            combat::render::CombatPlugin,
+            item::render::ItemsPlugin,
+            area::object::render::ObjectPlugin,
+            view::ViewPlugin,
+            player::session::ClientSessionPlugin,
+            input::InputPlugin,
+        ))
+        .add_plugins((
+            hud::HudPlugin,
+            dialogue::stage::StagePlugin,
+            notification::NotificationPlugin,
+            history::widget::HistoryPlugin,
+            shop::counter::ShopCounterPlugin,
+            item::card::ItemCardPlugin,
+            quest::card::QuestCardPlugin,
+            quest::log::QuestLogPlugin,
+            quest::tracker::QuestTrackerPlugin,
+            spectate::widget::SpectatorPlugin,
+            terminal::TerminalPlugin,
+        ));
+    ui::theme::set_theme(ui::themes::dark::THEME);
+    app
+}
+
 /// Steps every area world one tick, fanning the isolated worlds across all cores. Areas share only the
 /// read-only asset service, so this is embarrassingly parallel. The worlds (not the owning `App`s) are
 /// stepped directly because `App` is `!Send` (its runner box carries no `Send` bound) while `World` is
@@ -323,6 +406,14 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     Ok(())
 }
 
+pub fn build_info() -> String {
+    serde_json::json!({
+        "build": crate::core::content::version::build(),
+        "content_version": registry().version().0,
+    })
+    .to_string()
+}
+
 pub fn registry() -> ContentRegistry {
     use crate::core::content::LoadStep;
     let mut registry = ContentRegistry::default();
@@ -342,6 +433,7 @@ pub fn registry() -> ContentRegistry {
         .modules::<npc::NpcDef>()
         .row::<player::PlayerDef>()
         .modules::<player::PlayerDef>()
+        .row::<player::snapshot::CharacterSnapshot>()
         .row::<quest::QuestDef>()
         .modules::<quest::QuestDef>()
         .row::<script::ScriptDef>()
@@ -364,6 +456,7 @@ pub fn registry() -> ContentRegistry {
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)
+        .hook(LoadStep::Across, player::snapshot::check_all)
         .hook(LoadStep::Settings, check_settings);
     registry
 }

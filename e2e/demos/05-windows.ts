@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter, soundscapeMixer } from "../helpers/demo";
 import {
   clickUi,
@@ -40,13 +40,9 @@ test(
   chapter({
     summary: "Inventory, equipment, stats and settings, laid out your way",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "armed");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [
-        ["rusty_sword", 1],
-        ["bone_shield", 1],
-      ]);
     },
     play: async (page) => {
       await caption(page, "Every window has a hotkey: I, E, K, L, O and C");

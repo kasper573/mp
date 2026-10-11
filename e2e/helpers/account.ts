@@ -5,7 +5,7 @@ export interface Account {
   password: string;
 }
 
-export type KeycloakGroup = "admin" | "spectator";
+export type KeycloakGroup = "spectator";
 
 const REALM = "rift";
 
@@ -48,7 +48,7 @@ export async function signIn(page: Page, account: Account): Promise<void> {
 
 // Roles land in the access token at sign-in, so an account gets its groups before it first signs in:
 // created straight through Keycloak's admin API, as the bootstrap admin only a test stack has.
-export async function provisionAccount(page: Page, groups: KeycloakGroup[]): Promise<Account> {
+export async function provisionAccount(page: Page, groups: KeycloakGroup[] = []): Promise<Account> {
   const account = newAccount();
   const admin = {
     username: requireEnv("KC_BOOTSTRAP_ADMIN_USERNAME"),

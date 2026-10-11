@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import { clickUi, focusGame, hoverTile, hoverUi, probe, waitFor, waitForWorld } from "../helpers/game";
 import { loadReference } from "../helpers/image";
@@ -12,10 +12,9 @@ test(
   chapter({
     summary: "Talk to the townsfolk: busts, choices, prices, refusals, history",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "talker");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [["gold", 12]]);
     },
     play: async (page) => {
       await caption(page, "Click a townsperson to talk — you walk into reach and the conversation opens");

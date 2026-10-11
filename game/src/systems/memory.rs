@@ -9,7 +9,6 @@ use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, Value, ValueType,
 };
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::systems::player::conn_player;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Condition, Reach, RiftScripting};
 
@@ -208,51 +207,4 @@ impl EffectDef<RiftScripting> for Forget {
             .map(|memory| Reach::Remembers(*memory))
             .collect()
     }
-}
-
-/// Set one of your character's memories.
-#[bevy_terminal::command(name = "remember", access = crate::systems::account::role::is_admin)]
-fn remember_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    key: String,
-    value: Option<String>,
-) -> Result<String, String> {
-    let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
-    let key = crate::core::content::named::<MemoryDef>(world, &key)?;
-    let content = *world.resource::<Content>();
-    let value = match (key.get(&content).ty, value) {
-        (ValueType::Boolean, None) => Value::Bool(true),
-        (ValueType::Boolean, Some(text)) => Value::Bool(text.parse().map_err(|_| "true or false")?),
-        (ValueType::Integer, None) => Value::Int(1),
-        (ValueType::Integer, Some(text)) => Value::Int(text.parse().map_err(|_| "an integer")?),
-        (ValueType::Number, None) => Value::Num(1.0),
-        (ValueType::Number, Some(text)) => Value::Num(text.parse().map_err(|_| "a number")?),
-        (ValueType::Text, text) => Value::Text(text.unwrap_or_default()),
-        (ValueType::Actor | ValueType::Character, _) => {
-            return Err("memories hold no actors".to_owned());
-        }
-    };
-    set(world, player, key, value);
-    Ok(format!(
-        "{} is now {:?}",
-        key.key(&content),
-        get(world, player, key)
-    ))
-}
-
-/// Make your character forget something.
-#[bevy_terminal::command(name = "forget", access = crate::systems::account::role::is_admin)]
-fn forget_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    key: String,
-) -> Result<String, String> {
-    let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
-    let key = crate::core::content::named::<MemoryDef>(world, &key)?;
-    forget(world, player, key);
-    Ok(format!(
-        "{} forgotten",
-        key.key(world.resource::<Content>())
-    ))
 }

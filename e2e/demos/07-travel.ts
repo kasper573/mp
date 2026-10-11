@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter, soundscapeMixer } from "../helpers/demo";
 import {
   arrivedIn,
@@ -26,10 +26,9 @@ test(
   chapter({
     summary: "Warps connect the areas of the world, some are locked, and each crossing plays a transition",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "traveler");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await admin(page, [["/give gold,20", /gave 20 Gold/]]);
     },
     play: async (page) => {
       await caption(page, "Warps lead to other areas — step onto one to cross");

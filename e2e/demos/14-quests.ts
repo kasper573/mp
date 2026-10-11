@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin, give } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   clickUi,
@@ -30,10 +30,9 @@ test(
   chapter({
     summary: "Offers, a tracker and a log, deliveries, timers, and a reward that needs room",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "chief_fallen");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await give(page, [["orc_tusk", 7]]);
     },
     play: async (page) => {
       await caption(page, "A ! over a townsperson means they have work for you");
@@ -59,7 +58,7 @@ test(
       await caption(page, "Accepted: the corner says so, the letter is in your bag, the quest on your tracker", {
         at: "top",
       });
-      await hearOutTobb(page);
+      await hearOutTobb(page, 12_000);
       await page.waitForTimeout(2000);
 
       await caption(page, "Quest items are marked: they can't be sold or dropped, and abandoning takes them back", {
@@ -72,6 +71,7 @@ test(
       await focusGame(page);
       await page.keyboard.press("KeyI");
 
+      await hearOutTobb(page, 1500);
       await caption(page, "Some quests run against the clock");
       await talkTo(page, "tobb");
       await readToChoices(page, 600);
@@ -120,6 +120,15 @@ test(
       await page.keyboard.press("Escape");
       await page.waitForTimeout(800);
 
+      await caption(page, "Bram's next errand stays out of sight until you're ready for it", { at: "top" });
+      await page.waitForTimeout(1500);
+      await talkTo(page, "bram");
+      await readToChoices(page, 600);
+      await page.waitForTimeout(2500);
+      await focusGame(page);
+      await page.keyboard.press("Escape");
+      await conversationOver(page);
+
       await caption(page, "The letter is for Bram: a ? marks where a quest is handed in");
       await waitFor(page, (snapshot) => townsperson(snapshot, "bram")?.marks.includes("quest_ready"), "Bram has no ?");
       await talkTo(page, "bram");
@@ -139,17 +148,9 @@ test(
       await caption(page, "The XP brought a new level, which joins it right below", { at: "top" });
       await waitFor(page, (snapshot) => milestone(snapshot, "Level up"), "no level up", 20_000);
       await page.waitForTimeout(2500);
-      await caption(page, "Bram's next errand stays out of sight until you're ready for it", { at: "top" });
-      await page.waitForTimeout(1500);
-      await talkTo(page, "bram");
-      await readToChoices(page, 600);
-      await page.waitForTimeout(2500);
-      await focusGame(page);
-      await page.keyboard.press("Escape");
+      await pick(page, "Never mind.");
       await conversationOver(page);
-
-      await caption(page, "(Admin shortcut: experience) At level 3 he has work for you", { at: "top" });
-      await admin(page, [["/xp 50", /granted 50 xp/]]);
+      await caption(page, "Now at level 3, he has work for you", { at: "top" });
       await waitFor(page, (snapshot) => townsperson(snapshot, "bram")?.marks.includes("quest_offered"), "Bram never had work");
       await talkTo(page, "bram");
       await readToChoices(page, 600);
@@ -159,29 +160,14 @@ test(
       await page.keyboard.press("Escape");
       await conversationOver(page);
 
-      await caption(page, "Mara pays for orc tusks — and their chief");
-      await talkTo(page, "mara");
-      await readToChoices(page, 600);
-      await pick(page, "Tusks for the Chief");
-      await onStage(page, "tusks_offer");
-      await caption(page, "Rewards can include a pick, chosen when you return", { at: "top" });
-      await readToChoices(page, 1400);
-      await page.waitForTimeout(1500);
-      await pick(page, "Consider it done.");
-      await waitFor(page, (snapshot) => onQuest(snapshot, "tusks_for_the_chief"), "Mara's quest never started");
-      await page.waitForTimeout(1500);
-
-      await caption(page, "(Admin shortcut: the chief falls, and the bag fills up)", { at: "top" });
-      const room = 25 - (await probe(page)).bag.length;
-      await admin(page, [
-        ["/quest tusks_for_the_chief,ready", /tusks_for_the_chief: Ready/],
-        [`/give rusty_sword,${room}`, /gave \d+ Rusty Sword/],
-      ]);
+      await caption(page, "Mara pays for orc tusks — and their chief. You came prepared: the chief is down, the tusks in the bag");
       await waitFor(page, (snapshot) => onQuest(snapshot, "tusks_for_the_chief")?.ready, "the quest never got ready");
-
+      await waitFor(page, (snapshot) => townsperson(snapshot, "mara")?.marks.includes("quest_ready"), "Mara has no ?");
       await talkTo(page, "mara");
       await readToChoices(page, 600);
       await pick(page, "Tusks for the Chief");
+      await caption(page, "Rewards can include a pick, chosen when you hand in", { at: "top" });
+      await page.waitForTimeout(2500);
       await caption(page, "With a full bag the pick is refused with an error — space is counted after the tusks are handed in", {
         at: "top",
       });
@@ -233,8 +219,9 @@ function logRow(snapshot: Snapshot, title: string): (element: UiElement) => bool
   return (element) => element.text === title && element.y > header.y && Math.abs(element.x - header.x) < 64;
 }
 
-async function hearOutTobb(page: Page): Promise<void> {
-  const deadline = Date.now() + 5000;
+// Tobb holds his news while you talk and calls you over once you're free; answered when it comes.
+async function hearOutTobb(page: Page, withinMs: number): Promise<void> {
+  const deadline = Date.now() + withinMs;
   while (Date.now() < deadline) {
     const { stage } = await probe(page);
     if (stage?.node === "news") {

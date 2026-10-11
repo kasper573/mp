@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   arrivedIn,
@@ -28,15 +28,9 @@ test(
   chapter({
     summary: "A quest found in a chest, a place to explore, and a choice you can't take back",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "tusks_midway");
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await admin(page, [
-        ["/give orc_tusk,5", /gave 5 Orc Tusk/],
-        ["/give road_pass,1", /gave 1 Road Pass/],
-        ["/xp 40", /granted 40 xp/],
-        ["/quest tusks_for_the_chief,accept", /tusks_for_the_chief: Accept/],
-      ]);
     },
     play: async (page) => {
       await caption(page, "The tide chest hides more than gold");

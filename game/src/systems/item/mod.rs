@@ -28,7 +28,7 @@ use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, commands_locked, conn_player, sender_player};
+use crate::systems::player::{ClientId, Owner, commands_locked, sender_player};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::ScriptModule;
 use crate::systems::script::{Condition, EventKind, RiftInstances};
@@ -849,30 +849,4 @@ fn scatter_pos(from: Pos<Tiles>, index: usize, count: usize, area: &area::Area) 
     let angle = std::f32::consts::TAU * index as f32 / count as f32;
     let spread = from + Offset::new(angle.cos() * DROP_RADIUS.0, angle.sin() * DROP_RADIUS.0);
     area.grid.nearest_walkable(spread).unwrap_or(rest)
-}
-
-/// Give items to a player.
-#[bevy_terminal::command(name = "give", access = crate::systems::account::role::is_admin)]
-fn give(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    item: String,
-    count: Option<u32>,
-    user: Option<String>,
-) -> Result<String, String> {
-    let target = match &user {
-        Some(user) => crate::systems::player::by_user(world, user)
-            .ok_or_else(|| format!("no player with user id `{user}` in your area"))?,
-        None => conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?,
-    };
-    let item = crate::core::content::named::<ItemDef>(world, &item)?;
-    let content = *world.resource::<Content>();
-    let stack = ItemStack::new(item, count.unwrap_or(1));
-    let mut inventory = world
-        .get_mut::<Inventory>(target)
-        .ok_or_else(|| "the player has no bag".to_owned())?;
-    inventory
-        .exchange(&content, &[], &[stack])
-        .map_err(|refusal| refusal.describe(&content))?;
-    Ok(format!("gave {}", stack.describe(&content)))
 }

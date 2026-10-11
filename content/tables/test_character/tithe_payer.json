@@ -1,0 +1,11 @@
+{
+  "name": "Tithe Payer",
+  "job": "adventurer",
+  "bag": [
+    {
+      "item": "bone",
+      "count": 10
+    }
+  ],
+  "start": "spawn"
+}

@@ -6,31 +6,24 @@ use bevy::prelude::*;
 use bevy_terminal::{AvailableTerminals, Terminal, TerminalLine};
 use serde::{Deserialize, Serialize};
 
-use crate::systems::account::role;
-
 use crate::systems::hud::{RefreshWindows, TERMINAL_WINDOW};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TerminalKind {
     Global,
-    Admin,
 }
 
 impl TerminalKind {
-    pub const ALL: [TerminalKind; 2] = [TerminalKind::Global, TerminalKind::Admin];
+    pub const ALL: [TerminalKind; 1] = [TerminalKind::Global];
 
     pub fn terminal(self) -> &'static Terminal {
         match self {
             TerminalKind::Global => &GLOBAL,
-            TerminalKind::Admin => &ADMIN,
         }
     }
 }
 
 static GLOBAL: Terminal = Terminal { access: None };
-static ADMIN: Terminal = Terminal {
-    access: Some(role::is_admin),
-};
 
 pub struct TerminalPlugin;
 

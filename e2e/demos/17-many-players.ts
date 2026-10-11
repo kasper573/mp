@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter, inset } from "../helpers/demo";
 import {
   clickUi,
@@ -29,20 +29,13 @@ test(
     summary: "One island, a world each: what you see of a townsperson is yours alone",
     setup: async (page, cast) => {
       other = await cast.newPage();
-      for (const [player, commands] of [
-        [page, [["/xp 40", /granted 40 xp/], ["/give gold,300", /gave 300 Gold/]]],
-        [
-          other,
-          [
-            ["/xp 40", /granted 40 xp/],
-            ["/quest tusks_for_the_chief,accept", /tusks_for_the_chief: Accept/],
-          ],
-        ],
-      ] as [Page, [string, RegExp][]][]) {
-        await signIn(player, await provisionAccount(player, ["admin"]));
-        await clickUi(player, "Play");
+      for (const [player, character] of [
+        [page, "well_off"],
+        [other, "on_maras_errand"],
+      ] as [Page, string][]) {
+        await playAs(player, character);
+        await signIn(player, await provisionAccount(player));
         await waitForWorld(player, loadReference("island.png"));
-        await admin(player, commands);
       }
       await standBelow(other, "mara", 1);
       await standBelow(page, "mara", -1);

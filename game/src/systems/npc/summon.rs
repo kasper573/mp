@@ -2,14 +2,12 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::Content;
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::position;
-use crate::systems::npc::NpcDef;
 use crate::systems::player::{ClientId, Owner};
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Reach, RiftScripting};
@@ -238,21 +236,4 @@ fn ring(region: &area::Area, at: Pos<Tiles>, index: u32, count: u32) -> Pos<Tile
     let angle = std::f32::consts::TAU * index as f32 / count as f32;
     let spot = at + Offset::new(angle.cos() * RING.0, angle.sin() * RING.0);
     region.grid.nearest_walkable(spot).unwrap_or(at.snap())
-}
-
-/// Spawn an NPC beside you, for everyone to see.
-#[bevy_terminal::command(name = "spawn", access = crate::systems::account::role::is_admin)]
-fn spawn_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    npc: String,
-) -> Result<String, String> {
-    let npc = crate::core::content::named::<NpcDef>(world, &npc)?;
-    let content = *world.resource::<Content>();
-    let player = crate::systems::player::conn_player(world, ctx.conn)
-        .ok_or_else(|| "you have no player".to_owned())?;
-    if summon(world, npc, 1, player, None, None).is_empty() {
-        return Err("nowhere to spawn".to_owned());
-    }
-    Ok(format!("spawned {}", npc.get(&content).name))
 }

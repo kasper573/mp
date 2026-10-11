@@ -141,10 +141,6 @@ impl Sim {
             .expect("joined player")
     }
 
-    pub fn conn(&self, client: u32) -> Entity {
-        self.conns[&client]
-    }
-
     pub fn notified(&self, client: u32) -> Vec<NotificationSent> {
         let conn = self.conns[&client];
         let sent = self.app.world().resource::<Notified>().0.iter().cloned();

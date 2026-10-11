@@ -1,9 +1,0 @@
-{
-  "label": "Show or hide hitboxes",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "F2"
-    }
-  ]
-}

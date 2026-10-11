@@ -1,0 +1,12 @@
+{
+  "name": "Well Off",
+  "job": "adventurer",
+  "xp": 40,
+  "bag": [
+    {
+      "item": "gold",
+      "count": 300
+    }
+  ],
+  "start": "spawn"
+}

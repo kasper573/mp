@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs, residentSpot } from "../helpers/character";
 import { caption, chapter } from "../helpers/demo";
 import {
   clickTile,
@@ -29,34 +29,14 @@ test(
   chapter({
     summary: "Who lives on the island, and what they have for you",
     setup: async (page) => {
-      await signIn(page, await provisionAccount(page, ["admin"]));
-      await clickUi(page, "Play");
+      await playAs(page, "swordsman", residentSpot("island", "mara"));
+      await signIn(page, await provisionAccount(page));
       await waitForWorld(page, loadReference("island.png"));
-      await admin(page, [["/give rusty_sword,1", /gave 1 Rusty Sword/]]);
     },
     play: async (page) => {
-      await caption(page, "Seven townsfolk live around the harbour — name plates show who they are");
-      await walkBelow(page, (snapshot) => townsperson(snapshot, "mara")?.at);
-      await page.waitForTimeout(1500);
-      await caption(page, "An icon over a head is the most important thing they have for you");
-      await page.waitForTimeout(3500);
-      await caption(page, "Things on the map can be used too: a notice board, a chest by the tide");
-      await walkBelow(page, (snapshot) => fixture(snapshot, "tide-chest")?.at);
-      const chest = await waitFor(page, (snapshot) => fixture(snapshot, "tide-chest"), "no tide chest");
-      await hoverTile(page, chest.aim);
-      await page.waitForTimeout(2200);
-      const board = await waitFor(page, (snapshot) => fixture(snapshot, "notice-board"), "no notice board");
-      await walkBelow(page, () => board.at);
-      await hoverTile(page, board.aim);
-      await page.waitForTimeout(2500);
-
       await caption(page, "Loot at a townsperson's feet? A click picks it up before it talks");
-      const { walkable, actors } = await probe(page);
-      const host = ["mara", "wren", "bram", "grisha"]
-        .map((npc) => actors.find((actor) => actor.npc === npc))
-        .find((actor) => actor && walkable.some((tile) => tile[0] === actor.at[0] && tile[1] === actor.at[1]))!;
-      await caption(page, `(Admin shortcut: drop a sword right where ${host.name} stands)`, { at: "top" });
-      await admin(page, [[`/tp ${host.at[0]},${host.at[1]}`, /teleported/]]);
+      const host = await waitFor(page, (snapshot) => townsperson(snapshot, "mara"), "no Mara");
+      await caption(page, `You arrived right where ${host.name} stands: drop a sword at her feet`, { at: "top" });
       await focusGame(page);
       await page.keyboard.press("KeyI");
       await page.keyboard.down("Control");
@@ -81,6 +61,21 @@ test(
         `${host.name} talked instead of letting you pick the sword up`,
       );
       await page.waitForTimeout(1500);
+
+      await caption(page, "Seven townsfolk live around the harbour — name plates show who they are");
+      await walkBelow(page, (snapshot) => townsperson(snapshot, "mara")?.at);
+      await page.waitForTimeout(1500);
+      await caption(page, "An icon over a head is the most important thing they have for you");
+      await page.waitForTimeout(3500);
+      await caption(page, "Things on the map can be used too: a notice board, a chest by the tide");
+      await walkBelow(page, (snapshot) => fixture(snapshot, "tide-chest")?.at);
+      const chest = await waitFor(page, (snapshot) => fixture(snapshot, "tide-chest"), "no tide chest");
+      await hoverTile(page, chest.aim);
+      await page.waitForTimeout(2200);
+      const board = await waitFor(page, (snapshot) => fixture(snapshot, "notice-board"), "no notice board");
+      await walkBelow(page, () => board.at);
+      await hoverTile(page, board.aim);
+      await page.waitForTimeout(2500);
     },
   }),
 );

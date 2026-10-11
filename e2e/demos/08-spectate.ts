@@ -1,7 +1,7 @@
 import { test, type Page } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
-import { admin } from "../helpers/admin";
+import { playAs } from "../helpers/character";
 import { caption, chapter, enterWorld } from "../helpers/demo";
 import {
   arrivedIn,
@@ -31,10 +31,9 @@ test(
       islander = await cast.newPage();
       await enterWorld(islander);
       explorer = await cast.newPage();
-      await signIn(explorer, await provisionAccount(explorer, ["admin"]));
-      await clickUi(explorer, "Play");
+      await playAs(explorer, "pass_holder");
+      await signIn(explorer, await provisionAccount(explorer));
       await waitForWorld(explorer, loadReference("island.png"));
-      await admin(explorer, [["/give road_pass,1", /gave 1 Road Pass/]]);
       const road = (await probe(explorer)).portals.find((portal) => portal.name === "forest-road")!;
       await travelTo(explorer, road.at);
       await waitFor(explorer, (snapshot) => arrivedIn(snapshot, road.to), "the explorer never reached the forest");
@@ -55,7 +54,7 @@ test(
       ]);
       await caption(page, "That includes their conversations, read along without a way to answer");
       await talkTo(islander, "tobb");
-      await onStage(page, "tobb_hello");
+      await onStage(page, "hello");
       await readToChoices(islander, 1800);
       await pick(islander, "A Letter for the Captain");
       await onStage(page, "letter_offer");

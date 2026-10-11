@@ -51,10 +51,7 @@ pub use rows::{NotificationRow, NotificationRows};
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
 const LATE_AFTER: Seconds = Seconds(2.0);
-const SERVER_LABEL: &str = "Server";
-const SERVER_LASTS: Seconds = Seconds(60.0);
 const LONGEST_ROW_WORDS: usize = 30;
-const LONGEST_NOTIFY_CHARS: usize = 160;
 
 pub fn register(app: &mut bevy_app::App) {
     use bevy_replicon::prelude::*;
@@ -491,35 +488,6 @@ pub fn notify_everywhere(worlds: &mut [&mut World], notification: &Notification)
             notify(world, player, notification.clone());
         }
     }
-}
-
-pub fn server_alert(content: &Content, message: impl Into<String>) -> Notification {
-    Notification {
-        kind: NotificationKind::Alert {
-            label: Cow::Borrowed(SERVER_LABEL),
-            sfx: Some(InterfaceSound::UiChime.id(content)),
-        },
-        text: LineText::plain(message),
-        lasts: Some(SERVER_LASTS),
-    }
-}
-
-/// Raise an alert for every player in every area.
-#[bevy_terminal::command(name = "notify", access = crate::systems::account::role::is_admin)]
-fn notify_command(
-    world: &mut World,
-    _ctx: &bevy_terminal::CommandCtx,
-    message: bevy_terminal::RestOfLine,
-) -> Result<String, String> {
-    let length = message.0.chars().count();
-    if length > LONGEST_NOTIFY_CHARS {
-        return Err(format!(
-            "{length} characters is too long, at most {LONGEST_NOTIFY_CHARS} fit"
-        ));
-    }
-    let alert = server_alert(world.resource::<Content>(), message.0);
-    broadcast(world, alert);
-    Ok("notified every area".to_owned())
 }
 
 pub struct NotificationPlugin;

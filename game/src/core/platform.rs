@@ -63,3 +63,13 @@ pub trait Platform: Send + Sync + 'static {
 
 #[derive(Resource, Clone)]
 pub struct ClientPlatform(pub Arc<dyn Platform>);
+
+/// Ends the process once whoever started it closes its stdin, so a child that outlives a crashed
+/// parent stops instead of lingering.
+pub fn exit_when_stdin_closes() {
+    std::thread::spawn(|| {
+        let mut sink = Vec::new();
+        let _ = std::io::Read::read_to_end(&mut std::io::stdin().lock(), &mut sink);
+        std::process::exit(0);
+    });
+}

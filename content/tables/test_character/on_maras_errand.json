@@ -1,0 +1,12 @@
+{
+  "name": "On Mara's Errand",
+  "job": "adventurer",
+  "xp": 40,
+  "quests": [
+    {
+      "quest": "tusks_for_the_chief",
+      "state": "active"
+    }
+  ],
+  "start": "spawn"
+}
