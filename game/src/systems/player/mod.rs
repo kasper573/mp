@@ -4,13 +4,14 @@ pub mod widget;
 use bevy_app::App;
 use bevy_ecs::component::Component;
 use bevy_ecs::message::Message;
+use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
-use crate::core::time::PlaybackRate;
+use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::Character;
 use crate::systems::GameSettings;
 use crate::systems::account::identity::Identity;
@@ -45,8 +46,10 @@ pub fn register(app: &mut App) {
     app.replicate::<Owner>()
         .replicate::<Xp>()
         .replicate::<CommandLock>()
+        .replicate::<ArrivalHold>()
         .add_client_message::<JoinRequest>(Channel::Ordered)
         .add_client_message::<RespawnRequest>(Channel::Ordered)
+        .add_client_message::<AreaDrawn>(Channel::Ordered)
         .add_server_message::<Welcome>(Channel::Ordered);
 }
 
@@ -85,6 +88,16 @@ impl Xp {
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CommandLock;
+
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct ArrivalHold {
+    pub until: Seconds,
+}
+
+pub const ARRIVAL_HOLD: Seconds = Seconds(5.0);
+
+#[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct AreaDrawn;
 
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct JoinRequest;
@@ -169,7 +182,31 @@ pub(crate) fn sender_player(
 }
 
 pub fn commands_locked(world: &World, player: Entity) -> bool {
-    world.get::<CommandLock>(player).is_some()
+    world.get::<CommandLock>(player).is_some() || held(world, player)
+}
+
+pub fn held(world: &World, entity: Entity) -> bool {
+    world.get::<ArrivalHold>(entity).is_some()
+}
+
+pub fn arrival_holds(world: &mut World) {
+    for request in crate::systems::requests::<AreaDrawn>(world) {
+        if let Some(player) = sender_player(world, request.client_id)
+            && let Ok(mut player) = world.get_entity_mut(player)
+        {
+            player.remove::<ArrivalHold>();
+        }
+    }
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    let expired: Vec<Entity> = world
+        .query::<(Entity, &ArrivalHold)>()
+        .iter(world)
+        .filter(|(_, hold)| hold.until <= now)
+        .map(|(entity, _)| entity)
+        .collect();
+    for entity in expired {
+        world.entity_mut(entity).remove::<ArrivalHold>();
+    }
 }
 
 pub fn by_user(world: &mut World, user: &str) -> Option<Entity> {
@@ -404,7 +441,13 @@ pub(crate) fn place(
         ))
         .id();
     state.stats.apply(world, entity);
-    world.entity_mut(entity).insert(SpawnPoint(state.spawn));
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    world.entity_mut(entity).insert((
+        SpawnPoint(state.spawn),
+        ArrivalHold {
+            until: now + ARRIVAL_HOLD,
+        },
+    ));
     let belongings = belongings::of(world, entity);
     world.entity_mut(entity).insert(belongings);
     world.resource_mut::<Players>().0.insert(client, entity);

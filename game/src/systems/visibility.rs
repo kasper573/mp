@@ -16,7 +16,7 @@ use crate::systems::attention::Attention;
 use crate::systems::dialogue::Conversation;
 use crate::systems::item::Inventory;
 use crate::systems::movement::{Position, position};
-use crate::systems::player::{ClientId, CommandLock, Owner, Players};
+use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players};
 use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
@@ -182,6 +182,7 @@ impl VisibilityFilter for OwnedBy {
         Inventory,
         Conversation,
         CommandLock,
+        ArrivalHold,
         Attention,
         ShopView,
         QuestLog,

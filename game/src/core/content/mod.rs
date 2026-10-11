@@ -7,6 +7,7 @@ pub mod locate;
 pub mod media;
 pub mod report;
 pub mod serial;
+pub mod store;
 pub mod sync;
 pub mod table;
 pub mod version;
@@ -17,7 +18,7 @@ pub use id::{ContentId, ContentScope, UnknownRow, with_content};
 pub use key::{KeyBuf, key_of};
 pub use load::{
     ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
-    LoadStep, Loading, Settings, load, write,
+    LoadStep, Loading, MemoryFolder, Settings, load, write,
 };
 pub use report::{ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};

@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use bevy::asset::AssetApp;
 use bevy::asset::io::AssetSourceId;
 use bevy::prelude::*;
+use game::core::assets::SyncedFiles;
 use game::core::math::Rng;
 use game::systems::account::Role;
 use game::{core, systems};
@@ -31,14 +34,10 @@ fn boot() {
     });
 
     let mut app = App::new();
-    let content = crate::assets::content();
-    let fonts = systems::interface::font_files(&content);
-    app.insert_resource(content.built::<systems::quest::Parties>().clone());
-    app.insert_resource(content.built::<systems::script::RiftScripts>().clone());
-    app.insert_resource(content.built::<systems::GameSettings>().clone());
-    app.insert_resource(content);
+    let files = SyncedFiles::default();
+    app.insert_resource(files.clone());
     app.insert_resource(Rng::from_entropy());
-    app.register_asset_source(AssetSourceId::Default, crate::assets::bevy_source())
+    app.register_asset_source(AssetSourceId::Default, files.source())
         .add_plugins(
             DefaultPlugins
                 .set(bevy::log::LogPlugin {
@@ -55,11 +54,11 @@ fn boot() {
         app.insert_resource(session);
     }
     app.insert_resource(params)
-        .insert_resource(core::platform::ClientPlatform(Box::new(
+        .insert_resource(core::platform::ClientPlatform(Arc::new(
             crate::platform::WebPlatform,
         )))
         .add_plugins((
-            ui::UiPlugin { fonts },
+            ui::UiPlugin,
             core::net::transport::RepliconRenetClientPlugin,
             core::interpolate::SnapshotPlugin {
                 period: systems::REPLICATION_PERIOD,

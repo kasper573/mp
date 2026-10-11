@@ -19,7 +19,7 @@ use crate::systems::job::{self, Job};
 use crate::systems::memory;
 use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, Pack, body};
-use crate::systems::player::Owner as PlayerOwner;
+use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
 use crate::systems::quest::{self, Objective};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility;
@@ -72,6 +72,7 @@ pub struct Listed {
     pub npc: Option<crate::systems::npc::Id>,
     pub character: bool,
     pub dead: bool,
+    pub held: bool,
     pub presence: bool,
 }
 
@@ -116,6 +117,7 @@ type RosterQuery = QueryState<
         Option<&'static Npc>,
         Option<&'static Stats>,
         Has<PlayerOwner>,
+        Has<ArrivalHold>,
         Has<Presence>,
     ),
     Or<(With<PlayerOwner>, With<Npc>)>,
@@ -124,19 +126,18 @@ type RosterQuery = QueryState<
 pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
     let mut listed = std::mem::take(&mut world.get_resource_or_init::<ActorRoster>().listed);
     listed.clear();
-    listed.extend(
-        query.iter(world).map(
-            |(entity, at, tag, npc, stats, character, presence)| Listed {
-                entity,
-                at: at.pos,
-                area: tag.area,
-                npc: npc.map(|npc| npc.def),
-                character,
-                dead: stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0),
-                presence,
-            },
-        ),
-    );
+    listed.extend(query.iter(world).map(
+        |(entity, at, tag, npc, stats, character, held, presence)| Listed {
+            entity,
+            at: at.pos,
+            area: tag.area,
+            npc: npc.map(|npc| npc.def),
+            character,
+            dead: stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0),
+            held,
+            presence,
+        },
+    ));
     let mut areas = std::mem::take(&mut world.resource_mut::<ActorRoster>().areas);
     let assets = world.resource::<Content>();
     for entry in &listed {
@@ -700,6 +701,7 @@ pub fn around<'w>(
         let fits = listed.entity != scan.owner
             && listed.area == scan.area
             && !listed.dead
+            && !listed.held
             && match among {
                 Among::Characters => listed.character,
                 Among::Npcs => listed.npc.is_some(),

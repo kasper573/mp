@@ -216,7 +216,7 @@ build:
     cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
 
 # The browser client: a wasm binary post-processed by wasm-bindgen into the bundle the website serves
-# (and bakes into its image). Assets are embedded in the binary, so there's nothing else to ship. The
+# (and bakes into its image). It carries code only; content syncs from the game server at boot. The
 # dev loop builds it plain and fast; the deploy alone re-runs this with LTO + size opt-level + strip
 # (env, see ci.yml) to roughly halve the bundle for mobile Safari's per-tab memory budget.
 wasm:

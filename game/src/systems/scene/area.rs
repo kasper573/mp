@@ -12,6 +12,7 @@ use crate::systems::actor::Actor;
 use crate::systems::area::{self, AreaTag, tileset};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
+use crate::systems::player::AreaDrawn;
 use crate::systems::player::session::{self, Viewpoint};
 use bevy::prelude::*;
 use bevy::scene::EntityScene;
@@ -38,12 +39,13 @@ impl Plugin for AreaPlugin {
                 )
                     .run_if(in_state(super::Scene::Area)),
             )
+            .add_systems(OnEnter(super::Scene::Area), restart_patience)
             .add_systems(
                 OnExit(super::Scene::Area),
                 (
                     crate::systems::scene::despawn_all::<DeathBanner>,
                     silence_soundscape,
-                    forget_crossing,
+                    leave_area,
                 ),
             );
     }
@@ -63,6 +65,7 @@ struct SpawnedArea {
 struct Crossing {
     last_seen: Option<Pose>,
     held: Option<Held>,
+    drawn: Option<area::Id>,
 }
 
 #[derive(Clone, Copy)]
@@ -83,7 +86,11 @@ struct Held {
 
 fn carry_view_across(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let Crossing { last_seen, held } = *world.resource::<Crossing>();
+    let Crossing {
+        last_seen,
+        held,
+        drawn,
+    } = *world.resource::<Crossing>();
     let (last_seen, held) = match world.resource::<Viewpoint>().0 {
         Some(character) => match (pose_of(world, character), held, last_seen) {
             (None, _, _) => (last_seen, held),
@@ -110,7 +117,9 @@ fn carry_view_across(world: &mut World) {
             (Some(pose), None, _) => (Some(pose), None),
         },
         None => match (held, last_seen) {
-            (Some(_), _) if session::followed(world).is_none() => {
+            (Some(_), _)
+                if session::my_id(world).is_some() && session::followed(world).is_none() =>
+            {
                 transition::abort(world);
                 (None, None)
             }
@@ -125,7 +134,32 @@ fn carry_view_across(world: &mut World) {
             _ => (None, held),
         },
     };
-    *world.resource_mut::<Crossing>() = Crossing { last_seen, held };
+    let drawn = match last_seen {
+        Some(pose) if held.is_none() && drawn != Some(pose.area) => {
+            if area_drawable(world, pose.area) {
+                world.write_message(AreaDrawn);
+                Some(pose.area)
+            } else {
+                None
+            }
+        }
+        Some(_) => drawn,
+        None => None,
+    };
+    *world.resource_mut::<Crossing>() = Crossing {
+        last_seen,
+        held,
+        drawn,
+    };
+}
+
+/// The patience counts from arriving in the area scene, not from when the veil came down: a
+/// reconnect may take any time, and the world behind it still needs its frames to draw.
+fn restart_patience(world: &mut World) {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    if let Some(held) = world.resource_mut::<Crossing>().held.as_mut() {
+        held.since = now;
+    }
 }
 
 impl Held {
@@ -163,9 +197,31 @@ fn area_drawable(world: &mut World, area: area::Id) -> bool {
     pending.iter().all(|image| images.contains(image))
 }
 
-fn forget_crossing(world: &mut World) {
-    transition::abort(world);
-    *world.resource_mut::<Crossing>() = Crossing::default();
+/// Leaving the area scene keeps the last view under the veil, so a lost connection or a content
+/// deploy shows the loading and reconnect cards over a frozen world and reveals the next one from
+/// where the character lands.
+fn leave_area(world: &mut World) {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    let Crossing {
+        last_seen, held, ..
+    } = *world.resource::<Crossing>();
+    let held = match (last_seen, held) {
+        (Some(pose), None) => {
+            transition::freeze(world, pose.at, pose.heading);
+            Some(Held::new(now, pose))
+        }
+        (Some(_), Some(held)) => Some(held),
+        (None, _) => {
+            transition::abort(world);
+            None
+        }
+    };
+    *world.resource_mut::<Crossing>() = Crossing {
+        last_seen: None,
+        held,
+        drawn: None,
+    };
+    world.resource_mut::<SpawnedArea>().area = None;
     world.resource_mut::<RetainedImages>().0.clear();
 }
 

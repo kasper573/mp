@@ -356,7 +356,7 @@ fn install() {
 
 // A snapshot scans the whole world every frame, so only a page that has asked for one pays for it.
 fn publish(world: &mut World) {
-    if REQUESTED.get() {
+    if REQUESTED.get() && world.contains_resource::<Content>() {
         let scope = ContentScope::of(world.resource::<Content>());
         let snapshot = snapshot(world);
         let (snapshot, _) = with_content(scope, || {

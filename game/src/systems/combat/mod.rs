@@ -34,6 +34,7 @@ pub enum Attitude {
 
 pub fn attackable(world: &World, attacker: Entity, target: Entity) -> bool {
     world.get::<Attitude>(target) != Some(&Attitude::Friendly)
+        && !player::held(world, target)
         && visibility::coexist(world, attacker, target)
 }
 
@@ -136,7 +137,10 @@ pub fn combat(
 }
 
 pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) -> bool {
-    if world.get_entity(target).is_err() || stat::is_dead(world, target) {
+    if world.get_entity(target).is_err()
+        || stat::is_dead(world, target)
+        || player::held(world, target)
+    {
         return false;
     }
     let time = Seconds(world.resource::<Time>().elapsed_secs());

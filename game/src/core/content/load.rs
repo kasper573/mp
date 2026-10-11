@@ -196,6 +196,49 @@ impl ContentFolder for FilesystemFolder {
     }
 }
 
+pub struct MemoryFolder {
+    pub name: String,
+    pub files: BTreeMap<String, Arc<[u8]>>,
+}
+
+impl ContentFolder for MemoryFolder {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn entries(&self, dir: &str) -> Vec<FolderEntry> {
+        let prefix = if dir.is_empty() {
+            String::new()
+        } else {
+            format!("{dir}/")
+        };
+        let mut entries: Vec<FolderEntry> = self
+            .files
+            .keys()
+            .filter_map(|path| path.strip_prefix(&prefix))
+            .map(|rest| match rest.split_once('/') {
+                Some((name, _)) => FolderEntry {
+                    name: name.to_owned(),
+                    dir: true,
+                },
+                None => FolderEntry {
+                    name: rest.to_owned(),
+                    dir: false,
+                },
+            })
+            .collect();
+        entries.dedup();
+        entries
+    }
+
+    fn read(&self, file: &str) -> io::Result<Vec<u8>> {
+        self.files
+            .get(file)
+            .map(|bytes| bytes.to_vec())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("missing {file}")))
+    }
+}
+
 /// The `game.json` row.
 pub trait Settings: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 'static {
     fn content_version(&self) -> &ContentVersion;

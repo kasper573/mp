@@ -654,7 +654,13 @@ async fn content_file(
     }
 }
 
-async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {
+#[derive(serde::Deserialize)]
+struct SessionRequest {
+    build: String,
+    rows: String,
+}
+
+async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
@@ -663,6 +669,16 @@ async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {
         Ok(identity) => identity,
         Err(status) => return status.into_response(),
     };
+    let request: SessionRequest = match serde_json::from_str(&body) {
+        Ok(request) => request,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if request.build != version::build() {
+        return (StatusCode::CONFLICT, "reload").into_response();
+    }
+    if request.rows != http.served.manifest.rows.hash {
+        return (StatusCode::CONFLICT, "sync").into_response();
+    }
 
     // The ticket is the renet client id. The browser opens `wss://host/?ticket=<id>`; the WebSocket
     // handshake claims it single-use. Unguessable in 2^64, ~30s expiry, only ever sent over TLS.

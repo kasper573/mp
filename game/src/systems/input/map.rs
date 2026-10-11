@@ -335,9 +335,10 @@ impl From<InputAction> for InputRef {
 }
 
 pub(super) fn plugin(app: &mut App) {
-    let map = InputMap::new(app.world().resource::<Content>());
-    app.insert_resource(map)
-        .add_systems(PreUpdate, publish.run_if(resource_changed::<InputMap>));
+    app.add_systems(
+        PreUpdate,
+        publish.run_if(resource_exists_and_changed::<InputMap>),
+    );
 }
 
 fn publish(map: Res<InputMap>, mut catalog: ResMut<InputCatalog>) {

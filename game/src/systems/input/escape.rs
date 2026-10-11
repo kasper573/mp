@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::map::{self, InputAction};
+use super::map::{self, InputAction, InputMap};
 use crate::systems::dialogue::stage;
 use crate::systems::history::widget as history;
 use crate::systems::{hud, item};
@@ -14,7 +14,12 @@ static LAYERS: &[fn(&mut World) -> bool] = &[
 ];
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, dismiss_topmost.run_if(not(ui::typing)));
+    app.add_systems(
+        Update,
+        dismiss_topmost
+            .run_if(not(ui::typing))
+            .run_if(resource_exists::<InputMap>),
+    );
 }
 
 fn dismiss_topmost(world: &mut World) {

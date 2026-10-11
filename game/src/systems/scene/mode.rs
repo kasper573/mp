@@ -3,7 +3,7 @@ use bevy::scene::EntityScene;
 use ui::{Activate, button, text_colored};
 
 use super::Scene;
-use super::connection;
+use super::loading::AfterLoading;
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -40,14 +40,14 @@ fn choose_mode(mut commands: Commands) {
     });
 }
 
-fn enter(
-    mode: Mode,
-) -> impl Fn(On<Activate>, ResMut<Mode>, ResMut<NextState<Scene>>, Commands) + Clone {
-    move |_, mut current, mut next, mut commands| {
-        *current = mode;
+fn enter(mode: Mode) -> impl Fn(On<Activate>, Commands) + Clone {
+    move |_, mut commands| {
         commands.queue(move |world: &mut World| {
-            connection::open_session(world, mode == Mode::Spectate)
+            *world.resource_mut::<Mode>() = mode;
+            world.resource_mut::<AfterLoading>().0 = Scene::Connecting;
+            world
+                .resource_mut::<NextState<Scene>>()
+                .set(Scene::Connecting);
         });
-        next.set(Scene::Connecting);
     }
 }

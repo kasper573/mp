@@ -113,9 +113,14 @@ pub struct BabblePlugin;
 
 impl Plugin for BabblePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BabbleClips>()
-            .add_systems(Startup, load_clips)
-            .add_systems(Update, babble);
+        app.init_resource::<BabbleClips>().add_systems(
+            Update,
+            (
+                load_clips.run_if(resource_exists_and_changed::<Content>),
+                babble.run_if(resource_exists::<Content>),
+            )
+                .chain(),
+        );
     }
 }
 

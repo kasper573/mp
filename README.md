@@ -42,4 +42,5 @@ The website lives at <https://rift.localhost> and Grafana at <https://grafana.ri
 ## Release and deploy
 
 Pushing to `main` builds the wasm client and stack images, and deploys them to production. The
-website serves the embedded-wasm `/play` endpoint.
+website serves the wasm at `/play`; the game server serves the content folder, which the client
+syncs at boot and keeps on the device.

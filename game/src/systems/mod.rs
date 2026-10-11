@@ -46,6 +46,8 @@ use bevy_ecs::prelude::{Bundle, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
 use bevy_terminal::Terminal;
 
+use crate::core::assets::SyncedFiles;
+use crate::core::content::sync::SyncedContent;
 use crate::core::content::{Content, ContentFolder, ContentRegistry, LoadReport};
 use terminal::TerminalKind;
 
@@ -190,6 +192,7 @@ pub fn server_app(
             (
                 (
                     actor::reset,
+                    player::arrival_holds,
                     combat::regen,
                     movement::move_request,
                     combat::request,
@@ -286,6 +289,38 @@ pub fn load_content(
         crate::core::content::version::build(),
         outcome,
     )
+}
+
+pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), LoadReport> {
+    let before = world.get_resource::<SyncedContent>();
+    if before.is_some_and(|before| before.same_as(&synced)) {
+        return Ok(());
+    }
+    let content = load_content(
+        std::sync::Arc::new(synced.folder()),
+        "the content did not load",
+    )?;
+    let changed = before.map(|before| synced.changed_assets(before));
+    world
+        .resource::<SyncedFiles>()
+        .replace(synced.assets.clone());
+    if let Some(changed) = changed {
+        let assets = world.resource::<bevy::asset::AssetServer>();
+        for path in changed {
+            let path = bevy::asset::AssetPath::from(path);
+            if assets.get_path_id(path.clone()).is_some() {
+                assets.reload(path);
+            }
+        }
+    }
+    world.insert_resource(content.built::<quest::Parties>().clone());
+    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    world.insert_resource(content.built::<GameSettings>().clone());
+    world.insert_resource(ui::FontFiles(interface::font_files(&content)));
+    world.insert_resource(input::map::InputMap::new(&content));
+    world.insert_resource(content);
+    world.insert_resource(synced);
+    Ok(())
 }
 
 pub fn registry() -> ContentRegistry {

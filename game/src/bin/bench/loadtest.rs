@@ -16,6 +16,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_replicon::prelude::*;
 use bevy_state::prelude::*;
+use game::core::content::sync::Manifest;
 use game::core::net::channels::RenetChannelsExt;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
@@ -242,9 +243,18 @@ fn build_client(http_url: &str, ws_url: &str, index: usize) -> Option<App> {
 }
 
 fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
+    let manifest = ureq::get(format!("{http_url}/content/manifest"))
+        .call()
+        .ok()?
+        .body_mut()
+        .read_to_string()
+        .ok()?;
+    let manifest: Manifest = serde_json::from_str(&manifest).ok()?;
+    let body = serde_json::json!({ "build": manifest.build, "rows": manifest.rows.hash });
     let mut response = ureq::post(format!("{http_url}/session"))
         .header("Authorization", format!("fake:{fake_id}"))
-        .send_empty()
+        .header("Content-Type", "application/json")
+        .send(body.to_string())
         .ok()?;
     Some(response.body_mut().read_to_string().ok()?.trim().to_owned())
 }

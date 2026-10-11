@@ -23,12 +23,10 @@ impl Plugin for ActorPlugin {
             .add_plugins(InterpolatePlugin::<RenderActor>::default())
             .add_systems(
                 Update,
-                (
-                    attach_sprites,
-                    (sync_actors, actor_cues).run_if(in_state(crate::systems::scene::Scene::Area)),
-                )
+                (attach_sprites, sync_actors, actor_cues)
                     .chain()
-                    .in_set(WorldViewSystems),
+                    .in_set(WorldViewSystems)
+                    .run_if(in_state(crate::systems::scene::Scene::Area)),
             );
     }
 }

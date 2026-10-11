@@ -15,7 +15,7 @@ use game::systems::interface::InterfaceSound;
 use game::systems::movement::{Position, position};
 use game::systems::notification::{self, Notification, NotificationKind, NotificationSent};
 use game::systems::npc::{self, Pack};
-use game::systems::player::{Xp, commands_locked};
+use game::systems::player::{AreaDrawn, Xp, commands_locked};
 use game::systems::quest;
 use game::systems::quest::Id as QuestId;
 use game::systems::terminal::TerminalKind as TerminalId;
@@ -78,6 +78,7 @@ fn travel(from: &mut Sim, player: Entity, to: game::systems::area::Id) -> (Sim, 
         .pop()
         .expect("a traveler");
     let arrived = transition::arrive(there.world(), traveler);
+    there.send(1, AreaDrawn);
     settle(&mut there);
     (there, arrived)
 }

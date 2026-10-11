@@ -1,5 +1,6 @@
 pub mod area;
 pub mod connection;
+pub mod loading;
 pub mod mode;
 
 use bevy::prelude::*;
@@ -11,6 +12,7 @@ use connection::{Announce, PendingSession};
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Scene {
     #[default]
+    Loading,
     Mode,
     Connecting,
     Lost,
@@ -23,20 +25,19 @@ pub struct ScenePlugin {
 
 impl Plugin for ScenePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_state(if self.spectator {
-            Scene::Mode
-        } else {
-            Scene::Connecting
-        })
-        .add_plugins((
-            mode::ModePlugin,
-            connection::ConnectionPlugin,
-            area::AreaPlugin,
-        ))
-        .add_systems(Update, (drive, announce));
-        if !self.spectator {
-            app.add_systems(Startup, begin);
-        }
+        app.init_state::<Scene>()
+            .insert_resource(loading::AfterLoading(if self.spectator {
+                Scene::Mode
+            } else {
+                Scene::Connecting
+            }))
+            .add_plugins((
+                loading::LoadingPlugin,
+                mode::ModePlugin,
+                connection::ConnectionPlugin,
+                area::AreaPlugin,
+            ))
+            .add_systems(Update, (connection::poll_session, drive, announce).chain());
     }
 }
 
@@ -46,7 +47,8 @@ fn drive(
     scene: Res<State<Scene>>,
     mut next: ResMut<NextState<Scene>>,
 ) {
-    if *scene.get() == Scene::Mode {
+    if matches!(scene.get(), Scene::Mode | Scene::Loading) || !matches!(*next, NextState::Unchanged)
+    {
         return;
     }
     let connected = client
@@ -66,10 +68,6 @@ fn drive(
     if *scene.get() != target {
         next.set(target);
     }
-}
-
-fn begin(world: &mut World) {
-    connection::open_session(world, false);
 }
 
 fn announce(world: &mut World) {

@@ -1,16 +1,17 @@
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
-use std::future::Future;
-use std::pin::Pin;
 use std::rc::Rc;
 
 use bevy::prelude::*;
-use game::core::platform::{Platform, ServerSocket, StartParams};
+use game::core::content::store::ContentStore;
+use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, StartParams};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 
 const CANVAS: &str = "#glcanvas";
+const STATUS: &str = "sync-status";
+const RELOADED_FOR: &str = "rift.reloaded-for";
 
 pub struct WebPlatform;
 
@@ -60,22 +61,68 @@ impl Platform for WebPlatform {
         }
     }
 
-    fn fetch(
+    fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
+        Box::pin(async move {
+            let response = gloo_net::http::Request::get(&url)
+                .send()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?;
+            refused(&response).await?;
+            response
+                .binary()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))
+        })
+    }
+
+    fn post(
         &self,
         url: String,
         authorization: String,
-    ) -> Pin<Box<dyn Future<Output = Result<String, String>>>> {
+        body: String,
+    ) -> LocalFuture<Result<String, FetchFailure>> {
         Box::pin(async move {
             let response = gloo_net::http::Request::post(&url)
                 .header("Authorization", &authorization)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?
                 .send()
                 .await
-                .map_err(|error| error.to_string())?;
-            if !response.ok() {
-                return Err(format!("session request failed: {}", response.status()));
-            }
-            response.text().await.map_err(|error| error.to_string())
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?;
+            refused(&response).await?;
+            response
+                .text()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))
         })
+    }
+
+    fn content_store(&self) -> Box<dyn ContentStore> {
+        Box::new(crate::store::WebStore)
+    }
+
+    fn announce(&self, status: &str) {
+        if let Some(element) = web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.get_element_by_id(STATUS))
+        {
+            element.set_text_content(Some(status));
+        }
+    }
+
+    fn relaunch(&self, build: &str) -> bool {
+        let Some(window) = web_sys::window() else {
+            return false;
+        };
+        let Some(session) = window.session_storage().ok().flatten() else {
+            return false;
+        };
+        if session.get_item(RELOADED_FOR).ok().flatten().as_deref() == Some(build) {
+            return false;
+        }
+        let _ = session.set_item(RELOADED_FOR, build);
+        window.location().reload().is_ok()
     }
 
     fn local_clock(&self) -> LocalClock {
@@ -127,6 +174,16 @@ pub fn expose_global_fn(name: &str, hook: impl Fn() -> Option<String> + 'static)
 
 fn storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok()?
+}
+
+async fn refused(response: &gloo_net::http::Response) -> Result<(), FetchFailure> {
+    if response.ok() {
+        return Ok(());
+    }
+    Err(FetchFailure::Status {
+        status: response.status(),
+        body: response.text().await.unwrap_or_default(),
+    })
 }
 
 struct WsSocket {

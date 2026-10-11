@@ -7,20 +7,30 @@ use ui::{Activate, button, text_colored};
 
 use super::Scene;
 use super::mode::Mode;
+use crate::core::content::sync::SyncedContent;
+use crate::core::content::version;
+use crate::core::math::Rng;
 use crate::core::net::auth::Session;
 use crate::core::net::channels::RenetChannelsExt;
 use crate::core::net::transport::{Client, Socket};
-use crate::core::platform::{ClientPlatform, StartParams};
+use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
+use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::time::Seconds;
 
-const OVERLAY_BG: Color = Color::srgb(0.07, 0.07, 0.07);
+pub(super) const OVERLAY_BG: Color = Color::srgb(0.07, 0.07, 0.07);
+
+const FIRST_RETRY: Seconds = Seconds(1.0);
+const LONGEST_RETRY: Seconds = Seconds(30.0);
 
 pub struct ConnectionPlugin;
 
 impl Plugin for ConnectionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, poll_session)
-            .add_systems(OnEnter(Scene::Connecting), connecting)
+        app.init_resource::<Reconnect>()
+            .add_systems(OnEnter(Scene::Connecting), (connecting, begin_session))
             .add_systems(OnEnter(Scene::Lost), lost)
+            .add_systems(OnEnter(Scene::Area), settle)
+            .add_systems(Update, retry_when_due.run_if(in_state(Scene::Lost)))
             .add_systems(
                 OnExit(Scene::Connecting),
                 crate::systems::scene::despawn_all::<ConnectionUi>,
@@ -39,8 +49,20 @@ pub struct Announce {
 
 #[derive(Resource)]
 pub struct PendingSession {
-    task: Task<Result<String, String>>,
+    task: Task<Result<String, FetchFailure>>,
     spectate: bool,
+}
+
+#[derive(Resource, Default)]
+struct Reconnect {
+    attempt: u32,
+    due: Option<Seconds>,
+}
+
+#[derive(serde::Serialize)]
+struct SessionRequest<'a> {
+    build: &'a str,
+    rows: &'a str,
 }
 
 pub fn open_session(world: &mut World, spectate: bool) {
@@ -49,15 +71,22 @@ pub fn open_session(world: &mut World, spectate: bool) {
         return;
     };
     let game_server_url = world.resource::<StartParams>().game_server_url.clone();
-    let fetch = world
-        .resource::<ClientPlatform>()
-        .0
-        .fetch(format!("{game_server_url}/session"), session.authorization);
+    let rows = world.resource::<SyncedContent>().manifest.rows.hash.clone();
+    let body = serde_json::to_string(&SessionRequest {
+        build: version::build(),
+        rows: &rows,
+    })
+    .expect("a session request serializes");
+    let fetch = world.resource::<ClientPlatform>().0.post(
+        format!("{game_server_url}/session"),
+        session.authorization,
+        body,
+    );
     let task = IoTaskPool::get().spawn_local(fetch);
     world.insert_resource(PendingSession { task, spectate });
 }
 
-fn poll_session(world: &mut World) {
+pub(super) fn poll_session(world: &mut World) {
     let Some(mut pending) = world.remove_resource::<PendingSession>() else {
         return;
     };
@@ -68,9 +97,26 @@ fn poll_session(world: &mut World) {
                 spectate: pending.spectate,
             });
         }
+        Some(Err(FetchFailure::Status { status: 409, body })) => {
+            info!("the server refused the session: {body}");
+            match body.trim() {
+                "reload" => {
+                    let platform = world.resource::<ClientPlatform>().0.clone();
+                    if !platform.relaunch("the server's") {
+                        error!("another build is live and this one already reloaded once");
+                    }
+                }
+                _ => world.resource_mut::<NextState<Scene>>().set(Scene::Loading),
+            }
+        }
         Some(Err(error)) => error!("could not open a session: {error}"),
         None => world.insert_resource(pending),
     }
+}
+
+fn begin_session(world: &mut World) {
+    let spectate = *world.resource::<Mode>() == Mode::Spectate;
+    open_session(world, spectate);
 }
 
 fn connect(world: &mut World, ticket: &str) {
@@ -92,30 +138,74 @@ fn connect(world: &mut World, ticket: &str) {
 #[derive(Component, Default, Clone)]
 struct ConnectionUi;
 
-fn connecting(mut commands: Commands) {
+fn connecting(mut commands: Commands, phase: Res<ScreenTransitionPhase>) {
+    let background = overlay(*phase);
     commands.spawn_scene(bsn! {
         ConnectionUi
         template_value(super::screen_node())
-        BackgroundColor({OVERLAY_BG})
+        BackgroundColor({background})
         GlobalZIndex({ui::tokens::layer::SYSTEM})
-        Children [ {EntityScene(text_colored("Connecting...", Color::WHITE))} ]
+        Children [ {EntityScene(text_colored("Connecting…", Color::WHITE))} ]
     });
 }
 
-fn lost(mut commands: Commands) {
-    commands.spawn_scene(bsn! {
+fn lost(world: &mut World) {
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
+    let attempt = world.resource::<Reconnect>().attempt;
+    let doubled = Seconds(FIRST_RETRY.0 * 2f32.powi(attempt.min(16) as i32));
+    let base = if doubled.0 > LONGEST_RETRY.0 {
+        LONGEST_RETRY
+    } else {
+        doubled
+    };
+    let jitter = 0.5 + world.resource_mut::<Rng>().rand_float();
+    *world.resource_mut::<Reconnect>() = Reconnect {
+        attempt: attempt + 1,
+        due: Some(now + Seconds(base.0 * jitter)),
+    };
+    let background = overlay(*world.resource::<ScreenTransitionPhase>());
+    let _ = world.spawn_scene(bsn! {
         ConnectionUi
         template_value(super::screen_node())
-        BackgroundColor({OVERLAY_BG})
+        BackgroundColor({background})
         GlobalZIndex({ui::tokens::layer::SYSTEM})
         Children [
             {EntityScene(text_colored("Connection lost", Color::WHITE))},
-            ( {button("Reconnect")} on(reconnect) ),
+            {EntityScene(text_colored("Reconnecting…", Color::WHITE))},
+            ( {button("Retry now")} on(retry_now) ),
         ]
     });
 }
 
-fn reconnect(_: On<Activate>, mode: Res<Mode>, mut commands: Commands) {
-    let spectate = *mode == Mode::Spectate;
-    commands.queue(move |world: &mut World| open_session(world, spectate));
+fn settle(mut reconnect: ResMut<Reconnect>) {
+    *reconnect = Reconnect::default();
+}
+
+fn retry_when_due(
+    time: Res<Time>,
+    mut reconnect: ResMut<Reconnect>,
+    mut next: ResMut<NextState<Scene>>,
+) {
+    let now = Seconds(time.elapsed_secs());
+    if reconnect.due.is_some_and(|due| now >= due) {
+        reconnect.due = None;
+        next.set(Scene::Loading);
+    }
+}
+
+fn retry_now(
+    _: On<Activate>,
+    mut reconnect: ResMut<Reconnect>,
+    mut next: ResMut<NextState<Scene>>,
+) {
+    reconnect.due = None;
+    next.set(Scene::Loading);
+}
+
+fn overlay(phase: ScreenTransitionPhase) -> Color {
+    if phase == ScreenTransitionPhase::Idle {
+        OVERLAY_BG
+    } else {
+        Color::NONE
+    }
 }

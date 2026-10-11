@@ -35,8 +35,12 @@ static GESTURES: &[&dyn Gesture] = &[
 ];
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Startup, setup)
-        .add_systems(Update, update.in_set(WorldViewSystems));
+    app.add_systems(Startup, setup).add_systems(
+        Update,
+        update
+            .in_set(WorldViewSystems)
+            .run_if(in_state(crate::systems::scene::Scene::Area)),
+    );
 }
 
 #[derive(Resource)]

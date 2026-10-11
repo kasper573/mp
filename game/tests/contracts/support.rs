@@ -29,7 +29,7 @@ use game::systems::notification::Id as NotificationId;
 use game::systems::notification::{Notification, NotificationKind, NotificationSent};
 use game::systems::npc::Id as NpcId;
 use game::systems::npc::{self, Npc, Pack};
-use game::systems::player::{ClientId, Immortal, JoinRequest, Players};
+use game::systems::player::{AreaDrawn, ClientId, Immortal, JoinRequest, Players};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
@@ -132,6 +132,7 @@ impl Sim {
         self.connect(client);
         self.send(client, JoinRequest);
         self.tick();
+        self.send(client, AreaDrawn);
         *self
             .world()
             .resource::<Players>()

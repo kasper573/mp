@@ -30,8 +30,15 @@ impl Plugin for SfxPlugin {
             .init_resource::<Played>()
             .add_message::<PlaySfx>()
             .add_message::<PlayClip>()
-            .add_systems(Startup, load)
-            .add_systems(Update, (mix, play_clips));
+            .add_systems(
+                Update,
+                (
+                    load.run_if(resource_exists_and_changed::<Content>),
+                    mix,
+                    play_clips,
+                )
+                    .chain(),
+            );
     }
 }
 
