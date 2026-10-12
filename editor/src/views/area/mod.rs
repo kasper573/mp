@@ -85,12 +85,6 @@ pub struct Hover {
 
 #[derive(Clone, Debug)]
 pub enum Deferred {
-    AddWithRow {
-        kind: AreaModuleKind,
-        field: String,
-        key: String,
-        at: Pos<Tiles>,
-    },
     Copy,
     Duplicate,
     Unpack(usize),
@@ -98,15 +92,6 @@ pub enum Deferred {
     Split(usize),
     ReturnDoor(usize),
     AdoptBlocks(usize),
-}
-
-#[derive(Clone, Debug)]
-pub struct DropMenu {
-    pub table: String,
-    pub key: String,
-    pub at: Pos<Tiles>,
-    pub screen: Pos2,
-    pub candidates: Vec<(AreaModuleKind, String)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -225,8 +210,6 @@ pub struct ViewState {
     pub deferred: Vec<Deferred>,
     pub menu: Option<modules::MenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,
-    pub drop_menu: Option<DropMenu>,
-    pub drag_hover: Option<(String, String, Pos<Tiles>)>,
     pub population_hidden: HashSet<usize>,
     pub population_seed: HashMap<usize, u64>,
     pub walk_value: Option<bool>,
@@ -270,8 +253,6 @@ impl ViewState {
             deferred: Vec::new(),
             menu: None,
             ghost: None,
-            drop_menu: None,
-            drag_hover: None,
             population_hidden: HashSet::new(),
             population_seed: HashMap::new(),
             walk_value: Some(false),
@@ -572,7 +553,6 @@ fn show_canvas(
         generation,
     );
     banners(editor, ui, view_key, content, canvas_rect);
-    drop_menu(editor, ui, view_key);
     let mut rail_ui = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rail)
@@ -711,89 +691,6 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, c
     }
 }
 
-fn drop_menu(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
-    use crate::ui::{theme, widgets};
-    let Some(menu) = editor.views.area.views[view_key].drop_menu.clone() else {
-        return;
-    };
-    let mut choice: Option<(AreaModuleKind, String)> = None;
-    let mut cancel = ui.input(|i| i.key_pressed(egui::Key::Escape));
-    egui::Area::new(ui.id().with((view_key, "drop-menu")))
-        .fixed_pos(menu.screen + Vec2::new(12.0, 12.0))
-        .order(egui::Order::Foreground)
-        .show(ui.ctx(), |ui| {
-            egui::Frame::new()
-                .fill(theme::RAISED)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(6.0)
-                .inner_margin(8.0)
-                .show(ui, |ui| {
-                    ui.set_width(280.0);
-                    ui.label(
-                        RichText::new(format!(
-                            "DROP {}/{} AS",
-                            menu.table.to_uppercase(),
-                            menu.key.to_uppercase()
-                        ))
-                        .size(11.0)
-                        .color(theme::MUTED)
-                        .family(egui::FontFamily::Name("medium".into())),
-                    );
-                    for (kind, field) in &menu.candidates {
-                        let description = match kind {
-                            AreaModuleKind::Population => "roams a rect · count 1 to start",
-                            AreaModuleKind::Resident => "stands at this spot",
-                            AreaModuleKind::Blueprint => "a copy at this spot",
-                            AreaModuleKind::Soundscape => "plays it over a rect",
-                            AreaModuleKind::Object => "an object running that script",
-                            _ => "",
-                        };
-                        let full = ui.available_rect_before_wrap();
-                        let (rect, response) =
-                            ui.allocate_exact_size(Vec2::new(full.width(), 38.0), Sense::click());
-                        if response.hovered() {
-                            ui.painter().rect_filled(rect, 4.0, theme::ACCENT_SOFT);
-                        }
-                        let mut child = ui.new_child(
-                            egui::UiBuilder::new()
-                                .max_rect(rect.shrink2(Vec2::new(6.0, 3.0)))
-                                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-                        );
-                        widgets::badge(&mut child, kind.tag());
-                        child.vertical(|ui| {
-                            ui.spacing_mut().item_spacing.y = 0.0;
-                            ui.label(RichText::new(kind.tag()).monospace().color(theme::TEXT));
-                            ui.label(RichText::new(description).size(11.5).color(theme::MUTED));
-                        });
-                        if response.clicked() {
-                            choice = Some((*kind, field.clone()));
-                        }
-                    }
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        if ui.button("Cancel").clicked() {
-                            cancel = true;
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            widgets::key_hint(ui, "Esc")
-                        });
-                    });
-                });
-        });
-    if choice.is_some() || cancel {
-        let view = editor.views.area.views.get_mut(view_key).expect("view");
-        view.drop_menu = None;
-        if let Some((kind, field)) = choice {
-            view.deferred.push(Deferred::AddWithRow {
-                kind,
-                field,
-                key: menu.key.clone(),
-                at: menu.at,
-            });
-        }
-    }
-}
-
 fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -851,6 +748,7 @@ fn canvas(
         center,
         zoom: zoom * ppp,
         generation,
+        live: true,
     });
     if let Some((texture, alloc, shown)) = texture {
         let uv = ERect::from_min_max(
@@ -903,12 +801,6 @@ fn canvas(
             .deferred,
     ) {
         match deferred {
-            Deferred::AddWithRow {
-                kind,
-                field,
-                key,
-                at,
-            } => pick::add_with_row(editor, view_key, &frame, kind, &field, &key, at),
             Deferred::Copy => select::copy_selection(editor, &frame),
             Deferred::Duplicate => select::duplicate_selection(editor, &frame),
             Deferred::Unpack(index) => placement::unpack(editor, &frame, index),

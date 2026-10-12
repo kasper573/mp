@@ -16,10 +16,11 @@ pub fn script_cards(
     field: &str,
     path: &str,
 ) -> Changed {
-    let Some(items) = cx.shapes.modules_of(table).cloned() else {
+    let shapes: &crate::schema::Shapes = cx.shapes;
+    let Some(items) = shapes.modules_of(table) else {
         return Changed::default();
     };
-    let variants: Vec<schema::Variant> = match schema::kind(cx.root, &items) {
+    let variants: Vec<schema::Variant> = match schema::kind(cx.root, items) {
         Kind::Union(variants) => variants
             .into_iter()
             .filter(|v| v.tag.ends_with("_script"))
@@ -392,17 +393,6 @@ pub(super) fn script_values(
 
 pub(super) fn speaker_of(table: &str, key: &str) -> Option<String> {
     (table == "npc").then(|| key.to_owned())
-}
-
-pub(super) fn strip_modules(root: &Value) -> Value {
-    let mut first = root.clone();
-    if let Some(properties) = first.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.remove("modules");
-    }
-    if let Some(required) = first.get_mut("required").and_then(Value::as_array_mut) {
-        required.retain(|name| name != "modules");
-    }
-    first
 }
 
 pub(super) fn is_objective(tag: &str) -> bool {

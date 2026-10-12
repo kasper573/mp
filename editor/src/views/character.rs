@@ -98,9 +98,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(theme::muted(format!("{file} is gone")));
         return;
     };
-    let Some(root) = editor.shapes.table(TABLE).map(|shape| shape.shape.clone()) else {
-        return;
-    };
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(TABLE);
     let section = editor.views.character.section;
     let characters: Vec<String> = editor
         .project
@@ -170,7 +169,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
-            let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+            let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
             cx.owner_table = Some(TABLE.to_owned());
             cx.owner_key = Some(key.to_owned());
             ui.push_id(("character", key), |ui| {
@@ -192,7 +191,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                                     Section::Stats => generic(
                                         ui,
                                         &mut cx,
-                                        &root,
+                                        root,
                                         &mut value,
                                         &[("stats", "Stats"), ("effects", "Effects")],
                                     ),
@@ -223,21 +222,21 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                                     Section::LinesHeard => generic(
                                         ui,
                                         &mut cx,
-                                        &root,
+                                        root,
                                         &mut value,
                                         &[("lines_heard", "Lines heard")],
                                     ),
                                     Section::Shops => generic(
                                         ui,
                                         &mut cx,
-                                        &root,
+                                        root,
                                         &mut value,
                                         &[("shops", "Shops")],
                                     ),
                                     Section::History => generic(
                                         ui,
                                         &mut cx,
-                                        &root,
+                                        root,
                                         &mut value,
                                         &[("history", "History")],
                                     ),
@@ -347,18 +346,18 @@ fn generic(
         let Some(schema) = schema::properties(root)
             .into_iter()
             .find(|(name, _)| name == field)
-            .map(|(_, schema)| schema.clone())
+            .map(|(_, schema)| schema)
         else {
             continue;
         };
         card(ui, "player", title, |ui| {
             if value.get(*field).is_none_or(Value::is_null) {
-                value[*field] = schema::template(cx.root, &schema);
+                value[*field] = schema::template(cx.root, schema);
             }
             changed = std::mem::take(&mut changed).or(crate::forms::value(
                 ui,
                 cx,
-                &schema,
+                schema,
                 &mut value[*field],
                 &format!("/{field}"),
             ));
@@ -600,6 +599,7 @@ fn start(
                 ),
                 zoom: px_per_tile / super::area::TILE_PX * ppp,
                 generation,
+                live: true,
             });
             ui.painter().rect_filled(rect, 4.0, theme::INPUT);
             if let Some((texture, alloc, shown)) = texture {

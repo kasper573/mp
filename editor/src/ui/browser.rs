@@ -1,17 +1,11 @@
 use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 
-use super::tree::{self, TreeIcon, TreeNode, TreeState};
+use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Dialog, Editor, RenameDialog, RenameTarget, RightTab};
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
 use crate::value::RowValue;
-
-#[derive(Clone, Debug)]
-pub struct RowDrag {
-    pub table: String,
-    pub key: String,
-}
 
 pub struct BrowserState {
     pub search: String,
@@ -29,9 +23,7 @@ impl Default for BrowserState {
             only_fixtures: false,
             focus_search: false,
             tree: TreeState {
-                open: ["tables".to_owned(), "tables/area".to_owned()]
-                    .into_iter()
-                    .collect(),
+                open: ["area".to_owned()].into_iter().collect(),
             },
         }
     }
@@ -110,7 +102,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             }
             let fixtures = widgets::chip_coloured(
                 ui,
-                "🔒 fixtures",
+                "fixtures",
                 if state.only_fixtures {
                     theme::ACCENT_SOFT
                 } else {
@@ -141,7 +133,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     let Some(project) = &editor.project else {
         return;
     };
-    let mut paths: Vec<String> = vec!["game.json".to_owned()];
+    let mut paths: Vec<String> = Vec::new();
     for table in &editor.shapes.order {
         paths.extend(
             project
@@ -153,76 +145,78 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                             && (!only_fixtures || editor.shapes.is_fixture(table, key))
                     })
                 })
-                .cloned(),
+                .map(|file| file.trim_start_matches("tables/").to_owned()),
         );
     }
     let selection = editor.selection.clone();
-    let open = editor.views.browser.tree.open.clone();
     let nodes = {
         let Editor {
-            project,
-            form,
-            shapes,
-            ..
+            project, shapes, ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let ctx = ui.ctx().clone();
         tree::from_paths(
             paths.iter().map(String::as_str),
             &mut |path| {
-                let mut node = match row_of(path) {
-                    Some((table, key)) => {
-                        let mut node = TreeNode::leaf(path, key);
-                        node.selected =
-                            selection.table == table && selection.keys.iter().any(|k| k == key);
-                        if open.contains(&format!("tables/{table}")) {
-                            node.icon = row_icon(&ctx, form, project, table, key)
-                                .map(|(texture, uv, size)| TreeIcon::Image { texture, uv, size })
-                                .unwrap_or(TreeIcon::None);
-                        }
-                        node.drag = Some(RowDrag {
-                            table: table.to_owned(),
-                            key: key.to_owned(),
-                        });
-                        node
-                    }
-                    None => TreeNode::leaf(path, path),
-                };
-                node.unsaved = project.is_unsaved(path);
+                let file = format!("tables/{path}");
+                let (table, key) = row_of(&file)?;
+                let mut node = TreeNode::leaf(&file, key);
+                node.selected = selection.table == table && selection.keys.iter().any(|k| k == key);
+                node.icon = TreeIcon::Thumb(file.clone());
+                node.unsaved = project.is_unsaved(&file);
                 Some(node)
             },
             &mut |folder| {
-                if let Some(table) = folder.id.strip_prefix("tables/") {
-                    folder.locked = shapes.has_fixtures(table);
-                    folder.adds = !folder.locked;
-                }
+                folder.locked = shapes.has_fixtures(&folder.id);
+                folder.adds = !folder.locked;
+                folder.table = true;
             },
         )
     };
     let mut action: Option<(String, String, Action)> = None;
+    let mut budget = super::assets::ICON_DECODES_PER_FRAME;
     let out = egui::ScrollArea::vertical()
         .id_salt("browser")
         .show(ui, |ui| {
+            let Editor {
+                project,
+                form,
+                views,
+                ..
+            } = editor;
+            let project = project.as_ref().expect("a project");
             tree::show(
                 ui,
-                &mut editor.views.browser.tree,
+                &mut views.browser.tree,
                 &nodes,
                 false,
-                Some(&mut |ui, node| {
-                    if let Some((table, key)) = row_of(&node.id) {
-                        row_menu(ui, &mut action, table, key);
-                    }
-                }),
+                tree::Hooks {
+                    menu: Some(&mut |ui, node| {
+                        if let Some((table, key)) = row_of(&node.id) {
+                            row_menu(ui, &mut action, table, key);
+                        }
+                    }),
+                    thumbs: Some(&mut |ctx, file| {
+                        let (table, key) = row_of(file)?;
+                        row_icon(ctx, form, project, table, key, &mut budget)
+                    }),
+                },
             )
         })
         .inner;
-    if let Some(table) = out.add.as_deref().and_then(|id| id.strip_prefix("tables/")) {
-        crate::rows::new_row_dialog(editor, table);
+    if let Some(table) = out.add {
+        crate::rows::new_row_dialog(editor, &table);
+    }
+    if let Some(table) = out.open_table {
+        editor.open_tab(Tab::Sheet { table });
     }
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
-        select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
+        if table == crate::views::world::TABLE {
+            action = Some((table.to_owned(), key.to_owned(), Action::Open));
+        } else {
+            select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
+        }
     }
     if let Some(path) = out.double_clicked
         && let Some((table, key)) = row_of(&path)
@@ -240,7 +234,8 @@ pub fn row_icon(
     project: &crate::project::Project,
     table: &str,
     key: &str,
-) -> Option<(egui::TextureId, egui::Rect, egui::Vec2)> {
+    budget: &mut u32,
+) -> Option<IconImage> {
     match table {
         "npc" | "player" | "model" => {
             let model_key = if table == "model" {
@@ -254,7 +249,9 @@ pub fn row_icon(
                 .files
                 .json(&crate::project::row_file("model", &model_key))?;
             let image = model["sprites"]["image"].as_str()?;
-            let thumb = form.thumbnails.image(ctx, &project.files, image)?;
+            let thumb = form
+                .thumbnails
+                .image_within(ctx, &project.files, image, budget)?;
             let w = model["sprites"]["frame_size"]["width"].as_f64()? as f32;
             let h = model["sprites"]["frame_size"]["height"].as_f64()? as f32;
             let frame = model["sprites"]["actions"]["idle"]["s"][0]["frame"]
@@ -264,22 +261,17 @@ pub fn row_icon(
             let x = (frame % columns) * w;
             let y = (frame / columns).floor() * h;
             let scale = 18.0 / h.max(1.0);
-            Some((
-                thumb.texture.id(),
-                crate::thumbs::uv(thumb.size, x, y, w, h),
-                egui::vec2(w * scale, h * scale),
-            ))
+            Some(IconImage {
+                texture: thumb.texture.id(),
+                uv: crate::thumbs::uv(thumb.size, x, y, w, h),
+                size: egui::vec2(w * scale, h * scale),
+            })
         }
         "item" | "interface_icon" | "cursor" | "attention" => {
             let row = project.files.json(&crate::project::row_file(table, key))?;
             let path = row["icon"].as_str().or_else(|| row["image"].as_str())?;
-            let thumb = form.thumbnails.image(ctx, &project.files, path)?;
-            let scale = 16.0 / thumb.size[1].max(1) as f32;
-            Some((
-                thumb.texture.id(),
-                egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
-                egui::vec2(thumb.size[0] as f32 * scale, 16.0),
-            ))
+            let thumb = form.thumbnails.icon(ctx, &project.files, path, budget)?;
+            Some(super::assets::icon_image(&thumb))
         }
         _ => None,
     }
@@ -494,6 +486,9 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         let mut folders: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         for path in project.files.paths_under("assets/") {
             let relative = path.trim_start_matches("assets/");
+            if super::assets::kind(relative).is_none() {
+                continue;
+            }
             if let Some((folder, _)) = relative.rsplit_once('/')
                 && folder.to_lowercase().contains(&needle)
             {
@@ -669,26 +664,25 @@ fn result_line(
         child.label(theme::faint("·"));
         child.label(theme::muted(owner).monospace().size(12.5));
     } else if let Some((table, key)) = row {
+        let mut budget = super::assets::ICON_DECODES_PER_FRAME;
         let icon = editor.project.as_ref().and_then(|project| {
-            row_icon(&child.ctx().clone(), &mut editor.form, project, table, key)
+            row_icon(
+                &child.ctx().clone(),
+                &mut editor.form,
+                project,
+                table,
+                key,
+                &mut budget,
+            )
         });
-        child.dnd_drag_source(
-            egui::Id::new(("result-drag", table, key)),
-            RowDrag {
-                table: table.to_owned(),
-                key: key.to_owned(),
-            },
-            |ui| {
-                if let Some((texture, uv, size)) = icon {
-                    ui.add(egui::Image::from_texture((texture, size)).uv(uv));
-                }
-                ui.label(theme::mono(label).size(13.0).color(if selected {
-                    theme::TEXT
-                } else {
-                    theme::CODE
-                }));
-            },
-        );
+        if let Some(icon) = icon {
+            child.add(egui::Image::from_texture((icon.texture, icon.size)).uv(icon.uv));
+        }
+        child.label(theme::mono(label).size(13.0).color(if selected {
+            theme::TEXT
+        } else {
+            theme::CODE
+        }));
     } else {
         child.label(theme::mono(label).size(13.0).color(if selected {
             theme::TEXT

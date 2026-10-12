@@ -236,15 +236,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
         )
         .show(root, |ui| {
             ui.horizontal(|ui| {
-                ui.menu_button(RichText::new("Rift editor").strong().size(15.0), |ui| {
-                    if ui.button("New game…").clicked() {
-                        start::new_game_dialog(editor, None);
-                        ui.close();
-                    }
-                    if ui.button("Open folder…").clicked() {
-                        start::pick_folder(editor);
-                        ui.close();
-                    }
+                ui.menu_button(RichText::new("File").strong().size(15.0), |ui| {
                     let has_project = editor.project.is_some();
                     if ui
                         .add_enabled(
@@ -257,28 +249,13 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         ui.close();
                     }
                     if ui
-                        .add_enabled(has_project, egui::Button::new("Close folder"))
+                        .add_enabled(has_project, egui::Button::new("Close project"))
                         .clicked()
                     {
                         request_close(editor, CloseThen::Close);
                         ui.close();
                     }
                     ui.separator();
-                    if has_project {
-                        ui.menu_button("Tables as spreadsheets", |ui| {
-                            for table in editor.shapes.order.clone() {
-                                if ui.button(&table).clicked() {
-                                    editor.open_tab(Tab::Sheet { table });
-                                    ui.close();
-                                }
-                            }
-                        });
-                        if ui.button("World map").clicked() {
-                            editor.open_tab(Tab::World);
-                            ui.close();
-                        }
-                        ui.separator();
-                    }
                     if ui.button("Game binaries…").clicked() {
                         editor.dialogs.push(Dialog::Binaries);
                         ui.close();
@@ -310,17 +287,6 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         return;
                     }
                     crate::play::top_bar(editor, ui);
-                    let (can_undo, can_redo) = editor
-                        .project
-                        .as_ref()
-                        .map(|project| (project.history.can_undo(), project.history.can_redo()))
-                        .unwrap_or((false, false));
-                    if widgets::keyed_button(ui, "Redo", "Ctrl ⇧ Z", can_redo).clicked() {
-                        editor.redo();
-                    }
-                    if widgets::keyed_button(ui, "← Undo", "Ctrl Z", can_undo).clicked() {
-                        editor.undo();
-                    }
                     if let Some(project) = &editor.project {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {

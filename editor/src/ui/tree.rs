@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, HashSet};
 use egui::{Align, Layout, Modifiers, Sense, Ui};
 
 use super::theme;
-use crate::ui::browser::RowDrag;
 
 pub struct TreeNode {
     pub id: String,
@@ -14,17 +13,20 @@ pub struct TreeNode {
     pub unsaved: bool,
     pub locked: bool,
     pub adds: bool,
-    pub drag: Option<RowDrag>,
+    pub table: bool,
 }
 
 pub enum TreeIcon {
     None,
     Glyph(&'static str),
-    Image {
-        texture: egui::TextureId,
-        uv: egui::Rect,
-        size: egui::Vec2,
-    },
+    Thumb(String),
+}
+
+#[derive(Clone, Copy)]
+pub struct IconImage {
+    pub texture: egui::TextureId,
+    pub uv: egui::Rect,
+    pub size: egui::Vec2,
 }
 
 #[derive(Default)]
@@ -37,9 +39,17 @@ pub struct TreeOutput {
     pub clicked: Option<(String, Modifiers)>,
     pub double_clicked: Option<String>,
     pub add: Option<String>,
+    pub open_table: Option<String>,
 }
 
 pub type LeafMenu<'a> = dyn FnMut(&mut Ui, &TreeNode) + 'a;
+pub type Thumbs<'a> = dyn FnMut(&egui::Context, &str) -> Option<IconImage> + 'a;
+
+#[derive(Default)]
+pub struct Hooks<'a, 'b> {
+    pub menu: Option<&'a mut LeafMenu<'b>>,
+    pub thumbs: Option<&'a mut Thumbs<'b>>,
+}
 
 impl TreeNode {
     pub fn leaf(id: impl Into<String>, label: impl Into<String>) -> TreeNode {
@@ -52,7 +62,7 @@ impl TreeNode {
             unsaved: false,
             locked: false,
             adds: false,
-            drag: None,
+            table: false,
         }
     }
 
@@ -93,7 +103,7 @@ pub fn show(
     state: &mut TreeState,
     nodes: &[TreeNode],
     open_all: bool,
-    mut menu: Option<&mut LeafMenu<'_>>,
+    mut hooks: Hooks<'_, '_>,
 ) -> TreeOutput {
     let mut out = TreeOutput::default();
     let mut toggle: Vec<String> = Vec::new();
@@ -106,7 +116,7 @@ pub fn show(
             open_all,
             &mut out,
             &mut toggle,
-            &mut menu,
+            &mut hooks,
         );
     }
     for id in toggle {
@@ -119,6 +129,7 @@ pub fn show(
 
 const LINE: f32 = 22.0;
 const INDENT: f32 = 14.0;
+const BUTTON: f32 = 18.0;
 
 #[allow(clippy::too_many_arguments)]
 fn node_line(
@@ -129,10 +140,11 @@ fn node_line(
     open_all: bool,
     out: &mut TreeOutput,
     toggle: &mut Vec<String>,
-    menu: &mut Option<&mut LeafMenu<'_>>,
+    hooks: &mut Hooks<'_, '_>,
 ) {
     let full = ui.available_rect_before_wrap();
     let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), Sense::click());
+    let visible = ui.clip_rect().intersects(rect);
     if node.selected {
         ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
     } else if response.hovered() {
@@ -151,18 +163,23 @@ fn node_line(
     match &node.children {
         Some(children) => {
             let open = open_all || state.open.contains(&node.id);
-            folder_line(&mut child, node, children, open, out);
+            folder_line(&mut child, node, open, out);
             if response.clicked() {
                 toggle.push(node.id.clone());
             }
+            if node.adds || node.table {
+                response.context_menu(|ui| folder_menu(ui, node, out));
+            }
             if open {
                 for child in children {
-                    node_line(ui, state, child, depth + 1, open_all, out, toggle, menu);
+                    node_line(ui, state, child, depth + 1, open_all, out, toggle, hooks);
                 }
             }
         }
         None => {
-            leaf_line(&mut child, node);
+            if visible {
+                leaf_line(&mut child, node, &mut hooks.thumbs);
+            }
             if node.unsaved {
                 ui.painter().circle_filled(
                     egui::pos2(rect.max.x - 10.0, rect.center().y),
@@ -176,83 +193,87 @@ fn node_line(
             if response.double_clicked() {
                 out.double_clicked = Some(node.id.clone());
             }
-            if let Some(menu) = menu.as_deref_mut() {
+            if let Some(menu) = hooks.menu.as_deref_mut() {
                 response.context_menu(|ui| menu(ui, node));
             }
         }
     }
 }
 
-fn folder_line(
-    ui: &mut Ui,
-    node: &TreeNode,
-    children: &[TreeNode],
-    open: bool,
-    out: &mut TreeOutput,
-) {
+fn folder_line(ui: &mut Ui, node: &TreeNode, open: bool, out: &mut TreeOutput) {
     ui.add(
         egui::Label::new(theme::muted(if open { "▾" } else { "▸" }).size(11.0)).selectable(false),
     );
-    ui.add(
-        egui::Label::new(
-            theme::mono(format!(
-                "{}{}",
-                if node.locked { "🔒 " } else { "" },
-                node.label
-            ))
-            .color(theme::CODE),
-        )
+    let label = ui.add(
+        egui::Label::new(theme::mono(&node.label).color(if node.locked {
+            theme::MUTED
+        } else {
+            theme::CODE
+        }))
         .selectable(false),
     );
-    let leaves = children.iter().filter(|c| c.children.is_none()).count();
+    if node.locked {
+        label.on_hover_text("Fixtures: the engine names these rows, so none can be added");
+    }
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-        ui.add_space(6.0);
-        if leaves > 0 {
-            ui.add(
-                egui::Label::new(theme::muted(leaves.to_string()).monospace().size(12.0))
-                    .selectable(false),
-            );
-        }
-        if open
-            && node.adds
-            && ui
-                .add(egui::Label::new(theme::faint("+")).sense(Sense::click()))
-                .on_hover_text(format!("New {}", node.label))
-                .clicked()
-        {
+        ui.add_space(4.0);
+        ui.spacing_mut().item_spacing.x = 4.0;
+        if node.adds && line_button(ui, "+", &format!("New {}", node.label)).clicked() {
             out.add = Some(node.id.clone());
+        }
+        if node.table && line_button(ui, "▦", "Open table").clicked() {
+            out.open_table = Some(node.id.clone());
         }
     });
 }
 
-fn leaf_line(ui: &mut Ui, node: &TreeNode) {
+fn folder_menu(ui: &mut Ui, node: &TreeNode, out: &mut TreeOutput) {
+    if node.adds && ui.button(format!("New {}…", node.label)).clicked() {
+        out.add = Some(node.id.clone());
+        ui.close();
+    }
+    if node.table && ui.button("Open table").clicked() {
+        out.open_table = Some(node.id.clone());
+        ui.close();
+    }
+}
+
+fn line_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
+    ui.spacing_mut().button_padding = egui::vec2(0.0, 0.0);
+    ui.add(
+        egui::Button::new(egui::RichText::new(glyph).size(13.0).color(theme::TEXT))
+            .fill(theme::RAISED)
+            .stroke(egui::Stroke::new(1.0, theme::BORDER))
+            .corner_radius(3.0)
+            .min_size(egui::vec2(BUTTON, BUTTON)),
+    )
+    .on_hover_text(tip)
+}
+
+fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut Thumbs<'_>>) {
     let colour = if node.selected {
         theme::TEXT
     } else {
         theme::CODE
     };
-    let draw = |ui: &mut Ui| {
-        ui.add_space(14.0);
-        match &node.icon {
-            TreeIcon::None => {}
-            TreeIcon::Glyph(glyph) => {
-                ui.add(egui::Label::new(theme::muted(*glyph)).selectable(false));
-            }
-            TreeIcon::Image { texture, uv, size } => {
-                ui.add(egui::Image::from_texture((*texture, *size)).uv(*uv));
-                ui.add_space(2.0);
-            }
+    ui.add_space(14.0);
+    let image = match &node.icon {
+        TreeIcon::None => None,
+        TreeIcon::Glyph(glyph) => {
+            ui.add(egui::Label::new(theme::muted(*glyph)).selectable(false));
+            None
         }
-        ui.add(
-            egui::Label::new(theme::mono(&node.label).size(13.0).color(colour)).selectable(false),
-        );
+        TreeIcon::Thumb(path) => thumbs
+            .as_deref_mut()
+            .and_then(|thumbs| thumbs(&ui.ctx().clone(), path)),
     };
-    match &node.drag {
-        Some(drag) => {
-            ui.dnd_drag_source(egui::Id::new(("drag", &node.id)), drag.clone(), draw);
-        }
-        None => draw(ui),
+    if let Some(image) = image {
+        ui.add(egui::Image::from_texture((image.texture, image.size)).uv(image.uv));
+        ui.add_space(2.0);
+    } else if matches!(node.icon, TreeIcon::Thumb(_)) {
+        ui.add_space(18.0);
     }
+    ui.add(egui::Label::new(theme::mono(&node.label).size(13.0).color(colour)).selectable(false));
 }
 
 #[derive(Default)]

@@ -208,6 +208,7 @@ pub fn show(
             center: Pos::new(info.size.width / 2.0, info.size.height / 2.0),
             zoom: px_per_tile / TILE_PX * ppp,
             generation,
+            live: false,
         });
         painter.rect_filled(card.art, 2.0, theme::INPUT);
         if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {

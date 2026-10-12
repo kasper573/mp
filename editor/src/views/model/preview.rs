@@ -283,6 +283,7 @@ pub fn spawn_backdrop(
         center: Pos::new(at.x + 0.5, at.y + 0.5),
         zoom: zoom * ppp,
         generation,
+        live: true,
     });
     if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
         let uv = ERect::from_min_max(

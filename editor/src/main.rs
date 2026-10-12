@@ -5,7 +5,7 @@ use bevy::window::{PresentMode, WindowResolution};
 
 use editor::app::{EditorPlugin, Launch};
 
-const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH] [--build-info] [--shapes]
+const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
 
   --scene STEPS      opens the folder on a state, for recordings and tests; steps join with `;`:
                      area:<key>  blueprint:<key>  row:<table>/<key>  rows:<table>/<key>,<key>
@@ -20,6 +20,7 @@ const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH]
                      imp:<files|apply|retime>:<arg>  sh:<columns|sort|filter|cell>:<arg>
                      wm:<lens|colour|line|route|look|select|layer|arrange|arrange-apply|region|note>:<arg>  (look:<area>/<zoom>, route:<from>/<to>)
   --user-folder PATH settings, journal and import records go here instead of the user's folder
+  --frame-log PATH   writes a line per frame: frame ms, ui ms, the active tab
   --build-info       prints the build and exits
   --shapes           prints every row shape as JSON and exits";
 
@@ -41,6 +42,7 @@ fn main() {
             }
             "--scene" => launch.scene = args.next(),
             "--user-folder" => launch.user = args.next().map(PathBuf::from),
+            "--frame-log" => launch.frame_log = args.next().map(PathBuf::from),
             "--help" | "-h" => {
                 println!("{USAGE}");
                 return;

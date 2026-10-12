@@ -330,13 +330,26 @@ pub fn object(
     value: &mut Value,
     path: &str,
 ) -> Changed {
+    object_without(ui, cx, schema, value, path, &[])
+}
+
+pub fn object_without(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    schema: &Value,
+    value: &mut Value,
+    path: &str,
+    hidden: &[&str],
+) -> Changed {
     if !value.is_object() {
         *value = Value::Object(Map::new());
     }
     let required = schema::required(schema);
     let mut changed = Changed::default();
     for (name, field) in schema::properties(schema) {
-        if schema::tag_of(schema).is_some_and(|(tag, _)| tag == *name) {
+        if schema::tag_of(schema).is_some_and(|(tag, _)| tag == *name)
+            || hidden.contains(&name.as_str())
+        {
             continue;
         }
         let field_path = format!("{path}/{name}");

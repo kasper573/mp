@@ -25,6 +25,9 @@ pub struct SceneRequest {
     pub center: Pos<Tiles>,
     pub zoom: f32,
     pub generation: u64,
+    /// A still scene keeps its last frame until something about it changes, so the world map's
+    /// many cards cost no rendering while nothing moves.
+    pub live: bool,
 }
 
 #[derive(Clone, PartialEq)]
@@ -56,6 +59,10 @@ pub struct Scene {
     spec: SceneSpec,
     generation: u64,
     idle: u32,
+    zoom: f32,
+    center: Pos<Tiles>,
+    fresh: u8,
+    active: bool,
 }
 
 #[derive(Component)]
@@ -71,6 +78,14 @@ pub struct Scenes {
 
 pub const IDLE_FRAMES: u32 = 120;
 
+/// Spawning a scene builds its tile meshes, so a view asking for many at once (the world map's
+/// cards) gets them over a few frames instead of one long one.
+const SPAWNS_PER_FRAME: usize = 6;
+
+/// Frames a still scene keeps rendering after a change, so its spawned tiles and uploaded images
+/// are all on the target before the camera rests.
+const SETTLE_FRAMES: u8 = 3;
+
 pub fn sync(
     scenes: &mut Scenes,
     requests: Vec<SceneRequest>,
@@ -79,6 +94,7 @@ pub fn sync(
     world: &mut World,
 ) {
     let mut seen: Vec<String> = Vec::new();
+    let mut spawned = 0;
     for request in requests {
         seen.push(request.key.clone());
         let Some(content) = content else {
@@ -90,6 +106,10 @@ pub fn sync(
         };
         if respawn {
             despawn(scenes, &request.key, world);
+            if spawned == SPAWNS_PER_FRAME {
+                continue;
+            }
+            spawned += 1;
             spawn(scenes, &request, content, files, world);
         }
         let Some(scene) = scenes.by_key.get_mut(&request.key) else {
@@ -97,6 +117,24 @@ pub fn sync(
         };
         scene.idle = 0;
         let wanted = [request.width.max(1), request.height.max(1)];
+        let changed = respawn
+            || scene.shown != wanted
+            || scene.zoom != request.zoom
+            || scene.center != request.center;
+        if changed {
+            scene.fresh = SETTLE_FRAMES;
+        }
+        let active = request.live || scene.fresh > 0;
+        if !changed {
+            scene.fresh = scene.fresh.saturating_sub(1);
+        }
+        let rest = !changed && active == scene.active;
+        scene.zoom = request.zoom;
+        scene.center = request.center;
+        scene.active = active;
+        if rest {
+            continue;
+        }
         if wanted[0] > scene.alloc[0]
             || wanted[1] > scene.alloc[1]
             || scene.alloc[0] > wanted[0] * 2
@@ -117,6 +155,7 @@ pub fn sync(
         scene.shown = wanted;
         if let Ok(mut camera) = world.get_entity_mut(scene.camera) {
             if let Some(mut cam) = camera.get_mut::<Camera>() {
+                cam.is_active = active;
                 cam.viewport = Some(Viewport {
                     physical_position: UVec2::ZERO,
                     physical_size: UVec2::new(wanted[0], wanted[1]),
@@ -276,6 +315,10 @@ fn spawn(
             spec: request.spec.clone(),
             generation: request.generation,
             idle: 0,
+            zoom: request.zoom,
+            center: request.center,
+            fresh: SETTLE_FRAMES,
+            active: true,
         },
     );
 }

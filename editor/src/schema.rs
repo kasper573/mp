@@ -49,6 +49,11 @@ impl Shapes {
         self.tables.get(name)
     }
 
+    pub fn shape_of(&self, name: &str) -> &Value {
+        static NULL: Value = Value::Null;
+        self.tables.get(name).map_or(&NULL, |table| &table.shape)
+    }
+
     pub fn is_fixture(&self, table: &str, key: &str) -> bool {
         self.tables
             .get(table)

@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use egui::{Color32, Key, Sense, Ui, Vec2};
 use serde_json::Value;
@@ -30,6 +31,7 @@ pub struct SheetState {
     pub editing: Option<String>,
     pub form: FormState,
     pub last_edit: Option<(String, String, String)>,
+    columns: Option<(u64, Arc<Vec<Column>>)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -51,7 +53,7 @@ pub struct Column {
 
 pub struct Row {
     pub key: String,
-    pub value: Value,
+    pub value: Arc<Value>,
 }
 
 impl Column {
@@ -82,7 +84,7 @@ impl Column {
 
     pub fn lacks_module(&self, row: &Row) -> bool {
         match &self.source {
-            Source::Module { tag, .. } => !row.value["modules"]
+            Source::Module { tag, .. } => !(*row.value)["modules"]
                 .as_array()
                 .is_some_and(|modules| modules.iter().any(|module| module["type"] == *tag)),
             _ => false,
@@ -184,7 +186,7 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[Row]) -> Vec<Column> {
             });
             let mut keyed: BTreeMap<String, (String, bool)> = BTreeMap::new();
             for row in rows {
-                let Some(modules) = row.value["modules"].as_array() else {
+                let Some(modules) = (*row.value)["modules"].as_array() else {
                     continue;
                 };
                 for module in modules.iter().filter(|m| m["type"] == variant.tag) {
@@ -294,7 +296,7 @@ pub fn rows_of(editor: &Editor, table: &str) -> Vec<Row> {
             }
             Some(Row {
                 key: key.to_owned(),
-                value: project.files.json_owned(path)?,
+                value: project.files.json(path)?,
             })
         })
         .collect();
@@ -354,7 +356,7 @@ fn filters_of(view: &SpreadsheetView) -> Vec<String> {
 
 fn passes(row: &Row, filter: &str, combat: &BTreeSet<String>, columns: &[Column]) -> bool {
     if filter == "can be fought" {
-        return row.value["modules"].as_array().is_some_and(|modules| {
+        return (*row.value)["modules"].as_array().is_some_and(|modules| {
             modules.iter().any(|module| {
                 module["type"] == "shared_script"
                     && module["script"]
@@ -364,12 +366,12 @@ fn passes(row: &Row, filter: &str, combat: &BTreeSet<String>, columns: &[Column]
         });
     }
     if let Some(tag) = filter.strip_prefix("has ") {
-        return row.value["modules"]
+        return (*row.value)["modules"]
             .as_array()
             .is_some_and(|modules| modules.iter().any(|module| module["type"] == tag));
     }
     if let Some(tag) = filter.strip_prefix("lacks ") {
-        return !row.value["modules"]
+        return !(*row.value)["modules"]
             .as_array()
             .is_some_and(|modules| modules.iter().any(|module| module["type"] == tag));
     }
@@ -435,9 +437,12 @@ fn sort_rows(rows: &mut [Row], column: &Column, descending: bool) {
     });
 }
 
-pub fn shown_rows(editor: &Editor, table: &str) -> (Vec<Row>, Vec<Column>, SpreadsheetView, usize) {
+pub fn shown_rows(
+    editor: &mut Editor,
+    table: &str,
+) -> (Vec<Row>, Arc<Vec<Column>>, SpreadsheetView, usize) {
     let all = rows_of(editor, table);
-    let columns = columns_of(editor, table, &all);
+    let columns = columns_cached(editor, table, &all);
     let view = view_of(editor, table, &columns);
     let combat = combat_scripts(editor);
     let filters = filters_of(&view);
@@ -466,13 +471,34 @@ pub fn shown_rows(editor: &Editor, table: &str) -> (Vec<Row>, Vec<Column>, Sprea
     (rows, columns, view, total)
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
-    editor
+fn columns_cached(editor: &mut Editor, table: &str, rows: &[Row]) -> Arc<Vec<Column>> {
+    let generation = editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.generation);
+    let state = editor
         .views
         .sheet
         .views
         .entry(table.to_owned())
         .or_default();
+    if let Some((built_for, columns)) = &state.columns
+        && *built_for == generation
+    {
+        return columns.clone();
+    }
+    let columns = Arc::new(columns_of(editor, table, rows));
+    let state = editor
+        .views
+        .sheet
+        .views
+        .entry(table.to_owned())
+        .or_default();
+    state.columns = Some((generation, columns.clone()));
+    columns
+}
+
+pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
     let (rows, columns, mut view, total) = shown_rows(editor, table);
     let shown: Vec<&Column> = view
         .columns
@@ -705,6 +731,7 @@ fn table_body(
         egui::Stroke::new(1.0, theme::BORDER),
     );
     let mut more_note = None;
+    let mut icon_budget = crate::ui::assets::ICON_DECODES_PER_FRAME;
     let output = egui::ScrollArea::both()
         .id_salt(("sheet", table))
         .auto_shrink([false, false])
@@ -732,18 +759,21 @@ fn table_body(
                     egui::Stroke::new(1.0, theme::BORDER.gamma_multiply(0.6)),
                 );
                 let mut x = line.min.x;
-                if let Some((texture, uv, size)) = editor.project.as_ref().and_then(|project| {
+                if let Some(image) = editor.project.as_ref().and_then(|project| {
                     crate::ui::browser::row_icon(
                         &ui.ctx().clone(),
                         &mut editor.form,
                         project,
                         table,
                         &row.key,
+                        &mut icon_budget,
                     )
                 }) {
-                    let icon =
-                        egui::Rect::from_center_size(egui::pos2(x + 11.0, line.center().y), size);
-                    painter.image(texture, icon, uv, Color32::WHITE);
+                    let icon = egui::Rect::from_center_size(
+                        egui::pos2(x + 11.0, line.center().y),
+                        image.size,
+                    );
+                    painter.image(image.texture, icon, image.uv, Color32::WHITE);
                 }
                 x += 22.0;
                 for (column, width) in shown.iter().zip(&widths) {
@@ -956,15 +986,13 @@ fn edit_cell(
     if ui.input(|i| i.key_pressed(Key::Escape)) {
         return CellEdit::Cancelled;
     }
-    let Some(shape) = editor.shapes.table(table) else {
-        return CellEdit::Cancelled;
-    };
-    let root = shape.shape.clone();
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(table);
     let schema = column.schema.clone();
     let mut value = column
         .get(&row.value)
         .cloned()
-        .unwrap_or_else(|| schema::template(&root, &schema));
+        .unwrap_or_else(|| schema::template(root, &schema));
     let path = format!("/{}", column.id.replace('.', "/"));
     let mut actions = Vec::new();
     let Editor {
@@ -977,7 +1005,7 @@ fn edit_cell(
         return CellEdit::Cancelled;
     };
     let state = views.sheet.views.get_mut(table).expect("the sheet state");
-    let mut cx = FormCx::new(project, &root, shapes, &mut state.form, &mut actions);
+    let mut cx = FormCx::new(project, root, shapes, &mut state.form, &mut actions);
     cx.owner_table = Some(table.to_owned());
     cx.owner_key = Some(row.key.clone());
     let first_frame = !cx
@@ -1214,12 +1242,9 @@ fn keys(
                 if column.source == Source::Key {
                     continue;
                 }
-                let root = editor
-                    .shapes
-                    .table(table)
-                    .map(|s| s.shape.clone())
-                    .unwrap_or(Value::Null);
-                if let Some(value) = parse_cell(&root, column, piece.trim()) {
+                let shapes = editor.shapes.clone();
+                let root = shapes.shape_of(table);
+                if let Some(value) = parse_cell(root, column, piece.trim()) {
                     cells.push((row.key.clone(), column.clone(), value));
                 }
             }
@@ -1418,7 +1443,7 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         for other in brief {
             widgets::kv_text(ui, &other.title, other.text(row).unwrap_or_default());
         }
-        let modules: Vec<String> = row.value["modules"]
+        let modules: Vec<String> = (*row.value)["modules"]
             .as_array()
             .map(|modules| {
                 modules

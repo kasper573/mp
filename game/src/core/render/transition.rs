@@ -7,7 +7,7 @@ use super::camera::WorldCamera;
 use super::present::{self, SCALE};
 use super::screen::ToScreen;
 use crate::core::math::{Direction, Pos};
-use crate::core::tiling::Tiles;
+use crate::core::tiling::{Cell, CellPos, Tiles};
 use crate::core::time::Seconds;
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -295,7 +295,7 @@ fn target_marks(
     };
     Some(TargetMarks {
         viewed: project(viewed_at)?,
-        tile_origin: project(Pos::origin())?,
+        tile_origin: project(CellPos::new(0, 0).bounds().min())?,
     })
 }
 

@@ -351,11 +351,8 @@ pub fn catalogue(editor: &mut Editor) -> &Catalogue {
     let shapes = editor.shapes.clone();
     let views = &mut editor.views.script;
     if views.catalogue.is_none() || views.catalogue_for != generation {
-        let root = shapes
-            .table("script")
-            .map(|shape| shape.shape.clone())
-            .unwrap_or(Value::Null);
-        views.catalogue = Some(Catalogue::build(&root, content));
+        let root = shapes.shape_of("script");
+        views.catalogue = Some(Catalogue::build(root, content));
         views.catalogue_for = generation;
     }
     views.catalogue.as_ref().expect("built above")
@@ -1277,20 +1274,17 @@ pub fn add_node(
     at: Option<egui::Pos2>,
     link: Option<(String, String)>,
 ) {
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
-    let Some(mut node) = nodes::template(&root, kind) else {
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
+    let Some(mut node) = nodes::template(root, kind) else {
         editor.toast(format!("No node kind {kind}"));
         return;
     };
     if kind == "dialogue" {
         node["lines"] = serde_json::json!([{ "by": default_speaker(doc), "text": [""] }]);
     }
-    if let (Some(schema), Some(project)) = (nodes::node_schema(&root), editor.project.as_ref()) {
-        nodes::fill_references(&root, schema, &mut node, &project.files);
+    if let (Some(schema), Some(project)) = (nodes::node_schema(root), editor.project.as_ref()) {
+        nodes::fill_references(root, schema, &mut node, &project.files);
     }
     if kind == "on"
         && let Some(catalogue) = editor.views.script.catalogue.as_ref()
@@ -1299,7 +1293,7 @@ pub fn add_node(
         if let Some((event, _)) = catalogue.events.iter().find(|(event, _)| {
             catalogue.event_refusal(event, doc.kind).is_none() && !used.contains(event.as_str())
         }) {
-            node = nodes::template_event(&root, event).unwrap_or(node);
+            node = nodes::template_event(root, event).unwrap_or(node);
         }
     }
     let base = if kind == "dialogue" {

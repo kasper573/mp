@@ -22,6 +22,7 @@ use crate::app::Editor;
 use crate::project::{Edit, Project, Selection, row_file};
 use crate::ui::theme;
 
+pub const TABLE: &str = "world_map";
 pub const ROW_KEY: &str = "world";
 pub const TILE_UNITS: f32 = 16.0;
 pub const AREA_ZOOM: f32 = 0.35;

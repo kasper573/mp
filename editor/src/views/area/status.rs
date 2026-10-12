@@ -38,7 +38,7 @@ pub(super) fn status_bar(
                 .trim_end_matches('.')
                 .to_lowercase(),
         );
-        left.push("S stamps it, or drag it from the browser onto an area".to_owned());
+        left.push("S stamps it".to_owned());
     }
     if let Some(tile) = frame.pointer_tile {
         let cell = tile.cell();

@@ -477,11 +477,14 @@ pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
     found
 }
 
-pub fn form_schema(root: &Value, node: &Value) -> Option<Value> {
+pub fn form_fields<'a>(root: &'a Value, node: &Value) -> Option<(&'a Value, Vec<String>)> {
     let kind = kind(node);
     let schema = variant_schema(root, kind)?;
-    let mut form = schema.clone();
-    let arrows: HashSet<String> = match kind {
+    let mut hidden: Vec<String> = vec!["type".to_owned()];
+    if kind == "on" {
+        hidden.push("event".to_owned());
+    }
+    hidden.extend(match kind {
         "on" => ["next"].iter().map(|s| (*s).to_owned()).collect(),
         "if" => ["yes", "no"].iter().map(|s| (*s).to_owned()).collect(),
         "repeat" => ["each", "then"].iter().map(|s| (*s).to_owned()).collect(),
@@ -494,41 +497,16 @@ pub fn form_schema(root: &Value, node: &Value) -> Option<Value> {
             .into_iter()
             .filter(|(_, field)| is_arrow(field))
             .map(|(name, _)| name.clone())
-            .collect(),
-    };
-    if let Some(properties) = form.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.remove("type");
-        if kind == "on" {
-            properties.remove("event");
-        }
-        for name in &arrows {
-            properties.remove(name);
-        }
-    }
-    if let Some(required) = form.get_mut("required").and_then(Value::as_array_mut) {
-        required.retain(|name| {
-            name.as_str()
-                .is_none_or(|n| n != "type" && !arrows.contains(n))
-        });
-    }
-    if let Some(map) = form.as_object_mut() {
-        map.remove("oneOf");
-    }
-    Some(form)
+            .collect::<Vec<String>>(),
+    });
+    Some((schema, hidden))
 }
 
-pub fn event_form_schema(root: &Value, event: &str) -> Option<Value> {
-    let variant = event_variants(root)
+pub fn event_variant<'a>(root: &'a Value, event: &str) -> Option<&'a Value> {
+    event_variants(root)
         .into_iter()
-        .find(|variant| variant.tag == event)?;
-    let mut form = variant.schema.clone();
-    if let Some(properties) = form.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.remove("event");
-    }
-    if let Some(required) = form.get_mut("required").and_then(Value::as_array_mut) {
-        required.retain(|name| name != "event");
-    }
-    Some(form)
+        .find(|variant| variant.tag == event)
+        .map(|variant| variant.schema)
 }
 
 fn is_arrow(field: &Value) -> bool {

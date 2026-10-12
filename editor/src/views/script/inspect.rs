@@ -233,11 +233,8 @@ fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
 fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let key = doc.owner.key().to_owned();
     breadcrumb(ui, &format!("script/{key}"));
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
     let owner_schema = root
         .pointer("/properties/owner")
         .cloned()
@@ -246,7 +243,7 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let mut actions = Vec::new();
     let mut make = false;
     let changed = {
-        let mut cx = form_cx(editor, &root, &mut actions, doc);
+        let mut cx = form_cx(editor, root, &mut actions, doc);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -596,11 +593,8 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         return;
     }
     widgets::section_count(ui, "Variables", variables.len());
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
     let variable_schema = root
         .pointer("/properties/variables/additionalProperties")
         .cloned()
@@ -621,7 +615,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let mut actions = Vec::new();
     let mut changed = Changed::default();
     {
-        let mut cx = form_cx(editor, &root, &mut actions, doc);
+        let mut cx = form_cx(editor, root, &mut actions, doc);
         for (name, variable) in &variables {
             let holes: Vec<String> = doc
                 .nodes()
@@ -643,12 +637,16 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 });
                 let path = format!("/variables/{name}");
                 let mut draft = variable.clone();
-                let mut form = variable_schema.clone();
-                if let Some(properties) = form.get_mut("properties").and_then(Value::as_object_mut)
+                if crate::forms::object_without(
+                    ui,
+                    &mut cx,
+                    &variable_schema,
+                    &mut draft,
+                    &path,
+                    &["default"],
+                )
+                .is_some()
                 {
-                    properties.remove("default");
-                }
-                if crate::forms::object(ui, &mut cx, &form, &mut draft, &path).is_some() {
                     script["variables"][name] = draft.clone();
                     changed = Changed::at(&path);
                 }
@@ -914,11 +912,8 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     };
     let kind = nodes::kind(&node).to_owned();
     breadcrumb(ui, &format!("{} › {name}", owner_short(editor, doc)));
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
     let (outs, ins, system, blurb) = {
         let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
@@ -946,7 +941,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     let badge_kind = badge_of(&kind, system);
     let title = super::graph::card_title(name, &node);
     let changed = {
-        let mut cx = form_cx(editor, &root, &mut actions, doc);
+        let mut cx = form_cx(editor, root, &mut actions, doc);
         widgets::card_frame(true)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -966,11 +961,14 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
                 });
                 let mut changed = Changed::default();
                 match kind.as_str() {
-                    "on" => changed = on_form(ui, &mut cx, &root, &mut draft, &path),
+                    "on" => changed = on_form(ui, &mut cx, root, &mut draft, &path),
                     "dialogue" => {}
                     _ => {
-                        if let Some(schema) = nodes::form_schema(&root, &draft) {
-                            changed = crate::forms::object(ui, &mut cx, &schema, &mut draft, &path);
+                        if let Some((schema, hidden)) = nodes::form_fields(root, &draft) {
+                            let hidden: Vec<&str> = hidden.iter().map(String::as_str).collect();
+                            changed = crate::forms::object_without(
+                                ui, &mut cx, schema, &mut draft, &path, &hidden,
+                            );
                         }
                     }
                 }
@@ -995,11 +993,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
         let mut draft_dialogue = draft.clone();
         let mut dialogue_actions = Vec::new();
         let dialogue_changed = {
-            let mut cx = form_cx(editor, &root, &mut dialogue_actions, doc);
+            let mut cx = form_cx(editor, root, &mut dialogue_actions, doc);
             dialogue_form(
                 ui,
                 &mut cx,
-                &root,
+                root,
                 &mut draft_dialogue,
                 &path,
                 doc,
@@ -1222,16 +1220,11 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
     let Some(mut row) = editor.row_value("memory", memory) else {
         return;
     };
-    let Some(schema) = editor
-        .shapes
-        .table("memory")
-        .map(|shape| shape.shape.clone())
-    else {
-        return;
-    };
+    let shapes = editor.shapes.clone();
+    let schema = shapes.shape_of("memory");
     let mut actions = Vec::new();
     let changed = {
-        let mut cx = form_cx(editor, &schema, &mut actions, doc);
+        let mut cx = form_cx(editor, schema, &mut actions, doc);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -1244,8 +1237,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
                         ui.close();
                     }
                 });
-                let form = crate::ui::inspector::without_field(&schema, "modules");
-                crate::forms::object(ui, &mut cx, &form, &mut row, "")
+                crate::forms::object_without(ui, &mut cx, schema, &mut row, "", &["modules"])
             })
             .inner
     };
@@ -1369,8 +1361,15 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
         }
         changed = Changed::at(path);
     }
-    if let Some(schema) = nodes::event_form_schema(root, nodes::event_of(node).unwrap_or("")) {
-        changed = changed.or(crate::forms::object(ui, cx, &schema, node, path));
+    if let Some(schema) = nodes::event_variant(root, nodes::event_of(node).unwrap_or("")) {
+        changed = changed.or(crate::forms::object_without(
+            ui,
+            cx,
+            schema,
+            node,
+            path,
+            &["event"],
+        ));
     }
     changed
 }
@@ -1739,13 +1738,10 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
             nodes::clip(&label_text, 40)
         ),
     );
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let choice_schema = nodes::variant_schema(&root, "dialogue")
+    let choice_schema = nodes::variant_schema(root, "dialogue")
         .and_then(|schema| schema.pointer("/properties/choices/items").cloned())
         .unwrap_or(Value::Null);
     let mut draft = node.clone();
@@ -1753,7 +1749,7 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
     let mut menu = ChoiceMenu::default();
     let mut go: Option<String> = None;
     let mut changed = {
-        let mut cx = form_cx(editor, &root, &mut actions, doc);
+        let mut cx = form_cx(editor, root, &mut actions, doc);
         choice_card(
             ui,
             &mut cx,
@@ -1941,16 +1937,13 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
     if doc.is_shared() {
         return;
     }
-    let root = editor
-        .shapes
-        .table("script")
-        .map(|shape| shape.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of("script");
     let mut constants = Vec::new();
     let mut taken: BTreeMap<String, usize> = BTreeMap::new();
     for (name, node) in doc.nodes() {
         let kind = nodes::kind(node);
-        let Some(schema) = nodes::variant_schema(&root, kind) else {
+        let Some(schema) = nodes::variant_schema(root, kind) else {
             continue;
         };
         for (field, field_schema) in schema::properties(schema) {

@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::Mutex;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 
 use crate::app::{Dialog, Editor};
@@ -34,6 +34,7 @@ pub struct Play {
     pub failure: Option<Failure>,
     pub last_start: Option<Place>,
     pub binaries: Option<Binaries>,
+    pub checking: Option<Mutex<Receiver<Binaries>>>,
 }
 
 pub struct Running {
@@ -85,6 +86,14 @@ pub struct Binaries {
 }
 
 impl Binaries {
+    fn of(&self, name: &str) -> &Result<BuildInfo, String> {
+        if name == SERVER {
+            &self.server
+        } else {
+            &self.client
+        }
+    }
+
     pub fn matches(&self, build: &str) -> bool {
         [&self.server, &self.client]
             .iter()
@@ -260,13 +269,11 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         editor.toast("No test character: add a test_character row first");
         return;
     };
-    let binaries = check_binaries(editor);
     let build = game::core::content::version::build();
-    if !binaries.matches(build) {
-        editor.play.binaries = Some(binaries);
+    let Some(binaries) = check_binaries(editor).filter(|binaries| binaries.matches(build)) else {
         editor.dialogs.push(Dialog::Binaries);
         return;
-    }
+    };
     editor.play.failure = None;
     if editor.has_unsaved() && !editor.save() {
         editor.play.failure = Some(Failure {
@@ -672,7 +679,9 @@ pub fn next_to_editor() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
-pub fn check_binaries(editor: &mut Editor) -> Binaries {
+/// Starting a game binary for its build line takes long enough to feel as a freeze, so the check
+/// runs on a thread and answers `None` until it is done.
+pub fn check_binaries(editor: &mut Editor) -> Option<Binaries> {
     let folder = binaries_folder(editor);
     if let Some(known) = editor
         .play
@@ -680,15 +689,33 @@ pub fn check_binaries(editor: &mut Editor) -> Binaries {
         .as_ref()
         .filter(|known| known.folder == folder)
     {
-        return known.clone();
+        return Some(known.clone());
     }
-    let binaries = Binaries {
-        server: build_info(&folder.join(SERVER)),
-        client: build_info(&folder.join(CLIENT)),
-        folder,
-    };
-    editor.play.binaries = Some(binaries.clone());
-    binaries
+    if let Some(receiver) = &editor.play.checking {
+        let received = receiver
+            .lock()
+            .map(|receiver| receiver.try_recv())
+            .unwrap_or(Err(TryRecvError::Disconnected));
+        match received {
+            Ok(binaries) if binaries.folder == folder => {
+                editor.play.binaries = Some(binaries.clone());
+                editor.play.checking = None;
+                return Some(binaries);
+            }
+            Ok(_) | Err(TryRecvError::Disconnected) => editor.play.checking = None,
+            Err(TryRecvError::Empty) => return None,
+        }
+    }
+    let (sender, receiver) = channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(Binaries {
+            server: build_info(&folder.join(SERVER)),
+            client: build_info(&folder.join(CLIENT)),
+            folder,
+        });
+    });
+    editor.play.checking = Some(Mutex::new(receiver));
+    None
 }
 
 fn build_info(binary: &Path) -> Result<BuildInfo, String> {
@@ -704,16 +731,22 @@ fn build_info(binary: &Path) -> Result<BuildInfo, String> {
 }
 
 pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
-    let binaries = check_binaries(editor);
+    let checked = check_binaries(editor);
+    let folder = binaries_folder(editor);
     let build = game::core::content::version::build();
-    let content_version = editor.registry().version().0.clone();
+    let content_version = crate::app::content_version();
     let folder_version = editor.project.as_ref().and_then(|p| p.content).map(|c| {
         c.built::<game::systems::GameSettings>()
             .content_version
             .0
             .clone()
     });
-    let ok = binaries.matches(build);
+    let ok = checked
+        .as_ref()
+        .is_some_and(|binaries| binaries.matches(build));
+    if checked.is_none() {
+        ui.ctx().request_repaint_after(Duration::from_millis(50));
+    }
     let mut close = false;
     let mut pick = false;
     let mut next_to = false;
@@ -730,7 +763,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     widgets::kv(ui, "folder", |ui| {
         let response = crate::forms::boxed_input(ui, Some("pick…"), |ui| {
             ui.add(
-                egui::Label::new(theme::mono(crate::ui::pretty_path(&binaries.folder)).size(13.0))
+                egui::Label::new(theme::mono(crate::ui::pretty_path(&folder)).size(13.0))
                     .sense(egui::Sense::click()),
             )
         });
@@ -769,10 +802,11 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         });
     };
     row(ui, "editor", build, None);
-    for (name, info) in [(SERVER, &binaries.server), (CLIENT, &binaries.client)] {
-        match info {
-            Ok(info) => row(ui, name, &info.build, Some(info.build == build)),
-            Err(error) => row(ui, name, error, Some(false)),
+    for name in [SERVER, CLIENT] {
+        match checked.as_ref().map(|binaries| binaries.of(name)) {
+            Some(Ok(info)) => row(ui, name, &info.build, Some(info.build == build)),
+            Some(Err(error)) => row(ui, name, error, Some(false)),
+            None => row(ui, name, "checking…", None),
         }
     }
     let folder_note = match &folder_version {
@@ -791,14 +825,14 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
         ),
     );
     ui.add_space(8.0);
-    if ok {
+    if ok || checked.is_none() {
         ui.label(
             theme::muted(
                 "Builds come from each binary's --build-info and must match the editor's.",
             )
             .size(13.0),
         );
-    } else {
+    } else if let Some(binaries) = &checked {
         let culprit = [(SERVER, &binaries.server), (CLIENT, &binaries.client)]
             .iter()
             .find(|(_, info)| !info.as_ref().is_ok_and(|info| info.build == build))
@@ -816,7 +850,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     }
     ui.add_space(10.0);
     ui.horizontal(|ui| {
-        if ok {
+        if ok || checked.is_none() {
             if widgets::primary(ui, "Done").clicked() {
                 close = true;
             }
@@ -838,7 +872,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     if pick
         && let Some(folder) = rfd::FileDialog::new()
             .set_title("The folder holding game-server and desktop-client")
-            .set_directory(&binaries.folder)
+            .set_directory(&folder)
             .pick_folder()
     {
         editor.settings.binaries = Some(folder);

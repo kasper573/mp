@@ -22,6 +22,7 @@ pub struct Launch {
     pub folder: Option<PathBuf>,
     pub scene: Option<String>,
     pub user: Option<PathBuf>,
+    pub frame_log: Option<PathBuf>,
 }
 
 pub struct EditorPlugin {
@@ -37,6 +38,12 @@ impl Plugin for EditorPlugin {
         let settings = user.load_settings();
         let mut editor = Editor::new(user, settings);
         editor.scene = self.launch.scene.clone();
+        editor.frame_log = self
+            .launch
+            .frame_log
+            .as_ref()
+            .and_then(|path| std::fs::File::create(path).ok())
+            .map(std::io::BufWriter::new);
         if let Some(folder) = &self.launch.folder {
             editor.open_folder(folder);
         }
@@ -83,6 +90,7 @@ pub struct Editor {
     pub pick: Option<PickRequest>,
     pub quit: bool,
     pub frame: u64,
+    pub frame_log: Option<std::io::BufWriter<std::fs::File>>,
 }
 
 #[derive(Default)]
@@ -191,6 +199,7 @@ pub struct StartScreen {
     pub report: Option<(PathBuf, String)>,
     pub watch: Option<Watcher>,
     pub recover: Option<(PathBuf, JournalData)>,
+    pub names: Vec<(PathBuf, String)>,
 }
 
 #[derive(Clone, Debug)]
@@ -346,6 +355,7 @@ pub enum CloseThen {
 
 impl Editor {
     pub fn new(user: UserFolder, settings: Settings) -> Editor {
+        content_version();
         Editor {
             user,
             settings,
@@ -376,6 +386,7 @@ impl Editor {
             pick: None,
             quit: false,
             frame: 0,
+            frame_log: None,
         }
     }
 
@@ -502,6 +513,7 @@ impl Editor {
                 self.start.failed = None;
                 self.start.report = None;
                 self.start.watch = None;
+                crate::play::check_binaries(self);
                 if let Some(scene) = self.scene.take() {
                     crate::scenes::open(self, &scene);
                 }
@@ -714,7 +726,7 @@ impl Editor {
         }
         let data = JournalData {
             build: game::core::content::version::build().to_owned(),
-            content_version: game::systems::registry().version().0,
+            content_version: content_version().to_owned(),
             folder: project.root.clone(),
             written: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -743,9 +755,22 @@ fn editor_ui(world: &mut World) {
         };
         context.get_mut().clone()
     };
+    let frame_ms = world.resource::<Time>().delta_secs() * 1000.0;
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
+        let started = Instant::now();
         crate::ui::show(&mut editor, &ctx, world);
+        let ui_ms = started.elapsed().as_secs_f32() * 1000.0;
+        let tab = crate::ui::active_tab(&editor).map(|tab| tab.title());
+        if let Some(log) = &mut editor.frame_log {
+            use std::io::Write;
+            let _ = writeln!(
+                log,
+                "{frame_ms:.3}\t{ui_ms:.3}\t{}",
+                tab.unwrap_or_default()
+            )
+            .and_then(|()| log.flush());
+        }
     });
     if world.resource::<Editor>().quit {
         world.write_message(bevy::app::AppExit::Success);
@@ -763,3 +788,8 @@ fn background(world: &mut World) {
 }
 
 pub type RowKeys = HashMap<String, Vec<String>>;
+
+pub fn content_version() -> &'static str {
+    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    VERSION.get_or_init(|| game::systems::registry().version().0)
+}

@@ -1,10 +1,8 @@
-use std::str::FromStr;
-
 use egui::{Sense, Ui, Vec2};
-use game::systems::area::{self, AreaModuleKind};
+use game::systems::area;
 use serde_json::Value;
 
-use super::{pick, pins};
+use super::pins;
 use crate::app::Editor;
 use crate::project::Edit;
 use crate::ui::{theme, widgets};
@@ -112,6 +110,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         center,
         zoom: zoom * ppp,
         generation,
+        live: true,
     });
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, theme::INPUT);
@@ -208,72 +207,4 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         ui,
         "Click a cell for its centre, Alt-click for any point, in 1/16 tiles. Esc keeps the old place.",
     );
-}
-
-pub fn drop_preview(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    area_key: &str,
-    table: &str,
-    key: &str,
-    tile: game::core::math::Pos<game::core::tiling::Tiles>,
-) {
-    let candidates = drop_candidates(editor, table);
-    ui.label(
-        theme::muted(format!("area/{area_key} › new module"))
-            .monospace()
-            .size(13.0),
-    );
-    ui.add_space(4.0);
-    if let Some((kind, field)) = candidates.first() {
-        let cell = game::core::tiling::TilePos::cell(tile);
-        widgets::card_frame(false).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            widgets::card_header(ui, kind.tag(), kind.tag(), "on drop", |_| {});
-            ui.add_space(4.0);
-            widgets::kv_text(ui, field, format!("{table}/ {key}"));
-            match kind {
-                AreaModuleKind::Population => {
-                    widgets::kv_text(ui, "count", "1");
-                    widgets::kv_text(
-                        ui,
-                        "roams",
-                        format!("{}, {} · 4 × 4 tiles", cell.x - 2, cell.y - 2),
-                    );
-                }
-                _ => widgets::kv_text(ui, "at", format!("{}, {} tiles", cell.x, cell.y)),
-            }
-        });
-    }
-    widgets::section(ui, "Rows that drop onto an area");
-    let mut by_table: Vec<(String, Vec<String>)> = Vec::new();
-    for (tag, _) in super::modules::module_variants(editor) {
-        if let Some((_, table_of)) = pick::main_reference(editor, &tag) {
-            match by_table.iter_mut().find(|(t, _)| *t == table_of) {
-                Some((_, kinds)) => kinds.push(tag),
-                None => by_table.push((table_of, vec![tag])),
-            }
-        }
-    }
-    for (table_of, kinds) in by_table {
-        ui.horizontal(|ui| {
-            ui.label(theme::mono(&table_of).size(13.0).color(theme::CODE));
-            ui.label(
-                theme::muted(format!("→ {}", kinds.join(", ")))
-                    .monospace()
-                    .size(12.5),
-            );
-        });
-    }
-}
-
-pub fn drop_candidates(editor: &Editor, table: &str) -> Vec<(AreaModuleKind, String)> {
-    super::modules::module_variants(editor)
-        .into_iter()
-        .filter_map(|(tag, _)| {
-            let (field, table_of) = pick::main_reference(editor, &tag)?;
-            let kind = AreaModuleKind::from_str(&tag).ok()?;
-            (table_of == table).then_some((kind, field))
-        })
-        .collect()
 }

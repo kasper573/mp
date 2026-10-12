@@ -37,7 +37,7 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
                         theme::faint(format!(
                             "build {} · content version {}",
                             game::core::content::version::build(),
-                            editor.registry().version().0
+                            crate::app::content_version()
                         ))
                         .size(12.0),
                     );
@@ -79,11 +79,23 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
         ));
         return;
     }
+    if editor
+        .start
+        .names
+        .iter()
+        .map(|(folder, _)| folder)
+        .ne(recent.iter())
+    {
+        editor.start.names = recent
+            .iter()
+            .map(|folder| (folder.clone(), game_name(folder)))
+            .collect();
+    }
+    let names = editor.start.names.clone();
     let mut open = None;
     let mut forget = None;
     let mut copy = None;
-    for folder in &recent {
-        let name = game_name(folder);
+    for (folder, name) in &names {
         let path = super::pretty_path(folder);
         let ago = editor.settings.opened_ago(folder);
         let response = ui
@@ -144,7 +156,7 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
                 egui::Color32::from_rgba_unmultiplied(255, 255, 255, 6),
             );
         }
-        if response.clicked() {
+        if response.double_clicked() {
             open = Some(folder.clone());
         }
         response.context_menu(|ui| {
@@ -260,7 +272,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
                         }
                     });
             });
-        let same_version = data.content_version == editor.registry().version().0;
+        let same_version = data.content_version == crate::app::content_version();
         if !same_version {
             ui.add_space(6.0);
             ui.colored_label(
@@ -268,7 +280,7 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
                 format!(
                     "Written for content version {}; this editor reads {}. They are set aside.",
                     data.content_version,
-                    editor.registry().version().0
+                    crate::app::content_version()
                 ),
             );
         }

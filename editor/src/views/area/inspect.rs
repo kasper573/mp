@@ -8,7 +8,7 @@ use serde_json::Value;
 use super::grid;
 use super::placement::placement_extras;
 use super::population::from_npc;
-use super::preview::{clipboard_panel, drop_preview, pick_preview};
+use super::preview::{clipboard_panel, pick_preview};
 use super::scenery::{scenery_extras, scenery_rows};
 use super::soundscape::soundscape_extras;
 use super::{Tool, pins};
@@ -35,10 +35,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let walk = editor.views.area.views[&view_key].walk_overlay;
     if editor.views.area.views[&view_key].paste.is_some() {
         clipboard_panel(editor, ui);
-        return;
-    }
-    if let Some((table, row_key, tile)) = editor.views.area.views[&view_key].drag_hover.clone() {
-        drop_preview(editor, ui, key, &table, &row_key, tile);
         return;
     }
     if editor.pick.is_some() {
@@ -1082,15 +1078,12 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     if indices.is_empty() {
         return;
     }
-    let Some(items) = editor.shapes.modules_of("area").cloned() else {
+    let shapes = editor.shapes.clone();
+    let Some(items) = shapes.modules_of("area") else {
         return;
     };
-    let shape = editor
-        .shapes
-        .table("area")
-        .map(|t| t.shape.clone())
-        .unwrap_or(Value::Null);
-    let variants = match crate::schema::kind(&shape, &items) {
+    let shape = shapes.shape_of("area");
+    let variants = match crate::schema::kind(shape, items) {
         crate::schema::Kind::Union(variants) => variants,
         _ => Vec::new(),
     };
@@ -1108,7 +1101,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, &shape, shapes, form, &mut actions);
+        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions);
         cx.owner_table = Some("area".to_owned());
         cx.owner_key = Some(area_key.clone());
         if indices.len() == 1 {
@@ -1256,8 +1249,15 @@ fn module_inspector(
         let module = &mut row["modules"][index];
         match crate::schema::variant_of(variants, module) {
             Some(variant) => {
-                let schema = form_schema(variant, module_kind);
-                changed |= crate::forms::object(ui, cx, &schema, module, &path).is_some();
+                changed |= crate::forms::object_without(
+                    ui,
+                    cx,
+                    variant.schema,
+                    module,
+                    &path,
+                    hidden_fields(module_kind),
+                )
+                .is_some();
             }
             None => {
                 changed |= crate::forms::raw_json(ui, cx, module, &path).is_some();
@@ -1323,21 +1323,13 @@ fn module_inspector(
     changed
 }
 
-pub(super) fn form_schema(variant: &crate::schema::Variant, kind: Option<AreaModuleKind>) -> Value {
-    let mut schema = crate::ui::inspector::without_field(variant.schema, "type");
-    for field in hidden_fields(kind) {
-        schema = crate::ui::inspector::without_field(&schema, field);
-    }
-    schema
-}
-
-fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static str] {
+pub(super) fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static str] {
     match kind {
-        Some(AreaModuleKind::Scenery) => &["tiles", "sort", "blocks"],
-        Some(AreaModuleKind::Blueprint) => &["values"],
-        Some(AreaModuleKind::Object) => &["scripts"],
-        Some(AreaModuleKind::Soundscape) => &["channels"],
-        _ => &[],
+        Some(AreaModuleKind::Scenery) => &["type", "tiles", "sort", "blocks"],
+        Some(AreaModuleKind::Blueprint) => &["type", "values"],
+        Some(AreaModuleKind::Object) => &["type", "scripts"],
+        Some(AreaModuleKind::Soundscape) => &["type", "channels"],
+        _ => &["type"],
     }
 }
 

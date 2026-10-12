@@ -366,50 +366,6 @@ pub(super) fn overlay_selected_scenery(
             );
         }
     }
-    let ctx = ui.ctx().clone();
-    let Some((texture, uv, drawn)) = population::player_sprite(editor, &ctx, frame.content) else {
-        return;
-    };
-    let view = editor.views.area.views.get_mut(view_key).expect("view");
-    let feet_tile = view
-        .ghost
-        .unwrap_or(Pos::new(rect.center().x, line_y + 1.0));
-    let scale = canvas.scale() / TILE_PX;
-    let shown = drawn * scale;
-    let feet = canvas.to_screen(feet_tile) + Vec2::new(0.0, canvas.scale() * 0.5);
-    let sprite = ERect::from_min_max(
-        feet - Vec2::new(shown.x / 2.0, shown.y),
-        feet + Vec2::new(shown.x / 2.0, 0.0),
-    );
-    let in_front = feet_tile.y + 0.5 >= line_y;
-    painter.add(egui::Shape::ellipse_filled(
-        feet,
-        Vec2::new(shown.x * 0.35, shown.x * 0.12),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 70),
-    ));
-    painter.image(
-        texture,
-        sprite,
-        uv,
-        Color32::from_rgba_unmultiplied(255, 255, 255, if in_front { 230 } else { 120 }),
-    );
-    label_chip(
-        painter,
-        sprite.left_bottom() + Vec2::new(0.0, 22.0),
-        if in_front {
-            "ghost · in front"
-        } else {
-            "ghost · behind"
-        },
-        Color32::WHITE,
-    );
-    let drag = ui.interact(sprite, ui.id().with((view_key, "ghost")), Sense::drag());
-    if drag.dragged()
-        && let Some(pointer) = drag.interact_pointer_pos()
-    {
-        let tile = canvas.to_tile(pointer);
-        view.ghost = Some(Pos::new(tile.x, tile.y - 0.5));
-    }
     let tiles: usize = module["tiles"].as_array().map_or(0, |rows| {
         rows.iter()
             .map(|r| {
@@ -425,7 +381,7 @@ pub(super) fn overlay_selected_scenery(
     editor
         .status
         .left
-        .push("drag the sort line · ⇧ snaps to 1/16 · drag the ghost to check sorting".to_owned());
+        .push("drag the sort line · ⇧ snaps to 1/16".to_owned());
 }
 
 pub(super) fn overlay_soundscape_reach(editor: &Editor, painter: &egui::Painter, frame: &Frame) {

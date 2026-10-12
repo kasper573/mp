@@ -571,7 +571,7 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                             text.push_str(&format!("  ⚠ {warn}"));
                         }
                         if choice.locked {
-                            text.push_str("  🔒");
+                            text.push_str("  locked");
                         }
                         if ui
                             .add_enabled(

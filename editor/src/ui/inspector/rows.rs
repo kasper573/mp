@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use egui::{Align, Layout, RichText, Ui, Vec2};
 use serde_json::Value;
 
-use super::scripts::strip_modules;
-use super::{LEFT_COLUMN, act, add_module_popup, without_field};
+use super::{LEFT_COLUMN, act, add_module_popup};
 use super::{theme, widgets};
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
@@ -23,11 +22,8 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                 .map(|value| (key.clone(), value))
         })
         .collect();
-    let Some(shape) = editor.shapes.table(&table) else {
-        return;
-    };
-    let root = shape.shape.clone();
-    let first_class = strip_modules(&root);
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(&table);
     let mut edits: Vec<(String, Value)> = Vec::new();
     let mut actions = Vec::new();
     let mut add_to_all: Option<Value> = None;
@@ -52,7 +48,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+        let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
         cx.owner_table = Some(table.clone());
         let shared_card = |ui: &mut Ui, cx: &mut FormCx, edits: &mut Vec<(String, Value)>| {
             widgets::card_frame(false).show(ui, |ui| {
@@ -65,7 +61,10 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                     |_| {},
                 );
                 ui.add_space(4.0);
-                for (name, field) in schema::properties(&first_class) {
+                for (name, field) in schema::properties(root) {
+                    if name == "modules" {
+                        continue;
+                    }
                     let distinct: Vec<Value> = {
                         let mut seen: Vec<Value> = Vec::new();
                         for (_, value) in &values {
@@ -124,10 +123,11 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                             edits: &mut Vec<(String, Value)>,
                             add_to_all: &mut Option<Value>,
                             status: &mut Option<String>| {
-            let Some(items) = cx.shapes.modules_of(&table).cloned() else {
+            let shapes: &crate::schema::Shapes = cx.shapes;
+            let Some(items) = shapes.modules_of(&table) else {
                 return;
             };
-            let variants = match schema::kind(cx.root, &items) {
+            let variants = match schema::kind(cx.root, items) {
                 Kind::Union(variants) => variants,
                 _ => Vec::new(),
             };
@@ -175,12 +175,13 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                         let mut shared = firsts[0].2.clone();
                         let path = format!("/modules/{tag}");
                         let changed = match schema::variant_of(&variants, &shared) {
-                            Some(variant) => crate::forms::object(
+                            Some(variant) => crate::forms::object_without(
                                 ui,
                                 cx,
-                                &without_field(variant.schema, "nodes"),
+                                variant.schema,
                                 &mut shared,
                                 &path,
+                                &["nodes"],
                             ),
                             None => crate::forms::raw_json(ui, cx, &mut shared, &path),
                         };

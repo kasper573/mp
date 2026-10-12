@@ -11,7 +11,7 @@ use super::select::{
     select_input, selected_indices, snapped_delta, start_paste,
 };
 use super::{Canvas, Drag, Frame, MAX_ZOOM, MIN_ZOOM, Tool, blueprint, grid, shapes};
-use super::{pick, placement, scenery, stamp};
+use super::{placement, scenery, stamp};
 use crate::app::Editor;
 use crate::project::{Edit, Selection, row_file};
 use crate::value::RowValue;
@@ -227,41 +227,6 @@ pub fn input(
         pick_place(editor, painter, view_key, frame, &pick, modifiers.alt);
         return;
     }
-    if let Some(payload) = response.dnd_release_payload::<crate::ui::browser::RowDrag>() {
-        editor
-            .views
-            .area
-            .views
-            .get_mut(view_key)
-            .expect("view")
-            .drag_hover = None;
-        if let Some(tile) = frame.pointer_tile {
-            pick::drop_row(editor, view_key, frame, &payload.table, &payload.key, tile);
-        }
-        return;
-    }
-    {
-        let hover = response
-            .dnd_hover_payload::<crate::ui::browser::RowDrag>()
-            .and_then(|payload| {
-                let pointer = ui.input(|i| i.pointer.hover_pos())?;
-                Some((
-                    payload.table.clone(),
-                    payload.key.clone(),
-                    frame.canvas.to_tile(pointer),
-                ))
-            });
-        if hover.is_some() {
-            ui.ctx().request_repaint();
-        }
-        let view = editor.views.area.views.get_mut(view_key).expect("view");
-        if view.drag_hover != hover {
-            view.drag_hover = hover;
-        }
-    }
-    if editor.views.area.views[view_key].drop_menu.is_some() {
-        return;
-    }
     let tool = editor.views.area.views[view_key].tool;
     let walk_overlay = editor.views.area.views[view_key].walk_overlay;
     if response.secondary_clicked() {
@@ -444,62 +409,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             .left
             .push("Ctrl ⇧ V pastes at the same tiles".to_owned());
     }
-    let drag_hover = view.drag_hover.clone();
-    let tool_now = view.tool;
-    if let Some((table, key, tile)) = drag_hover {
-        let cell = tile.cell();
-        let candidates = super::preview::drop_candidates(editor, &table);
-        if candidates
-            .iter()
-            .any(|(kind, _)| *kind == AreaModuleKind::Population)
-        {
-            let rect = canvas.rect(Rect::new(
-                Pos::new(cell.x as f32 - 2.5, cell.y as f32 - 2.5),
-                game::core::math::Size::new(4.0, 4.0),
-            ));
-            painter.add(egui::Shape::dashed_line(
-                &[
-                    rect.left_top(),
-                    rect.right_top(),
-                    rect.right_bottom(),
-                    rect.left_bottom(),
-                    rect.left_top(),
-                ],
-                EStroke::new(
-                    1.5,
-                    super::overlays::module_color(Some(AreaModuleKind::Population)),
-                ),
-                6.0,
-                4.0,
-            ));
-        }
-        let ctx = painter.ctx().clone();
-        if let Some((texture, uv, drawn)) =
-            super::population::npc_sprite(editor, &ctx, frame.content, &key)
-        {
-            let scale = canvas.scale() / super::TILE_PX;
-            let shown = drawn * scale;
-            let feet = canvas.to_screen(tile) + Vec2::new(0.0, canvas.scale() * 0.5);
-            painter.image(
-                texture,
-                ERect::from_min_max(
-                    feet - Vec2::new(shown.x / 2.0, shown.y),
-                    feet + Vec2::new(shown.x / 2.0, 0.0),
-                ),
-                uv,
-                Color32::from_rgba_unmultiplied(255, 255, 255, 200),
-            );
-        }
-        super::overlays::label_chip(
-            painter,
-            canvas.to_screen(tile) + Vec2::new(canvas.scale(), canvas.scale() * 2.0),
-            &format!("{table}/{key}"),
-            Color32::WHITE,
-        );
-        editor.status.left.push(format!("dragging {table}/{key}"));
-    }
     let view = &editor.views.area.views[view_key];
-    let _ = tool_now;
     let Some(cell) = frame.pointer_cell() else {
         return;
     };

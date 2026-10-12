@@ -14,7 +14,7 @@ use self::bindings::bindings_section;
 use self::rows::{fieldless_note, free_singles, show_rows};
 use self::scripts::{
     is_objective, module_lines, outline_block, script_extras, script_summary, script_values,
-    speaker_of, strip_modules, summary_of,
+    speaker_of, summary_of,
 };
 use self::usages::show_asset;
 use super::{theme, widgets};
@@ -42,7 +42,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     if editor.project.is_none() {
         return;
     }
-    if selection.keys.is_empty() {
+    if selection.keys.is_empty() || selection.table == crate::views::world::TABLE {
         if matches!(super::active_tab(editor), Some(Tab::World)) {
             crate::views::world::inspect_world(editor, ui);
             return;
@@ -200,7 +200,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 .size(13.0),
         );
         if fixture {
-            ui.label(theme::faint("🔒 fixture").size(12.0));
+            ui.label(theme::faint("fixture").size(12.0));
         }
         if !wide && !matches!(table, "world_map") {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -215,10 +215,8 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         }
     });
     ui.add_space(4.0);
-    let Some(shape) = editor.shapes.table(table) else {
-        return;
-    };
-    let root = shape.shape.clone();
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(table);
     let has_modules = root
         .get("properties")
         .and_then(|p| p.get("modules"))
@@ -243,24 +241,17 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+        let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
         cx.speaker = speaker_of(table, key);
         cx.owner_table = Some(table.to_owned());
         cx.owner_key = Some(key.to_owned());
         ui.push_id(("row", table, key), |ui| {
-            let first_class = strip_modules(&root);
             if wide && second_column {
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.set_width(LEFT_COLUMN);
                         changed = std::mem::take(&mut changed).or(first_class_card(
-                            ui,
-                            &mut cx,
-                            table,
-                            key,
-                            fixture,
-                            &first_class,
-                            &mut value,
+                            ui, &mut cx, table, key, fixture, root, &mut value,
                         ));
                     });
                     ui.add_space(16.0);
@@ -287,13 +278,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.set_max_width(SINGLE_COLUMN);
                 }
                 changed = std::mem::take(&mut changed).or(first_class_card(
-                    ui,
-                    &mut cx,
-                    table,
-                    key,
-                    fixture,
-                    &first_class,
-                    &mut value,
+                    ui, &mut cx, table, key, fixture, root, &mut value,
                 ));
                 if table == "input" {
                     ui.add_space(10.0);
@@ -439,8 +424,8 @@ fn first_class_card(
                     .show(ui, |ui| {
                         ui.set_width(ui.available_width() - 12.0);
                         ui.horizontal(|ui| {
-                            ui.label(theme::faint("🔒"));
                             ui.label(theme::mono(key));
+                            ui.label(theme::faint("fixture").size(12.0));
                         });
                     });
             });
@@ -465,18 +450,12 @@ fn first_class_card(
             changed = crate::views::tileset::inspect::first_class_body(ui, cx, value);
             return;
         }
-        let mut schema = schema.clone();
-        if table == "input"
-            && let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut)
-        {
-            properties.remove("bindings");
-        }
-        if table == crate::views::job::TABLE
-            && let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut)
-        {
-            properties.remove("levels");
-        }
-        changed = crate::forms::object(ui, cx, &schema, value, "");
+        let hidden: &[&str] = match table {
+            "input" => &["modules", "bindings"],
+            crate::views::job::TABLE => &["modules", "levels"],
+            _ => &["modules"],
+        };
+        changed = crate::forms::object_without(ui, cx, schema, value, "", hidden);
         if table == crate::views::job::TABLE {
             changed = std::mem::take(&mut changed).or(crate::views::job::levels(ui, cx, value));
         }
@@ -519,10 +498,11 @@ fn modules_column(
     selected: Option<usize>,
     status: &mut Option<String>,
 ) -> Changed {
-    let Some(items) = cx.shapes.modules_of(table).cloned() else {
+    let shapes: &crate::schema::Shapes = cx.shapes;
+    let Some(items) = shapes.modules_of(table) else {
         return Changed::default();
     };
-    let variants = match schema::kind(cx.root, &items) {
+    let variants = match schema::kind(cx.root, items) {
         Kind::Union(variants) => variants,
         _ => Vec::new(),
     };
@@ -738,18 +718,29 @@ pub(super) fn card_body(
     ui.add_space(4.0);
     let mut changed = Changed::default();
     if let Some(variant) = schema::variant_of(variants, module) {
-        let schema = match variant.tag.as_str() {
-            "inline_script" => without_field(variant.schema, "nodes"),
-            "shared_script" => without_field(variant.schema, "values"),
-            _ => variant.schema.clone(),
+        let hidden: &[&str] = match variant.tag.as_str() {
+            "inline_script" => &["nodes"],
+            "shared_script" => &["values"],
+            _ => &[],
         };
-        let fieldless = schema["properties"]
+        let fieldless = variant.schema["properties"]
             .as_object()
-            .is_none_or(|fields| fields.keys().all(|name| name == "type"));
+            .is_none_or(|fields| {
+                fields
+                    .keys()
+                    .all(|name| name == "type" || hidden.contains(&name.as_str()))
+            });
         if fieldless {
             widgets::hint(ui, fieldless_note(table, &variant.tag));
         } else {
-            changed = changed.or(crate::forms::object(ui, cx, &schema, module, path));
+            changed = changed.or(crate::forms::object_without(
+                ui,
+                cx,
+                variant.schema,
+                module,
+                path,
+                hidden,
+            ));
         }
         if variant.tag == "shared_script" {
             changed = changed.or(script_values(ui, cx, module, path));
@@ -944,17 +935,6 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         }
         FormAction::RowAction(action) => crate::ui::browser::act(editor, table, key, action),
     }
-}
-
-pub fn without_field(schema: &Value, field: &str) -> Value {
-    let mut copy = schema.clone();
-    if let Some(properties) = copy.get_mut("properties").and_then(Value::as_object_mut) {
-        properties.remove(field);
-    }
-    if let Some(required) = copy.get_mut("required").and_then(Value::as_array_mut) {
-        required.retain(|name| name != field);
-    }
-    copy
 }
 
 fn paste_modules(

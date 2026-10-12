@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::str::FromStr;
 
 use super::holes;
-use super::inspect::form_schema;
+use super::inspect::hidden_fields;
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{Edit, Selection, row_file};
@@ -128,13 +128,10 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
 }
 
 pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
-    let items = editor.shapes.modules_of("area").cloned()?;
-    let root = editor
-        .shapes
-        .table("area")
-        .map(|t| t.shape.clone())
-        .unwrap_or(Value::Null);
-    let variants = match crate::schema::kind(&root, &items) {
+    let shapes = editor.shapes.clone();
+    let items = shapes.modules_of("area")?;
+    let root = shapes.shape_of("area");
+    let variants = match crate::schema::kind(root, items) {
         crate::schema::Kind::Union(variants) => variants,
         _ => Vec::new(),
     };
@@ -176,7 +173,7 @@ pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
             ui.label(RichText::new(description).size(11.5).color(theme::MUTED));
         });
         if response.clicked() {
-            let mut template = crate::schema::variant_template(&root, variant);
+            let mut template = crate::schema::variant_template(root, variant);
             match kind {
                 AreaModuleKind::Population => {
                     template["roams"] =
@@ -220,15 +217,12 @@ pub(super) fn part_cards(
     row: &mut Value,
     selected: &[usize],
 ) {
-    let Some(items) = editor.shapes.modules_of("area").cloned() else {
+    let shapes = editor.shapes.clone();
+    let Some(items) = shapes.modules_of("area") else {
         return;
     };
-    let shape = editor
-        .shapes
-        .table("area")
-        .map(|t| t.shape.clone())
-        .unwrap_or(Value::Null);
-    let variants = match crate::schema::kind(&shape, &items) {
+    let shape = shapes.shape_of("area");
+    let variants = match crate::schema::kind(shape, items) {
         crate::schema::Kind::Union(variants) => variants,
         _ => Vec::new(),
     };
@@ -255,7 +249,7 @@ pub(super) fn part_cards(
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, &shape, shapes, form, &mut actions);
+        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions);
         cx.owner_table = Some("blueprint".to_owned());
         cx.owner_key = Some(key.to_owned());
         for &index in selected {
@@ -300,9 +294,15 @@ pub(super) fn part_cards(
                 });
                 match crate::schema::variant_of(&variants, &plain) {
                     Some(variant) => {
-                        let schema = form_schema(variant, module_kind);
-                        changed |=
-                            crate::forms::object(ui, &mut cx, &schema, &mut plain, &path).is_some();
+                        changed |= crate::forms::object_without(
+                            ui,
+                            &mut cx,
+                            variant.schema,
+                            &mut plain,
+                            &path,
+                            hidden_fields(module_kind),
+                        )
+                        .is_some();
                     }
                     None => {
                         changed |= crate::forms::raw_json(ui, &mut cx, &mut plain, &path).is_some();
@@ -542,11 +542,8 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
 }
 
 pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row: &mut Value) {
-    let shape = editor
-        .shapes
-        .table("blueprint")
-        .map(|t| t.shape.clone())
-        .unwrap_or(Value::Null);
+    let shapes = editor.shapes.clone();
+    let shape = shapes.shape_of("blueprint");
     let count = row["modules"].as_array().map_or(0, Vec::len);
     widgets::section_count(ui, "Modules", count);
     let mut changed = false;
@@ -559,7 +556,7 @@ pub(super) fn blueprint_modules(editor: &mut Editor, ui: &mut Ui, key: &str, row
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, &shape, shapes, form, &mut actions);
+        let mut cx = FormCx::new(project, shape, shapes, form, &mut actions);
         cx.owner_table = Some("blueprint".to_owned());
         cx.owner_key = Some(key.to_owned());
         changed |= crate::ui::inspector::scripts::script_cards(
