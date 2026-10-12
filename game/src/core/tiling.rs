@@ -18,6 +18,7 @@ use crate::core::time::Seconds;
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "tiles"))]
 pub struct Tiles(pub f32);
 
 pub type CellPos = euclid::default::Point2D<i32>;

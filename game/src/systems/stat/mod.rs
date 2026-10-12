@@ -42,6 +42,39 @@ impl StatKind {
     pub const fn of(self, value: f32) -> Stat {
         Stat { kind: self, value }
     }
+
+    pub const fn unit(self) -> Option<&'static str> {
+        match self {
+            StatKind::AttackDelay => Some("ms"),
+            StatKind::MovementSpeed => Some("tiles/s"),
+            StatKind::Range => Some("tiles"),
+            StatKind::Health | StatKind::MaxHealth | StatKind::Damage | StatKind::AttackSpeed => {
+                None
+            }
+        }
+    }
+}
+
+/// Marks every stat's schema with its unit, for `#[schemars(transform = ...)]` on a `StatMap` field.
+pub fn schema_with_units(schema: &mut schemars::Schema) {
+    let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) else {
+        return;
+    };
+    for &kind in StatKind::VARIANTS {
+        let name = serde_json::to_value(kind)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default();
+        if let (Some(unit), Some(property)) = (
+            kind.unit(),
+            properties.get_mut(&name).and_then(|v| v.as_object_mut()),
+        ) {
+            property.insert(
+                "x-unit".to_owned(),
+                serde_json::Value::String(unit.to_owned()),
+            );
+        }
+    }
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

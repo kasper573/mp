@@ -6,8 +6,9 @@ pub mod tileset;
 pub mod transition;
 pub mod walk;
 pub mod warp;
+pub mod world_map;
 
-pub use blueprint::{Flattened, Placement};
+pub use blueprint::{Flattened, PlacedBlueprint, Placement};
 pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
 
@@ -55,11 +56,13 @@ pub fn content(registry: &mut ContentRegistry) {
         .row::<tileset::TilesetDef>()
         .row::<tileset::SurfaceDef>()
         .row::<blueprint::BlueprintDef>()
+        .row::<world_map::WorldMapDef>()
         .folder::<AreaDef>()
         .modules::<AreaDef>()
         .hook(LoadStep::Files, read_grids)
         .hook(LoadStep::Blueprints, flatten_all)
         .hook(LoadStep::Areas, build_all)
+        .hook(LoadStep::Across, world_map::check_all)
         .writer(write_grids);
 }
 
@@ -548,9 +551,19 @@ pub struct Resident {
 
 pub struct PlacedModules(pub Vec<Vec<Flattened>>);
 
+pub struct PlacedBlueprints(pub Vec<Vec<PlacedBlueprint>>);
+
 pub fn placed(content: &Content, area: Id) -> &'static [Flattened] {
     content
         .built::<PlacedModules>()
+        .0
+        .get(area.index())
+        .map_or(&[], Vec::as_slice)
+}
+
+pub fn placements(content: &Content, area: Id) -> &'static [PlacedBlueprint] {
+    content
+        .built::<PlacedBlueprints>()
         .0
         .get(area.index())
         .map_or(&[], Vec::as_slice)
@@ -798,6 +811,8 @@ fn read_grids(loading: &mut Loading) {
                         ok = false;
                     }
                 }
+            } else {
+                ok = false;
             }
             palette.push(PaletteEntry {
                 tileset: tileset_id,
@@ -876,9 +891,11 @@ fn read_grids(loading: &mut Loading) {
 fn flatten_all(loading: &mut Loading) {
     let content = loading.content();
     let mut placed: Vec<Vec<Flattened>> = content.ids::<AreaDef>().map(|_| Vec::new()).collect();
+    let mut placements: Vec<Vec<PlacedBlueprint>> =
+        content.ids::<AreaDef>().map(|_| Vec::new()).collect();
     for (id, def) in loading.rows::<AreaDef>() {
         let mut errors = Vec::new();
-        let modules = blueprint::flatten(&content, &def.modules, &mut errors);
+        let flattening = blueprint::flatten(&content, &def.modules, &mut errors);
         if !errors.is_empty() {
             loading.fail(id);
         }
@@ -902,9 +919,11 @@ fn flatten_all(loading: &mut Loading) {
                 ),
             }
         }
-        placed[id.index()] = modules;
+        placed[id.index()] = flattening.modules;
+        placements[id.index()] = flattening.placements;
     }
     loading.built(PlacedModules(placed));
+    loading.built(PlacedBlueprints(placements));
 }
 
 fn build_all(loading: &mut Loading) {

@@ -183,10 +183,17 @@ fn stat_label(stat: StatKind) -> &'static str {
 
 type Compiled = HashMap<usize, Arc<Eval>>;
 
+thread_local! {
+    static CACHE: RefCell<Compiled> = RefCell::new(HashMap::new());
+}
+
+/// Drops this thread's compiled conditions, which are keyed by their row's address: a process that
+/// releases a content and loads another must call it before the addresses are reused.
+pub fn forget_compiled() {
+    CACHE.with(|cache| cache.borrow_mut().clear());
+}
+
 fn compiled(content: &Content, condition: &'static Condition, want: ValueType) -> Arc<Eval> {
-    thread_local! {
-        static CACHE: RefCell<Compiled> = RefCell::new(HashMap::new());
-    }
     let key = condition as *const Condition as usize;
     if let Some(found) = CACHE.with(|cache| cache.borrow().get(&key).cloned()) {
         return found;

@@ -283,7 +283,9 @@ impl JsonSchema for Face {
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        String::json_schema(generator)
+        let mut schema = String::json_schema(generator);
+        schema.insert("x-face".to_owned(), true.into());
+        schema
     }
 
     fn inline_schema() -> bool {

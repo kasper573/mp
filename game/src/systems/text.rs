@@ -64,7 +64,9 @@ impl JsonSchema for Span {
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        SpanRow::json_schema(generator)
+        let mut schema = SpanRow::json_schema(generator);
+        schema.insert("x-span".to_owned(), true.into());
+        schema
     }
 
     fn inline_schema() -> bool {

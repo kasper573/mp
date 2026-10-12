@@ -1,0 +1,57 @@
+use std::path::PathBuf;
+
+use bevy::prelude::*;
+use bevy::window::{PresentMode, WindowResolution};
+
+use editor::app::{EditorPlugin, Launch};
+
+const USAGE: &str =
+    "usage: editor [folder] [--scene NAME] [--user-folder PATH] [--build-info] [--shapes]";
+
+fn main() {
+    let mut launch = Launch::default();
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--build-info" => {
+                println!("{}", game::systems::build_info());
+                return;
+            }
+            "--shapes" => {
+                let settings = schemars::generate::SchemaSettings::draft2020_12()
+                    .with(|settings| settings.inline_subschemas = true);
+                let shapes = game::systems::registry().shapes(&settings);
+                println!("{}", serde_json::to_string_pretty(&shapes).expect("json"));
+                return;
+            }
+            "--scene" => launch.scene = args.next(),
+            "--user-folder" => launch.user = args.next().map(PathBuf::from),
+            "--help" | "-h" => {
+                println!("{USAGE}");
+                return;
+            }
+            other if other.starts_with("--") => {
+                eprintln!("unknown flag {other}\n{USAGE}");
+                std::process::exit(2);
+            }
+            folder => launch.folder = Some(PathBuf::from(folder)),
+        }
+    }
+    App::new()
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Rift editor".to_owned(),
+                        resolution: WindowResolution::new(1600, 1000),
+                        present_mode: PresentMode::AutoVsync,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        )
+        .add_plugins(bevy_kira_audio::AudioPlugin)
+        .add_plugins(EditorPlugin { launch })
+        .run();
+}

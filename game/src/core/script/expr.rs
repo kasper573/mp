@@ -95,7 +95,9 @@ impl<V: Vocabulary> JsonSchema for Expr<V> {
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        ExprRow::<V>::json_schema(generator)
+        let mut schema = ExprRow::<V>::json_schema(generator);
+        schema.insert("x-condition".to_owned(), true.into());
+        schema
     }
 }
 

@@ -38,6 +38,7 @@ impl crate::core::content::ContentRow for JobDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct JobLevel {
     pub xp: u32,
+    #[schemars(transform = crate::systems::stat::schema_with_units)]
     pub stats: crate::systems::stat::StatMap,
     #[serde(
         default,

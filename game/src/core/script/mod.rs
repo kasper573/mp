@@ -19,7 +19,10 @@ pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, Reveal, Spok
 pub use expr::Expr;
 pub use may_do::{MayDo, Reach};
 pub use node::{Assignment, Node, Target};
-pub use run::{Answer, BoxEnding, FlowCx, FlowKey, Instances, Locals, Owner, Pause};
+pub use run::{
+    Answer, BoxEnding, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals, Owner, Pause,
+    TraceStep,
+};
 pub use value::{Value, ValueType};
 
 use crate::core::content::{Content, ContentId, ContentRow};

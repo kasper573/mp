@@ -84,6 +84,7 @@ pub struct Near(Vec<Entity>);
 pub struct NpcDef {
     pub name: String,
     pub model: crate::systems::actor::bust::Id,
+    #[schemars(transform = crate::systems::stat::schema_with_units)]
     pub stats: crate::systems::stat::StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,

@@ -9,6 +9,7 @@ pub struct IndexedValue {
     pub line: usize,
     pub column: usize,
     pub string: Option<String>,
+    pub key: bool,
 }
 
 impl JsonIndex {
@@ -31,7 +32,11 @@ impl JsonIndex {
     pub fn position(&self, pointer: &str) -> Option<(usize, usize)> {
         let mut wanted = pointer.to_owned();
         loop {
-            if let Some(value) = self.values.iter().find(|value| value.pointer == wanted) {
+            if let Some(value) = self
+                .values
+                .iter()
+                .find(|value| !value.key && value.pointer == wanted)
+            {
                 return Some((value.line, value.column));
             }
             let cut = wanted.rfind('/')?;
@@ -132,12 +137,23 @@ impl Scanner<'_> {
                     return;
                 }
                 Some('"') => {
+                    let (line, column) = (self.line, self.column);
                     let key = self.string();
                     self.skip_space();
                     if self.chars.peek() == Some(&':') {
                         self.bump();
                     }
-                    self.path.push(Frame::Object { key: Some(key) });
+                    self.path.push(Frame::Object {
+                        key: Some(key.clone()),
+                    });
+                    let pointer = self.pointer();
+                    self.values.push(IndexedValue {
+                        pointer,
+                        line,
+                        column,
+                        string: Some(key),
+                        key: true,
+                    });
                     self.value();
                     self.path.pop();
                     self.skip_space();
@@ -216,6 +232,7 @@ impl Scanner<'_> {
             line,
             column,
             string,
+            key: false,
         });
     }
 }

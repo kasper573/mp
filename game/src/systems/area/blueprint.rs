@@ -132,6 +132,23 @@ impl Flattened {
     }
 }
 
+/// One placement an area ends up with, at any depth, with the values its holes took and its
+/// blueprint's own scripts filled from them: the owner an instance runs for in play.
+pub struct PlacedBlueprint {
+    pub blueprint: Id,
+    pub origin: usize,
+    pub chain: Vec<(Id, usize)>,
+    pub at: Pos<Tiles>,
+    pub flip: Flip,
+    pub values: BTreeMap<String, Value>,
+    pub scripts: Vec<ScriptModule>,
+}
+
+pub struct Flattening {
+    pub modules: Vec<Flattened>,
+    pub placements: Vec<PlacedBlueprint>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FlattenAt {
     Area(String),
@@ -152,8 +169,9 @@ pub fn flatten(
     content: &Content,
     modules: &[AreaModule],
     errors: &mut Vec<FlattenError>,
-) -> Vec<Flattened> {
+) -> Flattening {
     let mut out = Vec::new();
+    let mut placements = Vec::new();
     for (index, module) in modules.iter().enumerate() {
         match module {
             AreaModule::Blueprint(placement) => {
@@ -161,6 +179,7 @@ pub fn flatten(
                     content,
                     errors,
                     out: &mut out,
+                    placements: &mut placements,
                     origin: index,
                     pointer: format!("/modules/{index}"),
                     chain: Vec::new(),
@@ -183,13 +202,17 @@ pub fn flatten(
             nearest: None,
         });
     }
-    out
+    Flattening {
+        modules: out,
+        placements,
+    }
 }
 
 struct Expansion<'a> {
     content: &'a Content,
     errors: &'a mut Vec<FlattenError>,
     out: &'a mut Vec<Flattened>,
+    placements: &'a mut Vec<PlacedBlueprint>,
     origin: usize,
     pointer: String,
     chain: Vec<(Id, usize)>,
@@ -318,6 +341,16 @@ impl Expansion<'_> {
         {
             return;
         }
+        let scripts = self.filled_scripts(placement.blueprint, def, &filled);
+        self.placements.push(PlacedBlueprint {
+            blueprint: placement.blueprint,
+            origin: self.origin,
+            chain: self.chain.clone(),
+            at,
+            flip,
+            values: filled.clone(),
+            scripts,
+        });
         let start = self.out.len();
         for (index, part) in def.parts.iter().enumerate() {
             let part_pointer = format!("/parts/{index}");
@@ -403,6 +436,7 @@ impl Expansion<'_> {
                         content: self.content,
                         errors: self.errors,
                         out: self.out,
+                        placements: self.placements,
                         origin: self.origin,
                         pointer: self.pointer.clone(),
                         chain,
@@ -427,6 +461,48 @@ impl Expansion<'_> {
                 format!("at most {MAX_PARTS} flattened parts per blueprint"),
             );
         }
+    }
+
+    fn filled_scripts(
+        &mut self,
+        blueprint: Id,
+        def: &BlueprintDef,
+        filled: &BTreeMap<String, Value>,
+    ) -> Vec<ScriptModule> {
+        let content = *self.content;
+        let mut scripts = Vec::new();
+        for (index, module) in def.modules.iter().enumerate() {
+            let pointer = format!("/modules/{index}");
+            let Ok(mut json) =
+                with_content(ContentScope::of(&content), || serde_json::to_value(module)).0
+            else {
+                continue;
+            };
+            let mut unknown: Vec<(String, String)> = Vec::new();
+            fill(&mut json, filled, &def.variables, &pointer, &mut unknown);
+            for (pointer, name) in unknown {
+                self.errors.push(FlattenError {
+                    at: FlattenAt::Blueprint(blueprint, pointer),
+                    rule: "unknown variable",
+                    found: format!("{name:?}"),
+                    expected: format!("a variable {} declares", blueprint.key(&content)),
+                    nearest: nearest(def.variables.keys(), &name).map(|n| format!("{n:?}")),
+                });
+            }
+            let (result, _) = with_content(ContentScope::of(&content), || {
+                serde_json::from_value::<ScriptModule>(json)
+            });
+            match result {
+                Ok(script) => scripts.push(script),
+                Err(error) => self.error(
+                    FlattenAt::Blueprint(blueprint, pointer),
+                    "wrong type",
+                    error.to_string(),
+                    "a script module whose holes the placement fills".to_owned(),
+                ),
+            }
+        }
+        scripts
     }
 
     fn chain_text(&self, last: Option<Id>) -> String {

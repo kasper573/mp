@@ -8,6 +8,10 @@ description = "The game: the isomorphic simulation library and its server, brows
 game = true
 
 [[bin]]
+name = "game-server"
+path = "src/bin/server/main.rs"
+
+[[bin]]
 name = "kc-roles"
 path = "src/bin/kc_roles.rs"
 

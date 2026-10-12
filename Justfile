@@ -212,7 +212,7 @@ synth-sfx:
     save "$work/stone_trade.wav" "content/assets/audio/items/trade/stone.wav"
 
 build:
-    cargo build --release -p website -p game --bin website --bin server
+    cargo build --release -p website -p game --bin website --bin game-server
     cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
 
 # The browser client: a wasm binary post-processed by wasm-bindgen into the bundle the website serves
@@ -320,6 +320,7 @@ gallery-demo scene seconds="6" input="":
       target/release/gallery "$1" & app=$!
       window=$(xdotool search --sync --name "rift ui gallery" | head -1)
       xdotool windowmove --sync "$window" 0 0
+      xdotool windowfocus --sync "$window"
       eval "$(xdotool getwindowgeometry --shell "$window")"
       # The window maps before bevy has rendered into it.
       sleep 2
@@ -332,6 +333,37 @@ gallery-demo scene seconds="6" input="":
 
 # Frames sampled evenly across VIDEO, tiled into one image beside it (<video>.png): a recording at a
 # glance, e.g. to check a demo shows what it should before sharing it.
+# Records the editor on a copy of the shipped content folder opened at a scene, to
+# target/demo/editor-<scene>.webm. INPUT is an xdotool command chain played while recording.
+# Exports under art/ sit beside the copy, so import scenes find them; HOOK is a shell line run
+# while recording, with WORK naming the copy's parent.
+editor-demo scene seconds="8" input="" hook="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --release -p editor
+    mkdir -p {{demo_dir}}
+    slug=$(echo '{{scene}}' | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+    out="{{demo_dir}}/editor-$slug.webm"
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    cp -r content "$work/game"
+    [ ! -d art ] || cp -r art "$work/art"
+    xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
+      export WORK="$5"
+      target/release/editor "$5/game" --scene "$1" --user-folder "$5/user" & app=$!
+      window=$(xdotool search --sync --name "Rift editor" | head -1)
+      xdotool windowmove --sync "$window" 0 0
+      xdotool windowfocus --sync "$window"
+      eval "$(xdotool getwindowgeometry --shell "$window")"
+      sleep 2
+      ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
+        -t "$2" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 "$3" & recording=$!
+      [ -z "$6" ] || bash -c "$6" &
+      [ -z "$4" ] || xdotool $4
+      wait $recording
+      kill $app' _ '{{scene}}' '{{seconds}}' "$out" '{{input}}' "$work" '{{hook}}'
+    echo "$out"
+
 contact-sheet video:
     #!/usr/bin/env bash
     set -euo pipefail

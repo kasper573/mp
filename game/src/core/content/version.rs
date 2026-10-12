@@ -34,13 +34,17 @@ pub fn compute(registry: &ContentRegistry) -> ContentVersion {
     ContentVersion(blake3::hash(text.as_bytes()).to_hex()[..8].to_owned())
 }
 
-/// Keys sorted and prose dropped, so neither field order in Rust nor a doc comment moves the hash.
+/// Keys sorted, prose and `x-` markers dropped, so neither field order in Rust, a doc comment nor
+/// an editor hint moves the hash.
 fn canonical(value: Value) -> Value {
     match value {
         Value::Object(fields) => Value::Object(
             fields
                 .into_iter()
-                .filter(|(key, _)| !matches!(key.as_str(), "title" | "description" | "$schema"))
+                .filter(|(key, _)| {
+                    !matches!(key.as_str(), "title" | "description" | "$schema")
+                        && !key.starts_with("x-")
+                })
                 .map(|(key, value)| (key, canonical(value)))
                 .collect::<BTreeMap<String, Value>>()
                 .into_iter()

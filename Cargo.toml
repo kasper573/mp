@@ -6,6 +6,7 @@ members = [
     "bevy/terminal",
     "bevy/terminal/macros",
     "game",
+    "editor",
     "service",
     "website",
 ]

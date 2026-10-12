@@ -122,6 +122,7 @@ pub type Id = ContentId<PlayerDef>;
 pub struct PlayerDef {
     pub model: crate::systems::actor::bust::Id,
     pub job: crate::systems::job::Id,
+    #[schemars(transform = crate::systems::stat::schema_with_units)]
     pub stats: crate::systems::stat::StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<PlayerModule>,

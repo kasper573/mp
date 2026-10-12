@@ -96,7 +96,9 @@ impl<Row: ContentRow> JsonSchema for ContentId<Row> {
     }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        String::json_schema(generator)
+        let mut schema = String::json_schema(generator);
+        schema.insert("x-table".to_owned(), Row::TABLE.into());
+        schema
     }
 
     fn inline_schema() -> bool {

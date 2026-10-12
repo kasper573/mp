@@ -19,6 +19,7 @@ use crate::core::script::{
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::bust::Face;
+use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaObject};
 use crate::systems::dialogue;
 use crate::systems::item::ItemDef;
@@ -51,15 +52,30 @@ pub type Procedure = script::Procedure<RiftScripting>;
 pub type MayDo = script::MayDo<RiftScripting>;
 pub type Fill<T> = script::Fill<T>;
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(from = "PlaceRow", into = "PlaceRow")]
 pub struct Place {
     pub area: area::Id,
     pub at: Pos<Tiles>,
 }
 
+impl JsonSchema for Place {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("Place")
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        PlaceRow::json_schema(generator)
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
+}
+
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-place" = true))]
 struct PlaceRow {
     area: area::Id,
     x: f32,
@@ -370,6 +386,42 @@ pub fn build_all(loading: &mut Loading) {
             );
         }
     }
+    for (id, _) in loading.rows::<AreaDef>() {
+        let key = id.key(&content);
+        for (ordinal, placement) in area::placements(&content, id).iter().enumerate() {
+            if placement.scripts.is_empty() {
+                continue;
+            }
+            let blueprint = placement.blueprint.key(&content);
+            let modules = placement
+                .scripts
+                .iter()
+                .enumerate()
+                .map(|(at, module)| {
+                    (
+                        ScriptSite {
+                            file: format!("tables/{}/{blueprint}.json", BlueprintDef::TABLE),
+                            pointer: format!("/modules/{at}"),
+                        },
+                        module,
+                    )
+                })
+                .collect();
+            bind(
+                OwnerRow {
+                    kind: OwnerKind::Blueprint,
+                    row: id.raw(),
+                    object: Some(ordinal as u32),
+                },
+                owner_label(
+                    OwnerKind::Blueprint,
+                    blueprint,
+                    Some(&format!("{key} {ordinal}")),
+                ),
+                modules,
+            );
+        }
+    }
     for (id, def) in loading.rows::<NpcDef>() {
         let key = id.key(&content);
         bind(
@@ -467,7 +519,17 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
             ShopDef::TABLE,
             ContentId::<ShopDef>::new(row.row).key(content),
         ),
-        OwnerKind::Any | OwnerKind::Blueprint => (ScriptDef::TABLE, ""),
+        OwnerKind::Blueprint => {
+            let area: ContentId<AreaDef> = ContentId::new(row.row);
+            let placement = row
+                .object
+                .and_then(|ordinal| area::placements(content, area).get(ordinal as usize));
+            (
+                BlueprintDef::TABLE,
+                placement.map_or("", |placement| placement.blueprint.key(content)),
+            )
+        }
+        OwnerKind::Any => (ScriptDef::TABLE, ""),
     };
     ScriptSite {
         file: format!("tables/{table}/{key}.json"),
@@ -486,11 +548,14 @@ pub fn spawn_stateless(world: &mut World) {
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
             OwnerKind::Area if row.row == area.raw() => Owner::Area,
+            OwnerKind::Blueprint if row.row == area.raw() => {
+                Owner::Row(OwnerKind::Blueprint, row.object.unwrap_or_default())
+            }
             OwnerKind::Item | OwnerKind::Quest | OwnerKind::Shop => Owner::Row(row.kind, row.row),
             _ => continue,
         };
         instances.spawn_owner(owner, procedures.clone());
-        if owner == Owner::Area {
+        if matches!(owner, Owner::Area | Owner::Row(OwnerKind::Blueprint, _)) {
             instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
         }
     }
@@ -537,7 +602,7 @@ pub fn check_all(loading: &mut Loading) {
                     }
                     let placed = match row.kind {
                         OwnerKind::Npc => row.row == npc.raw(),
-                        OwnerKind::Object | OwnerKind::Area => {
+                        OwnerKind::Object | OwnerKind::Area | OwnerKind::Blueprint => {
                             let area: ContentId<AreaDef> = ContentId::new(row.row);
                             area::residents(area::placed(&content, area))
                                 .any(|resident| resident == *npc)

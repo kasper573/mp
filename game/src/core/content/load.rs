@@ -51,7 +51,10 @@ pub struct ContentRegistry {
     hooks: Vec<(LoadStep, Hook)>,
     settings: Option<Box<dyn SettingsLoader>>,
     writers: Vec<FolderWriter>,
+    module_rules: Vec<(&'static str, ModuleProbe)>,
 }
+
+type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
 
 impl ContentRegistry {
     pub fn row<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
@@ -64,7 +67,24 @@ impl ContentRegistry {
 
     /// Checks a registered table's module rules.
     pub fn modules<Row: ModuleSet>(&mut self) -> &mut ContentRegistry {
+        self.module_rules.push((
+            Row::TABLE,
+            Box::new(|json| {
+                let (parsed, _) = with_content(ContentScope::new(), || {
+                    serde_json::from_value::<Row::Module>(json.clone())
+                });
+                parsed.ok().map(|module| Row::rule(&module))
+            }),
+        ));
         self.hook(LoadStep::Rows, module_rules::<Row>)
+    }
+
+    /// How many modules of the kind `json` is a table's row may hold, read from its module set.
+    pub fn module_rule(&self, table: &str, json: &serde_json::Value) -> Option<ModuleRule> {
+        self.module_rules
+            .iter()
+            .find(|(name, _)| *name == table)
+            .and_then(|(_, probe)| probe(json))
     }
 
     /// A table whose rows may own a folder `tables/<table>/<key>/` of extra files.
@@ -145,6 +165,43 @@ impl ContentRegistry {
         })
     }
 
+    /// Every row or asset `text` names, as a parse of `file` (a row file or `game.json`) against
+    /// `content` resolves them, each located in the text: the reference graph a tool rewrites by.
+    pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
+        let leaves = if file == "game.json" {
+            let Some(loader) = self.settings.as_deref() else {
+                return Vec::new();
+            };
+            leaves_of(content, text, &|text| loader.parse(text))
+        } else {
+            let loader =
+                table_of(file).and_then(|table| self.rows.iter().find(|row| row.name() == table));
+            let Some(loader) = loader else {
+                return Vec::new();
+            };
+            leaves_of(content, text, &|text| loader.parse(text))
+        };
+        let index = JsonIndex::of(text);
+        let mut strings = index.strings();
+        leaves
+            .into_iter()
+            .filter_map(|leaf| {
+                let found = strings
+                    .by_ref()
+                    .find(|value| value.string.as_deref() == Some(leaf.value.as_str()))?;
+                Some(Reference {
+                    kind: leaf.kind,
+                    value: leaf.value,
+                    known: leaf.problem.is_none(),
+                    pointer: found.pointer.clone(),
+                    key: found.key,
+                    line: found.line,
+                    column: found.column,
+                })
+            })
+            .collect()
+    }
+
     pub(super) fn settings_loader(&self) -> Option<&dyn SettingsLoader> {
         self.settings.as_deref()
     }
@@ -156,6 +213,30 @@ impl ContentRegistry {
     pub(super) fn folder_writers(&self) -> &[FolderWriter] {
         &self.writers
     }
+}
+
+/// One reference a file makes, located in its text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Reference {
+    pub kind: LeafKind,
+    pub value: String,
+    pub known: bool,
+    pub pointer: String,
+    /// The reference is the key of a map entry at `pointer`, not the value there.
+    pub key: bool,
+    pub line: usize,
+    pub column: usize,
+}
+
+fn table_of(file: &str) -> Option<&str> {
+    let rest = file.strip_prefix("tables/")?;
+    let (table, name) = rest.split_once('/')?;
+    name.ends_with(".json").then_some(table)
+}
+
+fn leaves_of(content: &Content, text: &str, parse: &dyn Fn(&str) -> ParseResult) -> Vec<Leaf> {
+    let (_, scope) = with_content(ContentScope::of(content), || parse(text));
+    scope.leaves().to_vec()
 }
 
 /// Where a content folder's files come from: a directory, or files embedded in a binary.

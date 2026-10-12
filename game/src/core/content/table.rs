@@ -16,7 +16,7 @@ pub trait ContentRow: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 
 }
 
 pub trait ModuleSet: ContentRow {
-    type Module: Serialize;
+    type Module: Serialize + DeserializeOwned;
     fn modules(&self) -> &[Self::Module];
     fn rule(module: &Self::Module) -> ModuleRule;
 }
@@ -209,6 +209,32 @@ impl Content {
 
     pub(super) fn tables(&self) -> impl Iterator<Item = (TypeId, &'static dyn AnyTable)> {
         self.0.tables.iter().map(|(id, table)| (*id, *table))
+    }
+
+    /// Frees every table and built value this content leaked, for a process that loads many
+    /// contents in a row (the editor rechecks the folder after every edit).
+    ///
+    /// # Safety
+    ///
+    /// Nothing may still refer into this content: no copy of it, no `&'static` row or built value,
+    /// no world holding its compiled scripts, and no cache keyed by the address of one of its rows.
+    pub unsafe fn release(self) {
+        let loaded = self.0 as *const Loaded as *mut Loaded;
+        // SAFETY: every pointer below was leaked from a `Box` by `ContentBuilder`, and the caller
+        // promises no reference into any of them survives this call.
+        unsafe {
+            for table in self.0.tables.values() {
+                drop(Box::from_raw(
+                    *table as *const dyn AnyTable as *mut dyn AnyTable,
+                ));
+            }
+            for built in self.0.built.values() {
+                drop(Box::from_raw(
+                    *built as *const (dyn Any + Send + Sync) as *mut (dyn Any + Send + Sync),
+                ));
+            }
+            drop(Box::from_raw(loaded));
+        }
     }
 }
 

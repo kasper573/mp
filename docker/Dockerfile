@@ -18,6 +18,6 @@ ENTRYPOINT ["website"]
 FROM runtime AS game-server
 # A static busybox supplies wget for the compose healthcheck without an apt layer.
 COPY --from=busybox:1.36-musl /bin/busybox /usr/bin/wget
-COPY target/release/server /usr/local/bin/game-server
+COPY target/release/game-server /usr/local/bin/game-server
 COPY content /content
 ENTRYPOINT ["game-server"]

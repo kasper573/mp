@@ -48,6 +48,7 @@ pub struct FlowKey {
 pub enum Pause {
     Wait { until: f64 },
     NextTick { tick: u64 },
+    Step { tick: u64 },
     Dialogue,
     Effect { keeps_box: bool },
 }
@@ -374,7 +375,7 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
         for flow in instances.flows.values().flatten() {
             let ready = match flow.pause {
                 Some(Pause::Wait { until }) => until <= now,
-                Some(Pause::NextTick { tick: at }) => at <= tick,
+                Some(Pause::NextTick { tick: at }) | Some(Pause::Step { tick: at }) => at <= tick,
                 _ => false,
             };
             if ready {
@@ -725,6 +726,7 @@ fn resume<V: Vocabulary>(
             .iter()
             .position(|(known, _)| known == name)
             .map(|index| outputs[index]),
+        (_, Pause::Step { .. }, Answer::Output(_)) => Some(frame.node),
         _ => None,
     };
     let Some(next) = next else {
@@ -804,7 +806,44 @@ fn put_state<V: Vocabulary>(
     }
 }
 
-fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, mut flow: Flow<V>, clock: TickClock) {
+/// Every node a flow stepped through while this resource was in the world, for tools that watch a
+/// script run; play never inserts it.
+#[derive(Resource, Default)]
+pub struct FlowTrace {
+    pub steps: Vec<TraceStep>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TraceStep {
+    pub key: FlowKey,
+    pub procedure: String,
+    pub node: Name,
+}
+
+/// How a tool steers a run while this resource is in the world: the output each named random node
+/// takes instead of rolling, and whether every node pauses until the next tick so a run can be
+/// stepped; play never inserts it.
+#[derive(Resource, Default)]
+pub struct FlowSteering {
+    pub random: HashMap<String, usize>,
+    pub step: bool,
+}
+
+fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, flow: Flow<V>, clock: TickClock) {
+    let mut trace = world.remove_resource::<FlowTrace>();
+    run_flow_traced(world, key, flow, clock, &mut trace);
+    if let Some(trace) = trace {
+        world.insert_resource(trace);
+    }
+}
+
+fn run_flow_traced<V: Vocabulary>(
+    world: &mut World,
+    key: FlowKey,
+    mut flow: Flow<V>,
+    clock: TickClock,
+    trace: &mut Option<FlowTrace>,
+) {
     loop {
         let mut frame = flow.frames.pop().expect("a frame");
         let Some(node) = frame.node else {
@@ -828,6 +867,13 @@ fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, mut flow: Flow<V>, c
             state: take_state(world, key.owner, &frame.procedure),
             event: std::mem::take(&mut flow.event),
         };
+        if let Some(trace) = trace.as_mut() {
+            trace.steps.push(TraceStep {
+                key,
+                procedure: frame.procedure.label.clone(),
+                node: frame.procedure.names[node],
+            });
+        }
         let outcome;
         match &frame.procedure.steps[node] {
             Step::On { next } => outcome = StepOutcome::Next(*next),
@@ -835,17 +881,25 @@ fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, mut flow: Flow<V>, c
                 outcome = StepOutcome::Next(if test(world, &cx).truthy() { *yes } else { *no });
             }
             Step::Random { weights, outputs } => {
-                let total: u32 = weights.iter().sum();
-                let roll = world.resource_mut::<Rng>().rand_range(0..total);
-                let mut seen = 0;
-                let mut picked = outputs.len() - 1;
-                for (index, weight) in weights.iter().enumerate() {
-                    seen += weight;
-                    if roll < seen {
-                        picked = index;
-                        break;
+                let steered = world
+                    .get_resource::<FlowSteering>()
+                    .and_then(|steering| steering.random.get(frame.procedure.names[node]))
+                    .copied()
+                    .filter(|picked| *picked < outputs.len());
+                let picked = steered.unwrap_or_else(|| {
+                    let total: u32 = weights.iter().sum();
+                    let roll = world.resource_mut::<Rng>().rand_range(0..total);
+                    let mut seen = 0;
+                    let mut picked = outputs.len() - 1;
+                    for (index, weight) in weights.iter().enumerate() {
+                        seen += weight;
+                        if roll < seen {
+                            picked = index;
+                            break;
+                        }
                     }
-                }
+                    picked
+                });
                 outcome = StepOutcome::Next(outputs[picked]);
             }
             Step::Repeat {
@@ -1011,6 +1065,18 @@ fn run_flow<V: Vocabulary>(world: &mut World, key: FlowKey, mut flow: Flow<V>, c
             }
         }
         give_back(world, &mut frame, &mut flow, cx);
+        let stepping = world
+            .get_resource::<FlowSteering>()
+            .is_some_and(|steering| steering.step);
+        if stepping && let StepOutcome::Next(Some(next)) = outcome {
+            frame.node = Some(next);
+            flow.frames.push(frame);
+            flow.pause = Some(Pause::Step {
+                tick: clock.tick + 1,
+            });
+            put_flow(world, key, flow);
+            return;
+        }
         match outcome {
             StepOutcome::Next(next) => {
                 frame.node = next;

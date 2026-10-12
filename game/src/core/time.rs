@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "s"))]
 pub struct Seconds(pub f32);
 
 #[derive(
@@ -34,6 +35,7 @@ pub struct Seconds(pub f32);
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "ms"))]
 pub struct Millis(pub f32);
 
 #[derive(
@@ -42,6 +44,7 @@ pub struct Millis(pub f32);
 pub struct PlaybackRate(pub f32);
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[schemars(extend("x-unit" = "Hz"))]
 pub struct Hertz(pub f32);
 
 impl Hertz {

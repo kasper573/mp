@@ -5,6 +5,7 @@ use crate::core::math::{Pos, Rect, Size};
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-rect" = true))]
 pub struct RectRow {
     x: f32,
     y: f32,
@@ -61,6 +62,7 @@ pub fn is_empty<T>(list: &[T]) -> bool {
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(extend("x-pos" = true))]
 pub struct PosRow {
     x: f32,
     y: f32,

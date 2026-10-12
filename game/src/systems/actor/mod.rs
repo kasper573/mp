@@ -89,7 +89,7 @@ pub struct Rgba(pub u32);
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tint {
-    #[schemars(with = "[u8; 4]")]
+    #[schemars(with = "[u8; 4]", extend("x-color" = true))]
     #[serde(serialize_with = "rgba_bytes", deserialize_with = "rgba_from_bytes")]
     pub rgba: Rgba,
 }

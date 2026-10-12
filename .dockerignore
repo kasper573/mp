@@ -3,7 +3,7 @@
 .claude
 target
 !target/release/website
-!target/release/server
+!target/release/game-server
 !target/wasm
 docker/.env*
 *.md
