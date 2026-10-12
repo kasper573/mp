@@ -118,7 +118,7 @@ impl Default for SyncPolicy {
             tries: 5,
             first_backoff: Duration::from_millis(500),
             longest_backoff: Duration::from_secs(8),
-            at_once: 6,
+            at_once: 16,
             restarts: 5,
         }
     }

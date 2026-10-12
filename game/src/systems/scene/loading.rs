@@ -1,8 +1,10 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::scene::Scene as UiScene;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
+use bevy::winit::{UpdateMode, WinitSettings};
 use ui::{Activate, CardOptions, button, card, styled_text, text_colored};
 
 use super::Scene;
@@ -80,14 +82,23 @@ impl ContentSource for ServerContent {
     }
 }
 
+// The card only needs a few frames a second, and every frame a software renderer draws is main-thread
+// time the download's fetches and cache writes can't have.
+const CARD_FRAME: Duration = Duration::from_millis(100);
+
 fn begin(world: &mut World) {
     world.remove_resource::<LoadingFailure>();
+    world.insert_resource(WinitSettings {
+        focused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
+        unfocused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
+    });
     start(world);
 }
 
 fn forget(world: &mut World) {
     world.remove_resource::<Syncing>();
     world.remove_resource::<LoadingFailure>();
+    world.insert_resource(WinitSettings::game());
     *world.resource_mut::<Shown>() = Shown::default();
 }
 
