@@ -165,10 +165,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 }
             });
             ui.add_space(6.0);
-            widgets::hint(
-                ui,
-                "Frames are sheet tiles with a length each. Nothing here changes a pixel.",
-            );
         });
     });
     ui.add_space(10.0);

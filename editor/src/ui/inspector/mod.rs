@@ -3,6 +3,7 @@ pub mod preview;
 pub mod quests;
 pub mod rows;
 pub mod scripts;
+pub mod settings;
 pub mod usages;
 
 use std::collections::BTreeMap;
@@ -34,12 +35,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         super::history::step_card(editor, ui);
         ui.add_space(8.0);
     }
-    if editor.play.failure.is_some() {
-        crate::play::failures_card(ui);
-        ui.add_space(8.0);
-    }
     let selection = editor.selection.clone();
     if editor.project.is_none() {
+        return;
+    }
+    if selection.is_game() {
+        egui::ScrollArea::vertical()
+            .id_salt("inspector-game")
+            .show(ui, |ui| settings::show_game(editor, ui));
         return;
     }
     if selection.keys.is_empty() || selection.table == crate::views::world::TABLE {
@@ -136,7 +139,9 @@ pub fn right_tabs(editor: &Editor) -> Vec<(RightTab, String)> {
     } else {
         tabs.push((RightTab::Inspector, "Inspector".to_owned()));
     }
-    tabs.push((RightTab::UsedBy, "Used by".to_owned()));
+    if !selection.is_game() {
+        tabs.push((RightTab::UsedBy, "Used by".to_owned()));
+    }
     tabs
 }
 
@@ -439,7 +444,6 @@ fn first_class_card(
                     .show(ui, |ui| {
                         ui.label(theme::code(code_name(table, key)).size(12.0));
                     });
-                ui.label(theme::muted(". Editable, never renamed or deleted.").size(12.0));
             });
         }
         if table == crate::views::model::TABLE {

@@ -19,20 +19,39 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             }
         });
     });
-    egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
-        let start = editor.output.lines.len().saturating_sub(2_000);
-        for line in &editor.output.lines[start..] {
-            let bad = alarming(&line.text);
-            ui.horizontal(|ui| {
-                ui.add_sized(egui::vec2(104.0, 18.0), egui::Label::new(RichText::new(format!("{}:", line.tag)).monospace().size(12.5).color(if bad { theme::DANGER } else { theme::MUTED })));
-                ui.add(egui::Label::new(RichText::new(&line.text).monospace().size(12.5).color(if bad { theme::DANGER } else { theme::TEXT })).wrap().selectable(true));
-            });
-        }
-        if editor.output.lines.is_empty() {
-            ui.label(theme::muted("Play starts the server and the client here; their lines land in order, tagged.").size(13.0));
-        }
-    });
+    let lines = &editor.output.lines;
+    egui::ScrollArea::both()
+        .stick_to_bottom(true)
+        .show_rows(ui, ROW, lines.len(), |ui, rows| {
+            for line in &lines[rows] {
+                let bad = alarming(&line.text);
+                ui.horizontal(|ui| {
+                    ui.set_height(ROW);
+                    ui.add_sized(
+                        egui::vec2(104.0, ROW),
+                        egui::Label::new(
+                            RichText::new(format!("{}:", line.tag))
+                                .monospace()
+                                .size(12.5)
+                                .color(if bad { theme::DANGER } else { theme::MUTED }),
+                        ),
+                    );
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(&line.text)
+                                .monospace()
+                                .size(12.5)
+                                .color(if bad { theme::DANGER } else { theme::TEXT }),
+                        )
+                        .extend()
+                        .selectable(true),
+                    );
+                });
+            }
+        });
 }
+
+const ROW: f32 = 18.0;
 
 fn alarming(text: &str) -> bool {
     let lower = text.to_lowercase();

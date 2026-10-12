@@ -3,7 +3,7 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{RenderTarget, ScalingMode};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureFormat};
+use bevy::render::render_resource::{AsBindGroup, TextureFormat};
 use bevy::shader::{Shader, ShaderRef};
 use bevy::sprite_render::Material2d;
 use bevy::window::PrimaryWindow;
@@ -24,6 +24,7 @@ pub(super) struct Screen;
 pub(super) struct WorldTargets {
     live: Handle<Image>,
     held: Handle<Image>,
+    size: (u32, u32),
 }
 
 #[derive(Resource, Default, Clone, Copy)]
@@ -69,6 +70,7 @@ pub(super) fn setup(
     commands.insert_resource(WorldTargets {
         live: target.clone(),
         held: held.clone(),
+        size: (target_w, target_h),
     });
 
     commands.spawn((
@@ -126,39 +128,39 @@ pub(super) fn match_display(
 
 pub(super) fn fit(
     window: Single<&Window, With<PrimaryWindow>>,
-    targets: Res<WorldTargets>,
+    mut targets: ResMut<WorldTargets>,
     mut images: ResMut<Assets<Image>>,
-    mut projection: Query<&mut Projection, With<WorldCamera>>,
-    mut quad: Query<&mut Transform, With<Screen>>,
+    mut camera: Query<(&mut RenderTarget, &mut Projection), With<WorldCamera>>,
+    mut quad: Query<(&mut Transform, &MeshMaterial2d<Present>), With<Screen>>,
+    mut materials: ResMut<Assets<Present>>,
     mut viewport: ResMut<Viewport>,
 ) {
     let (width, height) = (window.resolution.width(), window.resolution.height());
     let (target_w, target_h) = target_size(&window);
     viewport.scale = height / target_h as f32;
-    let stale = images.get(&targets.live).is_some_and(|image| {
-        image.texture_descriptor.size.width != target_w
-            || image.texture_descriptor.size.height != target_h
-    });
-    if stale {
-        for target in [&targets.live, &targets.held] {
-            if let Some(mut image) = images.get_mut(target) {
-                image.resize(Extent3d {
-                    width: target_w,
-                    height: target_h,
-                    depth_or_array_layers: 1,
-                });
+    if targets.size != (target_w, target_h) {
+        // Fresh textures rather than resized ones: the screen's bind group would keep the old
+        // texture otherwise and show a frozen frame stretched to the new window.
+        targets.size = (target_w, target_h);
+        targets.live = images.add(world_target(target_w, target_h));
+        targets.held = images.add(world_target(target_w, target_h));
+        if let Ok((mut target, mut projection)) = camera.single_mut() {
+            *target = RenderTarget::Image(targets.live.clone().into());
+            if let Projection::Orthographic(ortho) = projection.as_mut() {
+                ortho.scaling_mode = ScalingMode::Fixed {
+                    width: target_w as f32 / SCALE,
+                    height: target_h as f32 / SCALE,
+                };
             }
         }
-        if let Ok(mut proj) = projection.single_mut()
-            && let Projection::Orthographic(ortho) = proj.as_mut()
+        if let Ok((_, material)) = quad.single()
+            && let Some(mut material) = materials.get_mut(&material.0)
         {
-            ortho.scaling_mode = ScalingMode::Fixed {
-                width: target_w as f32 / SCALE,
-                height: target_h as f32 / SCALE,
-            };
+            material.world = targets.live.clone();
+            material.snapshot = targets.held.clone();
         }
     }
-    if let Ok(mut transform) = quad.single_mut() {
+    if let Ok((mut transform, _)) = quad.single_mut() {
         transform.scale = Vec3::new(width, height, 1.0);
     }
 }

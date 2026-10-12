@@ -181,7 +181,7 @@ pub(super) fn draw_preview(
     let model = game::systems::actor::model(&content, id);
     let Some(thumb) = form
         .thumbnails
-        .image(&ctx, &project.files, &model.sheet().0)
+        .image(&ctx, &project.files, model.sheet().as_str())
     else {
         return;
     };
@@ -316,7 +316,7 @@ pub(super) fn quest_card(
             ui.set_width(width - 28.0);
             ui.spacing_mut().item_spacing.y = 8.0;
             ui.horizontal(|ui| {
-                icon(ui, &def.icon(&content).0, 28.0);
+                icon(ui, def.icon(&content).as_str(), 28.0);
                 ui.label(RichText::new(&def.title).size(17.0).color(ink).strong());
             });
             ui.label(
@@ -328,7 +328,7 @@ pub(super) fn quest_card(
             ui.label(RichText::new("OBJECTIVES").size(11.0).color(soft));
             for (objective, progress) in def.objectives().zip(&progress) {
                 ui.horizontal(|ui| {
-                    icon(ui, &objective.icon(&content).0, 20.0);
+                    icon(ui, objective.icon(&content).as_str(), 20.0);
                     ui.label(RichText::new(&progress.label).size(13.0).color(ink));
                     if progress.counted {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -355,7 +355,7 @@ pub(super) fn quest_card(
                     for stack in def.rewards() {
                         let item = stack.item.get(&content);
                         ui.horizontal(|ui| {
-                            icon(ui, &item.icon.0, 16.0);
+                            icon(ui, item.icon.as_str(), 16.0);
                             let label = if stack.count == 1 {
                                 item.name.clone()
                             } else {
@@ -373,7 +373,7 @@ pub(super) fn quest_card(
                     );
                     ui.horizontal(|ui| {
                         for stack in def.pick_one() {
-                            icon(ui, &stack.item.get(&content).icon.0, 28.0);
+                            icon(ui, stack.item.get(&content).icon.as_str(), 28.0);
                         }
                     });
                 }
@@ -384,7 +384,6 @@ pub(super) fn quest_card(
                     .color(soft),
             );
         });
-    widgets::hint(ui, "Laid out as the game's quest card, from the same data.");
 }
 
 pub(super) fn attitude(

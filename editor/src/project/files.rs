@@ -128,6 +128,8 @@ pub fn json_bytes(value: &serde_json::Value) -> Bytes {
     Bytes::from(bytes)
 }
 
+pub const GAME_FILE: &str = "game.json";
+
 pub fn row_file(table: &str, key: &str) -> String {
     format!("tables/{table}/{key}.json")
 }

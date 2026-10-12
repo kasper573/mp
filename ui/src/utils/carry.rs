@@ -76,6 +76,9 @@ pub(crate) fn lift(
 }
 
 pub(crate) fn follow(drag: On<Pointer<Drag>>, mut ghosts: Query<&mut Node, With<Ghost>>) {
+    if drag.entity != drag.original_event_target() {
+        return;
+    }
     let at = drag.pointer_location.position;
     for mut node in &mut ghosts {
         node.left = Val::Px(at.x - GHOST / 2.0);
@@ -84,10 +87,13 @@ pub(crate) fn follow(drag: On<Pointer<Drag>>, mut ghosts: Query<&mut Node, With<
 }
 
 pub(crate) fn set_down(
-    _: On<Pointer<DragEnd>>,
+    end: On<Pointer<DragEnd>>,
     ghosts: Query<Entity, With<Ghost>>,
     mut commands: Commands,
 ) {
+    if end.entity != end.original_event_target() {
+        return;
+    }
     for ghost in &ghosts {
         commands.entity(ghost).despawn();
     }

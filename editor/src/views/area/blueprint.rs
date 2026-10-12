@@ -334,7 +334,6 @@ pub fn make_blueprint_dialog(
             });
         }
         ui.add_space(8.0);
-        ui.label(theme::muted("Everything selected but ground tiles goes in, objects with their scripts. Names and values stay fixed until made variables.").size(12.5));
         if let Some(error) = &dialog.error {
             ui.colored_label(theme::DANGER, error);
         }

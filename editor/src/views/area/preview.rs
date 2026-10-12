@@ -29,10 +29,6 @@ pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
         ui.label(theme::faint("…").size(12.5));
     }
     ui.add_space(6.0);
-    widgets::hint(
-        ui,
-        "Also on the system clipboard: pastes into another window, folder or text editor.",
-    );
 }
 
 pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {

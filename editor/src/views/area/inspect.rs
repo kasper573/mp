@@ -216,7 +216,7 @@ fn palette_summary(ui: &mut Ui, content: Content, area_id: area::Id) {
     widgets::hint(
         ui,
         &format!(
-            "{} tiles from {} tilesets. Painting adds a tile; unused ones drop out on save.",
+            "{} tiles from {} tilesets",
             thousands(grids.palette.len()),
             tilesets.len()
         ),
@@ -399,10 +399,6 @@ fn terrain_card(
     if others > 0 {
         ui.label(theme::faint(format!("… {others} more in other tilesets")).size(12.5));
     }
-    widgets::hint(
-        ui,
-        "A missing mix is named where needed; that cell keeps its tile.",
-    );
     let picked = {
         let view = &editor.views.area.views[view_key];
         view.terrain
@@ -850,7 +846,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
     else {
         return;
     };
-    widgets::section(ui, "The game's spawn · game.json");
+    widgets::section(ui, "The game's spawn");
     let mut picked = spawn_area.clone();
     let mut actions = Vec::new();
     let mut go = false;
@@ -895,7 +891,6 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
             go = true;
         }
     });
-    widgets::hint(ui, "New characters appear here. One per game.");
     if picked != spawn_area
         && let Some(target) = content.by_key::<area::AreaDef>(&picked)
     {
@@ -980,10 +975,6 @@ fn ways_in(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .size(12.5),
         );
     }
-    widgets::hint(
-        ui,
-        &format!("The dead come back where they last entered {name} (C6)."),
-    );
     if let Some(arrival) = open {
         pins::open_pin(
             editor,

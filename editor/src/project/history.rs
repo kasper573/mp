@@ -16,6 +16,8 @@ pub struct Step {
     pub at: SystemTime,
 }
 
+pub const GAME: &str = "game";
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Selection {
     pub table: String,
@@ -34,6 +36,14 @@ impl Selection {
 
     pub fn row(table: &str, key: &str) -> Selection {
         Selection::rows(table, vec![key.to_owned()])
+    }
+
+    pub fn game() -> Selection {
+        Selection::row(GAME, GAME)
+    }
+
+    pub fn is_game(&self) -> bool {
+        self.table == GAME
     }
 
     pub fn is_empty(&self) -> bool {

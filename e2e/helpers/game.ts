@@ -573,7 +573,7 @@ async function tilePoint(page: Page, tile: Tile): Promise<{ x: number; y: number
 }
 
 // A tile's width clear of the edges, where the HUD sits.
-function clickable(snapshot: Snapshot, tile: Tile, size: { width: number; height: number }): boolean {
+export function clickable(snapshot: Snapshot, tile: Tile, size: { width: number; height: number }): boolean {
   if (!snapshot.view) return false;
   const margin = 1;
   const x = snapshot.view.origin[0] + tile[0] * snapshot.view.tile_size[0];

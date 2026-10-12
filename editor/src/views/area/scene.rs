@@ -135,12 +135,11 @@ pub fn sync(
         if rest {
             continue;
         }
-        if wanted[0] > scene.alloc[0]
-            || wanted[1] > scene.alloc[1]
-            || scene.alloc[0] > wanted[0] * 2
-            || scene.alloc[1] > wanted[1] * 2
-        {
-            let alloc = [round_up(wanted[0]), round_up(wanted[1])];
+        let fit = [round_up(wanted[0]), round_up(wanted[1])];
+        let grows = wanted[0] > scene.alloc[0] || wanted[1] > scene.alloc[1];
+        let shrinks = scene.alloc[0] >= fit[0] * 2 || scene.alloc[1] >= fit[1] * 2;
+        if grows || shrinks {
+            let alloc = fit;
             let image = target_image(alloc);
             let handle = world.resource_mut::<Assets<Image>>().add(image);
             let mut textures = world.resource_mut::<EguiUserTextures>();

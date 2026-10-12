@@ -66,7 +66,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                             ),
                         );
                         frame_card(editor, ui, &key, &frames, action, direction, index);
-                        keys_card(ui);
                     }
                     (Some(_), None) => {
                         let indices: Vec<usize> = selection
@@ -87,7 +86,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                             .size(12.0),
                         );
                         frames_card(editor, ui, &key, &frames, action, direction, &indices);
-                        keys_card(ui);
                     }
                     _ => {
                         strip_card(editor, ui, &key, &row, &frames, action, direction);
@@ -470,16 +468,6 @@ fn plan(
         out.insert(*index, (ms.max(1.0) as u32).min(MAX_FRAME_MS));
     }
     Some(out)
-}
-
-fn keys_card(ui: &mut Ui) {
-    widgets::section(ui, "Keys");
-    widgets::key_hint_text(ui, "Alt ← →", "10 ms shorter or longer");
-    widgets::key_hint_text(ui, "Shift Alt ← →", "1 ms");
-    widgets::key_hint_text(ui, "Ctrl ← →", "move the frame");
-    widgets::key_hint_text(ui, "Ctrl D", "duplicate it");
-    widgets::key_hint_text(ui, "Del", "remove it; the step names its cues");
-    widgets::key_hint_text(ui, "A · S · T", "apex, sound, step on the frame");
 }
 
 #[allow(clippy::too_many_arguments)]

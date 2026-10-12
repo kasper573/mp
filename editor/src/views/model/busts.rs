@@ -67,10 +67,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     widgets::section(ui, &format!("Bust · {title}"));
     if module_index(row).is_none() {
         ui.add_space(6.0);
-        widgets::hint(
-            ui,
-            "No bust module: this model never speaks. Add one in the inspector to give it faces.",
-        );
+        widgets::hint(ui, "No bust module: this model never speaks.");
         editor.status.left.push(format!("model/{key} · no bust"));
         return;
     }

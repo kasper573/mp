@@ -546,45 +546,6 @@ pub fn save_output(editor: &Editor) {
     }
 }
 
-pub fn failures_card(ui: &mut Ui) {
-    widgets::section(ui, "How a play-test can fail");
-    for (what, then) in [
-        (
-            "Saving fails",
-            "read-only folder, full disk, locked file: nothing starts; the reason names the file.",
-        ),
-        (
-            "A binary is missing or from another build",
-            "nothing starts; names the setting and both builds.",
-        ),
-        (
-            "The folder doesn't load",
-            "Play is disabled with the reason. A change on disk after Play: the server prints its report and exits 2.",
-        ),
-        ("No ready line in 30 s", "both stopped, output kept."),
-        (
-            "A process exits before connecting",
-            "this screen: the other is stopped.",
-        ),
-        (
-            "The server stops during play",
-            "the client shows lost connection; the editor stops it and shows the exit code.",
-        ),
-        ("The client is closed", "the server is stopped."),
-        (
-            "Stop while starting",
-            "both stopped; a late ready line is ignored.",
-        ),
-    ] {
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            ui.label(theme::strong(what).size(12.5));
-            ui.label(theme::muted("·").size(12.5));
-            ui.label(theme::muted(then).size(12.5));
-        });
-    }
-}
-
 pub fn status(editor: &mut Editor) {
     if let Some(running) = editor.play.running.as_ref() {
         let text = match running.phase {

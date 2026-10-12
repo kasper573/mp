@@ -4,7 +4,6 @@ type DistanceRow<'a> = (&'a String, u32, Option<&'a ((f64, f64), f64)>);
 
 use egui::{Align, Color32, Layout as EguiLayout, Rect, RichText, Stroke, Ui, Vec2};
 use game::core::tiling::TilePos;
-use serde_json::Value;
 
 use super::atlas::{self, Atlas, Source};
 use super::canvas::{self, line_steps, viridis};
@@ -118,10 +117,6 @@ fn overview(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
         ),
     );
     ui.add_space(8.0);
-    widgets::hint(
-        ui,
-        "Double-click an area to open it. Right-click a spot to play there.",
-    );
 }
 
 fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
@@ -202,10 +197,6 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
         }
         ui.add_space(6.0);
     }
-    widgets::hint(
-        ui,
-        "Click a source to go to its area. Works for any row, module type or field value.",
-    );
     if let Some(area) = go {
         let layout = with_defaults(atlas, layout_of(editor));
         let zoom = editor.views.world.zoom;
@@ -538,10 +529,6 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
         },
     );
     ui.add_space(8.0);
-    widgets::hint(
-        ui,
-        "Numbers on the cards are warps from the spawn. Alt-click two areas for the route between them.",
-    );
 }
 
 fn check(ui: &mut Ui, ok: bool, text: &str) {
@@ -643,10 +630,6 @@ fn tile_panel(
         editor.play.character = Some(picked);
     }
     ui.add_space(6.0);
-    widgets::hint(
-        ui,
-        "Play here changes only where the test character starts.",
-    );
 }
 
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
@@ -733,10 +716,6 @@ fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, a: &str, b: &st
         }
         ui.add_space(6.0);
     }
-    ui.label(
-        theme::muted("Owners whose scripts may warp across this edge. Click one to open it.")
-            .size(12.5),
-    );
     if let Some((area, owner)) = open {
         open_owner(editor, &area, &owner);
     }
@@ -881,22 +860,8 @@ fn inspect_cards(
         editor.open_tab(Tab::Area { key });
     }
     ui.add_space(8.0);
-    widgets::section(ui, "Keys");
-    for (keys, text) in [
-        ("− =", "size of every selected card, 10% a step"),
-        ("Shift with them", "1% a step"),
-        ("← → ↑ ↓", "move the selection"),
-        ("Ctrl A", "select every card"),
-        ("P", "pin or unpin"),
-    ] {
-        widgets::key_hint_text(ui, keys, text);
-    }
     if cards.len() == 1 {
         ui.add_space(8.0);
-        widgets::section(ui, "Stored in world_map/world.json");
-        let json = serde_json::to_string_pretty(&crate::value::json(&card).unwrap_or(Value::Null))
-            .unwrap_or_default();
-        widgets::code_block(ui, &format!("\"{first}\": {json}"));
         if let Some(info) = atlas.areas.get(first) {
             ui.add_space(4.0);
             ui.label(
@@ -980,10 +945,6 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, layout: &Layout, index: usiz
         return;
     }
     ui.add_space(8.0);
-    widgets::hint(
-        ui,
-        "Dragging a region's label moves its cards. Regions and notes live in the world_map row.",
-    );
     ui.add_space(6.0);
     if widgets::danger(ui, "Delete region").clicked() {
         let mut next = layout.clone();
@@ -1023,10 +984,6 @@ fn inspect_note(editor: &mut Editor, ui: &mut Ui, layout: &Layout, index: usize)
         }
     }
     ui.add_space(6.0);
-    widgets::hint(
-        ui,
-        "Notes hold the team's open questions and plans, where they matter.",
-    );
     ui.add_space(6.0);
     if widgets::danger(ui, "Delete note").clicked() {
         let mut next = layout.clone();

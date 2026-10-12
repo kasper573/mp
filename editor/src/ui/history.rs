@@ -39,23 +39,41 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .left
         .push("Ctrl Z undo · Ctrl ⇧ Z redo · click a step to go back to it".to_owned());
     let mut jump = None;
-    egui::ScrollArea::vertical().id_salt("history").show(ui, |ui| {
-        ui.add_space(4.0);
-        if rows.is_empty() {
-            ui.label(theme::muted("Every step since the folder opened, newest first. Ctrl Z takes the last one back.").size(13.0));
-        }
-        for (number, label, time, done) in rows.iter().rev() {
-            let current = *number == applied;
-            let response = row(ui, label, time, *done, current, saved_at == Some(*number), focus == Some(*number));
-            if response.clicked() {
-                jump = Some(*number);
+    egui::ScrollArea::vertical()
+        .id_salt("history")
+        .show(ui, |ui| {
+            ui.add_space(4.0);
+            if rows.is_empty() {
+                ui.label(theme::muted("No steps yet.").size(13.0));
             }
-        }
-        let response = row(ui, &format!("Open {opened}"), "", true, applied == 0, saved_at == Some(0), focus == Some(0));
-        if response.clicked() {
-            jump = Some(0);
-        }
-    });
+            for (number, label, time, done) in rows.iter().rev() {
+                let current = *number == applied;
+                let response = row(
+                    ui,
+                    label,
+                    time,
+                    *done,
+                    current,
+                    saved_at == Some(*number),
+                    focus == Some(*number),
+                );
+                if response.clicked() {
+                    jump = Some(*number);
+                }
+            }
+            let response = row(
+                ui,
+                &format!("Open {opened}"),
+                "",
+                true,
+                applied == 0,
+                saved_at == Some(0),
+                focus == Some(0),
+            );
+            if response.clicked() {
+                jump = Some(0);
+            }
+        });
     if let Some(index) = jump
         && let Some(project) = &mut editor.project
     {
@@ -168,10 +186,6 @@ pub fn step_card(editor: &Editor, ui: &mut Ui) {
     widgets::section(ui, "Step");
     if index == 0 {
         ui.label(theme::strong(format!("Open {}", super::pretty_path(&project.root))).size(14.0));
-        widgets::hint(
-            ui,
-            "The folder as it was opened; every edit since is a step above.",
-        );
         return;
     }
     let Some(step) = project.history.steps().get(index - 1) else {

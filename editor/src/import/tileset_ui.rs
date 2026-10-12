@@ -336,7 +336,8 @@ pub fn dialog(
                 && iw > 0
             {
                 let scale = (rect.width() / iw as f32).min(rect.height() / ih as f32);
-                let shown = Rect::from_min_size(rect.min, Vec2::new(iw as f32 * scale, ih as f32 * scale));
+                let shown =
+                    Rect::from_min_size(rect.min, Vec2::new(iw as f32 * scale, ih as f32 * scale));
                 painter.image(
                     texture.id(),
                     shown,
@@ -345,15 +346,23 @@ pub fn dialog(
                 );
                 if let Ok(cut) = &dialog.cut {
                     let settings = cut.settings;
-                    let pitch = (settings.tile + 2 * settings.extruded + settings.spacing) as f32 * scale;
+                    let pitch =
+                        (settings.tile + 2 * settings.extruded + settings.spacing) as f32 * scale;
                     let stroke = egui::Stroke::new(1.0, Color32::from_white_alpha(28));
                     for column in 0..=cut.columns {
-                        let x = shown.min.x + settings.margin as f32 * scale + column as f32 * pitch;
-                        painter.line_segment([egui::pos2(x, shown.min.y), egui::pos2(x, shown.max.y)], stroke);
+                        let x =
+                            shown.min.x + settings.margin as f32 * scale + column as f32 * pitch;
+                        painter.line_segment(
+                            [egui::pos2(x, shown.min.y), egui::pos2(x, shown.max.y)],
+                            stroke,
+                        );
                     }
                     for row in 0..=cut.rows {
                         let y = shown.min.y + settings.margin as f32 * scale + row as f32 * pitch;
-                        painter.line_segment([egui::pos2(shown.min.x, y), egui::pos2(shown.max.x, y)], stroke);
+                        painter.line_segment(
+                            [egui::pos2(shown.min.x, y), egui::pos2(shown.max.x, y)],
+                            stroke,
+                        );
                     }
                 }
             }
@@ -393,7 +402,11 @@ pub fn dialog(
                         ui.scope(|ui| {
                             ui.set_max_width(170.0);
                             let response = crate::forms::boxed_input(ui, Some("px"), |ui| {
-                                ui.add(egui::TextEdit::singleline(text).desired_width(110.0).font(egui::TextStyle::Monospace))
+                                ui.add(
+                                    egui::TextEdit::singleline(text)
+                                        .desired_width(110.0)
+                                        .font(egui::TextStyle::Monospace),
+                                )
                             });
                             changed |= response.changed();
                         });
@@ -429,10 +442,6 @@ pub fn dialog(
                     }
                 }
                 ui.add_space(8.0);
-                widgets::hint(
-                    ui,
-                    "Exports carry no game data: walk, surfaces, terrains and animations are set in the tileset view.",
-                );
             });
         });
         ui.add_space(10.0);
@@ -768,10 +777,6 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
             });
         });
     }
-    widgets::hint(
-        ui,
-        "Grids name palette entries, not tiles, so no cell in any grid changes.",
-    );
     if !draft.plan.gone_used.is_empty() {
         widgets::section(ui, "Gone but still painted");
         let gone: Vec<(u32, Vec<tileset::PaletteUse>)> = draft
@@ -1103,7 +1108,6 @@ pub fn animation_dialog(
                             line(ui, false, warning.clone());
                         }
                         ui.add_space(6.0);
-                        widgets::hint(ui, "Areas need nothing: a tile animates wherever it is painted.");
                     }
                     Err(error) => {
                         ui.horizontal_wrapped(|ui| {

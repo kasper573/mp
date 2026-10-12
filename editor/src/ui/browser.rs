@@ -3,6 +3,7 @@ use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Dialog, Editor, RenameDialog, RenameTarget, RightTab};
+use crate::project::files::GAME_FILE;
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
 use crate::value::RowValue;
@@ -149,7 +150,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         );
     }
     let selection = editor.selection.clone();
-    let nodes = {
+    let mut nodes = {
         let Editor {
             project, shapes, ..
         } = editor;
@@ -172,6 +173,17 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
             },
         )
     };
+    if !only_fixtures {
+        let project = editor.project.as_ref().expect("a project");
+        let unsaved = project.is_unsaved(GAME_FILE);
+        if !only_unsaved || unsaved {
+            let mut game = TreeNode::leaf(GAME_FILE, "game");
+            game.icon = TreeIcon::Glyph("⚙");
+            game.selected = selection.is_game();
+            game.unsaved = unsaved;
+            nodes.insert(0, game);
+        }
+    }
     let mut action: Option<(String, String, Action)> = None;
     let mut budget = super::assets::ICON_DECODES_PER_FRAME;
     let out = egui::ScrollArea::vertical()
@@ -208,6 +220,14 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     }
     if let Some(table) = out.open_table {
         editor.open_tab(Tab::Sheet { table });
+    }
+    if out
+        .clicked
+        .as_ref()
+        .is_some_and(|(path, _)| path == GAME_FILE)
+    {
+        editor.select(Selection::game());
+        editor.panels.right = RightTab::Inspector;
     }
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
@@ -284,7 +304,11 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
         return;
     }
     let selection = editor.selection.clone();
-    if selection.keys.len() != 1 || !selection.parts.is_empty() || selection.table.is_empty() {
+    if selection.keys.len() != 1
+        || !selection.parts.is_empty()
+        || selection.table.is_empty()
+        || selection.is_game()
+    {
         return;
     }
     let pressed = ui.input_mut(|i| {

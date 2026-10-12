@@ -256,7 +256,6 @@ fn selection_card(editor: &mut Editor, ui: &mut Ui, key: &str, grid: &super::Gri
             view.selection = None;
         }
     });
-    widgets::hint(ui, "One scenery part, sorted at its bottom row.");
     let _ = grid;
 }
 

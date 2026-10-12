@@ -2,6 +2,8 @@ import { test, type Page } from "@playwright/test";
 
 import { caption, chapter, soundscapeMixer } from "../helpers/demo";
 import {
+  canvasSize,
+  clickable,
   closestTile,
   distance,
   leaveConversation,
@@ -74,8 +76,11 @@ async function approach(page: Page, spot: Tile): Promise<void> {
       continue;
     }
     const at = snapshot.me!.at;
+    const size = await canvasSize(page);
     const step = closestTile(
-      snapshot.walkable.filter((tile) => !occupied(snapshot, tile) && !warps(snapshot, tile)),
+      snapshot.walkable.filter(
+        (tile) => !occupied(snapshot, tile) && !warps(snapshot, tile) && clickable(snapshot, tile, size),
+      ),
       spot,
     );
     if (!step || distance(step, spot) >= distance(at, spot) - 0.5) return;

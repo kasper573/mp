@@ -129,10 +129,6 @@ pub(super) fn quest_parties_sections(editor: &mut Editor, ui: &mut Ui, quest: &s
             });
         }
     }
-    widgets::hint(
-        ui,
-        "A quest no script offers, or none takes back, doesn't load.",
-    );
     if let Some((table, key)) = open.filter(|(table, _)| !table.is_empty()) {
         editor.select(crate::project::Selection::row(&table, &key));
         editor.open_tab(Tab::for_row(&table, &key));

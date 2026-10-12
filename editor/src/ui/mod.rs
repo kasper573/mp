@@ -435,10 +435,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
 fn empty_centre(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(ui.available_height() * 0.08);
-        ui.label(RichText::new("Ctrl P searches everything").strong().size(20.0));
-        ui.add_space(6.0);
-        ui.set_max_width(460.0);
-        ui.label(theme::muted("Keys, object names, display names, module types and file names. Enter opens the first result."));
+        ui.label(theme::muted("Ctrl P").size(20.0));
     });
 }
 

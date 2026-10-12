@@ -54,9 +54,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                     }
                     _ => node_inspector(editor, ui, &doc, &name),
                 }
-                if outline {
-                    keys_card(ui);
-                }
+                if outline {}
             }
             many => {
                 breadcrumb(
@@ -87,10 +85,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                         super::delete_nodes(editor, &doc, many.to_vec());
                     }
                 });
-                widgets::hint(
-                    ui,
-                    "Drag moves them together. Del removes them and the arrows into them.",
-                );
             }
         });
 }
@@ -294,13 +288,6 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
     variables_section(editor, ui, doc);
     run_by_section(editor, ui, doc);
-    if editor.shapes.is_fixture("script", &key) {
-        widgets::section(ui, "From the New Game template");
-        widgets::hint(
-            ui,
-            "Every game made from New Game starts with it; another game may change or drop it.",
-        );
-    }
     action_buttons(editor, ui, doc);
     if make {
         make_inline_dialog(editor, doc);
@@ -510,17 +497,6 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
             {
                 open = true;
             }
-            let state = doc.script["state"]
-                .as_object()
-                .is_some_and(|m| !m.is_empty());
-            widgets::hint(
-                ui,
-                if state {
-                    "State is the object's own, shared by its flows."
-                } else {
-                    "State none: what it remembers is each subject's."
-                },
-            );
         }
         None if doc.kind == OwnerKind::Npc => {
             let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
@@ -723,10 +699,6 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
             format!("Edit the variables of script/{key}"),
         );
     }
-    widgets::hint(
-        ui,
-        "Same card and types as a blueprint's variables: declared here, valued by each owner.",
-    );
 }
 
 fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
@@ -734,7 +706,6 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let content = project.content;
     let mut callers: Vec<(String, String, String)> = Vec::new();
     for usage in project.usages.of_row("script", &key) {
         let Some((table, row_key)) = row_of(&usage.file) else {
@@ -809,51 +780,6 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                         .size(12.5),
                 );
             });
-        }
-    }
-    if let Some(content) = content
-        && content.has_built::<game::systems::script::RiftScripts>()
-    {
-        let quests: Vec<String> = doc
-            .nodes()
-            .values()
-            .filter(|node| {
-                matches!(
-                    nodes::kind(node),
-                    "offer_quest" | "accept_quest" | "turn_in"
-                )
-            })
-            .filter_map(|node| node["quest"].as_str().map(str::to_owned))
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        if !quests.is_empty() {
-            widgets::section(ui, "Worked out");
-            let who = callers
-                .first()
-                .map(|(owner, _, _)| owner.clone())
-                .unwrap_or_else(|| "its owner".to_owned());
-            let gives = doc
-                .nodes()
-                .values()
-                .any(|node| matches!(nodes::kind(node), "offer_quest" | "accept_quest"));
-            let takes = doc
-                .nodes()
-                .values()
-                .any(|node| nodes::kind(node) == "turn_in");
-            for quest in &quests {
-                let verbs = match (gives, takes) {
-                    (true, true) => "gives and takes back",
-                    (true, false) => "gives",
-                    _ => "takes back",
-                };
-                widgets::hint(
-                    ui,
-                    &format!(
-                        "{who} {verbs} quest/{quest}, so its quest marks and its quest log entry name {who}."
-                    ),
-                );
-            }
         }
     }
 }
@@ -1040,13 +966,8 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
         .as_ref()
         .filter(|callout| callout.live(&doc.owner) && callout.node == name)
     {
-        widgets::section(ui, "Checked on every edit");
         ui.label(theme::strong(&callout.rule).size(13.0).color(theme::DANGER));
         ui.label(theme::muted(&callout.text).size(12.5));
-        widgets::hint(
-            ui,
-            "Tried against the whole folder as if saved and loaded; anything the load report would name is refused.",
-        );
     }
     if let Some(target) = go_to {
         select_nodes(editor, doc, &[target]);
@@ -1166,38 +1087,6 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &Doc, shown: Shown) {
             keeps_cards(ui, doc);
         }
         "repeat" => bounds_card(editor, ui, doc, name, node),
-        "walk_to" | "wander" | "attack" | "stop" | "face" => {
-            widgets::section(ui, "One body");
-            widgets::hint(
-                ui,
-                "One thing at a time: equal or higher priority interrupts; lower waits until the body is free.",
-            );
-        }
-        "warp" => widgets::hint(ui, "Also sets the spawn point."),
-        "spawn_ground_items" => {
-            let seconds = node["seconds"].as_f64().unwrap_or(60.0);
-            widgets::hint(
-                ui,
-                &format!("Reserved to the subject for {seconds} s, as dropped loot is."),
-            );
-        }
-        "wait" => {
-            let at_most = node["at_most"].as_f64().unwrap_or(3600.0);
-            widgets::hint(
-                ui,
-                &format!(
-                    "at most: a constant, up to 3,600 s; here {at_most} s. 0 pauses one tick."
-                ),
-            );
-        }
-        "random" => widgets::hint(
-            ui,
-            "Picked by weight on the server. May do lists every output; Run lets you choose.",
-        ),
-        "run" => widgets::hint(
-            ui,
-            "The caller waits, then goes on. Owner and subject carry over; calls nest 8 deep, never recursively.",
-        ),
         _ => {
             if !blurb.is_empty() {
                 widgets::hint(ui, blurb);
@@ -1212,7 +1101,6 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &Doc, shown: Shown) {
                 ui.label(theme::muted(label).size(12.5));
             });
         }
-        widgets::hint(ui, "Two arrows may lead into one node.");
     }
 }
 
@@ -1330,10 +1218,13 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &V
             match waits.as_slice() {
                 [] => "none in a pass".to_owned(),
                 [one] => format!("at most {} · {} s in all", at_most as i64, one * at_most),
-                many => format!("at most {} · {} s in all", at_most as i64 * many.len() as i64, many.iter().sum::<f64>() * at_most),
+                many => format!(
+                    "at most {} · {} s in all",
+                    at_most as i64 * many.len() as i64,
+                    many.iter().sum::<f64>() * at_most
+                ),
             },
         );
-        widgets::hint(ui, "Proven when the script compiles. Past 10,000 steps between pauses, the folder doesn't load.");
     });
 }
 
@@ -1514,12 +1405,6 @@ fn dialogue_form(
         }
         changed = Changed::at(path);
         *label = format!("Add a choice in {}", doc.owner.title());
-    }
-    if count == 0 {
-        widgets::hint(
-            ui,
-            "Without choices the node goes on by next; with them, each choice leaves by its own arrow.",
-        );
     }
     if let Some(target) = go {
         cx.actions.push(FormAction::OpenRow {
@@ -1788,27 +1673,6 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
         let mut script = doc.script.clone();
         script["nodes"][name] = draft;
         write(editor, doc, script, label);
-    }
-}
-
-fn keys_card(ui: &mut Ui) {
-    widgets::section(ui, "Keys");
-    for (keys, text) in [
-        ("↑ ↓", "previous, next row"),
-        ("← →", "fold, unfold"),
-        ("Enter", "edit the row"),
-        ("Tab", "add a node after"),
-        ("Ctrl L", "link to a node by name"),
-        ("O", "back to the canvas"),
-    ] {
-        ui.horizontal(|ui| {
-            ui.allocate_ui_with_layout(
-                egui::vec2(72.0, 20.0),
-                egui::Layout::left_to_right(egui::Align::Center),
-                |ui| widgets::key_hint(ui, keys),
-            );
-            ui.label(theme::muted(text).size(13.0));
-        });
     }
 }
 

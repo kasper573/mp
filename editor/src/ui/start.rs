@@ -20,7 +20,6 @@ pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
                 ui.vertical(|ui| {
                     ui.set_width(560.0);
                     ui.label(RichText::new("Open a game").strong().size(26.0));
-                    ui.label(theme::muted("A game is one content folder."));
                     ui.add_space(24.0);
                     recent_list(editor, ui);
                     ui.add_space(12.0);

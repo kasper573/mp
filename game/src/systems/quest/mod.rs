@@ -769,7 +769,7 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
     let failed = Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Quest,
-            icon: Some(quest.get(&content).icon(&content).0.to_owned()),
+            icon: Some(quest.get(&content).icon(&content).path()),
             tally: None,
             failure: true,
             sfx: Some(InterfaceSound::QuestAbandoned.id(&content)),
@@ -1232,7 +1232,7 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
                     counted.push(Notification::new(
                         NotificationKind::Feed {
                             topic: HistoryTopic::Quest,
-                            icon: Some(objective.icon(&content).0.to_owned()),
+                            icon: Some(objective.icon(&content).path()),
                             tally: Some(RecordTally::Progress {
                                 have: active.counts[index],
                                 need: count,

@@ -4,7 +4,7 @@ use serde_json::Value;
 use super::{ACTIONS, DIRECTIONS, strip_of};
 use crate::app::Editor;
 use crate::project::Selection;
-use crate::ui::{theme, widgets};
+use crate::ui::theme;
 use crate::views::area::TILE_PX;
 
 const ZOOM: f32 = 4.0;
@@ -324,14 +324,6 @@ fn inset(
         egui::StrokeKind::Outside,
     );
     ui.add_space(4.0);
-    widgets::hint(
-        ui,
-        if flies {
-            "Flies over fences and crops: walks ignore blocked cells. A wild one still turns back at safe zones."
-        } else {
-            "Walks the grid: blocked cells stop it, and a wild one turns back at safe zones."
-        },
-    );
 }
 
 fn round(value: f32) -> Value {

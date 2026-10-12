@@ -13,6 +13,7 @@ use crate::core::render::transition::WorldViewSystems;
 use crate::systems::interface::CursorShape;
 use bevy::prelude::*;
 use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
+use strum::VariantArray;
 
 pub trait Gesture: Send + Sync {
     fn priority(&self) -> i32;
@@ -35,12 +36,17 @@ static GESTURES: &[&dyn Gesture] = &[
 ];
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Startup, setup).add_systems(
-        Update,
-        update
-            .in_set(WorldViewSystems)
-            .run_if(in_state(crate::systems::scene::Scene::Area)),
-    );
+    app.add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            load_cursors.run_if(resource_exists_and_changed::<Content>),
+        )
+        .add_systems(
+            Update,
+            update
+                .in_set(WorldViewSystems)
+                .run_if(in_state(crate::systems::scene::Scene::Area)),
+        );
 }
 
 #[derive(Resource)]
@@ -57,6 +63,19 @@ struct GestureIndex(usize);
 
 #[derive(Resource, Default)]
 struct AppliedCursor(Option<CursorIcon>);
+
+// Held for the whole session: a cursor loaded by path on each switch is unloaded as soon as the
+// shape changes, and the next switch back finds it missing again.
+#[derive(Resource)]
+struct CursorImages(Vec<(CursorShape, Handle<Image>)>);
+
+fn load_cursors(content: Res<Content>, assets: Res<AssetServer>, mut commands: Commands) {
+    let images = CursorShape::VARIANTS
+        .iter()
+        .map(|&shape| (shape, assets.load(shape.get(&content).image.path())))
+        .collect();
+    commands.insert_resource(CursorImages(images));
+}
 
 fn setup(mut commands: Commands) {
     let mut gestures: Vec<&'static dyn Gesture> = GESTURES.to_vec();
@@ -129,6 +148,11 @@ fn apply_cursor(world: &mut World, cursor: Option<CursorIcon>) {
     if world.resource::<AppliedCursor>().0.as_ref() == Some(&cursor) {
         return;
     }
+    if let CursorIcon::Custom(CustomCursor::Image(image)) = &cursor
+        && !world.resource::<Assets<Image>>().contains(&image.handle)
+    {
+        return;
+    }
     world.resource_mut::<AppliedCursor>().0 = Some(cursor.clone());
     if let Ok(window) = world
         .query_filtered::<Entity, With<PrimaryWindow>>()
@@ -140,8 +164,13 @@ fn apply_cursor(world: &mut World, cursor: Option<CursorIcon>) {
 
 pub(crate) fn content_cursor(world: &World, shape: CursorShape) -> CursorIcon {
     let cursor = shape.get(world.resource::<Content>());
+    let handle = world
+        .get_resource::<CursorImages>()
+        .and_then(|images| images.0.iter().find(|(known, _)| *known == shape))
+        .map(|(_, handle)| handle.clone())
+        .unwrap_or_default();
     CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
-        handle: world.resource::<AssetServer>().load(cursor.image.path()),
+        handle,
         texture_atlas: None,
         flip_x: false,
         flip_y: false,

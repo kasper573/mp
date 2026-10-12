@@ -178,10 +178,7 @@ pub fn shape(painter: &egui::Painter, center: Pos2, radius: f32, index: usize, f
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let Some(set) = current_set(editor, key, row) else {
-        widgets::hint(
-            ui,
-            "This tileset declares no terrain set. Add one in the inspector to mark corners.",
-        );
+        widgets::hint(ui, "This tileset declares no terrain set.");
         return;
     };
     let terrains = terrains_of(row, &set);

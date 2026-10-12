@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
-pub struct AssetRef(pub String);
+pub struct AssetRef(String);
 
 impl AssetRef {
     pub fn new(path: impl Into<String>) -> AssetRef {

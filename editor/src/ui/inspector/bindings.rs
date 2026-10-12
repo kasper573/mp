@@ -84,7 +84,6 @@ pub(super) fn bindings_section(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) 
         }
     });
     if capturing {
-        widgets::hint(ui, "Modifiers count: Ctrl I is a different binding from I.");
         let captured = ui.input(|i| {
             if i.key_pressed(egui::Key::Escape) {
                 return Some(None);
@@ -268,14 +267,6 @@ pub fn show_conflicts(editor: &mut Editor, ui: &mut Ui) {
             for other in others {
                 ui.label(theme::mono(format!("input/{other}")).color(theme::WARN));
             }
-            widgets::hint(ui, "Actions share a binding only where priority picks one.");
         }
-    }
-    if editor.shapes.is_fixture("input", key) {
-        widgets::section(ui, "Why it is locked");
-        widgets::hint(
-            ui,
-            "The engine reads this row by key, so every game must provide it. New Game ships one.",
-        );
     }
 }

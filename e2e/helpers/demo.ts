@@ -245,10 +245,15 @@ function chapterPath(chapterFile: string, extension: ".webm" | ".log"): string {
   return join(dir, `${basename(chapterFile, extname(chapterFile))}${extension}`);
 }
 
+// bevy's wasm logger writes every level through console.log, so the level is read off the text.
+const BEVY_ALARM = /^(?:%c)?(WARN|ERROR)\b/;
+
 function watchConsole(page: Page, log: WriteStream): void {
   page.on("console", (message) => {
     const type = message.type();
-    if (type === "warning" || type === "error") log.write(`[${type}] ${message.text()} (${message.location().url})\n`);
+    const text = message.text();
+    const alarming = type === "warning" || type === "error" || BEVY_ALARM.test(text);
+    if (alarming) log.write(`[${type}] ${text} (${message.location().url})\n`);
   });
   page.on("pageerror", (error) => log.write(`[pageerror] ${error.message}\n`));
 }

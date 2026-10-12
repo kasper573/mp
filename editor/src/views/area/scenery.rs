@@ -369,12 +369,7 @@ pub(super) fn scenery_extras(
         .unwrap_or(0);
     ui.add_space(4.0);
     if under > 0 {
-        widgets::hint(
-            ui,
-            &format!(
-                "{under} cells under it are blocked on the walk grid and stay put if it moves."
-            ),
-        );
+        widgets::hint(ui, &format!("{under} cells under it are blocked"));
         if ui
             .button(format!("⧉ Make the {under} blocked cells its own"))
             .clicked()
@@ -382,7 +377,7 @@ pub(super) fn scenery_extras(
             deferred.push(super::Deferred::AdoptBlocks(index));
         }
     } else {
-        widgets::hint(ui, "Nothing under it is blocked on the walk grid.");
+        widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
         if ui.button("▣ Make blueprint…").clicked() {

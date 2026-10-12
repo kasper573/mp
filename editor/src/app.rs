@@ -764,9 +764,12 @@ fn editor_ui(world: &mut World) {
         let tab = crate::ui::active_tab(&editor).map(|tab| tab.title());
         if let Some(log) = &mut editor.frame_log {
             use std::io::Write;
+            let entities = world.query::<Entity>().iter(world).count();
+            let images = world.resource::<Assets<Image>>().len();
+            let meshes = world.resource::<Assets<Mesh>>().len();
             let _ = writeln!(
                 log,
-                "{frame_ms:.3}\t{ui_ms:.3}\t{}",
+                "{frame_ms:.3}\t{ui_ms:.3}\t{}\t{entities}\t{images}\t{meshes}",
                 tab.unwrap_or_default()
             )
             .and_then(|()| log.flush());

@@ -375,11 +375,6 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 ui,
                 "Run needs an owner: name this script from an npc, object, item, quest, shop or area first.",
             );
-        } else {
-            widgets::hint(
-                ui,
-                "Fire raises the event on a copy of the owner, on the server's compiled procedures. Nothing real is touched.",
-            );
         }
         return;
     };
@@ -676,10 +671,6 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
     memories_card(ui, run, &content, &read_memories);
     quests_card(ui, run, &content, &reaches, &mut open);
     bag_card(ui, run, &content, &reaches, &mut open);
-    widgets::hint(
-        ui,
-        "The server's compiled procedures, on a copy of this owner. No server or real character is touched. Every edit here lands on the pretend character at once.",
-    );
     if let Some(tab) = open {
         if let Some((table, key)) = tab.row() {
             editor.select(Selection::row(&table, &key));

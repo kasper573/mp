@@ -3,11 +3,20 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ContentId, ContentRow, Loading, RowCheck};
+use crate::core::content::{ContentId, ContentRow, Fixture, Loading, RowCheck};
 
 pub type Id = ContentId<WorldMapDef>;
 
-pub const KEY: &str = "world";
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum WorldMap {
+    World,
+}
+
+impl Fixture for WorldMap {
+    type Row = WorldMapDef;
+}
+
 pub const MIN_SIZE: u32 = 10;
 pub const MAX_SIZE: u32 = 400;
 pub const MAX_NOTE: usize = 280;
@@ -94,16 +103,17 @@ pub fn check_all(loading: &mut Loading) {
             }
         }
     }
+    let only = WorldMap::World.key();
     for id in content.ids::<WorldMapDef>() {
         let key = id.key(&content);
-        if key != KEY {
+        if key != only {
             loading.row_error(
                 id,
                 "",
                 "wrong key",
                 format!("world_map/{key}"),
-                format!("one world_map row, keyed {KEY}"),
-                Some(format!("{KEY:?}")),
+                format!("one world_map row, the {only} fixture"),
+                Some(format!("{only:?}")),
             );
         }
     }

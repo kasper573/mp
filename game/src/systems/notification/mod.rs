@@ -142,7 +142,9 @@ pub fn notify_from(
 ) {
     record(world, player, &notification);
     let at = world.resource::<WallClock>().now;
-    let speaker = speaker.filter(|&npc| notification.spoken_by(world, npc));
+    let speaker = speaker.filter(|&npc| {
+        notification.spoken_by(world, npc) && visibility::present(world, npc, player)
+    });
     let live = match notification.kind {
         NotificationKind::Feed { .. } | NotificationKind::Error { .. } => true,
         _ => budget::admit(world, player, &notification, speaker, at) == budget::Admit::Live,

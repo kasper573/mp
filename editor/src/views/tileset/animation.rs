@@ -341,10 +341,7 @@ pub fn remove_frame(editor: &mut Editor, key: &str, row: &Value, common: &Common
 
 pub fn card(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let Some(selection) = editor.views.tileset.views[key].selection else {
-        widgets::hint(
-            ui,
-            "Drag over tiles to select them; their frames show as offsets over the block.",
-        );
+        widgets::hint(ui, "Drag over tiles to select them.");
         return;
     };
     let common = common_of(row, &selection, grid);

@@ -431,10 +431,6 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
             });
         });
         ui.add_space(8.0);
-        widgets::hint(
-            ui,
-            "A tag maps by name when it reads as an action and a direction, any case, joined by a space, _ or -. This machine remembers the mapping.",
-        );
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             let ready = dialog.plan.ready();

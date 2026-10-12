@@ -150,7 +150,7 @@ pub fn model_sprite(
     let thumb = editor
         .form
         .thumbnails
-        .image(ctx, &project.files, &model.sheet().0)?;
+        .image(ctx, &project.files, model.sheet().as_str())?;
     let region = model.frame(
         game::systems::actor::Action::Idle,
         game::core::math::Direction::S,

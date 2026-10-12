@@ -242,36 +242,47 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let rows = may_do_rows(&content, doc, &may, files);
     let read_by = read_by_rows(&content, &may);
     let wide = ui.available_width() > 760.0 && !read_by.is_empty();
-    egui::ScrollArea::vertical().id_salt(("may-do", doc.owner.slug())).show(ui, |ui| {
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(if wide { ui.available_width() * 0.55 } else { ui.available_width() });
-                for (label, text, present) in &rows {
-                    may_row(ui, label, text, *present);
-                }
-            });
-            if wide {
-                ui.add_space(16.0);
+    egui::ScrollArea::vertical()
+        .id_salt(("may-do", doc.owner.slug()))
+        .show(ui, |ui| {
+            ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
-                    ui.set_width(ui.available_width());
-                    widgets::section(ui, "Read by");
-                    for (who, what) in &read_by {
-                        ui.horizontal(|ui| {
-                            ui.add_sized(egui::vec2(96.0, 20.0), egui::Label::new(theme::strong(who).size(13.0)));
-                            ui.add(egui::Label::new(theme::muted(what).size(13.0)).wrap());
-                        });
-                        let rect = ui.max_rect();
-                        let y = ui.cursor().min.y;
-                        ui.painter().line_segment([egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)], Stroke::new(1.0, theme::BORDER));
+                    ui.set_width(if wide {
+                        ui.available_width() * 0.55
+                    } else {
+                        ui.available_width()
+                    });
+                    for (label, text, present) in &rows {
+                        may_row(ui, label, text, *present);
                     }
                 });
+                if wide {
+                    ui.add_space(16.0);
+                    ui.vertical(|ui| {
+                        ui.set_width(ui.available_width());
+                        widgets::section(ui, "Read by");
+                        for (who, what) in &read_by {
+                            ui.horizontal(|ui| {
+                                ui.add_sized(
+                                    egui::vec2(96.0, 20.0),
+                                    egui::Label::new(theme::strong(who).size(13.0)),
+                                );
+                                ui.add(egui::Label::new(theme::muted(what).size(13.0)).wrap());
+                            });
+                            let rect = ui.max_rect();
+                            let y = ui.cursor().min.y;
+                            ui.painter().line_segment(
+                                [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
+                                Stroke::new(1.0, theme::BORDER),
+                            );
+                        }
+                    });
+                }
+            });
+            if !wide && !read_by.is_empty() {
+                ui.add_space(6.0);
             }
         });
-        if !wide && !read_by.is_empty() {
-            ui.add_space(6.0);
-            widgets::hint(ui, "Read by the world map, the area view's pins, quest givers and turn-ins, marks and item sources.");
-        }
-    });
 }
 
 fn may_row(ui: &mut Ui, label: &str, text: &str, present: bool) {
@@ -869,10 +880,6 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
             {
                 open = Some((table.clone(), key.clone(), Some(pointer.clone())));
             }
-            widgets::hint(
-                ui,
-                "An inline script has one owner. Make shared… moves it into a script row any owner may name.",
-            );
         }
         ScriptOwner::Shared { key } => {
             let Some(project) = &editor.project else {
@@ -920,10 +927,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 }
             }
             if rows.is_empty() {
-                widgets::hint(
-                    ui,
-                    "Nothing names this script yet. A shared_script module on an owner names it.",
-                );
+                widgets::hint(ui, "Nothing names this script yet.");
                 return;
             }
             let areas: std::collections::BTreeSet<&str> = rows

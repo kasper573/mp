@@ -2,6 +2,8 @@ import { test, type Page } from "@playwright/test";
 
 import { caption, chapter } from "../helpers/demo";
 import {
+  canvasSize,
+  clickable,
   closestTile,
   distance,
   doubleClickUi,
@@ -139,8 +141,9 @@ async function runBack(page: Page, trail: Tile[]): Promise<void> {
     const near = trail.findIndex((at) => distance(at, me) < 2);
     let back = near >= 0 ? near : trail.indexOf(closestTile(trail, me)!);
     while (back > 0 && distance(trail[back], me) < 5) back--;
+    const size = await canvasSize(page);
     const step = closestTile(
-      snapshot.walkable.filter((tile) => !occupied(snapshot, tile)),
+      snapshot.walkable.filter((tile) => !occupied(snapshot, tile) && clickable(snapshot, tile, size)),
       trail[back],
     );
     if (step) await walkTo(page, step).catch(() => undefined);

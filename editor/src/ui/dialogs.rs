@@ -114,9 +114,6 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                                 *picked = template.key.clone();
                             }
                         }
-                        ui.add_space(6.0);
-                        ui.label(theme::muted("Read-only, and always loads with this build."));
-                        ui.label(theme::muted("To start from a game of yours: New game from this… on the start screen."));
                     });
                     ui.add_space(20.0);
                     if let Some(template) = templates.iter().find(|t| t.key == *picked) {
@@ -128,7 +125,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                             });
                             widgets::kv_code(ui, "spawn", &template.spawn);
                             widgets::kv(ui, "holds", |ui| {
-                                let mut parts: Vec<String> = vec!["game.json".to_owned(), "every fixture, with example values and files".to_owned()];
+                                let mut parts: Vec<String> = vec!["game.json".to_owned(), "every fixture".to_owned()];
                                 for (table, keys) in &template.tables {
                                     if editor.shapes.has_fixtures(table) {
                                         continue;
@@ -820,7 +817,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
         Dialog::Keys => {
             let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             let mut open = true;
-            card(ctx, "keys", 1380.0, |ui| {
+            card(ctx, "keys", 1500.0, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Keys").strong().size(18.0));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -830,7 +827,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     });
                 });
                 ui.add_space(8.0);
-                ui.columns(3, |columns| {
+                ui.columns(4, |columns| {
                     for (column, (title, rows)) in columns.iter_mut().zip(KEY_SHEET) {
                         super::widgets::section(column, title);
                         egui::Grid::new(("keys", title))
@@ -849,10 +846,6 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                             });
                     }
                 });
-                ui.add_space(8.0);
-                ui.label(theme::muted(
-                    "Every command is also in a menu, and every view works from the keyboard alone. Shortcuts are editor settings, never content.",
-                ));
             });
             (open && !escape).then_some(Dialog::Keys)
         }
@@ -983,7 +976,7 @@ fn differing_lines(a: Option<&str>, b: Option<&str>) -> (Vec<String>, Vec<String
     (only_in(&a, &b), only_in(&b, &a))
 }
 
-const KEY_SHEET: [(&str, &[(&str, &str)]); 3] = [
+const KEY_SHEET: [(&str, &[(&str, &str)]); 4] = [
     (
         "Everywhere",
         &[
@@ -1022,11 +1015,25 @@ const KEY_SHEET: [(&str, &[(&str, &str)]); 3] = [
         ],
     ),
     (
+        "World map",
+        &[
+            ("−  =", "selected cards 10% smaller · bigger; ⇧ for 1%"),
+            ("Arrows", "move the selection"),
+            ("Ctrl A", "select every card"),
+            ("P", "pin · unpin"),
+            ("Alt click", "two areas: the route between them"),
+            ("Space drag  wheel", "pan · zoom"),
+        ],
+    ),
+    (
         "Model and script",
         &[
             ("Space", "play or pause the strip"),
             (",  .", "step a frame"),
             ("Alt ←  Alt →", "frames 10 ms shorter · longer; ⇧ for 1 ms"),
+            ("Ctrl ←  Ctrl →", "move the frame"),
+            ("Ctrl D", "duplicate the frame"),
+            ("A  S  T", "apex · sound · step cue on the frame"),
             ("1 2 3", "pick a terrain for corners"),
             ("Arrows", "move through the matrix or the graph"),
             ("Tab", "the palette: a node after the selection"),
