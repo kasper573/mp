@@ -905,7 +905,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
         let mut game = editor
             .project
             .as_ref()
-            .and_then(|p| p.files.json("game.json"))
+            .and_then(|p| p.files.json_owned("game.json"))
             .unwrap_or(Value::Null);
         game["spawn"] = pins::place_json(
             &picked,

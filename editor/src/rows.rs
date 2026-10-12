@@ -123,7 +123,7 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
     let mut edit = Edit::new(format!("New {} {key}", dialog.table));
     edit.write_json(row_file(&dialog.table, &key), &dialog.value);
     if let Some((file, pointer)) = &dialog.into
-        && let Some(mut target) = project.files.json(file)
+        && let Some(mut target) = project.files.json_owned(file)
     {
         if let Some(slot) = target.pointer_mut(pointer) {
             *slot = Value::String(key.clone());
@@ -190,7 +190,7 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
     }
     let own = row_file(table, key);
     for (file, usages) in by_file {
-        let Some(mut value) = project.files.json(&file) else {
+        let Some(mut value) = project.files.json_owned(&file) else {
             continue;
         };
         for usage in usages {
@@ -740,7 +740,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         }
     }
     for (file, mut entries) in by_file {
-        let Some(mut value) = project.files.json(&file) else {
+        let Some(mut value) = project.files.json_owned(&file) else {
             continue;
         };
         entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use game::core::content::MemoryFolder;
 
@@ -9,32 +9,90 @@ pub type Bytes = Arc<[u8]>;
 
 #[derive(Clone, Default)]
 pub struct Files {
-    pub map: BTreeMap<String, Bytes>,
+    map: BTreeMap<String, Stored>,
+}
+
+#[derive(Clone)]
+struct Stored {
+    bytes: Bytes,
+    hash: String,
+    json: OnceLock<Option<Arc<serde_json::Value>>>,
 }
 
 impl Files {
     pub fn read_dir(root: &Path) -> io::Result<Files> {
         let mut files = Files::default();
-        walk(root, root, &mut files.map)?;
+        walk(root, root, &mut files)?;
         Ok(files)
     }
 
     pub fn get(&self, path: &str) -> Option<&Bytes> {
-        self.map.get(path)
+        self.map.get(path).map(|stored| &stored.bytes)
+    }
+
+    pub fn hash_of(&self, path: &str) -> Option<&str> {
+        self.map.get(path).map(|stored| stored.hash.as_str())
+    }
+
+    pub fn contains(&self, path: &str) -> bool {
+        self.map.contains_key(path)
+    }
+
+    pub fn insert(&mut self, path: String, bytes: Bytes) {
+        let hash = hash(&bytes);
+        self.map.insert(
+            path,
+            Stored {
+                bytes,
+                hash,
+                json: OnceLock::new(),
+            },
+        );
+    }
+
+    pub fn remove(&mut self, path: &str) {
+        self.map.remove(path);
+    }
+
+    pub fn paths(&self) -> impl Iterator<Item = &String> {
+        self.map.keys()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Bytes)> {
+        self.map.iter().map(|(path, stored)| (path, &stored.bytes))
+    }
+
+    pub fn hashes(&self) -> BTreeMap<String, String> {
+        self.map
+            .iter()
+            .map(|(path, stored)| (path.clone(), stored.hash.clone()))
+            .collect()
     }
 
     pub fn text(&self, path: &str) -> Option<String> {
-        String::from_utf8(self.map.get(path)?.to_vec()).ok()
+        String::from_utf8(self.get(path)?.to_vec()).ok()
     }
 
-    pub fn json(&self, path: &str) -> Option<serde_json::Value> {
-        serde_json::from_slice(self.map.get(path)?).ok()
+    pub fn json(&self, path: &str) -> Option<Arc<serde_json::Value>> {
+        let stored = self.map.get(path)?;
+        stored
+            .json
+            .get_or_init(|| serde_json::from_slice(&stored.bytes).ok().map(Arc::new))
+            .clone()
+    }
+
+    pub fn json_owned(&self, path: &str) -> Option<serde_json::Value> {
+        self.json(path).map(|value| (*value).clone())
     }
 
     pub fn folder(&self, name: &str) -> MemoryFolder {
         MemoryFolder {
             name: name.to_owned(),
-            files: self.map.clone(),
+            files: self
+                .map
+                .iter()
+                .map(|(path, stored)| (path.clone(), stored.bytes.clone()))
+                .collect(),
         }
     }
 
@@ -42,19 +100,21 @@ impl Files {
         let mut files = self.clone();
         for change in changes {
             match &change.bytes {
-                Some(bytes) => {
-                    files.map.insert(change.file.clone(), bytes.clone());
-                }
-                None => {
-                    files.map.remove(&change.file);
-                }
+                Some(bytes) => files.insert(change.file.clone(), bytes.clone()),
+                None => files.remove(&change.file),
             }
         }
         files
     }
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {
-        self.map.keys().filter(move |path| path.starts_with(prefix))
+        self.map
+            .range::<str, _>((
+                std::ops::Bound::Included(prefix),
+                std::ops::Bound::Unbounded,
+            ))
+            .map(|(path, _)| path)
+            .take_while(move |path| path.starts_with(prefix))
     }
 }
 
@@ -96,7 +156,7 @@ impl PartialEq for Change {
     }
 }
 
-fn walk(root: &Path, dir: &Path, into: &mut BTreeMap<String, Bytes>) -> io::Result<()> {
+fn walk(root: &Path, dir: &Path, into: &mut Files) -> io::Result<()> {
     let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())

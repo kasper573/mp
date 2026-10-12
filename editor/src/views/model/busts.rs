@@ -443,7 +443,11 @@ pub fn rename(editor: &mut Editor, key: &str, face: &Face, new_name: &str) -> bo
     files.sort();
     files.dedup();
     for file in files {
-        let Some(mut value) = editor.project.as_ref().and_then(|p| p.files.json(&file)) else {
+        let Some(mut value) = editor
+            .project
+            .as_ref()
+            .and_then(|p| p.files.json_owned(&file))
+        else {
             continue;
         };
         rewrite_faces(&mut value, &face.name, Some(new_name));
@@ -478,7 +482,11 @@ pub fn remove(editor: &mut Editor, key: &str, face: &Face, replacement: &str) ->
     files.sort();
     files.dedup();
     for file in files {
-        let Some(mut value) = editor.project.as_ref().and_then(|p| p.files.json(&file)) else {
+        let Some(mut value) = editor
+            .project
+            .as_ref()
+            .and_then(|p| p.files.json_owned(&file))
+        else {
             continue;
         };
         rewrite_faces(&mut value, &face.name, Some(replacement));

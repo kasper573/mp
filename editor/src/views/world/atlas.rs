@@ -128,7 +128,9 @@ impl Atlas {
             let key = id.key(&content).to_owned();
             let def = id.get(&content);
             let loaded = area::load(&content, id);
-            let row = files.json(&row_file("area", &key)).unwrap_or(Value::Null);
+            let row = files
+                .json_owned(&row_file("area", &key))
+                .unwrap_or(Value::Null);
             let mut modules: BTreeSet<String> = module_types(&row);
             let mut text = row.to_string().to_lowercase();
             let placed = area::placed(&content, id);
@@ -547,7 +549,9 @@ impl Atlas {
         for id in content.ids::<QuestDef>() {
             let key = id.key(&content).to_owned();
             let def = id.get(&content);
-            let row = files.json(&row_file("quest", &key)).unwrap_or(Value::Null);
+            let row = files
+                .json_owned(&row_file("quest", &key))
+                .unwrap_or(Value::Null);
             let areas_where = |pick: &dyn Fn(&Reach) -> bool| -> Vec<String> {
                 let mut areas: Vec<String> = self
                     .owners
@@ -675,7 +679,9 @@ impl Atlas {
         let keys: Vec<String> = quests.iter().map(|quest| quest.key.clone()).collect();
         for quest in &mut quests {
             let key = quest.key.clone();
-            let row = files.json(&row_file("quest", &key)).unwrap_or(Value::Null);
+            let row = files
+                .json_owned(&row_file("quest", &key))
+                .unwrap_or(Value::Null);
             let mut after: Vec<QuestLink> = Vec::new();
             for module in row["modules"].as_array().into_iter().flatten() {
                 if matches!(module.kind(), "shown" | "requires") {

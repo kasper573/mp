@@ -56,7 +56,7 @@ impl Journal {
     }
 
     pub fn clear(&mut self) {
-        self.last = None;
+        self.last = Some(Instant::now());
         let _ = std::fs::remove_file(&self.file);
     }
 

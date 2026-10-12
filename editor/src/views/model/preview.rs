@@ -1,5 +1,6 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use game::core::math::Pos;
+use game::core::tiling::Tiles;
 use serde_json::Value;
 
 use super::{FrameData, SheetInfo, sounds::PlayRequest};
@@ -158,66 +159,20 @@ pub fn draw(
     fit: Fit,
 ) -> ERect {
     let Fit { size, zoom } = fit;
-    let ppp = ui.ctx().pixels_per_point();
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 6.0, Color32::from_rgb(78, 128, 52));
-    let scene_key = format!("model-preview:{key}");
-    let ground = editor.project.as_ref().and_then(|project| {
-        let content = project.content?;
-        let settings = content.built::<game::systems::GameSettings>();
-        let place = &settings.spawn;
-        Some((place.area.key(&content).to_owned(), place.at))
-    });
-    if let Some((area, at)) = ground {
-        let generation = editor
-            .project
-            .as_ref()
-            .map_or(0, |project| project.generation);
-        editor.views.area.requests.push(SceneRequest {
-            key: scene_key.clone(),
-            spec: SceneSpec {
-                ground: area,
-                scenery: SceneryOf::Area,
-                hidden_ground: Vec::new(),
-                show_blueprints: true,
-                show_scenery: true,
-            },
-            width: (size.x * ppp) as u32,
-            height: (size.y * ppp) as u32,
-            center: Pos::new(at.x + 0.5, at.y - 1.0),
-            zoom: zoom * ppp,
-            generation,
-        });
-        if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
-            let uv = ERect::from_min_max(
-                egui::Pos2::ZERO,
-                egui::pos2(
-                    scene.shown[0] as f32 / scene.alloc[0].max(1) as f32,
-                    scene.shown[1] as f32 / scene.alloc[1].max(1) as f32,
-                ),
-            );
-            painter.image(scene.texture, rect, uv, Color32::WHITE);
-        }
-    }
+    let feet = spawn_backdrop(editor, &painter, rect, format!("model-preview:{key}"), zoom)
+        .unwrap_or(rect.center() + Vec2::new(0.0, TILE_PX * zoom / 2.0));
     let scale = zoom * super::hitbox::scale_of(row);
     let shown = Vec2::new(
         sheet.frame_width as f32 * scale,
         sheet.frame_height as f32 * scale,
     );
-    let feet = rect.center() + Vec2::new(0.0, TILE_PX * zoom * 1.0);
-    painter.add(egui::Shape::ellipse_filled(
-        feet,
-        Vec2::new(shown.x * 0.3, shown.x * 0.1),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 80),
-    ));
     if let Some(frame) = frame
         && let Some(thumb) = &sheet.thumb
     {
-        let sprite = ERect::from_min_max(
-            feet - Vec2::new(shown.x / 2.0, shown.y - TILE_PX * zoom / 4.0),
-            feet + Vec2::new(shown.x / 2.0, TILE_PX * zoom / 4.0),
-        );
+        let sprite = sprite_rect(feet, shown);
         painter.image(thumb.texture.id(), sprite, sheet.uv(frame), Color32::WHITE);
     }
     painter.rect_stroke(
@@ -292,4 +247,60 @@ pub fn keys(ui: &Ui, preview: &mut Preview, frames: &[FrameData]) {
         };
         preview.position = (super::starts_at(frames, next) as f32).min(total - 1.0);
     }
+}
+
+pub fn spawn_ground(editor: &Editor) -> Option<(String, Pos<Tiles>, String)> {
+    let content = editor.project.as_ref()?.content?;
+    let place = &content.built::<game::systems::GameSettings>().spawn;
+    let name = place.area.get(&content).name.clone();
+    Some((place.area.key(&content).to_owned(), place.at, name))
+}
+
+pub fn spawn_backdrop(
+    editor: &mut Editor,
+    painter: &egui::Painter,
+    rect: ERect,
+    scene_key: String,
+    zoom: f32,
+) -> Option<egui::Pos2> {
+    let (area, at, _) = spawn_ground(editor)?;
+    let ppp = painter.ctx().pixels_per_point();
+    let generation = editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.generation);
+    editor.views.area.requests.push(SceneRequest {
+        key: scene_key.clone(),
+        spec: SceneSpec {
+            ground: area,
+            scenery: SceneryOf::Area,
+            hidden_ground: Vec::new(),
+            show_blueprints: true,
+            show_scenery: true,
+        },
+        width: (rect.width() * ppp) as u32,
+        height: (rect.height() * ppp) as u32,
+        center: Pos::new(at.x + 0.5, at.y + 0.5),
+        zoom: zoom * ppp,
+        generation,
+    });
+    if let Some(scene) = editor.views.area.scenes.by_key.get(&scene_key) {
+        let uv = ERect::from_min_max(
+            egui::Pos2::ZERO,
+            egui::pos2(
+                scene.shown[0] as f32 / scene.alloc[0].max(1) as f32,
+                scene.shown[1] as f32 / scene.alloc[1].max(1) as f32,
+            ),
+        );
+        painter.image(scene.texture, rect, uv, Color32::WHITE);
+    }
+    Some(rect.center() + Vec2::new(0.0, TILE_PX * zoom / 2.0))
+}
+
+pub fn sprite_rect(feet: egui::Pos2, shown: Vec2) -> ERect {
+    let anchor = game::systems::actor::render::ACTOR_ANCHOR.0;
+    ERect::from_min_max(
+        feet - Vec2::new(shown.x / 2.0, (0.5 - anchor.y) * shown.y),
+        feet + Vec2::new(shown.x / 2.0, (0.5 + anchor.y) * shown.y),
+    )
 }

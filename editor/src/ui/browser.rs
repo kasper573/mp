@@ -1,32 +1,11 @@
-use egui::{Align, Key, Layout, Modifiers, RichText, Sense, Ui};
+use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 
+use super::tree::{self, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Dialog, Editor, RenameDialog, RightTab};
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
 use crate::value::RowValue;
-
-const GROUPS: [(&str, &[&str]); 7] = [
-    ("World", &["area", "world_map"]),
-    ("People", &["npc", "model", "player", "job"]),
-    ("Things", &["item", "shop"]),
-    ("Story", &["script", "quest", "memory", "notification"]),
-    ("Art", &["tileset", "blueprint", "surface"]),
-    ("Sound", &["sfx", "babble", "babble_bank"]),
-    (
-        "Game",
-        &[
-            "attention",
-            "cursor",
-            "font",
-            "input",
-            "interface_icon",
-            "test_character",
-        ],
-    ),
-];
-
-const SHOWN_ROWS: usize = 7;
 
 #[derive(Clone, Debug)]
 pub struct RowDrag {
@@ -39,8 +18,7 @@ pub struct BrowserState {
     pub only_unsaved: bool,
     pub only_fixtures: bool,
     pub focus_search: bool,
-    pub open: std::collections::HashSet<String>,
-    pub expanded: std::collections::HashSet<String>,
+    pub tree: TreeState,
 }
 
 impl Default for BrowserState {
@@ -50,8 +28,11 @@ impl Default for BrowserState {
             only_unsaved: false,
             only_fixtures: false,
             focus_search: false,
-            open: ["area".to_owned()].into_iter().collect(),
-            expanded: Default::default(),
+            tree: TreeState {
+                open: ["tables".to_owned(), "tables/area".to_owned()]
+                    .into_iter()
+                    .collect(),
+            },
         }
     }
 }
@@ -150,285 +131,116 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     if searching {
         results(editor, ui, enter);
     } else {
-        groups(editor, ui);
+        folders(editor, ui);
     }
 }
 
-fn groups(editor: &mut Editor, ui: &mut Ui) {
-    let listed = editor.shapes.order.clone();
+fn folders(editor: &mut Editor, ui: &mut Ui) {
     let only_unsaved = editor.views.browser.only_unsaved;
     let only_fixtures = editor.views.browser.only_fixtures;
-    let grouped: Vec<(&str, Vec<String>)> = GROUPS
-        .iter()
-        .map(|(group, tables)| {
-            let mut names: Vec<String> = tables.iter().map(|t| (*t).to_owned()).collect();
-            if *group == "Game" {
-                names.extend(
-                    listed
-                        .iter()
-                        .filter(|t| !GROUPS.iter().any(|(_, ts)| ts.contains(&t.as_str())))
-                        .cloned(),
-                );
-            }
-            names.retain(|table| listed.contains(table));
-            (*group, names)
-        })
-        .collect();
-    let mut clicked: Option<(String, String, bool, bool)> = None;
+    let Some(project) = &editor.project else {
+        return;
+    };
+    let mut paths: Vec<String> = vec!["game.json".to_owned()];
+    for table in &editor.shapes.order {
+        paths.extend(
+            project
+                .files
+                .paths_under(&format!("tables/{table}/"))
+                .filter(|file| {
+                    row_of(file).is_some_and(|(_, key)| {
+                        (!only_unsaved || project.is_unsaved(file))
+                            && (!only_fixtures || editor.shapes.is_fixture(table, key))
+                    })
+                })
+                .cloned(),
+        );
+    }
+    let selection = editor.selection.clone();
+    let open = editor.views.browser.tree.open.clone();
+    let nodes = {
+        let Editor {
+            project,
+            form,
+            shapes,
+            ..
+        } = editor;
+        let project = project.as_ref().expect("a project");
+        let ctx = ui.ctx().clone();
+        tree::from_paths(
+            paths.iter().map(String::as_str),
+            &mut |path| {
+                let mut node = match row_of(path) {
+                    Some((table, key)) => {
+                        let mut node = TreeNode::leaf(path, key);
+                        node.selected =
+                            selection.table == table && selection.keys.iter().any(|k| k == key);
+                        if open.contains(&format!("tables/{table}")) {
+                            node.icon = row_icon(&ctx, form, project, table, key)
+                                .map(|(texture, uv, size)| TreeIcon::Image { texture, uv, size })
+                                .unwrap_or(TreeIcon::None);
+                        }
+                        node.drag = Some(RowDrag {
+                            table: table.to_owned(),
+                            key: key.to_owned(),
+                        });
+                        node
+                    }
+                    None => TreeNode::leaf(path, path),
+                };
+                node.unsaved = project.is_unsaved(path);
+                Some(node)
+            },
+            &mut |folder| {
+                if let Some(table) = folder.id.strip_prefix("tables/") {
+                    folder.locked = shapes.has_fixtures(table);
+                    folder.adds = !folder.locked;
+                }
+            },
+        )
+    };
     let mut action: Option<(String, String, Action)> = None;
-    let mut new_row: Option<String> = None;
-    let mut toggle_table: Option<String> = None;
-    let mut expand: Option<String> = None;
-    egui::ScrollArea::vertical()
+    let out = egui::ScrollArea::vertical()
         .id_salt("browser")
         .show(ui, |ui| {
-            for (group, tables) in &grouped {
-                let open_tables: Vec<&String> = tables
-                    .iter()
-                    .filter(|t| editor.views.browser.open.contains(*t))
-                    .collect();
-                ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new(group.to_uppercase())
-                            .size(11.0)
-                            .color(theme::MUTED)
-                            .family(egui::FontFamily::Name("medium".into())),
-                    );
-                    if open_tables.is_empty() && *group == "Game" {
-                        ui.label(theme::muted("game.json").monospace().size(13.0));
-                        if ui
-                            .add(
-                                egui::Label::new(
-                                    theme::muted(format!("+{}", tables.len()))
-                                        .monospace()
-                                        .size(13.0),
-                                )
-                                .sense(Sense::click()),
-                            )
-                            .clicked()
-                        {
-                            toggle_table = Some(tables[0].clone());
-                        }
-                    } else if open_tables.is_empty() {
-                        for (shown, table) in tables.iter().enumerate() {
-                            if shown == 2 {
-                                let rest = tables.len() - shown;
-                                if ui
-                                    .add(
-                                        egui::Label::new(
-                                            theme::muted(format!("+{rest}")).monospace().size(13.0),
-                                        )
-                                        .sense(Sense::click()),
-                                    )
-                                    .clicked()
-                                {
-                                    toggle_table = Some(tables[shown].clone());
-                                }
-                                break;
-                            }
-                            if shown > 0 {
-                                ui.label(theme::faint("·"));
-                            }
-                            if ui
-                                .add(
-                                    egui::Label::new(theme::muted(table).monospace().size(13.0))
-                                        .sense(Sense::click()),
-                                )
-                                .clicked()
-                            {
-                                toggle_table = Some(table.clone());
-                            }
-                        }
+            tree::show(
+                ui,
+                &mut editor.views.browser.tree,
+                &nodes,
+                false,
+                Some(&mut |ui, node| {
+                    if let Some((table, key)) = row_of(&node.id) {
+                        row_menu(ui, &mut action, table, key);
                     }
-                });
-                for table in tables {
-                    let Some(project) = &editor.project else {
-                        return;
-                    };
-                    let prefix = format!("tables/{table}/");
-                    let rows: Vec<(String, String, bool)> = project
-                        .files
-                        .paths_under(&prefix)
-                        .filter_map(|file| {
-                            row_of(file).map(|(_, key)| (file.clone(), key.to_owned()))
-                        })
-                        .map(|(file, key)| {
-                            let unsaved = project.is_unsaved(&file);
-                            (file, key, unsaved)
-                        })
-                        .filter(|(_, key, unsaved)| {
-                            (!only_unsaved || *unsaved)
-                                && (!only_fixtures || editor.shapes.is_fixture(table, key))
-                        })
-                        .collect();
-                    let open = editor.views.browser.open.contains(table);
-                    if !open && open_tables.is_empty() {
-                        continue;
-                    }
-                    let fixtures = editor.shapes.has_fixtures(table);
-                    let header = ui
-                        .horizontal(|ui| {
-                            ui.add_space(6.0);
-                            ui.label(theme::muted(if open { "▾" } else { "▸" }).size(11.0));
-                            ui.label(
-                                theme::mono(format!(
-                                    "{}{table}",
-                                    if fixtures { "🔒 " } else { "" }
-                                ))
-                                .color(theme::CODE),
-                            );
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label(
-                                    theme::muted(rows.len().to_string()).monospace().size(12.0),
-                                );
-                                if open
-                                    && !fixtures
-                                    && ui
-                                        .add(
-                                            egui::Label::new(theme::faint("+"))
-                                                .sense(Sense::click()),
-                                        )
-                                        .on_hover_text(format!("New {table}"))
-                                        .clicked()
-                                {
-                                    new_row = Some(table.clone());
-                                }
-                            });
-                        })
-                        .response
-                        .interact(Sense::click());
-                    if header.clicked() {
-                        toggle_table = Some(table.clone());
-                    }
-                    if !open {
-                        continue;
-                    }
-                    let expanded = editor.views.browser.expanded.contains(table);
-                    let shown = if expanded {
-                        rows.len()
-                    } else {
-                        rows.len().min(SHOWN_ROWS)
-                    };
-                    for (_, key, unsaved) in rows.iter().take(shown) {
-                        let selected =
-                            editor.selection.table == *table && editor.selection.keys.contains(key);
-                        let response = row_line(editor, ui, table, key, *unsaved, selected);
-                        if response.clicked() {
-                            let modifiers = ui.input(|i| i.modifiers);
-                            clicked =
-                                Some((table.clone(), key.clone(), modifiers.ctrl, modifiers.shift));
-                        }
-                        if response.double_clicked() {
-                            action = Some((table.clone(), key.clone(), Action::Open));
-                        }
-                        response.context_menu(|ui| row_menu(ui, &mut action, table, key));
-                    }
-                    if rows.len() > shown {
-                        ui.horizontal(|ui| {
-                            ui.add_space(30.0);
-                            if ui
-                                .add(
-                                    egui::Label::new(
-                                        theme::muted(format!("… {} more", rows.len() - shown))
-                                            .monospace()
-                                            .size(13.0),
-                                    )
-                                    .sense(Sense::click()),
-                                )
-                                .clicked()
-                            {
-                                expand = Some(table.clone());
-                            }
-                        });
-                    }
-                }
-                ui.add_space(6.0);
-            }
-        });
-    if let Some(table) = toggle_table {
-        let open = &mut editor.views.browser.open;
-        if !open.remove(&table) {
-            open.insert(table);
-        }
+                }),
+            )
+        })
+        .inner;
+    if let Some(table) = out.add.as_deref().and_then(|id| id.strip_prefix("tables/")) {
+        crate::rows::new_row_dialog(editor, table);
     }
-    if let Some(table) = expand {
-        editor.views.browser.expanded.insert(table);
+    if let Some((path, modifiers)) = out.clicked
+        && let Some((table, key)) = row_of(&path)
+    {
+        select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
     }
-    if let Some(table) = new_row {
-        crate::rows::new_row_dialog(editor, &table);
-    }
-    if let Some((table, key, ctrl, shift)) = clicked {
-        select_row(editor, &table, &key, ctrl, shift);
+    if let Some(path) = out.double_clicked
+        && let Some((table, key)) = row_of(&path)
+    {
+        action = Some((table.to_owned(), key.to_owned(), Action::Open));
     }
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
     }
 }
 
-fn row_line(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    table: &str,
-    key: &str,
-    unsaved: bool,
-    selected: bool,
-) -> egui::Response {
-    let full = ui.available_rect_before_wrap();
-    let height = 22.0;
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), height), Sense::click());
-    if selected {
-        ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
-    } else if response.hovered() {
-        ui.painter().rect_filled(
-            rect,
-            3.0,
-            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-        );
-    }
-    let drag_id = egui::Id::new(("drag", table, key));
-    let mut child = ui.new_child(
-        egui::UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::left_to_right(Align::Center)),
-    );
-    child.dnd_drag_source(
-        drag_id,
-        RowDrag {
-            table: table.to_owned(),
-            key: key.to_owned(),
-        },
-        |ui| {
-            ui.add_space(30.0);
-            if let Some((texture, uv, size)) = row_icon(editor, ui, table, key) {
-                ui.add(egui::Image::from_texture((texture, size)).uv(uv));
-                ui.add_space(2.0);
-            }
-            ui.label(theme::mono(key).size(13.0).color(if selected {
-                theme::TEXT
-            } else {
-                theme::CODE
-            }));
-        },
-    );
-    if unsaved {
-        ui.painter().circle_filled(
-            egui::pos2(rect.max.x - 10.0, rect.center().y),
-            3.5,
-            theme::WARN,
-        );
-    }
-    response
-}
-
 pub fn row_icon(
-    editor: &mut Editor,
-    ui: &Ui,
+    ctx: &egui::Context,
+    form: &mut crate::forms::FormState,
+    project: &crate::project::Project,
     table: &str,
     key: &str,
 ) -> Option<(egui::TextureId, egui::Rect, egui::Vec2)> {
-    let ctx = ui.ctx().clone();
-    let Editor { project, form, .. } = editor;
-    let project = project.as_ref()?;
     match table {
         "npc" | "player" | "model" => {
             let model_key = if table == "model" {
@@ -442,7 +254,7 @@ pub fn row_icon(
                 .files
                 .json(&crate::project::row_file("model", &model_key))?;
             let image = model["sprites"]["image"].as_str()?;
-            let thumb = form.thumbnails.image(&ctx, &project.files, image)?;
+            let thumb = form.thumbnails.image(ctx, &project.files, image)?;
             let w = model["sprites"]["frame_size"]["width"].as_f64()? as f32;
             let h = model["sprites"]["frame_size"]["height"].as_f64()? as f32;
             let frame = model["sprites"]["actions"]["idle"]["s"][0]["frame"]
@@ -461,7 +273,7 @@ pub fn row_icon(
         "item" | "interface_icon" | "cursor" | "attention" => {
             let row = project.files.json(&crate::project::row_file(table, key))?;
             let path = row["icon"].as_str().or_else(|| row["image"].as_str())?;
-            let thumb = form.thumbnails.image(&ctx, &project.files, path)?;
+            let thumb = form.thumbnails.image(ctx, &project.files, path)?;
             let scale = 16.0 / thumb.size[1].max(1) as f32;
             Some((
                 thumb.texture.id(),
@@ -855,7 +667,9 @@ fn result_line(
         child.label(theme::faint("·"));
         child.label(theme::muted(owner).monospace().size(12.5));
     } else if let Some((table, key)) = row {
-        let icon = row_icon(editor, &child, table, key);
+        let icon = editor.project.as_ref().and_then(|project| {
+            row_icon(&child.ctx().clone(), &mut editor.form, project, table, key)
+        });
         child.dnd_drag_source(
             egui::Id::new(("result-drag", table, key)),
             RowDrag {

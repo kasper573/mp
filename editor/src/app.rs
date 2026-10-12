@@ -623,11 +623,15 @@ impl Editor {
             .is_some_and(|project| !project.unsaved().is_empty())
     }
 
-    pub fn row_value(&self, table: &str, key: &str) -> Option<Value> {
+    pub fn row(&self, table: &str, key: &str) -> Option<std::sync::Arc<Value>> {
         self.project
             .as_ref()?
             .files
             .json(&crate::project::row_file(table, key))
+    }
+
+    pub fn row_value(&self, table: &str, key: &str) -> Option<Value> {
+        self.row(table, key).map(|row| (*row).clone())
     }
 
     pub fn registry(&self) -> &'static game::core::content::ContentRegistry {

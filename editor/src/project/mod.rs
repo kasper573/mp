@@ -129,6 +129,7 @@ pub struct Project {
     pub root: PathBuf,
     pub files: Files,
     pub disk: BTreeMap<String, String>,
+    unsaved: Vec<String>,
     pub content: Option<Content>,
     pub report: Option<LoadReport>,
     pub history: History,
@@ -149,15 +150,12 @@ impl Project {
         }
         save::clean_leftovers(root);
         let files = Files::read_dir(root).map_err(|error| error.to_string())?;
-        let disk = files
-            .map
-            .iter()
-            .map(|(path, bytes)| (path.clone(), hash(bytes)))
-            .collect();
+        let disk = files.hashes();
         let mut project = Project {
             root: root.to_path_buf(),
             files,
             disk,
+            unsaved: Vec::new(),
             content: None,
             report: None,
             history: History::default(),
@@ -170,6 +168,7 @@ impl Project {
             generation: 0,
             outside_rewrote: 0,
         };
+        project.refresh_unsaved();
         project.reload();
         Ok(project)
     }
@@ -238,6 +237,7 @@ impl Project {
             })
             .collect();
         self.files = next;
+        self.refresh_unsaved();
         self.last_load = Some(took);
         self.report = None;
         self.swap(content);
@@ -306,39 +306,57 @@ impl Project {
         let (content, took) = load(&next, &self.root.display().to_string())
             .map_err(|report| Box::new(Refusal::of(&report)))?;
         self.files = next;
+        self.refresh_unsaved();
         self.last_load = Some(took);
         self.report = None;
         self.swap(content);
         Ok(())
     }
 
-    pub fn unsaved(&self) -> Vec<String> {
-        let mut paths: Vec<String> = self
-            .files
-            .map
-            .iter()
-            .filter(|(path, bytes)| self.disk.get(*path) != Some(&hash(bytes)))
-            .map(|(path, _)| path.clone())
-            .collect();
-        paths.extend(
-            self.disk
-                .keys()
-                .filter(|path| !self.files.map.contains_key(*path))
-                .cloned(),
-        );
-        paths.sort();
-        paths
+    pub fn unsaved(&self) -> &[String] {
+        &self.unsaved
     }
 
     pub fn is_unsaved(&self, path: &str) -> bool {
-        match self.files.get(path) {
-            Some(bytes) => self.disk.get(path) != Some(&hash(bytes)),
-            None => self.disk.contains_key(path),
+        self.unsaved
+            .binary_search_by(|p| p.as_str().cmp(path))
+            .is_ok()
+    }
+
+    fn refresh_unsaved(&mut self) {
+        let mut paths: Vec<String> = Vec::new();
+        let mut here = self.files.paths().peekable();
+        let mut known = self.disk.iter().peekable();
+        loop {
+            match (here.peek(), known.peek()) {
+                (Some(path), Some((on_disk, hash))) => match path.as_str().cmp(on_disk.as_str()) {
+                    std::cmp::Ordering::Less => {
+                        paths.push(here.next().cloned().unwrap_or_default())
+                    }
+                    std::cmp::Ordering::Greater => {
+                        paths.push(known.next().map(|(p, _)| p.clone()).unwrap_or_default())
+                    }
+                    std::cmp::Ordering::Equal => {
+                        if self.files.hash_of(path) != Some(hash.as_str()) {
+                            paths.push((*path).clone());
+                        }
+                        here.next();
+                        known.next();
+                    }
+                },
+                (Some(_), None) => paths.push(here.next().cloned().unwrap_or_default()),
+                (None, Some(_)) => {
+                    paths.push(known.next().map(|(p, _)| p.clone()).unwrap_or_default())
+                }
+                (None, None) => break,
+            }
         }
+        self.unsaved = paths;
     }
 
     pub fn save(&mut self) -> Result<save::SaveOutcome, save::SaveError> {
         let outcome = save::save(&self.root, &self.files, &mut self.disk);
+        self.refresh_unsaved();
         if outcome.is_ok() {
             self.saved_at = Some(self.history.applied());
         }
@@ -352,7 +370,7 @@ impl Project {
             Some(paths) => paths,
             None => Files::read_dir(&self.root)
                 .map(|files| {
-                    let mut all: Vec<String> = files.map.keys().cloned().collect();
+                    let mut all: Vec<String> = files.paths().cloned().collect();
                     all.extend(self.disk.keys().cloned());
                     all.sort();
                     all.dedup();
@@ -378,12 +396,13 @@ impl Project {
                 });
             } else {
                 match on_disk {
-                    Some(bytes) => self.files.map.insert(path.clone(), bytes),
-                    None => self.files.map.remove(&path),
-                };
+                    Some(bytes) => self.files.insert(path.clone(), bytes),
+                    None => self.files.remove(&path),
+                }
                 taken.push(path);
             }
         }
+        self.refresh_unsaved();
         if !taken.is_empty() {
             self.history.clear();
             self.reload();
@@ -397,9 +416,10 @@ impl Project {
 
     pub fn take_disk(&mut self, conflict: &Conflict) {
         match &conflict.disk {
-            Some(bytes) => self.files.map.insert(conflict.file.clone(), bytes.clone()),
-            None => self.files.map.remove(&conflict.file),
-        };
+            Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
+            None => self.files.remove(&conflict.file),
+        }
+        self.refresh_unsaved();
         self.history.clear();
         self.saved_at = Some(0);
         self.reload();

@@ -6,6 +6,7 @@ use crate::core::content::media::ImageSizes;
 use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::transition::{self, WorldViewSystems};
+use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
@@ -291,7 +292,7 @@ fn spawn_area_tiles(
     }
     let content = &service;
     let area = area::load(content, area_id);
-    let origin = Pos::<Tiles>::new(0.0, 0.0).to_screen();
+    let origin = area.size.bounds().min().to_screen();
     let sheets = AreaSheets::new(content, area, &assets);
     let grids = area.grids;
     let size = grids.size;

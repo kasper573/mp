@@ -27,6 +27,7 @@ use crate::value::RowValue;
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
+const SINGLE_COLUMN: f32 = 560.0;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
     if editor.panels.bottom == crate::app::BottomTab::History && editor.history_focus.is_some() {
@@ -152,6 +153,7 @@ pub fn has_preview(editor: &Editor) -> bool {
 pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
     egui::ScrollArea::vertical()
         .id_salt(("row-tab", table, key))
+        .auto_shrink([false, false])
         .show(ui, |ui| {
             egui::Frame::new()
                 .inner_margin(egui::Margin::symmetric(16, 10))
@@ -281,6 +283,9 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     });
                 });
             } else {
+                if wide {
+                    ui.set_max_width(SINGLE_COLUMN);
+                }
                 changed = std::mem::take(&mut changed).or(first_class_card(
                     ui,
                     &mut cx,
@@ -466,7 +471,15 @@ fn first_class_card(
         {
             properties.remove("bindings");
         }
+        if table == crate::views::job::TABLE
+            && let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut)
+        {
+            properties.remove("levels");
+        }
         changed = crate::forms::object(ui, cx, &schema, value, "");
+        if table == crate::views::job::TABLE {
+            changed = std::mem::take(&mut changed).or(crate::views::job::levels(ui, cx, value));
+        }
     });
     changed
 }

@@ -294,7 +294,7 @@ pub fn rows_of(editor: &Editor, table: &str) -> Vec<Row> {
             }
             Some(Row {
                 key: key.to_owned(),
-                value: project.files.json(path)?,
+                value: project.files.json_owned(path)?,
             })
         })
         .collect();
@@ -732,9 +732,15 @@ fn table_body(
                     egui::Stroke::new(1.0, theme::BORDER.gamma_multiply(0.6)),
                 );
                 let mut x = line.min.x;
-                if let Some((texture, uv, size)) =
-                    crate::ui::browser::row_icon(editor, ui, table, &row.key)
-                {
+                if let Some((texture, uv, size)) = editor.project.as_ref().and_then(|project| {
+                    crate::ui::browser::row_icon(
+                        &ui.ctx().clone(),
+                        &mut editor.form,
+                        project,
+                        table,
+                        &row.key,
+                    )
+                }) {
                     let icon =
                         egui::Rect::from_center_size(egui::pos2(x + 11.0, line.center().y), size);
                     painter.image(texture, icon, uv, Color32::WHITE);

@@ -396,16 +396,19 @@ pub fn object(
             }
             continue;
         }
-        let row_id = ui.id().with(&field_path).with("row");
-        let hovered = ui
-            .ctx()
-            .data(|d| d.get_temp::<egui::Rect>(row_id))
-            .is_some_and(|rect| ui.rect_contains_pointer(rect));
-        let row = ui.horizontal(|ui| {
-            ui.allocate_ui_with_layout(
+        ui.horizontal(|ui| {
+            let (label_rect, _) = ui.allocate_exact_size(
                 egui::vec2(LABEL_WIDTH, ui.spacing().interact_size.y),
-                egui::Layout::left_to_right(egui::Align::Center),
-                |ui| {
+                egui::Sense::hover(),
+            );
+            let mut label_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(label_rect)
+                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
+            );
+            {
+                let ui = &mut label_ui;
+                {
                     if optional && !present {
                         if ui
                             .add(
@@ -428,11 +431,7 @@ pub fn object(
                         }
                         return;
                     }
-                    ui.add(
-                        egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
-                            .truncate(),
-                    );
-                    if optional && hovered {
+                    if optional {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
                                 .add(
@@ -445,12 +444,22 @@ pub fn object(
                                 value.as_object_mut().expect("object").remove(name);
                                 changed = Changed::at(&field_path);
                             }
+                            ui.add(
+                                egui::Label::new(
+                                    crate::ui::theme::muted(name).monospace().size(13.0),
+                                )
+                                .truncate(),
+                            );
                         });
+                    } else {
+                        ui.add(
+                            egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
+                                .truncate(),
+                        );
                     }
-                },
-            );
-            if present {
-                let child = value.get_mut(name).expect("present");
+                }
+            }
+            if let Some(child) = value.get_mut(name).filter(|_| present) {
                 ui.vertical(|ui| {
                     ui.set_min_width(ui.available_width());
                     changed = std::mem::take(&mut changed).or(self::value(
@@ -465,8 +474,6 @@ pub fn object(
                 ui.label(crate::ui::theme::faint("—"));
             }
         });
-        ui.ctx()
-            .data_mut(|d| d.insert_temp(row_id, row.response.rect));
     }
     changed
 }
@@ -1118,7 +1125,7 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Chan
     changed
 }
 
-fn number(
+pub fn number(
     ui: &mut Ui,
     cx: &mut FormCx,
     schema: &Value,

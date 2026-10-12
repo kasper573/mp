@@ -410,7 +410,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
     for (area, groups) in by_area {
         let mut row = project
             .files
-            .json(&row_file("area", &area))
+            .json_owned(&row_file("area", &area))
             .ok_or("an area is gone")?;
         let mut list: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
         let mut remove: Vec<usize> = groups
@@ -578,7 +578,7 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
         by_file.entry(user.file.clone()).or_default().push(user);
     }
     for (file, users) in by_file {
-        let mut json = project.files.json(&file).ok_or("a file is gone")?;
+        let mut json = project.files.json_owned(&file).ok_or("a file is gone")?;
         let mut users = users;
         users.sort_by(|a, b| b.pointer.cmp(&a.pointer));
         for user in users {

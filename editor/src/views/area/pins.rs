@@ -170,7 +170,11 @@ pub fn open_pin(editor: &mut Editor, pin: PinHit) {
 }
 
 pub fn move_pin(editor: &mut Editor, frame: &Frame, file: &str, pointer: &str, at: Pos<Tiles>) {
-    let Some(mut json) = editor.project.as_ref().and_then(|p| p.files.json(file)) else {
+    let Some(mut json) = editor
+        .project
+        .as_ref()
+        .and_then(|p| p.files.json_owned(file))
+    else {
         return;
     };
     let Some(place) = json.pointer_mut(pointer) else {
@@ -190,7 +194,7 @@ pub fn set_spawn(editor: &mut Editor, frame: &Frame, at: Pos<Tiles>) {
     let Some(mut game) = editor
         .project
         .as_ref()
-        .and_then(|p| p.files.json("game.json"))
+        .and_then(|p| p.files.json_owned("game.json"))
     else {
         return;
     };

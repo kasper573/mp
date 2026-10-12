@@ -243,7 +243,7 @@ pub fn layout_of(editor: &Editor) -> Layout {
     editor
         .project
         .as_ref()
-        .and_then(|project| project.files.json(&row_file("world_map", ROW_KEY)))
+        .and_then(|project| project.files.json_owned(&row_file("world_map", ROW_KEY)))
         .and_then(|value| serde_json::from_value(value).ok())
         .unwrap_or_default()
 }
@@ -315,7 +315,7 @@ pub fn art_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
 }
 
 pub fn card_beside(project: &Project, edit: &mut Edit, key: &str, copy: &str) {
-    let Some(value) = project.files.json(&row_file("world_map", ROW_KEY)) else {
+    let Some(value) = project.files.json_owned(&row_file("world_map", ROW_KEY)) else {
         return;
     };
     let Ok(mut layout) = serde_json::from_value::<Layout>(value) else {

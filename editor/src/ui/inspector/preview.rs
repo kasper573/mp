@@ -122,14 +122,12 @@ pub(super) fn draw_preview(
     nameplates: &mut Vec<String>,
 ) {
     let ctx = ui.ctx().clone();
-    let Editor { project, form, .. } = editor;
-    let Some(project) = project.as_ref() else {
-        return;
-    };
-    let Some(content) = project.content else {
+    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
         return;
     };
     if table == "quest" {
+        let Editor { project, form, .. } = editor;
+        let project = project.as_ref().expect("a project");
         ui.vertical(|ui| {
             ui.set_width(size.x);
             quest_card(ui, &ctx, form, &project.files, content, key, size.x);
@@ -139,6 +137,8 @@ pub(super) fn draw_preview(
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 6.0, Color32::from_rgb(78, 128, 52));
+    let Editor { project, form, .. } = editor;
+    let project = project.as_ref().expect("a project");
     painter.rect_stroke(
         rect,
         6.0,
@@ -213,16 +213,15 @@ pub(super) fn draw_preview(
         .clamp(1.0, 4.0)
         .floor();
     let shown = Vec2::new(drawn.width * scale, drawn.height * scale);
-    let feet = rect.center() + Vec2::new(0.0, size.y * 0.22);
-    painter.add(egui::Shape::ellipse_filled(
-        feet,
-        Vec2::new(shown.x * 0.35, shown.x * 0.12),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 70),
-    ));
-    let sprite = egui::Rect::from_min_max(
-        feet - Vec2::new(shown.x / 2.0, shown.y * 5.0 / 6.0),
-        feet + Vec2::new(shown.x / 2.0, shown.y / 6.0),
-    );
+    let feet = crate::views::model::preview::spawn_backdrop(
+        editor,
+        &painter,
+        rect,
+        format!("inspector-preview:{table}/{key}"),
+        scale,
+    )
+    .unwrap_or(rect.center() + Vec2::new(0.0, size.y * 0.22));
+    let sprite = crate::views::model::preview::sprite_rect(feet, shown);
     let tint = value["modules"]
         .as_array()
         .into_iter()

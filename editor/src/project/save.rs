@@ -2,7 +2,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
-use super::files::{Bytes, Files, hash};
+use super::files::{Bytes, Files};
 
 pub struct SaveOutcome {
     pub written: Vec<String>,
@@ -28,16 +28,18 @@ pub fn save(
     };
     let mut new_files = Vec::new();
     let mut changed = Vec::new();
-    for (path, bytes) in &files.map {
+    for (path, bytes) in files.iter() {
         match disk.get(path) {
             None => new_files.push((path, bytes)),
-            Some(known) if *known != hash(bytes) => changed.push((path, bytes)),
+            Some(known) if Some(known.as_str()) != files.hash_of(path) => {
+                changed.push((path, bytes))
+            }
             _ => {}
         }
     }
     let removals: Vec<String> = disk
         .keys()
-        .filter(|path| !files.map.contains_key(*path))
+        .filter(|path| !files.contains(path))
         .cloned()
         .collect();
     for (path, bytes) in new_files.into_iter().chain(changed) {
@@ -48,7 +50,9 @@ pub fn save(
                 done,
             });
         }
-        disk.insert(path.clone(), hash(bytes));
+        if let Some(known) = files.hash_of(path) {
+            disk.insert(path.clone(), known.to_owned());
+        }
         done.written.push(path.clone());
     }
     for path in removals {

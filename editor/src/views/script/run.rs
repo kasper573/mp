@@ -1342,7 +1342,7 @@ fn snapshot_for(
 ) -> Result<CharacterSnapshot, String> {
     let json = match key {
         Some(key) => files
-            .json(&crate::project::row_file("test_character", key))
+            .json_owned(&crate::project::row_file("test_character", key))
             .ok_or_else(|| format!("no test character {key}"))?,
         None => {
             let job = content

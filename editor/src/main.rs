@@ -59,7 +59,7 @@ fn main() {
                     primary_window: Some(Window {
                         title: "Rift editor".to_owned(),
                         resolution: WindowResolution::new(1600, 1000),
-                        present_mode: PresentMode::AutoVsync,
+                        present_mode: PresentMode::AutoNoVsync,
                         ..default()
                     }),
                     ..default()

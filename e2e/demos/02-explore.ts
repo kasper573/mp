@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
 
 import { caption, chapter } from "../helpers/demo";
-import { closestTile, probe, walkTo, type Tile } from "../helpers/game";
+import { closestTile, occupied, probe, walkTo, type Tile } from "../helpers/game";
 
 const ROUTE: Array<{ from_spawn: Tile; caption: string }> = [
   { from_spawn: [4, 1], caption: "Click the ground to walk there — the camera follows" },
@@ -18,8 +18,9 @@ test(
       const spawn = (await probe(page)).me!.at;
       for (const stop of ROUTE) {
         await caption(page, stop.caption);
-        const { walkable } = await probe(page);
-        await walkTo(page, closestTile(walkable, [spawn[0] + stop.from_spawn[0], spawn[1] + stop.from_spawn[1]])!);
+        const snapshot = await probe(page);
+        const ground = snapshot.walkable.filter((tile) => !occupied(snapshot, tile));
+        await walkTo(page, closestTile(ground, [spawn[0] + stop.from_spawn[0], spawn[1] + stop.from_spawn[1]])!);
         await page.waitForTimeout(1500);
       }
     },

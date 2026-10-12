@@ -21,7 +21,7 @@ impl Thumbnails {
     pub fn image(&mut self, ctx: &egui::Context, files: &Files, path: &str) -> Option<Thumb> {
         let file = format!("assets/{path}");
         let bytes = files.get(&file)?;
-        let hash = crate::project::hash(bytes);
+        let hash = files.hash_of(&file)?.to_owned();
         if let Some(Some(thumb)) = self.textures.get(&file)
             && thumb.hash == hash
         {

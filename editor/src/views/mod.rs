@@ -1,5 +1,6 @@
 pub mod area;
 pub mod character;
+pub mod job;
 pub mod model;
 pub mod script;
 pub mod sheet;

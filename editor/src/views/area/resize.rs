@@ -283,7 +283,10 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             let mut json = if usage.file == row_file("area", &dialog.area) {
                 row.clone()
             } else {
-                project.files.json(&usage.file).ok_or("a file is gone")?
+                project
+                    .files
+                    .json_owned(&usage.file)
+                    .ok_or("a file is gone")?
             };
             let Some(place) = json.pointer_mut(parent) else {
                 continue;

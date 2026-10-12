@@ -179,7 +179,11 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
                 return;
             }
             let crate::app::PickWhat::Place { file, pointer } = &pick.what;
-            let Some(mut target) = editor.project.as_ref().and_then(|p| p.files.json(file)) else {
+            let Some(mut target) = editor
+                .project
+                .as_ref()
+                .and_then(|p| p.files.json_owned(file))
+            else {
                 editor.pick = None;
                 return;
             };

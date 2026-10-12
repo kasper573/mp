@@ -11,7 +11,7 @@ use bevy_egui::{EguiTextureHandle, EguiUserTextures};
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::render::{TILE, ToScreen};
-use game::core::tiling::Tiles;
+use game::core::tiling::{TileSize, Tiles};
 use game::systems::area::{self, AreaModule, Scenery};
 
 use crate::project::Files;
@@ -425,7 +425,7 @@ fn spawn_tiles(
     let area = area::load(&spec.content, spec.area);
     let grids = area.grids;
     let size = grids.size;
-    let origin = Pos::<Tiles>::new(0.0, 0.0).to_screen();
+    let origin = area.size.bounds().min().to_screen();
     let index_of =
         |tileset: area::tileset::Id| spec.sheets.tilesets.iter().position(|&id| id == tileset);
     for (index, layer) in grids.ground.iter().enumerate() {

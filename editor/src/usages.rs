@@ -24,7 +24,6 @@ impl Usages {
     pub fn build(content: &Content, files: &Files) -> Usages {
         let registry = game::systems::registry();
         let texts: Vec<(&String, String)> = files
-            .map
             .iter()
             .filter(|(path, _)| path.as_str() == "game.json" || path.ends_with(".json"))
             .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes.to_vec()).ok()?)))

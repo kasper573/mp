@@ -7,6 +7,7 @@ pub mod output;
 pub mod report;
 pub mod start;
 pub mod theme;
+pub mod tree;
 pub mod widgets;
 
 use bevy::prelude::World;
@@ -476,6 +477,8 @@ fn empty_centre(ui: &mut egui::Ui) {
     });
 }
 
+const STATUS_HEIGHT: f32 = 28.0;
+
 fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
     let mut left = std::mem::take(&mut editor.status.left);
     if let Some(project) = &editor.project
@@ -496,6 +499,7 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
     }
     let right = std::mem::take(&mut editor.status.right);
     egui::Panel::bottom("status")
+        .exact_size(STATUS_HEIGHT)
         .frame(
             egui::Frame::new()
                 .fill(theme::BG)
