@@ -12,8 +12,8 @@ use crate::project::{Edit, Selection, row_file, row_of};
 use crate::schema;
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
-/// The inspector of a script tab: the script's own card, one node's card, or what several share.
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     let Some(owner) = editor.views.script.focus.clone() else {
         ui.label(theme::muted("No script in view"));
@@ -100,7 +100,6 @@ fn breadcrumb(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
 }
 
-/// "npc/mara" or "tide_chest": the owner as a breadcrumb names it.
 fn owner_short(editor: &Editor, doc: &Doc) -> String {
     let label = super::owner_label(editor, doc);
     match label.rsplit_once(" · object ") {
@@ -122,25 +121,15 @@ fn form_cx<'a>(
         ..
     } = editor;
     let project = project.as_ref().expect("a project");
-    FormCx {
-        root,
-        content: project.content,
-        files: &project.files,
-        usages: &project.usages,
-        shapes,
-        state: form,
-        actions,
-        speaker: match (&doc.kind, &doc.owner) {
-            (OwnerKind::Npc, ScriptOwner::Inline { key, .. }) => Some(key.clone()),
-            _ => None,
-        },
-        owner_table: Some(doc.owner.table().to_owned()),
-        owner_key: None,
-    }
+    let mut cx = FormCx::new(project, root, shapes, form, actions);
+    cx.speaker = match (&doc.kind, &doc.owner) {
+        (OwnerKind::Npc, ScriptOwner::Inline { key, .. }) => Some(key.clone()),
+        _ => None,
+    };
+    cx.owner_table = Some(doc.owner.table().to_owned());
+    cx
 }
 
-/// The script's own card: owner, state, locals and nodes; its events; the owner's other scripts;
-/// Run, Outline and Make shared. A shared script shows its variables and who runs it instead.
 pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let _ = super::catalogue(editor);
     if super::run::inspector(editor, ui, doc) {
@@ -321,7 +310,6 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// EVENTS: one row per on node, each a click away.
 fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     widgets::section(ui, "Events");
     let mut go: Option<String> = None;
@@ -370,7 +358,6 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// The owner's other script modules, so the whole behaviour is one glance away.
 fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let ScriptOwner::Inline {
         table,
@@ -407,7 +394,7 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         .flatten()
         .enumerate()
     {
-        let tag = module["type"].as_str().unwrap_or("");
+        let tag = module.kind();
         if !tag.ends_with("_script") {
             continue;
         }
@@ -420,7 +407,7 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         }
         any = true;
         let (word, name, detail) = if tag == "shared_script" {
-            let script = module["script"].as_str().unwrap_or("?").to_owned();
+            let script = module.text_or("script", "?").to_owned();
             let values = module["values"]
                 .as_object()
                 .map(|v| {
@@ -452,7 +439,7 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         {
             open = Some(if tag == "shared_script" {
                 ScriptOwner::Shared {
-                    key: module["script"].as_str().unwrap_or("").to_owned(),
+                    key: module.text("script").to_owned(),
                 }
             } else {
                 ScriptOwner::inline(table, key, &module_pointer)
@@ -484,7 +471,6 @@ fn object_index_of(pointer: &str) -> Option<usize> {
         .flatten()
 }
 
-/// OWNER for an object's script: the area and object, and what state means for it.
 fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let ScriptOwner::Inline {
         table,
@@ -499,7 +485,7 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         Some(index) => {
             let row = editor.row_value(table, key).unwrap_or(Value::Null);
             let module = &row["modules"][index];
-            let name = module["name"].as_str().unwrap_or("object").to_owned();
+            let name = module.text_or("name", "object").to_owned();
             let label = module["label"]
                 .as_str()
                 .map(str::to_owned)
@@ -598,7 +584,6 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// VARIABLES of a shared script: a card each with type, default, holes and who gives values.
 fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let key = doc.owner.key().to_owned();
     let variables: Vec<(String, Value)> = doc.script["variables"]
@@ -746,7 +731,6 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     );
 }
 
-/// RUN BY and SPEAKS FOR of a shared script, and what is worked out from it.
 fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let key = doc.owner.key().to_owned();
     let Some(project) = editor.project.as_ref() else {
@@ -876,7 +860,6 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// Run F8 · Outline O · Make shared… / Make inline…
 fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     ui.add_space(8.0);
     let outline = editor
@@ -925,7 +908,6 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// One node's card: its fields as rows, its arrows, and what its kind brings along.
 fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     let Some(node) = doc.nodes().get(name).cloned() else {
         return;
@@ -1093,7 +1075,6 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     }
 }
 
-/// The badge a node kind wears: its system's letter, flow and dialogue as scripts.
 fn badge_of(kind: &str, system: &str) -> String {
     match kind {
         "on" | "if" | "random" | "repeat" | "wait" | "set" | "run" | "return" | "dialogue" => {
@@ -1114,7 +1095,6 @@ fn badge_of(kind: &str, system: &str) -> String {
     }
 }
 
-/// The arrows a node leaves by: linked ones as a jump, free ones as what ending means here.
 fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::Port], kind: &str) {
     let mut go: Option<String> = None;
     for port in outs {
@@ -1160,8 +1140,6 @@ fn free_arrow_meaning(kind: &str, label: &str) -> String {
     }
 }
 
-/// What a kind brings along under its card: a memory row, compiled bounds, one body, the arrows in.
-/// The node a card shows: its name, value, kind, the arrows into it and its blurb.
 struct Shown<'a> {
     name: &'a str,
     node: &'a Value,
@@ -1240,7 +1218,6 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &Doc, shown: Shown) {
     }
 }
 
-/// The memory row a remember node sets, editable in place.
 fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
     let Some(mut row) = editor.row_value("memory", memory) else {
         return;
@@ -1282,7 +1259,6 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
     }
 }
 
-/// Who keeps what: state is the owner's, locals one flow's, variables each owner's values.
 fn keeps_cards(ui: &mut Ui, doc: &Doc) {
     let owner = doc.owner.key().to_owned();
     for (title, field, sentence) in [
@@ -1311,7 +1287,6 @@ fn keeps_cards(ui: &mut Ui, doc: &Doc) {
     });
 }
 
-/// The bounds the compiler proves for a repeat: steps and waits per pass.
 fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &Value) {
     let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
     let at_most = node["at_most"].as_f64().unwrap_or(1.0);
@@ -1400,7 +1375,6 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
     changed
 }
 
-/// LINES and CHOICES of a dialogue node, a card each.
 fn dialogue_form(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -1563,7 +1537,6 @@ struct ChoiceMenu {
     swap: Option<(usize, usize)>,
 }
 
-/// One choice's card: its label, condition, what it reveals, a warning and the arrow it leaves by.
 #[allow(clippy::too_many_arguments)]
 fn choice_card(
     ui: &mut Ui,
@@ -1748,7 +1721,6 @@ fn choice_card(
     changed
 }
 
-/// The inspector of one choice, as the outline selects it: the card alone, under its node.
 fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, index: usize) {
     let Some(node) = doc.nodes().get(name).cloned() else {
         return;
@@ -1823,7 +1795,6 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
     }
 }
 
-/// KEYS: what the outline answers, for the reader who has not learnt them.
 fn keys_card(ui: &mut Ui) {
     widgets::section(ui, "Keys");
     for (keys, text) in [
@@ -1845,7 +1816,6 @@ fn keys_card(ui: &mut Ui) {
     }
 }
 
-/// Who speaks a line: an npc with a face from its busts, the owning object, or the narrator.
 fn speaker_rows(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -1855,7 +1825,7 @@ fn speaker_rows(
     doc: &Doc,
 ) -> Changed {
     let mut changed = Changed::default();
-    let current = by["type"].as_str().unwrap_or("narrator").to_owned();
+    let current = by.kind_or("narrator").to_owned();
     let mut picked = current.clone();
     let options: Vec<&str> = if doc.kind == OwnerKind::Object {
         vec!["npc", "object", "narrator"]
@@ -1942,7 +1912,6 @@ fn act(editor: &mut Editor, action: FormAction, doc: &Doc) {
     crate::ui::inspector::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
-/// A constant in a node that Make shared may turn into a variable.
 #[derive(Clone, Debug)]
 pub struct Constant {
     pub node: String,

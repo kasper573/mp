@@ -49,7 +49,6 @@ pub fn corners_of(row: &Value, tile: u32, set: &str) -> Option<[String; 4]> {
     })
 }
 
-/// The set a view paints, defaulting to the first the row declares.
 pub fn current_set(editor: &mut Editor, key: &str, row: &Value) -> Option<String> {
     let sets = sets_of(row);
     let view = editor
@@ -335,7 +334,6 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str, terrains: &[String]) {
     }
 }
 
-/// Sets one corner of a tile in a set, starting from all-base when the tile had no corners.
 pub fn set_corner(
     editor: &mut Editor,
     key: &str,
@@ -457,7 +455,6 @@ fn close_up(
     }
 }
 
-/// "South-west is floor, the rest rug."
 fn sentence(corners: Option<&[String; 4]>, terrains: &[String]) -> String {
     let Some(corners) = corners else {
         return "Not in this set: every corner reads as the base.".to_owned();
@@ -487,7 +484,6 @@ fn sentence(corners: Option<&[String; 4]>, terrains: &[String]) -> String {
     format!("{}, the rest {last}.", parts.join(", "))
 }
 
-/// Every mix the set can need, as the brush sees it: the tile that draws it, or that none does.
 pub fn mixes(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let Some(set) = current_set(editor, key, row) else {
         widgets::hint(ui, "no terrain set");
@@ -610,7 +606,6 @@ pub fn tiles_by_mix(row: &Value, set: &str) -> BTreeMap<[String; 4], Vec<u32>> {
     by_mix
 }
 
-/// How many non-base mixes have a tile, how many there are, and the mixes missing.
 pub fn completeness(row: &Value, set: &str) -> (usize, usize, Vec<String>) {
     let terrains = terrains_of(row, set);
     if terrains.is_empty() {
@@ -641,7 +636,6 @@ pub fn completeness(row: &Value, set: &str) -> (usize, usize, Vec<String>) {
     (have, total, missing)
 }
 
-/// How many tiles a set marks, and how many share a mix with another.
 pub fn tile_counts(row: &Value, set: &str) -> (usize, usize) {
     let by_mix = tiles_by_mix(row, set);
     let tiles: usize = by_mix.values().map(Vec::len).sum();

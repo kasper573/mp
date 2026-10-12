@@ -155,8 +155,6 @@ pub fn strong(text: impl Into<String>) -> RichText {
         .color(TEXT)
 }
 
-/// The colour of a module kind's letter badge: people yellow, places green, scripts pink, sound
-/// violet, loot and lists teal, everything else grey.
 pub fn badge_colour(kind: &str) -> Color32 {
     match kind {
         "population" | "resident" | "npc" | "player" | "nameplate" | "tint" | "voice" => {
@@ -178,7 +176,6 @@ pub fn badge_colour(kind: &str) -> Color32 {
     }
 }
 
-/// The letter a module kind's badge shows.
 pub fn badge_letter(kind: &str) -> String {
     match kind {
         "shared_script" | "inline_script" | "script" => "S".to_owned(),

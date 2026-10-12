@@ -20,7 +20,6 @@ use super::report::{ErrorPlace, LoadError, LoadReport, VERSION_RULE};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
 
-/// Which loading step a hook runs in; the loader's own work in each step runs first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LoadStep {
     Rows,
@@ -42,8 +41,6 @@ struct FixtureEntry {
 }
 pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> + Send + Sync>;
 
-/// Every table, fixture, settings type and loading hook the game registers. The loader and the
-/// writer read the registry; nothing else knows which tables exist.
 #[derive(Default)]
 pub struct ContentRegistry {
     rows: Vec<Box<dyn TableLoader>>,
@@ -65,7 +62,6 @@ impl ContentRegistry {
         self
     }
 
-    /// Checks a registered table's module rules.
     pub fn modules<Row: ModuleSet>(&mut self) -> &mut ContentRegistry {
         self.module_rules.push((
             Row::TABLE,
@@ -79,7 +75,6 @@ impl ContentRegistry {
         self.hook(LoadStep::Rows, module_rules::<Row>)
     }
 
-    /// How many modules of the kind `json` is a table's row may hold, read from its module set.
     pub fn module_rule(&self, table: &str, json: &serde_json::Value) -> Option<ModuleRule> {
         self.module_rules
             .iter()
@@ -87,7 +82,6 @@ impl ContentRegistry {
             .and_then(|(_, probe)| probe(json))
     }
 
-    /// A table whose rows may own a folder `tables/<table>/<key>/` of extra files.
     pub fn folder<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
         self.rows.push(Box::new(RowLoader::<Row> {
             folders: true,
@@ -165,8 +159,6 @@ impl ContentRegistry {
         })
     }
 
-    /// Every row or asset `text` names, as a parse of `file` (a row file or `game.json`) against
-    /// `content` resolves them, each located in the text: the reference graph a tool rewrites by.
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
         let leaves = if file == "game.json" {
             let Some(loader) = self.settings.as_deref() else {
@@ -215,14 +207,12 @@ impl ContentRegistry {
     }
 }
 
-/// One reference a file makes, located in its text.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Reference {
     pub kind: LeafKind,
     pub value: String,
     pub known: bool,
     pub pointer: String,
-    /// The reference is the key of a map entry at `pointer`, not the value there.
     pub key: bool,
     pub line: usize,
     pub column: usize,
@@ -239,7 +229,6 @@ fn leaves_of(content: &Content, text: &str, parse: &dyn Fn(&str) -> ParseResult)
     scope.leaves().to_vec()
 }
 
-/// Where a content folder's files come from: a directory, or files embedded in a binary.
 pub trait ContentFolder: Send + Sync {
     fn name(&self) -> String;
     fn entries(&self, dir: &str) -> Vec<FolderEntry>;
@@ -320,7 +309,6 @@ impl ContentFolder for MemoryFolder {
     }
 }
 
-/// The `game.json` row.
 pub trait Settings: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 'static {
     fn content_version(&self) -> &ContentVersion;
 }
@@ -370,7 +358,6 @@ pub fn load(
     }
 }
 
-/// The folder being loaded: what parsed so far, what was built from it, and every error met.
 pub struct Loading {
     folder: Arc<dyn ContentFolder>,
     listing: Listing,
@@ -422,7 +409,6 @@ impl Loading {
         });
     }
 
-    /// An error inside a JSON file at `pointer`, located through the file's text.
     pub fn json_error(
         &mut self,
         file: impl Into<String>,
@@ -480,7 +466,6 @@ impl Loading {
             || self.failed.contains(&(Row::TABLE, key.to_owned()))
     }
 
-    /// The rows of a table that loaded and failed no later step.
     pub fn rows<Row: ContentRow>(&mut self) -> Vec<(ContentId<Row>, &'static Row)> {
         let content = self.content();
         content
@@ -519,7 +504,6 @@ impl Loading {
             .is_ok()
     }
 
-    /// The files inside `tables/<table>/<key>/`, as names, sorted bytewise.
     pub fn row_folder<Row: ContentRow>(&mut self, id: ContentId<Row>) -> Vec<String> {
         let key = id.key(&self.content()).to_owned();
         self.listing
@@ -771,7 +755,6 @@ pub struct FileHash {
     pub size: u64,
 }
 
-/// Every file of the folder by its relative path, hashed with blake3.
 pub struct FileHashes(pub BTreeMap<String, FileHash>);
 
 struct Parsed {
@@ -1279,7 +1262,6 @@ fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
     }
 }
 
-/// Step 1: the folder's entries against the layout.
 struct Listing {
     game_json: bool,
     tables: BTreeMap<&'static str, TableListing>,
@@ -1485,7 +1467,6 @@ pub fn valid_key(key: &str) -> bool {
             .any(|device| device.eq_ignore_ascii_case(key))
 }
 
-/// Writes files under one folder, touching only those whose bytes change.
 pub struct FileWriter {
     root: PathBuf,
     written: Vec<String>,
@@ -1535,7 +1516,6 @@ impl FileWriter {
     }
 }
 
-/// Writes every row, the settings and each table's folder files of `content` into `root`.
 pub fn write(registry: &ContentRegistry, content: Content, root: &Path) -> io::Result<FileWriter> {
     let mut writer = FileWriter::new(root);
     let result = with_content(ContentScope::of(&content), || {

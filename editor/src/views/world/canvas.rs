@@ -14,7 +14,7 @@ use crate::app::Editor;
 use crate::ui::theme;
 use crate::views::area::{TILE_PX, scene};
 
-const LABEL: f32 = 16.0;
+const LABEL: f32 = 28.0;
 const PAD: f32 = 3.0;
 const ROUTE: Color32 = Color32::from_rgb(90, 160, 255);
 const WARP: Color32 = Color32::from_rgb(150, 150, 170);
@@ -40,8 +40,6 @@ impl Frame {
     }
 }
 
-/// Where a card sits on screen this frame: the map rectangle, the art drawn from it and the frame
-/// around both art and name. Small cards grow to a readable minimum.
 pub struct Placed {
     pub key: String,
     pub frame: Rect,
@@ -112,7 +110,6 @@ pub fn placed_of<'a>(placed: &'a [Placed], key: &str) -> Option<&'a Placed> {
     placed.iter().find(|card| card.key == key)
 }
 
-/// The tile under a screen point, through the card's art.
 pub fn tile_at(
     atlas: &Atlas,
     placed: &[Placed],
@@ -172,7 +169,7 @@ pub fn show(
         draw_regions(&painter, &frame, atlas, &shown, &selected);
     }
     if layers.warps {
-        draw_warps(&painter, atlas, &placed, &route);
+        draw_warps(&painter, atlas, &placed, &route, &selected);
     }
     let ppp = ui.ctx().pixels_per_point();
     let mut requests = Vec::new();
@@ -362,6 +359,23 @@ pub fn show(
                     FontId::monospace(11.0),
                     ink,
                 );
+                let ways: HashSet<&String> = atlas
+                    .warps
+                    .iter()
+                    .filter(|warp| &warp.from == key && warp.to != *key)
+                    .map(|warp| &warp.to)
+                    .collect();
+                painter.text(
+                    Pos2::new(card.frame.center().x, card.art.max.y + 14.0),
+                    Align2::CENTER_TOP,
+                    match ways.len() {
+                        0 => "no way out".to_owned(),
+                        1 => "1 way out".to_owned(),
+                        n => format!("{n} ways out"),
+                    },
+                    FontId::proportional(10.0),
+                    theme::FAINT,
+                );
             }
         }
         let stroke = if is_selected {
@@ -545,7 +559,6 @@ pub fn show(
     );
 }
 
-/// What the canvas drew over the cards this frame, for the status line to describe.
 struct Overlays<'a> {
     lit: &'a Option<BTreeMap<String, Vec<Source>>>,
     colours: &'a Option<Ranges>,
@@ -834,13 +847,18 @@ fn draw_region_labels(painter: &egui::Painter, frame: &Frame, atlas: &Atlas, lay
     }
 }
 
-fn draw_warps(
-    painter: &egui::Painter,
-    atlas: &Atlas,
-    placed: &[Placed],
-    route: &Option<Vec<atlas::Warp>>,
-) {
+pub struct EdgeSegment {
+    pub from: String,
+    pub to: String,
+    pub a: Pos2,
+    pub b: Pos2,
+    pub out: usize,
+    pub back: usize,
+}
+
+pub fn edge_segments(atlas: &Atlas, placed: &[Placed]) -> Vec<EdgeSegment> {
     let mut drawn: HashSet<(String, String)> = HashSet::new();
+    let mut out = Vec::new();
     for warp in &atlas.warps {
         if warp.from == warp.to {
             continue;
@@ -854,32 +872,91 @@ fn draw_warps(
         else {
             continue;
         };
-        let a = edge_point(from.frame, to.frame.center());
-        let b = edge_point(to.frame, from.frame.center());
+        out.push(EdgeSegment {
+            from: warp.from.clone(),
+            to: warp.to.clone(),
+            a: edge_point(from.frame, to.frame.center()),
+            b: edge_point(to.frame, from.frame.center()),
+            out: atlas.warps_between(&warp.from, &warp.to),
+            back: atlas.warps_between(&warp.to, &warp.from),
+        });
+    }
+    out
+}
+
+pub fn edge_at(segments: &[EdgeSegment], p: Pos2) -> Option<(String, String)> {
+    segments
+        .iter()
+        .map(|edge| (edge, distance_to_segment(p, edge.a, edge.b)))
+        .filter(|(_, distance)| *distance <= 7.0)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(edge, _)| (edge.from.clone(), edge.to.clone()))
+}
+
+fn distance_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
+    let ab = b - a;
+    let t = if ab.length_sq() <= f32::EPSILON {
+        0.0
+    } else {
+        ((p - a).dot(ab) / ab.length_sq()).clamp(0.0, 1.0)
+    };
+    (p - (a + ab * t)).length()
+}
+
+fn draw_warps(
+    painter: &egui::Painter,
+    atlas: &Atlas,
+    placed: &[Placed],
+    route: &Option<Vec<atlas::Warp>>,
+    selected: &HashSet<Part>,
+) {
+    for edge in edge_segments(atlas, placed) {
+        let (a, b) = (edge.a, edge.b);
         let on_route = route.as_ref().is_some_and(|route| {
             route.iter().any(|step| {
-                step.from == warp.from && step.to == warp.to
-                    || step.from == warp.to && step.to == warp.from
+                step.from == edge.from && step.to == edge.to
+                    || step.from == edge.to && step.to == edge.from
             })
         });
-        let both = atlas.both_ways(&warp.from, &warp.to);
-        let stroke = if on_route {
+        let is_selected = selected.iter().any(|part| {
+            matches!(part, Part::Edge(x, y) if (x == &edge.from && y == &edge.to) || (x == &edge.to && y == &edge.from))
+        });
+        let both = edge.back > 0;
+        let stroke = if is_selected {
+            Stroke::new(2.5, theme::SELECTION)
+        } else if on_route {
             Stroke::new(3.0, ROUTE)
-        } else {
+        } else if both {
             Stroke::new(1.5, WARP)
+        } else {
+            Stroke::new(1.5, theme::WARN)
         };
         if both {
             painter.line_segment([a, b], stroke);
             arrow_head(painter, b, b - a, stroke);
             arrow_head(painter, a, a - b, stroke);
         } else {
-            let stroke = if on_route {
-                stroke
-            } else {
-                Stroke::new(1.5, theme::WARN)
-            };
             painter.add(Shape::dashed_line(&[a, b], stroke, 6.0, 4.0));
             arrow_head(painter, b, b - a, stroke);
+        }
+        if (a - b).length() >= 70.0 {
+            chip(
+                painter,
+                a + (b - a) / 2.0,
+                Align2::CENTER_CENTER,
+                &format!("{} · {}", edge.out, edge.back),
+                if is_selected {
+                    theme::ACCENT_SOFT
+                } else {
+                    theme::PANEL
+                },
+                if is_selected {
+                    theme::TEXT
+                } else {
+                    theme::MUTED
+                },
+                10.0,
+            );
         }
     }
 }
@@ -909,7 +986,6 @@ fn arrow_head(painter: &egui::Painter, tip: Pos2, direction: Vec2, stroke: Strok
     ));
 }
 
-/// The steps of a quest line in order: numbered along the main chain, lettered for branches.
 pub struct LineStep {
     pub badge: String,
     pub label: String,
@@ -1104,7 +1180,6 @@ fn draw_notes(painter: &egui::Painter, frame: &Frame, layout: &Layout, selected:
     }
 }
 
-/// Zoomed in: the area under the view with its off-screen neighbours tagged at the edge.
 fn draw_edge_tags(
     painter: &egui::Painter,
     atlas: &Atlas,
@@ -1258,7 +1333,6 @@ pub fn route_of(editor: &Editor, atlas: &Atlas) -> Option<Vec<atlas::Warp>> {
     atlas.route(from, to)
 }
 
-/// "drop · 2 shops · quest": each source kind and how many of it.
 pub fn tag_line(sources: &[Source]) -> String {
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     for source in sources {
@@ -1277,7 +1351,6 @@ pub fn tag_line(sources: &[Source]) -> String {
         .join(" · ")
 }
 
-/// Which areas the lenses light, and why; `Some(empty)` means a lens is on and nothing matches.
 pub fn lit_areas(
     editor: &Editor,
     content: Content,
@@ -1325,8 +1398,6 @@ pub fn lit_areas(
     Some(out)
 }
 
-/// Per area: its (low, high) range and the value coloured; then the lowest and highest value over
-/// the map and the unit of the field.
 pub type Ranges = (BTreeMap<String, ((f64, f64), f64)>, f64, f64, String);
 
 pub fn colour_ranges(editor: &Editor, atlas: &Atlas) -> Option<Ranges> {

@@ -13,14 +13,11 @@ const MOTIONS: [&str; 3] = ["wave", "shake", "pulse"];
 const VALUE_TOKEN: &str = "⟨value⟩";
 const INPUT_TOKEN: &str = "⟨input⟩";
 
-/// What a line editor did this frame: the spans it now holds and whether Enter left the field.
 pub struct LineEdit {
     pub spans: Option<Value>,
     pub entered: bool,
 }
 
-/// A whole line of spans as one text field: typing edits the words and keeps their styling,
-/// selecting text opens the span toolbar above it.
 pub fn line(
     ui: &mut Ui,
     drafts: &mut HashMap<egui::Id, String>,
@@ -140,7 +137,6 @@ pub fn line(
     }
 }
 
-/// The words of a span list, with value and input spans as single tokens.
 pub fn plain(spans: &Value) -> String {
     spans_of(spans)
         .as_array()
@@ -150,7 +146,6 @@ pub fn plain(spans: &Value) -> String {
         .collect()
 }
 
-/// The spans as styled text: inks in their colour, slow and voiced spans underlined, values in code.
 pub fn layout_job(spans: &Value, font: FontId, ink: Color32, wrap_width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = wrap_width;
@@ -194,8 +189,6 @@ pub fn ink_colour(ink: &str) -> Color32 {
     }
 }
 
-/// Maps one contiguous edit of the plain text back into the spans; none when it would cut into
-/// a value or input token.
 pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
     let old: Vec<char> = before.chars().collect();
     let new: Vec<char> = after.chars().collect();
@@ -296,7 +289,6 @@ pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
     Some(Value::Array(merged))
 }
 
-/// The span toolbar over a selection: ink, voice, motion, slow, a pause and a value span.
 fn toolbar(
     ui: &mut Ui,
     spans: &Value,
@@ -392,7 +384,6 @@ fn toolbar(
     outcome
 }
 
-/// Splits the spans at the selection bounds and changes the styling of the text spans inside.
 pub fn restyle(
     spans: &Value,
     (start, end): (usize, usize),
@@ -432,8 +423,6 @@ pub fn restyle(
     Value::Array(out)
 }
 
-/// One span of a line in a plain form: text with its inks, voices and motions, an input name,
-/// or a value.
 pub fn edit(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -591,7 +580,6 @@ pub fn edit(
     changed
 }
 
-/// A line's spans in a form: the styled field and, under it, the value spans' expressions.
 pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
     let id = ui.id().with(path).with("line");
     let mut changed = Changed::default();

@@ -12,6 +12,7 @@ use serde_json::Value;
 use super::Doc;
 use super::nodes::{self, Catalogue, Piece, Port, Tone};
 use crate::ui::theme;
+use crate::value::RowValue;
 
 const COLUMN: f32 = 240.0;
 pub const CARD: f32 = 176.0;
@@ -30,7 +31,6 @@ pub struct GraphNode {
     pub name: String,
 }
 
-/// The snarl graph built from a script's nodes, rebuilt whenever the content changes.
 pub struct Graph {
     pub snarl: Snarl<GraphNode>,
     pub ids: HashMap<String, NodeId>,
@@ -69,7 +69,6 @@ pub enum GraphAction {
     },
 }
 
-/// Places nodes without a position: by depth from the on nodes, left to right, rows per column.
 pub fn place_missing(doc: &Doc, catalogue: &Catalogue, layout: &mut Layout) {
     let nodes = doc.nodes();
     let depths = nodes::depths(nodes, catalogue);
@@ -95,7 +94,6 @@ pub fn place_missing(doc: &Doc, catalogue: &Catalogue, layout: &mut Layout) {
     layout.nodes.retain(|name, _| nodes.contains_key(name));
 }
 
-/// Roughly how tall a card draws, for placing cards that have no position yet.
 fn estimated_height(node: &Value, catalogue: &Catalogue) -> f32 {
     let outputs = nodes::ports(node, catalogue).len() as f32;
     if nodes::kind(node) == "dialogue" {
@@ -138,7 +136,6 @@ pub fn build(doc: &Doc, catalogue: &Catalogue, layout: &Layout, generation: u64)
     }
 }
 
-/// Reads the positions back after a frame of dragging.
 pub fn positions(graph: &Graph) -> BTreeMap<String, [f32; 2]> {
     graph
         .snarl
@@ -147,7 +144,6 @@ pub fn positions(graph: &Graph) -> BTreeMap<String, [f32; 2]> {
         .collect()
 }
 
-/// The faces of every npc line, keyed by npc and face name, with the square the card shows.
 pub type Faces = HashMap<(String, Option<String>), (egui::TextureId, Rect)>;
 
 pub struct Viewer<'a> {
@@ -285,7 +281,7 @@ impl<'a> Viewer<'a> {
         match by["type"].as_str() {
             Some("npc") => {
                 let key = (
-                    by["npc"].as_str().unwrap_or("").to_owned(),
+                    by.text("npc").to_owned(),
                     by["face"].as_str().map(str::to_owned),
                 );
                 match self
@@ -798,7 +794,6 @@ pub fn kind_glyph(kind: &str) -> (&'static str, Color32) {
     }
 }
 
-/// What the card's header says: the event of an on node, a dialogue's name, else the kind.
 pub fn card_title(name: &str, node: &Value) -> String {
     match nodes::kind(node) {
         "on" => format!("on {}", nodes::event_of(node).unwrap_or("?")),
@@ -807,7 +802,6 @@ pub fn card_title(name: &str, node: &Value) -> String {
     }
 }
 
-/// Card pieces laid out as one wrapped line.
 pub fn pieces_job(pieces: &[Piece], width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = width;

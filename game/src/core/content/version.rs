@@ -20,8 +20,6 @@ impl fmt::Display for ContentVersion {
     }
 }
 
-/// The engine build: eight hex digits of the commit, `-dirty` with uncommitted changes, or
-/// `RIFT_BUILD` when built outside git.
 pub fn build() -> &'static str {
     env!("RIFT_BUILD")
 }

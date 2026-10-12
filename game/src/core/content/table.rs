@@ -261,7 +261,6 @@ impl ContentBuilder {
         value
     }
 
-    /// Leaks a view over the tables and built values inserted so far. Later inserts need a new one.
     pub fn build(&self) -> Content {
         Content(Box::leak(Box::new(Loaded {
             tables: self.tables.clone(),

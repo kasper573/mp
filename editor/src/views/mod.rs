@@ -15,11 +15,9 @@ use crate::project::Selection;
 use crate::tabs::Tab;
 use crate::ui::browser::BrowserState;
 
-/// The camera every bevy-rendered view draws with.
 #[derive(Component)]
 pub struct EditorCamera;
 
-/// Per-view state kept while a folder is open; none of it is content.
 #[derive(Default)]
 pub struct Views {
     pub browser: BrowserState,
@@ -33,7 +31,7 @@ pub struct Views {
     pub sound: sound::SoundViews,
     pub character: character::CharacterView,
     pub assets: crate::ui::assets::AssetsState,
-    pub preview: crate::ui::inspector::PreviewState,
+    pub preview: crate::ui::inspector::preview::PreviewState,
     pub generation_seen: u64,
 }
 
@@ -65,11 +63,14 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     model::sounds::sync(editor, world);
 }
 
-/// The bottom panel's tabs for the tab in front: a view's own first, then history and output.
 pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
     let mut tabs: Vec<BottomTab> = match crate::ui::active_tab(editor) {
         Some(Tab::Area { .. }) | Some(Tab::Blueprint { .. }) => {
-            vec![BottomTab::Palette, BottomTab::Blueprints]
+            let mut tabs = vec![BottomTab::Palette, BottomTab::Blueprints];
+            if editor.views.sound.listening.is_some() {
+                tabs.push(BottomTab::Listen);
+            }
+            tabs
         }
         Some(Tab::Script(_)) => vec![BottomTab::MayDo, BottomTab::UsedBy, BottomTab::Run],
         Some(Tab::Model { key }) => model::bottom_tabs(editor, &key),
@@ -100,6 +101,9 @@ pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
         }
         (Some(Tab::Area { key }), BottomTab::Blueprints) => {
             area::bottom(editor, ui, &format!("area:{key}"), tab)
+        }
+        (Some(Tab::Area { .. }) | Some(Tab::Blueprint { .. }), BottomTab::Listen) => {
+            sound::panel(editor, ui)
         }
         (Some(Tab::Blueprint { key }), BottomTab::Palette | BottomTab::Blueprints) => {
             area::bottom(editor, ui, &format!("blueprint:{key}"), tab)
@@ -157,10 +161,7 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         return;
     }
     match selection.table.as_str() {
-        "area" | "blueprint" => {
-            area::inspect_parts(editor, ui, selection);
-            sound::panel(editor, ui);
-        }
+        "area" | "blueprint" => area::inspect_parts(editor, ui, selection),
         "world_map" => world::inspect_parts(editor, ui, selection),
         "model" => model::inspect_parts(editor, ui, selection),
         "tileset" => tileset::inspect_parts(editor, ui, selection),

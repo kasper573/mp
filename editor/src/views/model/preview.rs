@@ -8,7 +8,6 @@ use crate::ui::theme;
 use crate::views::area::TILE_PX;
 use crate::views::area::scene::{SceneRequest, SceneSpec, SceneryOf};
 
-/// The live preview's clock: the game's playback over the strip being looked at.
 pub struct Preview {
     pub playing: bool,
     pub muted: bool,
@@ -33,7 +32,6 @@ impl Default for Preview {
 
 pub const SPEEDS: [f32; 4] = [1.0, 0.5, 0.25, 2.0];
 
-/// Where in a strip a clock position falls, and which frames it passed since the last tick.
 pub struct Tick {
     pub index: usize,
     pub passed: Vec<usize>,
@@ -56,8 +54,6 @@ pub fn index_at(frames: &[FrameData], position: f32, holds: bool) -> usize {
     frames.len().saturating_sub(1)
 }
 
-/// Advances the clock by this frame's time and names every frame whose start it passed, in order,
-/// across wraps.
 pub fn tick(preview: &mut Preview, dt: f32, frames: &[FrameData], action: &str) -> Tick {
     let total = super::total_ms(frames).max(1) as f32;
     let holds = action == "death";
@@ -109,7 +105,6 @@ pub fn restart(preview: &mut Preview) {
     preview.playing = true;
 }
 
-/// Plays the cues of passed frames: every sound, and one footstep for all the steps among them.
 pub fn fire(editor: &mut Editor, key: &str, frames: &[FrameData], passed: &[usize]) {
     let muted = editor
         .views
@@ -147,8 +142,6 @@ pub fn fire(editor: &mut Editor, key: &str, frames: &[FrameData], passed: &[usiz
     }
 }
 
-/// The actor at a frame over the spawn's ground, with its shadow, as the game draws it.
-/// How big the preview is and how many screen pixels one sprite pixel gets.
 #[derive(Clone, Copy)]
 pub struct Fit {
     pub size: Vec2,
@@ -236,7 +229,6 @@ pub fn draw(
     rect
 }
 
-/// The transport under a preview: pause, mute, speed, and the frame counter.
 pub fn controls(ui: &mut Ui, preview: &mut Preview, index: usize, count: usize, speed: bool) {
     ui.horizontal(|ui| {
         let play = if preview.playing { "⏸" } else { "▶" };

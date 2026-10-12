@@ -1,15 +1,7 @@
-use crate::app::Editor;
+use crate::app::{Dialog, Editor};
 use crate::project::Selection;
 use crate::tabs::Tab;
 
-/// Opens the editor on a named scene, for recordings and tests: `area:<key>`, `blueprint:<key>`,
-/// `row:<table>/<key>`, `rows:<table>/<key>,<key>`, `script:<key>` or `script:<table>/<key>#<pointer>`,
-/// `model:<key>`, `tileset:<key>`, `sheet:<table>`, `world`, `clipboard:<table>/<key>/<module index>`,
-/// `fold:<table>/<key>/<indices>`, `unfold:…`, `delete:<table>/<key>`, `section:<name>` of a test character,
-/// `wm:<lens|colour|line|route|look|select|layer|arrange>:<arg>` on the world map,
-/// `mp:<strip|timing|cues|hitbox|busts|bottom|setby|surface|drop>:<arg>` on the open model,
-/// `tp:<mode|brush|select|tile|set|terrain|closeup|bottom|zoom|dialog>:<arg>` on the open tileset;
-/// steps chain with `;`.
 pub fn open(editor: &mut Editor, name: &str) {
     for step in name.split(';') {
         open_one(editor, step.trim());
@@ -55,7 +47,7 @@ fn open_one(editor: &mut Editor, name: &str) {
                     key: key.to_owned(),
                 });
                 editor.dialogs.push(crate::app::Dialog::Resize(
-                    crate::views::area::tools::ResizeDialog {
+                    crate::views::area::resize::ResizeDialog {
                         area: key.to_owned(),
                         width: size.map_or(0, |s| s.width as u32),
                         height: size.map_or(0, |s| s.height as u32),
@@ -258,20 +250,9 @@ fn open_one(editor: &mut Editor, name: &str) {
                 "select" => {
                     let parts: Vec<Part> = arg
                         .split(',')
-                        .map(|key| Part::Card(key.to_owned()))
+                        .map(|item| Part::parse(item).unwrap_or(Part::Card(item.to_owned())))
                         .collect();
-                    editor.views.world.selected = parts.clone();
-                    editor.select(Selection {
-                        table: "world_map".to_owned(),
-                        keys: vec!["world".to_owned()],
-                        parts: parts
-                            .iter()
-                            .map(|part| match part {
-                                Part::Card(key) => format!("card:{key}"),
-                                _ => String::new(),
-                            })
-                            .collect(),
-                    });
+                    crate::views::world::select(editor, parts);
                 }
                 "layer" => match arg {
                     "residents" => view.layers.residents = true,
@@ -296,7 +277,7 @@ fn open_one(editor: &mut Editor, name: &str) {
                         let mut edit = crate::project::Edit::new("Arrange the world map");
                         edit.write_json(
                             crate::project::row_file("world_map", "world"),
-                            &serde_json::to_value(&solved).unwrap_or_default(),
+                            &crate::value::json(&solved).unwrap_or_default(),
                         );
                         editor.apply(edit);
                         editor.views.world.fitted = false;
@@ -322,7 +303,7 @@ fn open_one(editor: &mut Editor, name: &str) {
                     let mut edit = crate::project::Edit::new(format!("Add {name}"));
                     edit.write_json(
                         crate::project::row_file("world_map", "world"),
-                        &serde_json::to_value(&layout).unwrap_or_default(),
+                        &crate::value::json(&layout).unwrap_or_default(),
                     );
                     editor.apply(edit);
                 }
@@ -348,15 +329,16 @@ fn open_one(editor: &mut Editor, name: &str) {
         "save" => {
             editor.save();
         }
+        "dialog" => match rest {
+            "keys" => editor.dialogs.push(Dialog::Keys),
+            "binaries" => editor.dialogs.push(Dialog::Binaries),
+            _ => {}
+        },
         "start" => {}
         other => editor.say(format!("unknown scene {other}")),
     }
 }
 
-/// A step on the model tab in front: `strip:<action>/<dir>`, `timing:<action>/<dir>[/<frames>]`,
-/// `cues:<action>/<dir>[/<frame>/<kind>]`, `hitbox`, `busts[:<face>]`, `bottom:<tab>`,
-/// `setby:<ms|fps|scale>=<text>`, `surface:<key>`, `drop:<path>`.
-/// `sh:columns:<a,b>`, `sh:sort:<column>[:asc]`, `sh:filter:<f;g>`, `sh:cell:<key>/<column>[:edit]` on the open sheet tab.
 fn sheet_step(editor: &mut Editor, rest: &str) {
     let pending = editor.open_tabs.iter().rev().find_map(|tab| match tab {
         Tab::Sheet { table } => Some(table.clone()),
@@ -505,9 +487,6 @@ fn model_step(editor: &mut Editor, rest: &str) {
     }
 }
 
-/// A step on the tileset tab in front: `mode:<walk|surface|terrain|animation>`, `brush:<value>`,
-/// `select:<x,y,w,h>`, `tile:<n>`, `set:<name>`, `terrain:<index>`, `closeup:<tile>`,
-/// `bottom:<tab>`, `zoom:<factor>`, `dialog:<blueprint|surface|set>`.
 fn tileset_step(editor: &mut Editor, rest: &str) {
     use crate::views::tileset::{Mode, TileRect, TilesetDialog, WalkBrush};
     let key = match crate::ui::active_tab(editor) {

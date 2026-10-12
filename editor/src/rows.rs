@@ -9,8 +9,6 @@ use crate::usages::Usage;
 
 pub const KEY_MAX: usize = 64;
 
-/// Every usage of the rows being deleted that sits at one kind of place, with the decision taken
-/// for all of them.
 #[derive(Clone, Debug)]
 pub struct UsageGroup {
     pub table: String,
@@ -63,7 +61,6 @@ pub fn new_row_dialog(editor: &mut Editor, table: &str) {
     new_row_into(editor, table, None);
 }
 
-/// Opens the new-row dialog; when `into` names a field, the created key is written there too.
 pub fn new_row_into(editor: &mut Editor, table: &str, into: Option<(String, String)>) {
     let Some(project) = &editor.project else {
         return;
@@ -172,7 +169,6 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
     }
 }
 
-/// Renames a row: every usage rewritten, the file and its folder moved, as one step.
 pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Result<(), String> {
     if new_key == key {
         return Ok(());
@@ -375,8 +371,6 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
     }));
 }
 
-/// The rows naming a row, grouped by their table and the field or module that names it: for a
-/// rename dialog's summary.
 pub fn usage_groups(
     project: &crate::project::Project,
     table: &str,
@@ -403,7 +397,6 @@ pub fn usage_groups(
     groups
 }
 
-/// The module type or top-level field a pointer sits in, such as `loot` for `/modules/3/items/0/item`.
 pub fn field_of(project: &crate::project::Project, file: &str, pointer: &str) -> String {
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
     if segments.first() == Some(&"modules")
@@ -426,9 +419,6 @@ enum Entry {
     Module,
 }
 
-/// Where a usage sits: its row's table, the module or field naming the row, and what removing it
-/// would take away: a list entry, a whole module where the row may hold any number of that kind,
-/// or nothing because a lone field or a script node can only be repointed.
 fn kind_of(
     project: &crate::project::Project,
     file: &str,
@@ -468,8 +458,6 @@ fn kind_of(
     (table, kind, any_number.then_some(Entry::Module))
 }
 
-/// What a usage says besides the reference: the other scalar fields of the entry it sits in,
-/// such as `50% · 1` for a loot entry or `× 5` for a quest objective.
 fn usage_detail(project: &crate::project::Project, file: &str, pointer: &str) -> String {
     let Some(row) = project.files.json(file) else {
         return String::new();
@@ -794,7 +782,6 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     Ok(())
 }
 
-/// Replaces the placement the pointer sits in with its parts, placed where it stood.
 fn unpack_entry(project: &crate::project::Project, value: &mut Value, pointer: &str) {
     let Some(content) = project.content else {
         return;
@@ -818,14 +805,13 @@ fn unpack_entry(project: &crate::project::Project, value: &mut Value, pointer: &
     if index >= list.len() {
         return;
     }
-    let parts = crate::views::area::blueprint::unpacked(content, &list[index]);
+    let parts = crate::views::area::placement::unpacked(content, &list[index]);
     list.remove(index);
     for (offset, part) in parts.into_iter().enumerate() {
         list.insert(index + offset, part);
     }
 }
 
-/// Removes the list entry the pointer sits in: the nearest indexed ancestor.
 fn remove_entry(value: &mut Value, pointer: &str) {
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
     let Some(at) = segments

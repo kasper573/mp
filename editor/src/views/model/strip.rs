@@ -42,7 +42,6 @@ pub enum Confirm {
     Cues,
 }
 
-/// A dragged sheet frame, on its way into the timeline.
 pub struct SheetFrame(pub u32);
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
@@ -668,7 +667,6 @@ pub fn insert_frame(
     }
 }
 
-/// The cue lanes under a timeline: apex, sound and step, each riding its frame.
 #[allow(clippy::too_many_arguments)]
 pub fn lanes(
     editor: &mut Editor,
@@ -855,7 +853,6 @@ pub fn lanes(
     }
 }
 
-/// Puts a cue on a frame: a second apex moves it, a new sound replaces, a step toggles.
 pub fn set_cue(
     editor: &mut Editor,
     key: &str,
@@ -1003,7 +1000,6 @@ fn sentence(
     parts.join(" · ")
 }
 
-/// What the strip lasted before: the import's lengths, else the action's common total.
 fn was_ms(
     editor: &Editor,
     key: &str,
@@ -1285,8 +1281,6 @@ fn frames_text(indices: &[usize]) -> String {
     }
 }
 
-/// Applies the strip's lengths (or cues) to the other directions, by frame number where counts
-/// match, after saying which ones keep theirs.
 pub fn confirm(
     editor: &mut Editor,
     ctx: &egui::Context,

@@ -7,8 +7,6 @@ use game::systems::area::tileset::TilesetDef;
 
 use super::grid::GridDraft;
 
-/// Paints vertices of a terrain set around the brush and re-picks every touched cell's tile;
-/// returns how many cells kept their tile for want of a matching mix.
 #[allow(clippy::too_many_arguments)]
 pub fn paint(
     draft: &mut GridDraft,
@@ -97,7 +95,52 @@ pub fn paint(
     kept
 }
 
-/// How many of the set's mixes have a tile, and how many mixes there are.
+pub fn repaint(
+    draft: &mut GridDraft,
+    layer: usize,
+    def: &TilesetDef,
+    tileset: &str,
+    set: &str,
+    rng: &mut Rng,
+) -> (usize, usize) {
+    let cells: Vec<CellPos> = draft.cells().collect();
+    let (mut changed, mut kept) = (0, 0);
+    for cell in cells {
+        let Some((ts, tile, _)) = draft
+            .get(layer, cell)
+            .and_then(|index| draft.entry(index).cloned())
+        else {
+            continue;
+        };
+        if ts != tileset {
+            continue;
+        }
+        let Some(corners) = def
+            .data(tile)
+            .and_then(|data| data.corners.get(set))
+            .cloned()
+        else {
+            continue;
+        };
+        let matches: Vec<u32> = def
+            .tiles
+            .iter()
+            .filter(|(_, data)| data.corners.get(set).is_some_and(|c| *c == corners))
+            .map(|(tile, _)| *tile)
+            .collect();
+        if matches.is_empty() {
+            kept += 1;
+            continue;
+        }
+        let pick = matches[rng.rand_range(0..matches.len() as u32) as usize];
+        let index = draft.intern(tileset, pick, Flip::None);
+        if draft.set(layer, cell, Some(index)) {
+            changed += 1;
+        }
+    }
+    (changed, kept)
+}
+
 pub fn completeness(def: &TilesetDef, set: &str, terrains: &[String]) -> (usize, usize) {
     let total = terrains.len().pow(4);
     let seen: HashSet<&[String; 4]> = def

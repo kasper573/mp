@@ -18,10 +18,10 @@ use crate::app::{ConfirmAction, ConfirmDialog, Dialog, Editor};
 use crate::project::{Edit, Selection, row_file};
 use crate::tabs::Tab;
 use crate::ui::theme;
+use crate::value::RowValue;
 use graph::{Graph, GraphAction, Layout};
 use nodes::Catalogue;
 
-/// Whose script a view shows: a script row, or the script module at `pointer` in a row.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ScriptOwner {
     Shared {
@@ -132,8 +132,6 @@ fn object_index(pointer: &str) -> Option<usize> {
         .flatten()
 }
 
-/// A script as its file holds it: the row, the script object inside it and the owner kind it
-/// compiles for.
 #[derive(Clone)]
 pub struct Doc {
     pub owner: ScriptOwner,
@@ -154,9 +152,7 @@ impl Doc {
             return None;
         }
         let kind = match owner {
-            ScriptOwner::Shared { .. } => {
-                nodes::owner_kind_named(script["owner"].as_str().unwrap_or("any"))
-            }
+            ScriptOwner::Shared { .. } => nodes::owner_kind_named(script.text_or("owner", "any")),
             ScriptOwner::Inline { table, pointer, .. } => nodes::owner_kind_of(table, pointer),
         };
         Some(Doc {
@@ -176,7 +172,6 @@ impl Doc {
         matches!(self.owner, ScriptOwner::Shared { .. })
     }
 
-    /// The row with `script` written back where it came from.
     pub fn row_with(&self, script: Value) -> Value {
         match &self.owner {
             ScriptOwner::Shared { .. } => script,
@@ -255,7 +250,6 @@ impl ViewState {
     }
 }
 
-/// The keys a script tab answers, taken before any widget can claim them.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ScriptKeys {
     pub fire: bool,
@@ -274,7 +268,6 @@ pub struct ScriptKeys {
 }
 
 impl ScriptKeys {
-    /// Consumes the keys from this frame's input; called before the widgets are drawn.
     pub fn take(ctx: &egui::Context) -> ScriptKeys {
         ctx.input_mut(|i| ScriptKeys {
             fire: i.consume_key(Modifiers::NONE, Key::F8),
@@ -311,7 +304,6 @@ pub struct ScriptViews {
     pub generation: u64,
 }
 
-/// A step a scene asked for before the script tab had drawn, taken on its first frame.
 pub enum Pending {
     MakeShared,
     MakeInline,
@@ -322,7 +314,6 @@ pub enum Pending {
     },
 }
 
-/// The last refused edit, called out on the canvas by the node it touched until the next edit.
 pub struct Callout {
     pub owner: ScriptOwner,
     pub node: String,
@@ -351,7 +342,6 @@ impl ScriptViews {
     }
 }
 
-/// The catalogue for the current content, built once per content.
 pub fn catalogue(editor: &mut Editor) -> &Catalogue {
     let (generation, content) = editor
         .project
@@ -440,7 +430,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     save_layout(editor, owner, layout_file);
 }
 
-/// The bottom panel of a script tab: what the script may do, who uses it, or a run of it.
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: crate::app::BottomTab) {
     let Some(doc) = Doc::load(editor, owner) else {
         return;
@@ -596,7 +585,6 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<GraphAc
     }
 }
 
-/// The bust of every npc line in the script, cropped to a square, for the cards.
 fn faces(editor: &mut Editor, ctx: &egui::Context, doc: &Doc) -> graph::Faces {
     let mut faces = graph::Faces::new();
     let Some(project) = editor.project.as_ref() else {
@@ -637,7 +625,6 @@ fn faces(editor: &mut Editor, ctx: &egui::Context, doc: &Doc) -> graph::Faces {
     faces
 }
 
-/// "npc/mara · inline script · 7 nodes" in the canvas corner.
 fn header_chip(editor: &Editor, ui: &Ui, doc: &Doc) {
     let text = match editor
         .views
@@ -669,7 +656,6 @@ fn header_chip(editor: &Editor, ui: &Ui, doc: &Doc) {
     );
 }
 
-/// "npc/mara" or "area/island · object tide_chest": the owner as the chips name it.
 pub fn owner_label(editor: &Editor, doc: &Doc) -> String {
     match &doc.owner {
         ScriptOwner::Shared { key } => format!("script/{key}"),
@@ -690,7 +676,6 @@ pub fn owner_label(editor: &Editor, doc: &Doc) -> String {
     }
 }
 
-/// "npc/mara · inline script · 7 nodes" or "script/warp · owner object · 2 nodes".
 pub fn chip_title(editor: &Editor, doc: &Doc) -> String {
     let count = doc.nodes().len();
     let nodes = format!("{count} node{}", if count == 1 { "" } else { "s" });
@@ -708,7 +693,6 @@ pub fn chip_title(editor: &Editor, doc: &Doc) -> String {
     }
 }
 
-/// What the status bar says under a script: where we are, and the one hint that fits the moment.
 fn status(editor: &mut Editor, doc: &Doc) {
     let owner = doc.owner.clone();
     let view = editor.views.script.views.get(&owner);
@@ -791,7 +775,6 @@ fn status(editor: &mut Editor, doc: &Doc) {
     editor.status.left.push(hint);
 }
 
-/// The first free spot to the right of `from`, walking down past nodes already there.
 fn beside(view: &ViewState, from: &str) -> egui::Pos2 {
     let Some(origin) = view.layout.nodes.get(from) else {
         return egui::Pos2::new(40.0, 40.0);
@@ -808,8 +791,6 @@ fn beside(view: &ViewState, from: &str) -> egui::Pos2 {
     pos
 }
 
-/// The last refusal, drawn by the node it touched: the rule as a title, the sentence under it,
-/// and the arrow that was refused as a dashed line.
 fn callout(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     let Some(callout) = editor
         .views
@@ -923,7 +904,6 @@ fn callout(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     );
 }
 
-/// Puts the nodes in the editor's selection so the inspector shows them.
 pub fn select_nodes(editor: &mut Editor, doc: &Doc, names: &[String]) {
     editor.views.script.focus = Some(doc.owner.clone());
     editor.select(Selection {
@@ -1199,7 +1179,6 @@ fn act(editor: &mut Editor, doc: &Doc, action: GraphAction, generation: u64) {
     let _ = generation;
 }
 
-/// The speaker a new line starts with: the owning npc, the object, else the narrator.
 pub fn default_speaker(doc: &Doc) -> Value {
     match (doc.kind, &doc.owner) {
         (OwnerKind::Npc, ScriptOwner::Inline { key, .. }) => {
@@ -1210,7 +1189,6 @@ pub fn default_speaker(doc: &Doc) -> Value {
     }
 }
 
-/// Removes nodes and the arrows into them; nodes left unreachable are offered for deletion too.
 pub fn delete_nodes(editor: &mut Editor, doc: &Doc, names: Vec<String>) {
     let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
     let mut script = doc.script.clone();
@@ -1292,7 +1270,6 @@ pub fn delete_nodes_now(editor: &mut Editor, owner: &ScriptOwner, names: Vec<Str
     }
 }
 
-/// Adds a node of `kind` at a canvas spot, linked from `link` when given.
 pub fn add_node(
     editor: &mut Editor,
     doc: &Doc,
@@ -1361,7 +1338,6 @@ pub fn add_node(
     }
 }
 
-/// Writes the script into its row and applies the edit; a refusal is told and nothing changes.
 pub fn write(editor: &mut Editor, doc: &Doc, script: Value, label: String) -> bool {
     let row = doc.row_with(script);
     let mut edit = Edit::new(label);
@@ -1595,7 +1571,6 @@ pub fn open_inline(editor: &mut Editor, table: &str, key: &str, pointer: &str) {
     editor.open_tab(Tab::Script(owner));
 }
 
-/// Opens the script module at `pointer` when it is inline, else the row holding it.
 pub fn open_inline_or_row(editor: &mut Editor, table: &str, key: &str, pointer: &str) {
     let inline = editor
         .row_value(table, key)
@@ -1612,7 +1587,6 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     inspect::show(editor, ui, selection);
 }
 
-/// A script row in the inspector: the same card the script tab shows for it.
 pub fn inspect_row(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let owner = ScriptOwner::Shared {
         key: key.to_owned(),

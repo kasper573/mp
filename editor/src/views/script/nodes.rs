@@ -5,9 +5,8 @@ use game::core::script::{EffectDef, EventDef, OwnerKind};
 use serde_json::{Map, Value};
 
 use crate::schema::{self, Variant};
+use crate::value::RowValue;
 
-/// One output of a node: its label, where its arrow is written inside the node, and the node it
-/// points at.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Port {
     pub label: String,
@@ -15,8 +14,6 @@ pub struct Port {
     pub target: Option<String>,
 }
 
-/// One kind of node the palette offers: where it comes from, what it does, who may use it, and
-/// the outputs it leaves by.
 #[derive(Clone, Debug)]
 pub struct Entry {
     pub kind: String,
@@ -28,8 +25,6 @@ pub struct Entry {
     pub pauses: bool,
 }
 
-/// Every node kind and event the engine declares, read from the shapes and the engine's own
-/// definitions once per content.
 pub struct Catalogue {
     pub entries: Vec<Entry>,
     pub events: Vec<(String, Vec<OwnerKind>)>,
@@ -130,7 +125,6 @@ impl Catalogue {
         self.entries.iter().find(|entry| entry.kind == kind)
     }
 
-    /// Why this owner kind may not use the node kind, if it may not.
     pub fn refusal(&self, kind: &str, owner: OwnerKind) -> Option<String> {
         let entry = self.entry(kind)?;
         allowed(&entry.owners, owner)
@@ -159,14 +153,13 @@ fn allowed(owners: &[OwnerKind], owner: OwnerKind) -> Option<String> {
 }
 
 pub fn kind(node: &Value) -> &str {
-    node["type"].as_str().unwrap_or("")
+    node.kind()
 }
 
 pub fn has_input(node: &Value) -> bool {
     kind(node) != "on"
 }
 
-/// The outputs a node leaves by, in the order they are written.
 pub fn ports(node: &Value, catalogue: &Catalogue) -> Vec<Port> {
     let arrow = |field: &str| -> Port {
         Port {
@@ -221,7 +214,6 @@ pub fn ports(node: &Value, catalogue: &Catalogue) -> Vec<Port> {
     }
 }
 
-/// Writes or clears the arrow at `field` (a pointer inside the node).
 pub fn set_arrow(node: &mut Value, field: &str, target: Option<&str>) {
     let (parent, last) = match field.rfind('/') {
         Some(at) => (&field[..at], &field[at + 1..]),
@@ -255,7 +247,6 @@ pub fn set_arrow(node: &mut Value, field: &str, target: Option<&str>) {
     }
 }
 
-/// Every arrow pointing at `target`: the node it leaves and the field it sits in.
 pub fn arrows_into(
     nodes: &Map<String, Value>,
     target: &str,
@@ -272,7 +263,6 @@ pub fn arrows_into(
     found
 }
 
-/// What the arrow leaving `from` by `field` is called on its card.
 pub fn port_label(
     nodes: &Map<String, Value>,
     catalogue: &Catalogue,
@@ -290,7 +280,6 @@ pub fn port_label(
         .unwrap_or_else(|| field.rsplit('/').next().unwrap_or("").to_owned())
 }
 
-/// The nodes a flow can reach from any on node.
 pub fn reachable(nodes: &Map<String, Value>, catalogue: &Catalogue) -> HashSet<String> {
     let mut seen = HashSet::new();
     let mut queue: VecDeque<String> = nodes
@@ -315,7 +304,6 @@ pub fn reachable(nodes: &Map<String, Value>, catalogue: &Catalogue) -> HashSet<S
     seen
 }
 
-/// Renames a node and every arrow naming it.
 pub fn rename(nodes: &mut Map<String, Value>, old: &str, new: &str, catalogue: &Catalogue) {
     let Some(node) = nodes.remove(old) else {
         return;
@@ -332,7 +320,6 @@ pub fn rename(nodes: &mut Map<String, Value>, old: &str, new: &str, catalogue: &
     nodes.extend(sorted);
 }
 
-/// A key not yet taken: `base`, then `base_2`, `base_3`, …
 pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
     let base = base
         .trim()
@@ -351,7 +338,6 @@ pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
         .expect("a free suffix")
 }
 
-/// A fresh node of `kind`, its required fields filled.
 pub fn template(root: &Value, kind: &str) -> Option<Value> {
     if kind == "on" {
         return Some(serde_json::json!({ "type": "on", "event": "started" }));
@@ -425,7 +411,6 @@ pub fn fill_references(
     }
 }
 
-/// An on node starting at `event`, the event's required fields filled.
 pub fn template_event(root: &Value, event: &str) -> Option<Value> {
     let variant = event_variants(root)
         .into_iter()
@@ -442,7 +427,6 @@ pub fn template_event(root: &Value, event: &str) -> Option<Value> {
     Some(node)
 }
 
-/// A node's event, with the on node's arrow and tag set aside.
 pub fn event_of(node: &Value) -> Option<&str> {
     node["event"].as_str()
 }
@@ -470,7 +454,6 @@ pub fn variant_schema<'a>(root: &'a Value, kind: &str) -> Option<&'a Value> {
         .map(|variant| variant.schema)
 }
 
-/// The events an on node may start at, each tagged `event`.
 pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
     let Some(on) = variant_schema(root, "on") else {
         return Vec::new();
@@ -495,8 +478,6 @@ pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
     found
 }
 
-/// The schema of a node kind with its arrows and tag left out, for a form that edits only what
-/// wires do not.
 pub fn form_schema(root: &Value, node: &Value) -> Option<Value> {
     let kind = kind(node);
     let schema = variant_schema(root, kind)?;
@@ -537,7 +518,6 @@ pub fn form_schema(root: &Value, node: &Value) -> Option<Value> {
     Some(form)
 }
 
-/// The schema of an on node's event fields, the tag left out.
 pub fn event_form_schema(root: &Value, event: &str) -> Option<Value> {
     let variant = event_variants(root)
         .into_iter()
@@ -571,7 +551,6 @@ fn flow_outputs(kind: &str) -> Vec<String> {
     }
 }
 
-/// A short reading of a node for its card, the outline and the trace.
 pub fn summary(node: &Value) -> String {
     match kind(node) {
         "on" => {
@@ -614,7 +593,7 @@ pub fn summary(node: &Value) -> String {
                 .collect();
             format!("set {}", names.join(", "))
         }
-        "run" => format!("run {}", node["script"].as_str().unwrap_or("?")),
+        "run" => format!("run {}", node.text_or("script", "?")),
         "return" => match node.get("value") {
             Some(value) if !value.is_null() => {
                 format!("return {}", crate::condition::summary(value))
@@ -708,11 +687,11 @@ fn content_text(value: &Value) -> String {
         Value::Number(number) => number.to_string(),
         Value::Bool(flag) => flag.to_string(),
         Value::Object(map) if map.len() == 1 && map.contains_key("var") => {
-            format!("◇{}", map["var"].as_str().unwrap_or(""))
+            format!("◇{}", map.text("var"))
         }
         Value::Object(map) if map.contains_key("area") && map.contains_key("x") => format!(
             "{} {}, {}",
-            map["area"].as_str().unwrap_or("?"),
+            map.text_or("area", "?"),
             map["x"].as_f64().unwrap_or(0.0),
             map["y"].as_f64().unwrap_or(0.0)
         ),
@@ -729,7 +708,7 @@ fn stacks(list: &[Value]) -> String {
     list.iter()
         .map(|stack| {
             let count = stack["count"].as_u64().unwrap_or(1);
-            let item = stack["item"].as_str().unwrap_or("?");
+            let item = stack.text_or("item", "?");
             if count == 1 {
                 item.to_owned()
             } else {
@@ -741,16 +720,15 @@ fn stacks(list: &[Value]) -> String {
 }
 
 pub fn speaker_name(by: &Value) -> String {
-    match by["type"].as_str() {
-        Some("npc") => by["npc"].as_str().unwrap_or("npc").to_owned(),
-        Some("object") => "object".to_owned(),
-        Some("narrator") => "narrator".to_owned(),
-        Some("player") => "player".to_owned(),
+    match by.kind() {
+        "npc" => by.text_or("npc", "npc").to_owned(),
+        "object" => "object".to_owned(),
+        "narrator" => "narrator".to_owned(),
+        "player" => "player".to_owned(),
         _ => "?".to_owned(),
     }
 }
 
-/// The words of a span list, inks and values folded to text.
 pub fn plain_text(spans: &Value) -> String {
     match spans {
         Value::String(text) => text.clone(),
@@ -780,8 +758,6 @@ pub fn clip(text: &str, max: usize) -> String {
     out
 }
 
-/// Node names in written order with their depth from the first on node reaching them, for the
-/// outline; a node reached twice appears once, later visits as links.
 pub struct OutlineRow {
     pub name: String,
     pub depth: usize,
@@ -790,8 +766,6 @@ pub struct OutlineRow {
     pub choice: Option<usize>,
 }
 
-/// The graph as rows: each node under the arrow that led there, a dialogue's choices under it
-/// with their targets nested one deeper, and a node reached twice as a link back.
 pub fn outline(nodes: &Map<String, Value>, catalogue: &Catalogue) -> Vec<OutlineRow> {
     let mut rows = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -887,7 +861,6 @@ pub fn outline(nodes: &Map<String, Value>, catalogue: &Catalogue) -> Vec<Outline
     rows
 }
 
-/// Nodes and the depth each sits at from the on nodes, for a first layout.
 pub fn depths(nodes: &Map<String, Value>, catalogue: &Catalogue) -> BTreeMap<String, usize> {
     let mut depths: BTreeMap<String, usize> = BTreeMap::new();
     let mut queue: VecDeque<(String, usize)> = nodes
@@ -1026,7 +999,6 @@ const EFFECT_BLURBS: [(&str, &str, &str); 35] = [
     ),
 ];
 
-/// One styled run of a card line.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Piece {
     pub text: String,
@@ -1061,7 +1033,6 @@ fn var(text: impl Into<String>) -> Piece {
     }
 }
 
-/// The card lines of a node: what it names in strong text, the words around it muted.
 pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
     match kind(node) {
         "on" => vec![event_pieces(node)],
@@ -1110,10 +1081,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             })
             .collect(),
         "run" => {
-            let mut lines = vec![vec![
-                muted("script/"),
-                strong(node["script"].as_str().unwrap_or("?")),
-            ]];
+            let mut lines = vec![vec![muted("script/"), strong(node.text_or("script", "?"))]];
             if let Some(values) = node["values"].as_object().filter(|v| !v.is_empty()) {
                 let mut line = Vec::new();
                 for (index, (name, value)) in values.iter().enumerate() {
@@ -1132,7 +1100,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             _ => vec![vec![muted("back to the caller")]],
         },
         "remember" => {
-            let mut line = vec![strong(node["memory"].as_str().unwrap_or("?")), muted(" = ")];
+            let mut line = vec![strong(node.text_or("memory", "?")), muted(" = ")];
             match node.get("to") {
                 Some(to) if !to.is_null() => line.extend(expression_pieces(to)),
                 _ => line.push(strong("true")),
@@ -1162,7 +1130,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
                         }
                         let count = stack["count"].as_u64().unwrap_or(1);
                         line.push(strong(format!("{count} ")));
-                        line.push(strong(stack["item"].as_str().unwrap_or("?")));
+                        line.push(strong(stack.text_or("item", "?")));
                     }
                     lines.push(line);
                 }
@@ -1181,11 +1149,11 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             let mut line = vec![strong(who), muted(" to ")];
             match &node["to"] {
                 Value::Object(map) if map.len() == 1 && map.contains_key("var") => {
-                    line.push(var(format!("◇ {}", map["var"].as_str().unwrap_or(""))))
+                    line.push(var(format!("◇ {}", map.text("var"))))
                 }
                 Value::Object(map) if map.contains_key("area") => line.push(strong(format!(
                     "{} {}, {}",
-                    map["area"].as_str().unwrap_or("?"),
+                    map.text_or("area", "?"),
                     trim(map["x"].as_f64().unwrap_or(0.0)),
                     trim(map["y"].as_f64().unwrap_or(0.0))
                 ))),
@@ -1202,7 +1170,7 @@ fn event_pieces(node: &Value) -> Vec<Piece> {
     match event_of(node) {
         Some("interacted") => {
             line.push(muted("verb "));
-            line.push(strong(node["verb"].as_str().unwrap_or("use")));
+            line.push(strong(node.text_or("verb", "use")));
             if let Some(reach) = node["reach"].as_f64() {
                 line.push(muted(" · reach "));
                 line.push(strong(trim(reach)));
@@ -1266,7 +1234,7 @@ fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Pie
                 if field != "who" {
                     piece.push(muted(format!("{field} ")));
                 }
-                piece.push(var(format!("◇ {}", map["var"].as_str().unwrap_or(""))));
+                piece.push(var(format!("◇ {}", map.text("var"))));
             }
             (_, Value::String(text))
                 if matches!(
@@ -1286,10 +1254,7 @@ fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Pie
                         piece.push(muted(", "));
                     }
                     let count = stack["count"].as_u64().unwrap_or(1);
-                    piece.push(strong(format!(
-                        "{count} {}",
-                        stack["item"].as_str().unwrap_or("?")
-                    )));
+                    piece.push(strong(format!("{count} {}", stack.text_or("item", "?"))));
                 }
             }
             (_, Value::Object(map)) if map.contains_key("area") && map.contains_key("x") => {
@@ -1298,24 +1263,21 @@ fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Pie
                 }
                 piece.push(strong(format!(
                     "{} {}, {}",
-                    map["area"].as_str().unwrap_or("?"),
+                    map.text_or("area", "?"),
                     trim(map["x"].as_f64().unwrap_or(0.0)),
                     trim(map["y"].as_f64().unwrap_or(0.0))
                 )));
             }
             (_, Value::Object(map))
                 if map.get("type").is_some()
-                    && matches!(
-                        map["type"].as_str(),
-                        Some("object") | Some("actor") | Some("place")
-                    ) =>
+                    && matches!(map.kind(), "object" | "actor" | "place") =>
             {
                 let inner = map
                     .iter()
                     .find(|(k, _)| *k != "type")
                     .map(|(_, v)| content_text(v))
                     .unwrap_or_default();
-                piece.push(muted(format!("{} ", map["type"].as_str().unwrap_or(""))));
+                piece.push(muted(format!("{} ", map.kind())));
                 piece.push(strong(inner));
             }
             (_, Value::Number(_)) | (_, Value::Bool(_)) => {
@@ -1367,7 +1329,6 @@ fn actor_word(text: &str) -> String {
     }
 }
 
-/// A condition or expression as strong names and muted words.
 pub fn expression_pieces(value: &Value) -> Vec<Piece> {
     if let Some(map) = value.as_object()
         && map.len() == 1
@@ -1409,7 +1370,6 @@ fn trim(number: f64) -> String {
     }
 }
 
-/// The bust image of an npc's face, from its model's bust module.
 pub fn bust_file(files: &crate::project::Files, npc: &str, face: Option<&str>) -> Option<String> {
     let npc_row = files.json(&crate::project::row_file("npc", npc))?;
     let model = files.json(&crate::project::row_file(

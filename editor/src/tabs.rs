@@ -1,4 +1,3 @@
-/// Everything the centre can show in a tab.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Tab {
     World,
@@ -30,7 +29,6 @@ impl Tab {
         }
     }
 
-    /// The row a tab edits, when it edits one.
     pub fn row(&self) -> Option<(String, String)> {
         match self {
             Tab::World => Some((
@@ -48,7 +46,6 @@ impl Tab {
         }
     }
 
-    /// The tab a row of `table` opens in.
     pub fn for_row(table: &str, key: &str) -> Tab {
         match table {
             "area" => Tab::Area {

@@ -10,8 +10,6 @@ use crate::ui::{theme, widgets};
 
 const WIDTH: f32 = 190.0;
 
-/// The layers panel over the canvas: the ground layers under everyone, what is placed on
-/// them, and the editor's overlays, each with an eye to hide it.
 pub fn popover(
     editor: &mut Editor,
     ui: &mut Ui,

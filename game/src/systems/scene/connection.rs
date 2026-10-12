@@ -163,6 +163,10 @@ fn lost(world: &mut World) {
         attempt: attempt + 1,
         due: Some(now + Seconds(base.0 * jitter)),
     };
+    world
+        .resource::<ClientPlatform>()
+        .0
+        .announce("Connection lost. Reconnecting…");
     let background = overlay(*world.resource::<ScreenTransitionPhase>());
     let _ = world.spawn_scene(bsn! {
         ConnectionUi

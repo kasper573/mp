@@ -1,4 +1,6 @@
-use egui::{RichText, Ui};
+use egui::Ui;
+
+use crate::ui::theme;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
@@ -6,7 +8,6 @@ use game::systems::area;
 
 use crate::app::Editor;
 
-/// What a player at one spot hears: each soundscape within reach with its channels and loudness.
 #[derive(Clone, Debug, Default)]
 pub struct Listening {
     pub area: String,
@@ -18,6 +19,7 @@ pub struct Listening {
 pub struct Heard {
     pub module: usize,
     pub gain: f32,
+    pub outside: f32,
     pub channels: Vec<(u32, String, f32, Option<Loudness>)>,
 }
 
@@ -27,17 +29,15 @@ pub struct Loudness {
     pub peak_dbfs: f64,
 }
 
-pub const FALLOFF: f32 = 4.0;
-
 pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<Tiles>) {
     let area = area::load(&content, area_id);
     let key = area_id.key(&content).to_owned();
     let mut heard = Vec::new();
     for (index, zone) in area.soundscape.iter().enumerate() {
-        let gain = zone_gain(zone, at);
-        if gain <= 0.0 {
+        let Some(positional) = zone.heard_from(at) else {
             continue;
-        }
+        };
+        let outside = ((at - zone.shape.nearest(at)).length() - zone.emit.0).max(0.0);
         let channels = zone
             .channels
             .iter()
@@ -61,7 +61,8 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<
             .collect();
         heard.push(Heard {
             module: index,
-            gain,
+            gain: positional.proximity,
+            outside,
             channels,
         });
     }
@@ -72,41 +73,6 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<
     });
 }
 
-/// How loud a zone plays at a point: full inside, fading to silence over the falloff past emit.
-pub fn zone_gain(zone: &game::core::audio::soundscape::SoundscapeZone, at: Pos<Tiles>) -> f32 {
-    use game::core::audio::soundscape::SoundscapeShape;
-    let distance = match zone.shape {
-        SoundscapeShape::Rect(rect) => {
-            let dx = (rect.min().x - at.x).max(at.x - rect.max().x).max(0.0);
-            let dy = (rect.min().y - at.y).max(at.y - rect.max().y).max(0.0);
-            (dx * dx + dy * dy).sqrt()
-        }
-        SoundscapeShape::Ellipse(rect) => {
-            let c = rect.center();
-            let (rx, ry) = (rect.size.width / 2.0, rect.size.height / 2.0);
-            if rx <= 0.0 || ry <= 0.0 {
-                return 0.0;
-            }
-            let n = ((at.x - c.x) / rx).powi(2) + ((at.y - c.y) / ry).powi(2);
-            if n <= 1.0 {
-                0.0
-            } else {
-                (n.sqrt() - 1.0) * rx.min(ry)
-            }
-        }
-    };
-    let reach = zone.emit.0;
-    if distance <= reach {
-        1.0
-    } else if distance >= reach + FALLOFF {
-        0.0
-    } else {
-        1.0 - (distance - reach) / FALLOFF
-    }
-}
-
-/// Integrated loudness and true peak of a sound file, decoded with symphonia and measured with
-/// ebur128 at authored volume.
 pub fn measure(bytes: &[u8]) -> Option<Loudness> {
     let decoded = decode(bytes)?;
     let mut meter = ebur128::EbuR128::new(
@@ -185,49 +151,79 @@ pub struct SoundViews {
     pub listening: Option<Listening>,
 }
 
-/// The listening card: what plays at the listener, each file's loudness against the mix targets.
 pub fn panel(editor: &Editor, ui: &mut Ui) {
     let Some(listening) = &editor.views.sound.listening else {
         return;
     };
-    ui.label(
-        RichText::new(format!(
-            "Listening at {} {}, {}",
-            listening.area, listening.at.0, listening.at.1
-        ))
-        .strong(),
-    );
+    ui.label(theme::muted(format!(
+        "Listening at {:.1}, {:.1} in {} · what a player there hears at the default settings · Alt-click moves the listener",
+        listening.at.0, listening.at.1, listening.area
+    )));
+    ui.add_space(6.0);
     if listening.heard.is_empty() {
-        ui.label(RichText::new("silence").weak());
+        ui.label(theme::muted("Silence: no soundscape reaches this spot."));
+        return;
     }
+    let mut rows: Vec<(u32, String, String, String)> = Vec::new();
     for heard in &listening.heard {
-        ui.label(format!(
-            "soundscape {} · {:.0}%",
-            heard.module,
-            heard.gain * 100.0
-        ));
-        for (channel, file, volume, loudness) in &heard.channels {
-            let target = if *channel == 1 { -30.0 } else { -35.0 };
-            let text = match loudness {
-                Some(l) => {
-                    let effective = l.integrated + 20.0 * (*volume as f64).max(1e-6).log10();
-                    let band = if (effective - target).abs() <= 3.0 {
-                        "in band"
-                    } else if effective > target {
-                        "loud"
-                    } else {
-                        "quiet"
-                    };
-                    let peak = if l.peak_dbfs > -12.0 {
-                        " · peaks over -12 dBFS"
-                    } else {
-                        ""
-                    };
-                    format!("ch {channel} {file} · {effective:.1} LUFS ({band}){peak}")
-                }
-                None => format!("ch {channel} {file} · not measured"),
+        let from = soundscape_name(editor, &listening.area, heard.module);
+        for (channel, file, volume, _) in &heard.channels {
+            let where_ = if heard.outside <= 0.0 {
+                "inside".to_owned()
+            } else {
+                format!(
+                    "{:.1} tiles out · {:.0}%",
+                    heard.outside,
+                    heard.gain * 100.0
+                )
             };
-            ui.label(RichText::new(text).small());
+            rows.push((
+                *channel,
+                format!("{file} · {volume:.2}"),
+                from.clone(),
+                where_,
+            ));
         }
     }
+    rows.sort_by_key(|row| row.0);
+    egui::Grid::new("listen")
+        .num_columns(4)
+        .spacing([28.0, 6.0])
+        .striped(true)
+        .show(ui, |ui| {
+            for head in ["ch", "plays here", "from", "heard"] {
+                ui.label(theme::muted(head).monospace().size(12.0));
+            }
+            ui.end_row();
+            for (channel, plays, from, heard) in rows {
+                ui.label(theme::mono(channel.to_string()));
+                ui.label(theme::mono(plays));
+                ui.label(theme::mono(from));
+                ui.label(theme::mono(heard));
+                ui.end_row();
+            }
+        });
+}
+
+fn soundscape_name(editor: &Editor, area: &str, module: usize) -> String {
+    let row = editor.row_value("area", area);
+    let soundscape = row
+        .as_ref()
+        .and_then(|row| row["modules"].as_array())
+        .into_iter()
+        .flatten()
+        .enumerate()
+        .filter(|(_, m)| m["type"] == "soundscape")
+        .nth(module);
+    let Some((index, module)) = soundscape else {
+        return "soundscape".to_owned();
+    };
+    let stem = module["channels"]
+        .as_array()
+        .and_then(|channels| channels.first())
+        .and_then(|channel| channel["file"].as_str())
+        .and_then(|file| std::path::Path::new(file).file_stem())
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    format!("soundscape {index} · {stem}")
 }

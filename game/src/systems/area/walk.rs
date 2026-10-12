@@ -7,10 +7,8 @@ use super::grid::AreaGrids;
 use super::tileset::{TilesetDef, Walk};
 use super::{AreaModule, Scenery};
 
-/// The least of a cell a scenery tile must cover to speak for it.
 pub const OBSCURING_CUTOFF: f32 = 0.4;
 
-/// What one cell knows before the rule decides: its walk grid value and the votes of the tiles on it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CellVotes {
     pub grid: Option<bool>,
@@ -27,7 +25,6 @@ impl CellVotes {
         }
     }
 
-    /// The walk rule: the grid value wins, else a block wins, else a walkable tile walks.
     pub fn walkable(self) -> bool {
         match self.grid {
             Some(value) => value,
@@ -45,7 +42,6 @@ pub struct WalkGrids {
     pub footsteps: Vec<Option<SfxId>>,
 }
 
-/// Every grid the server, the client and the editor read, from the area's grids and placed modules.
 pub fn grids(
     content: &Content,
     grids: &AreaGrids,
@@ -120,7 +116,6 @@ pub fn votes(content: &Content, grids: &AreaGrids, modules: &[AreaModule]) -> Ve
     votes
 }
 
-/// Each tile of a scenery with the square it covers, flips applied.
 pub fn scenery_tiles(scenery: &Scenery) -> impl Iterator<Item = (u32, Rect<Tiles>)> + '_ {
     scenery
         .tiles
@@ -164,7 +159,6 @@ pub fn cell_overlap(rect: &Rect<Tiles>, cell: CellPos) -> f32 {
         .map_or(0.0, |overlap| overlap.area())
 }
 
-/// The topmost ground tile's surface decides a cell's footstep.
 pub fn footsteps(content: &Content, grids: &AreaGrids) -> Vec<Option<SfxId>> {
     let mut footsteps = vec![None; (grids.size.width * grids.size.height) as usize];
     for layer in &grids.ground {

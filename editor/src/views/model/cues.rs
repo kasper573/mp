@@ -77,8 +77,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     );
 }
 
-/// The strip's steps auditioned on every surface: the current strip when it has steps, else the
-/// model's first strip that does.
 #[allow(clippy::too_many_arguments)]
 fn steps(
     editor: &mut Editor,

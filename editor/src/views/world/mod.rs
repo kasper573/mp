@@ -23,16 +23,13 @@ use crate::project::{Edit, Project, Selection, row_file};
 use crate::ui::theme;
 
 pub const ROW_KEY: &str = "world";
-/// Map units per tile at 100%: a card is its area at game pixels.
 pub const TILE_UNITS: f32 = 16.0;
-/// From this zoom on, cards are drawn as the areas themselves, with no frame.
 pub const AREA_ZOOM: f32 = 0.35;
 const REGION_PAD: f32 = 20.0;
 const GAP: f32 = 48.0;
 const MIN_ZOOM: f32 = 0.01;
 const MAX_ZOOM: f32 = 8.0;
 
-/// The world_map row as the editor edits it: cards by area key, regions and notes.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Layout {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -70,15 +67,19 @@ pub struct Note {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Part {
     Card(String),
+    Edge(String, String),
     Region(usize),
     Note(usize),
 }
 
 impl Part {
-    fn parse(text: &str) -> Option<Part> {
+    pub fn parse(text: &str) -> Option<Part> {
         let (kind, rest) = text.split_once(':')?;
         match kind {
             "card" => Some(Part::Card(rest.to_owned())),
+            "edge" => rest
+                .split_once('/')
+                .map(|(a, b)| Part::Edge(a.to_owned(), b.to_owned())),
             "region" => rest.parse().ok().map(Part::Region),
             "note" => rest.parse().ok().map(Part::Note),
             _ => None,
@@ -88,13 +89,13 @@ impl Part {
     fn text(&self) -> String {
         match self {
             Part::Card(key) => format!("card:{key}"),
+            Part::Edge(a, b) => format!("edge:{a}/{b}"),
             Part::Region(index) => format!("region:{index}"),
             Part::Note(index) => format!("note:{index}"),
         }
     }
 }
 
-/// A lens over the map: areas light up where the row, module type or text is found.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Lens {
     Row { table: String, key: String },
@@ -126,7 +127,6 @@ impl Lens {
     }
 }
 
-/// A number field colouring every card by the rows placed in its area.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColourBy {
     pub value: String,
@@ -228,7 +228,6 @@ impl WorldView {
         self.atlas_for = None;
     }
 
-    /// Centres the view on an area at a zoom where its tiles can be read.
     pub fn look_at(&mut self, atlas: &Atlas, layout: &Layout, key: &str, zoom: f32) {
         if let Some(card) = layout.cards.get(key)
             && let Some(rect) = card_rect(atlas, key, card)
@@ -249,8 +248,6 @@ pub fn layout_of(editor: &Editor) -> Layout {
         .unwrap_or_default()
 }
 
-/// The stored layout with a card for every area that has none yet: at 100%, beside an area it
-/// links to, else past the right edge. They are stored once anything moves.
 pub fn with_defaults(atlas: &Atlas, mut layout: Layout) -> Layout {
     let missing: Vec<String> = atlas
         .areas
@@ -303,8 +300,6 @@ pub fn with_defaults(atlas: &Atlas, mut layout: Layout) -> Layout {
 /// The least room a card takes on the map, so small areas stay readable cards.
 pub const MIN_FOOTPRINT: Vec2 = Vec2::new(1000.0, 620.0);
 
-/// A card's rectangle in map units, centred on the stored position: the area at its size, never
-/// smaller than the minimum footprint.
 pub fn card_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
     let info = atlas.areas.get(key)?;
     let scale = card.size as f32 / 100.0 * TILE_UNITS;
@@ -312,7 +307,6 @@ pub fn card_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
     Some(Rect::from_center_size(Pos2::new(card.x, card.y), size))
 }
 
-/// The area itself in map units, centred on the stored position.
 pub fn art_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
     let info = atlas.areas.get(key)?;
     let scale = card.size as f32 / 100.0 * TILE_UNITS;
@@ -320,7 +314,6 @@ pub fn art_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
     Some(Rect::from_center_size(Pos2::new(card.x, card.y), size))
 }
 
-/// Gives the copy of an area a card beside the original's, at 100%.
 pub fn card_beside(project: &Project, edit: &mut Edit, key: &str, copy: &str) {
     let Some(value) = project.files.json(&row_file("world_map", ROW_KEY)) else {
         return;
@@ -350,7 +343,7 @@ pub fn card_beside(project: &Project, edit: &mut Edit, key: &str, copy: &str) {
     );
     edit.write_json(
         row_file("world_map", ROW_KEY),
-        &serde_json::to_value(&layout).unwrap_or_default(),
+        &crate::value::json(&layout).unwrap_or_default(),
     );
 }
 
@@ -397,7 +390,7 @@ fn round2(value: f32) -> f32 {
     (value * 100.0).round() / 100.0
 }
 
-fn select(editor: &mut Editor, parts: Vec<Part>) {
+pub fn select(editor: &mut Editor, parts: Vec<Part>) {
     editor.views.world.selected = parts.clone();
     editor.select(Selection {
         table: "world_map".to_owned(),
@@ -410,7 +403,7 @@ fn write_layout(editor: &mut Editor, layout: Layout, label: String) -> bool {
     let mut edit = Edit::new(label);
     edit.write_json(
         row_file("world_map", ROW_KEY),
-        &serde_json::to_value(&layout).unwrap_or_default(),
+        &crate::value::json(&layout).unwrap_or_default(),
     );
     editor.apply(edit)
 }
@@ -419,7 +412,7 @@ fn write_layout_merging(editor: &mut Editor, layout: Layout, label: String) -> b
     let mut edit = Edit::new(label).merging();
     edit.write_json(
         row_file("world_map", ROW_KEY),
-        &serde_json::to_value(&layout).unwrap_or_default(),
+        &crate::value::json(&layout).unwrap_or_default(),
     );
     editor.apply(edit)
 }

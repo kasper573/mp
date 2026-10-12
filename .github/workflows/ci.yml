@@ -176,3 +176,38 @@ jobs:
         run: |
           echo "🚨 Deployment failed — see deploy-failure-logs artifact for details."
           exit 1
+
+  # The archive a release ships, per platform from the same commit: editor, game-server,
+  # desktop-client and the example content (`just archive`). Attached to the run of every main push.
+  archive:
+    needs: ci
+    if: ${{ github.ref == 'refs/heads/main' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: windows-2022
+            platform: windows-x86_64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: ./.github/actions/setup
+        with:
+          deps: build
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: archive-${{ matrix.platform }}
+      - name: Build the archive
+        shell: bash
+        run: just archive target/archive
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: rift-${{ matrix.platform }}-${{ github.sha }}
+          path: target/archive/

@@ -1,0 +1,631 @@
+use std::collections::{BTreeMap, HashSet};
+
+use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
+use game::core::content::Content;
+use game::core::math::{Pos, Rect, Size};
+use game::core::tiling::{TilePos, Tiles};
+use game::systems::area::{self, Flip};
+use serde_json::Value;
+
+use super::holes::suffixed_from;
+use super::select;
+use super::{Frame, shapes};
+use crate::app::Editor;
+use crate::project::{Edit, Selection, row_file};
+use crate::value::RowValue;
+
+pub fn place_json(module: &mut Value, at: Pos<Tiles>, flip: Flip) {
+    let point = |x: f32, y: f32| {
+        let p = flip.apply(Pos::new(x, y));
+        (at.x + p.x, at.y + p.y)
+    };
+    let rect = |r: &Value| -> Value {
+        let (Some(x), Some(y), Some(w), Some(h)) = (
+            r["x"].as_f64(),
+            r["y"].as_f64(),
+            r["w"].as_f64(),
+            r["h"].as_f64(),
+        ) else {
+            return r.clone();
+        };
+        let placed = area::blueprint::place_rect(
+            Rect::new(Pos::new(x as f32, y as f32), Size::new(w as f32, h as f32)),
+            at,
+            flip,
+        );
+        let mut out = r.clone();
+        out["x"] = shapes::round(placed.origin.x);
+        out["y"] = shapes::round(placed.origin.y);
+        out
+    };
+    match module["type"].as_str() {
+        Some("object") => {
+            if module["shape"]["type"] == "point" {
+                let (x, y) = point(
+                    module["shape"]["x"].as_f64().unwrap_or(0.0) as f32,
+                    module["shape"]["y"].as_f64().unwrap_or(0.0) as f32,
+                );
+                module["shape"]["x"] = shapes::round(x);
+                module["shape"]["y"] = shapes::round(y);
+            } else {
+                module["shape"] = rect(&module["shape"]);
+            }
+        }
+        Some("safe_zone") => module["rect"] = rect(&module["rect"]),
+        Some("soundscape") => module["shape"] = rect(&module["shape"]),
+        Some("population") => {
+            if module["roams"].is_object() {
+                module["roams"] = rect(&module["roams"]);
+            }
+        }
+        Some("scenery") | Some("resident") | Some("blueprint") => {
+            let (x, y) = point(
+                module["at"]["x"].as_f64().unwrap_or(0.0) as f32,
+                module["at"]["y"].as_f64().unwrap_or(0.0) as f32,
+            );
+            module["at"]["x"] = shapes::round(x);
+            module["at"]["y"] = shapes::round(y);
+            if module["type"] != "resident" {
+                let own = Flip::parse(module.text("flip"))
+                    .unwrap_or(Flip::None)
+                    .compose(flip);
+                if own.is_none() {
+                    module.as_object_mut().map(|m| m.remove("flip"));
+                } else {
+                    module["flip"] = Value::String(own.csv().to_owned());
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+pub fn stamp_panel(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    view_key: &str,
+    content: Content,
+    area_id: area::Id,
+) {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for placement in area::placements(&content, area_id) {
+        if placement.chain.len() <= 1 {
+            *counts
+                .entry(placement.blueprint.key(&content).to_owned())
+                .or_default() += 1;
+        }
+    }
+    let all: Vec<String> = content
+        .table::<area::blueprint::BlueprintDef>()
+        .keys()
+        .to_vec();
+    let (everywhere, needle) = {
+        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.scope(|ui| {
+                ui.set_width(220.0);
+                crate::ui::widgets::search_box(
+                    ui,
+                    &mut view.blueprint_search,
+                    "Search blueprints",
+                    None,
+                );
+            });
+            ui.add_space(8.0);
+            for (value, label) in [
+                (false, "in this area".to_owned()),
+                (true, format!("everywhere · {}", all.len())),
+            ] {
+                let on = view.blueprint_everywhere == value;
+                if crate::ui::widgets::chip_coloured(
+                    ui,
+                    &label,
+                    if on {
+                        crate::ui::theme::ACCENT_SOFT
+                    } else {
+                        crate::ui::theme::RAISED
+                    },
+                    if on {
+                        crate::ui::theme::SELECTION
+                    } else {
+                        crate::ui::theme::TEXT
+                    },
+                )
+                .clicked()
+                {
+                    view.blueprint_everywhere = value;
+                }
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(crate::ui::theme::muted("one blueprint at a time").size(12.0));
+            });
+        });
+        (
+            view.blueprint_everywhere,
+            view.blueprint_search.to_lowercase(),
+        )
+    };
+    let mut listed: Vec<(String, usize)> = all
+        .iter()
+        .filter(|k| needle.is_empty() || k.to_lowercase().contains(&needle))
+        .map(|k| (k.clone(), counts.get(k).copied().unwrap_or(0)))
+        .filter(|(_, count)| everywhere || *count > 0)
+        .collect();
+    listed.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    ui.add_space(6.0);
+    let card = Vec2::new(72.0, 80.0);
+    let gap = 8.0;
+    let fit = ((ui.available_width() + gap) / (card.x + gap))
+        .floor()
+        .max(1.0) as usize;
+    let shown = if listed.len() > fit {
+        fit - 1
+    } else {
+        listed.len()
+    };
+    let mut picked: Option<String> = None;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = gap;
+        for (key, count) in listed.iter().take(shown) {
+            let selected = editor.views.area.views[view_key].stamp.as_deref() == Some(key);
+            if blueprint_card(editor, ui, content, key, *count, selected, card).clicked() {
+                picked = Some(key.clone());
+            }
+        }
+        if listed.len() > shown {
+            let (rect, _) = ui.allocate_exact_size(card, egui::Sense::hover());
+            ui.painter().rect_stroke(
+                rect,
+                4.0,
+                EStroke::new(1.0, crate::ui::theme::BORDER),
+                egui::StrokeKind::Inside,
+            );
+            let text = format!(
+                "{} more{}",
+                listed.len() - shown,
+                if everywhere { "" } else { " here" }
+            );
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                text,
+                egui::FontId::proportional(12.0),
+                crate::ui::theme::MUTED,
+            );
+        }
+    });
+    if let Some(key) = picked {
+        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        view.tool = super::Tool::Stamp;
+        view.stamp = Some(key.clone());
+        let stored = editor
+            .settings
+            .stamps
+            .get(&key)
+            .cloned()
+            .unwrap_or_default();
+        view.stamp_values = Value::Object(stored.values.into_iter().collect());
+    }
+}
+
+pub(super) fn blueprint_card(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    content: Content,
+    key: &str,
+    count: usize,
+    selected: bool,
+    card: Vec2,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(card, egui::Sense::click());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 4.0, crate::ui::theme::RAISED);
+    let stroke = if selected {
+        EStroke::new(2.0, crate::ui::theme::ACCENT)
+    } else {
+        EStroke::new(1.0, crate::ui::theme::BORDER)
+    };
+    painter.rect_stroke(rect, 4.0, stroke, egui::StrokeKind::Inside);
+    let art = ERect::from_min_size(
+        rect.min + Vec2::new(6.0, 6.0),
+        Vec2::new(card.x - 12.0, card.x - 12.0),
+    );
+    draw_blueprint_art(editor, ui, content, key, art);
+    if count > 0 {
+        painter.text(
+            Pos2::new(rect.center().x, rect.max.y - 10.0),
+            egui::Align2::CENTER_CENTER,
+            format!("×{count}"),
+            egui::FontId::monospace(11.0),
+            crate::ui::theme::MUTED,
+        );
+    }
+    response.on_hover_text(key)
+}
+
+pub fn draw_blueprint_art(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    content: Content,
+    key: &str,
+    into: ERect,
+) {
+    let sceneries = super::scene::parts_scenery(
+        content,
+        key,
+        Pos::new(0.0, 0.0),
+        &Value::Object(Default::default()),
+    );
+    if sceneries.is_empty() {
+        ui.painter_at(into).text(
+            into.center(),
+            egui::Align2::CENTER_CENTER,
+            "no art",
+            egui::FontId::proportional(11.0),
+            crate::ui::theme::FAINT,
+        );
+        return;
+    }
+    let mut min = Pos::<Tiles>::new(f32::MAX, f32::MAX);
+    let mut max = Pos::<Tiles>::new(f32::MIN, f32::MIN);
+    for scenery in &sceneries {
+        let height = scenery.tiles.len() as f32;
+        let width = scenery.tiles.iter().map(Vec::len).max().unwrap_or(0) as f32;
+        min = Pos::new(min.x.min(scenery.at.x), min.y.min(scenery.at.y));
+        max = Pos::new(
+            max.x.max(scenery.at.x + width),
+            max.y.max(scenery.at.y + height),
+        );
+    }
+    let span = (max.x - min.x).max(max.y - min.y).max(1.0);
+    let scale = (into.width() / span).min(into.height() / span);
+    let origin =
+        into.center() - Vec2::new((max.x - min.x) * scale / 2.0, (max.y - min.y) * scale / 2.0);
+    let ctx = ui.ctx().clone();
+    let painter = ui.painter_at(into);
+    for scenery in &sceneries {
+        let def = scenery.tileset.get(&content);
+        let image = def.image.as_str().to_owned();
+        let Some(project) = editor.project.as_ref() else {
+            return;
+        };
+        let Some(thumb) = editor.form.thumbnails.image(&ctx, &project.files, &image) else {
+            continue;
+        };
+        let grid = def.grid(thumb.size[0] as u32, thumb.size[1] as u32);
+        for (row, tiles) in scenery.tiles.iter().enumerate() {
+            for (column, tile) in tiles.iter().enumerate() {
+                let Some(tile) = tile else {
+                    continue;
+                };
+                let region = grid.region(tile.tile);
+                let mut uv = crate::thumbs::uv(
+                    thumb.size,
+                    region.min().x,
+                    region.min().y,
+                    region.size.width,
+                    region.size.height,
+                );
+                let flip = Flip::of(
+                    tile.flip.horizontal() != scenery.flip.horizontal(),
+                    tile.flip.vertical() != scenery.flip.vertical(),
+                );
+                if flip.horizontal() {
+                    uv = ERect::from_min_max(
+                        Pos2::new(uv.max.x, uv.min.y),
+                        Pos2::new(uv.min.x, uv.max.y),
+                    );
+                }
+                if flip.vertical() {
+                    uv = ERect::from_min_max(
+                        Pos2::new(uv.min.x, uv.max.y),
+                        Pos2::new(uv.max.x, uv.min.y),
+                    );
+                }
+                let x = scenery.at.x + column as f32 - min.x;
+                let y = scenery.at.y + row as f32 - min.y;
+                let cell = ERect::from_min_size(
+                    origin + Vec2::new(x * scale, y * scale),
+                    Vec2::splat(scale + 0.5),
+                );
+                painter.image(thumb.texture.id(), cell, uv, Color32::WHITE);
+            }
+        }
+    }
+}
+
+pub fn flip_stamp(editor: &mut Editor, view_key: &str, horizontal: bool) {
+    let Some(stamp) = editor.views.area.views[view_key].stamp.clone() else {
+        return;
+    };
+    let settings = editor.settings.stamps.entry(stamp).or_default();
+    if horizontal {
+        settings.flip_x = !settings.flip_x;
+    } else {
+        settings.flip_y = !settings.flip_y;
+    }
+    editor.save_settings();
+}
+
+pub(super) fn stamp_flip(editor: &Editor, stamp: &str) -> Flip {
+    let settings = editor
+        .settings
+        .stamps
+        .get(stamp)
+        .cloned()
+        .unwrap_or_default();
+    Flip::of(settings.flip_x, settings.flip_y)
+}
+
+pub fn stamp_footprint(
+    editor: &Editor,
+    content: Content,
+    stamp: &str,
+    values: &Value,
+) -> Size<Tiles> {
+    let flip = stamp_flip(editor, stamp);
+    let placement = serde_json::json!({ "type": "blueprint", "blueprint": stamp, "at": { "x": 0.0, "y": 0.0 }, "flip": flip.csv(), "values": values });
+    let Ok(module) =
+        game::core::content::with_content(game::core::content::ContentScope::of(&content), || {
+            serde_json::from_value::<area::AreaModule>(placement)
+        })
+        .0
+    else {
+        return Size::splat(1.0);
+    };
+    let mut errors = Vec::new();
+    let flattening = area::blueprint::flatten(&content, &[module], &mut errors);
+    let mut bounds: Option<Rect<Tiles>> = None;
+    for placed in flattening.modules {
+        if let Ok(json) = crate::value::json(&placed.module)
+            && let Some(b) = shapes::bounds(&json, None)
+        {
+            bounds = Some(bounds.map_or(b, |known| shapes::rect_union(known, b)));
+        }
+    }
+    bounds.map_or(Size::splat(1.0), |b| {
+        Size::new(b.size.width.max(1.0), b.size.height.max(1.0))
+    })
+}
+
+pub fn stamp_input(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Frame) {
+    let response = frame.response;
+    let Some(stamp) = editor.views.area.views[view_key].stamp.clone() else {
+        return;
+    };
+    let alt = ui.input(|i| i.modifiers.alt);
+    let Some(tile) = frame.pointer_tile.or_else(|| {
+        response
+            .interact_pointer_pos()
+            .map(|p| frame.canvas.to_tile(p))
+    }) else {
+        return;
+    };
+    let at = if alt {
+        select::snap_sixteenth(tile)
+    } else {
+        tile.snap()
+    };
+    let values = editor.views.area.views[view_key].stamp_values.clone();
+    let footprint = stamp_footprint(editor, frame.content, &stamp, &values);
+    let spacing = editor
+        .settings
+        .stamps
+        .get(&stamp)
+        .and_then(|s| s.spacing)
+        .map(|s| s as f32);
+    let step = spacing.unwrap_or(footprint.width.max(footprint.height).max(1.0));
+    if response.drag_started_by(egui::PointerButton::Primary) || response.clicked() {
+        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        view.drag = Some(super::Drag::Stamp {
+            placed: vec![at],
+            last: at,
+        });
+    }
+    if response.dragged_by(egui::PointerButton::Primary) {
+        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        if let Some(super::Drag::Stamp { placed, last }) = &mut view.drag
+            && last.distance(at).0 >= step
+        {
+            placed.push(at);
+            *last = at;
+        }
+    }
+    if response.drag_stopped_by(egui::PointerButton::Primary) || response.clicked() {
+        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        let Some(super::Drag::Stamp { placed, .. }) = view.drag.take() else {
+            return;
+        };
+        place_stamps(editor, frame, &stamp, &values, placed);
+    }
+}
+
+/// Writes a stroke of placements as one step; copies the folder refuses are retried one by one so
+/// the rest land, crossed out and counted.
+pub(super) fn place_stamps(
+    editor: &mut Editor,
+    frame: &Frame,
+    stamp: &str,
+    values: &Value,
+    placed: Vec<Pos<Tiles>>,
+) {
+    let content = frame.content;
+    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(stamp) else {
+        return;
+    };
+    let def = id.get(&content);
+    let flip = stamp_flip(editor, stamp);
+    let mut taken: HashSet<String> = object_names(content, frame.area_id);
+    let mut modules = Vec::new();
+    for at in &placed {
+        let mut own = values.clone();
+        for (name, variable) in &def.variables {
+            if variable.ty == game::core::script::VariableType::Name {
+                let base = own
+                    .get(name)
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .or_else(|| {
+                        variable
+                            .default
+                            .as_ref()
+                            .and_then(|d| crate::value::json(d).ok())
+                            .and_then(|v| v.as_str().map(str::to_owned))
+                    })
+                    .unwrap_or_else(|| name.clone());
+                let fresh = suffixed_from(&base, &taken);
+                taken.insert(fresh.clone());
+                own[name] = Value::String(fresh);
+            }
+        }
+        let mut module = serde_json::json!({ "type": "blueprint", "blueprint": stamp, "at": { "x": at.x, "y": at.y } });
+        if !flip.is_none() {
+            module["flip"] = Value::String(flip.csv().to_owned());
+        }
+        if own.as_object().is_some_and(|o| !o.is_empty()) {
+            module["values"] = own;
+        }
+        modules.push(module);
+    }
+    let count = modules.len();
+    let label = if count == 1 {
+        format!("Place {stamp} in {}", frame.area_key)
+    } else {
+        format!("Place {count} × {stamp} in {}", frame.area_key)
+    };
+    let Some(row) = editor.row_value("area", &frame.area_key) else {
+        return;
+    };
+    let mut attempt = row.clone();
+    if let Some(m) = attempt["modules"].as_array_mut() {
+        m.extend(modules.iter().cloned());
+    }
+    let mut edit = Edit::new(label.clone());
+    edit.write_json(row_file("area", &frame.area_key), &attempt);
+    let project = editor.project.as_mut().expect("project");
+    let viewpoint = crate::project::Viewpoint {
+        selection: editor.selection.clone(),
+        camera: editor.views.camera_state(),
+    };
+    match project.apply(edit, viewpoint.clone()) {
+        Ok(()) => {
+            editor.views.content_changed();
+            editor.form.errors.clear();
+            let start = row["modules"].as_array().map_or(0, Vec::len);
+            editor.selection = Selection {
+                table: "area".to_owned(),
+                keys: vec![frame.area_key.clone()],
+                parts: (start..start + count)
+                    .map(|i| format!("/modules/{i}"))
+                    .collect(),
+            };
+            let view = editor
+                .views
+                .area
+                .views
+                .get_mut(&format!("area:{}", frame.area_key));
+            if let Some(view) = view {
+                view.skipped = None;
+            }
+        }
+        Err(first) => {
+            let mut kept = Vec::new();
+            let mut skipped = 0;
+            let mut reason = first.sentence();
+            let mut working = row.clone();
+            for module in modules {
+                let mut next = working.clone();
+                if let Some(m) = next["modules"].as_array_mut() {
+                    m.push(module.clone());
+                }
+                let probe = crate::project::Files::with(
+                    &project.files,
+                    &[crate::project::Change {
+                        file: row_file("area", &frame.area_key),
+                        bytes: Some(crate::project::json_bytes(&next)),
+                    }],
+                );
+                match crate::project::load(&probe, &project.root.display().to_string()) {
+                    Ok((content, _)) => {
+                        unsafe { content.release() };
+                        kept.push(module);
+                        working = next;
+                    }
+                    Err(report) => {
+                        skipped += 1;
+                        if kept.is_empty() {
+                            reason = crate::project::Refusal::of(&report).sentence();
+                        }
+                    }
+                }
+            }
+            if !kept.is_empty() {
+                let mut edit = Edit::new(format!("{label} ({skipped} skipped)"));
+                edit.write_json(row_file("area", &frame.area_key), &working);
+                if project.apply(edit, viewpoint).is_ok() {
+                    editor.views.content_changed();
+                }
+            }
+            let text = format!("{skipped} of {count} skipped: {reason}");
+            editor.toast(text.clone());
+            if let Some(view) = editor
+                .views
+                .area
+                .views
+                .get_mut(&format!("area:{}", frame.area_key))
+            {
+                view.skipped = Some(text);
+            }
+        }
+    }
+}
+
+pub fn object_names(content: Content, area_id: area::Id) -> HashSet<String> {
+    area::objects(area::placed(&content, area_id))
+        .filter_map(|(_, object)| object.name.clone())
+        .collect()
+}
+
+pub fn stamp_overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, frame: &Frame) {
+    let canvas = frame.canvas;
+    let view = &editor.views.area.views[view_key];
+    let Some(stamp) = view.stamp.clone() else {
+        return;
+    };
+    let alt = painter.ctx().input(|i| i.modifiers.alt);
+    let values = view.stamp_values.clone();
+    let footprint = stamp_footprint(editor, frame.content, &stamp, &values);
+    let color = Color32::from_rgb(90, 220, 220);
+    let draw_ghost = |at: Pos<Tiles>| {
+        let rect = Rect::new(Pos::new(at.x - 0.5, at.y - 0.5), footprint);
+        painter.rect_stroke(
+            canvas.rect(rect),
+            0.0,
+            EStroke::new(1.5, color),
+            egui::StrokeKind::Inside,
+        );
+        painter.circle_filled(canvas.to_screen(at), 3.0, color);
+    };
+    if let Some(super::Drag::Stamp { placed, .. }) = &view.drag {
+        for at in placed {
+            draw_ghost(*at);
+        }
+    }
+    if let Some(tile) = frame.pointer_tile {
+        let at = if alt {
+            select::snap_sixteenth(tile)
+        } else {
+            tile.snap()
+        };
+        draw_ghost(at);
+        painter.text(
+            canvas.to_screen(at) + Vec2::new(8.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            &stamp,
+            egui::FontId::proportional(11.0),
+            color,
+        );
+    }
+}

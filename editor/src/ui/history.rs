@@ -10,8 +10,6 @@ use crate::project::history::Step;
 
 const ROW: f32 = 28.0;
 
-/// HISTORY: every step since the folder opened, newest first; redo steps above the current one,
-/// the saved point marked, and a click returns to exactly that state.
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let Some(project) = &editor.project else {
         return;
@@ -146,7 +144,6 @@ fn row(
     response
 }
 
-/// The glyph a step wears, from the verb its label starts with.
 fn glyph_of(label: &str) -> (&'static str, egui::Color32) {
     let verb = label.split_whitespace().next().unwrap_or("").to_lowercase();
     match verb.as_str() {
@@ -161,7 +158,6 @@ fn glyph_of(label: &str) -> (&'static str, egui::Color32) {
     }
 }
 
-/// STEP · TOUCHED · RESTORES: what one step of the history did, for the inspector.
 pub fn step_card(editor: &Editor, ui: &mut Ui) {
     let Some(project) = &editor.project else {
         return;
@@ -203,7 +199,6 @@ pub fn step_card(editor: &Editor, ui: &mut Ui) {
     ui.label(theme::muted(restores(step)).size(13.0));
 }
 
-/// "1 module", "3 fields", "the row" or "the grid": how much of a file a step changed.
 fn touched(before: Option<&Bytes>, after: Option<&Bytes>) -> String {
     let parse =
         |bytes: Option<&Bytes>| bytes.and_then(|b| serde_json::from_slice::<Value>(&b[..]).ok());

@@ -25,7 +25,6 @@ use crate::tabs::Tab;
 use crate::ui::theme;
 use formats::{Dropped, Export};
 
-/// Where an export lands.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Target {
     Model(String),
@@ -35,7 +34,6 @@ pub enum Target {
     Animation(String),
 }
 
-/// An export being read off the interface thread.
 pub struct Reading {
     pub id: u64,
     pub target: Target,
@@ -96,7 +94,6 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, dialog: ImportDialog) -> Optio
     }
 }
 
-/// Finished reads become dialogs or drafts; changed exports start reading again.
 pub fn poll(editor: &mut Editor) {
     if editor.project.is_none() {
         return;
@@ -133,7 +130,6 @@ pub fn poll(editor: &mut Editor) {
     }
 }
 
-/// Files dropped on the window, and drafts that apply themselves once typing stops.
 pub fn tick(editor: &mut Editor, ctx: &Context) {
     let dropped: Vec<PathBuf> = ctx.input(|i| {
         i.raw
@@ -164,8 +160,6 @@ pub fn tick(editor: &mut Editor, ctx: &Context) {
     scripted(editor);
 }
 
-/// Scene steps: `imp:files:<a>|<b>` drops exports (paths under `art/` resolve beside the folder),
-/// `imp:apply` applies the open import dialog, `imp:retime:<action>/<dir>/<frame>=<ms>` edits a length.
 fn scripted(editor: &mut Editor) {
     let Some(step) = editor.jobs.script.front().cloned() else {
         return;
@@ -335,14 +329,12 @@ fn pick_files(editor: &mut Editor, target: Target) {
     }
 }
 
-/// The folder beside the content folder where exports live, when it exists.
 pub fn art_dir(editor: &Editor) -> Option<PathBuf> {
     let root = &editor.project.as_ref()?.root;
     let art = root.parent()?.join("art");
     art.is_dir().then_some(art)
 }
 
-/// `art/farmer-girl.png` for a file beside the content folder, else its name.
 pub fn show_path(editor: &Editor, file: &std::path::Path) -> String {
     editor
         .project

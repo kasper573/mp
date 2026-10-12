@@ -9,7 +9,6 @@ use crate::views::model::sounds;
 
 const CARD: Vec2 = Vec2::new(190.0, 120.0);
 
-/// The SURFACES tab: every surface with its footstep's shape, tile count and loudness.
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, _row: &Value) {
     let surfaces = sounds::surfaces(editor);
     let brush = editor.views.tileset.views[key].surface.clone();
@@ -115,7 +114,6 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, _row: &Value) {
     }
 }
 
-/// A surface's card: its name, footstep and how its loudest moment sits in the mix.
 pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
     let Some(mut row) = editor.row_value("surface", surface) else {
         return;
@@ -240,18 +238,9 @@ fn sfx_picker(editor: &mut Editor, ui: &mut Ui, surface: &str, sound: &mut Strin
         let Some(project) = project.as_ref() else {
             return false;
         };
-        let mut cx = crate::forms::FormCx {
-            root: &root,
-            content: project.content,
-            files: &project.files,
-            usages: &project.usages,
-            shapes,
-            state: form,
-            actions: &mut actions,
-            speaker: None,
-            owner_table: Some("surface".to_owned()),
-            owner_key: Some(surface.to_owned()),
-        };
+        let mut cx = crate::forms::FormCx::new(project, &root, shapes, form, &mut actions);
+        cx.owner_table = Some("surface".to_owned());
+        cx.owner_key = Some(surface.to_owned());
         crate::picker::row(ui, &mut cx, "sfx", sound, "/footstep")
     };
     for action in actions {

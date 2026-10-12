@@ -324,7 +324,6 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
     }
 }
 
-/// The TIMELINE tab under the matrix: the selected strip's frames as wide as they last, cues above.
 pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);

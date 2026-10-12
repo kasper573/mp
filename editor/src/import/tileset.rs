@@ -30,7 +30,6 @@ impl GridCut {
     }
 }
 
-/// Cuts an exported grid, margin, spacing and extrusion dropped, into the engine's packed grid.
 pub fn cut_grid(image: &RgbaImage, settings: GridSettings) -> Result<GridCut, String> {
     let GridSettings {
         tile,
@@ -120,7 +119,6 @@ pub struct Rewrite {
     pub first: Option<(u32, u32)>,
 }
 
-/// What importing a changed tileset image onto its row does: every old tile found by pixels.
 #[derive(Clone, Debug)]
 pub struct TilePlan {
     pub tile: u32,
@@ -175,7 +173,6 @@ impl TilePlan {
     }
 }
 
-/// A palette file's rows as (tileset, tile, flip), header dropped.
 pub fn palette_rows(text: &str) -> Vec<(String, u32, String)> {
     text.lines()
         .skip(1)
@@ -343,7 +340,6 @@ pub fn tile_plan(
     }
 }
 
-/// The row and palettes after the plan: tile data and palette entries follow their tiles.
 pub fn apply_tile_plan(
     plan: &TilePlan,
     row: &Value,
@@ -437,7 +433,6 @@ pub struct AnimCell {
     pub frames: Vec<FrameRef>,
 }
 
-/// What an animation export does to a block of tiles: which animate, which frames exist already.
 #[derive(Clone, Debug)]
 pub struct AnimPlan {
     pub block: (u32, u32),
@@ -599,7 +594,6 @@ pub fn anim_plan(
     })
 }
 
-/// The tileset image and row after the animation lands: new frames appended after the last tile.
 pub fn apply_anim_plan(
     plan: &AnimPlan,
     tileset: &RgbaImage,

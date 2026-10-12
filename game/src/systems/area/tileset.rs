@@ -168,7 +168,6 @@ impl TilesetDef {
             .map_or(&[], |data| data.animation.as_slice())
     }
 
-    /// The tile grid of an image of `width` × `height` pixels.
     pub fn grid(&self, width: u32, height: u32) -> TilesetGrid {
         TilesetGrid {
             columns: (width / self.tile.max(1)).max(1),

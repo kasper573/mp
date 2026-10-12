@@ -55,7 +55,6 @@ pub struct Row {
 }
 
 impl Column {
-    /// The cell's value in a row: `None` when the row lacks the module.
     pub fn get<'a>(&self, row: &'a Value) -> Option<&'a Value> {
         match &self.source {
             Source::Key => None,
@@ -127,7 +126,6 @@ fn cell_text(value: &Value) -> String {
     }
 }
 
-/// Every column a table can show: first-class leaves, then each module's leaves.
 pub fn columns_of(editor: &Editor, table: &str, rows: &[Row]) -> Vec<Column> {
     let mut columns = vec![Column {
         id: "key".to_owned(),
@@ -235,7 +233,6 @@ fn is_numeric(root: &Value, schema: &Value) -> bool {
     matches!(schema::kind(root, schema), Kind::Integer | Kind::Number)
 }
 
-/// Scalar fields reachable through objects, three deep; arrays and maps are not cells.
 fn leaves(
     root: &Value,
     schema: &Value,
@@ -328,7 +325,6 @@ fn save_view(editor: &mut Editor, table: &str, view: SpreadsheetView) {
     editor.save_settings();
 }
 
-/// Scripts with an attack node: an npc carrying one can be fought.
 fn combat_scripts(editor: &Editor) -> BTreeSet<String> {
     let Some(project) = editor.project.as_ref() else {
         return BTreeSet::new();
@@ -439,7 +435,6 @@ fn sort_rows(rows: &mut [Row], column: &Column, descending: bool) {
     });
 }
 
-/// The rows a table shows now, filtered and sorted as its view says.
 pub fn shown_rows(editor: &Editor, table: &str) -> (Vec<Row>, Vec<Column>, SpreadsheetView, usize) {
     let all = rows_of(editor, table);
     let columns = columns_of(editor, table, &all);
@@ -945,7 +940,6 @@ enum CellEdit {
     Cancelled,
 }
 
-/// The form's own widget for the field, in the cell: its checks and pickers come along.
 fn edit_cell(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -977,18 +971,9 @@ fn edit_cell(
         return CellEdit::Cancelled;
     };
     let state = views.sheet.views.get_mut(table).expect("the sheet state");
-    let mut cx = FormCx {
-        root: &root,
-        content: project.content,
-        files: &project.files,
-        usages: &project.usages,
-        shapes,
-        state: &mut state.form,
-        actions: &mut actions,
-        speaker: None,
-        owner_table: Some(table.to_owned()),
-        owner_key: Some(row.key.clone()),
-    };
+    let mut cx = FormCx::new(project, &root, shapes, &mut state.form, &mut actions);
+    cx.owner_table = Some(table.to_owned());
+    cx.owner_key = Some(row.key.clone());
     let first_frame = !cx
         .state
         .drafts
@@ -1009,7 +994,6 @@ fn edit_cell(
     }
 }
 
-/// Writes cells into their rows, adding a module when a cell's row lacks it; one edit, one step.
 fn write_cells(
     editor: &mut Editor,
     table: &str,
@@ -1336,7 +1320,6 @@ fn status(
     }
 }
 
-/// The inspector for a cell: the column's profile, then the row in brief.
 pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     let table = selection.table.clone();
     let Some(key) = selection.keys.first().cloned() else {
@@ -1456,7 +1439,6 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     }
 }
 
-/// The narrowest band of values holding at least two thirds of the rows.
 fn densest(values: &[f64]) -> (f64, f64, usize) {
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

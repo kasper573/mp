@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
-/// Every table's row shape as the engine declares it, read once per build.
 pub struct Shapes {
     pub tables: BTreeMap<String, TableShape>,
     pub order: Vec<String>,
@@ -62,7 +61,6 @@ impl Shapes {
             .is_some_and(|shape| !shape.fixtures.is_empty())
     }
 
-    /// The schema of one module of `table`'s rows, when the table has modules.
     pub fn modules_of(&self, table: &str) -> Option<&Value> {
         let shape = &self.tables.get(table)?.shape;
         let items = shape.get("properties")?.get("modules")?.get("items")?;
@@ -70,7 +68,6 @@ impl Shapes {
     }
 }
 
-/// What a schema node describes, for a form to pick its widget.
 pub enum Kind<'a> {
     Object,
     Array(&'a Value),
@@ -87,7 +84,6 @@ pub enum Kind<'a> {
     Any,
 }
 
-/// One tagged variant of a union: its tag field, tag value and object schema.
 pub struct Variant<'a> {
     pub field: String,
     pub tag: String,
@@ -197,8 +193,6 @@ fn collect_variants<'a>(
     }
 }
 
-/// The constant tag of a tagged union member: `type` for modules, kinds and nodes, `event` for
-/// the on node's event.
 pub fn tag_of(schema: &Value) -> Option<(String, String)> {
     let properties = schema.get("properties")?.as_object()?;
     for field in ["type", "event"] {
@@ -253,7 +247,6 @@ pub fn marker(schema: &Value) -> Option<&str> {
         .map(String::as_str)
 }
 
-/// The alternative of a fill that names a variable instead of holding a value.
 pub fn is_var_fill(schema: &Value) -> bool {
     schema
         .get("properties")
@@ -273,7 +266,6 @@ pub fn maximum(schema: &Value) -> Option<f64> {
     schema.get("maximum").and_then(Value::as_f64)
 }
 
-/// A starting value for a schema: every required field filled, references left blank to pick.
 pub fn template(root: &Value, schema: &Value) -> Value {
     if let Some(default) = schema.get("default") {
         return default.clone();
@@ -329,7 +321,6 @@ pub fn variant_template(root: &Value, variant: &Variant) -> Value {
     value
 }
 
-/// The variant a tagged value is of.
 pub fn variant_of<'a>(variants: &'a [Variant<'a>], value: &Value) -> Option<&'a Variant<'a>> {
     variants.iter().find(|variant| {
         value

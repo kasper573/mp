@@ -13,6 +13,7 @@ use crate::project::{Edit, Selection, row_file};
 use crate::tabs::Tab;
 use crate::ui::theme;
 use crate::ui::widgets;
+use crate::value::RowValue;
 use crate::views::tileset::TABLE;
 
 pub struct TilesetDialog {
@@ -37,7 +38,6 @@ pub struct Cut {
     pub image: RgbaImage,
 }
 
-/// A changed tileset export read again: tiles found by pixels, waiting in the tileset tab.
 pub struct TilesetReimport {
     pub export: Export,
     pub settings: GridSettings,
@@ -546,7 +546,6 @@ fn create_tileset(editor: &mut Editor, dialog: &TilesetDialog) -> Result<(), Str
     Ok(())
 }
 
-/// The tileset tab while a changed grid waits: before and after, the first renumbered tile followed.
 pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
     let Some(draft) = editor.views.tileset.reimports.get_mut(key) else {
@@ -706,7 +705,6 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     ];
 }
 
-/// Inspector cards for a tileset draft: the counts, what it rewrites, gone tiles to replace.
 pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let mut apply = false;
     let mut cancel = false;
@@ -861,7 +859,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
             return;
         }
     };
-    let image = row["image"].as_str().unwrap_or("").to_owned();
+    let image = row.text("image").to_owned();
     let names = ImportRecord::of_files(&draft.export.files, TABLE, key).names();
     let mut edit = Edit::new(format!(
         "Imported {names} into {key} again · {} tiles renumbered",
@@ -1155,7 +1153,7 @@ fn apply_animation(
 ) -> Result<(), String> {
     let plan = dialog.plan.as_ref().map_err(|error| error.clone())?;
     let (png, new_row) = tileset::apply_anim_plan(plan, &dialog.tileset, row, &dialog.export)?;
-    let image = row["image"].as_str().unwrap_or("").to_owned();
+    let image = row.text("image").to_owned();
     let names = ImportRecord::of_files(&dialog.export.files, TABLE, &dialog.key).names();
     let mut edit = Edit::new(format!(
         "Animated {} tiles of {} from {names}",

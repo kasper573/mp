@@ -5,7 +5,7 @@ use game::core::content::Content;
 use game::systems::area;
 use game::systems::area::tileset::TilesetDef;
 
-use super::tools::{TerrainPick, TilePick};
+use super::brush::{TerrainPick, TilePick};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
 
@@ -16,8 +16,6 @@ pub enum Lens {
     Terrains,
 }
 
-/// The bottom PALETTE: a lens (tiles or terrains), the tilesets of this area first, and the sheet
-/// to pick from, full width.
 pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, area_id: area::Id) {
     let tile_px = area::load(&content, area_id).tile;
     let tilesets: Vec<(String, &'static TilesetDef)> = content
@@ -314,7 +312,6 @@ fn sheet_image(editor: &mut Editor, ui: &mut Ui, def: &TilesetDef) -> Option<cra
     thumb
 }
 
-/// Every terrain set of the matching tilesets, this area's own first.
 fn terrain_sets(
     tilesets: &[(String, &'static TilesetDef)],
     used: &HashSet<String>,
@@ -406,7 +403,6 @@ fn terrain_chips(
     }
 }
 
-/// The picked set's tileset with each tile tinted by its corners, and the legend to pick from.
 fn terrain_sheet(
     editor: &mut Editor,
     ui: &mut Ui,

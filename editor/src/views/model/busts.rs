@@ -10,7 +10,6 @@ use crate::ui::{theme, widgets};
 pub const GENERIC: [&str; 6] = ["neutral", "happy", "sad", "angry", "surprised", "thinking"];
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
-/// One face of a bust module: a generic expression or the model's own.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Face {
     pub name: String,
@@ -332,7 +331,6 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
     }
 }
 
-/// A dialogue line that asks for a face of this model.
 #[derive(Clone, Debug)]
 pub struct FaceLine {
     pub file: String,
@@ -340,7 +338,6 @@ pub struct FaceLine {
     pub face: String,
 }
 
-/// Every line spoken with one of the model's faces, by the npcs drawn with it.
 pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
@@ -421,7 +418,6 @@ fn find_nodes(row: &Value) -> Vec<(String, Value)> {
     out
 }
 
-/// Renames an own face in the bust and in every line that asks for it, as one step.
 pub fn rename(editor: &mut Editor, key: &str, face: &Face, new_name: &str) -> bool {
     let Some(mut row) = editor.row_value(super::TABLE, key) else {
         return false;
@@ -457,7 +453,6 @@ pub fn rename(editor: &mut Editor, key: &str, face: &Face, new_name: &str) -> bo
     editor.apply(edit)
 }
 
-/// Removes an own face, pointing its lines at a replacement, as one step.
 pub fn remove(editor: &mut Editor, key: &str, face: &Face, replacement: &str) -> bool {
     let Some(mut row) = editor.row_value(super::TABLE, key) else {
         return false;

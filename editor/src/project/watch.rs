@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 
-/// Reports files changed by someone else, batched until the folder has been quiet for half a second.
 pub struct Watcher {
     root: PathBuf,
     _watcher: Option<RecommendedWatcher>,
@@ -38,13 +37,11 @@ impl Watcher {
         }
     }
 
-    /// Asks for a full rescan on the next poll: lost events, or the window coming back.
     pub fn rescan(&mut self) {
         self.lost = true;
         self.quiet_since = Some(Instant::now());
     }
 
-    /// The relative paths that changed, once the folder has been quiet; `None` for a full rescan.
     pub fn poll(&mut self) -> Option<Option<Vec<String>>> {
         let events = self
             .events

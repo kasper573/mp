@@ -266,7 +266,6 @@ pub struct ScriptError {
     pub owner: String,
     pub node: Option<String>,
     pub expected: String,
-    /// The shared script the error lies in, when it is the script's own and not its caller's.
     pub script: Option<String>,
 }
 

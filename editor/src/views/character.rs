@@ -16,13 +16,13 @@ use crate::project::{Edit, Selection, row_file, row_of};
 use crate::schema;
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;
 const COLUMN: f32 = 300.0;
 const MAP: Vec2 = Vec2::new(272.0, 96.0);
 
-/// The test characters tab: one character's whole server state, section by section.
 #[derive(Default)]
 pub struct CharacterView {
     pub section: Section,
@@ -61,7 +61,6 @@ impl Section {
         Section::History,
     ];
 
-    /// The cards shown together, left column and right column, when this section is picked.
     fn page(self) -> (&'static [Section], &'static [Section]) {
         match self {
             Section::Identity | Section::Bag | Section::Equipment | Section::Start => (
@@ -171,18 +170,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
-            let mut cx = FormCx {
-                root: &root,
-                content: project.content,
-                files: &project.files,
-                usages: &project.usages,
-                shapes,
-                state: form,
-                actions: &mut actions,
-                speaker: None,
-                owner_table: Some(TABLE.to_owned()),
-                owner_key: Some(key.to_owned()),
-            };
+            let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+            cx.owner_table = Some(TABLE.to_owned());
+            cx.owner_key = Some(key.to_owned());
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
                 ui.horizontal_top(|ui| {
@@ -305,7 +295,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
         .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
         .collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
-    let level = level_of(cx, value["job"].as_str().unwrap_or(""), xp);
+    let level = level_of(cx, value.text("job"), xp);
     card(ui, "player", "Identity", |ui| {
         widgets::kv(ui, "name", |ui| {
             changed = std::mem::take(&mut changed).or(crate::forms::text(
@@ -316,7 +306,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
             ));
         });
         widgets::kv(ui, "job", |ui| {
-            let current = value["job"].as_str().unwrap_or("").to_owned();
+            let current = value.text("job").to_owned();
             let mut picked = current.clone();
             egui::ComboBox::from_id_salt("character-job")
                 .width(ui.available_width() - 8.0)
@@ -345,7 +335,6 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
     changed
 }
 
-/// Sections the generic form draws from the schema: stats and effects, lines heard, shops, history.
 fn generic(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -394,7 +383,7 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
         for index in 0..count {
             let path = format!("/bag/{index}");
             let stack = &mut value["bag"][index];
-            let item_key = stack["item"].as_str().unwrap_or("").to_owned();
+            let item_key = stack.text("item").to_owned();
             let cap = stack_max(cx, &item_key);
             ui.horizontal(|ui| {
                 if ui
@@ -532,7 +521,7 @@ fn start(
         spawn.clone().unwrap_or_default()
     } else {
         (
-            value["start"]["area"].as_str().unwrap_or("").to_owned(),
+            value["start"].text("area").to_owned(),
             Pos::new(
                 value["start"]["x"].as_f64().unwrap_or(0.0) as f32,
                 value["start"]["y"].as_f64().unwrap_or(0.0) as f32,
@@ -733,7 +722,6 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
     changed
 }
 
-/// Where a quest stands for this character, in the words the game uses.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Standing {
     NotTaken,
@@ -1053,7 +1041,6 @@ fn set_standing(value: &mut Value, quest: &str, standing: Standing) {
     }
 }
 
-/// A moment in a quest a test character can be dropped into: state, counts, bag and start as one step.
 #[derive(Clone, PartialEq, Eq)]
 enum Moment {
     JustOffered,
@@ -1187,7 +1174,6 @@ fn give(value: &mut Value, item: &str, count: u32) {
     }
 }
 
-/// Where an npc with this display name stands: the first area placing it as a resident.
 fn npc_place(cx: &FormCx, name: &str) -> Option<(String, Pos<Tiles>)> {
     let content = cx.content?;
     let npc = content
@@ -1215,8 +1201,8 @@ fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut Characte
             let row = cx.files.json(file)?;
             Some((
                 key.to_owned(),
-                row["type"].as_str().unwrap_or("boolean").to_owned(),
-                row["label"].as_str().unwrap_or("").to_owned(),
+                row.kind_or("boolean").to_owned(),
+                row.text("label").to_owned(),
             ))
         })
         .collect();
@@ -1383,7 +1369,6 @@ pub fn level_of(cx: &FormCx, job: &str, xp: u32) -> u32 {
         .unwrap_or(0)
 }
 
-/// Under the preview: what the row works out to and the two things to do with it.
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(row) = editor.row_value(TABLE, key) else {
         return;
@@ -1392,7 +1377,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;
-    let job = row["job"].as_str().unwrap_or("");
+    let job = row.text("job");
     let tiers = content
         .by_key::<JobDef>(job)
         .map(|id| id.get(&content).levels.clone())
@@ -1421,7 +1406,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let starts = match &row["start"] {
         Value::Object(place) => format!(
             "{} · {}, {}",
-            place["area"].as_str().unwrap_or("?"),
+            place.text_or("area", "?"),
             crate::forms::trim_number(place["x"].as_f64().unwrap_or(0.0)),
             crate::forms::trim_number(place["y"].as_f64().unwrap_or(0.0))
         ),

@@ -18,7 +18,6 @@ pub use history::{History, Selection, Step};
 use crate::schema::Shapes;
 use crate::usages::Usages;
 
-/// One checked change to the folder: the files it writes or removes, applied whole or not at all.
 #[derive(Clone, Debug, Default)]
 pub struct Edit {
     pub label: String,
@@ -66,7 +65,6 @@ impl Edit {
     }
 }
 
-/// Why an edit was not applied: the first rule the folder would break.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refusal {
     pub file: String,
@@ -116,7 +114,6 @@ impl Refusal {
     }
 }
 
-/// What the editor was looking at when a step was taken, restored by undo.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Viewpoint {
     pub selection: Selection,
@@ -128,8 +125,6 @@ pub struct Applied {
     pub label: String,
 }
 
-/// A content folder held in memory: every file, the last content that loaded from them, and the
-/// history of checked edits.
 pub struct Project {
     pub root: PathBuf,
     pub files: Files,
@@ -144,6 +139,7 @@ pub struct Project {
     pub last_load: Option<std::time::Duration>,
     pub last_usages: Option<std::time::Duration>,
     pub generation: u64,
+    pub outside_rewrote: usize,
 }
 
 impl Project {
@@ -172,6 +168,7 @@ impl Project {
             last_load: None,
             last_usages: None,
             generation: 0,
+            outside_rewrote: 0,
         };
         project.reload();
         Ok(project)
@@ -193,7 +190,6 @@ impl Project {
         self.report.is_none() && self.content.is_some()
     }
 
-    /// Loads the files as they are; on success they become the content, else the report.
     pub fn reload(&mut self) {
         match load(&self.files, &self.root.display().to_string()) {
             Ok((content, took)) => {
@@ -288,7 +284,6 @@ impl Project {
         Ok(Some(Applied { viewpoint, label }))
     }
 
-    /// Goes back or forward to exactly the state after step `index` (0 = before the first).
     pub fn jump(&mut self, index: usize) -> Result<Option<Applied>, Box<Refusal>> {
         let mut last = None;
         while self.history.applied() > index {
@@ -350,7 +345,6 @@ impl Project {
         outcome
     }
 
-    /// Files changed on disk by someone else: those not edited here are taken; the rest conflict.
     pub fn outside_changes(&mut self, paths: Option<Vec<String>>) -> OutsideChanges {
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
@@ -393,6 +387,10 @@ impl Project {
         if !taken.is_empty() {
             self.history.clear();
             self.reload();
+            self.outside_rewrote = match self.report {
+                Some(_) => taken.len(),
+                None => 0,
+            };
         }
         OutsideChanges { taken, conflicts }
     }

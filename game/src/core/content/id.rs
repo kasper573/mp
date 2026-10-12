@@ -211,7 +211,6 @@ impl ContentScope {
         Arc::make_mut(&mut self.keys).insert(type_id, (name, keys));
     }
 
-    /// The files under `assets/`, sorted; when set, every asset path read is checked against them.
     pub fn assets(&mut self, mut files: Vec<String>) {
         files.sort_unstable();
         self.assets = Some(Arc::new(files));

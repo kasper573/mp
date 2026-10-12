@@ -1,9 +1,8 @@
+use crate::value::RowValue;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::Tiles;
 use serde_json::Value;
 
-/// Where a module sits on the map, read from its JSON: a rect in tiles, or none for scripts and
-/// whole-area populations.
 pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<Rect<Tiles>> {
     match module["type"].as_str()? {
         "object" => shape_rect(&module["shape"]),
@@ -30,9 +29,9 @@ pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<R
 }
 
 pub fn is_point(module: &Value) -> bool {
-    match module["type"].as_str() {
-        Some("object") => module["shape"]["type"] == "point",
-        Some("resident") => true,
+    match module.kind() {
+        "object" => module["shape"]["type"] == "point",
+        "resident" => true,
         _ => false,
     }
 }
@@ -69,7 +68,7 @@ pub fn scenery_rect(module: &Value) -> Option<Rect<Tiles>> {
     let rows = module["tiles"].as_array()?;
     let height = rows.len() as f32;
     let width = rows.first().and_then(Value::as_array).map_or(0, Vec::len) as f32;
-    let flip = module["flip"].as_str().unwrap_or("none");
+    let flip = module.text_or("flip", "none");
     let x = if matches!(flip, "horizontal" | "both") {
         at.x - width
     } else {
@@ -83,7 +82,6 @@ pub fn scenery_rect(module: &Value) -> Option<Rect<Tiles>> {
     Some(Rect::new(Pos::new(x, y), Size::new(width, height)))
 }
 
-/// Moves a module by whole or fractional tiles, as a drag does.
 pub fn shift(module: &mut Value, dx: f32, dy: f32) {
     let shift_xy = |value: &mut Value| {
         if let Some(x) = value.get("x").and_then(Value::as_f64) {
@@ -103,7 +101,6 @@ pub fn shift(module: &mut Value, dx: f32, dy: f32) {
     }
 }
 
-/// Sets a module's size where it has one.
 pub fn resize(module: &mut Value, w: f32, h: f32) {
     let target = match module["type"].as_str() {
         Some("object") if module["shape"]["type"] == "rect" => &mut module["shape"],
@@ -126,10 +123,10 @@ pub fn has_size(module: &Value) -> bool {
 }
 
 pub fn flip_field(module: &mut Value, horizontal: bool) {
-    if !matches!(module["type"].as_str(), Some("scenery") | Some("blueprint")) {
+    if !matches!(module.kind(), "scenery" | "blueprint") {
         return;
     }
-    let current = module["flip"].as_str().unwrap_or("none");
+    let current = module.text_or("flip", "none");
     let (mut h, mut v) = match current {
         "horizontal" => (true, false),
         "vertical" => (false, true),
@@ -161,24 +158,21 @@ pub fn round(v: f32) -> Value {
 }
 
 pub fn label(module: &Value) -> String {
-    let kind = module["type"].as_str().unwrap_or("module");
+    let kind = module.kind_or("module");
     match kind {
         "object" => module["name"]
             .as_str()
             .or(module["label"].as_str())
             .map_or("object".to_owned(), |name| format!("object {name}")),
-        "blueprint" => format!(
-            "{} placement",
-            module["blueprint"].as_str().unwrap_or("blueprint")
-        ),
+        "blueprint" => format!("{} placement", module.text_or("blueprint", "blueprint")),
         "population" => format!(
             "{} × {}",
-            module["npc"].as_str().unwrap_or("npc"),
+            module.text_or("npc", "npc"),
             module["count"].as_u64().unwrap_or(0)
         ),
-        "resident" => format!("resident {}", module["npc"].as_str().unwrap_or("npc")),
-        "scenery" => format!("scenery {}", module["tileset"].as_str().unwrap_or("")),
-        "shared_script" => format!("script {}", module["script"].as_str().unwrap_or("")),
+        "resident" => format!("resident {}", module.text_or("npc", "npc")),
+        "scenery" => format!("scenery {}", module.text("tileset")),
+        "shared_script" => format!("script {}", module.text("script")),
         "inline_script" => "inline script".to_owned(),
         other => other.replace('_', " "),
     }

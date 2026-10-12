@@ -21,7 +21,6 @@ pub const MAX_PARTS: usize = 4096;
 pub const MAX_AREA_PARTS: usize = 65_536;
 pub const MAX_VARIABLES: usize = 32;
 
-/// Parts in area-module shape, with `{ "var": name }` holes, placed as one and flattened at load.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BlueprintDef {
@@ -86,8 +85,6 @@ pub struct Placement {
     pub values: BTreeMap<String, VarValue<RiftScripting>>,
 }
 
-/// One module an area ends up with: its own, or a blueprint part placed through a chain of
-/// placements.
 #[derive(Clone)]
 pub struct Flattened {
     pub module: AreaModule,
@@ -96,7 +93,6 @@ pub struct Flattened {
 }
 
 impl Flattened {
-    /// The file and pointer of the module as written: in its area, or in the blueprint it came from.
     pub fn site(&self, content: &Content, area: super::Id) -> (String, String) {
         match self.chain.last() {
             None => (
@@ -132,8 +128,6 @@ impl Flattened {
     }
 }
 
-/// One placement an area ends up with, at any depth, with the values its holes took and its
-/// blueprint's own scripts filled from them: the owner an instance runs for in play.
 pub struct PlacedBlueprint {
     pub blueprint: Id,
     pub origin: usize,
@@ -164,7 +158,6 @@ pub struct FlattenError {
     pub nearest: Option<String>,
 }
 
-/// Replaces every placement among `modules` by its blueprint's parts, nested ones included.
 pub fn flatten(
     content: &Content,
     modules: &[AreaModule],
@@ -521,7 +514,6 @@ impl Expansion<'_> {
 
 type ValueError = (&'static str, String, String, Option<String>);
 
-/// A variable's value as the JSON its holes take, checked against the declared type.
 fn typed_value(
     content: &Content,
     variable: &Variable<RiftScripting>,
@@ -573,7 +565,6 @@ fn typed_value(
     }
 }
 
-/// Replaces every `{ "var": name }` in `json` by the variable's value.
 fn fill(
     json: &mut Value,
     values: &BTreeMap<String, Value>,
@@ -617,7 +608,6 @@ fn fill(
     }
 }
 
-/// Every variable name the holes in `json` name.
 pub fn holes(json: &Value, into: &mut Vec<String>) {
     match json {
         Value::Object(map) => {
@@ -642,7 +632,6 @@ pub fn holes(json: &Value, into: &mut Vec<String>) {
     }
 }
 
-/// Moves a part from blueprint space to the area: mirrored about the origin, then offset.
 pub fn place(module: &mut AreaModule, at: Pos<Tiles>, flip: Flip) {
     let point = |p: Pos<Tiles>| at + flip.apply(p).to_vector();
     let rect = |r: Rect<Tiles>| place_rect(r, at, flip);

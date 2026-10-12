@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 
-/// An area, its distance from the spawn in warps, and its card's position and size.
 type DistanceRow<'a> = (&'a String, u32, Option<&'a ((f64, f64), f64)>);
 
 use egui::{Align, Color32, Layout as EguiLayout, Rect, RichText, Stroke, Ui, Vec2};
 use game::core::tiling::TilePos;
 use serde_json::Value;
 
-use super::atlas::{Atlas, Source};
+use super::atlas::{self, Atlas, Source};
 use super::canvas::{self, line_steps, viridis};
 use super::toolbar::{LayerCounts, number_fields};
 use super::{
@@ -19,8 +18,6 @@ use crate::project::Selection;
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
 
-/// The inspector while the World tab is open and nothing on the map is selected: the tile under the
-/// pointer when zoomed in, else whatever lens is on, else the world itself.
 pub fn inspect_world(editor: &mut Editor, ui: &mut Ui) {
     let Some(atlas) = editor.views.world.atlas.clone() else {
         return;
@@ -652,7 +649,6 @@ fn tile_panel(
     );
 }
 
-/// The inspector for what is selected on the map: cards, a region or a note.
 pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     let parts: Vec<Part> = selection
         .parts
@@ -675,6 +671,10 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         inspect_cards(editor, ui, &atlas, &layout, &cards);
         return;
     }
+    if let Some(Part::Edge(a, b)) = parts.first().cloned() {
+        inspect_edge(editor, ui, &atlas, &a, &b);
+        return;
+    }
     if let Some(Part::Region(index)) = parts.first().cloned()
         && index < layout.regions.len()
     {
@@ -688,6 +688,76 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         return;
     }
     inspect_world(editor, ui);
+}
+
+fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, a: &str, b: &str) {
+    crumb(ui, &format!("{a} ↔ {b}"));
+    let mut open: Option<(String, String)> = None;
+    for (from, to) in [(a, b), (b, a)] {
+        let warps: Vec<&atlas::Warp> = atlas
+            .warps
+            .iter()
+            .filter(|warp| warp.from == from && warp.to == to)
+            .collect();
+        widgets::section(ui, &format!("{from} → {to}"));
+        if warps.is_empty() {
+            ui.label(theme::muted("no warp this way").size(12.5));
+            continue;
+        }
+        for warp in warps {
+            let door = warp
+                .owner
+                .rsplit(" › ")
+                .next()
+                .unwrap_or(&warp.owner)
+                .to_owned();
+            ui.horizontal(|ui| {
+                widgets::badge(ui, "object");
+                if ui
+                    .add(
+                        egui::Label::new(theme::mono(&door).size(12.5)).sense(egui::Sense::click()),
+                    )
+                    .on_hover_text(&warp.owner)
+                    .clicked()
+                {
+                    open = Some((from.to_owned(), warp.owner.clone()));
+                }
+                ui.with_layout(EguiLayout::right_to_left(Align::Center), |ui| {
+                    ui.label(
+                        theme::faint(format!("→ {}, {}", warp.landing.x, warp.landing.y))
+                            .monospace()
+                            .size(12.0),
+                    );
+                });
+            });
+        }
+        ui.add_space(6.0);
+    }
+    ui.label(
+        theme::muted("Owners whose scripts may warp across this edge. Click one to open it.")
+            .size(12.5),
+    );
+    if let Some((area, owner)) = open {
+        open_owner(editor, &area, &owner);
+    }
+}
+
+fn open_owner(editor: &mut Editor, area: &str, owner: &str) {
+    let name = owner.rsplit(" › ").next().unwrap_or(owner);
+    let module = editor.row_value("area", area).and_then(|row| {
+        row["modules"]
+            .as_array()?
+            .iter()
+            .position(|m| m["type"] == "object" && (m["name"] == name || m["label"] == name))
+    });
+    editor.open_tab(Tab::Area {
+        key: area.to_owned(),
+    });
+    let mut selection = Selection::row("area", area);
+    if let Some(index) = module {
+        selection.parts = vec![format!("/modules/{index}")];
+    }
+    editor.select(selection);
 }
 
 fn inspect_cards(
@@ -824,7 +894,7 @@ fn inspect_cards(
     if cards.len() == 1 {
         ui.add_space(8.0);
         widgets::section(ui, "Stored in world_map/world.json");
-        let json = serde_json::to_string_pretty(&serde_json::to_value(card).unwrap_or(Value::Null))
+        let json = serde_json::to_string_pretty(&crate::value::json(&card).unwrap_or(Value::Null))
             .unwrap_or_default();
         widgets::code_block(ui, &format!("\"{first}\": {json}"));
         if let Some(info) = atlas.areas.get(first) {

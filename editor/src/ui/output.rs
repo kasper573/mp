@@ -3,7 +3,6 @@ use egui::{Align, Layout, RichText, Ui};
 use super::theme;
 use crate::app::Editor;
 
-/// OUTPUT: both play-test processes' lines in order, tagged, with the editor's own notes.
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.label(theme::faint(format!("{} lines", editor.output.lines.len())).size(12.0));

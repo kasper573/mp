@@ -7,7 +7,6 @@ use crate::ui::{theme, widgets};
 
 const CELL: f32 = 76.0;
 
-/// The SHEET tab: the model's image cut into frames, each labelled by the strip it starts.
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);

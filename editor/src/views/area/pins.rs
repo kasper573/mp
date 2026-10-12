@@ -12,7 +12,6 @@ use crate::app::Editor;
 use crate::project::{Edit, Selection, row_of};
 use crate::tabs::Tab;
 
-/// A place pointing into the area: where a warp, the game's spawn or a test start lands.
 #[derive(Clone, Debug)]
 pub struct Arrival {
     pub file: String,
@@ -107,7 +106,6 @@ pub fn draw_arrivals(editor: &Editor, painter: &egui::Painter, frame: &Frame) {
     }
 }
 
-/// "← forest · bloomvale_road": the row the place sits in and the named module it belongs to.
 fn chip_label(editor: &Editor, arrival: &Arrival) -> String {
     let owner = row_of(&arrival.file)
         .map(|(_, key)| key.to_owned())

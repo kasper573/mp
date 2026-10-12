@@ -8,7 +8,6 @@ use crate::project::Files;
 use crate::schema::{self, Kind, Shapes, Variant};
 use crate::usages::Usages;
 
-/// What a form needs besides the value it edits.
 pub struct FormCx<'a> {
     pub root: &'a Value,
     pub content: Option<Content>,
@@ -20,9 +19,47 @@ pub struct FormCx<'a> {
     pub speaker: Option<String>,
     pub owner_table: Option<String>,
     pub owner_key: Option<String>,
+    pub holes: Option<Holes>,
 }
 
-/// Drafts, errors and folded cards, kept across frames by field path.
+impl<'a> FormCx<'a> {
+    pub fn new(
+        project: &'a crate::project::Project,
+        root: &'a Value,
+        shapes: &'a Shapes,
+        state: &'a mut FormState,
+        actions: &'a mut Vec<FormAction>,
+    ) -> FormCx<'a> {
+        FormCx {
+            root,
+            content: project.content,
+            files: &project.files,
+            usages: &project.usages,
+            shapes,
+            state,
+            actions,
+            speaker: None,
+            owner_table: None,
+            owner_key: None,
+            holes: None,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Holes {
+    pub filled: Vec<(String, String)>,
+    pub open: Vec<(String, String)>,
+    pub variables: Vec<(String, String)>,
+    pub requests: Vec<HoleRequest>,
+}
+
+pub enum HoleRequest {
+    Make { field: String, kind: String },
+    Use { field: String, name: String },
+    Fix { field: String, name: String },
+}
+
 #[derive(Default)]
 pub struct FormState {
     pub drafts: HashMap<egui::Id, String>,
@@ -41,7 +78,6 @@ pub enum FormAction {
     RowAction(crate::ui::browser::Action),
 }
 
-/// The outcome of one frame of a form: what changed, committed at `path`.
 #[derive(Default)]
 pub struct Changed(pub Option<String>);
 
@@ -68,6 +104,177 @@ pub fn value(
     value: &mut Value,
     path: &str,
 ) -> Changed {
+    let filled = cx
+        .holes
+        .as_ref()
+        .and_then(|holes| holes.filled.iter().find(|(field, _)| field == path))
+        .map(|(_, name)| name.clone());
+    if let Some(name) = filled {
+        hole_chip(ui, cx, path, &name);
+        return Changed::default();
+    }
+    let open = cx
+        .holes
+        .as_ref()
+        .and_then(|holes| holes.open.iter().find(|(field, _)| field == path))
+        .map(|(_, kind)| kind.clone());
+    let Some(kind) = open else {
+        return plain(ui, cx, schema, value, path);
+    };
+    let mut changed = Changed::default();
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        hole_menu(ui, cx, path, &kind);
+        ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+            ui.set_min_width(ui.available_width());
+            changed = plain(ui, cx, schema, value, path);
+        });
+    });
+    changed
+}
+
+fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
+    let ink = Color32::from_rgb(176, 140, 230);
+    let kind = cx
+        .holes
+        .as_ref()
+        .and_then(|holes| holes.variables.iter().find(|(n, _)| n == name))
+        .map(|(_, kind)| kind.clone())
+        .unwrap_or_default();
+    ui.horizontal(|ui| {
+        let chip = egui::Frame::new()
+            .fill(Color32::from_rgba_unmultiplied(176, 140, 230, 30))
+            .stroke(egui::Stroke::new(1.0, ink))
+            .corner_radius(10.0)
+            .inner_margin(egui::Margin::symmetric(8, 2))
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(format!("◇ {name}"))
+                        .monospace()
+                        .size(12.5)
+                        .color(ink),
+                );
+            })
+            .response
+            .interact(egui::Sense::click())
+            .on_hover_text("Filled by the variable at each placement; click to change");
+        ui.label(crate::ui::theme::muted(&kind).size(12.5));
+        egui::Popup::from_toggle_button_response(&chip)
+            .id(ui.id().with(("hole", path)))
+            .show(|ui| {
+                let fitting: Vec<String> = cx
+                    .holes
+                    .as_ref()
+                    .map(|holes| {
+                        holes
+                            .variables
+                            .iter()
+                            .filter(|(other, k)| other != name && *k == kind)
+                            .map(|(other, _)| other.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for other in fitting {
+                    if ui.button(format!("Use variable {other}")).clicked() {
+                        request(
+                            cx,
+                            HoleRequest::Use {
+                                field: path.to_owned(),
+                                name: other,
+                            },
+                        );
+                        ui.close();
+                    }
+                }
+                if ui
+                    .button("Use a fixed value")
+                    .on_hover_text("The same for every placement")
+                    .clicked()
+                {
+                    request(
+                        cx,
+                        HoleRequest::Fix {
+                            field: path.to_owned(),
+                            name: name.to_owned(),
+                        },
+                    );
+                    ui.close();
+                }
+            });
+    });
+}
+
+fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: &str) {
+    let button = ui
+        .add(egui::Button::new(crate::ui::theme::muted("◇")).frame(false))
+        .on_hover_text("Make this field a variable, or fill it from one");
+    egui::Popup::from_toggle_button_response(&button)
+        .id(ui.id().with(("hole", path)))
+        .width(260.0)
+        .show(|ui| {
+            ui.label(
+                crate::ui::theme::faint(format!("{} · {kind}", field_name(path)))
+                    .monospace()
+                    .size(11.5),
+            );
+            if ui
+                .button("Make variable")
+                .on_hover_text(
+                    "A new one of this type, without a default; every placement keeps its value",
+                )
+                .clicked()
+            {
+                request(
+                    cx,
+                    HoleRequest::Make {
+                        field: path.to_owned(),
+                        kind: kind.to_owned(),
+                    },
+                );
+                ui.close();
+            }
+            let fitting: Vec<String> = cx
+                .holes
+                .as_ref()
+                .map(|holes| {
+                    holes
+                        .variables
+                        .iter()
+                        .filter(|(_, k)| k == kind)
+                        .map(|(name, _)| name.clone())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if fitting.is_empty() {
+                ui.add_enabled_ui(false, |ui| {
+                    let _ = ui.button(format!("Use variable · no {kind} variable yet"));
+                });
+            }
+            for name in fitting {
+                if ui.button(format!("Use variable {name}")).clicked() {
+                    request(
+                        cx,
+                        HoleRequest::Use {
+                            field: path.to_owned(),
+                            name,
+                        },
+                    );
+                    ui.close();
+                }
+            }
+        });
+}
+
+fn request(cx: &mut FormCx, request: HoleRequest) {
+    if let Some(holes) = cx.holes.as_mut() {
+        holes.requests.push(request);
+    }
+}
+
+fn field_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+fn plain(ui: &mut Ui, cx: &mut FormCx, schema: &Value, value: &mut Value, path: &str) -> Changed {
     let schema = schema::resolve(cx.root, schema);
     if path.ends_with("/chance") && matches!(schema::kind(cx.root, schema), Kind::Choice(_)) {
         return chance(ui, cx, value, path);
@@ -115,8 +322,6 @@ pub fn value(
     }
 }
 
-/// The fields of an object, each on its own row: the name muted on the left, the widget filling
-/// the rest. Optional fields add and unset; a nested object becomes a section of rows.
 pub fn object(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -356,7 +561,6 @@ pub enum Geometry {
     Rect,
 }
 
-/// An object that is a position (x, y) or a rectangle (x, y, w, h) in tiles, drawn on one line.
 pub fn geometry_of(root: &Value, schema: &Value) -> Option<Geometry> {
     let schema = schema::resolve(root, schema);
     let tag = schema::tag_of(schema).map(|(tag, _)| tag);
@@ -600,7 +804,6 @@ pub fn fits(root: &Value, schema: &Value, value: &Value) -> bool {
     })
 }
 
-/// A list: one row per entry, each removable and reorderable; short objects edit on one line.
 fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &str) -> Changed {
     if !value.is_array() {
         *value = Value::Array(Vec::new());
@@ -764,7 +967,6 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
     changed
 }
 
-/// A chance in percent, blank meaning always.
 fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
     let id = ui.id().with(path).with("chance");
     let current = value.as_f64().map(trim_number).unwrap_or_default();
@@ -991,8 +1193,6 @@ fn number(
     changed
 }
 
-/// A number as content writes it: `60`, `0.8`, `4294967295`.
-/// A tile coordinate for reading: at most three decimals, none when whole.
 pub fn tiles(value: f32) -> String {
     trim_number((value as f64 * 1000.0).round() / 1000.0)
 }
@@ -1005,7 +1205,6 @@ pub fn trim_number(value: f64) -> String {
     }
 }
 
-/// An input box of the form's look, with an optional muted unit at its right edge.
 pub fn boxed_input(
     ui: &mut Ui,
     unit: Option<&str>,

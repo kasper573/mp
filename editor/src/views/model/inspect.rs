@@ -314,7 +314,6 @@ fn frame_card(
     }
 }
 
-/// Several frames set together: in ms each, by fps, or scaled; the totals before and after.
 fn frames_card(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -705,7 +704,6 @@ fn verdict_row(ui: &mut Ui, label: &str, ok: bool, text: &str) {
     });
 }
 
-/// A row picker over the sfx table, on a model's own form context.
 fn sound_picker(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -727,18 +725,9 @@ fn sound_picker(
         let Some(project) = project.as_ref() else {
             return false;
         };
-        let mut cx = FormCx {
-            root: &root,
-            content: project.content,
-            files: &project.files,
-            usages: &project.usages,
-            shapes,
-            state: form,
-            actions: &mut actions,
-            speaker: None,
-            owner_table: Some(super::TABLE.to_owned()),
-            owner_key: Some(key.to_owned()),
-        };
+        let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+        cx.owner_table = Some(super::TABLE.to_owned());
+        cx.owner_key = Some(key.to_owned());
         crate::picker::row(ui, &mut cx, "sfx", sound, path)
     };
     for action in actions {
@@ -754,7 +743,6 @@ fn sound_picker(
     changed
 }
 
-/// One face of the bust: its name and file, and the lines that ask for it.
 fn face_card(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -958,7 +946,6 @@ fn remove_dialog(
     let _ = ui;
 }
 
-/// The removal card for an own face: lines that used it take a replacement, one step.
 pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     let Some(removing) = editor
         .views
@@ -1063,23 +1050,12 @@ fn asset_picker(
     let Some(project) = project.as_ref() else {
         return false;
     };
-    let mut cx = FormCx {
-        root: &root,
-        content: project.content,
-        files: &project.files,
-        usages: &project.usages,
-        shapes,
-        state: form,
-        actions: &mut actions,
-        speaker: None,
-        owner_table: Some(super::TABLE.to_owned()),
-        owner_key: Some(key.to_owned()),
-    };
+    let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
+    cx.owner_table = Some(super::TABLE.to_owned());
+    cx.owner_key = Some(key.to_owned());
     crate::picker::asset(ui, &mut cx, file, path)
 }
 
-/// The first-class card's fields: the hitbox in tiles, the sheet image, and the frame size the
-/// import set.
 pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> crate::forms::Changed {
     let mut changed = crate::forms::Changed::default();
     let width = value["hitbox"]["width"].as_f64().unwrap_or(1.0);

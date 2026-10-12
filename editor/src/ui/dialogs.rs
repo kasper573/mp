@@ -29,7 +29,6 @@ fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
         .show(ctx, body);
 }
 
-/// A dialog that is one wide card: no title bar, the title inside, Enter and Esc wired by the body.
 pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui)) {
     egui::Area::new(egui::Id::new(id))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -828,12 +827,51 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
             });
             open.then_some(Dialog::Binaries)
         }
+        Dialog::Keys => {
+            let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+            let mut open = true;
+            card(ctx, "keys", 1380.0, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Keys").strong().size(18.0));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Done").clicked() {
+                            open = false;
+                        }
+                    });
+                });
+                ui.add_space(8.0);
+                ui.columns(3, |columns| {
+                    for (column, (title, rows)) in columns.iter_mut().zip(KEY_SHEET) {
+                        super::widgets::section(column, title);
+                        egui::Grid::new(("keys", title))
+                            .num_columns(2)
+                            .spacing([14.0, 8.0])
+                            .show(column, |ui| {
+                                for (keys, text) in rows.iter() {
+                                    ui.horizontal(|ui| {
+                                        for key in keys.split("  ") {
+                                            super::widgets::key_hint(ui, key);
+                                        }
+                                    });
+                                    ui.label(RichText::new(*text).size(13.0));
+                                    ui.end_row();
+                                }
+                            });
+                    }
+                });
+                ui.add_space(8.0);
+                ui.label(theme::muted(
+                    "Every command is also in a menu, and every view works from the keyboard alone. Shortcuts are editor settings, never content.",
+                ));
+            });
+            (open && !escape).then_some(Dialog::Keys)
+        }
         Dialog::MakeBlueprint(dialog) => {
             crate::views::area::make_blueprint_dialog(editor, ctx, dialog)
                 .map(Dialog::MakeBlueprint)
         }
         Dialog::Resize(dialog) => {
-            crate::views::area::tools::resize_dialog(editor, ctx, dialog).map(Dialog::Resize)
+            crate::views::area::resize::resize_dialog(editor, ctx, dialog).map(Dialog::Resize)
         }
         Dialog::DeleteBlueprint(dialog) => {
             crate::views::area::delete_blueprint_dialog(editor, ctx, dialog)
@@ -907,7 +945,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
             match outcome {
                 Some(true) => {
                     let picked = dialog.picked.clone().unwrap_or_default();
-                    crate::views::area::blueprint::picked_row(editor, dialog.then, &picked);
+                    crate::views::area::pick::picked_row(editor, dialog.then, &picked);
                     None
                 }
                 Some(false) => None,
@@ -942,7 +980,6 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
     }
 }
 
-/// The lines that differ between two texts, each side's own, at most six per side.
 fn differing_lines(a: Option<&str>, b: Option<&str>) -> (Vec<String>, Vec<String>) {
     let a: Vec<&str> = a.unwrap_or("").lines().collect();
     let b: Vec<&str> = b.unwrap_or("").lines().collect();
@@ -955,3 +992,61 @@ fn differing_lines(a: Option<&str>, b: Option<&str>) -> (Vec<String>, Vec<String
     };
     (only_in(&a, &b), only_in(&b, &a))
 }
+
+const KEY_SHEET: [(&str, &[(&str, &str)]); 3] = [
+    (
+        "Everywhere",
+        &[
+            ("Ctrl P", "search rows, keys and files"),
+            ("Ctrl S", "save every unsaved file"),
+            ("Ctrl Z  Ctrl ⇧ Z", "undo · redo"),
+            ("F5  F6", "play from its own start · play here"),
+            ("Ctrl W", "close the tab"),
+            ("F2", "rename the selected row's key"),
+            ("⇧ F12", "show usages"),
+            ("Ctrl D", "duplicate"),
+            ("Del", "delete, after showing usages"),
+            ("F1", "this sheet"),
+        ],
+    ),
+    (
+        "Area view",
+        &[
+            (
+                "V B T G E I S M",
+                "select, paint, terrain, fill, erase, eyedropper, stamp, module",
+            ),
+            ("[  ]", "brush smaller · bigger"),
+            (
+                "X  Y",
+                "flip the brush, the stamp or the selected placement",
+            ),
+            ("W", "walk overlay"),
+            ("Ctrl G", "join tiles into one scenery"),
+            ("Ctrl Alt B", "make a blueprint of the selection"),
+            ("Enter  Esc", "open a blueprint in place · leave it"),
+            ("Alt click", "listen at a spot"),
+            ("Ctrl C  Ctrl V", "copy · paste at the cursor"),
+            ("Space drag  wheel", "pan · zoom"),
+            ("Arrows", "nudge the selection a tile; ⇧ for 1/16"),
+        ],
+    ),
+    (
+        "Model and script",
+        &[
+            ("Space", "play or pause the strip"),
+            (",  .", "step a frame"),
+            ("Alt ←  Alt →", "frames 10 ms shorter · longer; ⇧ for 1 ms"),
+            ("1 2 3", "pick a terrain for corners"),
+            ("Arrows", "move through the matrix or the graph"),
+            ("Tab", "the palette: a node after the selection"),
+            ("Ctrl L", "link an output to a node by name"),
+            ("O", "canvas · outline"),
+            ("F8", "run the script"),
+            ("Enter  Ctrl Enter", "edit the node · add a choice"),
+            ("Del", "unlink an arrow · delete a node"),
+            ("1 – 9", "pick a choice in the Run preview"),
+            ("Esc", "close a picker, a menu or the preview"),
+        ],
+    ),
+];

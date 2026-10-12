@@ -453,7 +453,6 @@ impl Scenery {
         self.tiles.first().map_or(0, Vec::len)
     }
 
-    /// The y a sorted scenery sorts at, in tile coordinates; `None` draws flat.
     pub fn sort_line(&self) -> Option<Tiles> {
         let sort = self.sort?;
         Some(Tiles(if self.flip.vertical() {
@@ -631,7 +630,6 @@ impl Area {
         }
     }
 
-    /// The depth ground ends at: flat scenery draws here, sorted things above it.
     pub fn sort_base(&self) -> f32 {
         self.grids.ground.len() as f32
     }
@@ -641,7 +639,6 @@ impl Area {
         self.footsteps[i].as_ref()
     }
 
-    /// Where a character lands when the content names no place: the walkable cell nearest the middle.
     pub fn fallback_spawn(&self) -> Pos<Tiles> {
         self.grid
             .nearest_walkable(self.center())

@@ -6,7 +6,9 @@ use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 
 use super::atlas::Atlas;
-use super::canvas::{Frame, Placed, card_at, note_rect, placed_of, tile_at};
+use super::canvas::{
+    Frame, Placed, card_at, edge_at, edge_segments, note_rect, placed_of, tile_at,
+};
 use super::{
     Layout, Part, card_rect, round2, select, tidy_regions, write_layout, write_layout_merging,
 };
@@ -90,6 +92,9 @@ pub fn run(
                 origin: stored.clone(),
                 moved: false,
             });
+        } else if let Some((a, b)) = edge_at(&edge_segments(atlas, placed), from) {
+            select(editor, vec![Part::Edge(a, b)]);
+            editor.views.world.drag = None;
         } else if let Some(index) = region_label_at(atlas, stored, frame, from) {
             let keys = stored.regions[index]
                 .cards
@@ -583,6 +588,7 @@ fn keys(
                 }
                 Part::Note(index) => notes.push(*index),
                 Part::Region(index) => regions.push(*index),
+                Part::Edge(..) => {}
             }
         }
         notes.sort_unstable_by(|a, b| b.cmp(a));
@@ -645,7 +651,6 @@ fn region_at(atlas: &Atlas, layout: &Layout, frame: &Frame, p: Pos2) -> Option<u
         .map(|(index, _)| index)
 }
 
-/// The label chip at a region's top-left corner: dragging it moves the region's cards.
 fn region_label_at(atlas: &Atlas, layout: &Layout, frame: &Frame, p: Pos2) -> Option<usize> {
     layout
         .regions
@@ -664,8 +669,6 @@ fn region_label_at(atlas: &Atlas, layout: &Layout, frame: &Frame, p: Pos2) -> Op
         .map(|(index, _)| index)
 }
 
-/// The drag delta pulled to where a moving card's edges or centre line up with a resting one's, and
-/// what it snapped to.
 fn snap_delta(
     atlas: &Atlas,
     origin: &Layout,

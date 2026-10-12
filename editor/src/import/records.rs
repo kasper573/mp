@@ -10,7 +10,6 @@ use crate::user::UserFolder;
 
 pub const RETRIES: u32 = 3;
 
-/// What the editor remembers of an import, per content folder, in the user folder.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImportRecord {
     pub export: PathBuf,
@@ -60,7 +59,6 @@ impl ImportRecord {
         self.files().iter().any(|file| !file.exists())
     }
 
-    /// The export's bytes differ from the import's: `None` while a file is missing.
     pub fn changed(&self) -> Option<bool> {
         if self.missing() {
             return None;
@@ -100,7 +98,6 @@ pub fn fingerprint(files: &[PathBuf]) -> (u64, u64, String) {
     (size, time, hasher.finalize().to_hex()[..16].to_owned())
 }
 
-/// A change seen on a recorded export, waiting for the folder to be quiet or a retry.
 #[derive(Clone, Debug)]
 pub struct Due {
     pub table: String,
@@ -200,7 +197,6 @@ impl Imports {
         }
     }
 
-    /// Exports whose files changed and have been quiet: ready to import again.
     pub fn poll(&mut self) -> Vec<Due> {
         let mut touched: Vec<PathBuf> = Vec::new();
         for (dir, watcher) in &mut self.watchers {
@@ -242,7 +238,6 @@ impl Imports {
         ready
     }
 
-    /// A read failed mid-write: try again in a while, up to the limit.
     pub fn retry(&mut self, due: Due) -> bool {
         if due.tries + 1 >= RETRIES {
             return false;
@@ -256,7 +251,6 @@ impl Imports {
     }
 }
 
-/// The lengths a strip had when it was last imported, when the editor remembers the import.
 pub fn recorded_lengths(
     editor: &Editor,
     key: &str,

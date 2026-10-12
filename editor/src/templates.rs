@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
+use crate::value::RowValue;
 use include_dir::{Dir, include_dir};
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
 
-/// A built-in starting point: a content folder embedded in this editor's binary.
 pub struct Template {
     pub key: String,
     pub name: String,
@@ -46,7 +46,7 @@ pub fn list() -> Vec<Template> {
                 .unwrap_or_default();
             let spawn = format!(
                 "{} · {}, {}",
-                game["spawn"]["area"].as_str().unwrap_or("?"),
+                game["spawn"].text_or("area", "?"),
                 game["spawn"]["x"].as_f64().unwrap_or_default(),
                 game["spawn"]["y"].as_f64().unwrap_or_default()
             );
@@ -94,7 +94,6 @@ pub fn list() -> Vec<Template> {
     templates
 }
 
-/// Writes a template's files into a new or empty folder under the given game name.
 pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String> {
     let dir = TEMPLATES
         .get_dir(template)
@@ -124,7 +123,6 @@ pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String>
     result
 }
 
-/// Copies what the loader reads of one game into a new or empty folder, renamed, atomically.
 pub fn new_game_from(source: &Path, name: &str, folder: &Path) -> Result<(), String> {
     if !source.join("game.json").is_file() {
         return Err(format!("No game.json in {}", source.display()));

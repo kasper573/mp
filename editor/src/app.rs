@@ -17,7 +17,6 @@ use crate::schema::Shapes;
 use crate::tabs::Tab;
 use crate::user::{Settings, UserFolder};
 
-/// How the editor was started: a folder to open, a scene to show, a user folder to use.
 #[derive(Clone, Debug, Default)]
 pub struct Launch {
     pub folder: Option<PathBuf>,
@@ -119,7 +118,6 @@ impl Output {
     }
 }
 
-/// Which tab each fixed panel shows.
 #[derive(Default)]
 pub struct Panels {
     pub left: LeftTab,
@@ -158,6 +156,7 @@ pub enum BottomTab {
     Sounds,
     Surfaces,
     Mixes,
+    Listen,
 }
 
 impl BottomTab {
@@ -175,11 +174,11 @@ impl BottomTab {
             BottomTab::Sounds => "Sounds",
             BottomTab::Surfaces => "Surfaces",
             BottomTab::Mixes => "Mixes",
+            BottomTab::Listen => "Listen",
         }
     }
 }
 
-/// What the status bar says this frame, set by the views as they draw.
 #[derive(Default)]
 pub struct StatusBar {
     pub left: Vec<String>,
@@ -194,7 +193,6 @@ pub struct StartScreen {
     pub recover: Option<(PathBuf, JournalData)>,
 }
 
-/// A picker that waits for a click on an area: a place for a field, or a start for a play-test.
 #[derive(Clone, Debug)]
 pub struct PickRequest {
     pub what: PickWhat,
@@ -216,6 +214,7 @@ pub enum Dialog {
     Delete(DeleteDialog),
     Close(CloseDialog),
     Binaries,
+    Keys,
     MakeBlueprint(crate::views::area::MakeBlueprintDialog),
     Resize(crate::views::area::ResizeDialog),
     DeleteBlueprint(crate::views::area::DeleteBlueprintDialog),
@@ -226,7 +225,6 @@ pub enum Dialog {
     MakeInline(crate::views::script::inspect::MakeInlineDialog),
 }
 
-/// A searchable list of a table's rows (or of plain options) feeding one action.
 pub struct PickRowDialog {
     pub title: String,
     pub table: String,
@@ -245,7 +243,7 @@ pub enum PickRowThen {
     ReplaceBlueprint {
         area: String,
         index: usize,
-        scope: crate::views::area::blueprint::ReplaceScope,
+        scope: crate::views::area::placement::ReplaceScope,
     },
     ReturnDoorTarget {
         area: String,
@@ -281,7 +279,6 @@ pub struct ConfirmDialog {
     pub action: ConfirmAction,
 }
 
-/// Two blocks of text shown side by side in a confirm dialog: what is there now, what replaces it.
 pub struct Compare {
     pub left_title: String,
     pub left: String,
@@ -383,7 +380,6 @@ impl Editor {
         self.user.save_settings(&self.settings);
     }
 
-    /// Opens a folder: its journal first when one waits, then the files, lock and watcher.
     pub fn open_folder(&mut self, folder: &Path) {
         let folder = folder.to_path_buf();
         if let Some(data) = Journal::recover(&self.user, &folder)

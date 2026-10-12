@@ -11,8 +11,6 @@ pub const MAX_FRAME_PX: u32 = 1024;
 pub const MAX_IMAGE_PX: u32 = 16384;
 pub const DEFAULT_MS: u32 = 100;
 
-/// An export decoded onto the one grid the engine reads: every frame the same size, untrimmed,
-/// unrotated, sRGB with straight alpha.
 #[derive(Clone, Debug)]
 pub struct Export {
     pub files: Vec<PathBuf>,
@@ -21,7 +19,6 @@ pub struct Export {
     pub trimmed: bool,
     pub strips: Vec<ExportStrip>,
     pub warnings: Vec<String>,
-    /// The whole image when the export is a plain grid, cut again when the frame size changes.
     pub sheet: Option<RgbaImage>,
 }
 
@@ -74,7 +71,6 @@ impl Export {
         self.strips.iter().map(|strip| strip.frames.len()).sum()
     }
 
-    /// Lengths come with the export; grids and sequences carry none.
     pub fn timed(&self) -> bool {
         matches!(self.kind, Kind::SheetJson | Kind::Gif | Kind::Apng)
             && self
@@ -87,7 +83,6 @@ impl Export {
         self.strips.iter().find(|strip| strip.tag == tag)
     }
 
-    /// Cuts a plain grid into one strip per row of `width × height` frames.
     pub fn cut_grid(&mut self, width: u32, height: u32) -> Result<(), String> {
         let sheet = self.sheet.as_ref().ok_or("not a grid")?;
         if width == 0 || height == 0 {
@@ -141,7 +136,6 @@ impl ExportFrame {
     }
 }
 
-/// Identity by what shows: fully transparent pixels count as one, whatever colour they hide.
 pub fn pixel_hash(image: &RgbaImage) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&image.width().to_le_bytes());
@@ -159,7 +153,6 @@ pub fn is_blank(image: &RgbaImage) -> bool {
     image.pixels().all(|pixel| pixel[3] == 0)
 }
 
-/// What the dropped files are, read from their headers before anything decodes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Dropped {
     Sheet { image: PathBuf, json: PathBuf },
@@ -222,7 +215,6 @@ pub fn sort_out(files: &[PathBuf]) -> Result<Dropped, String> {
     }
 }
 
-/// Decodes an export of any format onto the one grid.
 pub fn decode(dropped: &Dropped) -> Result<Export, String> {
     match dropped {
         Dropped::Sheet { image, json } => decode_sheet(image, json),
@@ -271,7 +263,6 @@ pub fn names(files: &[PathBuf]) -> String {
         .join(", ")
 }
 
-/// A file's name without its extension, the tag of a single-animation export.
 pub fn stem(file: &Path) -> String {
     file.file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
@@ -658,7 +649,6 @@ fn animated(
     Ok(export)
 }
 
-/// Every frame onto the same canvas, feet together when sizes differ.
 fn unify(export: &mut Export) -> Result<(), String> {
     let mut width = 0;
     let mut height = 0;
@@ -700,7 +690,6 @@ fn unify(export: &mut Export) -> Result<(), String> {
     Ok(())
 }
 
-/// `walk_s_01` → (`walk_s`, 1); `walk_s/0001` and `walk s 1` alike; a stem without a number keeps its name.
 pub fn split_number(stem: &str) -> (String, Option<u64>) {
     let digits = stem
         .chars()

@@ -3,7 +3,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::user::UserFolder;
 
-/// Keeps one editor writing a folder: a second one opens it read-only until the lock dies.
 pub struct Lock {
     file: PathBuf,
 }

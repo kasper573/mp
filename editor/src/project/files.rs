@@ -7,7 +7,6 @@ use game::core::content::MemoryFolder;
 
 pub type Bytes = Arc<[u8]>;
 
-/// Every file of a content folder, by its folder-relative path with forward slashes.
 #[derive(Clone, Default)]
 pub struct Files {
     pub map: BTreeMap<String, Bytes>,
@@ -73,7 +72,6 @@ pub fn row_file(table: &str, key: &str) -> String {
     format!("tables/{table}/{key}.json")
 }
 
-/// `tables/<table>/<key>.json` taken apart.
 pub fn row_of(file: &str) -> Option<(&str, &str)> {
     let rest = file.strip_prefix("tables/")?;
     let (table, name) = rest.split_once('/')?;
@@ -81,7 +79,6 @@ pub fn row_of(file: &str) -> Option<(&str, &str)> {
     (!key.contains('/')).then_some((table, key))
 }
 
-/// One file written or removed by an edit.
 #[derive(Clone, Debug)]
 pub struct Change {
     pub file: String,

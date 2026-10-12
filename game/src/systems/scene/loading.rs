@@ -229,7 +229,7 @@ fn card_model(
         SyncPhase::Downloading { changes } => {
             lines.push("Content checked".to_owned());
             let fetched = progress.fetched;
-            if fetched.files_total == 0 {
+            if fetched.files_total == 0 && !progress.rows_changed {
                 lines.push("Up to date".to_owned());
                 lines.push(format!(
                     "Read from this device {} MB",
@@ -243,9 +243,14 @@ fn card_model(
                     megabytes(fetched.bytes_total)
                 ));
                 lines.push(format!(
-                    "{} of {} files changed",
+                    "{} of {} files changed{}",
                     grouped(fetched.files_total),
-                    grouped(progress.files_in_index)
+                    grouped(progress.files_in_index),
+                    if progress.rows_changed {
+                        ", and the rows"
+                    } else {
+                        ""
+                    }
                 ));
             } else {
                 lines.push("Downloading".to_owned());
@@ -263,11 +268,13 @@ fn card_model(
         }
         SyncPhase::Done => {
             lines.push("Content checked".to_owned());
-            lines.push(if progress.fetched.files_total == 0 {
-                "Up to date".to_owned()
-            } else {
-                "Downloaded".to_owned()
-            });
+            lines.push(
+                if progress.fetched.files_total == 0 && !progress.rows_changed {
+                    "Up to date".to_owned()
+                } else {
+                    "Downloaded".to_owned()
+                },
+            );
             lines.push("Joining".to_owned());
         }
     }

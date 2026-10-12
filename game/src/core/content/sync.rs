@@ -17,8 +17,6 @@ use super::table::Content;
 use crate::core::math::Rng;
 use crate::core::platform::{FetchFailure, LocalFuture};
 
-/// What a client fetches first: the build, the content version and the two hashes that lead to
-/// everything else.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
@@ -36,7 +34,6 @@ pub struct FileStamp {
     pub size: u64,
 }
 
-/// Every file under `assets/`, by path.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FileIndex {
@@ -51,7 +48,6 @@ pub struct IndexedFile {
     pub size: u64,
 }
 
-/// A loaded folder held in memory to be served: the manifest, and every file by its hash.
 pub struct ServedContent {
     pub manifest: Manifest,
     files: HashMap<String, Arc<[u8]>>,
@@ -135,6 +131,7 @@ pub struct SyncProgress {
     pub read: Counted,
     pub fetched: Counted,
     pub files_in_index: usize,
+    pub rows_changed: bool,
     pub retrying: usize,
     pub memory_only: bool,
 }
@@ -268,12 +265,10 @@ pub async fn sync(
     }
 }
 
-/// `true` for exactly the hashes `GET /content/files/{hash}` accepts.
 pub fn well_formed_hash(hash: &str) -> bool {
     hash.len() == 64 && hash.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
-/// Unpacks a rows bundle into its files by folder-relative path.
 pub fn unpack_rows(bundle: &[u8]) -> io::Result<Vec<(String, Vec<u8>)>> {
     use std::io::Read;
     let decoder = flate2::read::GzDecoder::new(bundle);
@@ -296,7 +291,6 @@ fn stamp_of(bytes: &[u8]) -> FileStamp {
     }
 }
 
-/// A gzip tar that depends on nothing but the files: no timestamps, owners or platform bytes.
 fn rows_bundle(rows: &[(String, Vec<u8>)]) -> io::Result<Vec<u8>> {
     let mut archive = tar::Builder::new(Vec::new());
     for (path, bytes) in rows {
@@ -393,6 +387,7 @@ impl Run<'_> {
             progress.phase = SyncPhase::Downloading {
                 changes: !stored.is_empty(),
             };
+            progress.rows_changed = !stored.is_empty() && !stored.contains(&manifest.rows.hash);
             progress.fetched = Counted::of(&missing);
         });
         let mut downloads = stream::iter(missing)

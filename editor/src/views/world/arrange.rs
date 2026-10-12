@@ -197,7 +197,7 @@ pub fn dialog(
                 let mut edit = Edit::new(format!("Arrange {moved} world map cards"));
                 edit.write_json(
                     row_file("world_map", super::ROW_KEY),
-                    &serde_json::to_value(&after).unwrap_or_default(),
+                    &crate::value::json(&after).unwrap_or_default(),
                 );
                 editor.apply(edit);
                 editor.views.world.fitted = false;
@@ -271,9 +271,6 @@ fn preview(ui: &mut Ui, layout: &Layout, atlas: &Atlas) {
     }
 }
 
-/// Stress majorization from the current positions: linked cards pull together to a length that
-/// fits them both, every card keeps its size, pinned cards never move, then overlaps are pushed
-/// apart. Components without links line up left to right by their first key.
 pub fn solve(layout: &Layout, atlas: &Atlas, keep_regions: bool, doors_hint: bool) -> Layout {
     let keys: Vec<String> = layout.cards.keys().cloned().collect();
     let index: HashMap<&str, usize> = keys

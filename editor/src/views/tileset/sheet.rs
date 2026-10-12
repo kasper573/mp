@@ -11,7 +11,6 @@ pub const BLOCKS: Color32 = Color32::from_rgb(230, 90, 90);
 const MIN_TILE: f32 = 8.0;
 const MAX_TILE: f32 = 64.0;
 
-/// Where the sheet was drawn and what the pointer is over.
 pub struct Canvas {
     pub rect: ERect,
     pub shown: f32,
@@ -59,7 +58,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Gri
     draw_selection(editor, ui, key, grid, &canvas);
 }
 
-/// The whole image at the view's zoom, grid lines over it, with a mark drawn per tile.
 pub fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -244,7 +242,6 @@ fn paint(editor: &mut Editor, ui: &Ui, key: &str, row: &Value, grid: &Grid, canv
     }
 }
 
-/// Shift-drag (or any drag in animation mode) selects a block of tiles.
 pub fn select(editor: &mut Editor, ui: &Ui, key: &str, grid: &Grid, canvas: &Canvas) {
     let mode = editor.views.tileset.views[key].mode;
     let (pressed, down, released, pointer, shift) = ui.input(|i| {
@@ -369,12 +366,11 @@ pub fn draw_selection(editor: &Editor, ui: &Ui, key: &str, grid: &Grid, canvas: 
 pub fn walk_mark(painter: &egui::Painter, cell: ERect, walk: Option<&str>) {
     match walk {
         Some("walkable") => dots(painter, cell, WALKABLE),
-        Some("blocks") => crate::views::area::hatch(painter, cell, BLOCKS, cell.width()),
+        Some("blocks") => crate::views::area::overlays::hatch(painter, cell, BLOCKS, cell.width()),
         _ => {}
     }
 }
 
-/// A dotted fill: the pattern that says walkable or sand.
 pub fn dots(painter: &egui::Painter, cell: ERect, colour: Color32) {
     painter.rect_filled(
         cell,
@@ -444,14 +440,12 @@ pub const SURFACE_COLOURS: [Color32; 6] = [
     Color32::from_rgb(90, 180, 220),
 ];
 
-/// Each surface by pattern as well as colour: sand dotted, grass hatched, rock gridded, wood
-/// striped, and the rest cycling through the same four.
 pub fn surface_mark(painter: &egui::Painter, cell: ERect, surface: &str, index: usize) {
     let style = surface_style(surface, index);
     let colour = SURFACE_COLOURS[style % SURFACE_COLOURS.len()];
     match style % 4 {
         0 => dots(painter, cell, colour),
-        1 => crate::views::area::hatch(painter, cell, colour, cell.width()),
+        1 => crate::views::area::overlays::hatch(painter, cell, colour, cell.width()),
         2 => grid_lines(painter, cell, colour),
         _ => stripes(painter, cell, colour),
     }
@@ -471,7 +465,6 @@ thread_local! {
     static SURFACES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
-/// The surface keys in legend order, remembered from the last legend drawn this frame.
 pub fn editor_surfaces() -> Vec<String> {
     SURFACES.with(|s| s.borrow().clone())
 }
@@ -508,7 +501,9 @@ pub fn walk_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 );
                 match brush {
                     WalkBrush::Walkable => dots(painter, swatch, WALKABLE),
-                    WalkBrush::Blocks => crate::views::area::hatch(painter, swatch, BLOCKS, 14.0),
+                    WalkBrush::Blocks => {
+                        crate::views::area::overlays::hatch(painter, swatch, BLOCKS, 14.0)
+                    }
                     WalkBrush::Nothing => {}
                 }
                 if on {
@@ -610,7 +605,6 @@ pub fn surface_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
 }
 
-/// Names the blueprint one scenery part of the selected tiles becomes.
 #[allow(clippy::too_many_arguments)]
 pub fn make_blueprint_dialog(
     editor: &mut Editor,

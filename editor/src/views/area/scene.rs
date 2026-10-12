@@ -16,8 +16,6 @@ use game::systems::area::{self, AreaModule, Scenery};
 
 use crate::project::Files;
 
-/// What a view wants drawn this frame: the ground of one area and the scenery of a module list,
-/// through a camera over a texture of the given size.
 pub struct SceneRequest {
     pub key: String,
     pub spec: SceneSpec,
@@ -72,8 +70,6 @@ pub struct Scenes {
 
 pub const IDLE_FRAMES: u32 = 120;
 
-/// Reconciles the scenes with this frame's requests: spawns, resizes, moves cameras, respawns tiles
-/// when the content changed, and drops scenes no view has asked for in a while.
 pub fn sync(
     scenes: &mut Scenes,
     requests: Vec<SceneRequest>,
@@ -283,7 +279,6 @@ fn spawn(
     );
 }
 
-/// The scenery a blueprint's parts place at `at`, with the stamp's values filling its holes.
 pub fn parts_scenery(
     content: Content,
     blueprint: &str,
@@ -372,7 +367,6 @@ fn sheets_for(
     SheetSet { tilesets, sheets }
 }
 
-/// The bevy image of `assets/<path>`, decoded from the folder in memory and kept until its bytes change.
 pub fn image_handle(
     scenes: &mut Scenes,
     files: &Files,

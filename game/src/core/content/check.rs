@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-/// Errors a row finds in itself: bounds and its own rules, each at a JSON pointer into the row.
 #[derive(Default)]
 pub struct RowCheck {
     errors: Vec<RowError>,

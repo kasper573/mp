@@ -6,7 +6,6 @@ use game::systems::area::grid::{AreaGrids, Flip, GroundLayer, PaletteEntry};
 
 use crate::project::Edit;
 
-/// A working copy of an area's grid files, edited by cell and written back as CSV.
 #[derive(Clone)]
 pub struct GridDraft {
     pub area: String,
@@ -49,7 +48,6 @@ impl GridDraft {
             .map(|index| index as u32)
     }
 
-    /// The palette index of a tile, added at the end when the area didn't use it yet.
     pub fn intern(&mut self, tileset: &str, tile: u32, flip: Flip) -> u32 {
         if let Some(index) = self.entry_of(tileset, tile, flip) {
             return index;
@@ -96,7 +94,6 @@ impl GridDraft {
         true
     }
 
-    /// Edge-joined cells of the layer holding the same entry as `start`.
     pub fn flood(&self, layer: usize, start: CellPos) -> Vec<CellPos> {
         let Some(ground) = self.ground.get(layer) else {
             return Vec::new();
@@ -141,7 +138,6 @@ impl GridDraft {
         self.ground.iter().map(|layer| layer.name.clone()).collect()
     }
 
-    /// Drops palette entries no layer uses any more, renumbering the cells.
     pub fn compact_palette(&mut self) {
         let mut used = vec![false; self.palette.len()];
         for layer in &self.ground {
@@ -177,7 +173,6 @@ impl GridDraft {
         self.touched.insert("palette".to_owned());
     }
 
-    /// Writes every touched grid file into the edit.
     pub fn write_into(&self, edit: &mut Edit) {
         let folder = format!("tables/area/{}", self.area);
         let grids = self.as_grids();
@@ -200,7 +195,6 @@ impl GridDraft {
         }
     }
 
-    /// Writes every grid file into the edit, for a new or resized area.
     pub fn write_all_into(&self, edit: &mut Edit) {
         let folder = format!("tables/area/{}", self.area);
         let grids = self.as_grids();
@@ -227,8 +221,6 @@ impl GridDraft {
         }
     }
 
-    /// The grids resized to `size`, the old content shifted by `shift` cells; cells outside are
-    /// clipped and counted.
     pub fn resized(&self, size: GridSize, shift: (i32, i32)) -> (GridDraft, usize) {
         let count = (size.width * size.height) as usize;
         let mut clipped = 0;
@@ -288,7 +280,6 @@ fn bytes(text: String) -> crate::project::Bytes {
     crate::project::Bytes::from(text.into_bytes())
 }
 
-/// The cells a square brush of `size` covers, centred on the cursor cell (even sizes lean up-left).
 pub fn brush_cells(center: CellPos, size: u32) -> Vec<CellPos> {
     let size = size.max(1) as i32;
     let offset = (size - 1) / 2 + (size + 1) % 2;

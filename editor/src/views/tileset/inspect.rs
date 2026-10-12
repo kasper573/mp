@@ -281,7 +281,6 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, key: &str) {
     }
 }
 
-/// The first-class fields: the image and its grid; the tiles themselves are painted in the tab.
 pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
     let mut changed = Changed::default();
     widgets::kv(ui, "image", |ui| {

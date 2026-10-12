@@ -12,7 +12,7 @@ use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 
-const EDGE_FALLOFF: Tiles = Tiles(4.0);
+pub const EDGE_FALLOFF: Tiles = Tiles(4.0);
 // The quickest the mix may swing from silence to full. Proximity drives every change, and this only
 // catches the jumps, like travelling between areas, so they glide instead of cutting.
 const SLEW: Seconds = Seconds(0.75);
@@ -102,7 +102,7 @@ impl SoundscapeShape {
         }
     }
 
-    fn nearest(self, at: Pos<Tiles>) -> Pos<Tiles> {
+    pub fn nearest(self, at: Pos<Tiles>) -> Pos<Tiles> {
         match self {
             SoundscapeShape::Rect(bounds) => at.clamp(bounds.min(), bounds.max()),
             SoundscapeShape::Ellipse(bounds) => {

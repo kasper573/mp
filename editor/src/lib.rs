@@ -15,4 +15,5 @@ mod thumbs;
 mod ui;
 mod usages;
 mod user;
+mod value;
 mod views;

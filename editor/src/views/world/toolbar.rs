@@ -133,7 +133,6 @@ fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> eg
     inner.expect("search box")
 }
 
-/// The dropdown under the search box: what the text matches, grouped by kind. Enter takes the first.
 fn results(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -294,7 +293,6 @@ impl LayerCounts {
     }
 }
 
-/// Every number field of the tables placed in areas, read from the row schemas.
 pub fn number_fields(editor: &Editor) -> Vec<String> {
     let mut out = Vec::new();
     for table in ["npc", "item", "quest", "shop", "area"] {

@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
-/// An owner before its reaches are read: label, kind, key, row and where it stands.
 type OwnerSeed = (String, OwnerKind, String, OwnerRow, Option<Pos<Tiles>>);
 
 use game::core::content::Content;
@@ -13,9 +12,8 @@ use game::systems::script::{Reach, RiftScripts};
 use serde_json::Value;
 
 use crate::project::{Files, row_file};
+use crate::value::RowValue;
 
-/// Everything the map draws that is not layout: areas, the warps their scripts may do, who is
-/// placed where, and what each quest touches. Rebuilt when the content changes.
 #[derive(Default)]
 pub struct Atlas {
     pub areas: BTreeMap<String, AreaInfo>,
@@ -82,7 +80,6 @@ pub struct QuestInfo {
     pub giver: Option<String>,
 }
 
-/// How one quest follows another: the content's own links.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuestLink {
     pub quest: String,
@@ -109,7 +106,6 @@ pub struct QuestLine {
     pub quests: Vec<String>,
 }
 
-/// One reason an area lights up under a lens.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Source {
     pub kind: &'static str,
@@ -334,7 +330,6 @@ impl Atlas {
         distances
     }
 
-    /// The fewest warps from one area to another, ties by key: each step is the warp taken.
     pub fn route(&self, from: &str, to: &str) -> Option<Vec<Warp>> {
         let mut previous: HashMap<String, Warp> = HashMap::new();
         let mut seen: BTreeSet<String> = BTreeSet::new();
@@ -369,7 +364,6 @@ impl Atlas {
         None
     }
 
-    /// Npcs whose own scripts can turn them hostile.
     pub fn hostile(&self, npc: &str) -> bool {
         self.owners.iter().any(|owner| {
             owner.kind == OwnerKind::Npc
@@ -378,7 +372,6 @@ impl Atlas {
         })
     }
 
-    /// Where quests are offered: the npc owners that can offer one, with their spot.
     pub fn givers(&self, area: &str) -> Vec<&Owner> {
         self.owners
             .iter()
@@ -392,14 +385,19 @@ impl Atlas {
             .collect()
     }
 
+    pub fn warps_between(&self, from: &str, to: &str) -> usize {
+        self.warps
+            .iter()
+            .filter(|warp| warp.from == from && warp.to == to)
+            .count()
+    }
+
     pub fn both_ways(&self, from: &str, to: &str) -> bool {
         self.warps
             .iter()
             .any(|warp| warp.from == to && warp.to == from)
     }
 
-    /// Why `area` lights up under a lens on one row: each placement, drop, shop, quest or script
-    /// that brings the row there.
     pub fn sources(
         &self,
         content: Content,
@@ -582,10 +580,10 @@ impl Atlas {
                 });
             }
             for module in row["modules"].as_array().into_iter().flatten() {
-                let objective = module["type"].as_str().unwrap_or("");
+                let objective = module.kind();
                 match objective {
                     "defeat" => {
-                        let npc = module["npc"].as_str().unwrap_or("");
+                        let npc = module.text("npc");
                         let areas: Vec<String> = self
                             .areas
                             .iter()
@@ -599,7 +597,7 @@ impl Atlas {
                         });
                     }
                     "hold" | "deliver" => {
-                        let item = module["item"].as_str().unwrap_or("").to_owned();
+                        let item = module.text("item").to_owned();
                         let areas: Vec<String> = self
                             .areas
                             .keys()
@@ -662,7 +660,7 @@ impl Atlas {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .find(|module| matches!(module["type"].as_str(), Some("shown") | Some("requires")))
+                .find(|module| matches!(module.kind(), "shown" | "requires"))
                 .map(|module| crate::condition::summary(&module["condition"]));
             quests.push(QuestInfo {
                 key,
@@ -680,7 +678,7 @@ impl Atlas {
             let row = files.json(&row_file("quest", &key)).unwrap_or(Value::Null);
             let mut after: Vec<QuestLink> = Vec::new();
             for module in row["modules"].as_array().into_iter().flatten() {
-                if matches!(module["type"].as_str(), Some("shown") | Some("requires")) {
+                if matches!(module.kind(), "shown" | "requires") {
                     self.quest_links(content, &module["condition"], &keys, &key, &mut after);
                 }
             }
@@ -734,8 +732,6 @@ impl Atlas {
         self.lines = lines;
     }
 
-    /// The quests a condition links to: `on_quest` while one is open, `quest_done` after one, and a
-    /// memory that another quest's scripts remember. Anything under `not` is a hiding rule, not a link.
     fn quest_links(
         &self,
         content: Content,
@@ -798,8 +794,6 @@ impl Atlas {
         }
     }
 
-    /// The lowest and highest value of a number field over the rows of its table placed in `area`,
-    /// such as `npc.loot.xp`.
     pub fn number_range(&self, files: &Files, area: &str, path: &str) -> Option<(f64, f64)> {
         let (table, rest) = path.split_once('.').unwrap_or((path, ""));
         let info = self.areas.get(area)?;
@@ -828,7 +822,6 @@ impl Atlas {
     }
 }
 
-/// An owner as content names it: an npc by its name, anything else by its label.
 fn display_name(content: Content, owner: &Owner) -> String {
     if owner.kind == OwnerKind::Npc
         && let Some(id) = content.by_key::<game::systems::npc::NpcDef>(&owner.row_key)
@@ -872,7 +865,6 @@ fn loot_names(row: &Value, item: &str) -> bool {
         })
 }
 
-/// Whether any string in the value is exactly `key`.
 pub fn mentions(value: &Value, key: &str) -> bool {
     match value {
         Value::String(text) => text == key,

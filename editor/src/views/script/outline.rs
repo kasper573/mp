@@ -9,12 +9,11 @@ use super::{Doc, select_nodes};
 use crate::app::Editor;
 use crate::project::Selection;
 use crate::ui::theme;
+use crate::value::RowValue;
 
 const ROW: f32 = 22.0;
 const INDENT: f32 = 26.0;
 
-/// The same graph as an indented list: a row per node under the arrow that led there, a
-/// dialogue's choices under it with their targets on the same row, every row reachable by keyboard.
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<GraphAction>) {
     let owner = doc.owner.clone();
     let rows: Vec<OutlineRow> = {
@@ -158,7 +157,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
     }
 }
 
-/// One drawn line: its row, the target row a choice shares the line with, and what folding hides.
 struct Line {
     row: usize,
     key: String,
@@ -310,8 +308,6 @@ fn draw(
     response
 }
 
-/// What each node's row says after its title: an on node's event words, a dialogue's first
-/// speaker and its length, else the node's pieces.
 fn summaries(editor: &Editor, doc: &Doc) -> HashMap<String, String> {
     let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
     doc.nodes()
@@ -337,7 +333,7 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
         let by = &line["by"];
         match by["type"].as_str() {
             Some("npc") => {
-                let key = by["npc"].as_str().unwrap_or("");
+                let key = by.text("npc");
                 let name = editor
                     .row_value("npc", key)
                     .and_then(|row| row["name"].as_str().map(str::to_owned))

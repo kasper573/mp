@@ -3794,6 +3794,7 @@ dependencies = [
  "png 0.17.16",
  "postcard",
  "pprof",
+ "proc-macro2",
  "rand 0.9.4",
  "rayon",
  "renet2",

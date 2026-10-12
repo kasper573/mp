@@ -1,9 +1,10 @@
-use egui::{Align, Layout, RichText, Sense, Ui};
+use egui::{Align, Key, Layout, Modifiers, RichText, Sense, Ui};
 
 use super::{theme, widgets};
 use crate::app::{Dialog, Editor, RenameDialog, RightTab};
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
+use crate::value::RowValue;
 
 const GROUPS: [(&str, &[&str]); 7] = [
     ("World", &["area", "world_map"]),
@@ -27,7 +28,6 @@ const GROUPS: [(&str, &[&str]); 7] = [
 
 const SHOWN_ROWS: usize = 7;
 
-/// A row dragged from the browser onto a view.
 #[derive(Clone, Debug)]
 pub struct RowDrag {
     pub table: String,
@@ -91,6 +91,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     if editor.project.is_none() {
         return;
     }
+    row_keys(editor, ui);
     let state = &mut editor.views.browser;
     let response = widgets::search_box(
         ui,
@@ -419,7 +420,6 @@ fn row_line(
     response
 }
 
-/// A 16 px picture for rows that have one: an npc's or model's first idle frame, an item's icon.
 pub fn row_icon(
     editor: &mut Editor,
     ui: &Ui,
@@ -470,6 +470,36 @@ pub fn row_icon(
             ))
         }
         _ => None,
+    }
+}
+
+fn row_keys(editor: &mut Editor, ui: &mut Ui) {
+    let over_browser = ui.ui_contains_pointer();
+    let on_row_form = matches!(super::active_tab(editor), Some(Tab::Row { .. }));
+    if (!over_browser && !on_row_form) || ui.ctx().text_edit_focused() {
+        return;
+    }
+    let selection = editor.selection.clone();
+    if selection.keys.len() != 1 || !selection.parts.is_empty() || selection.table.is_empty() {
+        return;
+    }
+    let pressed = ui.input_mut(|i| {
+        [
+            (Action::Rename, i.consume_key(Modifiers::NONE, Key::F2)),
+            (Action::Usages, i.consume_key(Modifiers::SHIFT, Key::F12)),
+            (Action::Duplicate, i.consume_key(Modifiers::COMMAND, Key::D)),
+            (Action::Delete, i.consume_key(Modifiers::NONE, Key::Delete)),
+            (
+                Action::OpenTab,
+                i.consume_key(Modifiers::COMMAND, Key::Enter),
+            ),
+        ]
+        .into_iter()
+        .find(|(_, hit)| *hit)
+        .map(|(action, _)| action)
+    });
+    if let Some(action) = pressed {
+        act(editor, &selection.table, &selection.keys[0], action);
     }
 }
 
@@ -583,7 +613,6 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: Action) {
     }
 }
 
-/// Search results: rows, then the modules and objects matching inside rows, then files.
 fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     let needle = editor.views.browser.search.trim().to_lowercase();
     let only_unsaved = editor.views.browser.only_unsaved;
@@ -623,7 +652,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                     for (index, module) in
                         row["modules"].as_array().into_iter().flatten().enumerate()
                     {
-                        let kind = module["type"].as_str().unwrap_or("module").to_owned();
+                        let kind = module.kind_or("module").to_owned();
                         let name = module["name"].as_str().map(str::to_owned);
                         let kind_hit = kind.contains(&needle);
                         let name_hit = name
@@ -825,12 +854,26 @@ fn result_line(
         child.label(theme::mono(label).size(13.0));
         child.label(theme::faint("·"));
         child.label(theme::muted(owner).monospace().size(12.5));
+    } else if let Some((table, key)) = row {
+        let icon = row_icon(editor, &child, table, key);
+        child.dnd_drag_source(
+            egui::Id::new(("result-drag", table, key)),
+            RowDrag {
+                table: table.to_owned(),
+                key: key.to_owned(),
+            },
+            |ui| {
+                if let Some((texture, uv, size)) = icon {
+                    ui.add(egui::Image::from_texture((texture, size)).uv(uv));
+                }
+                ui.label(theme::mono(label).size(13.0).color(if selected {
+                    theme::TEXT
+                } else {
+                    theme::CODE
+                }));
+            },
+        );
     } else {
-        if let Some((table, key)) = row
-            && let Some((texture, uv, size)) = row_icon(editor, &child, table, key)
-        {
-            child.add(egui::Image::from_texture((texture, size)).uv(uv));
-        }
         child.label(theme::mono(label).size(13.0).color(if selected {
             theme::TEXT
         } else {

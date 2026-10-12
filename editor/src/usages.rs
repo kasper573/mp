@@ -6,7 +6,6 @@ use rayon::prelude::*;
 
 use crate::project::Files;
 
-/// One place a row or file is named.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Usage {
     pub file: String,
@@ -14,7 +13,6 @@ pub struct Usage {
     pub known: bool,
 }
 
-/// Everywhere every row and asset is named, rebuilt per content.
 #[derive(Default)]
 pub struct Usages {
     rows: HashMap<(String, String), Vec<Usage>>,
@@ -75,7 +73,6 @@ impl Usages {
         self.by_file.get(file).map_or(&[], Vec::as_slice)
     }
 
-    /// Files naming the row, each with the pointers where it does.
     pub fn files_naming(&self, table: &str, key: &str) -> Vec<(String, Vec<String>)> {
         let mut by_file: Vec<(String, Vec<String>)> = Vec::new();
         for usage in self.of_row(table, key) {

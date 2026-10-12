@@ -1,10 +1,8 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-/// One rule broken somewhere in the folder.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadError {
-    /// Folder-relative, forward slashes.
     pub file: String,
     pub at: ErrorPlace,
     pub rule: &'static str,

@@ -9,7 +9,6 @@ use crate::core::tiling::{GridSize, Tiles};
 
 use super::tileset;
 
-/// How a tile, a scenery or a placement is mirrored about its origin.
 #[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Flip {
@@ -49,7 +48,6 @@ impl Flip {
         )
     }
 
-    /// Mirrors a relative position about the origin.
     pub fn apply(self, p: Pos<Tiles>) -> Pos<Tiles> {
         Pos::new(
             if self.horizontal() { -p.x } else { p.x },
@@ -90,7 +88,6 @@ pub struct GroundLayer {
     pub cells: Vec<Option<u32>>,
 }
 
-/// An area's grid files: the palette, every ground layer and the walk grid, exactly as written.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AreaGrids {
     pub size: GridSize,
@@ -144,7 +141,6 @@ pub struct GridFile<'a> {
     pub text: &'a str,
 }
 
-/// Reads one headerless grid of `size` cells; each error names its row and column from 1.
 pub fn read_grid<T>(
     file: GridFile,
     size: GridSize,

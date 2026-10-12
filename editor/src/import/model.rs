@@ -8,7 +8,6 @@ use super::formats::{self, Export, MAX_IMAGE_PX};
 use super::records::ImportRecord;
 use crate::views::model::{ACTIONS, DIRECTIONS, FrameData};
 
-/// Which engine strip each tag lands on; `None` skips the tag.
 pub type Mapping = BTreeMap<String, Option<String>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,7 +52,6 @@ pub struct StripPlan {
     pub lengths: Vec<u32>,
     pub retimed: Option<Retimed>,
     pub cues: Vec<CueMove>,
-    /// For each new frame, the old frame with the same pixels, when there is one.
     pub origins: Vec<Option<usize>>,
 }
 
@@ -66,7 +64,6 @@ pub struct Retimed {
 }
 
 impl Retimed {
-    /// The frames whose length changed here since the last import, numbered from 1.
     pub fn frames(&self) -> Vec<usize> {
         self.here
             .iter()
@@ -114,7 +111,6 @@ impl CueMove {
         self.to.is_some() || self.choice.is_some()
     }
 
-    /// The frame the cue goes to, when settled.
     pub fn lands(&self) -> Option<usize> {
         match (self.to, self.choice) {
             (Some(to), _) => Some(to),
@@ -123,7 +119,6 @@ impl CueMove {
         }
     }
 
-    /// The frame now in the old one's place, offered when nothing matched.
     pub fn offered(&self, count: usize) -> usize {
         self.from.min(count.saturating_sub(1))
     }
@@ -142,7 +137,6 @@ impl StripPlan {
         self.cues.iter().filter(|cue| !cue.settled()).count()
     }
 
-    /// The lengths the row gets: the export's, or the ones set here when kept.
     pub fn final_lengths(&self) -> Vec<u32> {
         match &self.retimed {
             Some(retimed) if retimed.keep_here => (0..self.lengths.len())
@@ -226,7 +220,6 @@ impl Plan {
             .collect()
     }
 
-    /// Nothing waits for a decision: every cue found its frame and no strip was retimed here.
     pub fn decided(&self) -> bool {
         self.missing.is_empty() && self.needs_place() == 0 && self.retimed() == 0
     }
@@ -251,7 +244,6 @@ pub fn pretty(strip: &str) -> String {
     strip.replacen('_', " · ", 1)
 }
 
-/// `Death NW`, `attack-south`, `walk s` all read as a strip; anything else does not.
 pub fn strip_of_tag(tag: &str) -> Option<String> {
     let words: Vec<String> = tag
         .split(['_', '-', ' ', '/', '.'])
@@ -281,7 +273,6 @@ fn exact(tag: &str) -> bool {
     strip_names().iter().any(|name| name == tag)
 }
 
-/// Tags onto strips by name; grid rows by order when there are exactly as many.
 pub fn default_mapping(export: &Export) -> (Mapping, BTreeMap<String, Note>) {
     let mut mapping = Mapping::new();
     let mut notes = BTreeMap::new();
@@ -309,7 +300,6 @@ pub fn default_mapping(export: &Export) -> (Mapping, BTreeMap<String, Note>) {
     (mapping, notes)
 }
 
-/// The mapping an earlier import used, kept for tags the export still has.
 pub fn recorded_mapping(record: &ImportRecord, export: &Export) -> Mapping {
     let mut mapping = Mapping::new();
     for strip in &export.strips {
@@ -340,7 +330,6 @@ pub fn mapping_value(mapping: &Mapping) -> Value {
     )
 }
 
-/// The strip each tag lands on; the first tag wins when two name one strip.
 fn targets(mapping: &Mapping, export: &Export) -> BTreeMap<String, String> {
     let mut targets = BTreeMap::new();
     for strip in &export.strips {
@@ -353,7 +342,6 @@ fn targets(mapping: &Mapping, export: &Export) -> BTreeMap<String, String> {
     targets
 }
 
-/// The frames the row shows now, cut from its sheet, by strip name.
 pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String, Vec<String>> {
     let width = row["sprites"]["frame_size"]["width"].as_u64().unwrap_or(0) as u32;
     let height = row["sprites"]["frame_size"]["height"].as_u64().unwrap_or(0) as u32;
@@ -390,7 +378,6 @@ pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String
     hashes
 }
 
-/// What importing `export` onto `row` with `mapping` does; `asked` gives untimed strips a length.
 pub fn plan(
     row: Option<&Value>,
     sheet: Option<&RgbaImage>,
@@ -529,7 +516,6 @@ pub fn plan(
     }
 }
 
-/// The new frame with the old one's pixels: the nearest, then the lowest.
 fn follow(old: &[String], from: usize, new: &[&str]) -> Option<usize> {
     let hash = old.get(from)?;
     if hash.is_empty() {
@@ -549,7 +535,6 @@ pub struct Built {
     pub lengths: BTreeMap<String, Vec<u32>>,
 }
 
-/// The sheet and the row the plan leads to: one strip per sheet row, in engine order.
 pub fn build(
     plan: &Plan,
     export: &Export,
@@ -633,7 +618,6 @@ pub fn record(
     record
 }
 
-/// The export's files as the record names them, newest state on disk.
 pub fn primary_file(files: &[PathBuf]) -> PathBuf {
     files
         .iter()

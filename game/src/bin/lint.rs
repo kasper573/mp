@@ -27,13 +27,13 @@ fn main() {
     }
 
     if violations.is_empty() {
-        println!("lint: layering OK");
+        println!("lint: layering and content keys OK");
         return;
     }
     for violation in &violations {
         eprintln!("{violation}");
     }
-    eprintln!("\nlint: {} layering violation(s)", violations.len());
+    eprintln!("\nlint: {} violation(s)", violations.len());
     std::process::exit(1);
 }
 
@@ -59,6 +59,13 @@ fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
             for reference in core_to_systems(&file) {
                 out.push(format!(
                     "[{name}] src/{rel}: `{reference}` — core may not depend on any systems layer"
+                ));
+            }
+        }
+        if !rel.starts_with("core/content/") {
+            for (line, call) in content_keys(&file) {
+                out.push(format!(
+                    "[{name}] src/{rel}:{line}: `{call}` — code names content: use a fixture, or a setting in game.json"
                 ));
             }
         }
@@ -120,5 +127,64 @@ fn use_reaches_systems(tree: &UseTree) -> bool {
         UseTree::Rename(rename) => rename.ident == "systems",
         UseTree::Group(group) => group.items.iter().any(use_reaches_systems),
         UseTree::Glob(_) => false,
+    }
+}
+
+fn content_keys(file: &Path) -> Vec<(usize, String)> {
+    let mut found = KeyLookups::default();
+    if let Ok(source) = fs::read_to_string(file)
+        && let Ok(ast) = syn::parse_file(&source)
+    {
+        found.visit_file(&ast);
+    }
+    found.hits
+}
+
+const KEY_LOOKUPS: &[&str] = &["by_key", "id_of"];
+
+#[derive(Default)]
+struct KeyLookups {
+    hits: Vec<(usize, String)>,
+}
+
+impl<'ast> Visit<'ast> for KeyLookups {
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if KEY_LOOKUPS.contains(&call.method.to_string().as_str())
+            && let Some(key) = call.args.first().and_then(string_literal)
+        {
+            self.hits.push((
+                call.method.span().start().line,
+                format!("{}({key:?})", call.method),
+            ));
+        }
+        visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path) = &*call.func
+            && let Some(last) = path.path.segments.last()
+            && KEY_LOOKUPS.contains(&last.ident.to_string().as_str())
+            && let Some(key) = call.args.iter().find_map(string_literal)
+        {
+            self.hits.push((
+                last.ident.span().start().line,
+                format!("{}({key:?})", last.ident),
+            ));
+        }
+        visit::visit_expr_call(self, call);
+    }
+}
+
+fn string_literal(expr: &syn::Expr) -> Option<String> {
+    let expr = match expr {
+        syn::Expr::Reference(reference) => &*reference.expr,
+        other => other,
+    };
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(text),
+            ..
+        }) => Some(text.value()),
+        _ => None,
     }
 }

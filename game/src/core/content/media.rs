@@ -6,7 +6,6 @@ use rayon::prelude::*;
 use super::load::Loading;
 use super::report::ErrorPlace;
 
-/// Every PNG under `assets/` by its path, measured at load.
 pub struct ImageSizes(pub HashMap<String, (u32, u32)>);
 
 type MediaCheck = Result<Option<(u32, u32)>, (&'static str, String, &'static str)>;

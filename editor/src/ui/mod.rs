@@ -38,6 +38,7 @@ pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
     }
     if editor.project.is_some() {
         workspace(editor, &mut root, world);
+        report::not_loaded(editor, ctx);
         crate::import::tick(editor, ctx);
     } else {
         start::show(editor, &mut root);
@@ -109,7 +110,6 @@ pub fn focus_tab(dock: &mut DockState<Tab>, tab: Tab) {
     dock.push_to_focused_leaf(tab);
 }
 
-/// The tab in front of the centre, if any.
 pub fn active_tab(editor: &Editor) -> Option<Tab> {
     editor
         .dock
@@ -172,6 +172,14 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         editor
             .dock
             .remove_tab(egui_dock::TabPath::from((path, leaf.active)));
+    }
+    if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F1))
+        && !editor
+            .dialogs
+            .iter()
+            .any(|dialog| matches!(dialog, Dialog::Keys))
+    {
+        editor.dialogs.push(Dialog::Keys);
     }
     let (f5, shift_f5, f6, ctrl_t) = ctx.input_mut(|i| {
         (
@@ -276,6 +284,13 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         ui.close();
                     }
                     if ui
+                        .add(egui::Button::new("Keys").shortcut_text("F1"))
+                        .clicked()
+                    {
+                        editor.dialogs.push(Dialog::Keys);
+                        ui.close();
+                    }
+                    if ui
                         .add(egui::Button::new("Quit").shortcut_text("Ctrl Q"))
                         .clicked()
                     {
@@ -310,10 +325,10 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {
                             widgets::pill(ui, "read-only", theme::WARN).on_hover_text(reason);
-                        } else if project.report.is_some() {
-                            widgets::pill(ui, "does not load", theme::DANGER);
                         } else if unsaved > 0 {
                             widgets::pill(ui, &format!("{unsaved} unsaved"), theme::TEXT);
+                        } else if project.report.is_some() {
+                            widgets::pill(ui, "does not load", theme::DANGER);
                         } else {
                             widgets::pill(ui, "✔ saved", theme::OK);
                         }
@@ -381,9 +396,11 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
                             .inner_margin(egui::Margin::symmetric(10, 8))
                             .show(ui, |ui| match editor.panels.right {
                                 RightTab::Inspector => inspector::show(editor, ui),
-                                RightTab::UsedBy => inspector::show_used_by(editor, ui),
-                                RightTab::Preview => inspector::show_preview(editor, ui),
-                                RightTab::Conflicts => inspector::show_conflicts(editor, ui),
+                                RightTab::UsedBy => inspector::usages::show_used_by(editor, ui),
+                                RightTab::Preview => inspector::preview::show_preview(editor, ui),
+                                RightTab::Conflicts => {
+                                    inspector::bindings::show_conflicts(editor, ui)
+                                }
                             });
                     });
             });
@@ -461,7 +478,15 @@ fn empty_centre(ui: &mut egui::Ui) {
 
 fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
     let mut left = std::mem::take(&mut editor.status.left);
-    if left.is_empty() {
+    if let Some(project) = &editor.project
+        && project.report.is_some()
+    {
+        left = vec![
+            pretty_path(&project.root),
+            "not loaded".to_owned(),
+            "loads again by itself when a file changes".to_owned(),
+        ];
+    } else if left.is_empty() {
         let selection = &editor.selection;
         if selection.keys.len() == 1 && selection.parts.is_empty() {
             let (table, key) = (&selection.table, &selection.keys[0]);

@@ -10,8 +10,6 @@ pub struct AssetsState {
     pub open: std::collections::HashSet<String>,
 }
 
-/// The files under assets/, by folder, each selectable so the inspector can preview it and list
-/// where it is used.
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let Some(project) = &editor.project else {
         return;

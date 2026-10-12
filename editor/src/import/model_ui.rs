@@ -16,7 +16,6 @@ use crate::views::model::{FrameData, TABLE};
 
 const FRAME_CARD: f32 = 48.0;
 
-/// Textures of export frames, made on first draw and kept by pixel hash.
 #[derive(Default)]
 pub struct Textures {
     map: HashMap<String, TextureHandle>,
@@ -54,7 +53,6 @@ pub struct ModelDialog {
     pub error: Option<String>,
 }
 
-/// A changed export read again: what it does to the row, waiting in the model tab.
 pub struct ModelReimport {
     pub export: Export,
     pub mapping: Mapping,
@@ -487,7 +485,6 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     Some(dialog)
 }
 
-/// TAG · STRIP · FRAMES · note, one row per tag, the plain ones folded after the first two.
 fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
     let mut changed = false;
     let names = model::strip_names();
@@ -628,7 +625,6 @@ fn has_issue(plan: &Plan, mapping: &Mapping, tag: &str) -> bool {
         .is_some_and(|strip| strip.needs_place() > 0 || strip.retimed.is_some())
 }
 
-/// The note beside a tag: how it mapped, or the cue or lengths that wait on a decision.
 fn note_cell(_editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
     let mut changed = false;
     let target = dialog.mapping.get(tag).cloned().flatten();
@@ -746,7 +742,6 @@ fn note_cell(_editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog, tag: &str)
     changed
 }
 
-/// The selected tag's frames with their lengths, or the length every frame gets when asked.
 fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
     let mut changed = false;
     let Some(tag) = dialog.selected.clone() else {
@@ -929,7 +924,6 @@ fn draw_fit(painter: &egui::Painter, rect: Rect, texture: &TextureHandle, frame:
     );
 }
 
-/// Applies a dialog outside its frame, for scenes; back when it cannot.
 pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDialog> {
     match apply_dialog(editor, &dialog) {
         Ok(()) => None,
@@ -990,7 +984,6 @@ fn write(
     Ok(())
 }
 
-/// Drafts with nothing to decide apply themselves, once typing stops.
 pub fn apply_settled(editor: &mut Editor) {
     let keys: Vec<String> = editor
         .views
@@ -1032,7 +1025,6 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     }
 }
 
-/// The model tab while a changed export waits: the banner, every strip that changes, before and after.
 pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let ctx = ui.ctx().clone();
     let Some(draft) = editor.views.model.reimports.get_mut(key) else {
@@ -1097,7 +1089,6 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     ];
 }
 
-/// The pixels of a draft, before (the row's sheet) and after (the export).
 struct Frames<'a> {
     export: &'a Export,
     sheet: &'a Option<RgbaImage>,
@@ -1298,7 +1289,6 @@ fn cue_labels(frame: &FrameData) -> String {
     labels.join(" ")
 }
 
-/// Inspector cards for a draft: one per strip with cues to settle, one per strip retimed here.
 pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let mut apply = false;
     let mut keep = false;

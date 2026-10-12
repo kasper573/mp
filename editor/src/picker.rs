@@ -5,6 +5,7 @@ use game::systems::script::{Reach, RiftScripts};
 use crate::forms::{FormAction, FormCx};
 use crate::project::{row_file, row_of};
 use crate::ui::theme;
+use crate::value::RowValue;
 
 const PICTURE_TABLES: [&str; 6] = [
     "model",
@@ -15,8 +16,6 @@ const PICTURE_TABLES: [&str; 6] = [
     "cursor",
 ];
 
-/// A reference field: a chip naming the row, opening a picker over its table, never a text field.
-/// The arrow after it opens the row.
 pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &str) -> bool {
     let id = ui.id().with(path).with("picker");
     let mut changed = false;
@@ -117,7 +116,12 @@ fn picker_body(
                 || name.to_lowercase().contains(&needle)
         })
         .collect();
-    keys.sort_by(|a, b| a.2.is_some().cmp(&b.2.is_some()).then(a.0.cmp(&b.0)));
+    keys.sort_by(|a, b| {
+        a.2.is_some()
+            .cmp(&b.2.is_some())
+            .then((a.0 != *key).cmp(&(b.0 != *key)))
+            .then(a.0.cmp(&b.0))
+    });
     let pickable = keys
         .iter()
         .filter(|(_, _, reason)| reason.is_none())
@@ -375,8 +379,6 @@ fn filter_hint(cx: &FormCx, table: &str, blocked: &Option<Block>) -> String {
 
 type Block = (Box<dyn Fn(&FormCx, &str) -> Option<String>>, &'static str);
 
-/// The rule a field puts on its rows, as the reason a row can't be picked: scripts of another
-/// owner kind, npcs no script sets hostile for a defeat objective.
 fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
     if table == "script" {
         let owner = cx.owner_table.clone()?;
@@ -384,7 +386,7 @@ fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
         return Some((
             Box::new(move |cx, key| {
                 let row = cx.files.json(&row_file("script", key))?;
-                let script_owner = row["owner"].as_str().unwrap_or("");
+                let script_owner = row.text("owner");
                 (crate::views::script::nodes::owner_kind_named(script_owner) != kind)
                     .then(|| format!("owner {script_owner}"))
             }),
@@ -416,7 +418,6 @@ fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
     None
 }
 
-/// The second line of a picker entry: where an npc lives, how widely a script is used.
 fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
     match table {
         "npc" => {
@@ -470,7 +471,6 @@ fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
     }
 }
 
-/// The name a row shows in lists: its name, title or label field, else nothing.
 pub fn display_name(cx: &FormCx, table: &str, key: &str) -> String {
     let Some(row) = cx.files.json(&row_file(table, key)) else {
         return String::new();
@@ -498,8 +498,6 @@ fn picture_file(cx: &FormCx, table: &str, key: &str) -> Option<String> {
     }
 }
 
-/// A picture of a row, `size` points tall: a model's or npc's first idle frame, an item's icon, a
-/// tileset's first tiles.
 pub fn thumbnail(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str, size: f32) {
     let Some(row) = cx.files.json(&row_file(table, key)) else {
         return;
@@ -563,7 +561,6 @@ pub fn thumbnail(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str, size: f32
     }
 }
 
-/// A file field: a chip opening the files under assets/, with a picture of the file when it is one.
 pub fn asset(ui: &mut Ui, cx: &mut FormCx, file: &mut String, path: &str) -> bool {
     let id = ui.id().with(path).with("asset");
     let mut changed = false;

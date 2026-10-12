@@ -13,6 +13,7 @@ use crate::app::{BottomTab, Editor};
 use crate::project::{Edit, Selection, row_file};
 use crate::thumbs::Thumb;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 pub const TABLE: &str = "tileset";
 
@@ -23,7 +24,6 @@ pub struct TilesetViews {
     pub counts: Option<Counts>,
 }
 
-/// What every tileset says together, rebuilt when the folder changes.
 pub struct Counts {
     pub generation: u64,
     pub surfaces: HashMap<String, (usize, HashSet<String>)>,
@@ -57,7 +57,6 @@ impl Mode {
     }
 }
 
-/// What the walk brush paints: a value, or nothing said.
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum WalkBrush {
     Walkable,
@@ -157,7 +156,6 @@ impl Default for TilesetView {
     }
 }
 
-/// A tileset's image cut into its grid.
 #[derive(Clone)]
 pub struct Grid {
     pub tile_px: u32,
@@ -196,7 +194,7 @@ impl Grid {
 }
 
 pub fn grid_of(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> Grid {
-    let image = row["image"].as_str().unwrap_or("").to_owned();
+    let image = row.text("image").to_owned();
     let tile_px = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
     let Editor { project, form, .. } = editor;
     let thumb = project
@@ -397,12 +395,10 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
     }
 }
 
-/// The data of one tile as the row stores it.
 pub fn tile_data(row: &Value, tile: u32) -> Value {
     row["tiles"][tile.to_string()].clone()
 }
 
-/// Writes one tile's data, dropping the entry when nothing is left to say.
 pub fn set_tile_field(row: &mut Value, tile: u32, field: &str, value: Value) {
     if !row["tiles"].is_object() {
         row["tiles"] = Value::Object(serde_json::Map::new());
@@ -449,7 +445,6 @@ pub fn write_row(
     editor.apply(edit)
 }
 
-/// Every tileset's surfaces and every area's tilesets, for the counts the views show.
 fn refresh_counts(editor: &mut Editor) {
     let Some(project) = editor.project.as_ref() else {
         return;

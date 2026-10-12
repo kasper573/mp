@@ -6,8 +6,6 @@ use super::{Doc, add_node, nodes};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
 
-/// The command palette: every node kind this owner may use, by system, searched by name, blurb
-/// and system, chosen by the keys.
 pub struct Palette {
     pub at: Option<Pos2>,
     pub place: Option<Pos2>,
@@ -342,7 +340,6 @@ fn entry_of(entry: &nodes::Entry) -> Row {
     }
 }
 
-/// The systems whose nodes this owner may not use, with the reason, for the palette's foot.
 fn refused_groups(
     catalogue: &Catalogue,
     doc: &Doc,

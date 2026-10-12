@@ -153,8 +153,6 @@ fn carry_view_across(world: &mut World) {
     };
 }
 
-/// The patience counts from arriving in the area scene, not from when the veil came down: a
-/// reconnect may take any time, and the world behind it still needs its frames to draw.
 fn restart_patience(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     if let Some(held) = world.resource_mut::<Crossing>().held.as_mut() {

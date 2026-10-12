@@ -4,7 +4,8 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::world::EntityRef;
 use bevy_replicon::client::ClientSystems;
 use bevy_replicon::prelude::{AuthMethod, ClientState, RepliconPlugins, RepliconSharedPlugin};
-use bevy_state::prelude::OnEnter;
+use bevy_replicon::shared::server_entity_map::ServerEntityMap;
+use bevy_state::prelude::{OnEnter, OnExit};
 
 use super::{ClientId, JoinRequest, Owner, RespawnRequest, Welcome};
 use crate::core::math::Pos;
@@ -38,6 +39,10 @@ impl Plugin for ClientSessionPlugin {
                 .after(ClientSystems::Receive),
         );
         app.add_systems(OnEnter(ClientState::Disconnected), forget_me);
+        app.add_systems(
+            OnExit(ClientState::Connected),
+            drop_replicated.before(ClientSystems::Reset),
+        );
     }
 }
 
@@ -160,6 +165,22 @@ fn track_viewpoint(
     });
     if viewpoint.0 != character {
         viewpoint.0 = character;
+    }
+}
+
+/// A connection's world ends with it: the next server (the same one restarted, or another after a
+/// deploy) numbers its entities afresh, so nothing of the old one may stay to be mistaken for new.
+fn drop_replicated(world: &mut World) {
+    let entities: Vec<Entity> = world
+        .resource::<ServerEntityMap>()
+        .to_client()
+        .values()
+        .copied()
+        .collect();
+    for entity in entities {
+        if let Ok(entity) = world.get_entity_mut(entity) {
+            entity.despawn();
+        }
     }
 }
 

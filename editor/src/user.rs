@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// One person's folder on this machine: settings, journal, import records, caches and locks.
 /// Never inside a content folder.
 #[derive(Clone, Debug)]
 pub struct UserFolder {
@@ -66,7 +65,6 @@ impl UserFolder {
         }
     }
 
-    /// A stable file name for one content folder's records.
     pub fn folder_key(folder: &Path) -> String {
         blake3::hash(folder.to_string_lossy().as_bytes()).to_hex()[..16].to_owned()
     }
@@ -163,7 +161,6 @@ impl Settings {
         self.recent_at.remove(&folder.display().to_string());
     }
 
-    /// When a recent folder was last opened, in words: today, yesterday, 3 days ago, last week…
     pub fn opened_ago(&self, folder: &Path) -> String {
         let Some(at) = self.recent_at.get(&folder.display().to_string()) else {
             return String::new();

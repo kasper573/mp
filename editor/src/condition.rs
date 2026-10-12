@@ -4,6 +4,7 @@ use serde_json::{Map, Value};
 use crate::forms::{Changed, FormCx, fits};
 use crate::schema::{self, Kind, Variant};
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 const OPERATORS: [&str; 16] = [
     "all",
@@ -41,7 +42,6 @@ const ARITHMETIC: [(&str, &str); 6] = [
     ("max", "max"),
 ];
 
-/// The query picker's groups, in the order they are listed.
 const GROUPS: [(&str, &[&str]); 7] = [
     ("The character", &["level", "is_job", "stat", "buffed"]),
     ("Bag and gear", &["holding", "free_slots", "wearing"]),
@@ -67,7 +67,6 @@ const GROUPS: [(&str, &[&str]); 7] = [
     ("Ground", &["ground_items"]),
 ];
 
-/// What a block yields, as the slot labels say it.
 fn type_word(tag: &str) -> &'static str {
     match tag {
         "all" | "any" | "not" | "equal" | "not_equal" | "less" | "at_most" | "more"
@@ -83,8 +82,6 @@ fn type_word(tag: &str) -> &'static str {
     }
 }
 
-/// A condition or value as a tree of blocks: constants, variables, queries and operators, each
-/// slot offering only what fits it.
 pub fn edit(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -160,7 +157,6 @@ enum Slot {
     YesOrNo,
 }
 
-/// One block: its chip, then its slots in a row or, for all and any, a column of children.
 fn block(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -242,7 +238,7 @@ fn block(
             }
         }
         Value::Object(_) => {
-            let tag = value["type"].as_str().unwrap_or("").to_owned();
+            let tag = value.kind().to_owned();
             match tag.as_str() {
                 "all" | "any" => changed = list_block(ui, cx, palette, value, path, &tag, slot),
                 "not" | "round" => {
@@ -352,7 +348,6 @@ fn block(
     changed
 }
 
-/// all of / any of: the chip, a guided column of children, "+ condition".
 fn list_block(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -457,7 +452,6 @@ fn list_block(
     changed
 }
 
-/// A query: its chip and type, then its fields in a row; `of` and `among` only when set.
 fn query_block(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -549,7 +543,6 @@ fn chip(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> egui::Response 
         .on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-/// Clicking a block's chip opens the picker to swap the block for another.
 fn picker_popup(
     ui: &mut Ui,
     cx: &mut FormCx,
@@ -574,7 +567,6 @@ fn picker_popup(
     changed
 }
 
-/// The query picker: groups by what they ask about, each entry with its type; operators last.
 fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> Option<Value> {
     let mut picked: Option<Value> = None;
     ui.set_width(300.0);
@@ -721,9 +713,9 @@ pub fn describe(value: &Value) -> String {
                 return format!("variable {name}");
             }
             match object.get("type").and_then(Value::as_str) {
-                Some("local") => format!("local {}", object["local"].as_str().unwrap_or("")),
-                Some("state") => format!("state {}", object["state"].as_str().unwrap_or("")),
-                Some("event") => format!("event {}", object["event"].as_str().unwrap_or("")),
+                Some("local") => format!("local {}", object.text("local")),
+                Some("state") => format!("state {}", object.text("state")),
+                Some("event") => format!("event {}", object.text("event")),
                 Some(tag) => schema::title(tag),
                 None => "block".to_owned(),
             }
@@ -732,7 +724,6 @@ pub fn describe(value: &Value) -> String {
     }
 }
 
-/// A short reading of a whole condition, for cards and outlines.
 pub fn summary(value: &Value) -> String {
     fn go(value: &Value, out: &mut String, depth: usize) {
         if depth > 4 {
@@ -741,7 +732,7 @@ pub fn summary(value: &Value) -> String {
         }
         match value {
             Value::Object(object) if object.get("var").is_some() && object.len() == 1 => {
-                out.push_str(&format!("◇{}", object["var"].as_str().unwrap_or("")));
+                out.push_str(&format!("◇{}", object.text("var")));
             }
             Value::Object(object) => {
                 let tag = object.get("type").and_then(Value::as_str).unwrap_or("");

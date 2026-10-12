@@ -6,6 +6,7 @@ use super::{ACTIONS, DIRECTIONS, strip_of};
 use crate::app::Editor;
 use crate::project::Selection;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 use crate::views::area::TILE_PX;
 use crate::views::area::scene::{SceneRequest, SceneSpec, SceneryOf};
 
@@ -276,7 +277,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .push("drag the hitbox handles · Shift snaps to quarter tiles".to_owned());
 }
 
-/// What the model's modules change in play: its flight over an area it lives in.
 fn inset(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -384,7 +384,6 @@ fn inset(
     );
 }
 
-/// An area where an npc with this model stands, and its name.
 fn home(editor: &Editor, key: &str) -> Option<(String, Pos<game::core::tiling::Tiles>, String)> {
     let project = editor.project.as_ref()?;
     let npcs: Vec<String> = super::users(editor, key)
@@ -407,8 +406,7 @@ fn home(editor: &Editor, key: &str) -> Option<(String, Pos<game::core::tiling::T
         };
         for module in row["modules"].as_array().into_iter().flatten() {
             let npc = module["npc"].as_str().unwrap_or_default();
-            if !matches!(module["type"].as_str(), Some("resident" | "population"))
-                || !npcs.iter().any(|n| n == npc)
+            if !matches!(module.kind(), "resident" | "population") || !npcs.iter().any(|n| n == npc)
             {
                 continue;
             }

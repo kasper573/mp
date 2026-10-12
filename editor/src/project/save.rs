@@ -69,7 +69,6 @@ pub fn save(
     Ok(done)
 }
 
-/// Removes temp files an interrupted save left behind.
 pub fn clean_leftovers(root: &Path) {
     fn walk(dir: &Path) {
         let Ok(entries) = std::fs::read_dir(dir) else {

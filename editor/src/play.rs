@@ -14,13 +14,12 @@ use serde_json::Value;
 use crate::app::{Dialog, Editor};
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
 const READY_WITHIN: Duration = Duration::from_secs(30);
 
-/// A play-test: the prebuilt server and desktop client as one process group on the open folder,
-/// as a test character, their output tagged in the Output tab.
 #[derive(Default)]
 pub struct Play {
     pub running: Option<Running>,
@@ -60,7 +59,6 @@ pub struct Failure {
     pub reason: String,
 }
 
-/// What the binaries folder holds: each binary's build and the content version it reads.
 #[derive(Clone)]
 pub struct Binaries {
     pub folder: PathBuf,
@@ -82,7 +80,6 @@ impl Binaries {
     }
 }
 
-/// The ports and character a started server waits to spawn, with the channel that reports it.
 type SpawnJob = (
     u16,
     u16,
@@ -111,8 +108,6 @@ impl Running {
     }
 }
 
-/// Every frame: reads what the processes printed, follows the ready line into the client's
-/// start, and stops everything when one of them ends.
 pub fn poll(editor: &mut Editor) {
     let Some(running) = editor.play.running.as_mut() else {
         return;
@@ -237,8 +232,6 @@ fn drain(lines: &Mutex<Receiver<(&'static str, String)>>) -> Vec<(&'static str, 
         .unwrap_or_default()
 }
 
-/// Saves, then starts the server and the client as the picked test character, at `start` for
-/// Play here or at the character's own start.
 pub fn start(editor: &mut Editor, start: Option<Place>) {
     if editor.project.is_none() {
         return;
@@ -312,7 +305,6 @@ pub fn stop(editor: &mut Editor) {
     }
 }
 
-/// Saves and starts again as the same character from the same place; nothing carries over.
 pub fn restart(editor: &mut Editor) {
     let start = editor.play.last_start;
     if let Some(mut running) = editor.play.running.take() {
@@ -329,14 +321,22 @@ pub fn restart(editor: &mut Editor) {
     crate::play::start(editor, start);
 }
 
-/// The play controls at the right of the top bar: Play with its character menu, and while a
-/// play-test runs, its state, the edits since it started, Restart and Stop.
 pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let characters = test_characters(editor);
     let current = current_character(editor);
-    let play = widgets::primary(ui, "▸ Play")
-        .on_hover_text("Save, then play as the picked test character from its own start (F5)");
-    let menu = egui::Popup::from_toggle_button_response(&play)
+    let (play, arrow) = ui
+        .scope(|ui| {
+            ui.spacing_mut().item_spacing.x = 1.0;
+            let arrow = ui
+                .add(egui::Button::new(RichText::new("▾").size(12.0)).fill(theme::ACCENT))
+                .on_hover_text("Pick the test character");
+            let play = widgets::primary(ui, "▸ Play").on_hover_text(
+                "Save, then play as the picked test character from its own start (F5)",
+            );
+            (play, arrow)
+        })
+        .inner;
+    let menu = egui::Popup::from_toggle_button_response(&arrow)
         .id(ui.id().with("play-menu"))
         .width(230.0);
     let mut pick: Option<String> = None;
@@ -451,7 +451,6 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     }
 }
 
-/// The banner over an area when a play-test failed: the cause in one sentence and what to do next.
 pub fn banner(editor: &mut Editor, ui: &mut Ui) {
     let Some(failure) = editor.play.failure.as_ref() else {
         return;
@@ -524,7 +523,6 @@ pub fn save_output(editor: &Editor) {
     }
 }
 
-/// HOW A PLAY-TEST CAN FAIL: every ending, for the inspector while a failure shows.
 pub fn failures_card(ui: &mut Ui) {
     widgets::section(ui, "How a play-test can fail");
     for (what, then) in [
@@ -580,7 +578,6 @@ pub fn status(editor: &mut Editor) {
     }
 }
 
-/// The test characters of the folder, with the level their xp earns and where they start.
 pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
@@ -616,7 +613,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
                 })
                 .unwrap_or(0);
             let area = match &row["start"] {
-                Value::Object(place) => place["area"].as_str().unwrap_or("?").to_owned(),
+                Value::Object(place) => place.text_or("area", "?").to_owned(),
                 _ => spawn_area
                     .clone()
                     .map(|area| format!("the spawn · {area}"))
@@ -644,7 +641,6 @@ pub fn current_character(editor: &Editor) -> Option<String> {
         .or_else(|| characters.first().map(|character| character.key.clone()))
 }
 
-/// The folder the binaries come from: the setting, else next to the editor itself.
 pub fn binaries_folder(editor: &Editor) -> PathBuf {
     editor
         .settings
@@ -660,7 +656,6 @@ pub fn next_to_editor() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// Asks each binary in the folder for its build; cached until the folder changes.
 pub fn check_binaries(editor: &mut Editor) -> Binaries {
     let folder = binaries_folder(editor);
     if let Some(known) = editor
@@ -691,12 +686,11 @@ fn build_info(binary: &Path) -> Result<BuildInfo, String> {
     let text = String::from_utf8_lossy(&output.stdout);
     let value: Value = serde_json::from_str(text.trim()).map_err(|_| "no build line".to_owned())?;
     Ok(BuildInfo {
-        build: value["build"].as_str().unwrap_or("?").to_owned(),
-        content_version: value["content_version"].as_str().unwrap_or("?").to_owned(),
+        build: value.text_or("build", "?").to_owned(),
+        content_version: value.text_or("content_version", "?").to_owned(),
     })
 }
 
-/// GAME BINARIES: the folder, each binary's build against the editor's, and the way out of a mismatch.
 pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let binaries = check_binaries(editor);
     let build = game::core::content::version::build();
@@ -903,8 +897,6 @@ fn spawn_client(
     spawn(command, CLIENT, sender)
 }
 
-/// Starts a binary in its own process group with every pipe held, and two threads feeding its
-/// output lines into the Output tab.
 fn spawn(
     mut command: Command,
     tag: &'static str,
@@ -946,7 +938,6 @@ fn ready_ports(line: &str) -> Option<(u16, u16)> {
     Some((ready["http"].as_u64()? as u16, ready["ws"].as_u64()? as u16))
 }
 
-/// POST /test/character: the server builds the character from its own rows; Play here adds a start.
 fn hand_over(
     content: Option<Content>,
     http: u16,
@@ -956,7 +947,7 @@ fn hand_over(
     let mut body = serde_json::json!({ "test_character": character });
     if let (Some(place), Some(content)) = (start, content) {
         let (start_json, _) =
-            with_content(ContentScope::of(&content), || serde_json::to_value(place));
+            with_content(ContentScope::of(&content), || crate::value::json(&place));
         body["start"] = start_json.map_err(|error| error.to_string())?;
     }
     let response = ureq::post(format!("http://127.0.0.1:{http}/test/character"))
@@ -978,7 +969,6 @@ impl Drop for Process {
     }
 }
 
-/// Terminal colour codes mean nothing in the Output tab.
 fn plain(line: &str) -> String {
     let mut out = String::with_capacity(line.len());
     let mut chars = line.chars().peekable();

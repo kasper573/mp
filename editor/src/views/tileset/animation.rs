@@ -12,7 +12,6 @@ use crate::views::model::preview;
 pub const MAX_FRAMES: usize = 256;
 const PREVIEW_W: f32 = 224.0;
 
-/// A tile's animation as offsets from itself, with each frame's length.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Offsets {
     pub offsets: Vec<i64>,
@@ -37,7 +36,6 @@ pub fn offsets_of(row: &Value, tile: u32) -> Option<Offsets> {
     })
 }
 
-/// What the selection animates: the most common offsets and lengths, and the tiles that differ.
 pub struct Common {
     pub offsets: Offsets,
     pub tiles: Vec<u32>,
@@ -219,7 +217,6 @@ fn signed(offset: i64) -> String {
     }
 }
 
-/// The common animation as a strip the preview clock can run.
 pub fn reference_frames(common: Option<&Common>) -> Vec<FrameData> {
     common
         .map(|common| {
@@ -294,7 +291,6 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str, row: &Value, grid: &Grid) {
     }
 }
 
-/// Writes the same offsets and lengths onto every tile, each frame naming the tile it shows.
 pub fn apply(
     editor: &mut Editor,
     key: &str,
@@ -348,7 +344,6 @@ pub fn remove_frame(editor: &mut Editor, key: &str, row: &Value, common: &Common
     }
 }
 
-/// The animation card: frames as offsets over the selection, their unit and lengths.
 pub fn card(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let Some(selection) = editor.views.tileset.views[key].selection else {
         widgets::hint(
@@ -670,7 +665,6 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Gri
     }
 }
 
-/// The TIMELINE tab: the common animation's frames, each as the block it shows, as long as it lasts.
 pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let Some(selection) = editor.views.tileset.views[key].selection else {
         ui.add_space(8.0);

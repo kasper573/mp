@@ -6,8 +6,6 @@ use super::report::{self, ReportAction};
 use super::{theme, widgets};
 use crate::app::{Dialog, Editor, NewGameDialog, NewGameSource};
 
-/// The start screen: recent games with their menus, Open folder and New game, and beside them the
-/// load report of a folder this build refused.
 pub fn show(editor: &mut Editor, root: &mut egui::Ui) {
     let ctx = root.ctx().clone();
     let ctx = &ctx;
@@ -88,52 +86,59 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
         let name = game_name(folder);
         let path = super::pretty_path(folder);
         let ago = editor.settings.opened_ago(folder);
-        let response = egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(10, 8))
-            .corner_radius(4.0)
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.label(theme::strong(name));
-                    ui.label(theme::muted(path).monospace().size(12.5));
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.menu_button(theme::faint("…"), |ui| {
-                            if ui
-                                .add(egui::Button::new("Open").shortcut_text("Enter"))
-                                .clicked()
-                            {
-                                open = Some(folder.clone());
-                                ui.close();
-                            }
-                            if ui
-                                .add(
-                                    egui::Button::new("+ New game from this…")
-                                        .shortcut_text("Ctrl D"),
-                                )
-                                .clicked()
-                            {
-                                copy = Some(folder.clone());
-                                ui.close();
-                            }
-                            if ui.button("Show folder").clicked() {
-                                let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
-                                ui.close();
-                            }
-                            ui.separator();
-                            if ui
-                                .add(egui::Button::new("Remove from list").shortcut_text("Del"))
-                                .clicked()
-                            {
-                                forget = Some(folder.clone());
-                                ui.close();
-                            }
+        let response = ui
+            .scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::symmetric(10, 8))
+                    .corner_radius(4.0)
+                    .show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.horizontal(|ui| {
+                            ui.label(theme::strong(name));
+                            ui.label(theme::muted(path).monospace().size(12.5));
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.menu_button(theme::faint("…"), |ui| {
+                                    if ui
+                                        .add(egui::Button::new("Open").shortcut_text("Enter"))
+                                        .clicked()
+                                    {
+                                        open = Some(folder.clone());
+                                        ui.close();
+                                    }
+                                    if ui
+                                        .add(
+                                            egui::Button::new("+ New game from this…")
+                                                .shortcut_text("Ctrl D"),
+                                        )
+                                        .clicked()
+                                    {
+                                        copy = Some(folder.clone());
+                                        ui.close();
+                                    }
+                                    if ui.button("Show folder").clicked() {
+                                        let _ = std::process::Command::new("xdg-open")
+                                            .arg(folder)
+                                            .spawn();
+                                        ui.close();
+                                    }
+                                    ui.separator();
+                                    if ui
+                                        .add(
+                                            egui::Button::new("Remove from list")
+                                                .shortcut_text("Del"),
+                                        )
+                                        .clicked()
+                                    {
+                                        forget = Some(folder.clone());
+                                        ui.close();
+                                    }
+                                });
+                                ui.label(theme::faint(ago).monospace().size(12.0));
+                            });
                         });
-                        ui.label(theme::faint(ago).monospace().size(12.0));
                     });
-                });
             })
-            .response
-            .interact(egui::Sense::click());
+            .response;
         if response.hovered() {
             ui.painter().rect_filled(
                 response.rect,
@@ -182,7 +187,6 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
     }
 }
 
-/// The name in a folder's game.json, else the folder's name.
 pub fn game_name(folder: &Path) -> String {
     std::fs::read_to_string(folder.join("game.json"))
         .ok()
@@ -345,7 +349,6 @@ pub fn new_game_dialog(editor: &mut Editor, copy: Option<PathBuf>) {
     }));
 }
 
-/// A folder name from a game name: lower case, words joined by dashes.
 pub fn slug(name: &str) -> String {
     let mut out = String::new();
     for c in name.trim().chars() {

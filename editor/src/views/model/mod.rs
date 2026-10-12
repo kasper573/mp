@@ -18,6 +18,7 @@ use crate::app::{BottomTab, Editor};
 use crate::project::{Edit, Selection, row_file};
 use crate::thumbs::Thumb;
 use crate::ui::theme;
+use crate::value::RowValue;
 
 pub const TABLE: &str = "model";
 pub const ACTIONS: [&str; 5] = ["idle", "walk", "run", "attack", "death"];
@@ -99,7 +100,6 @@ pub struct RemoveFace {
     pub uses: usize,
 }
 
-/// One frame of a strip as the row stores it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameData {
     pub frame: u32,
@@ -149,7 +149,6 @@ impl FrameData {
     }
 }
 
-/// The sheet a model draws from: its image and the grid of frames cut from it.
 #[derive(Clone)]
 pub struct SheetInfo {
     pub image: String,
@@ -179,7 +178,6 @@ impl SheetInfo {
         )
     }
 
-    /// Draws one frame aspect-fitted into `rect`, at a whole scale when it fits.
     pub fn draw(&self, painter: &egui::Painter, rect: ERect, frame: u32, tint: Color32) {
         let Some(thumb) = &self.thumb else {
             return;
@@ -273,7 +271,6 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: Page) {
     });
 }
 
-/// The view state of a model, made on first sight with its bust card folded.
 pub fn ensure_view(editor: &mut Editor, key: &str) {
     if editor.views.model.views.contains_key(key) {
         return;
@@ -352,7 +349,6 @@ pub fn lengths(frames: &[FrameData]) -> Vec<u32> {
     frames.iter().map(|frame| frame.ms).collect()
 }
 
-/// The lengths most of an action's directions share, and which directions differ from them.
 pub struct ActionTiming {
     pub common: Vec<u32>,
     pub differing: Vec<usize>,
@@ -384,7 +380,6 @@ pub fn action_timing(row: &Value, action: &str) -> ActionTiming {
     ActionTiming { common, differing }
 }
 
-/// How the engine plays an action.
 pub fn play_rule(action: &str) -> &'static str {
     match action {
         "attack" => "once per swing",
@@ -402,7 +397,7 @@ pub fn play_rule_long(action: &str) -> &'static str {
 }
 
 pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> SheetInfo {
-    let image = row["sprites"]["image"].as_str().unwrap_or("").to_owned();
+    let image = row["sprites"].text("image").to_owned();
     let frame_width = row["sprites"]["frame_size"]["width"]
         .as_u64()
         .unwrap_or(1)
@@ -524,7 +519,6 @@ pub fn select_cue(
     });
 }
 
-/// The npcs and players drawn with a model.
 pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();

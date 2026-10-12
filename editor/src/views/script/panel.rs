@@ -9,6 +9,7 @@ use crate::app::Editor;
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
+use crate::value::RowValue;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, panel: Panel) {
     match panel {
@@ -19,15 +20,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, panel: Panel) {
     }
 }
 
-/// One owner a script is bound to: its label and the row the compiled scripts are keyed by.
 pub struct Bound {
     pub label: String,
     pub row: OwnerRow,
     pub file: String,
 }
 
-/// The owners whose compiled procedures this script is part of: the owner itself for an inline
-/// script, every owner naming a shared one.
 pub fn bindings(editor: &Editor, doc: &Doc) -> Vec<Bound> {
     let Some(project) = &editor.project else {
         return Vec::new();
@@ -194,7 +192,6 @@ pub fn owner_row(content: &Content, table: &str, key: &str, pointer: &str) -> Op
     })
 }
 
-/// MAY DO: everything any flow may do, by kind, with the content it names; one summary per owner.
 fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
         ui.label(theme::muted("The folder does not load"));
@@ -298,7 +295,6 @@ fn may_row(ui: &mut Ui, label: &str, text: &str, present: bool) {
     ui.add_space(2.0);
 }
 
-/// The MAY DO rows: label, sentence, whether anything is there.
 fn may_do_rows(
     content: &Content,
     doc: &Doc,
@@ -640,7 +636,7 @@ fn dedup(list: Vec<String>) -> Vec<String> {
 }
 
 fn nodes_kind(node: &Value) -> &str {
-    node["type"].as_str().unwrap_or("")
+    node.kind()
 }
 
 fn trim(number: f32) -> String {
@@ -651,7 +647,6 @@ fn trim(number: f32) -> String {
     }
 }
 
-/// "5 gold" from the first stack of that item in the script, else the item alone.
 fn stack_text(doc: &Doc, field: &str, item: &str) -> String {
     for node in doc.nodes().values() {
         for stack in node[field].as_array().into_iter().flatten() {
@@ -664,7 +659,6 @@ fn stack_text(doc: &Doc, field: &str, item: &str) -> String {
     item.to_owned()
 }
 
-/// What the conditions read: memories, held items, places, as the ifs and choices name them.
 fn reads_of(doc: &Doc) -> String {
     fn walk(
         value: &Value,
@@ -741,7 +735,6 @@ fn reads_of(doc: &Doc) -> String {
     parts.join(" · ")
 }
 
-/// Who reads the summary: the world map, the area view, the loader, item sources.
 fn read_by_rows(
     content: &Content,
     may: &game::core::script::MayDo<game::systems::script::RiftScripting>,
@@ -855,7 +848,6 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
     }
 }
 
-/// USED BY: each owner naming the script, with the values it gives; a click opens it in place.
 fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let mut open: Option<(String, String, Option<String>)> = None;
     match &doc.owner {
@@ -1037,7 +1029,6 @@ fn plural(count: usize, word: &str) -> String {
     }
 }
 
-/// How many owners name a shared script, for the tab's count.
 pub fn used_by_count(editor: &Editor, owner: &ScriptOwner) -> usize {
     match owner {
         ScriptOwner::Inline { .. } => 1,
@@ -1059,7 +1050,7 @@ fn summarise_values(values: &Value) -> String {
                     {
                         format!(
                             "{name} {} · {}, {}",
-                            place["area"].as_str().unwrap_or("?"),
+                            place.text_or("area", "?"),
                             trim(place["x"].as_f64().unwrap_or(0.0) as f32),
                             trim(place["y"].as_f64().unwrap_or(0.0) as f32)
                         )

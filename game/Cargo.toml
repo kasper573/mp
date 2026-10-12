@@ -155,6 +155,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optional = true }
 cargo_metadata = "0.19"
 syn = { workspace = true, features = ["visit"] }
+proc-macro2 = { workspace = true, features = ["span-locations"] }
 
 # Wasm-only features: `reflect_auto_register`'s #[used] registration slices defeat --gc-sections,
 # so enabling it natively would drag the whole (unused) render stack into the server binary.

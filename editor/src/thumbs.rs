@@ -4,7 +4,6 @@ use egui::{ColorImage, TextureHandle, TextureOptions};
 
 use crate::project::Files;
 
-/// Decoded images handed to egui, by asset path, so pickers and views can draw content art.
 #[derive(Default)]
 pub struct Thumbnails {
     textures: HashMap<String, Option<Thumb>>,
@@ -19,7 +18,6 @@ pub struct Thumb {
 }
 
 impl Thumbnails {
-    /// The texture of `assets/<path>`, decoded on first use and again when its bytes change.
     pub fn image(&mut self, ctx: &egui::Context, files: &Files, path: &str) -> Option<Thumb> {
         let file = format!("assets/{path}");
         let bytes = files.get(&file)?;
@@ -56,7 +54,6 @@ pub fn decode(bytes: &[u8]) -> Option<ColorImage> {
     Some(ColorImage::from_rgba_unmultiplied(size, image.as_raw()))
 }
 
-/// The egui texture rect of a region of a sheet, in 0–1 coordinates.
 pub fn uv(size: [usize; 2], x: f32, y: f32, w: f32, h: f32) -> egui::Rect {
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     egui::Rect::from_min_max(

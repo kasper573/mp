@@ -4,7 +4,6 @@ use egui::{
 
 use super::theme;
 
-/// A small-caps section header such as LAYERS or THIS WORLD.
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(6.0);
     ui.label(
@@ -16,12 +15,10 @@ pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(1.0);
 }
 
-/// A section header with a count after it, such as MODULES · 6.
 pub fn section_count(ui: &mut Ui, text: &str, count: impl std::fmt::Display) {
     section(ui, &format!("{text} · {count}"));
 }
 
-/// One row of a key–value list: the key muted on the left, the value on the right.
 pub fn kv(ui: &mut Ui, key: &str, value: impl FnOnce(&mut Ui)) {
     ui.horizontal(|ui| {
         ui.add_sized(
@@ -44,7 +41,6 @@ pub fn kv_code(ui: &mut Ui, key: &str, value: impl Into<String>) {
     });
 }
 
-/// A strip of panel tabs in small caps, the active one underlined in the accent colour.
 pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
@@ -97,7 +93,6 @@ pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active:
     );
 }
 
-/// A keyboard hint such as Ctrl Z, drawn as a key cap.
 pub fn key_hint(ui: &mut Ui, keys: &str) {
     let text = RichText::new(keys)
         .monospace()
@@ -113,7 +108,6 @@ pub fn key_hint(ui: &mut Ui, keys: &str) {
         });
 }
 
-/// A toolbar button with its shortcut as a key cap: "Undo [Ctrl Z]".
 pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Response {
     let label_width = ui
         .painter()
@@ -188,7 +182,6 @@ pub fn key_hint_text(ui: &mut Ui, keys: &str, text: &str) {
     });
 }
 
-/// A switch: on is accent with the knob right, off is muted with the knob left.
 pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
     let size = Vec2::new(30.0, 16.0);
     let (rect, mut response) = ui.allocate_exact_size(size, Sense::click());
@@ -210,7 +203,6 @@ pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
     response
 }
 
-/// A rounded chip: a filter, a tag, a state.
 pub fn chip(ui: &mut Ui, text: &str) -> Response {
     chip_coloured(ui, text, theme::RAISED, theme::TEXT)
 }
@@ -228,7 +220,6 @@ pub fn chip_coloured(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Re
     response.interact(Sense::click())
 }
 
-/// A chip with a ✕ that returns whether it was closed.
 pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
     let mut closed = false;
     let response = egui::Frame::new()
@@ -255,7 +246,6 @@ pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
     (response.interact(Sense::click()), closed)
 }
 
-/// A coloured pill such as "saved" or "playing".
 pub fn pill(ui: &mut Ui, text: &str, colour: Color32) -> Response {
     egui::Frame::new()
         .fill(Color32::from_rgba_unmultiplied(
@@ -278,7 +268,6 @@ pub fn pill(ui: &mut Ui, text: &str, colour: Color32) -> Response {
 
 pub const BADGE_SIZE: f32 = 16.0;
 
-/// The letter badge of a module kind.
 pub fn badge(ui: &mut Ui, kind: &str) {
     let colour = theme::badge_colour(kind);
     let letter = theme::badge_letter(kind);
@@ -293,7 +282,6 @@ pub fn badge(ui: &mut Ui, kind: &str) {
     );
 }
 
-/// A primary (blue) button.
 pub fn primary(ui: &mut Ui, text: &str) -> Response {
     ui.add(
         egui::Button::new(
@@ -313,7 +301,6 @@ pub fn danger(ui: &mut Ui, text: &str) -> Response {
     )
 }
 
-/// The frame of a card: raised fill, a hairline border, rounded corners.
 pub fn card_frame(selected: bool) -> egui::Frame {
     egui::Frame::new()
         .fill(theme::RAISED)
@@ -329,7 +316,6 @@ pub fn card_frame(selected: bool) -> egui::Frame {
         .inner_margin(egui::Margin::symmetric(10, 8))
 }
 
-/// A card header: grip, badge, title, a muted subtitle, and a ⋯ menu on the right.
 pub fn card_header(
     ui: &mut Ui,
     kind: &str,
@@ -357,7 +343,6 @@ pub fn card_header(
     response.interact(Sense::click())
 }
 
-/// A boxed block of monospace text: a report, stored JSON, a clipboard.
 pub fn code_block(ui: &mut Ui, text: &str) {
     egui::Frame::new()
         .fill(theme::INPUT)
@@ -369,12 +354,10 @@ pub fn code_block(ui: &mut Ui, text: &str) {
         });
 }
 
-/// A muted one-line explanation under a control.
 pub fn hint(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).color(theme::MUTED).size(12.5));
 }
 
-/// A search field with a magnifier and a key hint.
 pub fn search_box(
     ui: &mut Ui,
     text: &mut String,

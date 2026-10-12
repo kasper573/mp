@@ -5,7 +5,6 @@ use super::files::Change;
 pub const MAX_STEPS: usize = 500;
 pub const MAX_BYTES: usize = 64 * 1024 * 1024;
 
-/// One undoable gesture: the touched files before and after, and where the editor was looking.
 #[derive(Clone)]
 pub struct Step {
     pub label: String,
@@ -92,7 +91,6 @@ impl History {
         self.applied = 0;
     }
 
-    /// Merges a repeat of the latest step's gesture into it when it came within a second.
     pub fn merge_into_last(&mut self, label: &str, after: Vec<Change>) -> bool {
         if self.applied != self.steps.len() {
             return false;

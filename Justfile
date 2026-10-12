@@ -1,7 +1,7 @@
 set shell := ["bash", "-c"]
 
 compose_file := "docker/docker-compose.yaml"
-compose := "docker compose -f " + compose_file + " --profile test"
+compose := "docker compose -f " + compose_file + " -f docker/docker-compose.test.yaml --profile test"
 
 lint:
     cargo fmt --check
@@ -213,6 +213,24 @@ synth-sfx:
 
 build:
     cargo build --release -p website -p game --bin website --bin game-server
+
+# Build the editor and the two game binaries it starts into one folder (target/release), then open the
+# editor on FOLDER (the shipped example by default).
+editor folder="content":
+    cargo build --release -p editor -p game --bin editor --bin game-server --bin desktop-client
+    target/release/editor {{folder}}
+
+# The archive a release ships: the three binaries and the example content, for the running platform.
+archive out="target/archive":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --release -p editor -p game --bin editor --bin game-server --bin desktop-client
+    rm -rf "{{out}}" && mkdir -p "{{out}}"
+    for binary in editor game-server desktop-client; do
+      cp "target/release/$binary" "{{out}}/" 2>/dev/null || cp "target/release/$binary.exe" "{{out}}/"
+    done
+    cp -r content "{{out}}/content"
+    echo "{{out}}"
     cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
 
 # The browser client: a wasm binary post-processed by wasm-bindgen into the bundle the website serves
@@ -227,9 +245,14 @@ wasm:
 stack: build wasm stack-up
 
 # --profile dev adds the grafana/loki/tempo/... stack (opt-in; see the e2e-stack-up note).
-stack-up:
+stack-up: stack-content
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
     {{compose}} --profile dev up -d --build --wait
+
+# The content folder the local stack's game server reads: a copy, so a deploy chapter can change it.
+[private]
+stack-content:
+    rm -rf target/stack/content && mkdir -p target/stack && cp -r content target/stack/content
 
 prewarm:
     {{compose}} pull --ignore-buildable || true
@@ -271,7 +294,7 @@ e2e filter="": build wasm e2e-stack-up (e2e-run filter)
 # only stack-up activates) — the e2e doesn't exercise it, and pulling/starting it is the bulk of the
 # stack's startup. Everything else comes up, so new game services are picked up automatically.
 [private]
-e2e-stack-up:
+e2e-stack-up: stack-content
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
     {{compose}} up -d --build --wait
 

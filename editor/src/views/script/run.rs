@@ -37,7 +37,6 @@ use crate::ui::{theme, widgets};
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;
 
-/// What a run starts with: the event, the pretend subject, the clock and the picks that steer it.
 #[derive(Clone, Debug)]
 pub struct Setup {
     pub event: String,
@@ -71,8 +70,6 @@ pub enum RunState {
     Ended,
 }
 
-/// One script run: a headless area world of the owner's area, a pretend character as subject,
-/// and the trace of every node the flow stepped through.
 pub struct Run {
     pub doc_owner: ScriptOwner,
     pub label: String,
@@ -99,7 +96,6 @@ struct Watched {
     items: Vec<String>,
 }
 
-/// RUN: Fire an event on a copy of one owner by a pretend character; the trace lists each node.
 pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let _ = super::catalogue(editor);
     let bound = bindings(editor, doc);
@@ -473,8 +469,6 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// The client's conversation box, drawn over the canvas while the run waits for a choice;
-/// 1–9 pick, Esc leaves.
 pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let owner = doc.owner.clone();
     let Some(run) = editor
@@ -611,8 +605,6 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-/// The inspector while a run is live: the owner's state and flows, and the pretend subject as
-/// the run's world holds it now, edited in place.
 pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
     let owner_key = doc.owner.clone();
     if !editor
@@ -769,7 +761,7 @@ fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String])
     let set: Vec<String> = run
         .world
         .get::<Memory>(subject)
-        .and_then(|memory| serde_json::to_value(memory).ok())
+        .and_then(|memory| crate::value::json(memory).ok())
         .and_then(|json| json.as_object().map(|map| map.keys().cloned().collect()))
         .unwrap_or_default();
     let mut shown: Vec<String> = read.to_vec();
@@ -1119,7 +1111,6 @@ fn set_held(world: &mut World, subject: Entity, item: item::Id, count: u32) {
     }
 }
 
-/// The memories the script's ifs and choices read, in the order they appear.
 fn memories_read(doc: &Doc) -> Vec<String> {
     fn walk(value: &serde_json::Value, out: &mut Vec<String>) {
         match value {
@@ -1152,7 +1143,6 @@ fn memories_read(doc: &Doc) -> Vec<String> {
     out
 }
 
-/// Which arrow an if or random node took, read off the node the flow stepped to next.
 fn branch_taken(doc: &Doc, node: &str, next: Option<&String>) -> Option<String> {
     let next = next?.split("  ·  ").next()?;
     let source = doc.nodes().get(node)?;
@@ -1177,7 +1167,6 @@ fn run_content(run: &Run) -> Content {
     *run.world.resource::<Content>()
 }
 
-/// One tick of a headless area world, as the server steps its worlds.
 fn step(world: &mut World) {
     world.run_schedule(Main);
     world.clear_trackers();
@@ -1269,7 +1258,6 @@ fn send<M: bevy::ecs::message::Message>(world: &mut World, conn: Entity, message
     });
 }
 
-/// The area a run happens in and where the subject should stand.
 fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> {
     let spawn = content.built::<game::systems::GameSettings>().spawn;
     match owner.row.kind {
@@ -1420,7 +1408,6 @@ impl Run {
         step(&mut self.world);
     }
 
-    /// Ticks until the flow pauses where the game would, or ends.
     pub fn go(&mut self) {
         for _ in 0..MAX_TICKS {
             self.tick();
@@ -1472,7 +1459,6 @@ impl Run {
         }
     }
 
-    /// Reads what the last ticks did: nodes stepped, notices sent, the box shown, where it waits.
     fn read(&mut self) {
         let content = run_content(self);
         let steps: Vec<(FlowKey, String, &'static str)> = {

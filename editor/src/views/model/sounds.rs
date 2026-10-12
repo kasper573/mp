@@ -17,7 +17,6 @@ pub enum PlayRequest {
     Sfx(String),
 }
 
-/// A sound file's shape and measurements, decoded once per hash.
 #[derive(Clone)]
 pub struct Wave {
     pub bins: Vec<f32>,
@@ -74,7 +73,6 @@ fn analyse(bytes: &[u8]) -> Option<Wave> {
     })
 }
 
-/// The loudest window of a sound, as effects are judged, and its true peak.
 fn measure(decoded: &Decoded) -> Option<EffectLoudness> {
     let mut meter = ebur128::EbuR128::new(
         decoded.channels,
@@ -141,7 +139,6 @@ pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], colour: Col
     ));
 }
 
-/// What a sound is for, by where its file lives, and the level the mix wants from it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Role {
     Combat,
@@ -190,7 +187,6 @@ impl Role {
     }
 }
 
-/// How a sound's loudest moment sits against the mix: a sentence per measurement.
 pub struct Verdict {
     pub ok: bool,
     pub loudness: String,
@@ -251,7 +247,6 @@ pub fn sfx_keys(editor: &Editor) -> Vec<String> {
     keys
 }
 
-/// The surfaces a step can sound on: key, name and footstep row.
 pub fn surfaces(editor: &Editor) -> Vec<(String, String, String)> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
@@ -292,7 +287,6 @@ pub enum Filter {
     All,
 }
 
-/// The SOUNDS tab: every sound row with its shape, to audition or put on the selected cue.
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, _row: &Value) {
     let keys = sfx_keys(editor);
     let (search, filter) = {
@@ -497,7 +491,6 @@ fn sound_row(
     response
 }
 
-/// A sound row's volume and pitch as sentences, and the gain its loudest setting applies.
 pub fn volume_of(editor: &Editor, sfx: &str) -> (String, f32) {
     let row = editor.row_value("sfx", sfx).unwrap_or(Value::Null);
     scalar_text(&row["volume"])
@@ -541,7 +534,6 @@ fn resolve(value: &Value, seed: u64) -> f32 {
     min + (max - min) * unit
 }
 
-/// Plays queued sounds through the game's audio stack at game volumes.
 pub fn sync(editor: &mut Editor, world: &mut World) {
     let requests = std::mem::take(&mut editor.views.model.play);
     if requests.is_empty() {

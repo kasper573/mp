@@ -55,7 +55,6 @@ impl StatKind {
     }
 }
 
-/// Marks every stat's schema with its unit, for `#[schemars(transform = ...)]` on a `StatMap` field.
 pub fn schema_with_units(schema: &mut schemars::Schema) {
     let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) else {
         return;

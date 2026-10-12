@@ -1,4 +1,3 @@
-/// Where every value of a JSON document starts, by JSON pointer, in document order.
 pub struct JsonIndex {
     values: Vec<IndexedValue>,
 }
@@ -27,8 +26,6 @@ impl JsonIndex {
         }
     }
 
-    /// The position of the value at `pointer`, or of the nearest ancestor present (a missing field
-    /// lands at its object).
     pub fn position(&self, pointer: &str) -> Option<(usize, usize)> {
         let mut wanted = pointer.to_owned();
         loop {
