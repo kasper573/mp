@@ -10,6 +10,7 @@ use crate::core::script::{
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
 use crate::systems::area::{self, AreaTag, object};
+use crate::systems::dialogue;
 use crate::systems::movement::{self, MoveTarget, Path};
 use crate::systems::npc::{Home, Roams};
 use crate::systems::reach::{self, ReachAct};
@@ -137,11 +138,19 @@ pub fn face_toward(world: &mut World, npc: Entity, toward: Pos<Tiles>) {
 pub fn drive(
     world: &mut World,
     bodies: &mut QueryState<Entity, With<Body>>,
+    sessions: &mut dialogue::Sessions,
     mut npcs: Local<Vec<Entity>>,
 ) {
     npcs.clear();
     npcs.extend(bodies.iter(world));
+    let talking = dialogue::counterparts(world, sessions);
     for &npc in npcs.iter() {
+        if talking.contains(&npc) {
+            if movement::moving(world, npc) {
+                movement::forget(world, npc);
+            }
+            continue;
+        }
         if stat::is_dead(world, npc) {
             let Some(mut body) = world.get_mut::<Body>(npc) else {
                 continue;

@@ -324,6 +324,15 @@ pub fn in_conversation(world: &World, player: Entity) -> bool {
     world.get::<ConversationSession>(player).is_some()
 }
 
+pub type Sessions = QueryState<&'static ConversationSession>;
+
+pub fn counterparts(world: &World, sessions: &mut Sessions) -> Vec<Entity> {
+    sessions
+        .iter(world)
+        .filter_map(|session| session.with)
+        .collect()
+}
+
 pub fn engaged_with(world: &World, player: Entity, with: Option<Entity>) -> bool {
     world
         .get::<ConversationSession>(player)

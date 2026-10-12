@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page, TestInfo } from "@playwright/test";
+import { createWriteStream, type WriteStream } from "node:fs";
 import { basename, extname, join } from "node:path";
 
 import { VIDEO } from "../demo.config";
@@ -33,12 +34,16 @@ const OUTRO_MS = 1500;
 // `<chapter file name>.webm`, opening on a card with the test's title and the summary.
 export function chapter({ summary, setup = enterWorld, play }: Chapter) {
   return async ({ page, browser, baseURL }: Fixtures, info: TestInfo): Promise<void> => {
+    const log = createWriteStream(chapterPath(info.file, ".log"));
+    watchConsole(page, log);
     const extras: BrowserContext[] = [];
     const cast: Cast = {
       newPage: async () => {
         const context = await browser.newContext({ baseURL, viewport: VIDEO, ignoreHTTPSErrors: true });
         extras.push(context);
-        return context.newPage();
+        const other = await context.newPage();
+        watchConsole(other, log);
+        return other;
       },
     };
     try {
@@ -53,11 +58,12 @@ export function chapter({ summary, setup = enterWorld, play }: Chapter) {
         await page.waitForTimeout(OUTRO_MS);
       } finally {
         // Kept on failure too: the recording is the quickest way to see what went wrong.
-        await recording.finish(videoPath(info.file));
+        await recording.finish(chapterPath(info.file, ".webm"));
       }
     } finally {
       // The browser outlives the chapter, and so would these players, walking into the next one.
       await Promise.all(extras.map((context) => context.close()));
+      log.end();
     }
   };
 }
@@ -233,8 +239,16 @@ function escape(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function videoPath(chapterFile: string): string {
+function chapterPath(chapterFile: string, extension: ".webm" | ".log"): string {
   const dir = process.env.RIFT_DEMO_DIR;
   if (!dir) throw new Error("RIFT_DEMO_DIR is not set");
-  return join(dir, `${basename(chapterFile, extname(chapterFile))}.webm`);
+  return join(dir, `${basename(chapterFile, extname(chapterFile))}${extension}`);
+}
+
+function watchConsole(page: Page, log: WriteStream): void {
+  page.on("console", (message) => {
+    const type = message.type();
+    if (type === "warning" || type === "error") log.write(`[${type}] ${message.text()} (${message.location().url})\n`);
+  });
+  page.on("pageerror", (error) => log.write(`[pageerror] ${error.message}\n`));
 }
