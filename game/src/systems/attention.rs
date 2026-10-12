@@ -26,8 +26,7 @@ pub fn register(app: &mut App) {
         .init_resource::<BadgeSources>();
 }
 
-pub type AttentionId = ContentId<AttentionDef>;
-pub type Id = AttentionId;
+pub type Id = ContentId<AttentionDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct AttentionDef {
@@ -58,7 +57,7 @@ impl Fixture for AttentionMark {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MarkedTarget {
     pub target: Entity,
-    pub marks: Vec<AttentionId>,
+    pub marks: Vec<Id>,
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -74,7 +73,7 @@ impl MapEntities for Attention {
 }
 
 impl Attention {
-    pub fn of(&self, target: Entity) -> &[AttentionId] {
+    pub fn of(&self, target: Entity) -> &[Id] {
         self.0
             .iter()
             .find(|marked| marked.target == target)
@@ -83,9 +82,9 @@ impl Attention {
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct StatusBadges(pub Vec<AttentionId>);
+pub struct StatusBadges(pub Vec<Id>);
 
-pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<AttentionId> {
+pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<Id> {
     if let Some(badges) = world.get::<StatusBadges>(actor) {
         return badges.0.clone();
     }
@@ -96,9 +95,9 @@ pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<
         .collect()
 }
 
-pub type MarkSource = fn(&World, Entity, &[Entity], &mut dyn FnMut(Entity, AttentionId));
+pub type MarkSource = fn(&World, Entity, &[Entity], &mut dyn FnMut(Entity, Id));
 
-pub type BadgeSource = fn(&World, Entity) -> Option<AttentionId>;
+pub type BadgeSource = fn(&World, Entity) -> Option<Id>;
 
 #[derive(Resource, Default)]
 pub struct MarkSources(Vec<MarkSource>);
@@ -122,7 +121,7 @@ pub fn update(
     targets: &mut QueryState<(Entity, &'static AreaTag, &'static Position), With<Interactive>>,
     mut turn: Local<u32>,
     mut viewers: Local<Vec<Entity>>,
-    mut found: Local<Vec<(Entity, Entity, AttentionId)>>,
+    mut found: Local<Vec<(Entity, Entity, Id)>>,
 ) {
     *turn = (*turn + 1) % REFRESH_ROUNDS;
     let marking = world.resource::<MarkSources>().0.clone();

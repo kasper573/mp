@@ -20,9 +20,6 @@ struct Env {
     no_clients: Option<bool>,
 }
 
-/// Profiles a fixed `AREAS`-area workload with clients connected (the replication-heavy "full"
-/// config), writing a CPU flamegraph + pprof protobuf and reporting allocation churn per tick. Uses
-/// the exact same [`crate::sim`] world construction the benchmark does, so the two never diverge.
 pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: Content) {
     let env: Env = envy::prefixed("RIFT_BENCH_")
         .from_env()
@@ -140,8 +137,6 @@ fn report_aoi(worlds: &mut [App]) {
     );
 }
 
-/// Aggregates the pprof samples into self time per owning system and per leaf symbol — the CPU side
-/// of the profile in text form.
 fn print_hotspots(report: &pprof::Report) {
     let mut total = 0i64;
     let mut self_time: HashMap<String, i64> = HashMap::new();

@@ -2,8 +2,7 @@ mod auth;
 mod transport;
 
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -25,9 +24,12 @@ use game::systems::GameSettings;
 use game::systems::account::Identity;
 use game::systems::area::transition;
 use game::systems::area::{self, AreaDef};
+use game::systems::launch::{
+    AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig,
+    ServerReady, Switch, TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
+};
 use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
-use game::systems::player::{ClientId, Immortal, SpawnPolicy};
-use game::systems::script::Place;
+use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
 use game::systems::spectate::{self, SpectatorTransfer};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
@@ -39,68 +41,12 @@ service::heap_profiling!();
 
 const TOKEN_EXPIRE: Duration = Duration::from_secs(30);
 
-#[derive(serde::Deserialize)]
-struct Config {
-    bind: IpAddr,
-    port: u16,
-    ws_port: u16,
-    max_clients: usize,
-    areas: Areas,
-    content_dir: PathBuf,
-    player_spawn_type: SpawnPolicy,
-    player_immortal: bool,
-    daily_reset_utc_hour: UtcHour,
-    auth: AuthMode,
-    test_characters: Switch,
-    exit_on_stdin_eof: bool,
-    pyroscope_enabled: bool,
-    pyroscope_sample_hz: u32,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum AuthMode {
-    Oidc,
-    Fake,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Switch {
-    On,
-    Off,
-}
-
-#[derive(Clone, Copy)]
-enum Areas {
-    Real,
-    Bench(usize),
-}
-
-impl<'de> serde::Deserialize<'de> for Areas {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Areas, D::Error> {
-        let spec = String::deserialize(deserializer)?;
-        if spec == "real" {
-            return Ok(Areas::Real);
-        }
-        if let Some(count) = spec.strip_prefix("bench,") {
-            return count
-                .parse()
-                .map(Areas::Bench)
-                .map_err(serde::de::Error::custom);
-        }
-        Err(serde::de::Error::custom(format!(
-            "expected `real` or `bench,<n>`, got `{spec}`"
-        )))
-    }
-}
-
 fn main() {
-    if std::env::args().any(|arg| arg == "--build-info") {
-        println!("{}", game::systems::build_info());
+    if std::env::args().any(|arg| arg == BUILD_INFO_FLAG) {
+        println!("{}", build_info_line());
         return;
     }
-    let config: Config = envy::prefixed("RIFT_GAME_SERVER_")
+    let config: ServerConfig = envy::prefixed(SERVER_ENV_PREFIX)
         .from_env()
         .expect("RIFT_GAME_SERVER_* environment");
     let _profiler = service::profiler(
@@ -169,8 +115,10 @@ fn main() {
     let settings = Settings {
         area_ids,
         max_clients: config.max_clients,
-        spawn_policy: config.player_spawn_type,
-        immortal: Immortal(config.player_immortal),
+        rules: SpawnRules {
+            policy: config.player_spawn_type,
+            immortal: config.player_immortal,
+        },
         reset: config.daily_reset_utc_hour,
         test_characters,
     };
@@ -189,8 +137,7 @@ fn main() {
 struct Settings {
     area_ids: Vec<area::Id>,
     max_clients: usize,
-    spawn_policy: SpawnPolicy,
-    immortal: Immortal,
+    rules: SpawnRules,
     reset: UtcHour,
     test_characters: Option<TestCharacters>,
 }
@@ -209,8 +156,7 @@ fn simulate(
     let Settings {
         area_ids,
         max_clients,
-        spawn_policy,
-        immortal,
+        rules,
         reset,
         test_characters,
     } = settings;
@@ -221,16 +167,7 @@ fn simulate(
     let mut worlds: Vec<App> = area_ids
         .iter()
         .enumerate()
-        .map(|(ordinal, &id)| {
-            build_world(
-                id,
-                &assets,
-                spawn_policy,
-                immortal,
-                ordinal as u64,
-                wall_clock(reset),
-            )
-        })
+        .map(|(ordinal, &id)| build_world(id, &assets, rules, ordinal as u64, wall_clock(reset)))
         .collect();
 
     let (connection_config, client_channels) = {
@@ -244,17 +181,15 @@ fn simulate(
     // Opened only once players can connect, so a passing health check means the game is playable.
     runtime.spawn(api);
 
-    println!(
-        "{}",
-        serde_json::json!({
-            "ready": {
-                "build": version::build(),
-                "content_version": assets.built::<GameSettings>().content_version.0,
-                "http": http_addr.port(),
-                "ws": transport.local_addr().port(),
-            }
-        })
-    );
+    let ready = ReadyLine {
+        ready: ServerReady {
+            build: version::build().to_owned(),
+            content_version: assets.built::<GameSettings>().content_version.0.clone(),
+            http: http_addr.port(),
+            ws: transport.local_addr().port(),
+        },
+    };
+    println!("{}", serde_json::to_string(&ready).expect("a ready line"));
 
     let mut conns: HashMap<u64, Conn> = HashMap::new();
     let mut transfers: Vec<Transfer> = Vec::new();
@@ -303,7 +238,7 @@ fn simulate(
                                 if let Some(account) = account {
                                     accounts.insert(account, client);
                                 }
-                                let area = match (&join_as, spawn_policy) {
+                                let area = match (&join_as, rules.policy) {
                                     (Some(join_as), _) => area_ids
                                         .iter()
                                         .position(|&id| id == join_as.start.area)
@@ -469,27 +404,25 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, areas: Areas) -> Vec<game::systems::area::Id> {
+fn select_areas(content: &Content, areas: ServedAreas) -> Vec<game::systems::area::Id> {
     match areas {
-        Areas::Real => content.ids::<AreaDef>().collect(),
+        ServedAreas::Real => content.ids::<AreaDef>().collect(),
         // The bench area is one template instanced `count` times; the count is bounded only by the
         // machine, not by how many area rows the content table happens to define.
-        Areas::Bench(count) => vec![content.built::<GameSettings>().bench; count],
+        ServedAreas::Bench(count) => vec![content.built::<GameSettings>().bench; count],
     }
 }
 
 fn build_world(
     area: game::systems::area::Id,
     assets: &Content,
-    spawn_policy: SpawnPolicy,
-    immortal: Immortal,
+    rules: SpawnRules,
     ordinal: u64,
     clock: WallClock,
 ) -> App {
     let mut app = game::systems::server_app(area, ordinal, clock, assets);
     app.insert_resource(game::core::math::Rng::from_entropy());
-    app.insert_resource(spawn_policy);
-    app.insert_resource(immortal);
+    app.insert_resource(rules);
     app.finish();
     app.cleanup();
     app.world_mut()
@@ -687,7 +620,7 @@ async fn serve_http(
         .route("/content/manifest", get(manifest))
         .route("/content/files/{hash}", get(content_file));
     if http.test_characters.is_some() {
-        router = router.route("/test/character", post(test_character));
+        router = router.route(TEST_CHARACTER_ROUTE, post(test_character));
     }
     let router = service::track(router.with_state(http), metrics);
     ctrlc::set_handler(|| std::process::exit(0)).expect("install stop handler");
@@ -763,13 +696,6 @@ async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> 
         client_id.to_string(),
     )
         .into_response()
-}
-
-#[derive(serde::Deserialize)]
-struct TestCharacterRequest {
-    test_character: String,
-    #[serde(default)]
-    start: Option<Place>,
 }
 
 async fn test_character(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {

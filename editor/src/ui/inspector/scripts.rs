@@ -435,7 +435,7 @@ pub fn summary_of(module: &Value) -> String {
             .map_or(0, Vec::len);
         return format!(
             "{} expressions",
-            crate::views::model::busts::GENERIC.len() + own
+            crate::views::model::busts::generic().count() + own
         );
     }
     for (name, field) in object {

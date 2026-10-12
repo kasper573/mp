@@ -3,7 +3,7 @@ pub mod widget;
 
 mod health;
 
-pub use health::{apply_damage, current_health, fraction, heal, is_dead, max_health, refill};
+pub use health::{apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -95,7 +95,6 @@ pub fn of_map(stats: &StatMap, kind: StatKind) -> f32 {
 
 impl Stat {
     pub fn label(self) -> &'static str {
-        // Future proofing. Replace with i18n system
         self.kind.into()
     }
 }

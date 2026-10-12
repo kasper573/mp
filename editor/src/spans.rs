@@ -2,14 +2,19 @@ use std::collections::HashMap;
 
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
+use game::systems::text::{Ink, Motion, Voice};
 use serde_json::{Map, Value};
+use strum::VariantArray;
 
 use crate::forms::{Changed, FormCx, committed};
 use crate::ui::{theme, widgets};
 
-const INKS: [&str; 5] = ["danger", "item", "place", "name", "magic"];
-const VOICES: [&str; 2] = ["whisper", "shout"];
-const MOTIONS: [&str; 3] = ["wave", "shake", "pulse"];
+fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
+    T::VARIANTS
+        .iter()
+        .map(|variant| (*variant).into())
+        .collect()
+}
 const VALUE_TOKEN: &str = "⟨value⟩";
 const INPUT_TOKEN: &str = "⟨input⟩";
 
@@ -304,12 +309,16 @@ fn toolbar(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
-                for (field, options) in [("ink", &INKS[..]), ("voice", &VOICES[..]), ("motion", &MOTIONS[..])] {
+                for (field, options) in [
+                    ("ink", names::<Ink>()),
+                    ("voice", names::<Voice>()),
+                    ("motion", names::<Motion>()),
+                ] {
                     ui.menu_button(RichText::new(format!("{field} ▾")).size(12.0), |ui| {
                         for option in options {
-                            if ui.button(*option).clicked() {
+                            if ui.button(option).clicked() {
                                 outcome = Some(restyle(spans, (start, end), |map| {
-                                    map.insert(field.to_owned(), Value::String((*option).to_owned()));
+                                    map.insert(field.to_owned(), Value::String(option.to_owned()));
                                 }));
                                 ui.close();
                             }
@@ -490,9 +499,9 @@ pub fn edit(
         }
         ui.horizontal_wrapped(|ui| {
             for (field, options) in [
-                ("ink", &INKS[..]),
-                ("voice", &VOICES[..]),
-                ("motion", &MOTIONS[..]),
+                ("ink", names::<Ink>()),
+                ("voice", names::<Voice>()),
+                ("motion", names::<Motion>()),
             ] {
                 let current = object
                     .get(field)
@@ -510,7 +519,7 @@ pub fn edit(
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut picked, String::new(), format!("no {field}"));
                         for option in options {
-                            ui.selectable_value(&mut picked, (*option).to_owned(), *option);
+                            ui.selectable_value(&mut picked, option.to_owned(), option);
                         }
                     });
                 if picked != current {

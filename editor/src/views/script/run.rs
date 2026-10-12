@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
@@ -21,9 +22,11 @@ use game::systems::item::{self, Inventory, ItemDef, ItemStack};
 use game::systems::job::{self, Job, JobDef};
 use game::systems::memory::{Memory, MemoryDef};
 use game::systems::notification::NotificationSent;
-use game::systems::npc::{Npc, NpcDef, Pack};
+use game::systems::npc::Npc;
 use game::systems::player::snapshot::{CharacterSnapshot, JoinAs};
-use game::systems::player::{AreaDrawn, ClientId, Immortal, JoinRequest, Players, Xp};
+use game::systems::player::{
+    AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules, Xp,
+};
 use game::systems::quest::{self, ActiveQuest, FinishedQuest, QuestDef, QuestLog, QuestResult};
 use game::systems::script::{EventKind, Place, Reach, RiftInstances, RiftScripts};
 
@@ -1157,7 +1160,7 @@ fn branch_taken(doc: &Doc, node: &str, next: Option<&String>) -> Option<String> 
         return source["outputs"]
             .as_array()?
             .iter()
-            .position(|arrow| arrow["to"].as_str() == Some(next))
+            .position(|arrow| arrow.as_str() == Some(next))
             .map(|index| format!("output {}", index + 1));
     }
     None
@@ -1182,7 +1185,10 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
     };
     let mut app = game::systems::server_app(area_id, 0, clock, &content);
     app.insert_resource(Rng::new(1));
-    app.insert_resource(Immortal(true));
+    app.insert_resource(SpawnRules {
+        policy: SpawnPolicy::Map,
+        immortal: true,
+    });
     app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
     app.insert_resource(FlowTrace::default());
     app.insert_resource(FlowSteering::default());
@@ -1217,7 +1223,7 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
         .0
         .get(&ClientId(CLIENT))
         .ok_or("the pretend character did not join")?;
-    let world_owner = locate_owner(&mut world, &content, owner, area_id, at)?;
+    let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
     let mut run = Run {
         doc_owner: doc.owner.clone(),
@@ -1241,7 +1247,8 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
     run.traced = run.world.resource::<FlowTrace>().steps.len();
     run.visited.clear();
     run.log.clear();
-    let event = event_kind(&setup.event).ok_or_else(|| format!("unknown event {}", setup.event))?;
+    let event =
+        EventKind::from_str(&setup.event).map_err(|_| format!("unknown event {}", setup.event))?;
     let subject = (event != EventKind::Started).then_some(run.subject);
     run.world
         .resource_mut::<RiftInstances>()
@@ -1295,7 +1302,6 @@ fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> 
 
 fn locate_owner(
     world: &mut World,
-    content: &Content,
     owner: &Bound,
     area_id: area::Id,
     at: Pos<Tiles>,
@@ -1322,8 +1328,8 @@ fn locate_owner(
             let entity = match found {
                 Some(entity) => entity,
                 None => {
-                    let _ = content.table::<NpcDef>();
-                    game::systems::npc::spawn(world, def, at, area_id, Pack(u32::MAX))
+                    let pack = game::systems::npc::next_pack(world);
+                    game::systems::npc::spawn(world, def, at, area_id, pack)
                 }
             };
             Owner::Entity(OwnerKind::Npc, entity)
@@ -1358,34 +1364,6 @@ fn snapshot_for(
         serde_json::from_value::<CharacterSnapshot>(json)
     });
     parsed.map_err(|error| format!("the pretend character does not read: {error}"))
-}
-
-fn event_kind(name: &str) -> Option<EventKind> {
-    [
-        EventKind::Started,
-        EventKind::Run,
-        EventKind::Entered,
-        EventKind::Left,
-        EventKind::Discovered,
-        EventKind::Died,
-        EventKind::LeveledUp,
-        EventKind::Interacted,
-        EventKind::Heard,
-        EventKind::CameNear,
-        EventKind::Attacked,
-        EventKind::Defeated,
-        EventKind::Used,
-        EventKind::PickedUp,
-        EventKind::Equipped,
-        EventKind::Unequipped,
-        EventKind::Accepted,
-        EventKind::Completed,
-        EventKind::Failed,
-        EventKind::Bought,
-        EventKind::Sold,
-    ]
-    .into_iter()
-    .find(|kind| kind.name() == name)
 }
 
 impl Run {

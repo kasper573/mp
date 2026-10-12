@@ -1331,7 +1331,7 @@ fn ago_text(seconds: f64) -> String {
         format!("{} h ago", (seconds / 3600.0).round())
     } else {
         let days = (seconds / 86_400.0).round();
-        format!("{days} day{} ago", if days == 1.0 { "" } else { "s" })
+        format!("{days} day{} ago", crate::ui::widgets::plural(days))
     }
 }
 

@@ -26,6 +26,24 @@ impl TilePick {
     pub fn block_size(&self) -> (usize, usize) {
         (self.block.first().map_or(0, Vec::len), self.block.len())
     }
+
+    pub fn choices(&self) -> Vec<u32> {
+        if self.random.is_empty() {
+            self.block.iter().flatten().copied().collect()
+        } else {
+            self.random.clone()
+        }
+    }
+
+    pub fn tile_at(&self, anchor: CellPos, cell: CellPos, flip_x: bool, flip_y: bool) -> u32 {
+        let (w, h) = self.block_size();
+        let (w, h) = (w as i32, h as i32);
+        let bx = (cell.x - anchor.x).rem_euclid(w);
+        let by = (cell.y - anchor.y).rem_euclid(h);
+        let bx = if flip_x { w - 1 - bx } else { bx };
+        let by = if flip_y { h - 1 - by } else { by };
+        self.block[by as usize][bx as usize]
+    }
 }
 
 #[derive(Clone, Default, Debug)]
@@ -77,7 +95,7 @@ pub(super) fn grid_stroke(editor: &mut Editor, view_key: &str, frame: &Frame, ki
         let seed = editor
             .frame
             .wrapping_mul(6364136223846793005)
-            .wrapping_add(cell.x as u64 * 31 + cell.y as u64);
+            .wrapping_add((cell.x as i64).wrapping_mul(31).wrapping_add(cell.y as i64) as u64);
         editor
             .views
             .area
@@ -141,11 +159,7 @@ pub(super) fn apply_brush(
             }
             let flip = Flip::of(brush.flip_x, brush.flip_y);
             if !pick.random.is_empty() || brush.random {
-                let choices: Vec<u32> = if pick.random.is_empty() {
-                    pick.block.iter().flatten().copied().collect()
-                } else {
-                    pick.random.clone()
-                };
+                let choices = pick.choices();
                 for cell in grid::brush_cells(center, brush.size) {
                     if stroke.cells.contains(&cell) {
                         continue;
@@ -157,16 +171,8 @@ pub(super) fn apply_brush(
                     }
                 }
             } else {
-                let (w, h) = pick.block_size();
-                let (w, h) = (w as i32, h as i32);
                 for cell in grid::brush_cells(center, brush.size) {
-                    let bx = (cell.x - stroke.anchor.x).rem_euclid(w);
-                    let by = (cell.y - stroke.anchor.y).rem_euclid(h);
-                    let (bx, by) = (
-                        if brush.flip_x { w - 1 - bx } else { bx },
-                        if brush.flip_y { h - 1 - by } else { by },
-                    );
-                    let tile = pick.block[by as usize][bx as usize];
+                    let tile = pick.tile_at(stroke.anchor, cell, brush.flip_x, brush.flip_y);
                     let entry = stroke.draft.intern(&tileset, tile, flip);
                     if stroke.draft.set(layer, cell, Some(entry)) {
                         stroke.cells.insert(cell);
@@ -284,19 +290,12 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &Frame, cell: Cel
     }
     let flip = Flip::of(brush.flip_x, brush.flip_y);
     let mut rng = game::core::math::Rng::new(editor.frame);
-    let choices: Vec<u32> = if pick.random.is_empty() {
-        pick.block.iter().flatten().copied().collect()
-    } else {
-        pick.random.clone()
-    };
-    let (w, h) = pick.block_size();
+    let choices = pick.choices();
     for c in cells {
         let tile = if !pick.random.is_empty() || brush.random {
             choices[rng.rand_range(0..choices.len() as u32) as usize]
         } else {
-            let bx = (c.x - cell.x).rem_euclid(w as i32) as usize;
-            let by = (c.y - cell.y).rem_euclid(h as i32) as usize;
-            pick.block[by][bx]
+            pick.tile_at(cell, c, brush.flip_x, brush.flip_y)
         };
         let entry = draft.intern(&tileset, tile, flip);
         draft.set(layer, c, Some(entry));
@@ -337,14 +336,14 @@ pub(super) fn eyedrop(
             continue;
         };
         view.pick = TilePick {
-            tileset: Some(entry.0.clone()),
-            block: vec![vec![entry.1]],
+            tileset: Some(entry.tileset.clone()),
+            block: vec![vec![entry.tile]],
             random: Vec::new(),
             anchor: None,
         };
         view.layer = layer;
-        editor.settings.brush.flip_x = entry.2.horizontal();
-        editor.settings.brush.flip_y = entry.2.vertical();
+        editor.settings.brush.flip_x = entry.flip.horizontal();
+        editor.settings.brush.flip_y = entry.flip.vertical();
         view.tool = Tool::Paint;
         return;
     }
@@ -471,25 +470,17 @@ pub(super) fn paint_preview(
         return;
     };
     let columns = (thumb.size[0] as u32 / def.tile.max(1)).max(1);
-    let (w, h) = pick.block_size();
-    let anchor = view.stroke.as_ref().map(|s| s.anchor).unwrap_or(cells[0]);
+    let Some(&first) = cells.first() else {
+        return;
+    };
+    let anchor = view.stroke.as_ref().map_or(first, |s| s.anchor);
     let brush = &editor.settings.brush;
+    let choices = pick.choices();
     for cell in cells {
         let tile = if !pick.random.is_empty() || brush.random {
-            let choices: Vec<u32> = if pick.random.is_empty() {
-                pick.block.iter().flatten().copied().collect()
-            } else {
-                pick.random.clone()
-            };
             choices[((cell.x * 7 + cell.y * 13).rem_euclid(choices.len() as i32)) as usize]
         } else {
-            let bx = (cell.x - anchor.x).rem_euclid(w as i32) as usize;
-            let by = (cell.y - anchor.y).rem_euclid(h as i32) as usize;
-            let (bx, by) = (
-                if brush.flip_x { w - 1 - bx } else { bx },
-                if brush.flip_y { h - 1 - by } else { by },
-            );
-            pick.block[by][bx]
+            pick.tile_at(anchor, *cell, brush.flip_x, brush.flip_y)
         };
         let (x, y) = ((tile % columns) * def.tile, (tile / columns) * def.tile);
         let mut uv = crate::thumbs::uv(

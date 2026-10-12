@@ -9,7 +9,6 @@ use crate::user::UserFolder;
 
 pub const EVERY: Duration = Duration::from_secs(3);
 
-/// Unsaved files written to the user folder every few seconds, so a crash loses nothing.
 pub struct Journal {
     file: PathBuf,
     last: Option<Instant>,

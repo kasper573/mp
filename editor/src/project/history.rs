@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use super::CameraState;
 use super::files::Change;
 
 pub const MAX_STEPS: usize = 500;
@@ -11,7 +12,7 @@ pub struct Step {
     pub before: Vec<Change>,
     pub after: Vec<Change>,
     pub selection: Selection,
-    pub camera: Option<(String, [f32; 3])>,
+    pub camera: Option<CameraState>,
     pub at: SystemTime,
 }
 

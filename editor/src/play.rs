@@ -1,24 +1,31 @@
 use std::io::{BufRead, BufReader, Write};
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::{Duration, Instant};
 
-use egui::{RichText, Ui};
-use game::core::content::{Content, ContentScope, with_content};
-use game::systems::script::Place;
-use process_wrap::std::{ChildWrapper, CommandWrap, ProcessGroup};
-use serde_json::Value;
-
 use crate::app::{Dialog, Editor};
 use crate::tabs::Tab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use egui::{RichText, Ui};
+use game::core::content::{Content, ContentScope, with_content};
+use game::core::time::UtcHour;
+use game::systems::launch::{
+    self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
+    SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest,
+};
+use game::systems::player::SpawnPolicy;
+use game::systems::script::Place;
+use process_wrap::std::{ChildWrapper, CommandWrap, ProcessGroup};
+use serde_json::Value;
 
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
 const READY_WITHIN: Duration = Duration::from_secs(30);
+const LOCALHOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
 #[derive(Default)]
 pub struct Play {
@@ -37,9 +44,20 @@ pub struct Running {
     started: Instant,
     server: Process,
     client: Option<Process>,
-    lines: Mutex<Receiver<(&'static str, String)>>,
-    sender: Sender<(&'static str, String)>,
-    ports: Option<(u16, u16)>,
+    lines: Mutex<Receiver<OutputLine>>,
+    sender: Sender<OutputLine>,
+    ports: Option<ServerPorts>,
+}
+
+pub struct OutputLine {
+    pub tag: &'static str,
+    pub text: String,
+}
+
+#[derive(Clone, Copy)]
+struct ServerPorts {
+    http: u16,
+    ws: u16,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -66,12 +84,6 @@ pub struct Binaries {
     pub client: Result<BuildInfo, String>,
 }
 
-#[derive(Clone)]
-pub struct BuildInfo {
-    pub build: String,
-    pub content_version: String,
-}
-
 impl Binaries {
     pub fn matches(&self, build: &str) -> bool {
         [&self.server, &self.client]
@@ -80,13 +92,12 @@ impl Binaries {
     }
 }
 
-type SpawnJob = (
-    u16,
-    u16,
-    String,
-    Option<Place>,
-    Sender<(&'static str, String)>,
-);
+struct SpawnJob {
+    ports: ServerPorts,
+    character: String,
+    start: Option<Place>,
+    sender: Sender<OutputLine>,
+}
 
 pub struct TestCharacter {
     pub key: String,
@@ -112,14 +123,14 @@ pub fn poll(editor: &mut Editor) {
     let Some(running) = editor.play.running.as_mut() else {
         return;
     };
-    for (tag, line) in drain(&running.lines) {
-        if tag == SERVER
+    for line in drain(&running.lines) {
+        if line.tag == SERVER
             && running.ports.is_none()
-            && let Some(ports) = ready_ports(&line)
+            && let Some(ports) = ready_ports(&line.text)
         {
             running.ports = Some(ports);
         }
-        editor.output.say(tag, line);
+        editor.output.say(line.tag, line.text);
     }
     for process in [Some(&mut running.server), running.client.as_mut()]
         .into_iter()
@@ -147,14 +158,13 @@ pub fn poll(editor: &mut Editor) {
                 failure = Some(format!(
                     "{SERVER} exited with code {code} before it was ready."
                 ));
-            } else if let Some((http, ws)) = running.ports.filter(|_| running.client.is_none()) {
-                to_spawn = Some((
-                    http,
-                    ws,
-                    running.character.clone(),
-                    running.start,
-                    running.sender.clone(),
-                ));
+            } else if let Some(ports) = running.ports.filter(|_| running.client.is_none()) {
+                to_spawn = Some(SpawnJob {
+                    ports,
+                    character: running.character.clone(),
+                    start: running.start,
+                    sender: running.sender.clone(),
+                });
             } else if running.started.elapsed() > READY_WITHIN {
                 failure = Some(format!(
                     "no ready line from {SERVER} in {} s.",
@@ -174,15 +184,21 @@ pub fn poll(editor: &mut Editor) {
             }
         }
     }
-    if let Some((http, ws, character, start, sender)) = to_spawn {
+    if let Some(SpawnJob {
+        ports,
+        character,
+        start,
+        sender,
+    }) = to_spawn
+    {
         let content = editor.project.as_ref().and_then(|project| project.content);
-        match hand_over(content, http, &character, start) {
+        match hand_over(content, ports.http, &character, start) {
             Ok(()) => {
                 editor.output.say(
                     "editor",
                     format!("test character {character} handed to the server, starting {CLIENT}"),
                 );
-                match spawn_client(editor, http, ws, &character, sender) {
+                match spawn_client(editor, ports, &character, sender) {
                     Ok(process) => {
                         if let Some(running) = editor.play.running.as_mut() {
                             running.client = Some(process);
@@ -206,8 +222,8 @@ pub fn poll(editor: &mut Editor) {
         editor.toast("The play-test stopped; see Output");
     }
     if done && let Some(running) = editor.play.running.take() {
-        for (tag, line) in drain(&running.lines) {
-            editor.output.say(tag, line);
+        for line in drain(&running.lines) {
+            editor.output.say(line.tag, line.text);
         }
         editor.output.say(
             "editor",
@@ -225,7 +241,7 @@ pub fn poll(editor: &mut Editor) {
     }
 }
 
-fn drain(lines: &Mutex<Receiver<(&'static str, String)>>) -> Vec<(&'static str, String)> {
+fn drain(lines: &Mutex<Receiver<OutputLine>>) -> Vec<OutputLine> {
     lines
         .lock()
         .map(|lines| lines.try_iter().collect())
@@ -313,8 +329,8 @@ pub fn restart(editor: &mut Editor) {
         if let Some(client) = running.client.as_mut() {
             let _ = client.child.wait();
         }
-        for (tag, line) in drain(&running.lines) {
-            editor.output.say(tag, line);
+        for line in drain(&running.lines) {
+            editor.output.say(line.tag, line.text);
         }
         editor.output.say("editor", "restarting the play-test");
     }
@@ -429,7 +445,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         ui,
         &format!(
             "{changes} change{} since start",
-            if changes == 1 { "" } else { "s" }
+            crate::ui::widgets::plural(changes)
         ),
     );
     widgets::pill(
@@ -680,15 +696,11 @@ fn build_info(binary: &Path) -> Result<BuildInfo, String> {
         return Err("missing".to_owned());
     }
     let output = Command::new(binary)
-        .arg("--build-info")
+        .arg(BUILD_INFO_FLAG)
         .output()
         .map_err(|error| error.to_string())?;
     let text = String::from_utf8_lossy(&output.stdout);
-    let value: Value = serde_json::from_str(text.trim()).map_err(|_| "no build line".to_owned())?;
-    Ok(BuildInfo {
-        build: value.text_or("build", "?").to_owned(),
-        content_version: value.text_or("content_version", "?").to_owned(),
-    })
+    serde_json::from_str(text.trim()).map_err(|_| "no build line".to_owned())
 }
 
 pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
@@ -850,57 +862,58 @@ fn editor_folder(editor: &Editor) -> PathBuf {
 fn spawn_server(
     binaries: &Path,
     folder: &Path,
-    sender: Sender<(&'static str, String)>,
+    sender: Sender<OutputLine>,
 ) -> std::io::Result<Process> {
+    let config = ServerConfig {
+        bind: LOCALHOST,
+        port: 0,
+        ws_port: 0,
+        max_clients: 8,
+        areas: launch::ServedAreas::Real,
+        content_dir: folder.to_path_buf(),
+        player_spawn_type: SpawnPolicy::Map,
+        player_immortal: false,
+        daily_reset_utc_hour: UtcHour::MIDNIGHT,
+        auth: launch::AuthMode::Fake,
+        test_characters: launch::Switch::On,
+        exit_on_stdin_eof: true,
+        pyroscope_enabled: false,
+        pyroscope_sample_hz: 100,
+    };
     let mut command = Command::new(binaries.join(SERVER));
-    command
-        .env("RIFT_GAME_SERVER_BIND", "127.0.0.1")
-        .env("RIFT_GAME_SERVER_PORT", "0")
-        .env("RIFT_GAME_SERVER_WS_PORT", "0")
-        .env("RIFT_GAME_SERVER_MAX_CLIENTS", "8")
-        .env("RIFT_GAME_SERVER_AREAS", "real")
-        .env("RIFT_GAME_SERVER_CONTENT_DIR", folder)
-        .env("RIFT_GAME_SERVER_PLAYER_SPAWN_TYPE", "map")
-        .env("RIFT_GAME_SERVER_PLAYER_IMMORTAL", "false")
-        .env("RIFT_GAME_SERVER_DAILY_RESET_UTC_HOUR", "0")
-        .env("RIFT_GAME_SERVER_AUTH", "fake")
-        .env("RIFT_GAME_SERVER_TEST_CHARACTERS", "on")
-        .env("RIFT_GAME_SERVER_EXIT_ON_STDIN_EOF", "true")
-        .env("RIFT_GAME_SERVER_PYROSCOPE_ENABLED", "false")
-        .env("RIFT_GAME_SERVER_PYROSCOPE_SAMPLE_HZ", "100");
+    command.envs(launch::env_of(SERVER_ENV_PREFIX, &config));
     spawn(command, SERVER, sender)
 }
 
 fn spawn_client(
     editor: &Editor,
-    http: u16,
-    ws: u16,
+    ports: ServerPorts,
     character: &str,
-    sender: Sender<(&'static str, String)>,
+    sender: Sender<OutputLine>,
 ) -> std::io::Result<Process> {
     let binaries = binaries_folder(editor);
     let profile = editor.user.profiles_dir().join("play-test");
     std::fs::create_dir_all(&profile)?;
+    let config = ClientConfig {
+        game_server_url: format!("http://{LOCALHOST}:{}", ports.http),
+        game_server_ws_url: format!("ws://{LOCALHOST}:{}", ports.ws),
+        access_token: fake_token(character),
+        profile_dir: profile,
+        exit_on_stdin_eof: true,
+    };
     let mut command = Command::new(binaries.join(CLIENT));
-    command
-        .env(
-            "RIFT_CLIENT_GAME_SERVER_URL",
-            format!("http://127.0.0.1:{http}"),
-        )
-        .env(
-            "RIFT_CLIENT_GAME_SERVER_WS_URL",
-            format!("ws://127.0.0.1:{ws}"),
-        )
-        .env("RIFT_CLIENT_ACCESS_TOKEN", format!("fake:{character}"))
-        .env("RIFT_CLIENT_PROFILE_DIR", &profile)
-        .env("RIFT_CLIENT_EXIT_ON_STDIN_EOF", "true");
+    command.envs(launch::env_of(CLIENT_ENV_PREFIX, &config));
     spawn(command, CLIENT, sender)
+}
+
+fn fake_token(character: &str) -> String {
+    format!("fake:{character}")
 }
 
 fn spawn(
     mut command: Command,
     tag: &'static str,
-    sender: Sender<(&'static str, String)>,
+    sender: Sender<OutputLine>,
 ) -> std::io::Result<Process> {
     command
         .stdin(Stdio::piped())
@@ -914,14 +927,20 @@ fn spawn(
         let sender = sender.clone();
         std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                let _ = sender.send((tag, plain(&line)));
+                let _ = sender.send(OutputLine {
+                    tag,
+                    text: plain(&line),
+                });
             }
         });
     }
     if let Some(stderr) = child.stderr().take() {
         std::thread::spawn(move || {
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-                let _ = sender.send((tag, plain(&line)));
+                let _ = sender.send(OutputLine {
+                    tag,
+                    text: plain(&line),
+                });
             }
         });
     }
@@ -932,10 +951,12 @@ fn spawn(
     })
 }
 
-fn ready_ports(line: &str) -> Option<(u16, u16)> {
-    let value: Value = serde_json::from_str(line.trim()).ok()?;
-    let ready = value.get("ready")?;
-    Some((ready["http"].as_u64()? as u16, ready["ws"].as_u64()? as u16))
+fn ready_ports(line: &str) -> Option<ServerPorts> {
+    let line: ReadyLine = serde_json::from_str(line.trim()).ok()?;
+    Some(ServerPorts {
+        http: line.ready.http,
+        ws: line.ready.ws,
+    })
 }
 
 fn hand_over(
@@ -944,15 +965,23 @@ fn hand_over(
     character: &str,
     start: Option<Place>,
 ) -> Result<(), String> {
-    let mut body = serde_json::json!({ "test_character": character });
-    if let (Some(place), Some(content)) = (start, content) {
-        let (start_json, _) =
-            with_content(ContentScope::of(&content), || crate::value::json(&place));
-        body["start"] = start_json.map_err(|error| error.to_string())?;
+    let request = TestCharacterRequest {
+        test_character: character.to_owned(),
+        start: start.filter(|_| content.is_some()),
+    };
+    let body = match content {
+        Some(content) => {
+            with_content(ContentScope::of(&content), || {
+                serde_json::to_string(&request)
+            })
+            .0
+        }
+        None => serde_json::to_string(&request),
     }
-    let response = ureq::post(format!("http://127.0.0.1:{http}/test/character"))
-        .header("Authorization", format!("fake:{character}"))
-        .send(body.to_string().as_bytes());
+    .map_err(|error| error.to_string())?;
+    let response = ureq::post(format!("http://{LOCALHOST}:{http}{TEST_CHARACTER_ROUTE}"))
+        .header("Authorization", fake_token(character))
+        .send(body.as_bytes());
     match response {
         Ok(_) => Ok(()),
         Err(ureq::Error::StatusCode(code)) => Err(format!("status {code}")),
@@ -970,19 +999,5 @@ impl Drop for Process {
 }
 
 fn plain(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut chars = line.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' && chars.peek() == Some(&'[') {
-            chars.next();
-            for c in chars.by_ref() {
-                if c.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    out
+    String::from_utf8_lossy(&strip_ansi_escapes::strip(line)).into_owned()
 }

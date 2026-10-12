@@ -24,12 +24,6 @@ pub struct GridCut {
     pub image: RgbaImage,
 }
 
-impl GridCut {
-    pub fn tiles(&self) -> u32 {
-        self.columns * self.rows
-    }
-}
-
 pub fn cut_grid(image: &RgbaImage, settings: GridSettings) -> Result<GridCut, String> {
     let GridSettings {
         tile,
@@ -154,7 +148,7 @@ impl TilePlan {
         }
         Err(format!(
             "tile{} {} {} gone but still painted; pick what replaces {}",
-            if waiting.len() == 1 { "" } else { "s" },
+            crate::ui::widgets::plural(waiting.len()),
             waiting.join(", "),
             if waiting.len() == 1 { "is" } else { "are" },
             if waiting.len() == 1 { "it" } else { "them" }
@@ -378,8 +372,12 @@ pub fn apply_tile_plan(
                     data.as_object_mut().map(|data| data.remove("animation"));
                 }
             }
-            if data.as_object().is_some_and(|data| !data.is_empty()) {
-                moved.insert(target, data);
+            if data.as_object().is_some_and(|data| !data.is_empty())
+                && moved.insert(target, data).is_some()
+            {
+                return Err(format!(
+                    "two painted tiles would both become tile {target}; pick distinct replacements"
+                ));
             }
         }
         for (index, data) in moved {

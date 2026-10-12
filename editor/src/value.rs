@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use game::systems::area::AreaModuleKind;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -15,6 +18,14 @@ pub trait RowValue {
     fn kind_or<'a>(&'a self, default: &'a str) -> &'a str;
     fn text(&self, field: &str) -> &str;
     fn text_or<'a>(&'a self, field: &str, default: &'a str) -> &'a str;
+
+    fn module_kind(&self) -> Option<AreaModuleKind> {
+        AreaModuleKind::from_str(self.kind()).ok()
+    }
+
+    fn is_module(&self, kind: AreaModuleKind) -> bool {
+        self.module_kind() == Some(kind)
+    }
 }
 
 impl RowValue for Value {

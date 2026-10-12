@@ -13,6 +13,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
 pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, Reveal, SpokenValues};
@@ -20,8 +21,8 @@ pub use expr::Expr;
 pub use may_do::{MayDo, Reach};
 pub use node::{Assignment, Node, Target};
 pub use run::{
-    Answer, BoxEnding, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals, Owner, Pause,
-    TraceStep,
+    Answer, BoxEnding, ChoiceState, FlowCx, FlowKey, FlowSteering, FlowTrace, Instances, Locals,
+    Owner, Pause, TraceStep,
 };
 pub use value::{Value, ValueType};
 
@@ -186,8 +187,22 @@ pub enum ScriptModule<V: Vocabulary> {
     Inline(InlineScript<V>),
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    IntoStaticStr,
+    VariantArray,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum VariableType {
     Integer,
     Number,
@@ -202,17 +217,7 @@ pub enum VariableType {
 
 impl VariableType {
     pub fn name(self) -> &'static str {
-        match self {
-            VariableType::Integer => "integer",
-            VariableType::Number => "number",
-            VariableType::Boolean => "boolean",
-            VariableType::Text => "text",
-            VariableType::Name => "name",
-            VariableType::Place => "place",
-            VariableType::Row => "row",
-            VariableType::Audio => "audio",
-            VariableType::Condition => "condition",
-        }
+        self.into()
     }
 }
 

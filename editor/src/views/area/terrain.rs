@@ -41,8 +41,8 @@ pub fn paint(
             .get(layer, cell)
             .and_then(|index| draft.entry(index).cloned());
         match current {
-            Some((ts, tile, _)) if ts == tileset => def
-                .data(tile)
+            Some(row) if row.tileset == tileset => def
+                .data(row.tile)
                 .and_then(|data| data.corners.get(set))
                 .cloned()
                 .unwrap_or_else(|| [base.clone(), base.clone(), base.clone(), base.clone()]),
@@ -106,17 +106,17 @@ pub fn repaint(
     let cells: Vec<CellPos> = draft.cells().collect();
     let (mut changed, mut kept) = (0, 0);
     for cell in cells {
-        let Some((ts, tile, _)) = draft
+        let Some(row) = draft
             .get(layer, cell)
             .and_then(|index| draft.entry(index).cloned())
         else {
             continue;
         };
-        if ts != tileset {
+        if row.tileset != tileset {
             continue;
         }
         let Some(corners) = def
-            .data(tile)
+            .data(row.tile)
             .and_then(|data| data.corners.get(set))
             .cloned()
         else {

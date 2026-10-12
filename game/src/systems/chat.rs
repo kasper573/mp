@@ -3,13 +3,13 @@ use bevy_terminal::TerminalInbox;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::Content;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Name as ActorName;
 use crate::systems::area::AreaTag;
+use crate::systems::input::map::InputMap;
 use crate::systems::movement::position;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
@@ -92,9 +92,7 @@ pub fn say(world: &mut World, speaker: Entity, text: LineText, within: Tiles) {
         .get::<ActorName>(speaker)
         .map(|name| name.name.clone())
         .unwrap_or_default();
-    let words = text.words(&crate::systems::input::map::InputMap::new(
-        world.resource::<Content>(),
-    ));
+    let words = text.words(world.resource::<InputMap>());
     bevy_terminal::broadcast(world, TerminalKind::Global, format!("{name}: {words}"));
     let kind = match world.get::<Npc>(speaker) {
         Some(npc) => NotificationKind::Speech { speaker: npc.def },

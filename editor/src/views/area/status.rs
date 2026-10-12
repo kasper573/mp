@@ -31,7 +31,7 @@ pub(super) fn status_bar(
             .map_or(0, |id| id.get(&frame.content).parts.len());
         left.push(format!(
             "blueprint/{blueprint} · {parts} part{}",
-            if parts == 1 { "" } else { "s" }
+            crate::ui::widgets::plural(parts)
         ));
         left.push(
             placement::placement_count(frame.content, blueprint)

@@ -116,9 +116,7 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
                                         ui.close();
                                     }
                                     if ui.button("Show folder").clicked() {
-                                        let _ = std::process::Command::new("xdg-open")
-                                            .arg(folder)
-                                            .spawn();
+                                        let _ = opener::open(folder);
                                         ui.close();
                                     }
                                     ui.separator();
@@ -159,7 +157,7 @@ fn recent_list(editor: &mut Editor, ui: &mut egui::Ui) {
                 ui.close();
             }
             if ui.button("Show folder").clicked() {
-                let _ = std::process::Command::new("xdg-open").arg(folder).spawn();
+                let _ = opener::open(folder);
                 ui.close();
             }
             ui.separator();

@@ -1,13 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
+use game::systems::actor::bust::GenericExpression;
 use serde_json::Value;
+use strum::VariantArray;
 
 use crate::app::Editor;
 use crate::project::{Edit, Selection, row_file};
 use crate::ui::{theme, widgets};
 
-pub const GENERIC: [&str; 6] = ["neutral", "happy", "sad", "angry", "surprised", "thinking"];
+pub fn generic() -> impl Iterator<Item = &'static str> {
+    GenericExpression::VARIANTS.iter().map(|face| face.key())
+}
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,10 +34,9 @@ pub fn faces(row: &Value) -> Vec<Face> {
         return Vec::new();
     };
     let module = &row["modules"][index];
-    let mut faces: Vec<Face> = GENERIC
-        .iter()
+    let mut faces: Vec<Face> = generic()
         .map(|name| Face {
-            name: (*name).to_owned(),
+            name: name.to_owned(),
             file: module[name].as_str().unwrap_or_default().to_owned(),
             own: None,
             pointer: format!("/modules/{index}/{name}"),

@@ -278,7 +278,6 @@ pub fn header(
     }
 }
 
-/// Where the timeline put each frame, so lanes and drops line up with it.
 pub struct TimelineLayout {
     pub rect: ERect,
     pub width: f32,

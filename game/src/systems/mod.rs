@@ -15,6 +15,7 @@ pub mod interact;
 pub mod interface;
 pub mod item;
 pub mod job;
+pub mod launch;
 pub mod memory;
 pub mod movement;
 pub mod notification;
@@ -56,13 +57,10 @@ use movement::Position;
 
 pub const TICK_HZ: crate::core::time::Hertz = crate::core::time::Hertz(30.0);
 
-/// Simulation ticks per replication. The world steps every tick, but state is replicated to clients
-/// (and visibility recomputed) only every Nth tick; clients interpolate between the sparser
-/// snapshots. Replication serialization is the dominant server cost and scales with this rate, so
-/// replicating at `TICK_HZ / REPLICATION_INTERVAL` (10 Hz) rather than every tick cuts it ~3x.
+/// Replication serialization is the dominant server cost and scales with its rate, so state goes out
+/// every Nth tick (clients interpolate between the sparser snapshots) rather than every tick.
 pub const REPLICATION_INTERVAL: u64 = 3;
 
-/// Seconds of server time covered by one replication snapshot.
 pub const REPLICATION_PERIOD: crate::core::time::Seconds =
     crate::core::time::Seconds(REPLICATION_INTERVAL as f32 / TICK_HZ.0);
 
@@ -120,9 +118,6 @@ pub struct Character {
     pub area: AreaTag,
 }
 
-/// Builds one area world. `ordinal` is the world's slot among the worlds a driver steps concurrently;
-/// it only staggers the replication phase, so identical area instances still replicate on different
-/// ticks. The driver passes each world's index.
 pub fn server_app(
     area: area::Id,
     ordinal: u64,
@@ -142,6 +137,7 @@ pub fn server_app(
     app.insert_resource(*assets);
     app.insert_resource(assets.built::<quest::Parties>().clone());
     app.insert_resource(assets.built::<script::RiftScripts>().clone());
+    app.insert_resource(input::map::InputMap::new(assets));
     app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     app.add_plugins(
@@ -342,11 +338,9 @@ pub fn client_app(
     app
 }
 
-/// Steps every area world one tick, fanning the isolated worlds across all cores. Areas share only the
-/// read-only asset service, so this is embarrassingly parallel. The worlds (not the owning `App`s) are
-/// stepped directly because `App` is `!Send` (its runner box carries no `Send` bound) while `World` is
-/// `Send`; for these single-schedule headless apps `world.run_schedule(Main)` + `clear_trackers` is
-/// exactly what `App::update` does.
+/// The worlds, not the owning `App`s, are stepped because `App` is `!Send` while `World` is `Send`;
+/// for these single-schedule headless apps `run_schedule(Main)` + `clear_trackers` is what
+/// `App::update` does.
 pub fn step_areas(apps: &mut [App], clock: crate::core::time::WallClock) {
     use bevy_app::Main;
     use rayon::prelude::*;
@@ -404,14 +398,6 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     world.insert_resource(content);
     world.insert_resource(synced);
     Ok(())
-}
-
-pub fn build_info() -> String {
-    serde_json::json!({
-        "build": crate::core::content::version::build(),
-        "content_version": registry().version().0,
-    })
-    .to_string()
 }
 
 pub fn registry() -> ContentRegistry {

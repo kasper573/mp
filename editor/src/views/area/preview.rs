@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use egui::{Sense, Ui, Vec2};
-use game::systems::area;
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::{pick, pins};
@@ -16,7 +18,7 @@ pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
         theme::muted(format!(
             "clipboard · {} module{}",
             modules.len(),
-            if modules.len() == 1 { "" } else { "s" }
+            crate::ui::widgets::plural(modules.len())
         ))
         .monospace()
         .size(13.0),
@@ -227,11 +229,11 @@ pub fn drop_preview(
         let cell = game::core::tiling::TilePos::cell(tile);
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_header(ui, kind, kind, "on drop", |_| {});
+            widgets::card_header(ui, kind.tag(), kind.tag(), "on drop", |_| {});
             ui.add_space(4.0);
             widgets::kv_text(ui, field, format!("{table}/ {key}"));
-            match kind.as_str() {
-                "population" => {
+            match kind {
+                AreaModuleKind::Population => {
                     widgets::kv_text(ui, "count", "1");
                     widgets::kv_text(
                         ui,
@@ -265,12 +267,13 @@ pub fn drop_preview(
     }
 }
 
-pub fn drop_candidates(editor: &Editor, table: &str) -> Vec<(String, String)> {
+pub fn drop_candidates(editor: &Editor, table: &str) -> Vec<(AreaModuleKind, String)> {
     super::modules::module_variants(editor)
         .into_iter()
         .filter_map(|(tag, _)| {
             let (field, table_of) = pick::main_reference(editor, &tag)?;
-            (table_of == table).then_some((tag, field))
+            let kind = AreaModuleKind::from_str(&tag).ok()?;
+            (table_of == table).then_some((kind, field))
         })
         .collect()
 }

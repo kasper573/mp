@@ -110,8 +110,6 @@ impl WsTransport {
         }
     }
 
-    /// The identity the ticket authenticated, handed to the game loop when it processes the matching
-    /// renet `ClientConnected` event.
     pub fn take_identity(&mut self, client: u64) -> Option<Identity> {
         self.identities.remove(&client)
     }

@@ -12,8 +12,6 @@ pub const MIN_SIZE: u32 = 10;
 pub const MAX_SIZE: u32 = 400;
 pub const MAX_NOTE: usize = 280;
 
-/// The editor's layout of the world: one card per area, regions around cards, and notes. The game
-/// loads it like any row and never reads it.
 #[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldMapDef {

@@ -1,6 +1,5 @@
-use schemars::{JsonSchema, Schema, SchemaGenerator};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 use crate::core::assets::AssetRef;
@@ -55,55 +54,11 @@ impl crate::core::content::ContentRow for SfxDef {
     const TABLE: &'static str = "sfx";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(untagged)]
 pub enum SfxScalar {
     Fixed(f32),
-    Random(f32, f32),
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(untagged)]
-enum SfxScalarRow {
-    Fixed(f32),
     Random { min: f32, max: f32 },
-}
-
-impl<'de> Deserialize<'de> for SfxScalar {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<SfxScalar, D::Error> {
-        Ok(match SfxScalarRow::deserialize(deserializer)? {
-            SfxScalarRow::Fixed(value) => SfxScalar::Fixed(value),
-            SfxScalarRow::Random { min, max } => SfxScalar::Random(min, max),
-        })
-    }
-}
-
-impl JsonSchema for SfxScalar {
-    fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("SfxScalar")
-    }
-
-    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        SfxScalarRow::json_schema(generator)
-    }
-
-    fn inline_schema() -> bool {
-        true
-    }
-}
-
-impl Serialize for SfxScalar {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        match self {
-            SfxScalar::Fixed(value) => serializer.serialize_f32(*value),
-            SfxScalar::Random(min, max) => {
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry("min", min)?;
-                map.serialize_entry("max", max)?;
-                map.end()
-            }
-        }
-    }
 }
 
 #[derive(Resource, Default)]
@@ -151,7 +106,7 @@ impl SfxScalar {
     pub fn resolve(self, rng: &mut Rng) -> f32 {
         match self {
             SfxScalar::Fixed(value) => value,
-            SfxScalar::Random(min, max) => min + rng.rand_float() * (max - min),
+            SfxScalar::Random { min, max } => min + rng.rand_float() * (max - min),
         }
     }
 }

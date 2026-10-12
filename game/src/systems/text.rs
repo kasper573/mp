@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use bevy::color::Color;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
-use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
+use strum::{IntoStaticStr, VariantArray};
 use ui::tokens::palette;
 use ui::{RichPiece, RichSpan, RichText, TextMotion, TextVoice};
 
@@ -28,33 +28,13 @@ pub enum Span {
 
 impl Serialize for Span {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let (text, value, fx) = match self {
+        let row = match self {
             Span::Text { text, fx } if fx.is_empty() => return serializer.serialize_str(text),
-            Span::Text { text, fx } => (Some(text), None, fx),
-            Span::Value { value, fx } => (None, Some(value), fx),
-            Span::Input(action) => {
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("input", &action)?;
-                return map.end();
-            }
+            Span::Text { text, fx } => StyledRow::styled(Some(text.clone()), None, None, fx),
+            Span::Value { value, fx } => StyledRow::styled(None, Some((**value).clone()), None, fx),
+            Span::Input(action) => StyledRow::styled(None, None, Some(*action), &[]),
         };
-        let mut map = serializer.serialize_map(None)?;
-        if let Some(text) = text {
-            map.serialize_entry("text", text)?;
-        }
-        if let Some(value) = value {
-            map.serialize_entry("value", value)?;
-        }
-        for fx in fx {
-            match fx {
-                Fx::Ink(ink) => map.serialize_entry("ink", ink)?,
-                Fx::Voice(voice) => map.serialize_entry("voice", voice)?,
-                Fx::Motion(motion) => map.serialize_entry("motion", motion)?,
-                Fx::Slow => map.serialize_entry("slow", &true)?,
-                Fx::PauseAfter(millis) => map.serialize_entry("pause_after", millis)?,
-            }
-        }
-        map.end()
+        row.serialize(serializer)
     }
 }
 
@@ -115,25 +95,55 @@ enum SpanRow {
     Styled(StyledRow),
 }
 
-#[derive(JsonSchema, Deserialize)]
+#[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StyledRow {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     text: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     value: Option<Expr<RiftScripting>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     input: Option<InputAction>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     ink: Option<Ink>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     voice: Option<Voice>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     motion: Option<Motion>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     slow: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pause_after: Option<Millis>,
+}
+
+impl StyledRow {
+    fn styled(
+        text: Option<String>,
+        value: Option<Expr<RiftScripting>>,
+        input: Option<InputAction>,
+        fx: &[Fx],
+    ) -> StyledRow {
+        let mut row = StyledRow {
+            text,
+            value,
+            input,
+            ink: None,
+            voice: None,
+            motion: None,
+            slow: false,
+            pause_after: None,
+        };
+        for fx in fx {
+            match fx {
+                Fx::Ink(ink) => row.ink = Some(*ink),
+                Fx::Voice(voice) => row.voice = Some(*voice),
+                Fx::Motion(motion) => row.motion = Some(*motion),
+                Fx::Slow => row.slow = true,
+                Fx::PauseAfter(millis) => row.pause_after = Some(*millis),
+            }
+        }
+        row
+    }
 }
 
 pub fn plain(text: impl Into<String>) -> Span {
@@ -162,8 +172,20 @@ pub enum Fx {
     PauseAfter(Millis),
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Ink {
     Danger,
     Item,
@@ -172,15 +194,39 @@ pub enum Ink {
     Magic,
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Voice {
     Whisper,
     Shout,
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Motion {
     Wave,
     Shake,

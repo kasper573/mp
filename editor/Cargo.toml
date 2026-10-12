@@ -18,12 +18,13 @@ bevy_egui = "0.42"
 egui = "0.36"
 egui_dock = "0.21"
 egui-snarl = "0.12"
-egui_extras = "0.36"
 bevy_replicon = { workspace = true, features = ["server"] }
 serde.workspace = true
 serde_json.workspace = true
 schemars = "1"
 strum = { workspace = true }
+strip-ansi-escapes = "0.2"
+opener = "0.8"
 blake3 = "1"
 notify = "8"
 rfd = "0.17"
@@ -36,8 +37,6 @@ dirs = "7"
 ureq = { workspace = true }
 rayon.workspace = true
 symphonia = { version = "0.5", default-features = false, features = ["flac", "wav", "pcm"] }
-csv = "1"
 base64 = "0.22"
-envy.workspace = true
 
 [dev-dependencies]

@@ -259,7 +259,6 @@ fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
     Some(response.body_mut().read_to_string().ok()?.trim().to_owned())
 }
 
-/// A blocking-then-nonblocking WebSocket carrying opaque renet packets as binary frames.
 struct WsSocket {
     ws: tungstenite::WebSocket<MaybeTlsStream<TcpStream>>,
     open: bool,

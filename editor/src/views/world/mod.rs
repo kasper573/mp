@@ -297,7 +297,6 @@ pub fn with_defaults(atlas: &Atlas, mut layout: Layout) -> Layout {
     layout
 }
 
-/// The least room a card takes on the map, so small areas stay readable cards.
 pub const MIN_FOOTPRINT: Vec2 = Vec2::new(1000.0, 620.0);
 
 pub fn card_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {

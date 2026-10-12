@@ -2,10 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use egui::{Color32, Ui};
 use game::core::content::Content;
+use game::core::script::VariableType;
 use serde_json::{Map, Value};
 
 use crate::project::Files;
 use crate::schema::{self, Kind, Shapes, Variant};
+use crate::ui::theme;
 use crate::usages::Usages;
 
 pub struct FormCx<'a> {
@@ -49,13 +51,13 @@ impl<'a> FormCx<'a> {
 #[derive(Default)]
 pub struct Holes {
     pub filled: Vec<(String, String)>,
-    pub open: Vec<(String, String)>,
-    pub variables: Vec<(String, String)>,
+    pub open: Vec<(String, VariableType)>,
+    pub variables: Vec<(String, VariableType)>,
     pub requests: Vec<HoleRequest>,
 }
 
 pub enum HoleRequest {
-    Make { field: String, kind: String },
+    Make { field: String, kind: VariableType },
     Use { field: String, name: String },
     Fix { field: String, name: String },
 }
@@ -117,13 +119,13 @@ pub fn value(
         .holes
         .as_ref()
         .and_then(|holes| holes.open.iter().find(|(field, _)| field == path))
-        .map(|(_, kind)| kind.clone());
+        .map(|(_, kind)| *kind);
     let Some(kind) = open else {
         return plain(ui, cx, schema, value, path);
     };
     let mut changed = Changed::default();
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-        hole_menu(ui, cx, path, &kind);
+        hole_menu(ui, cx, path, kind);
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             ui.set_min_width(ui.available_width());
             changed = plain(ui, cx, schema, value, path);
@@ -133,16 +135,15 @@ pub fn value(
 }
 
 fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
-    let ink = Color32::from_rgb(176, 140, 230);
+    let ink = theme::VARIABLE;
     let kind = cx
         .holes
         .as_ref()
         .and_then(|holes| holes.variables.iter().find(|(n, _)| n == name))
-        .map(|(_, kind)| kind.clone())
-        .unwrap_or_default();
+        .map(|(_, kind)| *kind);
     ui.horizontal(|ui| {
         let chip = egui::Frame::new()
-            .fill(Color32::from_rgba_unmultiplied(176, 140, 230, 30))
+            .fill(theme::VARIABLE_FILL)
             .stroke(egui::Stroke::new(1.0, ink))
             .corner_radius(10.0)
             .inner_margin(egui::Margin::symmetric(8, 2))
@@ -157,7 +158,7 @@ fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
             .response
             .interact(egui::Sense::click())
             .on_hover_text("Filled by the variable at each placement; click to change");
-        ui.label(crate::ui::theme::muted(&kind).size(12.5));
+        ui.label(crate::ui::theme::muted(kind.map_or("", VariableType::name)).size(12.5));
         egui::Popup::from_toggle_button_response(&chip)
             .id(ui.id().with(("hole", path)))
             .show(|ui| {
@@ -168,7 +169,7 @@ fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
                         holes
                             .variables
                             .iter()
-                            .filter(|(other, k)| other != name && *k == kind)
+                            .filter(|(other, k)| other != name && Some(*k) == kind)
                             .map(|(other, _)| other.clone())
                             .collect()
                     })
@@ -203,7 +204,7 @@ fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
     });
 }
 
-fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: &str) {
+fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: VariableType) {
     let button = ui
         .add(egui::Button::new(crate::ui::theme::muted("◇")).frame(false))
         .on_hover_text("Make this field a variable, or fill it from one");
@@ -212,7 +213,7 @@ fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: &str) {
         .width(260.0)
         .show(|ui| {
             ui.label(
-                crate::ui::theme::faint(format!("{} · {kind}", field_name(path)))
+                crate::ui::theme::faint(format!("{} · {}", field_name(path), kind.name()))
                     .monospace()
                     .size(11.5),
             );
@@ -227,7 +228,7 @@ fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: &str) {
                     cx,
                     HoleRequest::Make {
                         field: path.to_owned(),
-                        kind: kind.to_owned(),
+                        kind,
                     },
                 );
                 ui.close();
@@ -239,14 +240,14 @@ fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: &str) {
                     holes
                         .variables
                         .iter()
-                        .filter(|(_, k)| k == kind)
+                        .filter(|(_, k)| *k == kind)
                         .map(|(name, _)| name.clone())
                         .collect()
                 })
                 .unwrap_or_default();
             if fitting.is_empty() {
                 ui.add_enabled_ui(false, |ui| {
-                    let _ = ui.button(format!("Use variable · no {kind} variable yet"));
+                    let _ = ui.button(format!("Use variable · no {} variable yet", kind.name()));
                 });
             }
             for name in fitting {
@@ -408,55 +409,51 @@ pub fn object(
             );
             {
                 let ui = &mut label_ui;
-                {
-                    if optional && !present {
+                if optional && !present {
+                    if ui
+                        .add(
+                            egui::Label::new(
+                                crate::ui::theme::faint(format!("+ {name}"))
+                                    .monospace()
+                                    .size(13.0),
+                            )
+                            .sense(egui::Sense::click()),
+                        )
+                        .on_hover_text(format!("Set {name}"))
+                        .clicked()
+                    {
+                        let fresh = schema::template(cx.root, field);
+                        value
+                            .as_object_mut()
+                            .expect("object")
+                            .insert(name.clone(), fresh);
+                        changed = Changed::at(&field_path);
+                    }
+                    return;
+                }
+                if optional {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .add(
-                                egui::Label::new(
-                                    crate::ui::theme::faint(format!("+ {name}"))
-                                        .monospace()
-                                        .size(13.0),
-                                )
-                                .sense(egui::Sense::click()),
+                                egui::Label::new(crate::ui::theme::faint("✕").size(11.0))
+                                    .sense(egui::Sense::click()),
                             )
-                            .on_hover_text(format!("Set {name}"))
+                            .on_hover_text(format!("Unset {name}"))
                             .clicked()
                         {
-                            let fresh = schema::template(cx.root, field);
-                            value
-                                .as_object_mut()
-                                .expect("object")
-                                .insert(name.clone(), fresh);
+                            value.as_object_mut().expect("object").remove(name);
                             changed = Changed::at(&field_path);
                         }
-                        return;
-                    }
-                    if optional {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .add(
-                                    egui::Label::new(crate::ui::theme::faint("✕").size(11.0))
-                                        .sense(egui::Sense::click()),
-                                )
-                                .on_hover_text(format!("Unset {name}"))
-                                .clicked()
-                            {
-                                value.as_object_mut().expect("object").remove(name);
-                                changed = Changed::at(&field_path);
-                            }
-                            ui.add(
-                                egui::Label::new(
-                                    crate::ui::theme::muted(name).monospace().size(13.0),
-                                )
-                                .truncate(),
-                            );
-                        });
-                    } else {
                         ui.add(
                             egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
                                 .truncate(),
                         );
-                    }
+                    });
+                } else {
+                    ui.add(
+                        egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
+                            .truncate(),
+                    );
                 }
             }
             if let Some(child) = value.get_mut(name).filter(|_| present) {
@@ -490,10 +487,10 @@ fn union(
         && value.as_object().is_some_and(|map| map.len() == 1)
     {
         ui.horizontal(|ui| {
-            let fill = Color32::from_rgba_unmultiplied(176, 140, 230, 30);
+            let fill = theme::VARIABLE_FILL;
             egui::Frame::new()
                 .fill(fill)
-                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(176, 140, 230)))
+                .stroke(egui::Stroke::new(1.0, theme::VARIABLE))
                 .corner_radius(10.0)
                 .inner_margin(egui::Margin::symmetric(8, 2))
                 .show(ui, |ui| {
@@ -501,7 +498,7 @@ fn union(
                         egui::RichText::new(format!("◇ {name}"))
                             .monospace()
                             .size(12.5)
-                            .color(Color32::from_rgb(176, 140, 230)),
+                            .color(theme::VARIABLE),
                     );
                 });
             let kinds: Vec<String> = variants
@@ -685,10 +682,10 @@ fn choice(
             .collect();
         let mut back = false;
         ui.horizontal(|ui| {
-            let fill = Color32::from_rgba_unmultiplied(176, 140, 230, 30);
+            let fill = theme::VARIABLE_FILL;
             let response = egui::Frame::new()
                 .fill(fill)
-                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(176, 140, 230)))
+                .stroke(egui::Stroke::new(1.0, theme::VARIABLE))
                 .corner_radius(10.0)
                 .inner_margin(egui::Margin::symmetric(8, 2))
                 .show(ui, |ui| {
@@ -696,7 +693,7 @@ fn choice(
                         egui::RichText::new(format!("◇ {name}"))
                             .monospace()
                             .size(12.5)
-                            .color(Color32::from_rgb(176, 140, 230)),
+                            .color(theme::VARIABLE),
                     );
                 })
                 .response
@@ -1377,9 +1374,8 @@ fn asset(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed
 }
 
 fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
-    let mut faces: Vec<String> = ["neutral", "happy", "sad", "angry", "surprised", "thinking"]
-        .iter()
-        .map(|face| (*face).to_owned())
+    let mut faces: Vec<String> = crate::views::model::busts::generic()
+        .map(str::to_owned)
         .collect();
     if let Some(speaker) = &cx.speaker
         && let Some(npc) = cx.files.json(&crate::project::row_file("npc", speaker))

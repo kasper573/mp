@@ -21,6 +21,7 @@ use bevy_ecs::entity::Entity;
 use bevy_ecs::world::World;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
@@ -235,7 +236,41 @@ pub enum AreaModule {
     Script(ScriptModule),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum AreaModuleKind {
+    Object,
+    SafeZone,
+    Soundscape,
+    Scenery,
+    Blueprint,
+    Population,
+    Resident,
+    SharedScript,
+    InlineScript,
+}
+
+impl AreaModuleKind {
+    pub fn tag(self) -> &'static str {
+        self.into()
+    }
+}
+
 impl AreaModule {
+    pub fn kind(&self) -> AreaModuleKind {
+        match self {
+            AreaModule::Object(_) => AreaModuleKind::Object,
+            AreaModule::SafeZone(_) => AreaModuleKind::SafeZone,
+            AreaModule::Soundscape(_) => AreaModuleKind::Soundscape,
+            AreaModule::Scenery(_) => AreaModuleKind::Scenery,
+            AreaModule::Blueprint(_) => AreaModuleKind::Blueprint,
+            AreaModule::Population(_) => AreaModuleKind::Population,
+            AreaModule::Resident(_) => AreaModuleKind::Resident,
+            AreaModule::Script(ScriptModule::Shared { .. }) => AreaModuleKind::SharedScript,
+            AreaModule::Script(ScriptModule::Inline(_)) => AreaModuleKind::InlineScript,
+        }
+    }
+
     fn check(&self, pointer: &str, cx: &mut RowCheck) {
         match self {
             AreaModule::Population(population) => cx.range(
@@ -677,10 +712,11 @@ fn read_grids(loading: &mut Loading) {
     let mut grids: Vec<Option<AreaGrids>> = content.ids::<AreaDef>().map(|_| None).collect();
     for (id, def) in loading.rows::<AreaDef>() {
         let map = def.map();
-        let folder = format!("tables/area/{}", id.key(&content));
+        let folder = grid::folder(id.key(&content));
         let files = loading.row_folder(id);
-        let mut expected: Vec<String> = vec!["palette.csv".to_owned(), "walk.csv".to_owned()];
-        expected.extend(map.ground.iter().map(|layer| format!("{layer}.csv")));
+        let mut expected: Vec<String> =
+            vec![grid::PALETTE_FILE.to_owned(), grid::WALK_FILE.to_owned()];
+        expected.extend(map.ground.iter().map(|layer| grid::layer_file(layer)));
         for file in &files {
             if !expected.contains(file) {
                 loading.file_error(
@@ -722,8 +758,8 @@ fn read_grids(loading: &mut Loading) {
                 }
             }
         };
-        let palette_text = read("palette.csv", "/map", loading);
-        let walk_text = read("walk.csv", "/map", loading);
+        let palette_text = read(grid::PALETTE_FILE, "/map", loading);
+        let walk_text = read(grid::WALK_FILE, "/map", loading);
         let layer_texts: Vec<Option<String>> = map
             .ground
             .iter()
@@ -745,7 +781,7 @@ fn read_grids(loading: &mut Loading) {
             continue;
         }
         let size = map.size.grid();
-        let palette_file = format!("{folder}/palette.csv");
+        let palette_file = format!("{folder}/{}", grid::PALETTE_FILE);
         let Some(rows) = grid::read_palette(
             grid::GridFile {
                 path: &palette_file,
@@ -816,12 +852,12 @@ fn read_grids(loading: &mut Loading) {
                 tile: row.tile,
                 flip: row.flip,
             });
-            palette_keys.push((row.tileset.clone(), row.tile, row.flip));
+            palette_keys.push(row.clone());
         }
         let entries = palette.len();
         let mut ground: Vec<grid::GroundLayer> = Vec::new();
         for (layer, text) in map.ground.iter().zip(layer_texts.iter().flatten()) {
-            let file = format!("{folder}/{layer}.csv");
+            let file = format!("{folder}/{}", grid::layer_file(layer));
             let cells = grid::read_grid(
                 grid::GridFile { path: &file, text },
                 size,
@@ -850,7 +886,7 @@ fn read_grids(loading: &mut Loading) {
                 None => ok = false,
             }
         }
-        let walk_file = format!("{folder}/walk.csv");
+        let walk_file = format!("{folder}/{}", grid::WALK_FILE);
         let walk = grid::read_grid(
             grid::GridFile {
                 path: &walk_file,
@@ -1312,15 +1348,18 @@ fn write_grids(content: &Content, writer: &mut crate::core::content::FileWriter)
         let Some(grids) = grids.0[id.index()].as_ref() else {
             continue;
         };
-        let folder = format!("tables/area/{}", id.key(content));
+        let folder = grid::folder(id.key(content));
         writer.file(
-            &format!("{folder}/palette.csv"),
+            &format!("{folder}/{}", grid::PALETTE_FILE),
             grids.write_palette().as_bytes(),
         )?;
-        writer.file(&format!("{folder}/walk.csv"), grids.write_walk().as_bytes())?;
+        writer.file(
+            &format!("{folder}/{}", grid::WALK_FILE),
+            grids.write_walk().as_bytes(),
+        )?;
         for layer in &grids.ground {
             writer.file(
-                &format!("{folder}/{}.csv", layer.name),
+                &format!("{folder}/{}", grid::layer_file(&layer.name)),
                 grids.write_layer(layer).as_bytes(),
             )?;
         }

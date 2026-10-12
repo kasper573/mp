@@ -1,5 +1,6 @@
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
+use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::modules;
@@ -24,7 +25,7 @@ pub fn drop_row(
     }
     if candidates.len() == 1 {
         let (kind, field) = &candidates[0];
-        add_with_row(editor, view_key, frame, kind, field, key, tile);
+        add_with_row(editor, view_key, frame, *kind, field, key, tile);
         return;
     }
     let view = editor.views.area.views.get_mut(view_key).expect("view");
@@ -57,24 +58,24 @@ pub fn add_with_row(
     editor: &mut Editor,
     view_key: &str,
     frame: &Frame,
-    kind: &str,
+    kind: AreaModuleKind,
     field: &str,
     key: &str,
     tile: Pos<Tiles>,
 ) {
-    let Some(mut module) = modules::variant_template(editor, kind) else {
+    let Some(mut module) = modules::variant_template(editor, kind.tag()) else {
         return;
     };
     module[field] = Value::String(key.to_owned());
     let cell = tile.cell();
     let (x, y) = (cell.x as f32, cell.y as f32);
     match kind {
-        "population" => {
+        AreaModuleKind::Population => {
             module["roams"] = serde_json::json!({ "x": x - 2.0, "y": y - 2.0, "w": 4.0, "h": 4.0 });
             module["count"] = serde_json::json!(1);
         }
-        "resident" => module["at"] = serde_json::json!({ "x": x, "y": y }),
-        "blueprint" => {
+        AreaModuleKind::Resident => module["at"] = serde_json::json!({ "x": x, "y": y }),
+        AreaModuleKind::Blueprint => {
             module["at"] = serde_json::json!({ "x": x, "y": y });
             editor
                 .views
@@ -84,7 +85,7 @@ pub fn add_with_row(
                 .expect("view")
                 .stamp = Some(key.to_owned());
         }
-        "scenery" => module["at"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5 }),
+        AreaModuleKind::Scenery => module["at"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5 }),
         _ => {}
     }
     let label = shapes::label(&module);

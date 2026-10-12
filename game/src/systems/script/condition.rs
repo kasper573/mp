@@ -82,7 +82,7 @@ pub fn check_value(
 pub fn min_level(part: &Condition) -> Option<u32> {
     match part {
         Expr::AtLeast(a, b) => match (&**a, &**b) {
-            (Expr::Query(RiftQuery::Level { .. }), Expr::Int(level)) => Some(*level as u32),
+            (Expr::Query(RiftQuery::Level { .. }), Expr::Int(level)) => u32::try_from(*level).ok(),
             _ => None,
         },
         _ => None,

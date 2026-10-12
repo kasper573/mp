@@ -236,13 +236,13 @@ fn touched(before: Option<&Bytes>, after: Option<&Bytes>) -> String {
     if changed_modules > 0 {
         parts.push(format!(
             "{changed_modules} module{}",
-            if changed_modules == 1 { "" } else { "s" }
+            crate::ui::widgets::plural(changed_modules)
         ));
     }
     if changed_fields > 0 {
         parts.push(format!(
             "{changed_fields} field{}",
-            if changed_fields == 1 { "" } else { "s" }
+            crate::ui::widgets::plural(changed_fields)
         ));
     }
     if parts.is_empty() {
@@ -257,8 +257,8 @@ fn restores(step: &Step) -> String {
     if !step.selection.keys.is_empty() {
         parts.push("the selection".to_owned());
     }
-    if let Some((area, _)) = &step.camera {
-        parts.push(format!("the camera on {area}"));
+    if let Some(camera) = &step.camera {
+        parts.push(format!("the camera on {}", camera.area));
     }
     match parts.len() {
         1 => parts.remove(0),

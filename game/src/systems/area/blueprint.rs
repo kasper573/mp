@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::content::id::{LeafKind, LeafProblem, nearest};
-use crate::core::content::{Content, ContentId, ContentRow, ContentScope, RowCheck, with_content};
+use crate::core::content::{
+    Content, ContentId, ContentRow, ContentScope, RowCheck, row_file, with_content,
+};
 use crate::core::math::{Pos, Rect};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
 use crate::core::tiling::Tiles;
@@ -96,7 +98,7 @@ impl Flattened {
     pub fn site(&self, content: &Content, area: super::Id) -> (String, String) {
         match self.chain.last() {
             None => (
-                format!("tables/{}/{}.json", AreaDef::TABLE, area.key(content)),
+                row_file(AreaDef::TABLE, area.key(content)),
                 format!("/modules/{}", self.origin),
             ),
             Some((blueprint, part)) => (
@@ -608,17 +610,23 @@ fn fill(
     }
 }
 
+pub fn hole_name(json: &Value) -> Option<&str> {
+    let map = json.as_object()?;
+    if map.len() != 1 {
+        return None;
+    }
+    map.get("var")?.as_str()
+}
+
 pub fn holes(json: &Value, into: &mut Vec<String>) {
+    if let Some(name) = hole_name(json) {
+        if !into.iter().any(|known| known == name) {
+            into.push(name.to_owned());
+        }
+        return;
+    }
     match json {
         Value::Object(map) => {
-            if map.len() == 1
-                && let Some(Value::String(name)) = map.get("var")
-            {
-                if !into.contains(name) {
-                    into.push(name.clone());
-                }
-                return;
-            }
             for value in map.values() {
                 holes(value, into);
             }

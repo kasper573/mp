@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
-use egui::{Color32, RichText, Vec2};
+use egui::{RichText, Vec2};
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
-use game::systems::area::{self, Flip};
+use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
 use super::holes::fill_holes;
@@ -12,6 +12,7 @@ use super::stamp::place_json;
 use super::{Frame, shapes};
 use crate::app::{Dialog, Editor};
 use crate::project::{Edit, Selection, row_file};
+use crate::ui::theme;
 use crate::value::RowValue;
 
 pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
@@ -23,9 +24,12 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
         .filter_map(|&i| row["modules"].get(i).cloned())
         .collect();
     if modules.is_empty()
-        || modules
-            .iter()
-            .any(|m| matches!(m.kind(), "shared_script" | "inline_script"))
+        || modules.iter().any(|m| {
+            matches!(
+                m.module_kind(),
+                Some(AreaModuleKind::SharedScript | AreaModuleKind::InlineScript)
+            )
+        })
     {
         editor.toast("A blueprint takes any selection but area scripts");
         return;
@@ -209,12 +213,12 @@ pub fn make_blueprint_dialog(
     let holds = {
         let mut counts: Vec<(String, usize)> = Vec::new();
         for module in &modules {
-            let name = match module.kind() {
-                "blueprint" => module["blueprint"]
+            let name = match module.module_kind() {
+                Some(AreaModuleKind::Blueprint) => module["blueprint"]
                     .as_str()
                     .unwrap_or("blueprint")
                     .to_owned(),
-                "scenery" => {
+                Some(AreaModuleKind::Scenery) => {
                     format!("scenery · {}", module.text("tileset"))
                 }
                 _ => shapes::label(module),
@@ -248,7 +252,7 @@ pub fn make_blueprint_dialog(
                 RichText::new(format!(
                     "Make blueprint from {} placement{}",
                     modules.len(),
-                    if modules.len() == 1 { "" } else { "s" }
+                    crate::ui::widgets::plural(modules.len())
                 ))
                 .strong()
                 .size(18.0),
@@ -315,7 +319,7 @@ pub fn make_blueprint_dialog(
                         ui.label(theme::strong(format!(
                             "{} identical arrangement{} {where_}",
                             dialog.matches.len(),
-                            if dialog.matches.len() == 1 { "" } else { "s" }
+                            crate::ui::widgets::plural(dialog.matches.len())
                         )));
                         ui.label(
                             theme::muted(format!("at {}. Replace them too.", spots.join(" · ")))
@@ -340,7 +344,7 @@ pub fn make_blueprint_dialog(
                 ui,
                 &format!(
                     "Make blueprint · {placements} placement{}",
-                    if placements == 1 { "" } else { "s" }
+                    crate::ui::widgets::plural(placements)
                 ),
             )
             .clicked()
@@ -537,7 +541,7 @@ pub fn delete_blueprint_dialog(
                 }
             });
             if let Some(error) = &dialog.error {
-                ui.colored_label(Color32::from_rgb(220, 80, 80), error);
+                ui.colored_label(theme::DANGER, error);
             }
             ui.horizontal(|ui| {
                 if ui.button("Delete").clicked() {
@@ -579,30 +583,37 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
     }
     for (file, users) in by_file {
         let mut json = project.files.json_owned(&file).ok_or("a file is gone")?;
-        let mut users = users;
-        users.sort_by(|a, b| b.pointer.cmp(&a.pointer));
-        for user in users {
-            let (parent, index) = {
+        let mut users = users
+            .into_iter()
+            .map(|user| {
                 let cut = user.pointer.rfind('/').ok_or("a bad pointer")?;
-                (
-                    user.pointer[..cut].to_owned(),
-                    user.pointer[cut + 1..]
-                        .parse::<usize>()
-                        .map_err(|_| "a bad pointer")?,
-                )
-            };
+                let index = user.pointer[cut + 1..]
+                    .parse::<usize>()
+                    .map_err(|_| "a bad pointer")?;
+                Ok((user.pointer[..cut].to_owned(), index, user))
+            })
+            .collect::<Result<Vec<_>, &str>>()?;
+        users.sort_by(|a, b| (&b.0, b.1).cmp(&(&a.0, a.1)));
+        for (parent, index, user) in users {
             let list = json
                 .pointer_mut(&parent)
                 .and_then(Value::as_array_mut)
                 .ok_or("a bad pointer")?;
             match &user.choice {
                 BlueprintChoice::Remove => {
+                    if index >= list.len() {
+                        return Err("a bad pointer".into());
+                    }
                     list.remove(index);
                 }
                 BlueprintChoice::Replace(other) => {
-                    list[index]["blueprint"] = Value::String(other.clone());
+                    let placement = list.get_mut(index).ok_or("a bad pointer")?;
+                    placement["blueprint"] = Value::String(other.clone());
                 }
                 BlueprintChoice::Unpack => {
+                    if index >= list.len() {
+                        return Err("a bad pointer".into());
+                    }
                     let placement = list.remove(index);
                     let at = shapes::pos_of(&placement["at"]).unwrap_or(Pos::new(0.0, 0.0));
                     let flip = Flip::parse(placement.text("flip")).unwrap_or(Flip::None);

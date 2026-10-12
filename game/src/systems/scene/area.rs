@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Duration;
 
 use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
@@ -360,7 +361,7 @@ fn spawn_area_tiles(
                         tile: tile.tile,
                         flip_x: flip.horizontal(),
                         flip_y: flip.vertical(),
-                        at: square.max().to_screen().with_x(square.min().to_screen().x),
+                        bottom_left: square.max().to_screen().with_x(square.min().to_screen().x),
                         z,
                     },
                     TILE.0,
@@ -436,7 +437,7 @@ impl AreaSheets {
                                 .iter()
                                 .map(|frame| bevy_tilemap::TileAnimationFrame {
                                     tile: frame.tile,
-                                    seconds: frame.ms as f32 / 1000.0,
+                                    lasts: Duration::from_millis(u64::from(frame.ms)),
                                 })
                                 .collect(),
                         })

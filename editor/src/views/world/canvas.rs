@@ -591,7 +591,7 @@ fn status(
             let note = view.drag_note.clone().unwrap_or_default();
             left.push(format!(
                 "moving {count} card{}{}",
-                if count == 1 { "" } else { "s" },
+                crate::ui::widgets::plural(count),
                 if note.is_empty() {
                     String::new()
                 } else {

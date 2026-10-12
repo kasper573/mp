@@ -307,10 +307,23 @@ pub enum ConfirmAction {
 }
 
 pub struct RenameDialog {
-    pub table: String,
-    pub key: String,
+    pub target: RenameTarget,
     pub draft: String,
     pub error: Option<String>,
+}
+
+pub enum RenameTarget {
+    Row { table: String, key: String },
+    Layer { area: String, layer: String },
+}
+
+impl RenameTarget {
+    pub fn name(&self) -> &str {
+        match self {
+            RenameTarget::Row { key, .. } => key,
+            RenameTarget::Layer { layer, .. } => layer,
+        }
+    }
 }
 
 pub struct DeleteDialog {
@@ -481,6 +494,11 @@ impl Editor {
                 self.form = FormState::default();
                 self.views = crate::views::Views::default();
                 self.imports = crate::import::Imports::load(&self.user, folder);
+                if let Some(problem) = self.imports.unreadable.clone() {
+                    self.toast(format!(
+                        "Import records are unreadable and will not be saved: {problem}"
+                    ));
+                }
                 self.start.failed = None;
                 self.start.report = None;
                 self.start.watch = None;
@@ -738,11 +756,6 @@ fn background(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.poll_outside();
         editor.tick_journal();
-        if editor.frame.is_multiple_of(1800)
-            && let Some(lock) = &editor.lock
-        {
-            lock.refresh();
-        }
         crate::play::poll(&mut editor);
         crate::import::poll(&mut editor);
         crate::views::sync(&mut editor, world);

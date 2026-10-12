@@ -14,7 +14,7 @@ use crate::core::script::{
 };
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::attention;
-use crate::systems::attention::AttentionId;
+use crate::systems::attention::Id as AttentionId;
 use crate::systems::dialogue;
 use crate::systems::item::Id as ItemId;
 use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemStack};
@@ -27,8 +27,7 @@ use crate::systems::script::{
 };
 use crate::systems::text::LineText;
 
-pub type ShopId = ContentId<ShopDef>;
-pub type Id = ShopId;
+pub type Id = ContentId<ShopDef>;
 
 const BUYBACK_KEPT: usize = 12;
 const MINUTE: f32 = 60.0;
@@ -162,7 +161,7 @@ pub struct ShopReactions {
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub shop: ShopId,
+    pub shop: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Arrow,
 }
@@ -204,7 +203,7 @@ impl EffectDef<RiftScripting> for OpenShop {
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ShopView {
-    pub shop: ShopId,
+    pub shop: Id,
     pub offers: Vec<OfferView>,
     pub buyback: Vec<Sale>,
     pub declined: Vec<u32>,
@@ -249,8 +248,8 @@ pub struct Sale {
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub struct ShopLedger {
-    stock: HashMap<(ShopId, u32), Restock>,
-    sales: HashMap<ShopId, VecDeque<Sale>>,
+    stock: HashMap<(Id, u32), Restock>,
+    sales: HashMap<Id, VecDeque<Sale>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -260,13 +259,13 @@ struct Restock {
 }
 
 impl ShopLedger {
-    pub fn stocked(&mut self, shop: ShopId, offer: u32, left: u32, full_at: UnixMillis) {
+    pub fn stocked(&mut self, shop: Id, offer: u32, left: u32, full_at: UnixMillis) {
         self.stock.insert((shop, offer), Restock { left, full_at });
     }
 
-    pub fn sold(&mut self, shop: ShopId, sale: Sale) {
+    pub fn record_sale(&mut self, shop: Id, sale: Sale) {
         let sales = self.sales.entry(shop).or_default();
-        sales.push_back(sale);
+        sales.push_front(sale);
         sales.truncate(BUYBACK_KEPT);
     }
 }
@@ -280,7 +279,7 @@ pub enum ShopRequest {
 
 #[derive(Component)]
 pub struct ShopVisit {
-    shop: ShopId,
+    shop: Id,
     flow: FlowKey,
     reactions: u32,
 }
@@ -323,7 +322,7 @@ impl ShopDef {
     }
 }
 
-fn open(world: &mut World, player: Entity, shop: ShopId, flow: FlowKey) -> bool {
+fn open(world: &mut World, player: Entity, shop: Id, flow: FlowKey) -> bool {
     if !dialogue::card(
         world,
         flow,
@@ -347,7 +346,7 @@ fn close(world: &mut World, player: Entity) {
     world.entity_mut(player).remove::<(ShopVisit, ShopView)>();
 }
 
-pub fn visiting(world: &World, player: Entity) -> Option<ShopId> {
+pub fn visiting(world: &World, player: Entity) -> Option<Id> {
     world.get::<ShopVisit>(player).map(|visit| visit.shop)
 }
 
@@ -455,7 +454,7 @@ fn stacks_text(content: &Content, stacks: &[ItemStack], times: u32) -> String {
     }
 }
 
-pub fn reaction_lines(content: &Content) -> Vec<(ShopId, &'static Line)> {
+pub fn reaction_lines(content: &Content) -> Vec<(Id, &'static Line)> {
     content
         .table::<ShopDef>()
         .iter()
@@ -523,7 +522,7 @@ fn marks(
     }
 }
 
-fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
+fn traded(world: &mut World, player: Entity, shop: Id, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
         ScriptOwner::Row(OwnerKind::Shop, shop.raw()),
         kind,
@@ -639,13 +638,14 @@ fn sell(world: &mut World, player: Entity, slot: u32, stack: ItemStack) {
     }
     let mut ledger = world.entity_mut(player);
     let mut ledger = ledger.entry::<ShopLedger>().or_default().into_mut();
-    let sales = ledger.sales.entry(shop).or_default();
-    sales.push_front(Sale {
-        item: stack.item,
-        count: stack.count,
-        paid,
-    });
-    sales.truncate(BUYBACK_KEPT);
+    ledger.record_sale(
+        shop,
+        Sale {
+            item: stack.item,
+            count: stack.count,
+            paid,
+        },
+    );
     react(world, player, |reactions| &reactions.sold);
     traded(world, player, shop, EventKind::Sold, stack);
     refresh_view(world, player);
@@ -706,7 +706,7 @@ fn trade(
 fn offer_refusal(
     world: &World,
     player: Entity,
-    shop: ShopId,
+    shop: Id,
     index: u32,
     now: UnixMillis,
 ) -> Option<WareRefusal> {
@@ -740,7 +740,7 @@ fn offer_refusal(
 fn stock(
     world: &World,
     player: Entity,
-    shop: ShopId,
+    shop: Id,
     index: u32,
     now: UnixMillis,
 ) -> Option<(u32, Option<Seconds>)> {
@@ -793,7 +793,7 @@ fn refresh_view(world: &mut World, player: Entity) {
     }
 }
 
-fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {
+fn declined(world: &World, player: Entity, shop: Id) -> Vec<u32> {
     let content = world.resource::<Content>();
     (0..)
         .zip(shop.get(content).buys())

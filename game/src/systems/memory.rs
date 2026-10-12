@@ -44,13 +44,17 @@ struct Recollection {
     day: GameDay,
 }
 
+impl Recollection {
+    fn holds(&self, resets: Resets, clock: WallClock) -> bool {
+        resets != Resets::Daily || self.day == clock.day()
+    }
+}
+
 impl Memory {
     pub fn get(&self, content: &Content, key: Id, clock: WallClock) -> Value {
         let def = key.get(content);
         match self.0.get(&key) {
-            Some(recollection)
-                if !(def.resets == Resets::Daily && recollection.day != clock.day()) =>
-            {
+            Some(recollection) if recollection.holds(def.resets, clock) => {
                 recollection.value.clone()
             }
             _ => def.ty.zero(),
@@ -76,8 +80,7 @@ impl Memory {
     pub fn set_within(&self, content: &Content, key: Id, lasts: Seconds, clock: WallClock) -> bool {
         let def = key.get(content);
         self.0.get(&key).is_some_and(|recollection| {
-            !(def.resets == Resets::Daily && recollection.day != clock.day())
-                && clock.now.since(recollection.at) < lasts
+            recollection.holds(def.resets, clock) && clock.now.since(recollection.at) < lasts
         })
     }
 

@@ -1,12 +1,13 @@
 use egui::{RichText, Vec2};
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::TileSize;
-use game::systems::area::{self};
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::shapes;
 use crate::app::Editor;
 use crate::project::{Edit, row_file};
+use crate::value::RowValue;
 
 pub struct ResizeDialog {
     pub area: String,
@@ -160,10 +161,10 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
         Some(if delta > 0 {
             format!(
                 "Adds {n} empty {unit}{} {where_}",
-                if n == 1 { "" } else { "s" }
+                crate::ui::widgets::plural(n)
             )
         } else {
-            format!("Clips {n} {unit}{} {where_}", if n == 1 { "" } else { "s" })
+            format!("Clips {n} {unit}{} {where_}", crate::ui::widgets::plural(n))
         })
     };
     if let Some(text) = side(
@@ -255,8 +256,10 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         if let Some(b) = shapes::bounds(module, None)
             && !bounds.contains_rect(&b)
         {
-            match module["type"].as_str() {
-                Some("safe_zone") | Some("soundscape") | Some("population") => {}
+            match module.module_kind() {
+                Some(AreaModuleKind::SafeZone)
+                | Some(AreaModuleKind::Soundscape)
+                | Some(AreaModuleKind::Population) => {}
                 _ => outside.push(format!("module {index} ({})", shapes::label(module))),
             }
         }

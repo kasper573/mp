@@ -10,14 +10,13 @@ pub struct ImageSizes(pub HashMap<String, (u32, u32)>);
 
 type MediaCheck = Result<Option<(u32, u32)>, (&'static str, String, &'static str)>;
 
-/// Reads every image, sound and font header under `assets/`, so a broken file fails the load.
 pub fn check_media(loading: &mut Loading) {
     let paths: Vec<String> = loading.assets().to_vec();
     let folder = loading.folder();
     let checked: Vec<(String, MediaCheck)> = paths
         .into_par_iter()
         .map(|path| {
-            let bytes = match folder.read(&format!("assets/{path}")) {
+            let bytes = match folder.read(&super::asset_file(&path)) {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     return (
@@ -70,7 +69,7 @@ pub fn check_media(loading: &mut Loading) {
             }
             Ok(None) => {}
             Err((rule, found, expected)) => loading.file_error(
-                format!("assets/{path}"),
+                super::asset_file(&path),
                 ErrorPlace::WholeFile,
                 rule,
                 found,

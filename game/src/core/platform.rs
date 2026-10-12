@@ -16,8 +16,7 @@ pub struct StartParams {
     pub game_server_ws_url: String,
 }
 
-/// The client's live byte stream to the server (a browser WebSocket in the web client), carrying
-/// opaque renet packets with no netcode layer — so frames are buffered and drained each tick.
+/// Carries opaque renet packets with no netcode layer, so frames are buffered and drained each tick.
 pub trait ServerSocket: 'static {
     fn recv(&self) -> Option<Vec<u8>>;
     fn send(&self, packet: &[u8]);
@@ -41,8 +40,6 @@ impl std::fmt::Display for FetchFailure {
     }
 }
 
-/// Host capabilities the client needs that bevy doesn't provide.
-/// Each target implements it in its binary and installs it as the [`ClientPlatform`] resource.
 pub trait Platform: Send + Sync + 'static {
     fn load(&self, key: &str) -> Option<String>;
     fn save(&self, key: &str, value: &str);

@@ -323,7 +323,22 @@ impl<V: Vocabulary> Instances<V> {
     }
 }
 
-pub fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usize) -> Option<bool> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChoiceState {
+    Open,
+    Locked,
+    Gone,
+}
+
+pub fn choice_state<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usize) -> ChoiceState {
+    match choice_open::<V>(world, key, choice) {
+        Some(true) => ChoiceState::Open,
+        Some(false) => ChoiceState::Locked,
+        None => ChoiceState::Gone,
+    }
+}
+
+fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usize) -> Option<bool> {
     let (procedure, node, cx) = {
         let mut instances = world.resource_mut::<Instances<V>>();
         let state = flow_state(&mut instances, key);
@@ -807,7 +822,7 @@ fn put_state<V: Vocabulary>(
 }
 
 /// Every node a flow stepped through while this resource was in the world, for tools that watch a
-/// script run; play never inserts it.
+/// script run.
 #[derive(Resource, Default)]
 pub struct FlowTrace {
     pub steps: Vec<TraceStep>,
@@ -822,7 +837,7 @@ pub struct TraceStep {
 
 /// How a tool steers a run while this resource is in the world: the output each named random node
 /// takes instead of rolling, and whether every node pauses until the next tick so a run can be
-/// stepped; play never inserts it.
+/// stepped.
 #[derive(Resource, Default)]
 pub struct FlowSteering {
     pub random: HashMap<String, usize>,

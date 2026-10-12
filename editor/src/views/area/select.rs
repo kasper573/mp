@@ -1,3 +1,4 @@
+use game::systems::area::AreaModuleKind;
 use std::collections::HashSet;
 
 use egui::{Pos2, Ui};
@@ -10,6 +11,7 @@ use super::{Corner, Drag, Frame, PasteGhost, Tool, pins, shapes};
 use super::{holes, pick, placement};
 use crate::app::Editor;
 use crate::project::Selection;
+use crate::value::RowValue;
 
 pub(super) fn selected_indices(editor: &Editor, area_key: &str) -> Vec<usize> {
     let mut indices: Vec<usize> = super::selected_parts(editor, area_key)
@@ -115,7 +117,7 @@ pub(super) fn select_input(
     if response.double_clicked()
         && let Some(hit) = frame.hit(tile)
     {
-        if frame.modules[hit]["type"] == "blueprint" {
+        if frame.modules[hit].is_module(AreaModuleKind::Blueprint) {
             placement::edit_in_place(editor, view_key, frame, hit);
         } else {
             editor.panels.right = crate::app::RightTab::Inspector;
@@ -238,7 +240,7 @@ pub(super) fn finish_select_drag(
                 if editing.is_some_and(|e| e != index) {
                     continue;
                 }
-                if frame.modules[index]["type"] == "population"
+                if frame.modules[index].is_module(AreaModuleKind::Population)
                     && frame.modules[index]["roams"].is_null()
                 {
                     continue;
@@ -509,7 +511,7 @@ pub fn delete_selection(editor: &mut Editor, frame: &Frame) {
             .views
             .area
             .views
-            .get(&format!("area:{}", frame.area_key))
+            .get(&super::area_view_key(&frame.area_key))
             .and_then(|v| v.in_place.last().cloned())
     {
         placement::delete_parts_in_place(editor, frame, &place);

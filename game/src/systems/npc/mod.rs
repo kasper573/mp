@@ -30,9 +30,7 @@ use crate::systems::player::Players;
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::ActorRoster;
-use crate::systems::script::{
-    self, EventKind, RiftEvent, RiftInstances, RiftScripts, ScriptModule,
-};
+use crate::systems::script::{EventKind, RiftEvent, RiftInstances, RiftScripts, ScriptModule};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
@@ -366,8 +364,12 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
     }
 }
 
-type Listens = Vec<(Tiles, script::Who, Option<crate::systems::npc::Id>)>;
-type Watcher = (Entity, Pos<Tiles>, area::Id, Listens);
+struct Watcher {
+    npc: Entity,
+    at: Pos<Tiles>,
+    area: area::Id,
+    reach: Tiles,
+}
 
 pub fn approach(world: &mut World) {
     let Some(roster) = world.get_resource::<ActorRoster>() else {
@@ -385,14 +387,20 @@ pub fn approach(world: &mut World) {
             if listed.dead {
                 return None;
             }
-            let listens: Vec<_> = instances
+            let reach = instances
                 .entries(owner, EventKind::CameNear)
                 .filter_map(|event| match event {
-                    RiftEvent::CameNear { within, by, npc } => Some((*within, *by, *npc)),
+                    RiftEvent::CameNear { within, .. } => Some(*within),
                     _ => None,
                 })
-                .collect();
-            Some((npc, listed.at, listed.area, listens))
+                .max_by(|a, b| a.0.total_cmp(&b.0))
+                .unwrap_or(Tiles(0.0));
+            Some(Watcher {
+                npc,
+                at: listed.at,
+                area: listed.area,
+                reach,
+            })
         })
         .collect();
     if watchers.is_empty() {
@@ -401,19 +409,14 @@ pub fn approach(world: &mut World) {
     let approached: Vec<(Watcher, Vec<Entity>)> = watchers
         .into_iter()
         .map(|watcher| {
-            let (npc, at, area, ref listens) = watcher;
-            let farthest = listens
-                .iter()
-                .map(|(within, ..)| within.0)
-                .fold(0.0, f32::max);
             let mut now: Vec<Entity> = roster
                 .iter()
                 .filter(|listed| {
-                    listed.entity != npc
-                        && listed.area == area
+                    listed.entity != watcher.npc
+                        && listed.area == watcher.area
                         && !listed.dead
-                        && listed.at.distance(at) <= Tiles(farthest)
-                        && visibility::coexist(world, npc, listed.entity)
+                        && listed.at.distance(watcher.at) <= watcher.reach
+                        && visibility::coexist(world, watcher.npc, listed.entity)
                         && !dialogue::in_conversation(world, listed.entity)
                 })
                 .map(|listed| listed.entity)
@@ -422,7 +425,7 @@ pub fn approach(world: &mut World) {
             (watcher, now)
         })
         .collect();
-    for ((npc, at, ..), now) in approached {
+    for (Watcher { npc, at, .. }, now) in approached {
         let before: Vec<Entity> = world
             .get::<Near>(npc)
             .map(|near| near.0.clone())

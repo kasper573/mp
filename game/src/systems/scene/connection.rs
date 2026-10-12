@@ -124,7 +124,6 @@ fn connect(world: &mut World, ticket: &str) {
     let connection_config =
         ConnectionConfig::from_channels(channels.server_configs(), channels.client_configs());
     let ws_url = world.resource::<StartParams>().game_server_ws_url.clone();
-    // The websocket is reliable+ordered (TCP); renet handles channels and reliability over it.
     let client = RenetClient::new(connection_config, true);
     let socket = world
         .resource::<ClientPlatform>()

@@ -21,7 +21,7 @@ impl AssetRef {
     }
 
     pub fn path(&self) -> String {
-        format!("assets/{}", self.0)
+        crate::core::content::asset_file(&self.0)
     }
 
     pub fn as_str(&self) -> &str {

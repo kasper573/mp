@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
-use game::systems::area;
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::grid;
@@ -19,7 +21,7 @@ use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let view_key = format!("area:{key}");
+    let view_key = super::area_view_key(key);
     let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
         return;
     };
@@ -213,7 +215,7 @@ fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
 fn palette_summary(ui: &mut Ui, content: Content, area_id: area::Id) {
     let grids = &area::load(&content, area_id).grids;
     let tilesets: std::collections::HashSet<&String> =
-        grids.palette_keys.iter().map(|(set, _, _)| set).collect();
+        grids.palette_keys.iter().map(|row| &row.tileset).collect();
     widgets::section(ui, "Palette of this area");
     widgets::hint(
         ui,
@@ -371,7 +373,7 @@ fn terrain_card(
         .grids
         .palette_keys
         .iter()
-        .map(|(set, _, _)| set.clone())
+        .map(|row| row.tileset.clone())
         .collect();
     let mut own: Vec<&(String, String, Vec<String>, usize, usize)> = sets
         .iter()
@@ -1031,18 +1033,9 @@ fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
             None => counts.push((kind, 1)),
         }
     }
-    let order = [
-        "object",
-        "safe_zone",
-        "soundscape",
-        "population",
-        "resident",
-        "blueprint",
-        "scenery",
-        "inline_script",
-        "shared_script",
-    ];
-    counts.sort_by_key(|(kind, _)| order.iter().position(|k| k == kind).unwrap_or(order.len()));
+    counts.sort_by_key(|(kind, _)| {
+        AreaModuleKind::from_str(kind).map_or(usize::MAX, |kind| kind as usize)
+    });
     let total: usize = counts.iter().map(|(_, n)| n).sum();
     widgets::section_count(ui, "Modules", total);
     for (kind, count) in &counts {
@@ -1120,7 +1113,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         cx.owner_key = Some(area_key.clone());
         if indices.len() == 1 {
             let index = indices[0];
-            let view = views.area.views.get_mut(&format!("area:{area_key}"));
+            let view = views.area.views.get_mut(&super::area_view_key(&area_key));
             label = super::shapes::label(&row["modules"][index]);
             changed = module_inspector(
                 ui,
@@ -1189,7 +1182,12 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     for extra in extras {
         placement::act(editor, extra, &area_key, &indices);
     }
-    if let Some(view) = editor.views.area.views.get_mut(&format!("area:{area_key}")) {
+    if let Some(view) = editor
+        .views
+        .area
+        .views
+        .get_mut(&super::area_view_key(&area_key))
+    {
         view.deferred.extend(deferred);
     }
     if editor.pick.is_some() {
@@ -1200,10 +1198,10 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         .views
         .area
         .views
-        .contains_key(&format!("area:{area_key}"))
+        .contains_key(&super::area_view_key(&area_key))
     {
         ui.add_space(8.0);
-        module_counts(editor, ui, &format!("area:{area_key}"), &area_key);
+        module_counts(editor, ui, &super::area_view_key(&area_key), &area_key);
     }
 }
 
@@ -1224,6 +1222,7 @@ fn module_inspector(
         .as_str()
         .unwrap_or("module")
         .to_owned();
+    let module_kind = row["modules"][index].module_kind();
     let shown_kind = kind.replace('_', " ");
     ui.label(
         theme::muted(format!("area/{area_key} › {shown_kind}"))
@@ -1257,16 +1256,16 @@ fn module_inspector(
         let module = &mut row["modules"][index];
         match crate::schema::variant_of(variants, module) {
             Some(variant) => {
-                let schema = form_schema(variant, &kind);
+                let schema = form_schema(variant, module_kind);
                 changed |= crate::forms::object(ui, cx, &schema, module, &path).is_some();
             }
             None => {
                 changed |= crate::forms::raw_json(ui, cx, module, &path).is_some();
             }
         }
-        match kind.as_str() {
-            "scenery" => changed |= scenery_rows(ui, module, &path),
-            "population" => {
+        match module_kind {
+            Some(AreaModuleKind::Scenery) => changed |= scenery_rows(ui, module, &path),
+            Some(AreaModuleKind::Population) => {
                 if let Some(view) = view {
                     widgets::kv(ui, "preview", |ui| {
                         let mut shown = !view.population_hidden.contains(&index);
@@ -1288,9 +1287,9 @@ fn module_inspector(
         }
     });
     let module = &mut row["modules"][index];
-    match kind.as_str() {
-        "scenery" => scenery_extras(ui, cx, module, extras, deferred, index),
-        "blueprint" => {
+    match module_kind {
+        Some(AreaModuleKind::Scenery) => scenery_extras(ui, cx, module, extras, deferred, index),
+        Some(AreaModuleKind::Blueprint) => {
             if let Some(blueprint) = module["blueprint"].as_str().map(str::to_owned)
                 && content
                     .and_then(|c| {
@@ -1309,8 +1308,8 @@ fn module_inspector(
             }
             placement_extras(ui, cx, module, extras, deferred, index);
         }
-        "population" | "resident" => from_npc(ui, cx, module),
-        "object" => {
+        Some(AreaModuleKind::Population | AreaModuleKind::Resident) => from_npc(ui, cx, module),
+        Some(AreaModuleKind::Object) => {
             ui.add_space(4.0);
             changed |= crate::ui::inspector::scripts::script_cards(
                 ui, cx, "area", module, "scripts", &path,
@@ -1318,13 +1317,13 @@ fn module_inspector(
             .is_some();
             object_extras(ui, module, extras, deferred, index);
         }
-        "soundscape" => changed |= soundscape_extras(ui, cx, module, &path),
+        Some(AreaModuleKind::Soundscape) => changed |= soundscape_extras(ui, cx, module, &path),
         _ => {}
     }
     changed
 }
 
-pub(super) fn form_schema(variant: &crate::schema::Variant, kind: &str) -> Value {
+pub(super) fn form_schema(variant: &crate::schema::Variant, kind: Option<AreaModuleKind>) -> Value {
     let mut schema = crate::ui::inspector::without_field(variant.schema, "type");
     for field in hidden_fields(kind) {
         schema = crate::ui::inspector::without_field(&schema, field);
@@ -1332,12 +1331,12 @@ pub(super) fn form_schema(variant: &crate::schema::Variant, kind: &str) -> Value
     schema
 }
 
-fn hidden_fields(kind: &str) -> &'static [&'static str] {
+fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static str] {
     match kind {
-        "scenery" => &["tiles", "sort", "blocks"],
-        "blueprint" => &["values"],
-        "object" => &["scripts"],
-        "soundscape" => &["channels"],
+        Some(AreaModuleKind::Scenery) => &["tiles", "sort", "blocks"],
+        Some(AreaModuleKind::Blueprint) => &["values"],
+        Some(AreaModuleKind::Object) => &["scripts"],
+        Some(AreaModuleKind::Soundscape) => &["channels"],
         _ => &[],
     }
 }

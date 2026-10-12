@@ -212,7 +212,7 @@ impl Content {
     }
 
     /// Frees every table and built value this content leaked, for a process that loads many
-    /// contents in a row (the editor rechecks the folder after every edit).
+    /// contents in a row.
     ///
     /// # Safety
     ///

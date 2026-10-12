@@ -1,10 +1,10 @@
 use egui::Ui;
 use game::core::math::Pos;
 use game::core::tiling::{Cell, TilePos, TileRect, Tiles};
-use game::systems::area::{self, Flip};
+use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
-use super::holes::suffixed_from;
+use super::holes::suffixed;
 use super::placement::warp_destinations;
 use super::stamp::object_names;
 use super::{Frame, shapes};
@@ -23,7 +23,7 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
     let sceneries: Vec<&Value> = indices
         .iter()
         .filter_map(|&i| frame.modules.get(i))
-        .filter(|m| m["type"] == "scenery")
+        .filter(|m| m.is_module(AreaModuleKind::Scenery))
         .collect();
     if sceneries.len() < 2 {
         editor.toast("Select two or more sceneries of one tileset to join (Ctrl G)");
@@ -111,7 +111,7 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
     let mut sorted = indices.clone();
     sorted.sort_unstable();
     for i in sorted.iter().rev() {
-        if frame.modules[*i]["type"] == "scenery" {
+        if frame.modules[*i].is_module(AreaModuleKind::Scenery) {
             modules.remove(*i);
         }
     }
@@ -140,7 +140,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &Frame, index: usize) {
         .views
         .area
         .views
-        .get(&format!("area:{}", frame.area_key))
+        .get(&super::area_view_key(&frame.area_key))
         .map_or(0, |v| v.layer);
     let rows = module["tiles"].as_array().cloned().unwrap_or_default();
     let h = rows.len();
@@ -259,7 +259,7 @@ pub fn return_door_from(editor: &mut Editor, area_key: &str, modules: &[Value], 
         return;
     };
     let mut names = object_names(content, there_id);
-    let name = suffixed_from(&format!("{}_back", module.text_or("name", "door")), &names);
+    let name = suffixed(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
     let door = serde_json::json!({
@@ -464,5 +464,5 @@ pub fn selected_scenery(editor: &Editor, frame: &super::Frame) -> Option<usize> 
         .strip_prefix("/modules/")?
         .parse()
         .ok()?;
-    (frame.modules.get(index)?["type"] == "scenery").then_some(index)
+    (frame.modules.get(index)?.is_module(AreaModuleKind::Scenery)).then_some(index)
 }

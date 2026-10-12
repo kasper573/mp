@@ -3,8 +3,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
+use game::core::script::VariableType;
 use game::core::tiling::Tiles;
-use game::systems::area::{self, Flip};
+use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
 use super::blueprint::open_make_blueprint;
@@ -87,7 +88,7 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
                 .unwrap_or_default();
             format!(
                 "Placed {direct} time{}, all in {name}.",
-                if direct == 1 { "" } else { "s" }
+                widgets::plural(direct)
             )
         }
         count => format!("Placed {direct} times in {count} areas."),
@@ -143,7 +144,7 @@ pub fn placement_card(
     path: &str,
     _extras: &mut Vec<Extra>,
 ) -> bool {
-    if module["type"] != "blueprint" {
+    if !module.is_module(AreaModuleKind::Blueprint) {
         return false;
     }
     let Some(content) = content else {
@@ -260,8 +261,8 @@ pub(super) fn short_value(value: &Value) -> String {
         }
         other => {
             let text = other.to_string();
-            if text.len() > 40 {
-                format!("{}…", &text[..40])
+            if text.chars().count() > 40 {
+                format!("{}…", text.chars().take(40).collect::<String>())
             } else {
                 text
             }
@@ -382,7 +383,6 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
     changed
 }
 
-/// The parts of a blueprint opened in place, mapped into the area so they draw and hit like modules.
 pub struct PartView {
     pub part: usize,
     pub module: Value,
@@ -402,7 +402,8 @@ pub fn parts_in_place(frame: &Frame, place: &InPlace) -> Vec<PartView> {
         let filled = fill_holes(&mut module, &place.values, &def.variables);
         let _ = filled;
         place_json(&mut module, place.at, place.flip);
-        let nested = (module["type"] == "blueprint").then(|| module.text("blueprint").to_owned());
+        let nested = (module.is_module(AreaModuleKind::Blueprint))
+            .then(|| module.text("blueprint").to_owned());
         let bounds = match &nested {
             Some(nested_key) => nested_bounds(content, nested_key, &module),
             None => shapes::bounds(&module, None),
@@ -444,7 +445,7 @@ pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index
         return;
     };
     let module = &row["modules"][index];
-    if module["type"] != "blueprint" {
+    if !module.is_module(AreaModuleKind::Blueprint) {
         return;
     }
     let Some(at) = shapes::pos_of(&module["at"]) else {
@@ -694,9 +695,8 @@ pub fn overlay_in_place(editor: &Editor, painter: &egui::Painter, frame: &Frame,
         let Some(bounds) = part.bounds else {
             continue;
         };
-        let kind = part.module.kind();
         let is_selected = selected.contains(&part.part);
-        let color = super::overlays::module_color(kind);
+        let color = super::overlays::module_color(part.module.module_kind());
         let width = if is_selected { 2.0 } else { 1.0 };
         painter.rect_stroke(
             canvas.rect(bounds),
@@ -888,7 +888,9 @@ pub fn replace_with(
             .flatten()
             .enumerate()
         {
-            if module["type"] != "blueprint" || module["blueprint"].as_str() != Some(old.as_str()) {
+            if !module.is_module(AreaModuleKind::Blueprint)
+                || module["blueprint"].as_str() != Some(old.as_str())
+            {
                 continue;
             }
             if scope == ReplaceScope::Here && (area != area_key || i != index) {
@@ -899,12 +901,12 @@ pub fn replace_with(
                 let keys: Vec<String> = values.keys().cloned().collect();
                 for key in keys {
                     let keep = new_def.variables.get(&key).is_some_and(|v| {
-                        value_kind(&values[&key]) == v.ty.name()
+                        let kind = value_kind(&values[&key]);
+                        kind == v.ty
+                            || (kind == VariableType::Integer && v.ty == VariableType::Number)
                             || matches!(
                                 v.ty,
-                                game::core::script::VariableType::Name
-                                    | game::core::script::VariableType::Row
-                                    | game::core::script::VariableType::Audio
+                                VariableType::Name | VariableType::Row | VariableType::Audio
                             ) && values[&key].is_string()
                     });
                     if !keep {

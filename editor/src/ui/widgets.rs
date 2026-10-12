@@ -388,3 +388,7 @@ pub fn search_box(
         });
     inner.expect("search field")
 }
+
+pub fn plural<N: PartialEq + From<u8>>(count: N) -> &'static str {
+    if count == N::from(1) { "" } else { "s" }
+}

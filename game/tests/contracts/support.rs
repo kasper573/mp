@@ -29,7 +29,7 @@ use game::systems::notification::Id as NotificationId;
 use game::systems::notification::{Notification, NotificationKind, NotificationSent};
 use game::systems::npc::Id as NpcId;
 use game::systems::npc::{self, Npc, Pack};
-use game::systems::player::{AreaDrawn, ClientId, Immortal, JoinRequest, Players};
+use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
@@ -79,7 +79,10 @@ impl Sim {
     pub fn area(area: game::systems::area::Id) -> Sim {
         let mut app = game::systems::server_app(area, 0, CLOCK, content());
         app.insert_resource(Rng::new(1));
-        app.insert_resource(Immortal(true));
+        app.insert_resource(SpawnRules {
+            policy: SpawnPolicy::Map,
+            immortal: true,
+        });
         app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
         app.init_resource::<Notified>().add_systems(
             bevy_app::PostUpdate,

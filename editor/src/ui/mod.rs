@@ -59,7 +59,6 @@ pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
     }
 }
 
-/// Draws a panel's content in the space the panel has, clipped: content never widens a panel.
 pub fn panel_body(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     let rect = ui.available_rect_before_wrap();
     let mut child = ui.new_child(

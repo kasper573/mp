@@ -133,7 +133,7 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
             area: tag.area,
             npc: npc.map(|npc| npc.def),
             character,
-            dead: stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0),
+            dead: stats.is_some_and(stat::dead),
             held,
             presence,
         },

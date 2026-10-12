@@ -1,23 +1,24 @@
 use crate::value::RowValue;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::Tiles;
+use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<Rect<Tiles>> {
-    match module["type"].as_str()? {
-        "object" => shape_rect(&module["shape"]),
-        "safe_zone" => rect_of(&module["rect"]),
-        "soundscape" => rect_of(&module["shape"]),
-        "scenery" => scenery_rect(module),
-        "blueprint" => placement_bounds.or_else(|| {
+    match module.module_kind()? {
+        AreaModuleKind::Object => shape_rect(&module["shape"]),
+        AreaModuleKind::SafeZone => rect_of(&module["rect"]),
+        AreaModuleKind::Soundscape => rect_of(&module["shape"]),
+        AreaModuleKind::Scenery => scenery_rect(module),
+        AreaModuleKind::Blueprint => placement_bounds.or_else(|| {
             let at = pos_of(&module["at"])?;
             Some(Rect::new(
                 at - game::core::math::Offset::new(0.5, 0.5),
                 Size::splat(1.0),
             ))
         }),
-        "population" => rect_of(&module["roams"]),
-        "resident" => {
+        AreaModuleKind::Population => rect_of(&module["roams"]),
+        AreaModuleKind::Resident => {
             let at = pos_of(&module["at"])?;
             Some(Rect::new(
                 at - game::core::math::Offset::new(0.5, 0.5),
@@ -29,9 +30,9 @@ pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<R
 }
 
 pub fn is_point(module: &Value) -> bool {
-    match module.kind() {
-        "object" => module["shape"]["type"] == "point",
-        "resident" => true,
+    match module.module_kind() {
+        Some(AreaModuleKind::Object) => module["shape"]["type"] == "point",
+        Some(AreaModuleKind::Resident) => true,
         _ => false,
     }
 }
@@ -91,22 +92,26 @@ pub fn shift(module: &mut Value, dx: f32, dy: f32) {
             value["y"] = round(y as f32 + dy);
         }
     };
-    match module["type"].as_str() {
-        Some("object") => shift_xy(&mut module["shape"]),
-        Some("safe_zone") => shift_xy(&mut module["rect"]),
-        Some("soundscape") => shift_xy(&mut module["shape"]),
-        Some("scenery") | Some("blueprint") | Some("resident") => shift_xy(&mut module["at"]),
-        Some("population") if module["roams"].is_object() => shift_xy(&mut module["roams"]),
+    match module.module_kind() {
+        Some(AreaModuleKind::Object) => shift_xy(&mut module["shape"]),
+        Some(AreaModuleKind::SafeZone) => shift_xy(&mut module["rect"]),
+        Some(AreaModuleKind::Soundscape) => shift_xy(&mut module["shape"]),
+        Some(AreaModuleKind::Scenery)
+        | Some(AreaModuleKind::Blueprint)
+        | Some(AreaModuleKind::Resident) => shift_xy(&mut module["at"]),
+        Some(AreaModuleKind::Population) if module["roams"].is_object() => {
+            shift_xy(&mut module["roams"])
+        }
         _ => {}
     }
 }
 
 pub fn resize(module: &mut Value, w: f32, h: f32) {
-    let target = match module["type"].as_str() {
-        Some("object") if module["shape"]["type"] == "rect" => &mut module["shape"],
-        Some("safe_zone") => &mut module["rect"],
-        Some("soundscape") => &mut module["shape"],
-        Some("population") if module["roams"].is_object() => &mut module["roams"],
+    let target = match module.module_kind() {
+        Some(AreaModuleKind::Object) if module["shape"]["type"] == "rect" => &mut module["shape"],
+        Some(AreaModuleKind::SafeZone) => &mut module["rect"],
+        Some(AreaModuleKind::Soundscape) => &mut module["shape"],
+        Some(AreaModuleKind::Population) if module["roams"].is_object() => &mut module["roams"],
         _ => return,
     };
     target["w"] = round(w.max(0.0625));
@@ -114,16 +119,19 @@ pub fn resize(module: &mut Value, w: f32, h: f32) {
 }
 
 pub fn has_size(module: &Value) -> bool {
-    match module["type"].as_str() {
-        Some("object") => module["shape"]["type"] == "rect",
-        Some("safe_zone") | Some("soundscape") => true,
-        Some("population") => module["roams"].is_object(),
+    match module.module_kind() {
+        Some(AreaModuleKind::Object) => module["shape"]["type"] == "rect",
+        Some(AreaModuleKind::SafeZone) | Some(AreaModuleKind::Soundscape) => true,
+        Some(AreaModuleKind::Population) => module["roams"].is_object(),
         _ => false,
     }
 }
 
 pub fn flip_field(module: &mut Value, horizontal: bool) {
-    if !matches!(module.kind(), "scenery" | "blueprint") {
+    if !matches!(
+        module.module_kind(),
+        Some(AreaModuleKind::Scenery | AreaModuleKind::Blueprint)
+    ) {
         return;
     }
     let current = module.text_or("flip", "none");
@@ -158,23 +166,25 @@ pub fn round(v: f32) -> Value {
 }
 
 pub fn label(module: &Value) -> String {
-    let kind = module.kind_or("module");
-    match kind {
-        "object" => module["name"]
+    match module.module_kind() {
+        Some(AreaModuleKind::Object) => module["name"]
             .as_str()
             .or(module["label"].as_str())
             .map_or("object".to_owned(), |name| format!("object {name}")),
-        "blueprint" => format!("{} placement", module.text_or("blueprint", "blueprint")),
-        "population" => format!(
+        Some(AreaModuleKind::Blueprint) => {
+            format!("{} placement", module.text_or("blueprint", "blueprint"))
+        }
+        Some(AreaModuleKind::Population) => format!(
             "{} × {}",
             module.text_or("npc", "npc"),
             module["count"].as_u64().unwrap_or(0)
         ),
-        "resident" => format!("resident {}", module.text_or("npc", "npc")),
-        "scenery" => format!("scenery {}", module.text("tileset")),
-        "shared_script" => format!("script {}", module.text("script")),
-        "inline_script" => "inline script".to_owned(),
-        other => other.replace('_', " "),
+        Some(AreaModuleKind::Resident) => format!("resident {}", module.text_or("npc", "npc")),
+        Some(AreaModuleKind::Scenery) => format!("scenery {}", module.text("tileset")),
+        Some(AreaModuleKind::SharedScript) => format!("script {}", module.text("script")),
+        Some(AreaModuleKind::InlineScript) => "inline script".to_owned(),
+        Some(other) => other.tag().replace('_', " "),
+        None => module.kind_or("module").replace('_', " "),
     }
 }
 

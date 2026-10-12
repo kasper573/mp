@@ -814,8 +814,8 @@ fn cast_key(who: Speaker) -> u64 {
     match who {
         Speaker::Player => 0,
         Speaker::Narrator => 1,
-        Speaker::Npc(npc) => 2 + npc.index() as u64,
-        Speaker::Object => 10_000,
+        Speaker::Object => 2,
+        Speaker::Npc(npc) => 3 + npc.index() as u64,
     }
 }
 

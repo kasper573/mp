@@ -1,6 +1,8 @@
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use game::systems::area;
+use game::core::script::VariableType;
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
+use std::str::FromStr;
 
 use super::holes;
 use super::inspect::form_schema;
@@ -143,17 +145,17 @@ pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
             .family(egui::FontFamily::Name("medium".into())),
     );
     let described = [
-        ("scenery", "tiles from one tileset"),
-        ("blueprint", "another blueprint, placed"),
-        ("soundscape", "a sound zone"),
-        ("object", "a shape, a look, a script"),
-        ("safe_zone", "a rect where no one fights"),
-        ("population", "people who roam a rect"),
-        ("resident", "one person at one spot"),
+        (AreaModuleKind::Scenery, "tiles from one tileset"),
+        (AreaModuleKind::Blueprint, "another blueprint, placed"),
+        (AreaModuleKind::Soundscape, "a sound zone"),
+        (AreaModuleKind::Object, "a shape, a look, a script"),
+        (AreaModuleKind::SafeZone, "a rect where no one fights"),
+        (AreaModuleKind::Population, "people who roam a rect"),
+        (AreaModuleKind::Resident, "one person at one spot"),
     ];
     let mut picked = None;
-    for (tag, description) in described {
-        let Some(variant) = variants.iter().find(|v| v.tag == tag) else {
+    for (kind, description) in described {
+        let Some(variant) = variants.iter().find(|v| v.tag == kind.tag()) else {
             continue;
         };
         let full = ui.available_rect_before_wrap();
@@ -167,26 +169,26 @@ pub(super) fn add_part_popup(editor: &Editor, ui: &mut Ui) -> Option<Value> {
                 .max_rect(rect.shrink2(Vec2::new(6.0, 3.0)))
                 .layout(Layout::left_to_right(Align::Center)),
         );
-        widgets::badge(&mut child, tag);
+        widgets::badge(&mut child, kind.tag());
         child.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 0.0;
-            ui.label(RichText::new(tag).monospace().color(theme::TEXT));
+            ui.label(RichText::new(kind.tag()).monospace().color(theme::TEXT));
             ui.label(RichText::new(description).size(11.5).color(theme::MUTED));
         });
         if response.clicked() {
             let mut template = crate::schema::variant_template(&root, variant);
-            match tag {
-                "population" => {
+            match kind {
+                AreaModuleKind::Population => {
                     template["roams"] =
                         serde_json::json!({ "x": 0.0, "y": 0.0, "w": 4.0, "h": 4.0 })
                 }
-                "safe_zone" => {
+                AreaModuleKind::SafeZone => {
                     template["rect"] = serde_json::json!({ "x": 0.0, "y": 0.0, "w": 4.0, "h": 4.0 })
                 }
-                "soundscape" => {
+                AreaModuleKind::Soundscape => {
                     template["shape"] = serde_json::json!({ "type": "rect", "x": 0.0, "y": 0.0, "w": 4.0, "h": 4.0 })
                 }
-                "object" => {
+                AreaModuleKind::Object => {
                     template["shape"] = serde_json::json!({ "type": "point", "x": 0.0, "y": 0.0 })
                 }
                 _ => template["at"] = serde_json::json!({ "x": 0.0, "y": 0.0 }),
@@ -230,11 +232,13 @@ pub(super) fn part_cards(
         crate::schema::Kind::Union(variants) => variants,
         _ => Vec::new(),
     };
-    let variables: Vec<(String, String)> = row["variables"]
+    let variables: Vec<(String, VariableType)> = row["variables"]
         .as_object()
         .map(|vars| {
             vars.iter()
-                .map(|(name, v)| (name.clone(), v.kind().to_owned()))
+                .filter_map(|(name, v)| {
+                    Some((name.clone(), VariableType::from_str(v.kind()).ok()?))
+                })
                 .collect()
         })
         .unwrap_or_default();
@@ -260,6 +264,7 @@ pub(super) fn part_cards(
                 continue;
             };
             let kind = part.kind_or("part").to_owned();
+            let module_kind = part.module_kind();
             let holes = holes::holes_in(part, "");
             let holeable = holes::holeable_fields(part);
             widgets::card_frame(true).show(ui, |ui| {
@@ -284,18 +289,18 @@ pub(super) fn part_cards(
                 cx.holes = Some(crate::forms::Holes {
                     filled: holes
                         .iter()
-                        .map(|(field, name)| (format!("{path}{field}"), name.clone()))
+                        .map(|hole| (format!("{path}{}", hole.pointer), hole.name.clone()))
                         .collect(),
                     open: holeable
                         .iter()
-                        .map(|(field, kind)| (format!("{path}{field}"), kind.clone()))
+                        .map(|field| (format!("{path}{}", field.pointer), field.kind))
                         .collect(),
                     variables: variables.clone(),
                     requests: Vec::new(),
                 });
                 match crate::schema::variant_of(&variants, &plain) {
                     Some(variant) => {
-                        let schema = form_schema(variant, &kind);
+                        let schema = form_schema(variant, module_kind);
                         changed |=
                             crate::forms::object(ui, &mut cx, &schema, &mut plain, &path).is_some();
                     }
@@ -306,7 +311,7 @@ pub(super) fn part_cards(
                 if plain != before {
                     holes::merge_keeping_holes(part, &plain);
                 }
-                if kind == "object" {
+                if module_kind == Some(AreaModuleKind::Object) {
                     changed |= crate::ui::inspector::scripts::script_cards(
                         ui, &mut cx, "area", part, "scripts", &path,
                     )
@@ -323,7 +328,7 @@ pub(super) fn part_cards(
     }
     let mut made: Vec<holes::MadeVariable> = Vec::new();
     for op in hole_ops {
-        made.extend(holes::apply_hole_op(row, op, key));
+        made.extend(holes::apply_hole_op(row, op));
         changed = true;
     }
     if let Some(index) = remove {
@@ -348,12 +353,12 @@ pub(super) fn part_cards(
             let kept = keep_placement_values(editor, key, &made);
             let names: Vec<String> = made
                 .iter()
-                .map(|variable| format!("{} · {}", variable.name, variable.kind))
+                .map(|variable| format!("{} · {}", variable.name, variable.kind.name()))
                 .collect();
             edit = Edit::new(format!(
                 "Make variable {} · no default · {kept} placement{} keep{} {} value · blueprint/{key}",
                 names.join(", "),
-                if kept == 1 { "" } else { "s" },
+                crate::ui::widgets::plural(kept),
                 if kept == 1 { "s" } else { "" },
                 if kept == 1 { "its" } else { "their" }
             ));
@@ -491,7 +496,7 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
         .iter()
         .filter_map(|area_key| editor.row_value("area", area_key))
         .flat_map(|row| row["modules"].as_array().cloned().unwrap_or_default())
-        .filter(|module| module["type"] == "blueprint" && module["blueprint"] == key)
+        .filter(|module| module.is_module(AreaModuleKind::Blueprint) && module["blueprint"] == key)
         .collect();
     let mut holes = Vec::new();
     for part in row["parts"].as_array().into_iter().flatten() {
@@ -525,7 +530,7 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
             ui.label(
                 theme::faint(format!(
                     "{count} hole{} · {own} give{} {} own",
-                    if count == 1 { "" } else { "s" },
+                    crate::ui::widgets::plural(count),
                     if own == 1 { "s" } else { "" },
                     if own == 1 { "its" } else { "their" }
                 ))
@@ -585,7 +590,9 @@ fn keep_placement_values(editor: &Editor, key: &str, made: &[holes::MadeVariable
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter(|module| module["type"] == "blueprint" && module["blueprint"] == key)
+                .filter(|module| {
+                    module.is_module(AreaModuleKind::Blueprint) && module["blueprint"] == key
+                })
                 .count()
         })
         .sum()
@@ -607,7 +614,7 @@ fn placements_keeping(
         };
         let mut touched = false;
         for module in row["modules"].as_array_mut().into_iter().flatten() {
-            if module["type"] != "blueprint" || module["blueprint"] != key {
+            if !module.is_module(AreaModuleKind::Blueprint) || module["blueprint"] != key {
                 continue;
             }
             for variable in made {

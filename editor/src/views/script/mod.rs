@@ -427,7 +427,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
         act(editor, &doc, action, generation);
     }
     editor.views.script.keys = ScriptKeys::default();
-    save_layout(editor, owner, layout_file);
+    save_layout(editor, ui, owner, layout_file);
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: crate::app::BottomTab) {
@@ -678,7 +678,7 @@ pub fn owner_label(editor: &Editor, doc: &Doc) -> String {
 
 pub fn chip_title(editor: &Editor, doc: &Doc) -> String {
     let count = doc.nodes().len();
-    let nodes = format!("{count} node{}", if count == 1 { "" } else { "s" });
+    let nodes = format!("{count} node{}", crate::ui::widgets::plural(count));
     match &doc.owner {
         ScriptOwner::Shared { key } => {
             let mut text = format!("script/{key} · owner {} · {nodes}", doc.kind.name());
@@ -1546,23 +1546,30 @@ fn layout_file(editor: &Editor, owner: &ScriptOwner) -> Option<PathBuf> {
     )
 }
 
-fn save_layout(editor: &mut Editor, owner: &ScriptOwner, file: Option<PathBuf>) {
+fn save_layout(editor: &mut Editor, ui: &Ui, owner: &ScriptOwner, file: Option<PathBuf>) {
     let Some(file) = file else {
         return;
     };
-    let dragging = editor.views.script.views.get(owner).is_some_and(|_| false);
+    if ui.input(|input| input.pointer.any_down()) {
+        return;
+    }
     let Some(view) = editor.views.script.views.get_mut(owner) else {
         return;
     };
-    if !view.layout_dirty || dragging {
+    if !view.layout_dirty {
         return;
     }
     view.layout_dirty = false;
-    if let Some(parent) = file.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(text) = serde_json::to_string_pretty(&view.layout) {
-        let _ = std::fs::write(file, text + "\n");
+    let written = file
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| serde_json::to_string_pretty(&view.layout).map_err(std::io::Error::other))
+        .and_then(|text| std::fs::write(&file, text + "\n"));
+    if let Err(error) = written {
+        editor.toast(format!(
+            "The graph layout was not saved to {}: {error}",
+            file.display()
+        ));
     }
 }
 

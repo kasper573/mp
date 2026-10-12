@@ -4,10 +4,10 @@ use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::{TilePos, Tiles};
-use game::systems::area::{self, Flip};
+use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
-use super::holes::suffixed_from;
+use super::holes::suffixed;
 use super::select;
 use super::{Frame, shapes};
 use crate::app::Editor;
@@ -38,8 +38,8 @@ pub fn place_json(module: &mut Value, at: Pos<Tiles>, flip: Flip) {
         out["y"] = shapes::round(placed.origin.y);
         out
     };
-    match module["type"].as_str() {
-        Some("object") => {
+    match module.module_kind() {
+        Some(AreaModuleKind::Object) => {
             if module["shape"]["type"] == "point" {
                 let (x, y) = point(
                     module["shape"]["x"].as_f64().unwrap_or(0.0) as f32,
@@ -51,21 +51,23 @@ pub fn place_json(module: &mut Value, at: Pos<Tiles>, flip: Flip) {
                 module["shape"] = rect(&module["shape"]);
             }
         }
-        Some("safe_zone") => module["rect"] = rect(&module["rect"]),
-        Some("soundscape") => module["shape"] = rect(&module["shape"]),
-        Some("population") => {
+        Some(AreaModuleKind::SafeZone) => module["rect"] = rect(&module["rect"]),
+        Some(AreaModuleKind::Soundscape) => module["shape"] = rect(&module["shape"]),
+        Some(AreaModuleKind::Population) => {
             if module["roams"].is_object() {
                 module["roams"] = rect(&module["roams"]);
             }
         }
-        Some("scenery") | Some("resident") | Some("blueprint") => {
+        Some(AreaModuleKind::Scenery)
+        | Some(AreaModuleKind::Resident)
+        | Some(AreaModuleKind::Blueprint) => {
             let (x, y) = point(
                 module["at"]["x"].as_f64().unwrap_or(0.0) as f32,
                 module["at"]["y"].as_f64().unwrap_or(0.0) as f32,
             );
             module["at"]["x"] = shapes::round(x);
             module["at"]["y"] = shapes::round(y);
-            if module["type"] != "resident" {
+            if !module.is_module(AreaModuleKind::Resident) {
                 let own = Flip::parse(module.text("flip"))
                     .unwrap_or(Flip::None)
                     .compose(flip);
@@ -441,8 +443,6 @@ pub fn stamp_input(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Fra
     }
 }
 
-/// Writes a stroke of placements as one step; copies the folder refuses are retried one by one so
-/// the rest land, crossed out and counted.
 pub(super) fn place_stamps(
     editor: &mut Editor,
     frame: &Frame,
@@ -475,7 +475,7 @@ pub(super) fn place_stamps(
                             .and_then(|v| v.as_str().map(str::to_owned))
                     })
                     .unwrap_or_else(|| name.clone());
-                let fresh = suffixed_from(&base, &taken);
+                let fresh = suffixed(&base, &taken);
                 taken.insert(fresh.clone());
                 own[name] = Value::String(fresh);
             }
@@ -525,7 +525,7 @@ pub(super) fn place_stamps(
                 .views
                 .area
                 .views
-                .get_mut(&format!("area:{}", frame.area_key));
+                .get_mut(&super::area_view_key(&frame.area_key));
             if let Some(view) = view {
                 view.skipped = None;
             }
@@ -549,6 +549,8 @@ pub(super) fn place_stamps(
                 );
                 match crate::project::load(&probe, &project.root.display().to_string()) {
                     Ok((content, _)) => {
+                        // SAFETY: the probe content was loaded only to check this module and
+                        // nothing was taken out of it.
                         unsafe { content.release() };
                         kept.push(module);
                         working = next;
@@ -574,7 +576,7 @@ pub(super) fn place_stamps(
                 .views
                 .area
                 .views
-                .get_mut(&format!("area:{}", frame.area_key))
+                .get_mut(&super::area_view_key(&frame.area_key))
             {
                 view.skipped = Some(text);
             }

@@ -28,8 +28,8 @@ fn main() {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--build-info" => {
-                println!("{}", game::systems::build_info());
+            game::systems::launch::BUILD_INFO_FLAG => {
+                println!("{}", game::systems::launch::build_info_line());
                 return;
             }
             "--shapes" => {

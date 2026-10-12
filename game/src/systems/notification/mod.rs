@@ -38,7 +38,7 @@ use crate::systems::npc::{Npc, NpcDef};
 use crate::systems::player::Players;
 use crate::systems::scene::Scene as GameScene;
 use crate::systems::script::condition;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
+use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Audience, Link};
 use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::text::{self, LineText, Motion, Span, SpanText};
 use crate::systems::visibility;
@@ -395,23 +395,28 @@ pub fn play_sound(
     owner: Option<Entity>,
     subject: Option<Entity>,
     sfx: SfxId,
-    everyone: bool,
+    audience: Audience,
 ) {
     let source = owner.or(subject);
     let at = source.and_then(|source| position(world, source));
     let played = SoundPlayed { sfx, at };
-    if everyone {
-        let Some(source) = source else {
-            return;
-        };
-        for client in visibility::seen_by(world, source) {
-            world.write_message(ToClients {
-                targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
-                message: played,
-            });
+    match audience {
+        Audience::Everyone => {
+            let Some(source) = source else {
+                return;
+            };
+            for client in visibility::seen_by(world, source) {
+                world.write_message(ToClients {
+                    targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
+                    message: played,
+                });
+            }
         }
-    } else if let Some(subject) = subject {
-        visibility::send_private(world, subject, played);
+        Audience::Subject => {
+            if let Some(subject) = subject {
+                visibility::send_private(world, subject, played);
+            }
+        }
     }
 }
 

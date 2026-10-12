@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use std::collections::HashMap;
 
 use bevy::asset::{RenderAssetUsages, load_internal_asset, uuid_handle};
@@ -22,7 +24,6 @@ impl Plugin for TilemapPlugin {
     }
 }
 
-/// Everything spawned by this crate carries it, so a scene can clear its map at once.
 #[derive(Component)]
 pub struct MapTile;
 
@@ -40,10 +41,10 @@ pub struct TileAnimation {
     pub frames: Vec<TileAnimationFrame>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TileAnimationFrame {
     pub tile: u32,
-    pub seconds: f32,
+    pub lasts: Duration,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,8 +66,7 @@ pub struct TileSprite {
     pub tile: u32,
     pub flip_x: bool,
     pub flip_y: bool,
-    /// The sprite's bottom-left corner in world units.
-    pub at: Vec2,
+    pub bottom_left: Vec2,
     pub z: f32,
 }
 
@@ -130,7 +130,7 @@ pub fn spawn_tile_sprite(
             ..default()
         },
         Anchor::BOTTOM_LEFT,
-        Transform::from_xyz(sprite.at.x, sprite.at.y, sprite.z),
+        Transform::from_xyz(sprite.bottom_left.x, sprite.bottom_left.y, sprite.z),
     ));
     if total > 0.0 {
         tile.insert(AnimatedSprite { frames, total });
@@ -251,7 +251,7 @@ impl IndexBuilder {
                 let frames: Vec<(u32, f32)> = animation
                     .frames
                     .iter()
-                    .map(|frame| (frame.tile.min(count - 1), frame.seconds))
+                    .map(|frame| (frame.tile.min(count - 1), frame.lasts.as_secs_f32()))
                     .collect();
                 Anim {
                     tile: animation.tile,
@@ -354,6 +354,8 @@ fn animate_tilemaps(
                 data[i + 1] = (shown >> 8) as u8;
             }
         }
+        // The material's bind group caches the frame-map texture view, so the material has to be
+        // marked changed for the rewritten image to reach the shader.
         materials.get_mut(&material.0);
     }
 }
@@ -385,7 +387,7 @@ fn frames(sheet: &TileSheet, tile: u32) -> Vec<(Rect, f32)> {
         Some(animation) if !animation.frames.is_empty() => animation
             .frames
             .iter()
-            .map(|frame| (region(sheet, frame.tile), frame.seconds))
+            .map(|frame| (region(sheet, frame.tile), frame.lasts.as_secs_f32()))
             .collect(),
         _ => vec![(region(sheet, tile), 0.0)],
     }

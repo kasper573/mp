@@ -1,5 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr};
 
 use crate::core::content::serial;
 use crate::core::script::{EventDef, Name, OwnerKind, ValueType};
@@ -7,7 +8,8 @@ use crate::core::tiling::Tiles;
 use crate::systems::attention::Id as AttentionId;
 use crate::systems::interact::Verb;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum EventKind {
     Started,
     Run,
@@ -174,29 +176,7 @@ impl EventDef for RiftEvent {
 
 impl EventKind {
     pub fn name(self) -> &'static str {
-        match self {
-            EventKind::Started => "started",
-            EventKind::Run => "run",
-            EventKind::Entered => "entered",
-            EventKind::Left => "left",
-            EventKind::Discovered => "discovered",
-            EventKind::Died => "died",
-            EventKind::LeveledUp => "leveled_up",
-            EventKind::Interacted => "interacted",
-            EventKind::Heard => "heard",
-            EventKind::CameNear => "came_near",
-            EventKind::Attacked => "attacked",
-            EventKind::Defeated => "defeated",
-            EventKind::Used => "used",
-            EventKind::PickedUp => "picked_up",
-            EventKind::Equipped => "equipped",
-            EventKind::Unequipped => "unequipped",
-            EventKind::Accepted => "accepted",
-            EventKind::Completed => "completed",
-            EventKind::Failed => "failed",
-            EventKind::Bought => "bought",
-            EventKind::Sold => "sold",
-        }
+        self.into()
     }
 }
 

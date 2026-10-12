@@ -31,7 +31,6 @@ fn save(path: &Path, image: &RgbaImage) {
     image.save(path).expect("saves");
 }
 
-/// An Aseprite export: hash-keyed frames, trimmed when asked, frameTags per strip.
 pub fn aseprite(
     dir: &Path,
     name: &str,
@@ -90,7 +89,6 @@ pub fn aseprite(
     vec![png, json]
 }
 
-/// A TexturePacker export: an array of named frames, every other one rotated, no durations.
 pub fn texturepacker(
     dir: &Path,
     name: &str,
@@ -144,7 +142,6 @@ pub fn texturepacker(
     vec![png, json]
 }
 
-/// A plain grid: one strip per row, as many columns as the longest strip.
 pub fn grid(
     dir: &Path,
     name: &str,
@@ -165,7 +162,6 @@ pub fn grid(
     png
 }
 
-/// Numbered files, `<tag>_<n>.png`.
 pub fn sequence(dir: &Path, strips: &[(String, Vec<(RgbaImage, u32)>)]) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for (tag, strip) in strips {
@@ -178,7 +174,6 @@ pub fn sequence(dir: &Path, strips: &[(String, Vec<(RgbaImage, u32)>)]) -> Vec<P
     files
 }
 
-/// An animated GIF with one delay, in hundredths of a second.
 pub fn gif(dir: &Path, name: &str, frames: &[RgbaImage], delay: u16) -> PathBuf {
     let path = dir.join(format!("{name}.gif"));
     let file = std::fs::File::create(&path).unwrap();
@@ -198,7 +193,6 @@ pub fn gif(dir: &Path, name: &str, frames: &[RgbaImage], delay: u16) -> PathBuf 
     path
 }
 
-/// An APNG with one delay as a fraction of a second.
 pub fn apng(dir: &Path, name: &str, frames: &[RgbaImage], delay: (u16, u16)) -> PathBuf {
     let path = dir.join(format!("{name}.png"));
     let (width, height) = frames[0].dimensions();
@@ -219,7 +213,6 @@ pub fn apng(dir: &Path, name: &str, frames: &[RgbaImage], delay: (u16, u16)) -> 
     path
 }
 
-/// A tileset export with a margin, spacing and extruded edges around every tile.
 pub fn spaced_grid(
     dir: &Path,
     name: &str,

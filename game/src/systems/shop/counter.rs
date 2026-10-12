@@ -5,7 +5,7 @@ use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
 use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap, component};
 
-use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
+use super::{Id as ShopId, OfferView, Sale, ShopRequest, ShopView, WareRefusal};
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
 use crate::systems::dialogue::stage;

@@ -146,16 +146,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Gri
     if let (Some(selection), Some(common)) = (selection, &common) {
         let painter = ui.painter_at(canvas.rect.expand(24.0));
         for (index, offset) in common.offsets.offsets.iter().enumerate() {
-            let (dx, dy) = (
-                offset.rem_euclid(grid.columns as i64),
-                offset.div_euclid(grid.columns as i64),
-            );
+            let columns = grid.columns as i64;
+            let linear = selection.y as i64 * columns + selection.x as i64 + offset;
+            let (x, y) = (linear.rem_euclid(columns), linear.div_euclid(columns));
             let rect = ERect::from_min_size(
-                canvas.rect.min
-                    + Vec2::new(
-                        (selection.x as i64 + dx) as f32 * canvas.shown,
-                        (selection.y as i64 + dy) as f32 * canvas.shown,
-                    ),
+                canvas.rect.min + Vec2::new(x as f32 * canvas.shown, y as f32 * canvas.shown),
                 Vec2::new(
                     selection.w as f32 * canvas.shown,
                     selection.h as f32 * canvas.shown,

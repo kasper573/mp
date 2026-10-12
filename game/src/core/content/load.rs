@@ -450,8 +450,7 @@ impl Loading {
     }
 
     pub fn row_file<Row: ContentRow>(&mut self, id: ContentId<Row>) -> String {
-        let key = id.key(&self.content());
-        format!("tables/{}/{key}.json", Row::TABLE)
+        super::row_file(Row::TABLE, id.key(&self.content()))
     }
 
     pub fn fail<Row: ContentRow>(&mut self, id: ContentId<Row>) {
@@ -515,8 +514,10 @@ impl Loading {
     }
 
     pub fn row_folder_file<Row: ContentRow>(&mut self, id: ContentId<Row>, name: &str) -> String {
-        let key = id.key(&self.content());
-        format!("tables/{}/{key}/{name}", Row::TABLE)
+        format!(
+            "{}/{name}",
+            super::row_folder(Row::TABLE, id.key(&self.content()))
+        )
     }
 
     pub fn place(&mut self, file: &str, pointer: &str) -> ErrorPlace {
@@ -572,7 +573,7 @@ impl Loading {
             .into_par_iter()
             .map(|(index, key)| {
                 let loader = &registry.row_loaders()[index];
-                let file = format!("tables/{}/{key}.json", loader.name());
+                let file = super::row_file(loader.name(), &key);
                 parse_file(root.as_ref(), &file, &scope, |text| loader.parse(text))
                     .finish(index, key)
             })
@@ -640,7 +641,7 @@ impl Loading {
             loader.check_rows(&content, &mut errors);
         }
         for (table, key, check) in errors {
-            let file = format!("tables/{table}/{key}.json");
+            let file = super::row_file(table, &key);
             self.failed.insert((table, key));
             for error in check.into_errors() {
                 self.json_error(
@@ -662,7 +663,7 @@ impl Loading {
         }
         for (table, listing) in &self.listing.tables {
             for key in &listing.keys {
-                files.push(format!("tables/{table}/{key}.json"));
+                files.push(super::row_file(table, key));
             }
             for (key, names) in &listing.folders {
                 for name in names {
@@ -674,7 +675,7 @@ impl Loading {
             self.listing
                 .assets
                 .iter()
-                .map(|path| format!("assets/{path}")),
+                .map(|path| super::asset_file(path)),
         );
         let root = self.folder.clone();
         let hashed: Vec<(String, io::Result<FileHash>)> = files
@@ -1416,9 +1417,7 @@ impl Listing {
 const KEY_RULE: &str =
     "1 to 64 of ASCII letters, digits, _ and -, not starting with -, not a Windows device name";
 
-type Entry = FolderEntry;
-
-fn describe(entry: &Entry) -> String {
+fn describe(entry: &FolderEntry) -> String {
     if entry.dir {
         format!("folder {}", entry.name)
     } else {
@@ -1426,8 +1425,8 @@ fn describe(entry: &Entry) -> String {
     }
 }
 
-fn entries(root: &dyn ContentFolder, dir: &str) -> Vec<Entry> {
-    let mut entries: Vec<Entry> = root
+fn entries(root: &dyn ContentFolder, dir: &str) -> Vec<FolderEntry> {
+    let mut entries: Vec<FolderEntry> = root
         .entries(dir)
         .into_iter()
         .filter(|entry| !entry.name.starts_with('.'))

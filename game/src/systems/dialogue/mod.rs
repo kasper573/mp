@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
-use crate::core::script::{self, Answer, BoxEnding, ChoiceOffer, DialogueView, FlowKey, Reveal};
+use crate::core::script::{
+    self, Answer, BoxEnding, ChoiceOffer, ChoiceState, DialogueView, FlowKey, Reveal,
+};
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
 use crate::systems::actor::bust::Face;
@@ -398,8 +400,8 @@ pub fn refresh(world: &mut World, sessions: &mut QueryState<Entity, With<Convers
             })
             .collect();
         for (index, choice) in choices {
-            let locked =
-                !script::run::choice_open::<RiftScripting>(world, flow, choice).unwrap_or(true);
+            let locked = script::run::choice_state::<RiftScripting>(world, flow, choice)
+                == ChoiceState::Locked;
             if let Some(mut session) = world.get_mut::<ConversationSession>(player) {
                 session.offers[index].view.locked = locked;
             }
@@ -441,6 +443,7 @@ struct Offer {
     pick: Pick,
 }
 
+#[derive(Clone)]
 enum Pick {
     Choice {
         index: usize,
@@ -644,18 +647,7 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
     };
     let flow = session.flow;
     let label = offer.view.label.clone();
-    let picked = match &offer.pick {
-        Pick::Choice {
-            index,
-            requires,
-            costs,
-        } => Picked::Choice {
-            index: *index,
-            requires: *requires,
-            costs: costs.clone(),
-        },
-        Pick::Card(card) => Picked::Card(card.clone()),
-    };
+    let picked = offer.pick.clone();
     if let Some(reason) = broken(world, player) {
         leave(world, player);
         tell_ended(world, player, reason);
@@ -666,16 +658,16 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
         .mark(Some(HistoryMark::You));
     history::record(world, player, said);
     let answer = match picked {
-        Picked::Choice {
+        Pick::Choice {
             index,
             requires,
             costs,
-        } => match script::run::choice_open::<RiftScripting>(world, flow, index) {
-            Some(true) => affordable(world, player, &costs).map(|()| Answer::Pick(index)),
-            Some(false) => Err(unmet(world, player, requires)),
-            None => Err(NO_LONGER.to_owned()),
+        } => match script::run::choice_state::<RiftScripting>(world, flow, index) {
+            ChoiceState::Open => affordable(world, player, &costs).map(|()| Answer::Pick(index)),
+            ChoiceState::Locked => Err(unmet(world, player, requires)),
+            ChoiceState::Gone => Err(NO_LONGER.to_owned()),
         },
-        Picked::Card(card) => card(world, player),
+        Pick::Card(card) => card(world, player),
     };
     match answer {
         Ok(answer) => {
@@ -686,15 +678,6 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
         }
         Err(reason) => refuse(world, player, choice, reason),
     }
-}
-
-enum Picked {
-    Choice {
-        index: usize,
-        requires: Option<&'static Condition>,
-        costs: Vec<ItemStack>,
-    },
-    Card(CardPick),
 }
 
 fn revealed_costs(choice: &ChoiceOffer<RiftScripting>) -> Vec<ItemStack> {

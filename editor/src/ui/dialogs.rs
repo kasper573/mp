@@ -1,7 +1,9 @@
 use egui::{Context, RichText};
 
 use super::{theme, widgets};
-use crate::app::{CloseThen, ConfirmAction, Dialog, Editor, NewGameDialog, NewGameSource};
+use crate::app::{
+    CloseThen, ConfirmAction, Dialog, Editor, NewGameDialog, NewGameSource, RenameTarget,
+};
 use crate::project::{Edit, row_file};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
@@ -96,9 +98,9 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                                             ui.label(theme::muted(format!(
                                                 "{} area{} · {players} player{} · {scripts} shared script{}",
                                                 template.areas.len(),
-                                                if template.areas.len() == 1 { "" } else { "s" },
-                                                if players == 1 { "" } else { "s" },
-                                                if scripts == 1 { "" } else { "s" }
+                                                crate::ui::widgets::plural(template.areas.len()),
+                                                crate::ui::widgets::plural(players),
+                                                crate::ui::widgets::plural(scripts)
                                             )));
                                         });
                                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -331,29 +333,25 @@ fn rename(
     mut dialog: crate::app::RenameDialog,
 ) -> Option<Dialog> {
     let mut outcome = None;
-    let is_layer = dialog.table.ends_with(" layer");
     let (enter, escape) = ctx.input(|i| {
         (
             i.key_pressed(egui::Key::Enter),
             i.key_pressed(egui::Key::Escape),
         )
     });
-    let groups: Vec<(String, String, Vec<String>)> = if is_layer {
-        Vec::new()
-    } else {
-        editor
-            .project
-            .as_ref()
-            .map(|project| crate::rows::usage_groups(project, &dialog.table, &dialog.key))
-            .unwrap_or_default()
+    let groups: Vec<(String, String, Vec<String>)> = match (&dialog.target, &editor.project) {
+        (RenameTarget::Row { table, key }, Some(project)) => {
+            crate::rows::usage_groups(project, table, key)
+        }
+        _ => Vec::new(),
     };
     let rows: usize = groups.iter().map(|(_, _, keys)| keys.len()).sum();
+    let title = match &dialog.target {
+        RenameTarget::Row { table, key } => format!("Rename {table}/{key}"),
+        RenameTarget::Layer { area, layer } => format!("Rename layer {layer} of {area}"),
+    };
     card(ctx, "rename", 600.0, |ui| {
-        ui.label(
-            RichText::new(format!("Rename {}/{}", dialog.table, dialog.key))
-                .strong()
-                .size(18.0),
-        );
+        ui.label(RichText::new(title).strong().size(18.0));
         ui.add_space(8.0);
         let response = ui.add(
             egui::TextEdit::singleline(&mut dialog.draft)
@@ -362,22 +360,22 @@ fn rename(
         );
         if !ui.memory(|m| m.has_focus(response.id))
             && dialog.error.is_none()
-            && dialog.draft == dialog.key
+            && dialog.draft == dialog.target.name()
         {
             response.request_focus();
         }
         ui.add_space(6.0);
-        if is_layer {
+        if let RenameTarget::Layer { .. } = &dialog.target {
             ui.label(theme::muted(
                 "The layer's grid file and every palette entry naming it change as one undo step.",
             ));
-        } else {
+        } else if let RenameTarget::Row { table, key } = &dialog.target {
             ui.label(theme::muted(if rows == 0 {
                 "Nothing names it. Only the file changes.".to_owned()
             } else {
                 format!(
                     "{rows} row{} name it. The file and those rows change as one undo step.",
-                    if rows == 1 { "" } else { "s" }
+                    crate::ui::widgets::plural(rows)
                 )
             }));
             if !groups.is_empty() {
@@ -392,7 +390,7 @@ fn rename(
                         ui.label(
                             theme::mono(format!(
                                 "{}  →  {}.json",
-                                crate::project::row_file(&dialog.table, &dialog.key),
+                                crate::project::row_file(table, key),
                                 dialog.draft.trim()
                             ))
                             .color(theme::CODE),
@@ -421,12 +419,12 @@ fn rename(
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            let label = if is_layer || rows == 0 {
+            let label = if matches!(dialog.target, RenameTarget::Layer { .. }) || rows == 0 {
                 "Rename".to_owned()
             } else {
                 format!(
                     "Rename and update {rows} row{}",
-                    if rows == 1 { "" } else { "s" }
+                    crate::ui::widgets::plural(rows)
                 )
             };
             if widgets::primary(ui, &label).clicked() {
@@ -444,27 +442,19 @@ fn rename(
         outcome = Some(false);
     }
     match outcome {
-        Some(true) if is_layer => {
-            let area = dialog
-                .table
-                .trim_start_matches("area/")
-                .trim_end_matches(" layer")
-                .to_owned();
-            match crate::views::area::tools::rename_layer(
-                editor,
-                &area,
-                &dialog.key,
-                dialog.draft.trim(),
-            ) {
-                Ok(()) => None,
-                Err(error) => {
-                    dialog.error = Some(error);
-                    Some(Dialog::Rename(dialog))
-                }
-            }
-        }
         Some(true) => {
-            match crate::rows::rename(editor, &dialog.table, &dialog.key, dialog.draft.trim()) {
+            let renamed = match &dialog.target {
+                RenameTarget::Layer { area, layer } => crate::views::area::tools::rename_layer(
+                    editor,
+                    area,
+                    layer,
+                    dialog.draft.trim(),
+                ),
+                RenameTarget::Row { table, key } => {
+                    crate::rows::rename(editor, table, key, dialog.draft.trim())
+                }
+            };
+            match renamed {
                 Ok(()) => None,
                 Err(error) => {
                     dialog.error = Some(error);
@@ -759,12 +749,12 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     } else if unpacked == edits {
                         format!(
                             "Delete and unpack {edits} placement{}",
-                            if edits == 1 { "" } else { "s" }
+                            crate::ui::widgets::plural(edits)
                         )
                     } else {
                         format!(
                             "Delete and apply {edits} edit{}",
-                            if edits == 1 { "" } else { "s" }
+                            crate::ui::widgets::plural(edits)
                         )
                     };
                     ui.add_enabled_ui(ready, |ui| {

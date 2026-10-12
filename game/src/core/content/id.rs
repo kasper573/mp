@@ -333,26 +333,5 @@ pub fn nearest<'a>(candidates: impl IntoIterator<Item = &'a String>, key: &str) 
 }
 
 fn edit_distance(a: &str, b: &str) -> usize {
-    let a: Vec<char> = a.to_lowercase().chars().collect();
-    let b: Vec<char> = b.to_lowercase().chars().collect();
-    let (n, m) = (a.len(), b.len());
-    let mut d = vec![vec![0usize; m + 1]; n + 1];
-    for (i, row) in d.iter_mut().enumerate() {
-        row[0] = i;
-    }
-    for (j, cell) in d[0].iter_mut().enumerate() {
-        *cell = j;
-    }
-    for i in 1..=n {
-        for j in 1..=m {
-            let cost = usize::from(a[i - 1] != b[j - 1]);
-            d[i][j] = (d[i - 1][j] + 1)
-                .min(d[i][j - 1] + 1)
-                .min(d[i - 1][j - 1] + cost);
-            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
-                d[i][j] = d[i][j].min(d[i - 2][j - 2] + 1);
-            }
-        }
-    }
-    d[n][m]
+    strsim::osa_distance(&a.to_lowercase(), &b.to_lowercase())
 }

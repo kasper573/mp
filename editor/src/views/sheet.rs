@@ -1196,7 +1196,7 @@ fn keys(
             "Fill {} down {} row{}",
             column.title,
             targets.len(),
-            if targets.len() == 1 { "" } else { "s" }
+            widgets::plural(targets.len())
         );
         write_cells(editor, table, &cells, &label);
         return;
@@ -1214,16 +1214,14 @@ fn keys(
                 if column.source == Source::Key {
                     continue;
                 }
-                let value = parse_cell(
-                    &editor
-                        .shapes
-                        .table(table)
-                        .map(|s| s.shape.clone())
-                        .unwrap_or(Value::Null),
-                    column,
-                    piece.trim(),
-                );
-                cells.push((row.key.clone(), column.clone(), value));
+                let root = editor
+                    .shapes
+                    .table(table)
+                    .map(|s| s.shape.clone())
+                    .unwrap_or(Value::Null);
+                if let Some(value) = parse_cell(&root, column, piece.trim()) {
+                    cells.push((row.key.clone(), column.clone(), value));
+                }
             }
         }
         if !cells.is_empty() {
@@ -1232,24 +1230,22 @@ fn keys(
                 editor,
                 table,
                 &cells,
-                &format!("Paste {count} cell{}", if count == 1 { "" } else { "s" }),
+                &format!("Paste {count} cell{}", widgets::plural(count)),
             );
         }
     }
 }
 
-fn parse_cell(root: &Value, column: &Column, text: &str) -> Value {
+fn parse_cell(root: &Value, column: &Column, text: &str) -> Option<Value> {
     match schema::kind(root, &column.schema) {
-        Kind::Integer => text
-            .parse::<i64>()
-            .map(Value::from)
-            .unwrap_or(Value::String(text.to_owned())),
-        Kind::Number => text
-            .parse::<f64>()
-            .map(Value::from)
-            .unwrap_or(Value::String(text.to_owned())),
-        Kind::Boolean => Value::Bool(matches!(text, "yes" | "true" | "1")),
-        _ => Value::String(text.to_owned()),
+        Kind::Integer => text.parse::<i64>().ok().map(Value::from),
+        Kind::Number => text.parse::<f64>().ok().map(Value::from),
+        Kind::Boolean => match text {
+            "yes" | "true" | "1" => Some(Value::Bool(true)),
+            "no" | "false" | "0" | "" => Some(Value::Bool(false)),
+            _ => None,
+        },
+        _ => Some(Value::String(text.to_owned())),
     }
 }
 

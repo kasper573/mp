@@ -1,16 +1,20 @@
 use egui::{Pos2, RichText, Ui, Vec2};
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
+use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::select::{copy_selection, delete_selection, duplicate_selection, start_paste};
-use super::{Frame, Tool, blueprint, pins, shapes};
+use super::{Frame, Tool, ViewState, blueprint, pins, shapes};
 use super::{pick, placement, scenery};
 use crate::app::Editor;
 use crate::project::{Edit, Selection, row_file};
+use crate::value::RowValue;
 
-thread_local! {
-    pub(super) static MENU_AT: std::cell::Cell<Option<(egui::Id, Pos2, Pos<Tiles>)>> = const { std::cell::Cell::new(None) };
+#[derive(Clone, Copy)]
+pub struct MenuAnchor {
+    pub at: Pos2,
+    pub tile: Pos<Tiles>,
 }
 
 pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &Frame) {
@@ -20,9 +24,8 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &Frame
     let view = editor.views.area.views.get_mut(view_key).expect("view");
     view.cursor_cell = Some(tile.cell());
     view.drag = None;
-    if view.tool == Tool::Select
-        && let Some(hit) = frame.hit(tile)
-    {
+    let selecting = view.tool == Tool::Select;
+    if selecting && let Some(hit) = frame.hit(tile) {
         let part = format!("/modules/{hit}");
         if !super::selected_parts(editor, &frame.area_key).contains(&part) {
             editor.selection = Selection {
@@ -32,33 +35,42 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &Frame
             };
         }
     }
-    let id = egui::Id::new((view_key, "context"));
-    egui::Popup::open_id(&frame.response.ctx, id);
-    MENU_AT.with(|cell| {
-        cell.set(Some((
-            id,
-            frame.pointer.unwrap_or(frame.canvas.rect.center()),
-            tile,
-        )))
-    });
+    let view = editor.views.area.views.get_mut(view_key).expect("view");
+    open_menu(
+        &frame.response.ctx,
+        view,
+        view_key,
+        frame.pointer.unwrap_or(frame.canvas.rect.center()),
+        tile,
+    );
 }
 
 pub(super) fn open_add_menu(
     ui: &mut Ui,
-    _editor: &mut Editor,
+    editor: &mut Editor,
     view_key: &str,
     frame: &Frame,
     tile: Pos<Tiles>,
 ) {
-    let id = egui::Id::new((view_key, "context"));
-    egui::Popup::open_id(ui.ctx(), id);
-    MENU_AT.with(|cell| {
-        cell.set(Some((
-            id,
-            frame.pointer.unwrap_or(frame.canvas.rect.center()),
-            tile,
-        )))
-    });
+    if let Some(view) = editor.views.area.views.get_mut(view_key) {
+        let at = frame.pointer.unwrap_or(frame.canvas.rect.center());
+        open_menu(ui.ctx(), view, view_key, at, tile);
+    }
+}
+
+pub(super) fn open_menu(
+    ctx: &egui::Context,
+    view: &mut ViewState,
+    view_key: &str,
+    at: Pos2,
+    tile: Pos<Tiles>,
+) {
+    egui::Popup::open_id(ctx, menu_id(view_key));
+    view.menu = Some(MenuAnchor { at, tile });
+}
+
+fn menu_id(view_key: &str) -> egui::Id {
+    egui::Id::new((view_key, "context"))
 }
 
 pub fn module_menu_row(ui: &mut Ui, kind: &str, description: &str) -> bool {
@@ -85,11 +97,17 @@ pub fn module_menu_row(ui: &mut Ui, kind: &str, description: &str) -> bool {
 }
 
 pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, frame: &Frame) {
-    let id = egui::Id::new((view_key, "context"));
+    let id = menu_id(view_key);
     if !egui::Popup::is_id_open(ui.ctx(), id) {
         return;
     }
-    let Some((_, at, tile)) = MENU_AT.with(|cell| cell.get()) else {
+    let Some(MenuAnchor { at, tile }) = editor
+        .views
+        .area
+        .views
+        .get(view_key)
+        .and_then(|view| view.menu)
+    else {
         return;
     };
     let mut action: Option<MenuAction> = None;
@@ -158,30 +176,30 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             (
                 "Shapes",
                 vec![
-                    ("object", "a point or rect with scripts"),
-                    ("safe_zone", "a rect where no one fights"),
-                    ("soundscape", "a sound zone"),
+                    (AreaModuleKind::Object, "a point or rect with scripts"),
+                    (AreaModuleKind::SafeZone, "a rect where no one fights"),
+                    (AreaModuleKind::Soundscape, "a sound zone"),
                 ],
             ),
             (
                 "People",
                 vec![
-                    ("population", "npcs that roam a rect"),
-                    ("resident", "one npc at one spot"),
+                    (AreaModuleKind::Population, "npcs that roam a rect"),
+                    (AreaModuleKind::Resident, "one npc at one spot"),
                 ],
             ),
             (
                 "Copies",
                 vec![
-                    ("blueprint", "a blueprint, placed"),
-                    ("scenery", "tiles drawn as one"),
+                    (AreaModuleKind::Blueprint, "a blueprint, placed"),
+                    (AreaModuleKind::Scenery, "tiles drawn as one"),
                 ],
             ),
             (
                 "Area-wide",
                 vec![
-                    ("inline_script", "its nodes in this area"),
-                    ("shared_script", "names a script row"),
+                    (AreaModuleKind::InlineScript, "its nodes in this area"),
+                    (AreaModuleKind::SharedScript, "names a script row"),
                 ],
             ),
         ] {
@@ -192,11 +210,11 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                     .color(crate::ui::theme::FAINT),
             );
             for (kind, description) in kinds {
-                if !variants.iter().any(|(tag, _)| tag == kind) {
+                if !variants.iter().any(|(tag, _)| tag == kind.tag()) {
                     continue;
                 }
-                if module_menu_row(ui, kind, description) {
-                    action = Some(MenuAction::Add(kind.to_owned()));
+                if module_menu_row(ui, kind.tag(), description) {
+                    action = Some(MenuAction::Add(kind));
                     ui.close();
                 }
             }
@@ -223,7 +241,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                     .and_then(|p| p.strip_prefix("/modules/")?.parse().ok());
                 if let Some(index) = index {
                     let module = &frame.modules[index];
-                    if module["type"] == "blueprint" {
+                    if module.is_module(AreaModuleKind::Blueprint) {
                         if ui.button("Edit blueprint in place (Enter)").clicked() {
                             action = Some(MenuAction::EditInPlace(index));
                             ui.close();
@@ -237,11 +255,15 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                             ui.close();
                         }
                     }
-                    if module["type"] == "scenery" && ui.button("Split into tiles").clicked() {
+                    if module.is_module(AreaModuleKind::Scenery)
+                        && ui.button("Split into tiles").clicked()
+                    {
                         action = Some(MenuAction::Split(index));
                         ui.close();
                     }
-                    if module["type"] == "object" && ui.button("Return door…").clicked() {
+                    if module.is_module(AreaModuleKind::Object)
+                        && ui.button("Return door…").clicked()
+                    {
                         action = Some(MenuAction::ReturnDoor(index));
                         ui.close();
                     }
@@ -285,7 +307,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                 .listener = Some(tile);
             pick::listen(editor, frame, tile);
         }
-        MenuAction::Add(kind) => add_module(editor, view_key, frame, &kind, tile),
+        MenuAction::Add(kind) => add_module(editor, view_key, frame, kind, tile),
         MenuAction::Copy => copy_selection(editor, frame),
         MenuAction::Duplicate => duplicate_selection(editor, frame),
         MenuAction::Delete => delete_selection(editor, frame),
@@ -304,7 +326,7 @@ pub(super) enum MenuAction {
     PlayFromStart,
     SetSpawn,
     Listen,
-    Add(String),
+    Add(AreaModuleKind),
     Copy,
     Duplicate,
     Delete,
@@ -350,68 +372,60 @@ pub fn add_module(
     editor: &mut Editor,
     view_key: &str,
     frame: &Frame,
-    kind: &str,
+    kind: AreaModuleKind,
     tile: Pos<Tiles>,
 ) {
-    let Some(mut module) = variant_template(editor, kind) else {
+    let Some(mut module) = variant_template(editor, kind.tag()) else {
         return;
     };
     let cell = tile.cell();
     let (x, y) = (cell.x as f32, cell.y as f32);
     match kind {
-        "object" => {
+        AreaModuleKind::Object => {
             module["shape"] = serde_json::json!({ "type": "point", "x": x, "y": y });
         }
-        "safe_zone" => {
+        AreaModuleKind::SafeZone => {
             module["rect"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5, "w": 2.0, "h": 2.0 });
         }
-        "soundscape" => {
+        AreaModuleKind::Soundscape => {
             module["shape"] = serde_json::json!({ "type": "rect", "x": x - 0.5, "y": y - 0.5, "w": 2.0, "h": 2.0 });
             module["emit"] = serde_json::json!(4.0);
             module["channels"] = serde_json::json!([]);
         }
-        "population" => {
+        AreaModuleKind::Population => {
             module["roams"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5, "w": 2.0, "h": 2.0 });
             module["count"] = serde_json::json!(1);
         }
-        "resident" => {
+        AreaModuleKind::Resident => {
             module["at"] = serde_json::json!({ "x": x, "y": y });
         }
-        "scenery" => {
+        AreaModuleKind::Scenery => {
             module["at"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5 });
         }
-        "blueprint" => {
+        AreaModuleKind::Blueprint => {
             module["at"] = serde_json::json!({ "x": x, "y": y });
             let stamp = editor.views.area.views[view_key].stamp.clone();
             if let Some(stamp) = stamp {
                 module["blueprint"] = Value::String(stamp);
             }
         }
-        "inline_script" => {
+        AreaModuleKind::InlineScript => {
             module["nodes"] = serde_json::json!({});
         }
         _ => {}
     }
-    if matches!(
-        kind,
-        "population" | "resident" | "blueprint" | "shared_script" | "scenery"
-    ) {
-        let table = match kind {
-            "population" | "resident" => "npc",
-            "blueprint" => "blueprint",
-            "shared_script" => "script",
-            _ => "tileset",
-        };
-        let field = match kind {
-            "population" | "resident" => "npc",
-            "blueprint" => "blueprint",
-            "shared_script" => "script",
-            _ => "tileset",
-        };
-        if module[field].as_str().unwrap_or_default().is_empty() {
-            pick::pick_then_add(editor, view_key, frame, module, table, field);
-            return;
-        }
+    let reference = match kind {
+        AreaModuleKind::Population | AreaModuleKind::Resident => Some("npc"),
+        AreaModuleKind::Blueprint => Some("blueprint"),
+        AreaModuleKind::SharedScript => Some("script"),
+        AreaModuleKind::Scenery => Some("tileset"),
+        _ => None,
+    };
+    if let Some(table) = reference
+        && module[table].as_str().unwrap_or_default().is_empty()
+    {
+        pick::pick_then_add(editor, view_key, frame, module, table, table);
+        return;
     }
     let label = shapes::label(&module);
     append_modules(

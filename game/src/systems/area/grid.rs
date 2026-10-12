@@ -3,7 +3,7 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ErrorPlace, LoadError};
+use crate::core::content::{ContentRow, ErrorPlace, LoadError};
 use crate::core::math::Pos;
 use crate::core::tiling::{GridSize, Tiles};
 
@@ -75,6 +75,17 @@ impl Flip {
     }
 }
 
+pub const PALETTE_FILE: &str = "palette.csv";
+pub const WALK_FILE: &str = "walk.csv";
+
+pub fn folder(area_key: &str) -> String {
+    crate::core::content::row_folder(<super::AreaDef as ContentRow>::TABLE, area_key)
+}
+
+pub fn layer_file(layer: &str) -> String {
+    format!("{layer}.csv")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PaletteEntry {
     pub tileset: tileset::Id,
@@ -92,7 +103,7 @@ pub struct GroundLayer {
 pub struct AreaGrids {
     pub size: GridSize,
     pub palette: Vec<PaletteEntry>,
-    pub palette_keys: Vec<(String, u32, Flip)>,
+    pub palette_keys: Vec<PaletteRow>,
     pub ground: Vec<GroundLayer>,
     pub walk: Vec<Option<bool>>,
 }
@@ -104,8 +115,13 @@ impl AreaGrids {
 
     pub fn write_palette(&self) -> String {
         let mut text = String::from("tileset,tile,flip\n");
-        for (tileset, tile, flip) in &self.palette_keys {
-            text.push_str(&format!("{tileset},{tile},{}\n", flip.csv()));
+        for row in &self.palette_keys {
+            text.push_str(&format!(
+                "{},{},{}\n",
+                row.tileset,
+                row.tile,
+                row.flip.csv()
+            ));
         }
         text
     }
@@ -202,6 +218,7 @@ where
     ok.then_some(cells)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaletteRow {
     pub tileset: String,
     pub tile: u32,

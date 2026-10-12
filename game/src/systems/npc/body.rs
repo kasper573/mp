@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
@@ -39,6 +40,23 @@ pub enum Act {
     WalkTo { to: Destination, within: Tiles },
     Attack { target: Entity, within: Tiles },
     Stop,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum Outcome {
+    Next,
+    Arrived,
+    Blocked,
+    Defeated,
+    Lost,
+    Interrupted,
+}
+
+impl Outcome {
+    pub fn name(self) -> Name {
+        self.into()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -107,7 +125,7 @@ pub fn order(world: &mut World, npc: Entity, act: Act, priority: Priority, flow:
     };
     if let Some(interrupted) = interrupted {
         clear(world, npc);
-        answer(world, interrupted, "interrupted");
+        answer(world, interrupted, Outcome::Interrupted);
     }
 }
 
@@ -162,7 +180,7 @@ pub fn drive(
                 .chain(body.waiting.drain(..))
                 .collect();
             for running in dropped {
-                answer(world, running, "lost");
+                answer(world, running, Outcome::Lost);
             }
             continue;
         }
@@ -201,39 +219,39 @@ fn clear(world: &mut World, npc: Entity) {
     reach::forget(world, npc);
 }
 
-fn answer(world: &mut World, running: Running, output: Name) {
+fn answer(world: &mut World, running: Running, outcome: Outcome) {
     if running.pauses()
         && let Some(flow) = running.flow
     {
         world
             .resource_mut::<RiftInstances>()
-            .answer(flow, Answer::Output(output));
+            .answer(flow, Answer::Output(outcome.name()));
     }
 }
 
-fn step(world: &mut World, npc: Entity, running: Running) -> Option<Name> {
+fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
     match running.act {
         Act::Stop => {
             movement::forget(world, npc);
-            Some("next")
+            Some(Outcome::Next)
         }
         Act::Wander { leash } => {
             if !running.started {
                 wander(world, npc, leash);
                 return None;
             }
-            (!movement::moving(world, npc)).then_some("next")
+            (!movement::moving(world, npc)).then_some(Outcome::Next)
         }
         Act::WalkTo { to, within } => {
             let Some(goal) = destination(world, npc, to) else {
-                return Some("blocked");
+                return Some(Outcome::Blocked);
             };
             if movement::approach(world, npc, goal, within) {
                 movement::forget(world, npc);
-                return Some("arrived");
+                return Some(Outcome::Arrived);
             }
             if running.started && !movement::moving(world, npc) {
-                return Some("blocked");
+                return Some(Outcome::Blocked);
             }
             None
         }
@@ -242,7 +260,7 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Name> {
                 reach::intend(world, npc, target, ReachAct::Attack);
             }
             if world.get_entity(target).is_err() || stat::is_dead(world, target) {
-                return Some("defeated");
+                return Some(Outcome::Defeated);
             }
             let lost = (|| {
                 let at = movement::position(world, npc)?;
@@ -260,7 +278,7 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Name> {
             })()
             .unwrap_or(true);
             if lost {
-                return Some("lost");
+                return Some(Outcome::Lost);
             }
             if reach::intent(world, npc, ReachAct::Attack) != Some(target) {
                 reach::intend(world, npc, target, ReachAct::Attack);
@@ -368,7 +386,7 @@ pub struct Stop {
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
-pub struct Face {
+pub struct FaceToward {
     pub toward: FaceTarget,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
@@ -384,6 +402,8 @@ pub enum FaceTarget {
 type Aimed<T> = Box<dyn Fn(&World, &crate::core::script::FlowCx) -> Option<T> + Send + Sync>;
 
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
+const WALK_BLOCKED: usize = 1;
+const ATTACK_LOST: usize = 1;
 
 impl EffectDef<RiftScripting> for Wander {
     fn owners(&self) -> &'static [OwnerKind] {
@@ -393,7 +413,7 @@ impl EffectDef<RiftScripting> for Wander {
         false
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
-        vec![("next", self.next.as_deref())]
+        vec![(Outcome::Next.name(), self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
@@ -427,9 +447,9 @@ impl EffectDef<RiftScripting> for WalkTo {
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![
-            ("arrived", self.arrived.as_deref()),
-            ("blocked", self.blocked.as_deref()),
-            ("interrupted", self.interrupted.as_deref()),
+            (Outcome::Arrived.name(), self.arrived.as_deref()),
+            (Outcome::Blocked.name(), self.blocked.as_deref()),
+            (Outcome::Interrupted.name(), self.interrupted.as_deref()),
         ]
     }
     fn pauses(&self) -> bool {
@@ -463,10 +483,10 @@ impl EffectDef<RiftScripting> for WalkTo {
         };
         Ok(Box::new(move |world, cx| {
             let Some(npc) = cx.owner.entity() else {
-                return EffectStep::Output(1);
+                return EffectStep::Output(WALK_BLOCKED);
             };
             let Some(to) = to(world, cx) else {
-                return EffectStep::Output(1);
+                return EffectStep::Output(WALK_BLOCKED);
             };
             let within = Tiles(within(world, cx).as_num() as f32);
             order(
@@ -493,9 +513,9 @@ impl EffectDef<RiftScripting> for Attack {
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![
-            ("defeated", self.defeated.as_deref()),
-            ("lost", self.lost.as_deref()),
-            ("interrupted", self.interrupted.as_deref()),
+            (Outcome::Defeated.name(), self.defeated.as_deref()),
+            (Outcome::Lost.name(), self.lost.as_deref()),
+            (Outcome::Interrupted.name(), self.interrupted.as_deref()),
         ]
     }
     fn pauses(&self) -> bool {
@@ -511,10 +531,10 @@ impl EffectDef<RiftScripting> for Attack {
             .map_err(effects::bad)?;
         Ok(Box::new(move |world, cx| {
             let Some(npc) = cx.owner.entity() else {
-                return EffectStep::Output(1);
+                return EffectStep::Output(ATTACK_LOST);
             };
             let Some(target) = query::actor(world, cx, &target) else {
-                return EffectStep::Output(1);
+                return EffectStep::Output(ATTACK_LOST);
             };
             let within = Tiles(within(world, cx).as_num() as f32);
             order(
@@ -540,7 +560,7 @@ impl EffectDef<RiftScripting> for Stop {
         false
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
-        vec![("next", self.next.as_deref())]
+        vec![(Outcome::Next.name(), self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false
@@ -559,7 +579,7 @@ impl EffectDef<RiftScripting> for Stop {
     }
 }
 
-impl EffectDef<RiftScripting> for Face {
+impl EffectDef<RiftScripting> for FaceToward {
     fn owners(&self) -> &'static [OwnerKind] {
         NPC
     }
@@ -567,7 +587,7 @@ impl EffectDef<RiftScripting> for Face {
         false
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
-        vec![("next", self.next.as_deref())]
+        vec![(Outcome::Next.name(), self.next.as_deref())]
     }
     fn pauses(&self) -> bool {
         false

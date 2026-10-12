@@ -869,7 +869,11 @@ pub fn apply_reimport(editor: &mut Editor, key: &str) {
     edit.write_json(row_file(TABLE, key), &new_row);
     for (area, text) in rewritten {
         edit.write(
-            format!("tables/area/{area}/palette.csv"),
+            format!(
+                "{}/{}",
+                game::systems::area::grid::folder(&area),
+                game::systems::area::grid::PALETTE_FILE
+            ),
             Arc::from(text.into_bytes()),
         );
     }
@@ -1069,7 +1073,7 @@ pub fn animation_dialog(
                                 true,
                                 format!(
                                     "{frames_text} already in the tileset, found by their pixels at column{} {}. No tiles added.",
-                                    if columns.len() == 1 { "" } else { "s" },
+                                    widgets::plural(columns.len()),
                                     join_and(&columns)
                                 ),
                             );
@@ -1080,7 +1084,7 @@ pub fn animation_dialog(
                                 format!(
                                     "{} new tile{} go after the last tile, so nothing renumbers{}.",
                                     plan.new_images.len(),
-                                    if plan.new_images.len() == 1 { "" } else { "s" },
+                                    widgets::plural(plan.new_images.len()),
                                     match plan.reused.len() {
                                         0 => String::new(),
                                         n => format!("; {n} found by their pixels already"),

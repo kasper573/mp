@@ -16,7 +16,7 @@ use crate::systems::history::{History, HistoryEntry};
 use crate::systems::item::{self, INVENTORY_MAX, Inventory, ItemKind, ItemStack};
 use crate::systems::job::{self, Job};
 use crate::systems::memory::{self, Memory};
-use crate::systems::player::{CharacterState, Immortal, Xp, def, player_stats};
+use crate::systems::player::{CharacterState, Xp, def, player_stats};
 use crate::systems::quest::{self, ActiveQuest, FinishedQuest, Parties, QuestLog, QuestResult};
 use crate::systems::script::Place;
 use crate::systems::shop::{self, Sale, ShopLedger};
@@ -166,7 +166,7 @@ pub fn materialize(
     snapshot: &CharacterSnapshot,
     start: Place,
     clock: WallClock,
-    immortal: Immortal,
+    immortal: bool,
 ) -> CharacterState {
     let mut stats = def(content).stats.clone();
     stats.extend(snapshot.stats.iter().map(|(&kind, &value)| (kind, value)));
@@ -201,7 +201,7 @@ pub fn materialize(
             );
         }
         for sale in &visited.sales {
-            ledger.sold(visited.shop, sale.clone());
+            ledger.record_sale(visited.shop, sale.clone());
         }
     }
     CharacterState {

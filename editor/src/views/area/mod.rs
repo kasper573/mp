@@ -31,12 +31,13 @@ use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::{CellPos, TilePos, TileSize, Tiles};
-use game::systems::area;
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use crate::app::Editor;
-use crate::project::{Edit, Selection, row_file};
+use crate::project::{CameraState, Edit, Selection, row_file};
 use crate::tabs::Tab;
+use crate::value::RowValue;
 
 use self::overlays::{
     overlay_blueprint_ghost, overlay_grid, overlay_modules, overlay_populations,
@@ -52,6 +53,20 @@ pub use resize::ResizeDialog;
 pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;
 pub const MAX_ZOOM: f32 = 16.0;
+const MAX_FIT_ZOOM: f32 = 4.0;
+const FIT_MARGIN: f32 = 0.94;
+
+pub fn area_view_key(area: &str) -> String {
+    format!("area:{area}")
+}
+
+pub fn blueprint_view_key(blueprint: &str) -> String {
+    format!("blueprint:{blueprint}")
+}
+
+fn camera_key(project: &crate::project::Project, view_key: &str) -> String {
+    format!("{}:{view_key}", project.root.display())
+}
 
 #[derive(Default)]
 pub struct AreaViews {
@@ -71,7 +86,7 @@ pub struct Hover {
 #[derive(Clone, Debug)]
 pub enum Deferred {
     AddWithRow {
-        kind: String,
+        kind: AreaModuleKind,
         field: String,
         key: String,
         at: Pos<Tiles>,
@@ -91,7 +106,7 @@ pub struct DropMenu {
     pub key: String,
     pub at: Pos<Tiles>,
     pub screen: Pos2,
-    pub candidates: Vec<(String, String)>,
+    pub candidates: Vec<(AreaModuleKind, String)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,8 +183,6 @@ impl Tool {
     }
 }
 
-/// A placement opened in place: its blueprint and where it sits in the area, so part edits map
-/// back to blueprint space.
 #[derive(Clone, Debug)]
 pub struct InPlace {
     pub blueprint: String,
@@ -210,6 +223,7 @@ pub struct ViewState {
     pub blueprint_everywhere: bool,
     pub palette_lens: palette::Lens,
     pub deferred: Vec<Deferred>,
+    pub menu: Option<modules::MenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,
     pub drop_menu: Option<DropMenu>,
     pub drag_hover: Option<(String, String, Pos<Tiles>)>,
@@ -254,6 +268,7 @@ impl ViewState {
             blueprint_everywhere: false,
             palette_lens: palette::Lens::Tiles,
             deferred: Vec::new(),
+            menu: None,
             ghost: None,
             drop_menu: None,
             drag_hover: None,
@@ -380,19 +395,20 @@ impl AreaViews {
         self.requests.clear();
     }
 
-    pub fn camera_state(&self) -> Option<(String, [f32; 3])> {
+    pub fn camera_state(&self) -> Option<CameraState> {
         let hover = self.hover.as_ref()?;
-        let view = self.views.get(&format!("area:{}", hover.area))?;
-        Some((
-            hover.area.clone(),
-            [view.center.x, view.center.y, view.zoom],
-        ))
+        let view = self.views.get(&area_view_key(&hover.area))?;
+        Some(CameraState {
+            area: hover.area.clone(),
+            center: view.center,
+            zoom: view.zoom,
+        })
     }
 
-    pub fn restore_camera(&mut self, key: &str, state: [f32; 3]) {
-        if let Some(view) = self.views.get_mut(&format!("area:{key}")) {
-            view.center = Pos::new(state[0], state[1]);
-            view.zoom = state[2];
+    pub fn restore_camera(&mut self, camera: &CameraState) {
+        if let Some(view) = self.views.get_mut(&area_view_key(&camera.area)) {
+            view.center = camera.center;
+            view.zoom = camera.zoom;
         }
     }
 
@@ -430,9 +446,13 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
     layers.retain(|name| name.as_str() != Some(layer));
     let mut edit = Edit::new(format!("Remove layer {layer} of {area}"));
     edit.write_json(row_file("area", area), &row);
-    edit.remove(format!("tables/area/{area}/{layer}.csv"));
+    edit.remove(format!(
+        "{}/{}",
+        area::grid::folder(area),
+        area::grid::layer_file(layer)
+    ));
     if editor.apply(edit)
-        && let Some(view) = editor.views.area.views.get_mut(&format!("area:{area}"))
+        && let Some(view) = editor.views.area.views.get_mut(&area_view_key(area))
     {
         view.layer = view.layer.saturating_sub(1);
     }
@@ -445,7 +465,7 @@ pub fn show(
     key: &str,
     _in_place: Option<String>,
 ) {
-    let view_key = format!("area:{key}");
+    let view_key = area_view_key(key);
     show_canvas(editor, ui, &view_key, key, None);
     crate::play::banner(editor, ui);
 }
@@ -477,7 +497,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: crate::app:
 }
 
 pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, _world: &mut World, key: &str) {
-    let view_key = format!("blueprint:{key}");
+    let view_key = blueprint_view_key(key);
     let preview = editor
         .views
         .area
@@ -533,14 +553,10 @@ fn show_canvas(
             view.center = Pos::new(size.width / 2.0, size.height / 2.0);
             let fit = (canvas_rect.width() / (size.width * TILE_PX))
                 .min(canvas_rect.height() / (size.height * TILE_PX))
-                * 0.94;
-            view.zoom = fit.clamp(0.1, 4.0);
+                * FIT_MARGIN;
+            view.zoom = fit.clamp(MIN_ZOOM, MAX_FIT_ZOOM);
             view.fitted = true;
-            if let Some(camera) = editor
-                .settings
-                .cameras
-                .get(&format!("{}:{view_key}", project.root.display()))
-            {
+            if let Some(camera) = editor.settings.cameras.get(&camera_key(project, view_key)) {
                 view.center = Pos::new(camera.x, camera.y);
                 view.zoom = camera.zoom;
             }
@@ -633,7 +649,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, c
             ui.label(
                 theme::mono(format!(
                     "Editing blueprint {name} · {count} placement{} on {area_key} change with it",
-                    if count == 1 { "" } else { "s" }
+                    crate::ui::widgets::plural(count)
                 ))
                 .size(13.0)
                 .color(Color32::WHITE),
@@ -700,7 +716,7 @@ fn drop_menu(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let Some(menu) = editor.views.area.views[view_key].drop_menu.clone() else {
         return;
     };
-    let mut choice: Option<(String, String)> = None;
+    let mut choice: Option<(AreaModuleKind, String)> = None;
     let mut cancel = ui.input(|i| i.key_pressed(egui::Key::Escape));
     egui::Area::new(ui.id().with((view_key, "drop-menu")))
         .fixed_pos(menu.screen + Vec2::new(12.0, 12.0))
@@ -724,12 +740,12 @@ fn drop_menu(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                         .family(egui::FontFamily::Name("medium".into())),
                     );
                     for (kind, field) in &menu.candidates {
-                        let description = match kind.as_str() {
-                            "population" => "roams a rect · count 1 to start",
-                            "resident" => "stands at this spot",
-                            "blueprint" => "a copy at this spot",
-                            "soundscape" => "plays it over a rect",
-                            "object" => "an object running that script",
+                        let description = match kind {
+                            AreaModuleKind::Population => "roams a rect · count 1 to start",
+                            AreaModuleKind::Resident => "stands at this spot",
+                            AreaModuleKind::Blueprint => "a copy at this spot",
+                            AreaModuleKind::Soundscape => "plays it over a rect",
+                            AreaModuleKind::Object => "an object running that script",
                             _ => "",
                         };
                         let full = ui.available_rect_before_wrap();
@@ -743,14 +759,14 @@ fn drop_menu(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
                                 .max_rect(rect.shrink2(Vec2::new(6.0, 3.0)))
                                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
                         );
-                        widgets::badge(&mut child, kind);
+                        widgets::badge(&mut child, kind.tag());
                         child.vertical(|ui| {
                             ui.spacing_mut().item_spacing.y = 0.0;
-                            ui.label(RichText::new(kind).monospace().color(theme::TEXT));
+                            ui.label(RichText::new(kind.tag()).monospace().color(theme::TEXT));
                             ui.label(RichText::new(description).size(11.5).color(theme::MUTED));
                         });
                         if response.clicked() {
-                            choice = Some((kind.clone(), field.clone()));
+                            choice = Some((*kind, field.clone()));
                         }
                     }
                     ui.separator();
@@ -892,7 +908,7 @@ fn canvas(
                 field,
                 key,
                 at,
-            } => pick::add_with_row(editor, view_key, &frame, &kind, &field, &key, at),
+            } => pick::add_with_row(editor, view_key, &frame, kind, &field, &key, at),
             Deferred::Copy => select::copy_selection(editor, &frame),
             Deferred::Duplicate => select::duplicate_selection(editor, &frame),
             Deferred::Unpack(index) => placement::unpack(editor, &frame, index),
@@ -971,7 +987,8 @@ impl Frame<'_> {
             let Some(bounds) = self.module_bounds(index) else {
                 continue;
             };
-            if self.modules[index]["type"] == "population" && self.modules[index]["roams"].is_null()
+            if self.modules[index].is_module(AreaModuleKind::Population)
+                && self.modules[index]["roams"].is_null()
             {
                 continue;
             }
@@ -1008,7 +1025,7 @@ fn remember_camera(editor: &mut Editor, view_key: &str) {
         return;
     };
     let view = &editor.views.area.views[view_key];
-    let key = format!("{}:{view_key}", project.root.display());
+    let key = camera_key(project, view_key);
     let camera = crate::user::CameraSettings {
         x: view.center.x,
         y: view.center.y,
@@ -1047,7 +1064,7 @@ pub fn open_area_at(editor: &mut Editor, area: &str, at: Option<Pos<Tiles>>, par
     editor.open_tab(Tab::Area {
         key: area.to_owned(),
     });
-    let view = editor.views.area.view_mut(&format!("area:{area}"), area);
+    let view = editor.views.area.view_mut(&area_view_key(area), area);
     if let Some(at) = at {
         view.center = at;
         view.fitted = true;

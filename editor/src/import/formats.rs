@@ -412,7 +412,6 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<Export, String> {
         return Err(format!("{} lists no frames", name(json_file)));
     }
     let mut trimmed = false;
-    let mut canvases = Vec::new();
     let mut decoded = Vec::new();
     for frame in &frames {
         trimmed |= frame.trimmed || frame.rotated;
@@ -450,7 +449,6 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<Export, String> {
         canvas
             .copy_from(&sprite, offset.0, offset.1)
             .map_err(|error| error.to_string())?;
-        canvases.push((source.w, source.h));
         decoded.push(ExportFrame::new(canvas, frame.duration));
     }
     let tags: Vec<(String, Vec<usize>)> = if sheet.meta.frame_tags.is_empty() {

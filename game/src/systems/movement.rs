@@ -46,10 +46,8 @@ impl Plugin for MovementPlugin {
     }
 }
 
-/// The position to render a replicated entity at. The authoritative [`Position`] only updates every
-/// [`crate::systems::REPLICATION_INTERVAL`] ticks, so it is interpolated between snapshots rather
-/// than read live. Every client-side depiction of an entity (sprite, camera, health bar, hitbox,
-/// positional audio) reads this instead of [`Position`].
+/// Interpolated between replication snapshots rather than read live, so every client-side depiction
+/// of an entity (sprite, camera, health bar, hitbox, positional audio) reads this, never [`Position`].
 #[derive(Component, Clone, Copy, PartialEq)]
 pub struct RenderPosition(pub Pos<Tiles>);
 
@@ -231,9 +229,6 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
         }
 
         let speed = TilesPerSec(Tiles(stat::effective(world, id, StatKind::MovementSpeed)));
-        // Position, Path and the optional Actor are fetched in one access instead of separate
-        // per-component lookups. Identical behavior: Position and Path are required (Path was just
-        // ensured above); an actor-less mover still moves, it just has no facing to update.
         let Ok((mut position, mut path, mut actor)) = step_query.get_mut(world, id) else {
             continue;
         };

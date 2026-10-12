@@ -1016,7 +1016,7 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
         true => format!("Imported {names} into {key} again · nothing to decide"),
         false => format!(
             "Imported {names} into {key} again · {changed} strip{}, cues followed",
-            if changed == 1 { "" } else { "s" }
+            widgets::plural(changed)
         ),
     };
     let record = model::record(&draft.export, key, &draft.mapping, built.lengths.clone());
@@ -1056,7 +1056,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         ""
                     },
                     changed.len(),
-                    if changed.len() == 1 { "" } else { "s" },
+                    widgets::plural(changed.len()),
                     to_decide(&draft.plan)
                 )));
             });
@@ -1334,7 +1334,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             "{} follow{} their frame{}. Found by its pixels.",
                             followed.join(", "),
                             if followed.len() == 1 { "s" } else { "" },
-                            if followed.len() == 1 { "" } else { "s" }
+                            widgets::plural(followed.len())
                         )));
                     });
                 }
@@ -1447,7 +1447,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                     ui.label(theme::warn("⚠"));
                     ui.label(theme::muted(format!(
                         "Frame{} {} {} retimed here since the last import.",
-                        if differing.len() == 1 { "" } else { "s" },
+                        widgets::plural(differing.len()),
                         join_and(&differing),
                         if differing.len() == 1 { "was" } else { "were" }
                     )));

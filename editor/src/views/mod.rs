@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use egui::Ui;
 
 use crate::app::{BottomTab, Editor};
-use crate::project::Selection;
+use crate::project::{CameraState, Selection};
 use crate::tabs::Tab;
 use crate::ui::browser::BrowserState;
 
@@ -42,13 +42,13 @@ impl Views {
         self.script.close();
     }
 
-    pub fn camera_state(&self) -> Option<(String, [f32; 3])> {
+    pub fn camera_state(&self) -> Option<CameraState> {
         self.area.camera_state()
     }
 
-    pub fn restore_camera(&mut self, camera: Option<(String, [f32; 3])>) {
-        if let Some((key, state)) = camera {
-            self.area.restore_camera(&key, state);
+    pub fn restore_camera(&mut self, camera: Option<CameraState>) {
+        if let Some(camera) = camera {
+            self.area.restore_camera(&camera);
         }
     }
 
@@ -98,16 +98,16 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
 pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
     match (crate::ui::active_tab(editor), tab) {
         (Some(Tab::Area { key }), BottomTab::Palette) => {
-            area::bottom(editor, ui, &format!("area:{key}"), tab)
+            area::bottom(editor, ui, &area::area_view_key(&key), tab)
         }
         (Some(Tab::Area { key }), BottomTab::Blueprints) => {
-            area::bottom(editor, ui, &format!("area:{key}"), tab)
+            area::bottom(editor, ui, &area::area_view_key(&key), tab)
         }
         (Some(Tab::Area { .. }) | Some(Tab::Blueprint { .. }), BottomTab::Listen) => {
             sound::panel(editor, ui)
         }
         (Some(Tab::Blueprint { key }), BottomTab::Palette | BottomTab::Blueprints) => {
-            area::bottom(editor, ui, &format!("blueprint:{key}"), tab)
+            area::bottom(editor, ui, &area::blueprint_view_key(&key), tab)
         }
         (Some(Tab::Script(owner)), BottomTab::MayDo | BottomTab::UsedBy | BottomTab::Run) => {
             script::bottom(editor, ui, &owner, tab)

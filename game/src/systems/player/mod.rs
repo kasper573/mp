@@ -112,8 +112,7 @@ pub struct Welcome {
     pub id: ClientId,
 }
 
-/// Health a player spawns with when [`Immortal`] is set — high enough that nothing in the world can
-/// grind it down, so test/dev sessions never die to NPCs.
+/// High enough that nothing in the world can grind it down.
 const IMMORTAL_HEALTH: f32 = 9999.0;
 
 pub type Id = ContentId<PlayerDef>;
@@ -251,31 +250,24 @@ pub fn client_left(
     }
 }
 
-#[derive(Resource, Clone, Copy, Default, PartialEq, serde::Deserialize)]
+#[derive(Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpawnPolicy {
-    #[default]
     Map,
     Dist,
 }
 
-/// When set, players spawn with [`IMMORTAL_HEALTH`] instead of their usual health — a config toggle
-/// (off in production) so test/dev sessions aren't killed by NPCs.
-#[derive(Resource, Clone, Copy, Default)]
-pub struct Immortal(pub bool);
+#[derive(Resource, Clone, Copy)]
+pub struct SpawnRules {
+    pub policy: SpawnPolicy,
+    pub immortal: bool,
+}
 
 pub fn join(world: &mut World) {
     let zone = world.resource::<crate::systems::WorldArea>().0;
     let assets = *world.resource::<Content>();
     let area = area::load(&assets, zone);
-    let policy = world
-        .get_resource::<SpawnPolicy>()
-        .copied()
-        .unwrap_or_default();
-    let immortal = world
-        .get_resource::<Immortal>()
-        .copied()
-        .unwrap_or_default();
+    let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
     for request in crate::systems::requests::<JoinRequest>(world) {
         let Some(client_entity) = request.client_id.entity() else {
             continue;
@@ -358,7 +350,7 @@ fn fresh_state(
     zone: area::Id,
     at: Pos<Tiles>,
     name: String,
-    immortal: Immortal,
+    immortal: bool,
 ) -> CharacterState {
     let def = def(content);
     CharacterState {
@@ -379,13 +371,11 @@ fn fresh_state(
     }
 }
 
-pub fn player_stats(stats: &stat::StatMap, immortal: Immortal) -> Stats {
+pub fn player_stats(stats: &stat::StatMap, immortal: bool) -> Stats {
     Stats(
         stat::listed(stats)
             .map(|stat| match stat.kind {
-                StatKind::Health | StatKind::MaxHealth if immortal.0 => {
-                    stat.kind.of(IMMORTAL_HEALTH)
-                }
+                StatKind::Health | StatKind::MaxHealth if immortal => stat.kind.of(IMMORTAL_HEALTH),
                 _ => stat,
             })
             .collect(),

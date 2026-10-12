@@ -18,7 +18,6 @@ const COLUMN: f32 = 240.0;
 pub const CARD: f32 = 176.0;
 const FACE: f32 = 20.0;
 
-/// Where every node of one script sits on the canvas; editor settings, never content.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Layout {

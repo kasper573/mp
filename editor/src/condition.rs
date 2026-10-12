@@ -227,12 +227,7 @@ fn block(
                 value["var"] = name.clone();
                 changed = Changed::at(path);
             }
-            let response = chip(
-                ui,
-                "◇ variable",
-                theme::INPUT,
-                Color32::from_rgb(176, 140, 230),
-            );
+            let response = chip(ui, "◇ variable", theme::INPUT, theme::VARIABLE);
             if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
                 changed = picked;
             }
@@ -623,13 +618,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     }
                 }
                 if palette.has_var
-                    && chip(
-                        ui,
-                        "◇ variable",
-                        theme::INPUT,
-                        Color32::from_rgb(176, 140, 230),
-                    )
-                    .clicked()
+                    && chip(ui, "◇ variable", theme::INPUT, theme::VARIABLE).clicked()
                 {
                     picked = Some(serde_json::json!({ "var": "" }));
                 }

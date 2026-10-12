@@ -1,27 +1,18 @@
 mod platform;
 mod store;
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use bevy::window::Window;
 use game::core::platform::{StartParams, exit_when_stdin_closes};
-
-#[derive(serde::Deserialize)]
-struct Config {
-    game_server_url: String,
-    game_server_ws_url: String,
-    access_token: String,
-    profile_dir: PathBuf,
-    exit_on_stdin_eof: bool,
-}
+use game::systems::launch::{BUILD_INFO_FLAG, CLIENT_ENV_PREFIX, ClientConfig, build_info_line};
 
 fn main() {
-    if std::env::args().any(|arg| arg == "--build-info") {
-        println!("{}", game::systems::build_info());
+    if std::env::args().any(|arg| arg == BUILD_INFO_FLAG) {
+        println!("{}", build_info_line());
         return;
     }
-    let config: Config = envy::prefixed("RIFT_CLIENT_")
+    let config: ClientConfig = envy::prefixed(CLIENT_ENV_PREFIX)
         .from_env()
         .expect("RIFT_CLIENT_* environment");
     if config.exit_on_stdin_eof {

@@ -175,7 +175,7 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
             &format!(
                 "{title} · {} {noun}{}",
                 rows.len(),
-                if rows.len() == 1 { "" } else { "s" }
+                crate::ui::widgets::plural(rows.len())
             ),
         );
         for (source, area) in rows {

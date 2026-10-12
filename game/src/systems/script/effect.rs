@@ -16,7 +16,7 @@ use crate::systems::item::effects::{
 use crate::systems::job::{GrantXp, SetJob};
 use crate::systems::memory::{Forget, Remember};
 use crate::systems::notification::{self, Notification, NotificationKind, Notify};
-use crate::systems::npc::body::{Attack, Face, Stop, WalkTo, Wander};
+use crate::systems::npc::body::{Attack, FaceToward, Stop, WalkTo, Wander};
 use crate::systems::npc::summon::{Despawn, SetAttitude, SpawnNpcs};
 use crate::systems::quest::effects::{
     AcceptQuest, CompleteTask, Decide, FailQuest, OfferQuest, TurnIn,
@@ -100,7 +100,7 @@ effects! {
     WalkTo(WalkTo),
     Attack(Attack),
     Stop(Stop),
-    Face(Face),
+    Face(FaceToward),
     SetAttitude(SetAttitude),
     SpawnNpcs(SpawnNpcs),
     Despawn(Despawn),
@@ -158,13 +158,8 @@ pub fn refuse(world: &mut World, cx: &FlowCx, wired: Link, reason: impl Into<Str
 #[serde(deny_unknown_fields)]
 pub struct PlaySound {
     pub sfx: super::Fill<SfxId>,
-    #[schemars(with = "PlaySoundFor")]
-    #[serde(
-        rename = "for",
-        serialize_with = "play_sound_for",
-        deserialize_with = "play_sound_for_from"
-    )]
-    pub for_everyone: bool,
+    #[serde(rename = "for")]
+    pub audience: Audience,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
@@ -174,7 +169,7 @@ impl EffectDef<RiftScripting> for PlaySound {
         ANY_OWNER
     }
     fn needs_subject(&self) -> bool {
-        !self.for_everyone
+        self.audience == Audience::Subject
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
@@ -184,9 +179,9 @@ impl EffectDef<RiftScripting> for PlaySound {
     }
     fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
         let sfx = cx.audio(&self.sfx).map_err(bad)?;
-        let everyone = self.for_everyone;
+        let audience = self.audience;
         Ok(Box::new(move |world, cx| {
-            notification::play_sound(world, cx.owner.entity(), cx.subject, sfx, everyone);
+            notification::play_sound(world, cx.owner.entity(), cx.subject, sfx, audience);
             EffectStep::Output(0)
         }))
     }
@@ -198,24 +193,11 @@ impl EffectDef<RiftScripting> for PlaySound {
     }
 }
 
-fn play_sound_for<S: serde::Serializer>(everyone: &bool, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(if *everyone { "everyone" } else { "subject" })
-}
-
-#[derive(Deserialize, JsonSchema)]
+#[derive(JsonSchema, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum PlaySoundFor {
+pub enum Audience {
     Everyone,
     Subject,
-}
-
-fn play_sound_for_from<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<bool, D::Error> {
-    Ok(matches!(
-        PlaySoundFor::deserialize(deserializer)?,
-        PlaySoundFor::Everyone
-    ))
 }
 
 pub fn interface_sound(

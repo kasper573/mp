@@ -28,7 +28,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, 
         .grids
         .palette_keys
         .iter()
-        .map(|(set, _, _)| set.clone())
+        .map(|row| row.tileset.clone())
         .collect();
     let mut lens = editor.views.area.views[view_key].palette_lens;
     if editor.views.area.views[view_key].tool == super::Tool::Terrain {

@@ -39,16 +39,12 @@ impl Canvas {
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Grid) {
     let mode = editor.views.tileset.views[key].mode;
+    let surfaces = surface_keys(editor);
     let canvas = canvas(editor, ui, key, grid, |painter, tile, cell| match mode {
         Mode::Walk => walk_mark(painter, cell, tile_data(row, tile)["walk"].as_str()),
         Mode::Surface => {
             if let Some(surface) = tile_data(row, tile)["surface"].as_str() {
-                surface_mark(
-                    painter,
-                    cell,
-                    surface,
-                    surface_index(editor_surfaces(), surface),
-                );
+                surface_mark(painter, cell, surface_index(&surfaces, surface));
             }
         }
         _ => {}
@@ -440,10 +436,9 @@ pub const SURFACE_COLOURS: [Color32; 6] = [
     Color32::from_rgb(90, 180, 220),
 ];
 
-pub fn surface_mark(painter: &egui::Painter, cell: ERect, surface: &str, index: usize) {
-    let style = surface_style(surface, index);
-    let colour = SURFACE_COLOURS[style % SURFACE_COLOURS.len()];
-    match style % 4 {
+pub fn surface_mark(painter: &egui::Painter, cell: ERect, index: usize) {
+    let colour = SURFACE_COLOURS[index % SURFACE_COLOURS.len()];
+    match index % 4 {
         0 => dots(painter, cell, colour),
         1 => crate::views::area::overlays::hatch(painter, cell, colour, cell.width()),
         2 => grid_lines(painter, cell, colour),
@@ -451,25 +446,14 @@ pub fn surface_mark(painter: &egui::Painter, cell: ERect, surface: &str, index: 
     }
 }
 
-fn surface_style(surface: &str, index: usize) -> usize {
-    match surface {
-        "sand" => 0,
-        "grass" => 1,
-        "rock" => 2,
-        "wood" => 3,
-        _ => 4 + index,
-    }
+pub fn surface_keys(editor: &mut Editor) -> Vec<String> {
+    crate::views::model::sounds::surfaces(editor)
+        .iter()
+        .map(|(key, _, _)| key.clone())
+        .collect()
 }
 
-thread_local! {
-    static SURFACES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-pub fn editor_surfaces() -> Vec<String> {
-    SURFACES.with(|s| s.borrow().clone())
-}
-
-pub fn surface_index(surfaces: Vec<String>, surface: &str) -> usize {
+pub fn surface_index(surfaces: &[String], surface: &str) -> usize {
     surfaces
         .iter()
         .position(|s| s == surface)
@@ -531,7 +515,6 @@ pub fn walk_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
 pub fn surface_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let surfaces = crate::views::model::sounds::surfaces(editor);
     let keys: Vec<String> = surfaces.iter().map(|(key, _, _)| key.clone()).collect();
-    SURFACES.with(|s| *s.borrow_mut() = keys.clone());
     let view = editor
         .views
         .tileset
@@ -547,7 +530,7 @@ pub fn surface_legend(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .horizontal(|ui| {
                 let (swatch, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
                 let painter = ui.painter();
-                surface_mark(painter, swatch, surface, index);
+                surface_mark(painter, swatch, index);
                 painter.rect_stroke(
                     swatch,
                     2.0,

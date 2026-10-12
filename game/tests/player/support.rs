@@ -12,7 +12,7 @@ use game::core::math::Rng;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::TICK_HZ;
 use game::systems::player::snapshot::JoinAs;
-use game::systems::player::{AreaDrawn, ClientId, Immortal, JoinRequest, Players};
+use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(1_000_000_000),
@@ -47,7 +47,10 @@ impl Sim {
     pub fn area(area: game::systems::area::Id) -> Sim {
         let mut app = game::systems::server_app(area, 0, CLOCK, content());
         app.insert_resource(Rng::new(1));
-        app.insert_resource(Immortal(false));
+        app.insert_resource(SpawnRules {
+            policy: SpawnPolicy::Map,
+            immortal: false,
+        });
         app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
         app.finish();
         app.cleanup();

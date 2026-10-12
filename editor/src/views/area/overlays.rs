@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 use game::core::math::{Pos, Rect};
 use game::core::tiling::{Cell, CellPos, TileRect, TileSize};
-use game::systems::area;
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::{
@@ -137,15 +137,15 @@ pub(super) fn clip_line(a: Pos2, b: Pos2, rect: ERect) -> Option<(Pos2, Pos2)> {
     Some((a + d * t0, a + d * t1))
 }
 
-pub fn module_color(kind: &str) -> Color32 {
+pub fn module_color(kind: Option<AreaModuleKind>) -> Color32 {
     match kind {
-        "object" => Color32::from_rgb(255, 200, 80),
-        "safe_zone" => Color32::from_rgb(90, 160, 255),
-        "soundscape" => Color32::from_rgb(170, 110, 255),
-        "scenery" => Color32::from_rgb(140, 220, 140),
-        "blueprint" => Color32::from_rgb(90, 220, 220),
-        "population" => Color32::from_rgb(255, 120, 120),
-        "resident" => Color32::from_rgb(255, 160, 200),
+        Some(AreaModuleKind::Object) => Color32::from_rgb(255, 200, 80),
+        Some(AreaModuleKind::SafeZone) => Color32::from_rgb(90, 160, 255),
+        Some(AreaModuleKind::Soundscape) => Color32::from_rgb(170, 110, 255),
+        Some(AreaModuleKind::Scenery) => Color32::from_rgb(140, 220, 140),
+        Some(AreaModuleKind::Blueprint) => Color32::from_rgb(90, 220, 220),
+        Some(AreaModuleKind::Population) => Color32::from_rgb(255, 120, 120),
+        Some(AreaModuleKind::Resident) => Color32::from_rgb(255, 160, 200),
         _ => Color32::from_gray(200),
     }
 }
@@ -172,17 +172,22 @@ pub(super) fn overlay_modules(
         if !visible.intersects(&bounds) {
             continue;
         }
-        let kind = module.kind();
-        if kind == "population" && module["roams"].is_null() {
+        let Some(kind) = module.module_kind() else {
+            continue;
+        };
+        if kind == AreaModuleKind::Population && module["roams"].is_null() {
             continue;
         }
         let part = format!("/modules/{index}");
         let is_selected = selected.contains(&part);
         let is_hovered = hovered == Some(index);
-        if matches!(kind, "blueprint" | "scenery") && !is_selected && !is_hovered {
+        if matches!(kind, AreaModuleKind::Blueprint | AreaModuleKind::Scenery)
+            && !is_selected
+            && !is_hovered
+        {
             continue;
         }
-        let color = module_color(kind);
+        let color = module_color(Some(kind));
         let rect = canvas.rect(bounds);
         let dim = editing.is_some_and(|e| e != index);
         let alpha = if dim {
@@ -195,7 +200,7 @@ pub(super) fn overlay_modules(
         let color = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha);
         let width = if is_selected { 2.0 } else { 1.0 };
         match kind {
-            "soundscape" if module["shape"]["type"] == "ellipse" => {
+            AreaModuleKind::Soundscape if module["shape"]["type"] == "ellipse" => {
                 let center = rect.center();
                 let radius = rect.size() / 2.0;
                 let points: Vec<Pos2> = (0..48)
@@ -206,7 +211,7 @@ pub(super) fn overlay_modules(
                     .collect();
                 painter.add(egui::Shape::closed_line(points, EStroke::new(width, color)));
             }
-            "resident" | "object" if shapes::is_point(module) => {
+            AreaModuleKind::Resident | AreaModuleKind::Object if shapes::is_point(module) => {
                 painter.circle_stroke(
                     rect.center(),
                     (canvas.scale() * 0.35).max(3.0),
@@ -222,7 +227,10 @@ pub(super) fn overlay_modules(
                 );
             }
         }
-        if is_selected || is_hovered || (kind == "population" && canvas.scale() >= 2.0) {
+        if is_selected
+            || is_hovered
+            || (kind == AreaModuleKind::Population && canvas.scale() >= 2.0)
+        {
             label_chip(
                 painter,
                 rect.min + Vec2::new(0.0, -4.0),
@@ -432,7 +440,7 @@ pub(super) fn overlay_soundscape_reach(editor: &Editor, painter: &egui::Painter,
         let Some(module) = frame.modules.get(index) else {
             continue;
         };
-        if module["type"] != "soundscape" {
+        if !module.is_module(AreaModuleKind::Soundscape) {
             continue;
         }
         let Some(bounds) = shapes::bounds(module, None) else {
@@ -525,7 +533,7 @@ pub(super) fn overlay_blueprint_ghost(
     let heard: Vec<String> = frame
         .modules
         .iter()
-        .filter(|m| m["type"] == "soundscape")
+        .filter(|m| m.is_module(AreaModuleKind::Soundscape))
         .filter_map(|m| {
             let bounds = shapes::bounds(m, None)?;
             let emit = m["emit"].as_f64().unwrap_or(0.0) as f32;
@@ -596,7 +604,7 @@ pub(super) fn overlay_populations(
     let hidden = editor.views.area.views[view_key].population_hidden.clone();
     let seeds = editor.views.area.views[view_key].population_seed.clone();
     for (index, module) in frame.modules.iter().enumerate() {
-        if module["type"] != "population" || hidden.contains(&index) {
+        if !module.is_module(AreaModuleKind::Population) || hidden.contains(&index) {
             continue;
         }
         let Some(npc) = module["npc"].as_str() else {
@@ -631,7 +639,6 @@ pub(super) fn overlay_populations(
     }
 }
 
-/// A dark chip above a module, in the module's colour, so it reads over any art.
 pub fn label_chip(painter: &egui::Painter, bottom_left: Pos2, text: &str, color: Color32) {
     let galley = painter.layout_no_wrap(text.to_owned(), egui::FontId::monospace(11.5), color);
     let size = galley.size() + Vec2::new(10.0, 6.0);
@@ -640,7 +647,6 @@ pub fn label_chip(painter: &egui::Painter, bottom_left: Pos2, text: &str, color:
     painter.galley(back.min + Vec2::new(5.0, 3.0), galley, color);
 }
 
-/// Each walkable cell tinted by its footstep surface, a band pattern so it reads without colour.
 pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &Frame, area: &area::Area) {
     let canvas = frame.canvas;
     if canvas.scale() < 3.0 {

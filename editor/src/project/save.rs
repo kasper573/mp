@@ -15,8 +15,6 @@ pub struct SaveError {
     pub done: SaveOutcome,
 }
 
-/// Writes every file whose bytes differ from `disk`: new files, then changed ones, then removals,
-/// each through a temp file and a rename so an interrupted save leaves a folder that loads.
 pub fn save(
     root: &Path,
     files: &Files,

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::{Cell, CellPos, GridSize, Tiles};
-use game::systems::area::grid::{AreaGrids, Flip, GroundLayer, PaletteEntry};
+use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteEntry, PaletteRow};
 
 use crate::project::Edit;
 
@@ -10,10 +10,17 @@ use crate::project::Edit;
 pub struct GridDraft {
     pub area: String,
     pub size: GridSize,
-    pub palette: Vec<(String, u32, Flip)>,
+    pub palette: Vec<PaletteRow>,
     pub ground: Vec<GroundLayer>,
     pub walk: Vec<Option<bool>>,
-    touched: HashSet<String>,
+    touched: HashSet<GridPart>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum GridPart {
+    Palette,
+    Walk,
+    Layer(String),
 }
 
 impl GridDraft {
@@ -37,14 +44,14 @@ impl GridDraft {
         (0..h).flat_map(move |y| (0..w).map(move |x| CellPos::new(x, y)))
     }
 
-    pub fn entry(&self, index: u32) -> Option<&(String, u32, Flip)> {
+    pub fn entry(&self, index: u32) -> Option<&PaletteRow> {
         self.palette.get(index as usize)
     }
 
     pub fn entry_of(&self, tileset: &str, tile: u32, flip: Flip) -> Option<u32> {
         self.palette
             .iter()
-            .position(|(set, t, f)| set == tileset && *t == tile && *f == flip)
+            .position(|row| row.tileset == tileset && row.tile == tile && row.flip == flip)
             .map(|index| index as u32)
     }
 
@@ -52,8 +59,12 @@ impl GridDraft {
         if let Some(index) = self.entry_of(tileset, tile, flip) {
             return index;
         }
-        self.palette.push((tileset.to_owned(), tile, flip));
-        self.touched.insert("palette".to_owned());
+        self.palette.push(PaletteRow {
+            tileset: tileset.to_owned(),
+            tile,
+            flip,
+        });
+        self.touched.insert(GridPart::Palette);
         (self.palette.len() - 1) as u32
     }
 
@@ -74,7 +85,7 @@ impl GridDraft {
         }
         ground.cells[index] = value;
         let name = ground.name.clone();
-        self.touched.insert(name);
+        self.touched.insert(GridPart::Layer(name));
         true
     }
 
@@ -90,7 +101,7 @@ impl GridDraft {
             return false;
         }
         self.walk[index] = value;
-        self.touched.insert("walk".to_owned());
+        self.touched.insert(GridPart::Walk);
         true
     }
 
@@ -127,7 +138,7 @@ impl GridDraft {
             name: name.to_owned(),
             cells: vec![None; (self.size.width * self.size.height) as usize],
         });
-        self.touched.insert(name.to_owned());
+        self.touched.insert(GridPart::Layer(name.to_owned()));
     }
 
     pub fn is_touched(&self) -> bool {
@@ -161,53 +172,52 @@ impl GridDraft {
             }
         }
         for layer in &mut self.ground {
-            let name = layer.name.clone();
+            let mut changed = false;
             for cell in &mut layer.cells {
                 if let Some(index) = *cell {
-                    *cell = renumber[index as usize];
+                    let renumbered = renumber[index as usize];
+                    changed |= renumbered != Some(index);
+                    *cell = renumbered;
                 }
             }
-            self.touched.insert(name);
+            if changed {
+                self.touched.insert(GridPart::Layer(layer.name.clone()));
+            }
         }
         self.palette = palette;
-        self.touched.insert("palette".to_owned());
+        self.touched.insert(GridPart::Palette);
     }
 
     pub fn write_into(&self, edit: &mut Edit) {
-        let folder = format!("tables/area/{}", self.area);
-        let grids = self.as_grids();
-        if self.touched.contains("palette") {
-            edit.write(
-                format!("{folder}/palette.csv"),
-                bytes(grids.write_palette()),
-            );
-        }
-        if self.touched.contains("walk") {
-            edit.write(format!("{folder}/walk.csv"), bytes(grids.write_walk()));
-        }
-        for layer in &grids.ground {
-            if self.touched.contains(&layer.name) {
-                edit.write(
-                    format!("{folder}/{}.csv", layer.name),
-                    bytes(grids.write_layer(layer)),
-                );
-            }
-        }
+        self.write_parts(edit, |part| self.touched.contains(part));
     }
 
     pub fn write_all_into(&self, edit: &mut Edit) {
-        let folder = format!("tables/area/{}", self.area);
+        self.write_parts(edit, |_| true);
+    }
+
+    fn write_parts(&self, edit: &mut Edit, wanted: impl Fn(&GridPart) -> bool) {
+        let folder = grid::folder(&self.area);
         let grids = self.as_grids();
-        edit.write(
-            format!("{folder}/palette.csv"),
-            bytes(grids.write_palette()),
-        );
-        edit.write(format!("{folder}/walk.csv"), bytes(grids.write_walk()));
-        for layer in &grids.ground {
+        if wanted(&GridPart::Palette) {
             edit.write(
-                format!("{folder}/{}.csv", layer.name),
-                bytes(grids.write_layer(layer)),
+                format!("{folder}/{}", grid::PALETTE_FILE),
+                bytes(grids.write_palette()),
             );
+        }
+        if wanted(&GridPart::Walk) {
+            edit.write(
+                format!("{folder}/{}", grid::WALK_FILE),
+                bytes(grids.write_walk()),
+            );
+        }
+        for layer in &grids.ground {
+            if wanted(&GridPart::Layer(layer.name.clone())) {
+                edit.write(
+                    format!("{folder}/{}", grid::layer_file(&layer.name)),
+                    bytes(grids.write_layer(layer)),
+                );
+            }
         }
     }
 
@@ -264,12 +274,13 @@ impl GridDraft {
     ) -> Vec<Option<PaletteEntry>> {
         self.palette
             .iter()
-            .map(|(tileset, tile, flip)| {
-                let id = content.by_key::<game::systems::area::tileset::TilesetDef>(tileset)?;
+            .map(|row| {
+                let id =
+                    content.by_key::<game::systems::area::tileset::TilesetDef>(&row.tileset)?;
                 Some(PaletteEntry {
                     tileset: id,
-                    tile: *tile,
-                    flip: *flip,
+                    tile: row.tile,
+                    flip: row.flip,
                 })
             })
             .collect()
@@ -282,7 +293,7 @@ fn bytes(text: String) -> crate::project::Bytes {
 
 pub fn brush_cells(center: CellPos, size: u32) -> Vec<CellPos> {
     let size = size.max(1) as i32;
-    let offset = (size - 1) / 2 + (size + 1) % 2;
+    let offset = size / 2;
     let min_x = center.x - offset;
     let min_y = center.y - offset;
     (0..size)

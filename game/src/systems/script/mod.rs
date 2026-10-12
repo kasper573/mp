@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, Loading};
+use crate::core::content::{Content, ContentId, ContentRow, Loading, row_file};
 use crate::core::math::Pos;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -334,7 +334,7 @@ pub fn build_all(loading: &mut Loading) {
                 .map(|(index, module)| {
                     (
                         ScriptSite {
-                            file: format!("tables/{table}/{key}.json"),
+                            file: row_file(table, key),
                             pointer: format!("/modules/{index}"),
                         },
                         module,
@@ -400,7 +400,7 @@ pub fn build_all(loading: &mut Loading) {
                 .map(|(at, module)| {
                     (
                         ScriptSite {
-                            file: format!("tables/{}/{blueprint}.json", BlueprintDef::TABLE),
+                            file: row_file(BlueprintDef::TABLE, blueprint),
                             pointer: format!("/modules/{at}"),
                         },
                         module,
@@ -472,14 +472,10 @@ pub fn build_all(loading: &mut Loading) {
     }
     for (site, error) in errors {
         let (file, pointer) = match (&error.script, &error.node) {
-            (Some(script), Some(node)) => (
-                format!("tables/{}/{script}.json", ScriptDef::TABLE),
-                format!("/nodes/{node}"),
-            ),
-            (Some(script), None) => (
-                format!("tables/{}/{script}.json", ScriptDef::TABLE),
-                String::new(),
-            ),
+            (Some(script), Some(node)) => {
+                (row_file(ScriptDef::TABLE, script), format!("/nodes/{node}"))
+            }
+            (Some(script), None) => (row_file(ScriptDef::TABLE, script), String::new()),
             (None, Some(node)) => (site.file.clone(), format!("{}/nodes/{node}", site.pointer)),
             (None, None) => (site.file.clone(), site.pointer.clone()),
         };
@@ -532,7 +528,7 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
         OwnerKind::Any => (ScriptDef::TABLE, ""),
     };
     ScriptSite {
-        file: format!("tables/{table}/{key}.json"),
+        file: row_file(table, key),
         pointer: "/modules".to_owned(),
     }
 }

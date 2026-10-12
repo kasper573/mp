@@ -367,7 +367,6 @@ pub fn template(root: &Value, kind: &str) -> Option<Value> {
     Some(value)
 }
 
-/// Points every empty row reference in `value` at the first row of its table, so a fresh node loads.
 pub fn fill_references(
     root: &Value,
     schema: &Value,

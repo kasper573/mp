@@ -22,8 +22,6 @@ pub struct ImportRecord {
     #[serde(default)]
     pub size: u64,
     #[serde(default)]
-    pub time: u64,
-    #[serde(default)]
     pub hash: String,
     #[serde(default)]
     pub strips: BTreeMap<String, Vec<u32>>,
@@ -33,7 +31,7 @@ pub struct ImportRecord {
 
 impl ImportRecord {
     pub fn of_files(files: &[PathBuf], table: &str, key: &str) -> ImportRecord {
-        let (size, time, hash) = fingerprint(files);
+        let (size, hash) = fingerprint(files);
         ImportRecord {
             export: super::model::primary_file(files),
             files: files.to_vec(),
@@ -41,7 +39,6 @@ impl ImportRecord {
             key: key.to_owned(),
             mapping: serde_json::Value::Null,
             size,
-            time,
             hash,
             strips: BTreeMap::new(),
             part: String::new(),
@@ -63,7 +60,7 @@ impl ImportRecord {
         if self.missing() {
             return None;
         }
-        let (size, _, hash) = fingerprint(&self.files());
+        let (size, hash) = fingerprint(&self.files());
         Some(size != self.size || hash != self.hash)
     }
 
@@ -79,23 +76,16 @@ impl ImportRecord {
     }
 }
 
-pub fn fingerprint(files: &[PathBuf]) -> (u64, u64, String) {
+pub fn fingerprint(files: &[PathBuf]) -> (u64, String) {
     let mut hasher = blake3::Hasher::new();
     let mut size = 0;
-    let mut time = 0;
     for file in files {
         if let Ok(bytes) = std::fs::read(file) {
             size += bytes.len() as u64;
             hasher.update(&bytes);
         }
-        if let Ok(meta) = std::fs::metadata(file)
-            && let Ok(modified) = meta.modified()
-            && let Ok(since) = modified.duration_since(std::time::UNIX_EPOCH)
-        {
-            time = time.max(since.as_secs());
-        }
     }
-    (size, time, hasher.finalize().to_hex()[..16].to_owned())
+    (size, hasher.finalize().to_hex()[..16].to_owned())
 }
 
 #[derive(Clone, Debug)]
@@ -114,6 +104,7 @@ pub struct Imports {
     file: Option<PathBuf>,
     watchers: HashMap<PathBuf, Watcher>,
     pub due: Vec<Due>,
+    pub unreadable: Option<String>,
 }
 
 impl Imports {
@@ -121,10 +112,14 @@ impl Imports {
         let file = user
             .imports_dir()
             .join(format!("{}.json", UserFolder::folder_key(folder)));
-        let records: Vec<ImportRecord> = std::fs::read(&file)
-            .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-            .unwrap_or_default();
+        let (records, unreadable): (Vec<ImportRecord>, Option<String>) = match std::fs::read(&file)
+        {
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(records) => (records, None),
+                Err(error) => (Vec::new(), Some(format!("{}: {error}", file.display()))),
+            },
+            Err(_) => (Vec::new(), None),
+        };
         let due = records
             .iter()
             .filter(|record| record.changed() == Some(true))
@@ -139,9 +134,10 @@ impl Imports {
             .collect();
         let mut imports = Imports {
             records,
-            file: Some(file),
+            file: unreadable.is_none().then_some(file),
             watchers: HashMap::new(),
             due,
+            unreadable,
         };
         imports.watch();
         imports

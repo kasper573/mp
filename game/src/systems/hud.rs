@@ -48,7 +48,6 @@ impl Plugin for HudPlugin {
     }
 }
 
-/// Open windows to rebuild because their contents derive from state that changed (not from `Open`).
 #[derive(Resource, Default)]
 pub(crate) struct RefreshWindows(pub std::collections::HashSet<&'static str>);
 

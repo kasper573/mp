@@ -55,7 +55,6 @@ pub fn content(registry: &mut crate::core::content::ContentRegistry) {
 }
 
 fn check_banks(loading: &mut crate::core::content::Loading) {
-    let content = loading.content();
     for (id, bank) in loading.rows::<BabbleBankDef>() {
         let mut check = crate::core::content::RowCheck::default();
         check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
@@ -74,7 +73,6 @@ fn check_banks(loading: &mut crate::core::content::Loading) {
             loading.row_errors(id, check);
             loading.fail(id);
         }
-        let _ = &content;
     }
 }
 

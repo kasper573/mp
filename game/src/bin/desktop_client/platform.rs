@@ -197,7 +197,6 @@ const CONNECTING: u8 = 0;
 const OPEN: u8 = 1;
 const CLOSED: u8 = 2;
 
-/// A WebSocket driven on its own thread: frames queue both ways, so the game thread never blocks.
 struct ThreadSocket {
     incoming: Mutex<Receiver<Vec<u8>>>,
     outgoing: Sender<Vec<u8>>,

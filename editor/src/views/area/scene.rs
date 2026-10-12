@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -356,7 +357,7 @@ fn sheets_for(
                             .iter()
                             .map(|frame| bevy_tilemap::TileAnimationFrame {
                                 tile: frame.tile,
-                                seconds: frame.ms as f32 / 1000.0,
+                                lasts: Duration::from_millis(u64::from(frame.ms)),
                             })
                             .collect(),
                     })
@@ -495,7 +496,7 @@ fn spawn_tiles(
                         tile: tile.tile,
                         flip_x: flip.horizontal(),
                         flip_y: flip.vertical(),
-                        at: square.max().to_screen().with_x(square.min().to_screen().x),
+                        bottom_left: square.max().to_screen().with_x(square.min().to_screen().x),
                         z,
                     },
                     TILE.0,

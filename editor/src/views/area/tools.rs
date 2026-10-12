@@ -1,6 +1,7 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
 use game::core::math::{Pos, Rect};
 use game::core::tiling::{Cell, TilePos, Tiles};
+use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::brush::{StrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
@@ -73,7 +74,6 @@ fn key_letter(tool: Tool) -> &'static str {
     }
 }
 
-/// The rail's pictograms, drawn as strokes so they match at any scale.
 fn tool_icon(painter: &egui::Painter, tool: Tool, c: Pos2, ink: Color32) {
     let stroke = EStroke::new(1.6, ink);
     let p = |x: f32, y: f32| Pos2::new(c.x + x, c.y + y);
@@ -159,7 +159,8 @@ pub fn rename_layer(
         }
     }
     let project = editor.project.as_ref().ok_or("no folder")?;
-    let old = format!("tables/area/{area_key}/{from}.csv");
+    let folder = area::grid::folder(area_key);
+    let old = format!("{folder}/{}", area::grid::layer_file(from));
     let bytes = project
         .files
         .get(&old)
@@ -167,7 +168,7 @@ pub fn rename_layer(
         .ok_or("the layer file is gone")?;
     let mut edit = Edit::new(format!("Rename layer {from} of {area_key} to {to}"));
     edit.write_json(row_file("area", area_key), &row);
-    edit.write(format!("tables/area/{area_key}/{to}.csv"), bytes);
+    edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
     edit.remove(old);
     if editor.apply(edit) {
         Ok(())
@@ -368,7 +369,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             let mut placed = module.clone();
             shapes::shift(&mut placed, at.x, at.y);
             if let Some(bounds) = shapes::bounds(&placed, None) {
-                let color = super::overlays::module_color(module.kind());
+                let color = super::overlays::module_color(module.module_kind());
                 let rect = canvas.rect(bounds);
                 painter.add(egui::Shape::dashed_line(
                     &[
@@ -382,7 +383,14 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                     6.0,
                     4.0,
                 ));
-                if matches!(module.kind(), "population" | "resident" | "object") {
+                if matches!(
+                    module.module_kind(),
+                    Some(
+                        AreaModuleKind::Population
+                            | AreaModuleKind::Resident
+                            | AreaModuleKind::Object
+                    )
+                ) {
                     super::overlays::label_chip(
                         painter,
                         rect.min + Vec2::new(0.0, -4.0),
@@ -419,7 +427,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             &format!(
                 "{} module{}{from}",
                 ghost.modules.len(),
-                if ghost.modules.len() == 1 { "" } else { "s" }
+                crate::ui::widgets::plural(ghost.modules.len())
             ),
             Color32::WHITE,
         );
@@ -441,7 +449,10 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     if let Some((table, key, tile)) = drag_hover {
         let cell = tile.cell();
         let candidates = super::preview::drop_candidates(editor, &table);
-        if candidates.iter().any(|(kind, _)| kind == "population") {
+        if candidates
+            .iter()
+            .any(|(kind, _)| *kind == AreaModuleKind::Population)
+        {
             let rect = canvas.rect(Rect::new(
                 Pos::new(cell.x as f32 - 2.5, cell.y as f32 - 2.5),
                 game::core::math::Size::new(4.0, 4.0),
@@ -454,7 +465,10 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
                     rect.left_bottom(),
                     rect.left_top(),
                 ],
-                EStroke::new(1.5, super::overlays::module_color("population")),
+                EStroke::new(
+                    1.5,
+                    super::overlays::module_color(Some(AreaModuleKind::Population)),
+                ),
                 6.0,
                 4.0,
             ));
@@ -654,7 +668,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Frame) {
     }
     if input.key_pressed(egui::Key::Enter) {
         let indices = selected_indices(editor, &frame.area_key);
-        if indices.len() == 1 && frame.modules[indices[0]]["type"] == "blueprint" {
+        if indices.len() == 1 && frame.modules[indices[0]].is_module(AreaModuleKind::Blueprint) {
             placement::edit_in_place(editor, view_key, frame, indices[0]);
         }
     }
@@ -733,8 +747,6 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Frame) {
             .map(|c| frame.canvas.to_screen(c.center()))
             .unwrap_or(frame.canvas.rect.center());
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
-        let id = egui::Id::new((view_key, "context"));
-        egui::Popup::open_id(ui.ctx(), id);
-        super::modules::MENU_AT.with(|cell| cell.set(Some((id, at, tile))));
+        super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }
 }

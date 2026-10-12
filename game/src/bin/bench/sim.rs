@@ -6,7 +6,7 @@ use game::core::content::Content;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::GameSettings;
 use game::systems::area::AreaModule;
-use game::systems::player::{ClientId, JoinRequest, SpawnPolicy};
+use game::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
 
 pub const PLAYERS_PER_AREA: usize = 25;
 
@@ -18,9 +18,6 @@ const CLOCK: WallClock = WallClock {
 /// Ticks stepped before sampling, so spawn waves and connect churn settle out of the measurement.
 pub const WARMUP: usize = 30;
 
-/// The connection entity per player (one per simulated client). Their characters are spawned by the
-/// world's own `join` system; [`connect`] later promotes them to fully replicating clients. Shared
-/// by the benchmark and the profiler so both measure the exact same simulation.
 pub type Roster = Vec<Entity>;
 
 /// How the area's players are positioned, which sets how much their areas-of-interest overlap. Maps
@@ -51,7 +48,6 @@ impl Layout {
     }
 }
 
-/// The NPCs each bench area spawns, read from the content layer (the same area the bench instances).
 pub fn npcs_per_area(content: &Content) -> usize {
     let area = content.built::<GameSettings>().bench.get(content);
     area.modules
@@ -64,9 +60,6 @@ pub fn npcs_per_area(content: &Content) -> usize {
         .sum()
 }
 
-/// Exactly `areas` instances of the benchmark area, each populated with its NPCs and players, plus
-/// each world's roster of connection entities. The area count is a pure runtime parameter — every
-/// world is an instance of the one area template, so the count built always equals the count asked for.
 pub fn worlds(areas: usize, layout: Layout, assets: &Content) -> (Vec<App>, Vec<Roster>) {
     let mut worlds = Vec::with_capacity(areas);
     let mut rosters = Vec::with_capacity(areas);
@@ -78,8 +71,6 @@ pub fn worlds(areas: usize, layout: Layout, assets: &Content) -> (Vec<App>, Vec<
     (worlds, rosters)
 }
 
-/// Promotes every rostered connection into a fully replicating client, giving each its owner-scoped
-/// replicated view.
 pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
     for (app, roster) in worlds.iter_mut().zip(rosters) {
         let world = app.world_mut();
@@ -110,7 +101,10 @@ fn build_world(layout: Layout, assets: &Content, ordinal: u64) -> (App, Roster) 
     let mut app =
         game::systems::server_app(assets.built::<GameSettings>().bench, ordinal, CLOCK, assets);
     app.insert_resource(game::core::math::Rng::from_entropy());
-    app.insert_resource(layout.spawn_policy());
+    app.insert_resource(SpawnRules {
+        policy: layout.spawn_policy(),
+        immortal: false,
+    });
     app.finish();
     app.cleanup();
     app.world_mut()

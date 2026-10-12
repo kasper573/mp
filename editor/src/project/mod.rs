@@ -11,6 +11,8 @@ use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
 use game::core::content::{Content, LoadError, LoadReport};
+use game::core::math::Pos;
+use game::core::tiling::Tiles;
 
 pub use files::{Bytes, Change, Files, hash, json_bytes, row_file, row_of};
 pub use history::{History, Selection, Step};
@@ -117,7 +119,14 @@ impl Refusal {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Viewpoint {
     pub selection: Selection,
-    pub camera: Option<(String, [f32; 3])>,
+    pub camera: Option<CameraState>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CameraState {
+    pub area: String,
+    pub center: Pos<Tiles>,
+    pub zoom: f32,
 }
 
 pub struct Applied {

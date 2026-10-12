@@ -24,6 +24,20 @@ pub use report::{ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 pub use version::ContentVersion;
 
+pub const GAME_FILE: &str = "game.json";
+
+pub fn row_file(table: &str, key: &str) -> String {
+    format!("{}.json", row_folder(table, key))
+}
+
+pub fn row_folder(table: &str, key: &str) -> String {
+    format!("tables/{table}/{key}")
+}
+
+pub fn asset_file(path: &str) -> String {
+    format!("assets/{path}")
+}
+
 pub fn named<Row: ContentRow>(
     world: &bevy_ecs::world::World,
     key: &str,

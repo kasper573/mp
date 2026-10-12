@@ -129,7 +129,6 @@ pub fn legend(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     });
 }
 
-/// A terrain's mark: a shape per index in its colour, so sets read without colour too.
 pub fn shape(painter: &egui::Painter, center: Pos2, radius: f32, index: usize, filled: bool) {
     let colour = terrain_colour(index);
     let stroke = Stroke::new(1.5, colour);

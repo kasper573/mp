@@ -1,4 +1,5 @@
 use egui::{Sense, Ui};
+use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::Party;
@@ -15,9 +16,11 @@ pub(super) fn quest_parties(editor: &Editor, quest: &str) -> (Vec<Party>, Vec<Pa
     };
     let files = &project.files;
     let mut scan = |table: &str, owner: String, module: &Value| {
-        let (script_label, nodes) = match module.kind() {
-            "inline_script" => ("inline script".to_owned(), module["nodes"].clone()),
-            "shared_script" => {
+        let (script_label, nodes) = match module.module_kind() {
+            Some(AreaModuleKind::InlineScript) => {
+                ("inline script".to_owned(), module["nodes"].clone())
+            }
+            Some(AreaModuleKind::SharedScript) => {
                 let name = module.text("script").to_owned();
                 (
                     format!("script/{name}"),

@@ -184,8 +184,10 @@ pub fn popover(
             editor
                 .dialogs
                 .push(Dialog::Rename(crate::app::RenameDialog {
-                    table: format!("area/{area_key} layer"),
-                    key: name.clone(),
+                    target: crate::app::RenameTarget::Layer {
+                        area: area_key.to_owned(),
+                        layer: name.clone(),
+                    },
                     draft: name,
                     error: None,
                 }));

@@ -522,7 +522,7 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
             "Nothing names it. The file goes; its assets stay until nothing names them.",
         ));
     } else {
-        ui.label(theme::muted(format!("Used in {total} place{} in {rows} row{}. Nothing is deleted until every group has an answer.", plural(total), plural(rows))));
+        ui.label(theme::muted(format!("Used in {total} place{} in {rows} row{}. Nothing is deleted until every group has an answer.", crate::ui::widgets::plural(total), crate::ui::widgets::plural(rows))));
     }
     let candidates: Vec<String> = project
         .files
@@ -684,14 +684,14 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     ui.add_space(4.0);
     let mut summary = format!(
         "{total} edit{} in {rows} row{} and {files_removed} deleted file{}, one undo step.",
-        plural(total),
-        plural(rows),
-        plural(files_removed)
+        crate::ui::widgets::plural(total),
+        crate::ui::widgets::plural(rows),
+        crate::ui::widgets::plural(files_removed)
     );
     if dialog.groups.is_empty() {
         summary = format!(
             "{files_removed} deleted file{}, one undo step.",
-            plural(files_removed)
+            crate::ui::widgets::plural(files_removed)
         );
     }
     if assets_named {
@@ -701,10 +701,6 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     if let Some(error) = &dialog.error {
         ui.colored_label(theme::DANGER, error);
     }
-}
-
-fn plural(count: usize) -> &'static str {
-    if count == 1 { "" } else { "s" }
 }
 
 fn entries_word(kind: &str) -> &'static str {

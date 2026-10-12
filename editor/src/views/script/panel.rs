@@ -353,7 +353,7 @@ fn may_do_rows(
             "says".to_owned(),
             format!(
                 "{dialogue_count} dialogue node{} to the subject{by}{more}",
-                if dialogue_count == 1 { "" } else { "s" }
+                crate::ui::widgets::plural(dialogue_count)
             ),
             true,
         ));
@@ -974,7 +974,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                                 "… {} more in {} {} · click one to open its {}",
                                 rows.len() - shown,
                                 areas.len(),
-                                plural(areas.len(), if all_areas { "area" } else { "owner" }),
+                                counted(areas.len(), if all_areas { "area" } else { "owner" }),
                                 if all_areas {
                                     "area with it selected"
                                 } else {
@@ -1021,7 +1021,7 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn plural(count: usize, word: &str) -> String {
+fn counted(count: usize, word: &str) -> String {
     if count == 1 {
         word.to_owned()
     } else {

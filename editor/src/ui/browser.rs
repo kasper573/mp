@@ -2,7 +2,7 @@ use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 
 use super::tree::{self, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Dialog, Editor, RenameDialog, RightTab};
+use crate::app::{Dialog, Editor, RenameDialog, RenameTarget, RightTab};
 use crate::project::{Selection, row_of};
 use crate::tabs::Tab;
 use crate::value::RowValue;
@@ -409,9 +409,11 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: Action) {
                 ));
             } else {
                 editor.dialogs.push(Dialog::Rename(RenameDialog {
-                    table: table.to_owned(),
+                    target: RenameTarget::Row {
+                        table: table.to_owned(),
+                        key: key.to_owned(),
+                    },
                     draft: key.to_owned(),
-                    key: key.to_owned(),
                     error: None,
                 }));
             }
@@ -514,7 +516,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
     editor.status.left.push(format!(
         "{} result{} for \"{}\"",
         hits.len(),
-        if hits.len() == 1 { "" } else { "s" },
+        crate::ui::widgets::plural(hits.len()),
         editor.views.browser.search.trim()
     ));
     let mut clicked: Option<(String, String, bool, bool)> = None;
