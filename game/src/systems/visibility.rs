@@ -8,6 +8,7 @@ use bevy_replicon::server::visibility::client_visibility::ClientVisibility;
 use bevy_replicon::server::visibility::filters_mask::FilterBit;
 use bevy_replicon::server::visibility::registry::FilterRegistry;
 use bevy_replicon::shared::replication::registry::ReplicationRegistry;
+use fixedbitset::FixedBitSet;
 
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
@@ -32,7 +33,9 @@ pub fn register(app: &mut App) {
     app.init_resource::<RangeBit>();
     app.init_resource::<PresenceBit>();
     app.init_resource::<Sights>();
+    app.init_resource::<Slots>();
     app.add_observer(grant_own_sight);
+    app.add_observer(release_slot);
     app.add_observer(reveal_to_all);
 }
 
@@ -64,12 +67,24 @@ pub struct PrivateSight {
 }
 
 type Clients = QueryState<(Entity, &'static ClientId)>;
-type Subjects = QueryState<(Entity, &'static Position, Option<&'static AreaTag>), With<Replicated>>;
+type Views = QueryState<(&'static mut ClientVisibility, &'static mut HiddenSlots)>;
+type Subjects = QueryState<
+    (
+        Entity,
+        &'static Position,
+        Option<&'static AreaTag>,
+        Option<&'static SubjectSlot>,
+    ),
+    With<Replicated>,
+>;
 type Presences = QueryState<Entity, (With<Presence>, With<Replicated>)>;
 
+/// Replicon is told only about range transitions: a client remembers which subjects it hides in a
+/// bitset over the subjects' slots, so the steady state costs no hashing per subject and client.
 pub fn update(
     world: &mut World,
     clients_query: &mut Clients,
+    views: &mut Views,
     subjects_query: &mut Subjects,
     presences: &mut Presences,
 ) {
@@ -83,14 +98,29 @@ pub fn update(
     let bit = world.resource::<RangeBit>().0;
     let presence_bit = world.resource::<PresenceBit>().0;
     let conditional: Vec<Entity> = presences.iter(world).collect();
-    let subjects: Vec<Subject> = subjects_query
+    let found: Vec<(Subject, Option<SubjectSlot>)> = subjects_query
         .iter(world)
-        .map(|(entity, position, tag)| Subject {
-            entity,
-            pos: position.pos,
-            area: tag.map(|tag| tag.area),
+        .map(|(entity, position, tag, slot)| {
+            let subject = Subject {
+                entity,
+                pos: position.pos,
+                area: tag.map(|tag| tag.area),
+            };
+            (subject, slot.copied())
         })
         .collect();
+    let subjects: Vec<(Subject, usize)> = found
+        .into_iter()
+        .map(|(subject, slot)| {
+            let slot = slot.unwrap_or_else(|| {
+                let slot = SubjectSlot(world.resource_mut::<Slots>().allocate());
+                world.entity_mut(subject.entity).insert(slot);
+                slot
+            });
+            (subject, slot.0)
+        })
+        .collect();
+    let slots = world.resource::<Slots>().len();
     for (client, id) in clients {
         let sight = sight(world, id);
         let present: Vec<(Entity, bool)> = conditional
@@ -102,11 +132,18 @@ pub fn update(
                 (subject, shown)
             })
             .collect();
-        let Some(mut visibility) = world.get_mut::<ClientVisibility>(client) else {
+        let Ok((mut visibility, mut hidden)) = views.get_mut(world, client) else {
             continue;
         };
-        for subject in &subjects {
-            visibility.set(subject.entity, bit, sees(sight.as_ref(), subject));
+        let visibility = visibility.as_mut();
+        let hidden = hidden.as_mut();
+        hidden.0.grow(slots);
+        for (subject, slot) in &subjects {
+            let hide = !sees(sight.as_ref(), subject);
+            if hidden.0.contains(*slot) != hide {
+                hidden.0.set(*slot, hide);
+                visibility.set(subject.entity, bit, !hide);
+            }
         }
         for (subject, shown) in present {
             visibility.set(subject, presence_bit, shown);
@@ -195,10 +232,56 @@ impl VisibilityFilter for OwnedBy {
 
 fn grant_own_sight(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Commands) {
     if let Ok(&own) = clients.get(add.entity) {
-        commands.entity(add.entity).insert(PrivateSight {
-            own,
-            watching: None,
-        });
+        commands.entity(add.entity).insert((
+            PrivateSight {
+                own,
+                watching: None,
+            },
+            HiddenSlots::default(),
+        ));
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+#[component(immutable)]
+pub struct SubjectSlot(usize);
+
+#[derive(Component, Default)]
+pub struct HiddenSlots(FixedBitSet);
+
+#[derive(Resource, Default)]
+struct Slots {
+    free: Vec<usize>,
+    len: usize,
+}
+
+impl Slots {
+    fn allocate(&mut self) -> usize {
+        self.free.pop().unwrap_or_else(|| {
+            self.len += 1;
+            self.len - 1
+        })
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+fn release_slot(
+    remove: On<Remove<SubjectSlot>>,
+    subjects: Query<&SubjectSlot>,
+    mut slots: ResMut<Slots>,
+    mut clients: Query<&mut HiddenSlots>,
+) {
+    let Ok(&SubjectSlot(slot)) = subjects.get(remove.entity) else {
+        return;
+    };
+    slots.free.push(slot);
+    for mut hidden in &mut clients {
+        if slot < hidden.0.len() {
+            hidden.0.set(slot, false);
+        }
     }
 }
 

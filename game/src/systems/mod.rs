@@ -184,7 +184,6 @@ pub fn server_app(
             Update,
             (
                 (
-                    actor::reset,
                     player::arrival_holds,
                     combat::regen,
                     movement::move_request,
@@ -230,6 +229,7 @@ pub fn server_app(
                 )
                     .chain(),
                 (
+                    actor::settle,
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,
                     chat::rebroadcast,

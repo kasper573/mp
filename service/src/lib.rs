@@ -20,8 +20,11 @@ pub use tikv_jemallocator::Jemalloc;
 #[macro_export]
 macro_rules! heap_profiling {
     () => {
+        $crate::heap_profiling!($crate::Jemalloc, $crate::Jemalloc);
+    };
+    ($allocator:ty, $init:expr) => {
         #[global_allocator]
-        static GLOBAL_ALLOCATOR: $crate::Jemalloc = $crate::Jemalloc;
+        static GLOBAL_ALLOCATOR: $allocator = $init;
 
         #[allow(non_upper_case_globals)]
         #[unsafe(export_name = "malloc_conf")]

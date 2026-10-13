@@ -1,9 +1,8 @@
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 
 use bevy_app::App;
@@ -35,21 +34,22 @@ pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: Content) {
     }
 
     report_aoi(&mut worlds);
+    report_changes(&mut worlds);
 
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(999)
         .blocklist(&["libc", "libgcc", "pthread", "vdso"])
         .build()
         .expect("start pprof profiler");
-    ALLOCS.store(0, Relaxed);
-    BYTES.store(0, Relaxed);
+    crate::ALLOCS.store(0, Relaxed);
+    crate::BYTES.store(0, Relaxed);
     let started = Instant::now();
     for _ in 0..MEASURE {
         crate::sim::step_single_threaded(&mut worlds);
     }
     let elapsed = started.elapsed();
-    let allocs = ALLOCS.load(Relaxed);
-    let bytes = BYTES.load(Relaxed);
+    let allocs = crate::ALLOCS.load(Relaxed);
+    let bytes = crate::BYTES.load(Relaxed);
 
     let report = guard.report().build().expect("build pprof report");
     print_hotspots(&report);
@@ -211,30 +211,48 @@ fn peak_rss_kib() -> Option<u64> {
         })
 }
 
-#[global_allocator]
-static ALLOC: Counting = Counting;
-
-static ALLOCS: AtomicU64 = AtomicU64::new(0);
-static BYTES: AtomicU64 = AtomicU64::new(0);
-
-struct Counting;
-
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOCS.fetch_add(1, Relaxed);
-        BYTES.fetch_add(layout.size() as u64, Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        ALLOCS.fetch_add(1, Relaxed);
-        if new_size > layout.size() {
-            BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
+/// Which replicated components change in a tick: every change is serialized for each viewer, so a
+/// component written every tick without actually changing is pure replication waste.
+fn report_changes(worlds: &mut [App]) {
+    let mut counts: HashMap<String, u64> = HashMap::new();
+    let mut entities = 0u64;
+    let mut changed_entities = 0u64;
+    for app in worlds.iter_mut() {
+        let last = app.world_mut().change_tick();
+        app.update();
+        let world = app.world_mut();
+        let this = world.change_tick();
+        let replicated: Vec<Entity> = world
+            .query_filtered::<Entity, With<Replicated>>()
+            .iter(world)
+            .collect();
+        for entity in replicated {
+            entities += 1;
+            let mut any = false;
+            let entity_ref = world.entity(entity);
+            for &id in entity_ref.archetype().components() {
+                let changed = entity_ref
+                    .get_change_ticks_by_id(id)
+                    .is_some_and(|ticks| ticks.is_changed(last, this));
+                if changed {
+                    any = true;
+                    let name = world
+                        .components()
+                        .get_name(id)
+                        .map(|name| name.to_string())
+                        .unwrap_or_default();
+                    *counts.entry(name).or_default() += 1;
+                }
+            }
+            if any {
+                changed_entities += 1;
+            }
         }
-        unsafe { System.realloc(ptr, layout, new_size) }
+    }
+    let mut rows: Vec<_> = counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    println!("[changes] replicated entities: {entities}, changed this tick: {changed_entities}");
+    for (name, count) in rows.iter().take(20) {
+        println!("[changes] {count:>8}  {name}");
     }
 }

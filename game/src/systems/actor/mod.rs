@@ -12,7 +12,8 @@ use crate::core::content::Content;
 use crate::core::math::{Direction, Pos, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
-use crate::systems::movement::Position;
+use crate::systems::combat::Swing;
+use crate::systems::movement::{Path, Position};
 use crate::systems::stat::{self, StatKind, Stats};
 
 pub use model::{ActorModel, Timing};
@@ -150,7 +151,7 @@ pub struct Name {
     pub name: String,
 }
 
-pub fn set_action(actor: &mut Mut<Actor>, action: Action) {
+fn set_action(actor: &mut Mut<Actor>, action: Action) {
     if actor.action != action {
         actor.action = action;
     }
@@ -163,9 +164,28 @@ pub fn set_facing(actor: &mut Mut<Actor>, dir: Direction, action: Action) {
     }
 }
 
-pub fn reset(mut actors: Query<(&mut Actor, Option<&Stats>)>) {
-    for (mut actor, stats) in &mut actors {
+type Situation = (
+    &'static mut Actor,
+    Option<&'static Stats>,
+    Has<Swing>,
+    Has<Path>,
+);
+
+pub fn settle(mut actors: Query<Situation>) {
+    for (mut actor, stats, swinging, walking) in &mut actors {
         let dead = stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0);
-        set_action(&mut actor, if dead { Action::Dead } else { Action::Idle });
+        let action = if dead {
+            Action::Dead
+        } else if swinging {
+            Action::Attack
+        } else if walking {
+            match actor.action {
+                Action::Walk | Action::Run => actor.action,
+                _ => Action::Walk,
+            }
+        } else {
+            Action::Idle
+        };
+        set_action(&mut actor, action);
     }
 }

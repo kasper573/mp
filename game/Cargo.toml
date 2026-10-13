@@ -32,7 +32,7 @@ path = "src/bin/desktop_client/main.rs"
 [features]
 # Opt-in CPU (pprof flamegraph) + allocation profiling of a fixed workload.
 # Build with `--profile profiling --features profiling` for debug symbols.
-profiling = ["dep:pprof"]
+profiling = ["dep:pprof", "bevy/debug"]
 
 # One dependency set for every target keeps the source tree free of #[cfg] gates: the browser-only
 # crates (bevy's render stack, ui, web-sys, kira, …) also compile natively — wasm imports become
@@ -100,6 +100,7 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 derive_more = { version = "2", features = ["add", "add_assign"] }
 euclid = { version = "0.22", features = ["serde"] }
 pathfinding = "4"
+fixedbitset = "0.5"
 oorandom = "11"
 getrandom = "0.4"
 gloo-net = { version = "0.7", default-features = false, features = ["http"] }

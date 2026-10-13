@@ -1,6 +1,7 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ClientId as Sender, ConnectedClient, FromClient, ServerState};
+use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use bevy_state::prelude::NextState;
 use game::core::content::Content;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
@@ -90,6 +91,7 @@ pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
 /// uses, so the benchmark's capacity reflects the threaded server.
 pub fn step(worlds: &mut [App]) {
     game::systems::step_areas(worlds, CLOCK);
+    consume_sent(worlds);
 }
 
 /// Advances every world one tick on the calling thread only. Used by the profiler so CPU samples
@@ -98,6 +100,17 @@ pub fn step(worlds: &mut [App]) {
 pub fn step_single_threaded(worlds: &mut [App]) {
     for app in worlds.iter_mut() {
         app.update();
+    }
+    consume_sent(worlds);
+}
+
+/// What the server's transport does with outgoing messages once they are on the wire.
+fn consume_sent(worlds: &mut [App]) {
+    for app in worlds.iter_mut() {
+        app.world_mut()
+            .resource_mut::<ServerMessages>()
+            .drain_sent()
+            .for_each(drop);
     }
 }
 

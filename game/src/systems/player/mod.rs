@@ -17,7 +17,7 @@ use crate::systems::Character;
 use crate::systems::GameSettings;
 use crate::systems::account::identity::Identity;
 use crate::systems::actor;
-use crate::systems::actor::{Action, Actor, Hitbox, Name, Rgba, Tint, set_action};
+use crate::systems::actor::{Action, Actor, Hitbox, Name, Rgba, Tint};
 use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::belongings;
@@ -458,9 +458,6 @@ pub fn respawn(world: &mut World) {
         }
         if let Some(mut position) = world.get_mut::<Position>(entity) {
             position.pos = spawn;
-        }
-        if let Some(mut actor) = world.get_mut::<Actor>(entity) {
-            set_action(&mut actor, Action::Idle);
         }
         crate::systems::reach::forget(world, entity);
     }

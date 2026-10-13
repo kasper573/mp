@@ -3,12 +3,42 @@ mod profiling;
 mod search;
 mod sim;
 
+use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Instant;
 
 use bevy_app::App;
 use game::core::content::{Content, FilesystemFolder};
+
+// The server's own allocator setup, so the measured ticks allocate exactly as production does.
+service::heap_profiling!(Counting, Counting);
+
+static ALLOCS: AtomicU64 = AtomicU64::new(0);
+static BYTES: AtomicU64 = AtomicU64::new(0);
+
+struct Counting;
+
+unsafe impl GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        BYTES.fetch_add(layout.size() as u64, Relaxed);
+        unsafe { service::Jemalloc.alloc(layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { service::Jemalloc.dealloc(ptr, layout) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        if new_size > layout.size() {
+            BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
+        }
+        unsafe { service::Jemalloc.realloc(ptr, layout, new_size) }
+    }
+}
 
 const BUDGET_MS: f64 = 40.0;
 // Must exceed the budget crossover (and the probe that overshoots it) but stay within RAM: the bench

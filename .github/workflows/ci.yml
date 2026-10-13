@@ -21,7 +21,14 @@ jobs:
   # after the e2e. The images only package the host-built crates, so the deploy reuses the e2e build —
   # no second compile, no artifact hand-off between jobs, and the e2e always ran on what we deploy.
   ci:
-    runs-on: ubuntu-26.04
+    # Not the newest image: ubuntu-26.04 ships GStreamer 1.28, whose device monitor starts its
+    # providers on a thread (gstdevicemonitor.c, since 1.28.0) and, when stopped while a provider is
+    # still failing to start, frees the provider list the stopping side is about to walk. A runner has
+    # no audio devices, so providers fail every time, and WebKit stops its capture device monitor from
+    # within that very start, so Playwright's WebKit web process dies with "double free or corruption"
+    # on any page that touches audio. Back to the newest image once Ubuntu ships a GStreamer with the
+    # fix; https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/12396 tracks that code.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       # rust-cache restores the registry and compiled dependencies across runs. Incremental off: the

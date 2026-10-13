@@ -11,7 +11,7 @@ use crate::core::content::Content;
 use crate::core::math::{Direction, Pos};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Millis, PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, set_action, set_facing};
+use crate::systems::actor::{self, Action, Actor, set_facing};
 use crate::systems::area::AreaTag;
 use crate::systems::movement::{MoveTarget, Path, halt, on_tile, position};
 use crate::systems::player::{self, Owner, commands_locked, sender_player, session};
@@ -153,9 +153,6 @@ pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, dama
     if !stat::is_dead(world, target) {
         return false;
     }
-    if let Some(mut actor) = world.get_mut::<Actor>(target) {
-        set_action(&mut actor, Action::Dead);
-    }
     reach::forget(world, target);
     world.entity_mut(target).remove::<Attackers>();
     world.write_message(Died {
@@ -238,8 +235,6 @@ fn progress_swings(world: &mut World, time: Seconds, swings: &mut QueryState<Ent
                 .entity_mut(id)
                 .remove::<Swing>()
                 .insert(LastAttack { at: swing.ends_at });
-        } else if let Some(mut actor) = world.get_mut::<Actor>(id) {
-            set_action(&mut actor, Action::Attack);
         }
     }
 }

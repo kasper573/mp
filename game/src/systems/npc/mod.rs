@@ -18,7 +18,7 @@ use crate::core::math::{Direction, Pos, Rect, Rng};
 use crate::core::script::{Owner, OwnerKind, OwnerRow};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, Hitbox, Rgba, Tint, set_action};
+use crate::systems::actor::{self, Action, Actor, Hitbox, Rgba, Tint};
 use crate::systems::area::{self, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Died};
 use crate::systems::dialogue;
@@ -555,9 +555,6 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
             .unwrap_or_else(|| region.fallback_spawn());
             if let Some(mut position) = world.get_mut::<Position>(id) {
                 position.pos = at;
-            }
-            if let Some(mut actor) = world.get_mut::<Actor>(id) {
-                set_action(&mut actor, Action::Idle);
             }
             world
                 .entity_mut(id)
