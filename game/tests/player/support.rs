@@ -1,18 +1,18 @@
 use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::path::Path;
+use std::sync::{Arc, LazyLock};
 
 use bevy_app::App;
 use bevy_ecs::message::Message;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ClientId as Sender, FromClient, ServerState};
-use bevy_state::prelude::NextState;
 use bevy_time::TimeUpdateStrategy;
-use game::core::content::{Content, ContentId, ContentRow, key_of};
+use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
 use game::core::math::Rng;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::TICK_HZ;
+use game::systems::area::Id as AreaId;
 use game::systems::player::snapshot::JoinAs;
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
+use game::systems::{TICK_HZ, from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(1_000_000_000),
@@ -21,9 +21,9 @@ pub const CLOCK: WallClock = WallClock {
 
 pub fn content() -> &'static Content {
     static CONTENT: LazyLock<Content> = LazyLock::new(|| {
-        game::systems::load_content(
-            std::sync::Arc::new(game::core::content::FilesystemFolder(
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
+        load_content(
+            Arc::new(FilesystemFolder(
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
             )),
             "cargo test failed",
         )
@@ -44,7 +44,7 @@ pub struct Sim {
 }
 
 impl Sim {
-    pub fn area(area: game::systems::area::Id) -> Sim {
+    pub fn area(area: AreaId) -> Sim {
         let mut app = game::systems::server_app(area, 0, CLOCK, content());
         app.insert_resource(Rng::new(1));
         app.insert_resource(SpawnRules {
@@ -52,12 +52,7 @@ impl Sim {
             immortal: false,
         });
         app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
-        app.finish();
-        app.cleanup();
-        app.world_mut()
-            .resource_mut::<NextState<ServerState>>()
-            .set(ServerState::Running);
-        app.update();
+        start_server(&mut app);
         Sim {
             app,
             conns: HashMap::new(),
@@ -84,9 +79,6 @@ impl Sim {
 
     fn send<M: Message>(&mut self, client: u32, message: M) {
         let conn = self.conns[&client];
-        self.world().write_message(FromClient {
-            client_id: Sender::Client(conn),
-            message,
-        });
+        from_client(self.world(), conn, message);
     }
 }

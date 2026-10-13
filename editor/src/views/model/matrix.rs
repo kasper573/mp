@@ -1,9 +1,13 @@
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
 use serde_json::Value;
 
-use super::{ACTIONS, DIRECTIONS, FrameData, Page, action_timing, play_rule, strip_of};
+use super::{ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, strip_of};
 use crate::app::Editor;
+use crate::import;
 use crate::ui::{theme, widgets};
+use game::systems::actor::model::{ActionName, DirectionName};
+use std::collections::BTreeMap;
+use strum::VariantArray;
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 100.0;
@@ -12,34 +16,23 @@ const PREVIEW: Vec2 = Vec2::new(180.0, 350.0);
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let timings: Vec<super::ActionTiming> = ACTIONS
+    let timings: BTreeMap<ActionName, super::ActionTiming> = ActionName::VARIANTS
         .iter()
-        .map(|action| action_timing(row, action))
+        .map(|&action| (action, action_timing(row, action)))
         .collect();
-    let (action, direction) = {
-        let view = &editor.views.model.views[key];
-        (view.action, view.direction)
-    };
+    let strip = editor.views.model.view(key).strip;
     keys(editor, ui, key);
-    let moved = {
-        let view = &editor.views.model.views[key];
-        (view.action, view.direction)
-    };
-    if moved != (action, direction) {
-        super::select_strip(editor, key, moved.0, moved.1);
+    let moved = editor.views.model.view(key).strip;
+    if moved != strip {
+        super::select_strip(editor, key, moved);
     }
-    let (action, direction) = moved;
-    let frames = strip_of(row, ACTIONS[action], DIRECTIONS[direction]);
+    let strip = moved;
+    let frames = strip_of(row, strip);
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         super::preview::keys(ui, &mut view.preview, &frames);
-        super::preview::tick(&mut view.preview, dt, &frames, ACTIONS[action])
+        super::preview::tick(&mut view.preview, dt, &frames, strip.action)
     };
     super::preview::fire(editor, key, &frames, &tick.passed);
     ui.ctx().request_repaint();
@@ -47,85 +40,76 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let mut pick = None;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
-            ui.set_width(LABEL_W + DIRECTIONS.len() as f32 * (CELL + 8.0));
+            ui.set_width(LABEL_W + DirectionName::VARIANTS.len() as f32 * (CELL + 8.0));
             header(ui);
-            let mut counts = (0usize, 0usize);
-            for (a, name) in ACTIONS.iter().enumerate() {
+            let mut strips = 0;
+            let mut frames_total = 0;
+            for &action in ActionName::VARIANTS {
+                let timing = &timings[&action];
                 ui.horizontal(|ui| {
-                    let first = strip_of(row, name, DIRECTIONS[0]);
+                    let first = strip_of(row, ModelStrip { action, ..ModelStrip::default() });
                     let total = super::total_ms(&first);
                     ui.allocate_ui_with_layout(
                         Vec2::new(LABEL_W, CELL + 22.0),
                         egui::Layout::top_down(egui::Align::Min),
                         |ui| {
                             ui.add_space(6.0);
-                            ui.label(theme::mono(*name).color(theme::CODE).size(13.0));
+                            ui.label(theme::mono(action.key()).color(theme::CODE).size(13.0));
                             ui.label(
                                 theme::muted(format!("{} · {total} ms", first.len())).size(12.0),
                             );
-                            ui.label(theme::faint(play_rule(name)).size(11.5));
+                            ui.label(theme::faint(play_rule(action)).size(11.5));
                         },
                     );
-                    for (d, dir) in DIRECTIONS.iter().enumerate() {
-                        let strip = strip_of(row, name, dir);
-                        counts.0 += 1;
-                        counts.1 += strip.len();
-                        let selected = (a, d) == (action, direction);
-                        let badged = timings[a].differing.contains(&d)
-                            && timings[a].differing.len() < DIRECTIONS.len();
-                        let response = cell(ui, &sheet, strip.first(), selected, badged);
+                    for &direction in DirectionName::VARIANTS {
+                        let this = ModelStrip { action, direction };
+                        let frames = strip_of(row, this);
+                        strips += 1;
+                        frames_total += frames.len();
+                        let badged = timing.out_of_step(direction);
+                        let response = cell(ui, &sheet, frames.first(), this == strip, badged);
                         if response.clicked() {
-                            pick = Some((a, d));
+                            pick = Some(this);
                         }
                         if response.double_clicked() {
-                            open = Some((a, d));
+                            open = Some(this);
                         }
                         if badged {
                             response.on_hover_text(format!(
-                                "{dir}: {} frames · {} ms · the other directions last {} ms over {} frames",
-                                strip.len(),
-                                super::total_ms(&strip),
-                                timings[a].common.iter().sum::<u32>(),
-                                timings[a].common.len()
+                                "{}: {} frames · {} ms · the other directions last {} ms over {} frames",
+                                direction.key(),
+                                frames.len(),
+                                super::total_ms(&frames),
+                                timing.common.iter().sum::<u32>(),
+                                timing.common.len()
                             ));
                         }
                     }
                 });
             }
             ui.add_space(8.0);
-            let out_of_step: usize = timings
-                .iter()
-                .map(|timing| {
-                    if timing.differing.len() < DIRECTIONS.len() {
-                        timing.differing.len()
-                    } else {
-                        0
-                    }
-                })
-                .sum();
+            let out_of_step: usize = timings.values().map(super::ActionTiming::stragglers).sum();
             ui.horizontal(|ui| {
                 if out_of_step == 0 {
                     ui.label(RichText::new("✓").color(theme::OK));
                     ui.label(theme::muted(format!(
-                        "{} strips · {} frames · all match",
-                        counts.0, counts.1
+                        "{strips} strips · {frames_total} frames · all match"
                     )));
                 } else {
                     ui.label(RichText::new("!").color(theme::WARN).strong());
                     ui.label(theme::muted(format!(
-                        "{} strips · {} frames · {out_of_step} out of step with their action",
-                        counts.0, counts.1
+                        "{strips} strips · {frames_total} frames · {out_of_step} out of step with their action"
                     )));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("🗋 Import onto this model…").clicked() {
-                        crate::import::start_for_model(editor, key);
+                        import::start_for_model(editor, key);
                     }
                 });
             });
             if let Some(record) = editor.imports.record_for(super::TABLE, key).cloned() {
                 ui.horizontal(|ui| {
-                    let export = crate::import::show_path(editor, &record.export);
+                    let export = import::show_path(editor, &record.export);
                     match record.missing() {
                         true => {
                             ui.label(theme::warn("⚠"));
@@ -146,7 +130,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         ui.vertical(|ui| {
             ui.set_width(PREVIEW.x);
             ui.label(
-                theme::mono(format!("{} · {}", ACTIONS[action], DIRECTIONS[direction]))
+                theme::mono(strip.name())
                     .color(theme::CODE),
             );
             let frame = frames.get(tick.index).map(|frame| frame.frame);
@@ -157,36 +141,30 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 &sheet,
                 row,
                 frame,
-                super::preview::Fit {
+                super::preview::PreviewFit {
                     size: PREVIEW,
                     zoom: 3.0,
                 },
             );
-            let view = editor.views.model.views.get_mut(key).expect("the view exists");
+            let view = editor.views.model.view_mut(key);
             super::preview::controls(ui, &mut view.preview, tick.index, frames.len(), false);
         });
     });
-    if let Some((a, d)) = pick {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
-        view.action = a;
-        view.direction = d;
+    if let Some(picked) = pick {
+        let view = editor.views.model.view_mut(key);
+        view.strip = picked;
         view.frames.clear();
         super::preview::restart(&mut view.preview);
-        super::select_strip(editor, key, a, d);
+        super::select_strip(editor, key, picked);
     }
-    if let Some((a, d)) = open {
-        open_strip(editor, key, a, d);
+    if let Some(opened) = open {
+        open_strip(editor, key, opened);
     }
     let used = super::users(editor, key).len();
-    editor.status.left.push(format!(
-        "model/{key} · {} · {}",
-        ACTIONS[action], DIRECTIONS[direction]
-    ));
+    editor
+        .status
+        .left
+        .push(format!("model/{key} · {}", strip.name()));
     editor.status.left.push(
         "Space plays · , and . step frames · arrows move in the matrix · Enter opens the strip"
             .to_owned(),
@@ -197,31 +175,25 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     ));
 }
 
-pub fn open_strip(editor: &mut Editor, key: &str, action: usize, direction: usize) {
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.action = action;
-    view.direction = direction;
-    view.page = Page::Timing;
+pub fn open_strip(editor: &mut Editor, key: &str, strip: ModelStrip) {
+    let view = editor.views.model.view_mut(key);
+    view.strip = strip;
+    view.page = ModelPage::Timing;
     view.frames.clear();
     view.cue = None;
     super::preview::restart(&mut view.preview);
-    super::select_strip(editor, key, action, direction);
+    super::select_strip(editor, key, strip);
 }
 
 fn header(ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_space(LABEL_W);
-        for dir in DIRECTIONS {
+        for direction in DirectionName::VARIANTS {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(CELL, 18.0), Sense::hover());
             ui.painter().text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
-                dir,
+                direction.key(),
                 egui::FontId::monospace(12.5),
                 theme::MUTED,
             );
@@ -231,8 +203,8 @@ fn header(ui: &mut Ui) {
 
 fn cell(
     ui: &mut Ui,
-    sheet: &super::SheetInfo,
-    first: Option<&FrameData>,
+    sheet: &super::ModelSheet,
+    first: Option<&StripFrame>,
     selected: bool,
     badged: bool,
 ) -> egui::Response {
@@ -291,47 +263,30 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
             i.key_pressed(egui::Key::Enter),
         )
     });
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    let mut moved = false;
-    if left && view.direction > 0 {
-        view.direction -= 1;
-        moved = true;
-    }
-    if right && view.direction + 1 < DIRECTIONS.len() {
-        view.direction += 1;
-        moved = true;
-    }
-    if up && view.action > 0 {
-        view.action -= 1;
-        moved = true;
-    }
-    if down && view.action + 1 < ACTIONS.len() {
-        view.action += 1;
-        moved = true;
-    }
-    if moved {
+    let view = editor.views.model.view_mut(key);
+    let was = view.strip;
+    let turn = i32::from(right) - i32::from(left);
+    let step = i32::from(down) - i32::from(up);
+    view.strip = ModelStrip {
+        action: shifted(ActionName::VARIANTS, was.action, step as isize),
+        direction: shifted(DirectionName::VARIANTS, was.direction, turn as isize),
+    };
+    if view.strip != was {
         view.frames.clear();
         super::preview::restart(&mut view.preview);
     }
     if enter {
-        let (a, d) = (view.action, view.direction);
-        open_strip(editor, key, a, d);
+        let strip = view.strip;
+        open_strip(editor, key, strip);
     }
 }
 
 pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let (action, direction, selected) = {
-        let view = &editor.views.model.views[key];
-        (view.action, view.direction, view.frames.clone())
-    };
-    let frames = strip_of(row, ACTIONS[action], DIRECTIONS[direction]);
+    let view = editor.views.model.view(key);
+    let (strip, selected) = (view.strip, view.frames.clone());
+    let frames = strip_of(row, strip);
     let total = super::total_ms(&frames).max(1);
     ui.add_space(6.0);
     let visible = (ui.clip_rect().right() - ui.cursor().left()).max(200.0);
@@ -351,11 +306,11 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     ui.horizontal(|ui| {
                         for cue in frame.cues() {
                             let text = match cue {
-                                super::CueKind::Apex => "◆ apex".to_owned(),
-                                super::CueKind::Sound => {
+                                super::FrameCueKind::Apex => "◆ apex".to_owned(),
+                                super::FrameCueKind::Sound => {
                                     format!("♫ {}", frame.sound.clone().unwrap_or_default())
                                 }
-                                super::CueKind::Step => "● step".to_owned(),
+                                super::FrameCueKind::Step => "● step".to_owned(),
                             };
                             widgets::chip_coloured(ui, &text, theme::ACCENT_SOFT, theme::TEXT);
                         }
@@ -382,63 +337,21 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         });
     });
     if let Some(index) = clicked {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.frames = vec![index];
-        super::select_frames(editor, key, action, direction);
+        super::select_frames(editor, key, strip);
     }
 }
 
-pub fn frame_card(
+fn frame_card(
     ui: &mut Ui,
-    sheet: &super::SheetInfo,
-    frame: &FrameData,
+    sheet: &super::ModelSheet,
+    frame: &StripFrame,
     index: usize,
     width: f32,
     selected: bool,
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 100.0), Sense::click());
-    let painter = ui.painter_at(rect);
-    painter.rect(
-        rect,
-        3.0,
-        if selected {
-            theme::ACCENT_SOFT
-        } else {
-            theme::INPUT
-        },
-        egui::Stroke::new(
-            1.0,
-            if selected {
-                theme::ACCENT
-            } else {
-                theme::BORDER
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
-    let art = ERect::from_min_max(
-        rect.min + Vec2::new(2.0, 4.0),
-        rect.right_top() + Vec2::new(-2.0, 58.0),
-    );
-    sheet.draw(&painter, art, frame.frame, Color32::WHITE);
-    painter.text(
-        egui::pos2(rect.center().x, rect.max.y - 26.0),
-        egui::Align2::CENTER_CENTER,
-        format!("{} ms", frame.ms),
-        egui::FontId::monospace(12.0),
-        theme::TEXT,
-    );
-    painter.text(
-        egui::pos2(rect.center().x, rect.max.y - 11.0),
-        egui::Align2::CENTER_CENTER,
-        format!("frame {}", index + 1),
-        egui::FontId::monospace(10.5),
-        theme::MUTED,
-    );
+    super::strip::frame_card(&ui.painter_at(rect), rect, sheet, frame, index, selected);
     response
 }

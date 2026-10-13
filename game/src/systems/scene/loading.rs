@@ -7,7 +7,7 @@ use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy::winit::{UpdateMode, WinitSettings};
 use ui::{Activate, CardOptions, button, card, styled_text, text_colored};
 
-use super::Scene;
+use super::{Scene, despawn_all};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
@@ -16,6 +16,7 @@ use crate::core::content::version;
 use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform, StartParams};
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::time::Seconds;
+use crate::systems::install_content;
 
 #[derive(Resource)]
 pub struct AfterLoading(pub Scene);
@@ -30,10 +31,7 @@ impl Plugin for LoadingPlugin {
                 Update,
                 (poll, show).chain().run_if(in_state(Scene::Loading)),
             )
-            .add_systems(
-                OnExit(Scene::Loading),
-                (crate::systems::scene::despawn_all::<LoadingUi>, forget),
-            );
+            .add_systems(OnExit(Scene::Loading), (despawn_all::<LoadingUi>, forget));
     }
 }
 
@@ -143,7 +141,7 @@ fn poll(world: &mut World) {
         None => world.insert_resource(syncing),
         Some(Ok(synced)) => {
             world.resource_mut::<Shown>().progress = syncing.status.latest();
-            match crate::systems::install_content(world, synced) {
+            match install_content(world, synced) {
                 Ok(()) => {
                     let next = world.resource::<AfterLoading>().0.clone();
                     world.resource_mut::<NextState<Scene>>().set(next);

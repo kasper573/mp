@@ -4,24 +4,27 @@ use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
 use image::RgbaImage;
 use serde_json::Value;
 
-use super::formats::{self, Export, Kind};
-use super::model::{self, Cue, Mapping, Note, Placement, Plan, StripPlan};
-use super::records::{Due, ImportRecord};
+use super::formats::{self, AnimationExport, ExportFormat};
+use super::model::{
+    self, CuePlacement, FrameCue, MappingNote, ModelImportPlan, StripMapping, StripPlan,
+};
+use super::records::{DueReimport, ImportRecord};
 use crate::app::Editor;
-use crate::project::{Edit, Selection, row_file};
-use crate::tabs::Tab;
-use crate::ui::theme;
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::tabs::EditorTab;
 use crate::ui::widgets;
-use crate::views::model::{FrameData, TABLE};
+use crate::ui::{dialogs, theme};
+use crate::views::model::{StripFrame, TABLE};
+use crate::{rows, schema};
 
 const FRAME_CARD: f32 = 48.0;
 
 #[derive(Default)]
-pub struct Textures {
+pub struct TextureCache {
     map: HashMap<String, TextureHandle>,
 }
 
-impl Textures {
+impl TextureCache {
     pub fn of(&mut self, ctx: &Context, hash: &str, image: &RgbaImage) -> TextureHandle {
         self.map
             .entry(hash.to_owned())
@@ -40,26 +43,26 @@ impl Textures {
 pub struct ModelDialog {
     pub key: String,
     pub new_row: bool,
-    pub export: Export,
-    pub mapping: Mapping,
-    pub notes: BTreeMap<String, Note>,
+    pub export: AnimationExport,
+    pub mapping: StripMapping,
+    pub notes: BTreeMap<String, MappingNote>,
     pub asked: BTreeMap<String, String>,
     pub grid: (String, String),
-    pub plan: Plan,
+    pub plan: ModelImportPlan,
     pub selected: Option<String>,
-    pub textures: Textures,
+    pub textures: TextureCache,
     pub record: Option<ImportRecord>,
     pub sheet: Option<RgbaImage>,
     pub error: Option<String>,
 }
 
 pub struct ModelReimport {
-    pub export: Export,
-    pub mapping: Mapping,
-    pub plan: Plan,
+    pub export: AnimationExport,
+    pub mapping: StripMapping,
+    pub plan: ModelImportPlan,
     pub auto: bool,
     pub while_closed: bool,
-    pub textures: Textures,
+    pub textures: TextureCache,
     pub sheet: Option<RgbaImage>,
     pub old_frame: (u32, u32),
 }
@@ -91,8 +94,8 @@ fn asked_ms(asked: &BTreeMap<String, String>) -> BTreeMap<String, u32> {
 pub fn land(
     editor: &mut Editor,
     key: &str,
-    export: Export,
-    again: Option<&Due>,
+    export: AnimationExport,
+    again: Option<&DueReimport>,
 ) -> Option<super::ImportDialog> {
     let row = editor.row_value(TABLE, key);
     let record = editor.imports.record_for(TABLE, key).cloned();
@@ -114,19 +117,19 @@ pub fn land(
             plan,
             auto,
             while_closed: due.while_closed,
-            textures: Textures::default(),
+            textures: TextureCache::default(),
             sheet,
             old_frame: frame_size_of(row),
         };
         if !auto {
-            editor.open_tab(Tab::Model {
+            editor.open_tab(EditorTab::Model {
                 key: key.to_owned(),
             });
-            editor.select(Selection {
-                table: TABLE.to_owned(),
-                keys: vec![key.to_owned()],
-                parts: vec!["/import".to_owned()],
-            });
+            editor.select(RowSelection::parts(
+                TABLE,
+                key,
+                vec![super::IMPORT_PART.to_owned()],
+            ));
             editor.toast(format!(
                 "{} changed{} · {} to decide in model/{key}",
                 record.names(),
@@ -151,7 +154,7 @@ pub fn land(
     ))))
 }
 
-pub fn land_new(editor: &mut Editor, export: Export) -> Option<super::ImportDialog> {
+pub fn land_new(editor: &mut Editor, export: AnimationExport) -> Option<super::ImportDialog> {
     let wanted = export
         .files
         .first()
@@ -160,7 +163,7 @@ pub fn land_new(editor: &mut Editor, export: Export) -> Option<super::ImportDial
     let key = editor
         .project
         .as_ref()
-        .map(|project| crate::rows::free_key(&project.files, TABLE, &wanted))
+        .map(|project| rows::free_key(&project.files, TABLE, &wanted))
         .unwrap_or(wanted);
     Some(super::ImportDialog::Model(Box::new(new_dialog(
         key, true, export, None, None, None,
@@ -170,7 +173,7 @@ pub fn land_new(editor: &mut Editor, export: Export) -> Option<super::ImportDial
 fn new_dialog(
     key: String,
     new_row: bool,
-    export: Export,
+    export: AnimationExport,
     row: Option<Value>,
     sheet: Option<RgbaImage>,
     record: Option<ImportRecord>,
@@ -190,7 +193,7 @@ fn new_dialog(
         .map(|strip| (strip.tag.clone(), formats::DEFAULT_MS.to_string()))
         .collect();
     let grid = match export.kind {
-        Kind::Grid => (String::new(), String::new()),
+        ExportFormat::Grid => (String::new(), String::new()),
         _ => (export.frame.0.to_string(), export.frame.1.to_string()),
     };
     let selected = export.strips.first().map(|strip| strip.tag.clone());
@@ -202,7 +205,7 @@ fn new_dialog(
         notes,
         asked,
         grid,
-        plan: Plan {
+        plan: ModelImportPlan {
             strips: Vec::new(),
             missing: Vec::new(),
             frame: (0, 0),
@@ -212,7 +215,7 @@ fn new_dialog(
             cues_total: 0,
         },
         selected,
-        textures: Textures::default(),
+        textures: TextureCache::default(),
         record,
         sheet,
         error: None,
@@ -232,7 +235,7 @@ fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
     let row = (!dialog.new_row)
         .then(|| editor.row_value(TABLE, &dialog.key))
         .flatten();
-    let choices: BTreeMap<(String, usize, Cue), Placement> = dialog
+    let choices: BTreeMap<(String, usize, FrameCue), CuePlacement> = dialog
         .plan
         .strips
         .iter()
@@ -274,7 +277,7 @@ fn recompute(editor: &Editor, dialog: &mut ModelDialog) {
     }
 }
 
-fn to_decide(plan: &Plan) -> String {
+fn to_decide(plan: &ModelImportPlan) -> String {
     let mut parts = Vec::new();
     match plan.needs_place() {
         0 => {}
@@ -301,7 +304,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     let mut import = false;
     let mut changed = false;
     let width = 1130.0;
-    crate::ui::dialogs::card(ctx, "import-model", width, |ui| {
+    dialogs::card(ctx, "import-model", width, |ui| {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("🗋").size(16.0).color(theme::MUTED));
             ui.label(
@@ -339,8 +342,8 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 },
                 dialog.export.strips.len(),
                 match dialog.export.kind {
-                    Kind::Grid => "rows",
-                    Kind::Sequence => "sequences",
+                    ExportFormat::Grid => "rows",
+                    ExportFormat::Sequence => "sequences",
                     _ => "tags",
                 }
             )));
@@ -362,21 +365,17 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             for (kind, label) in [
-                (Kind::SheetJson, "sheet + JSON"),
-                (Kind::Grid, "grid"),
-                (Kind::Sequence, "sequence"),
-                (Kind::Gif, "GIF · APNG"),
+                (ExportFormat::SheetJson, "sheet + JSON"),
+                (ExportFormat::Grid, "grid"),
+                (ExportFormat::Sequence, "sequence"),
+                (ExportFormat::Gif, "GIF · APNG"),
             ] {
                 let on = dialog.export.kind == kind
-                    || (kind == Kind::Gif && dialog.export.kind == Kind::Apng);
-                let (fill, ink) = match on {
-                    true => (theme::ACCENT, Color32::WHITE),
-                    false => (theme::RAISED, theme::MUTED),
-                };
-                widgets::chip_coloured(ui, label, fill, ink);
+                    || (kind == ExportFormat::Gif && dialog.export.kind == ExportFormat::Apng);
+                widgets::mode_chip(ui, label, on);
             }
             ui.label(theme::faint("picked from the files dropped"));
-            if dialog.export.kind == Kind::Grid {
+            if dialog.export.kind == ExportFormat::Grid {
                 ui.add_space(12.0);
                 ui.label(theme::muted("frame"));
                 let w = ui.add(egui::TextEdit::singleline(&mut dialog.grid.0).desired_width(40.0));
@@ -419,7 +418,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                     .id_salt("import-model-table")
                     .max_height(430.0)
                     .show(ui, |ui| {
-                        changed |= mapping_table(editor, ui, &mut dialog);
+                        changed |= mapping_table(ui, &mut dialog);
                     });
             });
             ui.add_space(10.0);
@@ -438,7 +437,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 .new_row
                 .then(|| {
                     editor.project.as_ref().and_then(|project| {
-                        crate::rows::key_problem(&project.files, TABLE, dialog.key.trim())
+                        rows::key_problem(&project.files, TABLE, dialog.key.trim())
                     })
                 })
                 .flatten();
@@ -481,7 +480,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
     Some(dialog)
 }
 
-fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
+fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
     let mut changed = false;
     let names = model::strip_names();
     let plain: Vec<String> = dialog
@@ -491,7 +490,7 @@ fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool
         .filter(|strip| {
             matches!(
                 dialog.notes.get(&strip.tag),
-                Some(Note::ByName | Note::ByOrder)
+                Some(MappingNote::ByName | MappingNote::ByOrder)
             ) && dialog.mapping.get(&strip.tag).is_some_and(Option::is_some)
                 && !has_issue(&dialog.plan, &dialog.mapping, &strip.tag)
         })
@@ -569,12 +568,12 @@ fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool
                     });
                 if let Some(picked) = picked {
                     dialog.mapping.insert(tag.clone(), picked);
-                    dialog.notes.insert(tag.clone(), Note::Picked);
+                    dialog.notes.insert(tag.clone(), MappingNote::Picked);
                     changed = true;
                 }
                 ui.label(theme::mono(count.to_string()).color(theme::MUTED));
                 ui.vertical(|ui| {
-                    changed |= note_cell(editor, ui, dialog, tag);
+                    changed |= note_cell(ui, dialog, tag);
                 });
                 ui.end_row();
             }
@@ -601,7 +600,7 @@ fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool
                         });
                     if let Some(tag) = picked {
                         dialog.mapping.insert(tag.clone(), Some(name.clone()));
-                        dialog.notes.insert(tag, Note::Picked);
+                        dialog.notes.insert(tag, MappingNote::Picked);
                         changed = true;
                     }
                 });
@@ -611,7 +610,7 @@ fn mapping_table(editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog) -> bool
     changed
 }
 
-fn has_issue(plan: &Plan, mapping: &Mapping, tag: &str) -> bool {
+fn has_issue(plan: &ModelImportPlan, mapping: &StripMapping, tag: &str) -> bool {
     let Some(Some(target)) = mapping.get(tag) else {
         return false;
     };
@@ -621,14 +620,14 @@ fn has_issue(plan: &Plan, mapping: &Mapping, tag: &str) -> bool {
         .is_some_and(|strip| strip.needs_place() > 0 || strip.retimed.is_some())
 }
 
-fn note_cell(_editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
+fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
     let mut changed = false;
     let target = dialog.mapping.get(tag).cloned().flatten();
     let Some(target) = target else {
         let note = dialog
             .notes
             .get(tag)
-            .map(Note::text)
+            .map(MappingNote::text)
             .unwrap_or_else(|| "skipped".to_owned());
         ui.label(theme::faint(note));
         return false;
@@ -680,11 +679,11 @@ fn note_cell(_editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog, tag: &str)
                             .selectable_label(false, format!("frame {}", frame + 1))
                             .clicked()
                         {
-                            picked = Some(Placement::Frame(frame));
+                            picked = Some(CuePlacement::Frame(frame));
                         }
                     }
                     if ui.selectable_label(false, "remove the cue").clicked() {
-                        picked = Some(Placement::Remove);
+                        picked = Some(CuePlacement::Remove);
                     }
                 });
             if let Some(picked) = picked {
@@ -729,7 +728,11 @@ fn note_cell(_editor: &Editor, ui: &mut Ui, dialog: &mut ModelDialog, tag: &str)
         });
     }
     if !any && !mapped_twice {
-        let note = dialog.notes.get(tag).map(Note::text).unwrap_or_default();
+        let note = dialog
+            .notes
+            .get(tag)
+            .map(MappingNote::text)
+            .unwrap_or_default();
         ui.horizontal(|ui| {
             ui.label(theme::ok("✓"));
             ui.label(theme::muted(note));
@@ -935,14 +938,14 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
     let row = match dialog.new_row {
         true => {
             let project = editor.project.as_ref().ok_or("no folder is open")?;
-            if let Some(problem) = crate::rows::key_problem(&project.files, TABLE, &key) {
+            if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
                 return Err(problem);
             }
             let shape = editor
                 .shapes
                 .table(TABLE)
                 .ok_or("the model table has no shape")?;
-            Some(crate::schema::template(&shape.shape, &shape.shape))
+            Some(schema::template(&shape.shape, &shape.shape))
         }
         false => editor.row_value(TABLE, &key),
     };
@@ -954,27 +957,25 @@ fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String>
     };
     let record = model::record(&dialog.export, &key, &dialog.mapping, built.lengths.clone());
     write(editor, &key, built, label, record)?;
-    editor.select(Selection::row(TABLE, &key));
-    editor.open_tab(Tab::Model { key });
+    editor.select(RowSelection::row(TABLE, &key));
+    editor.open_tab(EditorTab::Model { key });
     Ok(())
 }
 
 fn write(
     editor: &mut Editor,
     key: &str,
-    built: model::Built,
+    built: model::BuiltModel,
     label: String,
     record: ImportRecord,
 ) -> Result<(), String> {
-    let mut edit = Edit::new(label);
+    let mut edit = ContentEdit::new(label);
     edit.write(
         format!("assets/{}", built.image),
         std::sync::Arc::from(built.png),
     );
     edit.write_json(row_file(TABLE, key), &built.row);
-    if !editor.apply(edit) {
-        return Err("the folder refused the import; see the output".to_owned());
-    }
+    editor.try_apply(edit)?;
     editor.imports.remember(record);
     editor.views.model.reimports.remove(key);
     Ok(())
@@ -1086,7 +1087,7 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 struct Frames<'a> {
-    export: &'a Export,
+    export: &'a AnimationExport,
     sheet: &'a Option<RgbaImage>,
     old_frame: (u32, u32),
     frame: (u32, u32),
@@ -1095,7 +1096,7 @@ struct Frames<'a> {
 fn strip_section(
     ctx: &Context,
     ui: &mut Ui,
-    textures: &mut Textures,
+    textures: &mut TextureCache,
     frames: &Frames,
     strip: &StripPlan,
 ) {
@@ -1200,19 +1201,13 @@ fn strip_section(
             draw_fit(&painter, card.shrink(2.0), &texture, frame);
         }
         if waiting {
-            let dashes = egui::Shape::dashed_line(
-                &[
-                    card.left_top(),
-                    card.right_top(),
-                    card.right_bottom(),
-                    card.left_bottom(),
-                    card.left_top(),
-                ],
+            widgets::dashed_rect(
+                &painter,
+                card,
                 egui::Stroke::new(1.5, theme::DANGER),
                 4.0,
                 3.0,
             );
-            painter.extend(dashes);
         }
         let cues = cue_labels(frame_data);
         let text = match (cues.is_empty(), waiting) {
@@ -1271,7 +1266,7 @@ fn frame_image(sheet: &RgbaImage, frame: (u32, u32), index: u32) -> Option<RgbaI
     Some(image::imageops::crop_imm(sheet, x, y, fw, fh).to_image())
 }
 
-fn cue_labels(frame: &FrameData) -> String {
+fn cue_labels(frame: &StripFrame) -> String {
     let mut labels = Vec::new();
     if frame.apex {
         labels.push("apex".to_owned());
@@ -1304,7 +1299,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         let count = strip.after_count();
         widgets::card_frame(strip.needs_place() > 0).show(ui, |ui| {
             ui.vertical(|ui| {
-                widgets::card_header(ui, "model", &model::pretty(&strip.name), "", |_| {});
+                widgets::card_title(ui, "model", &model::pretty(&strip.name));
                 let mut followed: Vec<String> = Vec::new();
                 for cue in &strip.cues {
                     if let Some(to) = cue.to
@@ -1350,8 +1345,8 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         ui.label(theme::muted("put it on"));
                         let offered = cue.offered(count);
                         let shown = match cue.choice {
-                            Some(Placement::Frame(frame)) => format!("frame {}", frame + 1),
-                            Some(Placement::Remove) => "remove the cue".to_owned(),
+                            Some(CuePlacement::Frame(frame)) => format!("frame {}", frame + 1),
+                            Some(CuePlacement::Remove) => "remove the cue".to_owned(),
                             None => format!("frame {}", offered + 1),
                         };
                         let mut picked = None;
@@ -1371,22 +1366,22 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             for frame in 0..count {
                                 if ui
                                     .selectable_label(
-                                        cue.choice == Some(Placement::Frame(frame)),
+                                        cue.choice == Some(CuePlacement::Frame(frame)),
                                         format!("frame {}", frame + 1),
                                     )
                                     .clicked()
                                 {
-                                    picked = Some(Placement::Frame(frame));
+                                    picked = Some(CuePlacement::Frame(frame));
                                 }
                             }
                             if ui
                                 .selectable_label(
-                                    cue.choice == Some(Placement::Remove),
+                                    cue.choice == Some(CuePlacement::Remove),
                                     "remove the cue",
                                 )
                                 .clicked()
                             {
-                                picked = Some(Placement::Remove);
+                                picked = Some(CuePlacement::Remove);
                             }
                         });
                         if let Some(picked) = picked {
@@ -1444,7 +1439,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                     ui.label(theme::muted(format!(
                         "Frame{} {} {} retimed here since the last import.",
                         widgets::plural(differing.len()),
-                        join_and(&differing),
+                        widgets::join_and(&differing),
                         if differing.len() == 1 { "was" } else { "were" }
                     )));
                 });
@@ -1514,17 +1509,5 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
         editor.toast(format!(
             "Kept the old frames of {key}; the export is remembered as it is now"
         ));
-    }
-}
-
-fn join_and(items: &[String]) -> String {
-    match items.len() {
-        0 => String::new(),
-        1 => items[0].clone(),
-        _ => format!(
-            "{} and {}",
-            items[..items.len() - 1].join(", "),
-            items[items.len() - 1]
-        ),
     }
 }

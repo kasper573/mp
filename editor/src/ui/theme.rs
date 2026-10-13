@@ -1,3 +1,4 @@
+use egui::epaint::Shadow;
 use egui::{
     Color32, Context, FontData, FontDefinitions, FontFamily, FontId, RichText, Stroke, TextStyle,
 };
@@ -20,6 +21,15 @@ pub const VARIABLE_FILL: Color32 = Color32::from_rgba_premultiplied(21, 16, 27, 
 pub const OK: Color32 = Color32::from_rgb(86, 196, 124);
 pub const SELECTION: Color32 = Color32::from_rgb(120, 170, 250);
 pub const CANVAS: Color32 = Color32::from_rgb(20, 20, 24);
+pub const BLOCKED: Color32 = Color32::from_rgb(220, 60, 60);
+pub const SORT_LINE: Color32 = Color32::from_rgb(120, 170, 255);
+pub const OVERLAY: Color32 = Color32::from_rgba_premultiplied(13, 13, 17, 235);
+pub const SHADOW: Shadow = Shadow {
+    offset: [0, 6],
+    blur: 18,
+    spread: 0,
+    color: Color32::from_black_alpha(140),
+};
 
 pub fn apply(ctx: &Context) {
     let mut fonts = FontDefinitions::default();
@@ -57,7 +67,7 @@ pub fn apply(ctx: &Context) {
         .or_default()
         .push("symbols".to_owned());
     fonts.families.insert(
-        FontFamily::Name("medium".into()),
+        medium(),
         vec![
             "circular-medium".to_owned(),
             "circular".to_owned(),
@@ -76,16 +86,16 @@ pub fn apply(ctx: &Context) {
     style
         .text_styles
         .insert(TextStyle::Small, FontId::proportional(11.5));
-    style.text_styles.insert(
-        TextStyle::Heading,
-        FontId::new(17.0, FontFamily::Name("medium".into())),
-    );
+    style
+        .text_styles
+        .insert(TextStyle::Heading, FontId::new(17.0, medium()));
     style
         .text_styles
         .insert(TextStyle::Monospace, FontId::monospace(13.0));
     style.spacing.item_spacing = egui::vec2(6.0, 5.0);
     style.spacing.button_padding = egui::vec2(8.0, 4.0);
     style.spacing.interact_size.y = 22.0;
+    style.interaction.selectable_labels = false;
     let visuals = &mut style.visuals;
     visuals.dark_mode = true;
     visuals.override_text_color = Some(TEXT);
@@ -151,10 +161,16 @@ pub fn mono(text: impl Into<String>) -> RichText {
     RichText::new(text).monospace()
 }
 
+pub fn alpha(color: Color32, alpha: u8) -> Color32 {
+    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
+}
+
+pub fn medium() -> FontFamily {
+    FontFamily::Name("medium".into())
+}
+
 pub fn strong(text: impl Into<String>) -> RichText {
-    RichText::new(text)
-        .family(FontFamily::Name("medium".into()))
-        .color(TEXT)
+    RichText::new(text).family(medium()).color(TEXT)
 }
 
 pub fn badge_colour(kind: &str) -> Color32 {
@@ -197,3 +213,14 @@ pub fn badge_letter(kind: &str) -> String {
             .unwrap_or_default(),
     }
 }
+
+pub const TERRAIN: [Color32; 8] = [
+    Color32::from_rgb(230, 160, 70),
+    Color32::from_rgb(150, 110, 90),
+    Color32::from_rgb(240, 240, 220),
+    Color32::from_rgb(190, 200, 210),
+    Color32::from_rgb(110, 180, 110),
+    Color32::from_rgb(90, 150, 230),
+    Color32::from_rgb(200, 110, 200),
+    Color32::from_rgb(230, 90, 90),
+];

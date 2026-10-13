@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use ui::{Activate, button, text_colored};
 
-use super::Scene;
 use super::loading::AfterLoading;
+use super::{Scene, despawn_all};
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -17,10 +17,7 @@ impl Plugin for ModePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Mode>()
             .add_systems(OnEnter(Scene::Mode), choose_mode)
-            .add_systems(
-                OnExit(Scene::Mode),
-                crate::systems::scene::despawn_all::<ModeUi>,
-            );
+            .add_systems(OnExit(Scene::Mode), despawn_all::<ModeUi>);
     }
 }
 

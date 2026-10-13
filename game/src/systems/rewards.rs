@@ -6,14 +6,14 @@ use crate::core::content::Content;
 use crate::core::math::Rng;
 use crate::core::time::Seconds;
 use crate::systems::combat::Died;
-use crate::systems::item::{Reservation, ReservedBy, scatter_drop};
-use crate::systems::npc::Npc;
+use crate::systems::item::{Id as ItemId, Reservation, ReservedBy, scatter_drop};
+use crate::systems::npc::{Id as NpcId, Npc};
 use crate::systems::player::Players;
 use crate::systems::visibility::Presence;
 
 #[derive(Message, Clone, Copy, Debug, PartialEq)]
 pub struct KillCredited {
-    pub npc: crate::systems::npc::Id,
+    pub npc: NpcId,
     pub victim: Entity,
     pub credited: Entity,
 }
@@ -51,7 +51,7 @@ pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
             if let Some(entity) = rewardee {
                 crate::systems::job::grant_xp(world, entity, loot.xp);
             }
-            let drops: Vec<(crate::systems::item::Id, u32)> = loot
+            let drops: Vec<(ItemId, u32)> = loot
                 .items
                 .iter()
                 .filter(|drop| {

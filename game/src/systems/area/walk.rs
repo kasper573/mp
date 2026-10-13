@@ -1,11 +1,10 @@
+use super::grid::AreaGrids;
+use super::tileset::{TilesetDef, Walk};
+use super::{AreaModule, Scenery};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridDims, GridSize, TilePos, TileRect, Tiles};
-
-use super::grid::AreaGrids;
-use super::tileset::{TilesetDef, Walk};
-use super::{AreaModule, Scenery};
 
 pub const OBSCURING_CUTOFF: f32 = 0.4;
 

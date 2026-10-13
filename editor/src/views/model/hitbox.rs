@@ -1,10 +1,11 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use serde_json::Value;
 
-use super::{ACTIONS, DIRECTIONS, strip_of};
+use super::{ModelStrip, strip_of};
 use crate::app::Editor;
-use crate::project::Selection;
-use crate::ui::theme;
+use crate::forms;
+use crate::project::{ContentEdit, RowSelection};
+use crate::ui::{theme, widgets};
 use crate::views::area::TILE_PX;
 
 const ZOOM: f32 = 4.0;
@@ -13,7 +14,7 @@ const MIN: f32 = 0.1;
 const MAX: f32 = 8.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Handle {
+pub enum HitboxHandle {
     N,
     S,
     E,
@@ -24,36 +25,36 @@ pub enum Handle {
     Sw,
 }
 
-impl Handle {
-    const ALL: [Handle; 8] = [
-        Handle::N,
-        Handle::S,
-        Handle::E,
-        Handle::W,
-        Handle::Ne,
-        Handle::Nw,
-        Handle::Se,
-        Handle::Sw,
+impl HitboxHandle {
+    const ALL: [HitboxHandle; 8] = [
+        HitboxHandle::N,
+        HitboxHandle::S,
+        HitboxHandle::E,
+        HitboxHandle::W,
+        HitboxHandle::Ne,
+        HitboxHandle::Nw,
+        HitboxHandle::Se,
+        HitboxHandle::Sw,
     ];
 
     fn horizontal(self) -> bool {
-        !matches!(self, Handle::N | Handle::S)
+        !matches!(self, HitboxHandle::N | HitboxHandle::S)
     }
 
     fn vertical(self) -> bool {
-        !matches!(self, Handle::E | Handle::W)
+        !matches!(self, HitboxHandle::E | HitboxHandle::W)
     }
 
     fn at(self, rect: ERect) -> egui::Pos2 {
         match self {
-            Handle::N => rect.center_top(),
-            Handle::S => rect.center_bottom(),
-            Handle::E => rect.right_center(),
-            Handle::W => rect.left_center(),
-            Handle::Ne => rect.right_top(),
-            Handle::Nw => rect.left_top(),
-            Handle::Se => rect.right_bottom(),
-            Handle::Sw => rect.left_bottom(),
+            HitboxHandle::N => rect.center_top(),
+            HitboxHandle::S => rect.center_bottom(),
+            HitboxHandle::E => rect.right_center(),
+            HitboxHandle::W => rect.left_center(),
+            HitboxHandle::Ne => rect.right_top(),
+            HitboxHandle::Nw => rect.left_top(),
+            HitboxHandle::Se => rect.right_bottom(),
+            HitboxHandle::Sw => rect.left_bottom(),
         }
     }
 }
@@ -79,19 +80,13 @@ pub fn airborne(row: &Value) -> bool {
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    if editor.selection.table != super::TABLE
-        || editor.selection.keys != [key.to_owned()]
-        || editor.selection.parts != ["/hitbox".to_owned()]
-    {
-        editor.select(Selection {
-            table: super::TABLE.to_owned(),
-            keys: vec![key.to_owned()],
-            parts: vec!["/hitbox".to_owned()],
-        });
+    let hitbox = RowSelection::parts(super::TABLE, key, vec!["/hitbox".to_owned()]);
+    if editor.selection != hitbox {
+        editor.select(hitbox);
     }
     let width = row["hitbox"]["width"].as_f64().unwrap_or(1.0) as f32;
     let height = row["hitbox"]["height"].as_f64().unwrap_or(1.0) as f32;
-    let frame = strip_of(row, ACTIONS[0], DIRECTIONS[0])
+    let frame = strip_of(row, ModelStrip::default())
         .first()
         .map(|frame| frame.frame);
     let tile = TILE_PX * ZOOM;
@@ -107,39 +102,19 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 rect.center().x.round(),
                 (rect.center().y + canvas_h * 0.15).round(),
             );
-            let mut x = feet.x - ((feet.x - rect.min.x) / tile).ceil() * tile;
-            while x <= rect.max.x {
-                painter.line_segment(
-                    [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-                    egui::Stroke::new(1.0, theme::BORDER),
-                );
-                x += tile;
-            }
-            let mut y = feet.y - ((feet.y - rect.min.y) / tile).ceil() * tile;
-            while y <= rect.max.y {
-                painter.line_segment(
-                    [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-                    egui::Stroke::new(1.0, theme::BORDER),
-                );
-                y += tile;
-            }
+            draw_grid(&painter, rect, feet, tile);
             let shown = Vec2::new(
                 sheet.frame_width as f32 * ZOOM * scale_of(row),
                 sheet.frame_height as f32 * ZOOM * scale_of(row),
             );
             let sprite = super::preview::sprite_rect(feet, shown);
-            painter.extend(egui::Shape::dashed_line(
-                &[
-                    sprite.left_top(),
-                    sprite.right_top(),
-                    sprite.right_bottom(),
-                    sprite.left_bottom(),
-                    sprite.left_top(),
-                ],
+            widgets::dashed_rect(
+                &painter,
+                sprite,
                 egui::Stroke::new(1.0, theme::MUTED),
                 4.0,
                 4.0,
-            ));
+            );
             if let Some(frame) = frame
                 && let Some(thumb) = &sheet.thumb
             {
@@ -161,7 +136,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             );
             let hover = response.hover_pos();
             let mut hovered_handle = None;
-            for handle in Handle::ALL {
+            for handle in HitboxHandle::ALL {
                 let at = handle.at(hitbox);
                 let near = hover.is_some_and(|pos| (pos - at).length() <= 8.0);
                 if near {
@@ -175,33 +150,19 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     egui::StrokeKind::Inside,
                 );
             }
-            if hovered_handle.is_some() || editor.views.model.views[key].hitbox_drag.is_some() {
+            if hovered_handle.is_some() || editor.views.model.view(key).hitbox_drag.is_some() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
             }
-            let (pressed, down, released, pointer, shift) = ui.input(|i| {
-                (
-                    i.pointer.primary_pressed(),
-                    i.pointer.primary_down(),
-                    i.pointer.primary_released(),
-                    i.pointer.latest_pos(),
-                    i.modifiers.shift,
-                )
-            });
-            if pressed
-                && response.hovered()
+            let shift = ui.input(|i| i.modifiers.shift);
+            if response.drag_started()
                 && let Some(handle) = hovered_handle
             {
-                let view = editor
-                    .views
-                    .model
-                    .views
-                    .get_mut(key)
-                    .expect("the view exists");
+                let view = editor.views.model.view_mut(key);
                 view.hitbox_drag = Some(handle);
             }
-            if down
-                && let Some(handle) = editor.views.model.views[key].hitbox_drag
-                && let Some(pos) = pointer
+            if response.dragged()
+                && let Some(handle) = editor.views.model.view(key).hitbox_drag
+                && let Some(pos) = response.interact_pointer_pos()
             {
                 let mut new_width = width;
                 let mut new_height = height;
@@ -210,7 +171,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 }
                 if handle.vertical() {
                     new_height = match handle {
-                        Handle::S | Handle::Se | Handle::Sw => height,
+                        HitboxHandle::S | HitboxHandle::Se | HitboxHandle::Sw => height,
                         _ => ((feet.y + tile / 2.0 - pos.y) / tile).clamp(MIN, MAX),
                     };
                 }
@@ -225,18 +186,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                         editor,
                         key,
                         &changed,
-                        format!("Resize hitbox of {key}"),
-                        true,
+                        ContentEdit::new(format!("Resize hitbox of {key}")).merging(),
                     );
                 }
             }
-            if released {
-                let view = editor
-                    .views
-                    .model
-                    .views
-                    .get_mut(key)
-                    .expect("the view exists");
+            if response.drag_stopped() {
+                let view = editor.views.model.view_mut(key);
                 view.hitbox_drag = None;
             }
             painter.text(
@@ -246,8 +201,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     "frame {} × {} px · hitbox {} × {} tiles",
                     sheet.frame_width,
                     sheet.frame_height,
-                    crate::forms::trim_number(width as f64),
-                    crate::forms::trim_number(height as f64)
+                    forms::trim_number(width as f64),
+                    forms::trim_number(height as f64)
                 ),
                 egui::FontId::monospace(12.0),
                 theme::MUTED,
@@ -270,27 +225,23 @@ fn inset(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    sheet: &super::SheetInfo,
+    sheet: &super::ModelSheet,
     row: &Value,
     frame: Option<u32>,
 ) {
-    let Some((_, _, title)) = super::preview::spawn_ground(editor) else {
+    let Some(ground) = super::preview::spawn_ground(editor) else {
         return;
     };
     ui.label(
-        theme::mono(format!("In {title}"))
+        theme::mono(format!("In {}", ground.name))
             .color(theme::CODE)
             .size(13.0),
     );
     let zoom = 2.0;
     let (rect, _) = ui.allocate_exact_size(INSET, Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, 4.0, Color32::from_rgb(78, 128, 52));
-    let feet =
-        super::preview::spawn_backdrop(editor, &painter, rect, format!("model-inset:{key}"), zoom)
-            .unwrap_or(rect.center() + Vec2::new(0.0, TILE_PX * zoom / 2.0));
-    let flies = airborne(row);
-    if flies {
+    let feet = super::preview::backdrop(editor, &painter, rect, format!("model-inset:{key}"), zoom);
+    if airborne(row) {
         let from = rect.left_bottom() + Vec2::new(20.0, -20.0);
         let to = rect.right_top() + Vec2::new(-20.0, 20.0);
         let mut points = Vec::new();
@@ -307,16 +258,7 @@ fn inset(
             6.0,
         ));
     }
-    let shown = Vec2::new(
-        sheet.frame_width as f32 * zoom * scale_of(row),
-        sheet.frame_height as f32 * zoom * scale_of(row),
-    );
-    if let Some(frame) = frame
-        && let Some(thumb) = &sheet.thumb
-    {
-        let sprite = super::preview::sprite_rect(feet, shown);
-        painter.image(thumb.texture.id(), sprite, sheet.uv(frame), Color32::WHITE);
-    }
+    super::preview::draw_sprite(&painter, sheet, row, frame, feet, zoom);
     painter.rect_stroke(
         rect,
         4.0,
@@ -324,6 +266,26 @@ fn inset(
         egui::StrokeKind::Outside,
     );
     ui.add_space(4.0);
+}
+
+fn draw_grid(painter: &egui::Painter, rect: ERect, feet: egui::Pos2, tile: f32) {
+    let stroke = egui::Stroke::new(1.0, theme::BORDER);
+    let mut x = feet.x - ((feet.x - rect.min.x) / tile).ceil() * tile;
+    while x <= rect.max.x {
+        painter.line_segment(
+            [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
+            stroke,
+        );
+        x += tile;
+    }
+    let mut y = feet.y - ((feet.y - rect.min.y) / tile).ceil() * tile;
+    while y <= rect.max.y {
+        painter.line_segment(
+            [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
+            stroke,
+        );
+        y += tile;
+    }
 }
 
 fn round(value: f32) -> Value {

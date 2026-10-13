@@ -5,28 +5,33 @@ pub mod records;
 pub mod tileset;
 mod tileset_ui;
 
-use std::path::PathBuf;
-use std::sync::Mutex;
-use std::sync::mpsc::{Receiver, channel};
-
-use egui::Context;
-
 pub use model_ui::{
     ModelReimport, inspect_reimport as inspect_model_reimport, show_reimport as show_model_reimport,
 };
-pub use records::{ImportRecord, Imports, recorded_lengths};
+pub use records::{ImportRecord, ImportRecords, recorded_lengths};
 pub use tileset_ui::{
     TilesetReimport, inspect_reimport as inspect_tileset_reimport,
     show_reimport as show_tileset_reimport,
 };
 
-use crate::app::{Dialog, Editor};
-use crate::tabs::Tab;
-use crate::ui::theme;
-use formats::{Dropped, Export};
+use std::collections::VecDeque;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::channel;
+
+use egui::Context;
+
+use crate::app::{ChannelInbox, Editor, ModalDialog};
+use crate::project::ContentEdit;
+use crate::tabs::EditorTab;
+use crate::ui::{active_tab, dialogs, theme};
+use crate::views::model::{ModelPage, ModelStrip};
+use crate::views::model::{strip_of, write_strip};
+use formats::{AnimationExport, DroppedFiles};
+
+pub const IMPORT_PART: &str = "/import";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Target {
+pub enum ImportTarget {
     Model(String),
     NewModel,
     Tileset(String),
@@ -34,12 +39,12 @@ pub enum Target {
     Animation(String),
 }
 
-pub struct Reading {
+pub struct ImportReading {
     pub id: u64,
-    pub target: Target,
-    pub dropped: Dropped,
-    pub again: Option<records::Due>,
-    receiver: Mutex<Receiver<Result<Export, String>>>,
+    pub target: ImportTarget,
+    pub dropped: DroppedFiles,
+    pub again: Option<records::DueReimport>,
+    receiver: ChannelInbox<Result<AnimationExport, String>>,
 }
 
 pub enum ImportDialog {
@@ -49,14 +54,14 @@ pub enum ImportDialog {
     Animation(Box<tileset_ui::AnimationDialog>),
 }
 
-fn is_reading(dialog: &Dialog, id: u64) -> bool {
-    matches!(dialog, Dialog::Import(import) if matches!(**import, ImportDialog::Reading(seen) if seen == id))
+fn is_reading(dialog: &ModalDialog, id: u64) -> bool {
+    matches!(dialog, ModalDialog::Import(import) if matches!(**import, ImportDialog::Reading(seen) if seen == id))
 }
 
 #[derive(Default)]
-pub struct Jobs {
-    pub reading: Vec<Reading>,
-    pub script: std::collections::VecDeque<String>,
+pub struct ImportJobs {
+    pub reading: Vec<ImportReading>,
+    pub script: VecDeque<String>,
     next_id: u64,
 }
 
@@ -66,7 +71,7 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, dialog: ImportDialog) -> Optio
             let job = editor.jobs.reading.iter().find(|job| job.id == id)?;
             let name = formats::names(&files_of(&job.dropped));
             let mut cancel = false;
-            crate::ui::dialogs::card(ctx, "import-reading", 360.0, |ui| {
+            dialogs::card(ctx, "import-reading", 360.0, |ui| {
                 ui.label(theme::strong(format!("Reading {name}…")));
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
@@ -103,12 +108,7 @@ pub fn poll(editor: &mut Editor) {
     }
     let mut done = Vec::new();
     for (index, job) in editor.jobs.reading.iter().enumerate() {
-        let received = job
-            .receiver
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .try_recv();
-        if let Ok(result) = received {
+        if let Ok(result) = job.receiver.try_recv() {
             done.push((index, result));
         }
     }
@@ -140,12 +140,12 @@ pub fn tick(editor: &mut Editor, ctx: &Context) {
     });
     if !dropped.is_empty() {
         let busts = match active_tab(editor) {
-            Some(Tab::Model { key }) => editor
+            Some(EditorTab::Model { key }) => editor
                 .views
                 .model
                 .views
                 .get(&key)
-                .is_some_and(|view| view.page == crate::views::model::Page::Busts),
+                .is_some_and(|view| view.page == ModelPage::Busts),
             _ => false,
         };
         if busts {
@@ -189,14 +189,16 @@ fn scripted(editor: &mut Editor) {
             let Some(index) = editor
                 .dialogs
                 .iter()
-                .position(|dialog| matches!(dialog, Dialog::Import(_)))
+                .position(|dialog| matches!(dialog, ModalDialog::Import(_)))
             else {
                 match active_tab(editor) {
-                    Some(Tab::Model { key }) if editor.views.model.reimports.contains_key(&key) => {
+                    Some(EditorTab::Model { key })
+                        if editor.views.model.reimports.contains_key(&key) =>
+                    {
                         editor.jobs.script.pop_front();
                         model_ui::apply_reimport(editor, &key, false);
                     }
-                    Some(Tab::Tileset { key })
+                    Some(EditorTab::Tileset { key })
                         if editor.views.tileset.reimports.contains_key(&key) =>
                     {
                         editor.jobs.script.pop_front();
@@ -206,7 +208,7 @@ fn scripted(editor: &mut Editor) {
                 }
                 return;
             };
-            let Dialog::Import(dialog) = editor.dialogs.remove(index) else {
+            let ModalDialog::Import(dialog) = editor.dialogs.remove(index) else {
                 return;
             };
             editor.jobs.script.pop_front();
@@ -221,7 +223,9 @@ fn scripted(editor: &mut Editor) {
                 other => Some(other),
             };
             if let Some(kept) = kept {
-                editor.dialogs.insert(index, Dialog::Import(Box::new(kept)));
+                editor
+                    .dialogs
+                    .insert(index, ModalDialog::Import(Box::new(kept)));
             }
         }
         "retime" => {
@@ -238,25 +242,21 @@ fn scripted(editor: &mut Editor) {
             ) else {
                 return;
             };
-            let Some(Tab::Model { key }) = active_tab(editor) else {
+            let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
             let Some(row) = editor.row_value("model", &key) else {
                 return;
             };
-            let mut frames = crate::views::model::strip_of(&row, action, direction);
+            let Some(strip) = ModelStrip::parse(action, direction) else {
+                return;
+            };
+            let mut frames = strip_of(&row, strip);
             if let Some(target) = frames.get_mut(frame.saturating_sub(1)) {
                 target.ms = ms;
             }
-            crate::views::model::write_strip(
-                editor,
-                &key,
-                action,
-                direction,
-                &frames,
-                format!("Retime {action} · {direction} of {key}"),
-                false,
-            );
+            let label = format!("Retime {} of {key}", strip.name());
+            write_strip(editor, &key, strip, &frames, ContentEdit::new(label));
         }
         _ => {
             editor.jobs.script.pop_front();
@@ -277,42 +277,42 @@ pub fn dropped(editor: &mut Editor, files: Vec<PathBuf>) {
         }
     };
     let target = match active_tab(editor) {
-        Some(Tab::Model { key }) => Target::Model(key),
-        Some(Tab::Tileset { key }) => match dropped {
-            Dropped::Png(_) => Target::Tileset(key),
-            _ => Target::Animation(key),
+        Some(EditorTab::Model { key }) => ImportTarget::Model(key),
+        Some(EditorTab::Tileset { key }) => match dropped {
+            DroppedFiles::Png(_) => ImportTarget::Tileset(key),
+            _ => ImportTarget::Animation(key),
         },
         _ => match dropped {
-            Dropped::Png(_) => Target::NewTileset,
-            _ => Target::NewModel,
+            DroppedFiles::Png(_) => ImportTarget::NewTileset,
+            _ => ImportTarget::NewModel,
         },
     };
     begin(editor, target, dropped, None);
 }
 
 pub fn start_for_model(editor: &mut Editor, key: &str) {
-    pick_files(editor, Target::Model(key.to_owned()));
+    pick_files(editor, ImportTarget::Model(key.to_owned()));
 }
 
 pub fn start_for_tileset(editor: &mut Editor, key: &str) {
-    pick_files(editor, Target::Tileset(key.to_owned()));
+    pick_files(editor, ImportTarget::Tileset(key.to_owned()));
 }
 
 pub fn start_animation(editor: &mut Editor, key: &str) {
-    pick_files(editor, Target::Animation(key.to_owned()));
+    pick_files(editor, ImportTarget::Animation(key.to_owned()));
 }
 
 pub fn start_new_tileset(editor: &mut Editor) {
-    pick_files(editor, Target::NewTileset);
+    pick_files(editor, ImportTarget::NewTileset);
 }
 
-fn pick_files(editor: &mut Editor, target: Target) {
+fn pick_files(editor: &mut Editor, target: ImportTarget) {
     let title = match &target {
-        Target::Model(key) => format!("Import onto model/{key}"),
-        Target::NewModel => "Import a model".to_owned(),
-        Target::Tileset(key) => format!("Import onto tileset/{key}"),
-        Target::NewTileset => "Import a tileset".to_owned(),
-        Target::Animation(key) => format!("Import an animation onto tileset/{key}"),
+        ImportTarget::Model(key) => format!("Import onto model/{key}"),
+        ImportTarget::NewModel => "Import a model".to_owned(),
+        ImportTarget::Tileset(key) => format!("Import onto tileset/{key}"),
+        ImportTarget::NewTileset => "Import a tileset".to_owned(),
+        ImportTarget::Animation(key) => format!("Import an animation onto tileset/{key}"),
     };
     let mut picker = rfd::FileDialog::new()
         .set_title(&title)
@@ -335,7 +335,7 @@ pub fn art_dir(editor: &Editor) -> Option<PathBuf> {
     art.is_dir().then_some(art)
 }
 
-pub fn show_path(editor: &Editor, file: &std::path::Path) -> String {
+pub fn show_path(editor: &Editor, file: &Path) -> String {
     editor
         .project
         .as_ref()
@@ -345,7 +345,12 @@ pub fn show_path(editor: &Editor, file: &std::path::Path) -> String {
         .unwrap_or_else(|| formats::name(file))
 }
 
-fn begin(editor: &mut Editor, target: Target, dropped: Dropped, again: Option<records::Due>) {
+fn begin(
+    editor: &mut Editor,
+    target: ImportTarget,
+    dropped: DroppedFiles,
+    again: Option<records::DueReimport>,
+) {
     let (sender, receiver) = channel();
     let job_dropped = dropped.clone();
     std::thread::spawn(move || {
@@ -354,21 +359,21 @@ fn begin(editor: &mut Editor, target: Target, dropped: Dropped, again: Option<re
     editor.jobs.next_id += 1;
     let id = editor.jobs.next_id;
     let shown = again.is_none();
-    editor.jobs.reading.push(Reading {
+    editor.jobs.reading.push(ImportReading {
         id,
         target,
         dropped,
         again,
-        receiver: Mutex::new(receiver),
+        receiver: ChannelInbox::new(receiver),
     });
     if shown {
         editor
             .dialogs
-            .push(Dialog::Import(Box::new(ImportDialog::Reading(id))));
+            .push(ModalDialog::Import(Box::new(ImportDialog::Reading(id))));
     }
 }
 
-fn start_again(editor: &mut Editor, due: records::Due) {
+fn start_again(editor: &mut Editor, due: records::DueReimport) {
     let Some(record) = editor
         .imports
         .record_with(&due.table, &due.key, &due.part)
@@ -386,9 +391,9 @@ fn start_again(editor: &mut Editor, due: records::Due) {
     };
     let animation = !due.part.is_empty();
     let target = match (due.table.as_str(), animation) {
-        ("model", _) => Target::Model(due.key.clone()),
-        ("tileset", true) => Target::Animation(due.key.clone()),
-        ("tileset", false) => Target::Tileset(due.key.clone()),
+        ("model", _) => ImportTarget::Model(due.key.clone()),
+        ("tileset", true) => ImportTarget::Animation(due.key.clone()),
+        ("tileset", false) => ImportTarget::Tileset(due.key.clone()),
         _ => return,
     };
     if editor.row_value(&due.table, &due.key).is_none() {
@@ -398,44 +403,40 @@ fn start_again(editor: &mut Editor, due: records::Due) {
     begin(editor, target, dropped, Some(due));
 }
 
-fn land(editor: &mut Editor, job: Reading, export: Export) {
-    let mut next = match &job.target {
-        Target::Model(key) => model_ui::land(editor, key, export, job.again.as_ref()),
-        Target::NewModel => model_ui::land_new(editor, export),
-        Target::Tileset(key) => tileset_ui::land(editor, key, export, job.again.as_ref()),
-        Target::NewTileset => tileset_ui::land_new(editor, export),
-        Target::Animation(key) => {
+fn land(editor: &mut Editor, job: ImportReading, export: AnimationExport) {
+    let next = match &job.target {
+        ImportTarget::Model(key) => model_ui::land(editor, key, export, job.again.as_ref()),
+        ImportTarget::NewModel => model_ui::land_new(editor, export),
+        ImportTarget::Tileset(key) => tileset_ui::land(editor, key, export, job.again.as_ref()),
+        ImportTarget::NewTileset => tileset_ui::land_new(editor, export),
+        ImportTarget::Animation(key) => {
             tileset_ui::land_animation(editor, key, export, job.again.as_ref())
         }
     };
-    let mut replaced = false;
-    for dialog in &mut editor.dialogs {
-        if is_reading(dialog, job.id) {
-            if let Some(next) = next.take() {
-                *dialog = Dialog::Import(Box::new(next));
-            }
-            replaced = true;
+    let reading = editor
+        .dialogs
+        .iter()
+        .position(|dialog| is_reading(dialog, job.id));
+    match (reading, next) {
+        (Some(index), Some(next)) => editor.dialogs[index] = ModalDialog::Import(Box::new(next)),
+        (Some(index), None) => {
+            editor.dialogs.remove(index);
         }
-    }
-    if replaced {
-        editor.dialogs.retain(|dialog| !is_reading(dialog, job.id));
-    } else if let Some(next) = next {
-        editor.dialogs.push(Dialog::Import(Box::new(next)));
+        (None, Some(next)) => editor.dialogs.push(ModalDialog::Import(Box::new(next))),
+        (None, None) => {}
     }
 }
 
-fn files_of(dropped: &Dropped) -> Vec<PathBuf> {
+fn files_of(dropped: &DroppedFiles) -> Vec<PathBuf> {
     match dropped {
-        Dropped::Sheet { image, json } => vec![image.clone(), json.clone()],
-        Dropped::Png(file) | Dropped::Apng(file) | Dropped::Gif(file) => vec![file.clone()],
-        Dropped::Sequence(files) => files.clone(),
+        DroppedFiles::Sheet { image, json } => vec![image.clone(), json.clone()],
+        DroppedFiles::Png(file) | DroppedFiles::Apng(file) | DroppedFiles::Gif(file) => {
+            vec![file.clone()]
+        }
+        DroppedFiles::Sequence(files) => files.clone(),
     }
 }
 
-fn names_of(job: &Reading) -> String {
+fn names_of(job: &ImportReading) -> String {
     formats::names(&files_of(&job.dropped))
-}
-
-fn active_tab(editor: &Editor) -> Option<Tab> {
-    crate::ui::active_tab(editor)
 }

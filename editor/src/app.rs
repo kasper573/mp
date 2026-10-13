@@ -1,24 +1,41 @@
-use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use bevy::prelude::*;
 use bevy_egui::{EguiContext, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
 use egui_dock::DockState;
+use game::core::content::{Content, ContentRegistry, version};
+use game::systems;
+use game::systems::script::Place;
 use serde_json::Value;
 
 use crate::forms::FormState;
-use crate::project::journal::{Journal, JournalData, JournalFile};
-use crate::project::lock::Lock;
-use crate::project::watch::Watcher;
-use crate::project::{Conflict, Edit, Project, Refusal, Selection, Viewpoint};
-use crate::schema::Shapes;
-use crate::tabs::Tab;
-use crate::user::{Settings, UserFolder};
+use crate::project::journal::{RecoveryJournal, RecoveryJournalData, RecoveryJournalFile};
+use crate::project::lock::ProjectLock;
+use crate::project::watch::FolderWatcher;
+use crate::project::{
+    ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection, row_file,
+};
+use crate::schema::SchemaShapes;
+use crate::tabs::EditorTab;
+use crate::thumbs::Thumbnail;
+use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
+use crate::views::area::placement::ReplaceScope;
+use crate::views::area::{DeleteBlueprintDialog, MakeBlueprintDialog, ResizeDialog};
+use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
+use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
+use crate::views::world::ArrangeDialog;
+use crate::views::{EditorCamera, EditorViews};
+use crate::{import, play, rows, scenes, ui, views};
+use game::core::math::Pos;
+use game::core::tiling::Tiles;
 
 #[derive(Clone, Debug, Default)]
-pub struct Launch {
+pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
     pub scene: Option<String>,
     pub user: Option<PathBuf>,
@@ -26,7 +43,7 @@ pub struct Launch {
 }
 
 pub struct EditorPlugin {
-    pub launch: Launch,
+    pub launch: EditorLaunch,
 }
 
 impl Plugin for EditorPlugin {
@@ -56,45 +73,47 @@ impl Plugin for EditorPlugin {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn((Camera2d, PrimaryEguiContext, crate::views::EditorCamera));
+    commands.spawn((Camera2d, PrimaryEguiContext, EditorCamera));
 }
+
+pub const REFUSED: &str = "refused; see the output";
 
 #[derive(Resource)]
 pub struct Editor {
     pub user: UserFolder,
-    pub settings: Settings,
-    pub shapes: Arc<Shapes>,
+    pub settings: EditorSettings,
+    pub shapes: Arc<SchemaShapes>,
     pub project: Option<Project>,
-    pub lock: Option<Lock>,
-    pub watcher: Option<Watcher>,
-    pub journal: Option<Journal>,
-    pub dock: DockState<Tab>,
-    pub panels: Panels,
+    pub lock: Option<ProjectLock>,
+    pub watcher: Option<FolderWatcher>,
+    pub journal: Option<RecoveryJournal>,
+    pub dock: DockState<EditorTab>,
+    pub panels: DockTabs,
     pub status: StatusBar,
-    pub last_refusal: Option<Refusal>,
+    pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
     pub themed: bool,
-    pub selection: Selection,
+    pub selection: RowSelection,
     pub form: FormState,
-    pub output: Output,
-    pub dialogs: Vec<Dialog>,
+    pub output: OutputLog,
+    pub dialogs: Vec<ModalDialog>,
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
-    pub open_tabs: Vec<Tab>,
+    pub open_tabs: Vec<EditorTab>,
     pub scene: Option<String>,
-    pub clipboard: Option<Value>,
-    pub views: crate::views::Views,
-    pub play: crate::play::Play,
-    pub imports: crate::import::Imports,
-    pub jobs: crate::import::Jobs,
-    pub pick: Option<PickRequest>,
+    pub clipboard: Option<Clipboard>,
+    pub views: EditorViews,
+    pub play: play::PlayTest,
+    pub imports: import::ImportRecords,
+    pub jobs: import::ImportJobs,
+    pub pick: Option<PlacePick>,
     pub quit: bool,
     pub frame: u64,
-    pub frame_log: Option<std::io::BufWriter<std::fs::File>>,
+    pub frame_log: Option<BufWriter<File>>,
 }
 
 #[derive(Default)]
-pub struct Output {
+pub struct OutputLog {
     pub lines: Vec<OutputLine>,
 }
 
@@ -106,7 +125,7 @@ pub struct OutputLine {
 
 pub const OUTPUT_KEPT: usize = 20_000;
 
-impl Output {
+impl OutputLog {
     pub fn say(&mut self, tag: &'static str, text: impl Into<String>) {
         let text = text.into();
         eprintln!("[{tag}] {text}");
@@ -127,7 +146,7 @@ impl Output {
 }
 
 #[derive(Default)]
-pub struct Panels {
+pub struct DockTabs {
     pub left: LeftTab,
     pub right: RightTab,
     pub bottom: BottomTab,
@@ -197,41 +216,39 @@ pub struct StatusBar {
 pub struct StartScreen {
     pub failed: Option<(PathBuf, String)>,
     pub report: Option<(PathBuf, String)>,
-    pub watch: Option<Watcher>,
-    pub recover: Option<(PathBuf, JournalData)>,
+    pub watch: Option<FolderWatcher>,
+    pub recover: Option<(PathBuf, RecoveryJournalData)>,
     pub names: Vec<(PathBuf, String)>,
 }
 
 #[derive(Clone, Debug)]
-pub struct PickRequest {
-    pub what: PickWhat,
+pub struct PlacePick {
+    pub file: String,
+    pub pointer: String,
     pub area: Option<String>,
 }
 
-#[derive(Clone, Debug)]
-pub enum PickWhat {
-    Place { file: String, pointer: String },
-}
-
-pub enum Dialog {
+pub enum ModalDialog {
     NewGame(NewGameDialog),
     NewRow(NewRowDialog),
     Confirm(ConfirmDialog),
-    Conflicts(Vec<Conflict>),
+    Conflicts(Vec<FileConflict>),
     Error(String, String),
     Rename(RenameDialog),
     Delete(DeleteDialog),
     Close(CloseDialog),
     Binaries,
     Keys,
-    MakeBlueprint(crate::views::area::MakeBlueprintDialog),
-    Resize(crate::views::area::ResizeDialog),
-    DeleteBlueprint(crate::views::area::DeleteBlueprintDialog),
-    Arrange(crate::views::world::ArrangeDialog),
-    Import(Box<crate::import::ImportDialog>),
+    MakeBlueprint(MakeBlueprintDialog),
+    Resize(ResizeDialog),
+    DeleteBlueprint(DeleteBlueprintDialog),
+    Arrange(ArrangeDialog),
+    Import(Box<import::ImportDialog>),
     PickRow(PickRowDialog),
-    MakeShared(crate::views::script::inspect::MakeSharedDialog),
-    MakeInline(crate::views::script::inspect::MakeInlineDialog),
+    MakeShared(MakeSharedDialog),
+    MakeInline(MakeInlineDialog),
+    RenameNode(RenameNodeDialog),
+    LinkNode(LinkNodeDialog),
 }
 
 pub struct PickRowDialog {
@@ -252,11 +269,16 @@ pub enum PickRowThen {
     ReplaceBlueprint {
         area: String,
         index: usize,
-        scope: crate::views::area::placement::ReplaceScope,
+        scope: ReplaceScope,
     },
-    ReturnDoorTarget {
-        area: String,
-    },
+}
+
+#[derive(Clone)]
+pub struct Clipboard {
+    pub table: String,
+    pub from: String,
+    pub modules: Vec<Value>,
+    pub origin: Option<Pos<Tiles>>,
 }
 
 pub struct NewGameDialog {
@@ -284,11 +306,11 @@ pub struct ConfirmDialog {
     pub title: String,
     pub body: String,
     pub label: String,
-    pub compare: Option<Compare>,
+    pub compare: Option<TextComparison>,
     pub action: ConfirmAction,
 }
 
-pub struct Compare {
+pub struct TextComparison {
     pub left_title: String,
     pub left: String,
     pub right_title: String,
@@ -307,11 +329,11 @@ pub enum ConfirmAction {
         layer: String,
     },
     DeleteScriptNodes {
-        owner: crate::views::script::ScriptOwner,
+        owner: ScriptOwner,
         names: Vec<String>,
     },
     RestartPlay {
-        start: Option<game::systems::script::Place>,
+        start: Option<Place>,
     },
 }
 
@@ -338,7 +360,7 @@ impl RenameTarget {
 pub struct DeleteDialog {
     pub table: String,
     pub keys: Vec<String>,
-    pub groups: Vec<crate::rows::UsageGroup>,
+    pub groups: Vec<rows::UsageGroup>,
     pub error: Option<String>,
 }
 
@@ -354,35 +376,34 @@ pub enum CloseThen {
 }
 
 impl Editor {
-    pub fn new(user: UserFolder, settings: Settings) -> Editor {
-        content_version();
+    pub fn new(user: UserFolder, settings: EditorSettings) -> Editor {
         Editor {
             user,
             settings,
-            shapes: Arc::new(Shapes::new()),
+            shapes: Arc::new(SchemaShapes::load()),
             project: None,
             lock: None,
             watcher: None,
             journal: None,
             dock: DockState::new(Vec::new()),
-            panels: Panels::default(),
+            panels: DockTabs::default(),
             status: StatusBar::default(),
             last_refusal: None,
             history_focus: None,
             themed: false,
-            selection: Selection::default(),
+            selection: RowSelection::default(),
             form: FormState::default(),
-            output: Output::default(),
+            output: OutputLog::default(),
             dialogs: Vec::new(),
             toast: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
             scene: None,
             clipboard: None,
-            views: crate::views::Views::default(),
-            play: crate::play::Play::default(),
-            imports: crate::import::Imports::default(),
-            jobs: crate::import::Jobs::default(),
+            views: EditorViews::default(),
+            play: crate::play::PlayTest::default(),
+            imports: crate::import::ImportRecords::default(),
+            jobs: crate::import::ImportJobs::default(),
             pick: None,
             quit: false,
             frame: 0,
@@ -406,7 +427,7 @@ impl Editor {
 
     pub fn open_folder(&mut self, folder: &Path) {
         let folder = folder.to_path_buf();
-        if let Some(data) = Journal::recover(&self.user, &folder)
+        if let Some(data) = RecoveryJournal::recover(&self.user, &folder)
             && !data.files.is_empty()
             && self.start.recover.is_none()
         {
@@ -416,7 +437,7 @@ impl Editor {
         self.open_now(&folder, Vec::new());
     }
 
-    pub fn open_now(&mut self, folder: &Path, recovered: Vec<JournalFile>) {
+    pub fn open_now(&mut self, folder: &Path, recovered: Vec<RecoveryJournalFile>) {
         self.close_project();
         match Project::open(folder, self.shapes.clone()) {
             Ok(project) if project.report.is_some() && recovered.is_empty() => {
@@ -437,10 +458,10 @@ impl Editor {
                 self.save_settings();
                 self.start.failed = None;
                 self.start.report = Some((folder.to_path_buf(), report));
-                self.start.watch = Some(Watcher::on(folder));
+                self.start.watch = Some(FolderWatcher::on(folder));
             }
             Ok(mut project) => {
-                let lock = match Lock::take(&self.user, folder) {
+                let lock = match ProjectLock::take(&self.user, folder) {
                     Ok(lock) => Some(lock),
                     Err(reason) => {
                         project.read_only = Some(reason.clone());
@@ -449,7 +470,7 @@ impl Editor {
                     }
                 };
                 if !recovered.is_empty() {
-                    let mut edit = Edit::new("Recover unsaved rows from the journal");
+                    let mut edit = ContentEdit::new("Recover unsaved rows from the journal");
                     for file in &recovered {
                         let change = file.change();
                         match change.bytes {
@@ -457,7 +478,7 @@ impl Editor {
                             None => edit.remove(change.file),
                         };
                     }
-                    if let Err(refusal) = project.apply(edit, Viewpoint::default()) {
+                    if let Err(refusal) = project.apply(edit, EditViewpoint::default()) {
                         self.output.say(
                             "editor",
                             format!("The journal did not apply: {}", refusal.sentence()),
@@ -496,15 +517,15 @@ impl Editor {
                 self.settings.remember(folder);
                 self.save_settings();
                 self.lock = lock;
-                self.watcher = Some(Watcher::on(folder));
-                self.journal = Some(Journal::for_folder(&self.user, folder));
+                self.watcher = Some(FolderWatcher::on(folder));
+                self.journal = Some(RecoveryJournal::for_folder(&self.user, folder));
                 self.project = Some(project);
                 self.dock = DockState::new(Vec::new());
-                self.panels = Panels::default();
-                self.selection = Selection::default();
+                self.panels = DockTabs::default();
+                self.selection = RowSelection::default();
                 self.form = FormState::default();
-                self.views = crate::views::Views::default();
-                self.imports = crate::import::Imports::load(&self.user, folder);
+                self.views = EditorViews::default();
+                self.imports = crate::import::ImportRecords::load(&self.user, folder);
                 if let Some(problem) = self.imports.unreadable.clone() {
                     self.toast(format!(
                         "Import records are unreadable and will not be saved: {problem}"
@@ -513,9 +534,9 @@ impl Editor {
                 self.start.failed = None;
                 self.start.report = None;
                 self.start.watch = None;
-                crate::play::check_binaries(self);
+                play::check_binaries(self);
                 if let Some(scene) = self.scene.take() {
-                    crate::scenes::open(self, &scene);
+                    scenes::open(self, &scene);
                 }
             }
             Err(reason) => {
@@ -529,7 +550,7 @@ impl Editor {
         if let Some(mut play) = self.play.running.take() {
             play.stop();
         }
-        self.views.close(&mut self.project);
+        self.views.close();
         if let Some(journal) = &mut self.journal {
             journal.clear();
         }
@@ -540,33 +561,46 @@ impl Editor {
             drop(project);
         }
         self.dock = DockState::new(Vec::new());
-        self.panels = Panels::default();
+        self.panels = DockTabs::default();
     }
 
-    pub fn apply(&mut self, edit: Edit) -> bool {
-        let viewpoint = Viewpoint {
+    pub fn apply(&mut self, edit: ContentEdit) -> bool {
+        self.try_apply(edit).is_ok()
+    }
+
+    pub fn try_apply(&mut self, edit: ContentEdit) -> Result<(), String> {
+        let viewpoint = EditViewpoint {
             selection: self.selection.clone(),
             camera: self.views.camera_state(),
         };
         let label = edit.label.clone();
         let outcome = match &mut self.project {
             Some(project) => project.apply(edit, viewpoint),
-            None => return false,
+            None => return Err("no folder is open".to_owned()),
         };
         match outcome {
             Ok(()) => {
                 self.form.errors.clear();
                 self.views.content_changed();
-                true
+                Ok(())
             }
             Err(refusal) => {
                 self.refused(&label, &refusal);
-                false
+                Err(refusal.sentence())
             }
         }
     }
 
-    pub fn refused(&mut self, label: &str, refusal: &Refusal) {
+    pub fn release_retired(&mut self) {
+        if let Some(project) = &mut self.project
+            && project.has_retired()
+        {
+            self.views.content_changed();
+            project.release_retired();
+        }
+    }
+
+    pub fn refused(&mut self, label: &str, refusal: &EditRefusal) {
         let text = format!("{label}: refused · {}", refusal.sentence());
         self.toast(text);
         self.last_refusal = Some(refusal.clone());
@@ -639,11 +673,11 @@ impl Editor {
         }
     }
 
-    pub fn open_tab(&mut self, tab: Tab) {
+    pub fn open_tab(&mut self, tab: EditorTab) {
         self.open_tabs.push(tab);
     }
 
-    pub fn select(&mut self, selection: Selection) {
+    pub fn select(&mut self, selection: RowSelection) {
         self.selection = selection;
     }
 
@@ -653,21 +687,31 @@ impl Editor {
             .is_some_and(|project| !project.unsaved().is_empty())
     }
 
-    pub fn row(&self, table: &str, key: &str) -> Option<std::sync::Arc<Value>> {
-        self.project
-            .as_ref()?
-            .files
-            .json(&crate::project::row_file(table, key))
+    pub fn row(&self, table: &str, key: &str) -> Option<Arc<Value>> {
+        self.project.as_ref()?.files.json(&row_file(table, key))
     }
 
     pub fn row_value(&self, table: &str, key: &str) -> Option<Value> {
         self.row(table, key).map(|row| (*row).clone())
     }
 
-    pub fn registry(&self) -> &'static game::core::content::ContentRegistry {
-        static REGISTRY: std::sync::OnceLock<game::core::content::ContentRegistry> =
-            std::sync::OnceLock::new();
-        REGISTRY.get_or_init(game::systems::registry)
+    pub fn thumb(&mut self, ctx: &egui::Context, path: &str) -> Option<Thumbnail> {
+        let project = self.project.as_ref()?;
+        self.form.thumbnails.image(ctx, &project.files, path)
+    }
+
+    pub fn update_brush(&mut self, change: impl FnOnce(&mut BrushSettings)) {
+        change(&mut self.settings.brush);
+        self.save_settings();
+    }
+
+    pub fn set_brush(&mut self, brush: BrushSettings) {
+        self.settings.brush = brush;
+        self.save_settings();
+    }
+
+    pub fn loaded(&self) -> Option<Content> {
+        self.project.as_ref().and_then(|project| project.content)
     }
 
     fn poll_outside(&mut self) {
@@ -705,7 +749,7 @@ impl Editor {
             self.views.content_changed();
         }
         if !outcome.conflicts.is_empty() {
-            self.dialogs.push(Dialog::Conflicts(outcome.conflicts));
+            self.dialogs.push(ModalDialog::Conflicts(outcome.conflicts));
         }
     }
 
@@ -724,18 +768,15 @@ impl Editor {
             journal.clear();
             return;
         }
-        let data = JournalData {
-            build: game::core::content::version::build().to_owned(),
+        let data = RecoveryJournalData {
+            build: version::build().to_owned(),
             content_version: content_version().to_owned(),
             folder: project.root.clone(),
-            written: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
+            written: unix_seconds(),
             files: unsaved
                 .iter()
                 .map(|path| {
-                    JournalFile::of(
+                    RecoveryJournalFile::of(
                         path,
                         project.disk.get(path).map(String::as_str),
                         project.files.get(path),
@@ -758,12 +799,12 @@ fn editor_ui(world: &mut World) {
     let frame_ms = world.resource::<Time>().delta_secs() * 1000.0;
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
+        editor.release_retired();
         let started = Instant::now();
-        crate::ui::show(&mut editor, &ctx, world);
+        ui::show(&mut editor, &ctx);
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;
-        let tab = crate::ui::active_tab(&editor).map(|tab| tab.title());
+        let tab = ui::active_tab(&editor).map(|tab| tab.title());
         if let Some(log) = &mut editor.frame_log {
-            use std::io::Write;
             let entities = world.query::<Entity>().iter(world).count();
             let images = world.resource::<Assets<Image>>().len();
             let meshes = world.resource::<Assets<Mesh>>().len();
@@ -784,15 +825,42 @@ fn background(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.poll_outside();
         editor.tick_journal();
-        crate::play::poll(&mut editor);
-        crate::import::poll(&mut editor);
-        crate::views::sync(&mut editor, world);
+        play::poll(&mut editor);
+        import::poll(&mut editor);
+        views::sync(&mut editor, world);
     });
 }
 
-pub type RowKeys = HashMap<String, Vec<String>>;
+pub fn registry() -> &'static ContentRegistry {
+    static REGISTRY: OnceLock<ContentRegistry> = OnceLock::new();
+    REGISTRY.get_or_init(systems::registry)
+}
 
 pub fn content_version() -> &'static str {
-    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    VERSION.get_or_init(|| game::systems::registry().version().0)
+    static VERSION: OnceLock<String> = OnceLock::new();
+    VERSION.get_or_init(|| registry().version().0)
+}
+
+// A `Receiver` is `!Sync`, and everything the editor holds lives in one bevy resource, so each
+// channel end is wrapped once here instead of at every field.
+pub struct ChannelInbox<T>(Mutex<Receiver<T>>);
+
+impl<T> ChannelInbox<T> {
+    pub fn new(receiver: Receiver<T>) -> ChannelInbox<T> {
+        ChannelInbox(Mutex::new(receiver))
+    }
+
+    pub fn drain(&self) -> Vec<T> {
+        self.0
+            .lock()
+            .map(|receiver| receiver.try_iter().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn try_recv(&self) -> Result<T, TryRecvError> {
+        match self.0.lock() {
+            Ok(receiver) => receiver.try_recv(),
+            Err(_) => Err(TryRecvError::Disconnected),
+        }
+    }
 }

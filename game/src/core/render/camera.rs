@@ -1,11 +1,11 @@
-use crate::core::math::Pos;
-use crate::core::tiling::Tiles;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use super::present::Viewport;
-use crate::core::render::screen::{ToScreen, ToTile};
+use super::screen::{ToScreen, ToTile};
+use crate::core::math::Pos;
+use crate::core::tiling::Tiles;
 
 #[derive(Component)]
 pub(crate) struct WorldCamera;

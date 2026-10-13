@@ -7,7 +7,6 @@ use bevy_ecs::template::template;
 use bevy_math::Vec2;
 use bevy_picking::prelude::Pickable;
 use bevy_scene::{Scene, bsn};
-
 use bevy_ui::widget::ImageNode;
 use bevy_ui::{Node, PositionType, Val, ZIndex};
 

@@ -1,18 +1,20 @@
+use bevy::prelude::*;
+use ui::{DragHandle, DragRoot, OnSettle, text_colored};
+
 use crate::systems::actor::Name;
+use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget};
 use crate::systems::player::Xp;
 use crate::systems::player::session;
 use crate::systems::stat;
-use bevy::prelude::*;
-use ui::{DragHandle, DragRoot, OnSettle, text_colored};
 
 #[derive(Component, Default, Clone)]
 struct CharacterText;
 
 pub struct CharacterWidget;
 
-impl crate::systems::hud::Widget for CharacterWidget {
-    fn audience(&self) -> crate::systems::hud::HudAudience {
-        crate::systems::hud::HudAudience::Players
+impl Widget for CharacterWidget {
+    fn audience(&self) -> HudAudience {
+        HudAudience::Players
     }
     fn fallback(&self, _: f32) -> Vec2 {
         Vec2::new(8.0, 8.0)
@@ -38,11 +40,11 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
     };
     Box::new(bsn! {
         node
-        BackgroundColor({crate::systems::hud::PANEL_BG})
-        BorderColor::all(crate::systems::hud::BORDER)
+        BackgroundColor({PANEL_BG})
+        BorderColor::all(BORDER)
         DragRoot
         DragHandle
-        ~{OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom))}
+        ~{OnSettle::new(move |world, geom| persist_widget(world, id, geom))}
         Children [ @{text_colored(String::new(), Color::WHITE)} CharacterText ]
     })
 }

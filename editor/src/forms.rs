@@ -1,40 +1,45 @@
 use std::collections::{HashMap, HashSet};
 
-use egui::{Color32, Ui};
+use egui::Ui;
 use game::core::content::Content;
 use game::core::script::VariableType;
 use serde_json::{Map, Value};
 
-use crate::project::Files;
-use crate::schema::{self, Kind, Shapes, Variant};
-use crate::ui::theme;
-use crate::usages::Usages;
+use crate::project::{Project, ProjectFiles, row_file};
+use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
+use crate::ui::{browser, theme, widgets};
+use crate::usages::ContentUsages;
+use crate::views::model::busts;
+use crate::views::script::nodes::NodeCatalogue;
+use crate::{condition, picker, spans, thumbs, value};
 
 pub struct FormCx<'a> {
     pub root: &'a Value,
     pub content: Option<Content>,
-    pub files: &'a Files,
-    pub usages: &'a Usages,
-    pub shapes: &'a Shapes,
+    pub generation: u64,
+    pub files: &'a ProjectFiles,
+    pub usages: &'a ContentUsages,
+    pub shapes: &'a SchemaShapes,
     pub state: &'a mut FormState,
     pub actions: &'a mut Vec<FormAction>,
     pub speaker: Option<String>,
     pub owner_table: Option<String>,
     pub owner_key: Option<String>,
-    pub holes: Option<Holes>,
+    pub holes: Option<FormHoles>,
 }
 
 impl<'a> FormCx<'a> {
     pub fn new(
-        project: &'a crate::project::Project,
+        project: &'a Project,
         root: &'a Value,
-        shapes: &'a Shapes,
+        shapes: &'a SchemaShapes,
         state: &'a mut FormState,
         actions: &'a mut Vec<FormAction>,
     ) -> FormCx<'a> {
         FormCx {
             root,
             content: project.content,
+            generation: project.generation,
             files: &project.files,
             usages: &project.usages,
             shapes,
@@ -46,10 +51,16 @@ impl<'a> FormCx<'a> {
             holes: None,
         }
     }
+
+    pub fn owned_by(mut self, table: &str, key: Option<&str>) -> FormCx<'a> {
+        self.owner_table = Some(table.to_owned());
+        self.owner_key = key.map(str::to_owned);
+        self
+    }
 }
 
 #[derive(Default)]
-pub struct Holes {
+pub struct FormHoles {
     pub filled: Vec<(String, String)>,
     pub open: Vec<(String, VariableType)>,
     pub variables: Vec<(String, VariableType)>,
@@ -69,31 +80,59 @@ pub struct FormState {
     pub folded: HashSet<String>,
     pub unfolded: HashSet<String>,
     pub status: Vec<String>,
-    pub thumbnails: crate::thumbs::Thumbnails,
+    pub thumbnails: thumbs::Thumbnails,
+    catalogue: Option<(u64, NodeCatalogue)>,
+}
+
+impl FormState {
+    pub fn catalogue(
+        &mut self,
+        generation: u64,
+        root: &Value,
+        content: Option<Content>,
+    ) -> &NodeCatalogue {
+        if self
+            .catalogue
+            .as_ref()
+            .is_some_and(|(built, _)| *built != generation)
+        {
+            self.catalogue = None;
+        }
+        &self
+            .catalogue
+            .get_or_insert_with(|| (generation, NodeCatalogue::build(root, content)))
+            .1
+    }
 }
 
 pub enum FormAction {
     OpenRow { table: String, key: String },
     OpenScript { pointer: String },
+    MakeShared { pointer: String },
+    MakeInline { script: String },
     PickPlace { path: String },
     NewRow { table: String, path: String },
-    RowAction(crate::ui::browser::Action),
+    RowAction(browser::BrowserAction),
 }
 
 #[derive(Default)]
-pub struct Changed(pub Option<String>);
+pub struct FormChange(pub Option<String>);
 
-impl Changed {
-    pub fn at(path: &str) -> Changed {
-        Changed(Some(path.to_owned()))
-    }
-
-    pub fn or(self, other: Changed) -> Changed {
-        Changed(self.0.or(other.0))
+impl FormChange {
+    pub fn at(path: &str) -> FormChange {
+        FormChange(Some(path.to_owned()))
     }
 
     pub fn is_some(&self) -> bool {
         self.0.is_some()
+    }
+}
+
+impl std::ops::BitOrAssign for FormChange {
+    fn bitor_assign(&mut self, other: FormChange) {
+        if self.0.is_none() {
+            self.0 = other.0;
+        }
     }
 }
 
@@ -105,7 +144,7 @@ pub fn value(
     schema: &Value,
     value: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     let filled = cx
         .holes
         .as_ref()
@@ -113,7 +152,7 @@ pub fn value(
         .map(|(_, name)| name.clone());
     if let Some(name) = filled {
         hole_chip(ui, cx, path, &name);
-        return Changed::default();
+        return FormChange::default();
     }
     let open = cx
         .holes
@@ -123,7 +162,7 @@ pub fn value(
     let Some(kind) = open else {
         return plain(ui, cx, schema, value, path);
     };
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
         hole_menu(ui, cx, path, kind);
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -134,31 +173,34 @@ pub fn value(
     changed
 }
 
+fn variable_chip(ui: &mut Ui, name: &str) -> egui::Response {
+    egui::Frame::new()
+        .fill(theme::VARIABLE_FILL)
+        .stroke(egui::Stroke::new(1.0, theme::VARIABLE))
+        .corner_radius(10.0)
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(format!("◇ {name}"))
+                    .monospace()
+                    .size(12.5)
+                    .color(theme::VARIABLE),
+            );
+        })
+        .response
+        .interact(egui::Sense::click())
+}
+
 fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
-    let ink = theme::VARIABLE;
     let kind = cx
         .holes
         .as_ref()
         .and_then(|holes| holes.variables.iter().find(|(n, _)| n == name))
         .map(|(_, kind)| *kind);
     ui.horizontal(|ui| {
-        let chip = egui::Frame::new()
-            .fill(theme::VARIABLE_FILL)
-            .stroke(egui::Stroke::new(1.0, ink))
-            .corner_radius(10.0)
-            .inner_margin(egui::Margin::symmetric(8, 2))
-            .show(ui, |ui| {
-                ui.label(
-                    egui::RichText::new(format!("◇ {name}"))
-                        .monospace()
-                        .size(12.5)
-                        .color(ink),
-                );
-            })
-            .response
-            .interact(egui::Sense::click())
+        let chip = variable_chip(ui, name)
             .on_hover_text("Filled by the variable at each placement; click to change");
-        ui.label(crate::ui::theme::muted(kind.map_or("", VariableType::name)).size(12.5));
+        ui.label(theme::muted(kind.map_or("", VariableType::name)).size(12.5));
         egui::Popup::from_toggle_button_response(&chip)
             .id(ui.id().with(("hole", path)))
             .show(|ui| {
@@ -206,14 +248,14 @@ fn hole_chip(ui: &mut Ui, cx: &mut FormCx, path: &str, name: &str) {
 
 fn hole_menu(ui: &mut Ui, cx: &mut FormCx, path: &str, kind: VariableType) {
     let button = ui
-        .add(egui::Button::new(crate::ui::theme::muted("◇")).frame(false))
+        .add(egui::Button::new(theme::muted("◇")).frame(false))
         .on_hover_text("Make this field a variable, or fill it from one");
     egui::Popup::from_toggle_button_response(&button)
         .id(ui.id().with(("hole", path)))
         .width(260.0)
         .show(|ui| {
             ui.label(
-                crate::ui::theme::faint(format!("{} · {}", field_name(path), kind.name()))
+                theme::faint(format!("{} · {}", field_name(path), kind.name()))
                     .monospace()
                     .size(11.5),
             );
@@ -275,9 +317,15 @@ fn field_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
-fn plain(ui: &mut Ui, cx: &mut FormCx, schema: &Value, value: &mut Value, path: &str) -> Changed {
+fn plain(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    schema: &Value,
+    value: &mut Value,
+    path: &str,
+) -> FormChange {
     let schema = schema::resolve(cx.root, schema);
-    if path.ends_with("/chance") && matches!(schema::kind(cx.root, schema), Kind::Choice(_)) {
+    if path.ends_with("/chance") && matches!(schema::kind(cx.root, schema), SchemaKind::Choice(_)) {
         return chance(ui, cx, value, path);
     }
     if let Some(marker) = schema::marker(schema) {
@@ -289,37 +337,37 @@ fn plain(ui: &mut Ui, cx: &mut FormCx, schema: &Value, value: &mut Value, path: 
             "x-place" => return place(ui, cx, schema, value, path),
             "x-color" => return color(ui, value, path),
             "x-face" => return face(ui, cx, value, path),
-            "x-span" => return crate::spans::edit(ui, cx, schema, value, path),
-            "x-condition" => return crate::condition::edit(ui, cx, schema, value, path),
+            "x-span" => return spans::edit(ui, cx, value, path),
+            "x-condition" => return condition::edit(ui, cx, schema, value, path),
             _ => {}
         }
     }
     match schema::kind(cx.root, schema) {
-        Kind::Const(constant) => {
+        SchemaKind::Const(constant) => {
             if value != constant {
                 *value = constant.clone();
             }
             ui.label(constant.as_str().unwrap_or_default());
-            Changed::default()
+            FormChange::default()
         }
-        Kind::Enum(options) => enum_combo(ui, &options, value, path),
-        Kind::Union(variants) => union(ui, cx, &variants, value, path),
-        Kind::Choice(alternatives) => choice(ui, cx, &alternatives, value, path),
-        Kind::Object => match geometry_of(cx.root, schema) {
+        SchemaKind::Enum(options) => enum_combo(ui, &options, value, path),
+        SchemaKind::Union(variants) => union(ui, cx, &variants, value, path),
+        SchemaKind::Choice(alternatives) => choice(ui, cx, &alternatives, value, path),
+        SchemaKind::Object => match geometry_of(cx.root, schema) {
             Some(kind) => geometry(ui, cx, kind, value, path),
             None => object(ui, cx, schema, value, path),
         },
-        Kind::Array(items) => array(ui, cx, items, value, path),
-        Kind::Map(values) => map(ui, cx, values, value, path),
-        Kind::Text => text(ui, cx, value, path),
-        Kind::Integer => number(ui, cx, schema, value, path, true),
-        Kind::Number => number(ui, cx, schema, value, path, false),
-        Kind::Boolean => boolean(ui, value, path),
-        Kind::Null => {
+        SchemaKind::Array(items) => array(ui, cx, items, value, path),
+        SchemaKind::Map(values) => map(ui, cx, values, value, path),
+        SchemaKind::Text => text(ui, cx, value, path),
+        SchemaKind::Integer => number(ui, cx, schema, value, path, true),
+        SchemaKind::Number => number(ui, cx, schema, value, path, false),
+        SchemaKind::Boolean => boolean(ui, value, path),
+        SchemaKind::Null => {
             ui.label("—");
-            Changed::default()
+            FormChange::default()
         }
-        Kind::Any => raw_json(ui, cx, value, path),
+        SchemaKind::Any => raw_json(ui, cx, value, path),
     }
 }
 
@@ -329,7 +377,7 @@ pub fn object(
     schema: &Value,
     value: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     object_without(ui, cx, schema, value, path, &[])
 }
 
@@ -340,12 +388,12 @@ pub fn object_without(
     value: &mut Value,
     path: &str,
     hidden: &[&str],
-) -> Changed {
+) -> FormChange {
     if !value.is_object() {
         *value = Value::Object(Map::new());
     }
     let required = schema::required(schema);
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     for (name, field) in schema::properties(schema) {
         if schema::tag_of(schema).is_some_and(|(tag, _)| tag == *name)
             || hidden.contains(&name.as_str())
@@ -358,41 +406,40 @@ pub fn object_without(
         let resolved = schema::resolve(cx.root, field);
         let nested = present
             && schema::marker(resolved).is_none()
-            && matches!(schema::kind(cx.root, resolved), Kind::Object)
+            && matches!(schema::kind(cx.root, resolved), SchemaKind::Object)
             && geometry_of(cx.root, resolved).is_none();
         let list_of_objects = present
             && match schema::kind(cx.root, resolved) {
-                Kind::Array(items) => matches!(
+                SchemaKind::Array(items) => matches!(
                     schema::kind(cx.root, schema::resolve(cx.root, items)),
-                    Kind::Object
+                    SchemaKind::Object
                 ),
                 _ => false,
             };
         if list_of_objects {
             ui.horizontal(|ui| {
-                ui.label(crate::ui::theme::muted(name).monospace().size(13.0));
+                ui.label(theme::muted(name).monospace().size(13.0));
                 if optional
                     && ui
                         .add(
-                            egui::Label::new(crate::ui::theme::faint("✕").size(11.0))
+                            egui::Label::new(theme::faint("✕").size(11.0))
                                 .sense(egui::Sense::click()),
                         )
                         .on_hover_text(format!("Unset {name}"))
                         .clicked()
                 {
                     value.as_object_mut().expect("object").remove(name);
-                    changed = Changed::at(&field_path);
+                    changed = FormChange::at(&field_path);
                 }
             });
             if let Some(child) = value.get_mut(name) {
-                changed =
-                    std::mem::take(&mut changed).or(self::value(ui, cx, field, child, &field_path));
+                changed |= self::value(ui, cx, field, child, &field_path);
             }
             continue;
         }
         if nested {
             ui.horizontal(|ui| {
-                crate::ui::widgets::section(ui, name);
+                widgets::section(ui, name);
                 if optional
                     && ui
                         .small_button("×")
@@ -400,13 +447,11 @@ pub fn object_without(
                         .clicked()
                 {
                     value.as_object_mut().expect("object").remove(name);
-                    changed = Changed::at(&field_path);
+                    changed = FormChange::at(&field_path);
                 }
             });
-            if value.get(name).is_some() {
-                let child = value.get_mut(name).expect("present");
-                changed =
-                    std::mem::take(&mut changed).or(object(ui, cx, field, child, &field_path));
+            if let Some(child) = value.get_mut(name) {
+                changed |= object(ui, cx, field, child, &field_path);
             }
             continue;
         }
@@ -426,9 +471,7 @@ pub fn object_without(
                     if ui
                         .add(
                             egui::Label::new(
-                                crate::ui::theme::faint(format!("+ {name}"))
-                                    .monospace()
-                                    .size(13.0),
+                                theme::faint(format!("+ {name}")).monospace().size(13.0),
                             )
                             .sense(egui::Sense::click()),
                         )
@@ -440,7 +483,7 @@ pub fn object_without(
                             .as_object_mut()
                             .expect("object")
                             .insert(name.clone(), fresh);
-                        changed = Changed::at(&field_path);
+                        changed = FormChange::at(&field_path);
                     }
                     return;
                 }
@@ -448,40 +491,30 @@ pub fn object_without(
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .add(
-                                egui::Label::new(crate::ui::theme::faint("✕").size(11.0))
+                                egui::Label::new(theme::faint("✕").size(11.0))
                                     .sense(egui::Sense::click()),
                             )
                             .on_hover_text(format!("Unset {name}"))
                             .clicked()
                         {
                             value.as_object_mut().expect("object").remove(name);
-                            changed = Changed::at(&field_path);
+                            changed = FormChange::at(&field_path);
                         }
                         ui.add(
-                            egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
-                                .truncate(),
+                            egui::Label::new(theme::muted(name).monospace().size(13.0)).truncate(),
                         );
                     });
                 } else {
-                    ui.add(
-                        egui::Label::new(crate::ui::theme::muted(name).monospace().size(13.0))
-                            .truncate(),
-                    );
+                    ui.add(egui::Label::new(theme::muted(name).monospace().size(13.0)).truncate());
                 }
             }
             if let Some(child) = value.get_mut(name).filter(|_| present) {
                 ui.vertical(|ui| {
                     ui.set_min_width(ui.available_width());
-                    changed = std::mem::take(&mut changed).or(self::value(
-                        ui,
-                        cx,
-                        field,
-                        child,
-                        &field_path,
-                    ));
+                    changed |= self::value(ui, cx, field, child, &field_path);
                 });
             } else {
-                ui.label(crate::ui::theme::faint("—"));
+                ui.label(theme::faint("—"));
             }
         });
     }
@@ -491,36 +524,21 @@ pub fn object_without(
 fn union(
     ui: &mut Ui,
     cx: &mut FormCx,
-    variants: &[Variant],
+    variants: &[SchemaVariant],
     value: &mut Value,
     path: &str,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     if let Some(name) = value.get("var").and_then(Value::as_str).map(str::to_owned)
         && value.as_object().is_some_and(|map| map.len() == 1)
     {
         ui.horizontal(|ui| {
-            let fill = theme::VARIABLE_FILL;
-            egui::Frame::new()
-                .fill(fill)
-                .stroke(egui::Stroke::new(1.0, theme::VARIABLE))
-                .corner_radius(10.0)
-                .inner_margin(egui::Margin::symmetric(8, 2))
-                .show(ui, |ui| {
-                    ui.label(
-                        egui::RichText::new(format!("◇ {name}"))
-                            .monospace()
-                            .size(12.5)
-                            .color(theme::VARIABLE),
-                    );
-                });
+            variable_chip(ui, &name);
             let kinds: Vec<String> = variants
                 .iter()
                 .map(|variant| schema::title(&variant.tag).to_lowercase())
                 .collect();
-            ui.label(
-                crate::ui::theme::muted(format!("variable · {}", kinds.join(" or "))).size(12.5),
-            );
+            ui.label(theme::muted(format!("variable · {}", kinds.join(" or "))).size(12.5));
         });
         return changed;
     }
@@ -559,26 +577,26 @@ fn union(
             }
         }
         *value = fresh;
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if let Some(variant) = schema::variant_of(variants, value) {
         let schema = variant.schema;
         if let Some(kind) = geometry_of(cx.root, schema) {
-            changed = changed.or(geometry(ui, cx, kind, value, path));
+            changed |= geometry(ui, cx, kind, value, path);
         } else if schema::properties(schema).len() > 1 {
-            changed = changed.or(object(ui, cx, schema, value, path));
+            changed |= object(ui, cx, schema, value, path);
         }
     }
     changed
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Geometry {
+pub enum FieldGeometry {
     Pos,
     Rect,
 }
 
-pub fn geometry_of(root: &Value, schema: &Value) -> Option<Geometry> {
+pub fn geometry_of(root: &Value, schema: &Value) -> Option<FieldGeometry> {
     let schema = schema::resolve(root, schema);
     let tag = schema::tag_of(schema).map(|(tag, _)| tag);
     let mut names: Vec<&str> = schema::properties(schema)
@@ -587,7 +605,7 @@ pub fn geometry_of(root: &Value, schema: &Value) -> Option<Geometry> {
         .filter(|(_, field)| {
             matches!(
                 schema::kind(root, schema::resolve(root, field)),
-                Kind::Number | Kind::Integer
+                SchemaKind::Number | SchemaKind::Integer
             )
         })
         .map(|(name, _)| name.as_str())
@@ -595,8 +613,8 @@ pub fn geometry_of(root: &Value, schema: &Value) -> Option<Geometry> {
     names.sort_unstable();
     let count = schema::properties(schema).len() - usize::from(tag.is_some());
     match names.as_slice() {
-        ["x", "y"] if count == 2 => Some(Geometry::Pos),
-        ["h", "w", "x", "y"] if count == 4 => Some(Geometry::Rect),
+        ["x", "y"] if count == 2 => Some(FieldGeometry::Pos),
+        ["h", "w", "x", "y"] if count == 4 => Some(FieldGeometry::Rect),
         _ => None,
     }
 }
@@ -604,10 +622,10 @@ pub fn geometry_of(root: &Value, schema: &Value) -> Option<Geometry> {
 fn geometry(
     ui: &mut Ui,
     cx: &mut FormCx,
-    kind: Geometry,
+    kind: FieldGeometry,
     value: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     let id = ui.id().with(path).with("geometry");
     let number = |name: &str| {
         value[name]
@@ -616,8 +634,8 @@ fn geometry(
             .unwrap_or_else(|| "0".to_owned())
     };
     let current = match kind {
-        Geometry::Pos => format!("{}, {}", number("x"), number("y")),
-        Geometry::Rect => format!(
+        FieldGeometry::Pos => format!("{}, {}", number("x"), number("y")),
+        FieldGeometry::Rect => format!(
             "{}, {} · {} × {}",
             number("x"),
             number("y"),
@@ -642,7 +660,7 @@ fn geometry(
     if response.changed() {
         cx.state.drafts.insert(id, draft.clone());
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     if committed(ui, &response) {
         cx.state.drafts.remove(&id);
         let numbers: Vec<f64> = draft
@@ -651,14 +669,14 @@ fn geometry(
             .filter_map(|part| part.parse().ok())
             .collect();
         let names: &[&str] = match kind {
-            Geometry::Pos => &["x", "y"],
-            Geometry::Rect => &["x", "y", "w", "h"],
+            FieldGeometry::Pos => &["x", "y"],
+            FieldGeometry::Rect => &["x", "y", "w", "h"],
         };
         if numbers.len() == names.len() {
             for (name, number) in names.iter().zip(numbers) {
                 if value[*name].as_f64() != Some(number) {
                     value[*name] = Value::from(number);
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             }
             cx.state.errors.remove(path);
@@ -679,8 +697,8 @@ fn choice(
     alternatives: &[&Value],
     value: &mut Value,
     path: &str,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     let names: Vec<String> = alternatives
         .iter()
         .map(|alternative| describe(alternative))
@@ -695,29 +713,12 @@ fn choice(
             .collect();
         let mut back = false;
         ui.horizontal(|ui| {
-            let fill = theme::VARIABLE_FILL;
-            let response = egui::Frame::new()
-                .fill(fill)
-                .stroke(egui::Stroke::new(1.0, theme::VARIABLE))
-                .corner_radius(10.0)
-                .inner_margin(egui::Margin::symmetric(8, 2))
-                .show(ui, |ui| {
-                    ui.label(
-                        egui::RichText::new(format!("◇ {name}"))
-                            .monospace()
-                            .size(12.5)
-                            .color(theme::VARIABLE),
-                    );
-                })
-                .response
-                .interact(egui::Sense::click())
+            let response = variable_chip(ui, &name)
                 .on_hover_text("A hole each owner fills; click for a fixed value");
             if response.clicked() {
                 back = true;
             }
-            ui.label(
-                crate::ui::theme::muted(format!("variable · {}", kinds.join(" or "))).size(12.5),
-            );
+            ui.label(theme::muted(format!("variable · {}", kinds.join(" or "))).size(12.5));
         });
         if back
             && let Some(first) = alternatives
@@ -725,7 +726,7 @@ fn choice(
                 .find(|alternative| describe(alternative) != "Var")
         {
             *value = schema::template(cx.root, first);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         return changed;
     }
@@ -746,12 +747,12 @@ fn choice(
         && let Some(at) = picked
     {
         *value = schema::template(cx.root, alternatives[at]);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if let Some(at) = picked {
         let schema = alternatives[at];
         if schema::type_names(schema) != vec!["null"] {
-            changed = changed.or(self::value(ui, cx, schema, value, &format!("{path}~{at}")));
+            changed |= self::value(ui, cx, schema, value, &format!("{path}~{at}"));
         }
     }
     changed
@@ -821,14 +822,14 @@ pub fn fits(root: &Value, schema: &Value, value: &Value) -> bool {
     })
 }
 
-fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &str) -> Changed {
+fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &str) -> FormChange {
     if !value.is_array() {
         *value = Value::Array(Vec::new());
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let item_schema = schema::resolve(cx.root, items);
     if schema::marker(item_schema) == Some("x-span") {
-        return crate::spans::line_field(ui, cx, value, path);
+        return spans::line_field(ui, cx, value, path);
     }
     if let Some(options) = item_schema.get("enum").and_then(Value::as_array) {
         let list = value.as_array_mut().expect("array");
@@ -836,30 +837,25 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
             for option in options {
                 let text = option.as_str().unwrap_or("");
                 let on = list.contains(option);
-                let (fill, ink) = if on {
-                    (crate::ui::theme::ACCENT_SOFT, crate::ui::theme::TEXT)
-                } else {
-                    (crate::ui::theme::RAISED, crate::ui::theme::MUTED)
-                };
-                if crate::ui::widgets::chip_coloured(ui, text, fill, ink).clicked() {
+                if widgets::toggle_chip(ui, text, on).clicked() {
                     if on {
                         list.retain(|held| held != option);
                     } else {
                         list.push(option.clone());
                     }
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             }
         });
         return changed;
     }
     let inline = schema::marker(item_schema).is_none()
-        && matches!(schema::kind(cx.root, item_schema), Kind::Object)
+        && matches!(schema::kind(cx.root, item_schema), SchemaKind::Object)
         && schema::properties(item_schema).len() <= 4
         && schema::properties(item_schema).iter().all(|(_, field)| {
             !matches!(
                 schema::kind(cx.root, schema::resolve(cx.root, field)),
-                Kind::Array(_) | Kind::Object | Kind::Map(_)
+                SchemaKind::Array(_) | SchemaKind::Object | SchemaKind::Map(_)
             )
         });
     ui.vertical(|ui| {
@@ -871,7 +867,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
             let item_path = format!("{path}/{index}");
             ui.horizontal(|ui| {
                 let response = ui
-                    .add(egui::Label::new(crate::ui::theme::faint("×")).sense(egui::Sense::click()))
+                    .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
                     .on_hover_text("Remove");
                 if response.clicked() {
                     remove = Some(index);
@@ -910,13 +906,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                     ),
                                     egui::Layout::left_to_right(egui::Align::Center),
                                     |ui| {
-                                        changed = std::mem::take(&mut changed).or(self::value(
-                                            ui,
-                                            cx,
-                                            field,
-                                            child,
-                                            &field_path,
-                                        ));
+                                        changed |= self::value(ui, cx, field, child, &field_path);
                                     },
                                 );
                             } else {
@@ -933,7 +923,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                     |ui| {
                                         if !present {
                                             ui.style_mut().visuals.override_text_color =
-                                                Some(crate::ui::theme::MUTED);
+                                                Some(theme::MUTED);
                                         }
                                         let edited =
                                             self::value(ui, cx, field, &mut draft, &field_path);
@@ -941,7 +931,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                             item.as_object_mut()
                                                 .expect("object")
                                                 .insert((*name).clone(), draft);
-                                            changed = std::mem::take(&mut changed).or(edited);
+                                            changed |= edited;
                                         }
                                     },
                                 )
@@ -956,19 +946,18 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                     });
                 } else {
                     ui.vertical(|ui| {
-                        changed = std::mem::take(&mut changed)
-                            .or(self::value(ui, cx, items, item, &item_path));
+                        changed |= self::value(ui, cx, items, item, &item_path);
                     });
                 }
             });
         }
         if let Some(index) = remove {
             list.remove(index);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         if let Some((a, b)) = swap {
             list.swap(a, b);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         let singular = path
             .rsplit('/')
@@ -978,13 +967,13 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
             .unwrap_or_else(|| "entry".to_owned());
         if ui.button(format!("+ {singular}")).clicked() {
             list.push(schema::template(cx.root, items));
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
     });
     changed
 }
 
-fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
+fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("chance");
     let current = value.as_f64().map(trim_number).unwrap_or_default();
     let mut draft = cx
@@ -998,7 +987,7 @@ fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Change
             egui::TextEdit::singleline(&mut draft)
                 .frame(egui::Frame::NONE)
                 .font(egui::TextStyle::Monospace)
-                .hint_text(crate::ui::theme::muted("always"))
+                .hint_text(theme::muted("always"))
                 .desired_width(f32::INFINITY),
         )
     });
@@ -1012,17 +1001,17 @@ fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Change
                 Ok(number) => Value::from(number),
                 Err(_) => Value::Null,
             };
-            return Changed::at(path);
+            return FormChange::at(path);
         }
     }
-    Changed::default()
+    FormChange::default()
 }
 
-fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &str) -> Changed {
+fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &str) -> FormChange {
     if !value.is_object() {
         *value = Value::Object(Map::new());
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     ui.vertical(|ui| {
         let entries = value.as_object_mut().expect("object");
         let mut remove = None;
@@ -1051,20 +1040,19 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                     }
                 }
                 ui.vertical(|ui| {
-                    changed = std::mem::take(&mut changed)
-                        .or(self::value(ui, cx, values, item, &item_path));
+                    changed |= self::value(ui, cx, values, item, &item_path);
                 });
             });
         }
         if let Some(key) = remove {
             entries.remove(&key);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         if let Some((from, to)) = rename
             && let Some(item) = entries.remove(&from)
         {
             entries.insert(to, item);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         ui.horizontal(|ui| {
             let id = ui.id().with(path).with("new-key");
@@ -1082,14 +1070,14 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
             if add && !draft.is_empty() && !entries.contains_key(&draft) {
                 entries.insert(draft, schema::template(cx.root, values));
                 cx.state.drafts.remove(&id);
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
         });
     });
     changed
 }
 
-pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
+pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("text");
     let current = value.as_str().unwrap_or_default().to_owned();
     let mut draft = cx
@@ -1121,14 +1109,14 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Chan
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
         cx.state.drafts.remove(&id);
         cx.state.errors.remove(path);
-        return Changed::default();
+        return FormChange::default();
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     if committed(ui, &response) {
         cx.state.drafts.remove(&id);
         if draft != current {
             *value = Value::String(draft);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
     }
     error_line(ui, cx, path);
@@ -1142,7 +1130,7 @@ pub fn number(
     value: &mut Value,
     path: &str,
     integer: bool,
-) -> Changed {
+) -> FormChange {
     let id = ui.id().with(path).with("number");
     let current = value.as_f64().map(trim_number).unwrap_or_default();
     let mut draft = cx
@@ -1166,9 +1154,9 @@ pub fn number(
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
         cx.state.drafts.remove(&id);
         cx.state.errors.remove(path);
-        return Changed::default();
+        return FormChange::default();
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     if committed(ui, &response) {
         cx.state.drafts.remove(&id);
         if draft.trim() != current {
@@ -1195,7 +1183,7 @@ pub fn number(
                         } else {
                             Value::from(parsed)
                         };
-                        changed = Changed::at(path);
+                        changed = FormChange::at(path);
                     }
                 }
                 Err(_) => {
@@ -1229,8 +1217,8 @@ pub fn boxed_input(
 ) -> egui::Response {
     let focused_id = ui.ctx().memory(|m| m.focused());
     let frame = egui::Frame::new()
-        .fill(crate::ui::theme::INPUT)
-        .stroke(egui::Stroke::new(1.0, crate::ui::theme::BORDER))
+        .fill(theme::INPUT)
+        .stroke(egui::Stroke::new(1.0, theme::BORDER))
         .corner_radius(4.0)
         .inner_margin(egui::Margin::symmetric(8, 3));
     let mut inner = None;
@@ -1239,7 +1227,7 @@ pub fn boxed_input(
         ui.horizontal(|ui| {
             if let Some(unit) = unit {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(crate::ui::theme::faint(unit).size(12.0));
+                    ui.label(theme::faint(unit).size(12.0));
                     inner = Some(input(ui));
                 });
             } else {
@@ -1252,23 +1240,23 @@ pub fn boxed_input(
         ui.painter().rect_stroke(
             outer.response.rect,
             4.0,
-            egui::Stroke::new(1.0, crate::ui::theme::ACCENT),
+            egui::Stroke::new(1.0, theme::ACCENT),
             egui::StrokeKind::Inside,
         );
     }
     response
 }
 
-fn boolean(ui: &mut Ui, value: &mut Value, path: &str) -> Changed {
+fn boolean(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
     let mut on = value.as_bool().unwrap_or(false);
     if ui.checkbox(&mut on, "").changed() {
         *value = Value::Bool(on);
-        return Changed::at(path);
+        return FormChange::at(path);
     }
-    Changed::default()
+    FormChange::default()
 }
 
-fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) -> Changed {
+fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) -> FormChange {
     let current = value.as_str().unwrap_or_default().to_owned();
     let mut picked = current.clone();
     egui::ComboBox::from_id_salt(ui.id().with(path).with("enum"))
@@ -1280,41 +1268,28 @@ fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) ->
         });
     if picked != current {
         *value = Value::String(picked);
-        return Changed::at(path);
+        return FormChange::at(path);
     }
-    Changed::default()
+    FormChange::default()
 }
 
-fn color(ui: &mut Ui, value: &mut Value, path: &str) -> Changed {
-    let bytes: Vec<u8> = value
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .map(|v| v.as_u64().unwrap_or(255) as u8)
-                .collect()
-        })
-        .unwrap_or_else(|| vec![255, 255, 255, 255]);
-    let mut rgba = [
-        bytes.first().copied().unwrap_or(255),
-        bytes.get(1).copied().unwrap_or(255),
-        bytes.get(2).copied().unwrap_or(255),
-        bytes.get(3).copied().unwrap_or(255),
-    ];
-    let mut changed = Changed::default();
+fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
+    let mut rgba = value::rgba(value);
+    let mut changed = FormChange::default();
     ui.horizontal(|ui| {
         let response = ui.color_edit_button_srgba_unmultiplied(&mut rgba);
         if response.changed() {
             *value = Value::Array(rgba.iter().map(|byte| Value::from(*byte)).collect());
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         egui::Frame::new()
-            .fill(crate::ui::theme::INPUT)
-            .stroke(egui::Stroke::new(1.0, crate::ui::theme::BORDER))
+            .fill(theme::INPUT)
+            .stroke(egui::Stroke::new(1.0, theme::BORDER))
             .corner_radius(4.0)
             .inner_margin(egui::Margin::symmetric(8, 3))
             .show(ui, |ui| {
                 ui.label(
-                    crate::ui::theme::mono(format!(
+                    theme::mono(format!(
                         "{}, {}, {}, {}",
                         rgba[0], rgba[1], rgba[2], rgba[3]
                     ))
@@ -1325,7 +1300,7 @@ fn color(ui: &mut Ui, value: &mut Value, path: &str) -> Changed {
     changed
 }
 
-pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
+pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("json");
     let current = serde_json::to_string(value).unwrap_or_default();
     let mut draft = cx
@@ -1348,7 +1323,7 @@ pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> 
             match serde_json::from_str::<Value>(&draft) {
                 Ok(parsed) => {
                     *value = parsed;
-                    return Changed::at(path);
+                    return FormChange::at(path);
                 }
                 Err(error) => {
                     cx.state.errors.insert(path.to_owned(), error.to_string());
@@ -1357,7 +1332,7 @@ pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> 
         }
     }
     error_line(ui, cx, path);
-    Changed::default()
+    FormChange::default()
 }
 
 pub fn reference(
@@ -1366,34 +1341,32 @@ pub fn reference(
     schema: &Value,
     value: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     let table = schema::table_of(schema).unwrap_or_default().to_owned();
     let mut key = value.as_str().unwrap_or_default().to_owned();
-    let changed = crate::picker::row(ui, cx, &table, &mut key, path);
+    let changed = picker::row(ui, cx, &table, &mut key, path);
     if changed {
         *value = Value::String(key);
-        return Changed::at(path);
+        return FormChange::at(path);
     }
-    Changed::default()
+    FormChange::default()
 }
 
-fn asset(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
+fn asset(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let mut file = value.as_str().unwrap_or_default().to_owned();
-    if crate::picker::asset(ui, cx, &mut file, path) {
+    if picker::asset(ui, cx, &mut file, path) {
         *value = Value::String(file);
-        return Changed::at(path);
+        return FormChange::at(path);
     }
-    Changed::default()
+    FormChange::default()
 }
 
-fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
-    let mut faces: Vec<String> = crate::views::model::busts::generic()
-        .map(str::to_owned)
-        .collect();
+fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+    let mut faces: Vec<String> = busts::generic().map(str::to_owned).collect();
     if let Some(speaker) = &cx.speaker
-        && let Some(npc) = cx.files.json(&crate::project::row_file("npc", speaker))
+        && let Some(npc) = cx.files.json(&row_file("npc", speaker))
         && let Some(model) = npc["model"].as_str()
-        && let Some(model) = cx.files.json(&crate::project::row_file("model", model))
+        && let Some(model) = cx.files.json(&row_file("model", model))
     {
         for module in model["modules"].as_array().into_iter().flatten() {
             if module["type"] == "bust" {
@@ -1408,20 +1381,26 @@ fn face(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed 
     enum_combo(ui, &faces, value, path)
 }
 
-fn place(ui: &mut Ui, cx: &mut FormCx, schema: &Value, value: &mut Value, path: &str) -> Changed {
+fn place(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    schema: &Value,
+    value: &mut Value,
+    path: &str,
+) -> FormChange {
     if !value.is_object() {
         *value = schema::template(cx.root, schema);
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let mut area = value["area"].as_str().unwrap_or_default().to_owned();
-    if crate::picker::row(ui, cx, "area", &mut area, &format!("{path}/area")) {
+    if picker::row(ui, cx, "area", &mut area, &format!("{path}/area")) {
         value["area"] = Value::String(area);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     ui.horizontal(|ui| {
         ui.add_sized(
             egui::vec2(28.0, ui.spacing().interact_size.y),
-            egui::Label::new(crate::ui::theme::muted("at").monospace().size(13.0)),
+            egui::Label::new(theme::muted("at").monospace().size(13.0)),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
@@ -1433,10 +1412,33 @@ fn place(ui: &mut Ui, cx: &mut FormCx, schema: &Value, value: &mut Value, path: 
                     path: path.to_owned(),
                 });
             }
-            changed = std::mem::take(&mut changed).or(geometry(ui, cx, Geometry::Pos, value, path));
+            changed |= geometry(ui, cx, FieldGeometry::Pos, value, path);
         });
     });
     changed
+}
+
+pub fn drafted(
+    ui: &mut Ui,
+    id: egui::Id,
+    current: &str,
+    input: impl FnOnce(&mut Ui, &mut String) -> egui::Response,
+) -> Option<String> {
+    let mut draft = ui
+        .ctx()
+        .data(|d| d.get_temp::<String>(id))
+        .unwrap_or_else(|| current.to_owned());
+    let response = input(ui, &mut draft);
+    if committed(ui, &response) {
+        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+        return (draft != current).then_some(draft);
+    }
+    if response.has_focus() {
+        ui.ctx().data_mut(|d| d.insert_temp(id, draft));
+    } else {
+        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+    }
+    None
 }
 
 pub fn committed(ui: &Ui, response: &egui::Response) -> bool {
@@ -1445,6 +1447,6 @@ pub fn committed(ui: &Ui, response: &egui::Response) -> bool {
 
 pub fn error_line(ui: &mut Ui, cx: &FormCx, path: &str) {
     if let Some(error) = cx.state.errors.get(path) {
-        ui.colored_label(Color32::from_rgb(220, 80, 80), error);
+        ui.colored_label(theme::DANGER, error);
     }
 }

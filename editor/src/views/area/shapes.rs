@@ -1,8 +1,9 @@
-use crate::value::RowValue;
-use game::core::math::{Pos, Rect, Size};
+use game::core::math::{Offset, Pos, Rect, Size};
 use game::core::tiling::Tiles;
-use game::systems::area::AreaModuleKind;
+use game::systems::area::{AreaModuleKind, ObjectShape};
 use serde_json::Value;
+
+use crate::value::RowValue;
 
 pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<Rect<Tiles>> {
     match module.module_kind()? {
@@ -10,23 +11,17 @@ pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<R
         AreaModuleKind::SafeZone => rect_of(&module["rect"]),
         AreaModuleKind::Soundscape => rect_of(&module["shape"]),
         AreaModuleKind::Scenery => scenery_rect(module),
-        AreaModuleKind::Blueprint => placement_bounds.or_else(|| {
-            let at = pos_of(&module["at"])?;
-            Some(Rect::new(
-                at - game::core::math::Offset::new(0.5, 0.5),
-                Size::splat(1.0),
-            ))
-        }),
-        AreaModuleKind::Population => rect_of(&module["roams"]),
-        AreaModuleKind::Resident => {
-            let at = pos_of(&module["at"])?;
-            Some(Rect::new(
-                at - game::core::math::Offset::new(0.5, 0.5),
-                Size::splat(1.0),
-            ))
+        AreaModuleKind::Blueprint => {
+            placement_bounds.or_else(|| pos_of(&module["at"]).map(cell_rect))
         }
+        AreaModuleKind::Population => rect_of(&module["roams"]),
+        AreaModuleKind::Resident => pos_of(&module["at"]).map(cell_rect),
         _ => None,
     }
+}
+
+pub fn is_ellipse(module: &Value) -> bool {
+    module["shape"]["type"] == "ellipse"
 }
 
 pub fn is_point(module: &Value) -> bool {
@@ -38,15 +33,9 @@ pub fn is_point(module: &Value) -> bool {
 }
 
 pub fn shape_rect(shape: &Value) -> Option<Rect<Tiles>> {
-    match shape["type"].as_str()? {
-        "point" => {
-            let at = Pos::new(shape["x"].as_f64()? as f32, shape["y"].as_f64()? as f32);
-            Some(Rect::new(
-                at - game::core::math::Offset::new(0.5, 0.5),
-                Size::splat(1.0),
-            ))
-        }
-        _ => rect_of(shape),
+    match serde_json::from_value::<ObjectShape>(shape.clone()).ok()? {
+        ObjectShape::Point(at) => Some(cell_rect(at)),
+        ObjectShape::Rect(rect) => Some(rect),
     }
 }
 
@@ -55,6 +44,10 @@ pub fn rect_of(value: &Value) -> Option<Rect<Tiles>> {
         Pos::new(value["x"].as_f64()? as f32, value["y"].as_f64()? as f32),
         Size::new(value["w"].as_f64()? as f32, value["h"].as_f64()? as f32),
     ))
+}
+
+pub fn cell_rect(at: Pos<Tiles>) -> Rect<Tiles> {
+    Rect::new(at - Offset::new(0.5, 0.5), Size::splat(1.0))
 }
 
 pub fn pos_of(value: &Value) -> Option<Pos<Tiles>> {
@@ -86,10 +79,10 @@ pub fn scenery_rect(module: &Value) -> Option<Rect<Tiles>> {
 pub fn shift(module: &mut Value, dx: f32, dy: f32) {
     let shift_xy = |value: &mut Value| {
         if let Some(x) = value.get("x").and_then(Value::as_f64) {
-            value["x"] = round(x as f32 + dx);
+            value["x"] = sixteenth_json(x as f32 + dx);
         }
         if let Some(y) = value.get("y").and_then(Value::as_f64) {
-            value["y"] = round(y as f32 + dy);
+            value["y"] = sixteenth_json(y as f32 + dy);
         }
     };
     match module.module_kind() {
@@ -114,8 +107,8 @@ pub fn resize(module: &mut Value, w: f32, h: f32) {
         Some(AreaModuleKind::Population) if module["roams"].is_object() => &mut module["roams"],
         _ => return,
     };
-    target["w"] = round(w.max(0.0625));
-    target["h"] = round(h.max(0.0625));
+    target["w"] = sixteenth_json(w.max(0.0625));
+    target["h"] = sixteenth_json(h.max(0.0625));
 }
 
 pub fn has_size(module: &Value) -> bool {
@@ -155,12 +148,12 @@ pub fn flip_field(module: &mut Value, horizontal: bool) {
     match next {
         Some(flip) => module["flip"] = Value::String(flip.to_owned()),
         None => {
-            module.as_object_mut().map(|m| m.remove("flip"));
+            module.remove_field("flip");
         }
     }
 }
 
-pub fn round(v: f32) -> Value {
+pub fn sixteenth_json(v: f32) -> Value {
     let snapped = (v * 16.0).round() / 16.0;
     serde_json::json!(snapped)
 }
@@ -186,10 +179,4 @@ pub fn label(module: &Value) -> String {
         Some(other) => other.tag().replace('_', " "),
         None => module.kind_or("module").replace('_', " "),
     }
-}
-
-pub fn rect_union(a: Rect<Tiles>, b: Rect<Tiles>) -> Rect<Tiles> {
-    let min: Pos<Tiles> = Pos::new(a.min().x.min(b.min().x), a.min().y.min(b.min().y));
-    let max: Pos<Tiles> = Pos::new(a.max().x.max(b.max().x), a.max().y.max(b.max().y));
-    Rect::new(min, Size::new(max.x - min.x, max.y - min.y))
 }

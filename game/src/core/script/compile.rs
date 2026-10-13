@@ -13,10 +13,10 @@ use super::node::{
 use super::run::FlowCx;
 use super::value::{Value, ValueType};
 use super::{
-    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKind, QueryDef, ScriptDef,
+    Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKind, QueryDef,
     ScriptError, ScriptId, ScriptModule, VarValue, Variable, VariableType, Vocabulary,
 };
-use crate::core::content::Content;
+use crate::core::content::{Content, ContentId, ContentRow};
 
 pub type Eval = Box<dyn Fn(&World, &FlowCx) -> Value + Send + Sync>;
 pub type EffectCall = Box<dyn Fn(&mut World, &mut FlowCx) -> EffectStep + Send + Sync>;
@@ -31,6 +31,12 @@ pub struct OwnerRow {
     pub kind: OwnerKind,
     pub row: u32,
     pub object: Option<u32>,
+}
+
+impl OwnerRow {
+    pub fn id<Row: ContentRow>(&self) -> ContentId<Row> {
+        ContentId::new(self.row)
+    }
 }
 
 #[derive(Resource, Clone, Default)]
@@ -150,9 +156,11 @@ impl<V: Vocabulary> Procedure<V> {
             .find(|(_, event)| event.is_run())
             .map(|(node, _)| *node)
     }
+}
 
-    pub fn pauses_at(&self, node: usize) -> bool {
-        match &self.steps[node] {
+impl<V: Vocabulary> Step<V> {
+    pub fn pauses(&self) -> bool {
+        match self {
             Step::Wait { .. } | Step::Dialogue { .. } => true,
             Step::Effect { pauses, .. } => *pauses,
             _ => false,
@@ -485,7 +493,6 @@ fn compile_source<V: Vocabulary>(
         state: source.state.clone(),
         locals: source.locals.clone(),
         node: None,
-        has_subject: true,
         used_vars: HashSet::new(),
         read_slots: HashSet::new(),
         stack: stack.to_vec(),
@@ -822,7 +829,7 @@ fn compile_source<V: Vocabulary>(
     if entries.is_empty() {
         return Err(fail("unreachable node", None, "no on node".to_owned()));
     }
-    for (name, (_, _)) in &cx.variables {
+    for name in cx.variables.keys() {
         if !cx.used_vars.contains(name) {
             return Err(fail(
                 "unused variable",
@@ -938,98 +945,97 @@ fn bound_steps<V: Vocabulary>(
     entries: &[(usize, V::Event)],
     fail: &impl Fn(&'static str, Option<Name>, String) -> ScriptError,
 ) -> Result<(), ScriptError> {
-    let pauses = |node: usize| match &steps[node] {
-        Step::Wait { .. } | Step::Dialogue { .. } => true,
-        Step::Effect { pauses, .. } => *pauses,
-        _ => false,
+    let mut walk = Walk {
+        steps,
+        names,
+        successors,
+        path: Vec::new(),
+        memo: HashMap::new(),
+        fail,
     };
     let mut sources: Vec<usize> = entries.iter().map(|(entry, _)| *entry).collect();
-    sources.extend((0..steps.len()).filter(|node| pauses(*node)));
-    let mut memo: HashMap<usize, usize> = HashMap::new();
+    sources.extend((0..steps.len()).filter(|node| steps[*node].pauses()));
     for source in sources {
-        let mut path = Vec::new();
-        let starts: Vec<usize> = if pauses(source) {
+        let starts: Vec<usize> = if steps[source].pauses() {
             successors[source].clone()
         } else {
             vec![source]
         };
         for start in starts {
-            longest(
-                start, steps, names, successors, &pauses, &mut path, &mut memo, fail,
-            )?;
+            walk.longest(start)?;
         }
     }
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn longest<V: Vocabulary>(
-    node: usize,
-    steps: &[Step<V>],
-    names: &[Name],
-    successors: &[Vec<usize>],
-    pauses: &impl Fn(usize) -> bool,
-    path: &mut Vec<usize>,
-    memo: &mut HashMap<usize, usize>,
-    fail: &impl Fn(&'static str, Option<Name>, String) -> ScriptError,
-) -> Result<usize, ScriptError> {
-    if pauses(node) {
-        return Ok(1);
-    }
-    if let Some(known) = memo.get(&node) {
-        return Ok(*known);
-    }
-    if path.contains(&node) {
-        let cycle: Vec<&str> = path
-            .iter()
-            .skip_while(|seen| **seen != node)
-            .map(|seen| names[*seen])
-            .chain([names[node]])
-            .collect();
-        return Err(fail(
-            "loop without a wait",
-            Some(names[node]),
-            cycle.join(" → "),
-        ));
-    }
-    path.push(node);
-    let cost = match &steps[node] {
-        Step::Repeat {
-            at_most,
-            each,
-            then,
-            ..
-        } => {
-            let body = match each {
-                Some(each) => longest(*each, steps, names, successors, pauses, path, memo, fail)?,
-                None => 0,
-            };
-            let after = match then {
-                Some(then) => longest(*then, steps, names, successors, pauses, path, memo, fail)?,
-                None => 0,
-            };
-            (*at_most as usize) * (1 + body) + 1 + after
+struct Walk<'a, V: Vocabulary, F> {
+    steps: &'a [Step<V>],
+    names: &'a [Name],
+    successors: &'a [Vec<usize>],
+    path: Vec<usize>,
+    memo: HashMap<usize, usize>,
+    fail: &'a F,
+}
+
+impl<V: Vocabulary, F: Fn(&'static str, Option<Name>, String) -> ScriptError> Walk<'_, V, F> {
+    fn longest(&mut self, node: usize) -> Result<usize, ScriptError> {
+        if self.steps[node].pauses() {
+            return Ok(1);
         }
-        _ => {
-            let mut most = 0;
-            for next in &successors[node] {
-                most = most.max(longest(
-                    *next, steps, names, successors, pauses, path, memo, fail,
-                )?);
+        if let Some(known) = self.memo.get(&node) {
+            return Ok(*known);
+        }
+        if self.path.contains(&node) {
+            let cycle: Vec<&str> = self
+                .path
+                .iter()
+                .skip_while(|seen| **seen != node)
+                .map(|seen| self.names[*seen])
+                .chain([self.names[node]])
+                .collect();
+            return Err((self.fail)(
+                "loop without a wait",
+                Some(self.names[node]),
+                cycle.join(" → "),
+            ));
+        }
+        self.path.push(node);
+        let cost = match &self.steps[node] {
+            Step::Repeat {
+                at_most,
+                each,
+                then,
+                ..
+            } => {
+                let body = match each {
+                    Some(each) => self.longest(*each)?,
+                    None => 0,
+                };
+                let after = match then {
+                    Some(then) => self.longest(*then)?,
+                    None => 0,
+                };
+                (*at_most as usize) * (1 + body) + 1 + after
             }
-            1 + most
+            _ => {
+                let mut most = 0;
+                for next in &self.successors[node] {
+                    most = most.max(self.longest(*next)?);
+                }
+                1 + most
+            }
+        };
+        self.path.pop();
+        if cost > MAX_STEPS {
+            return Err((self.fail)(
+                "too many steps",
+                Some(self.names[node]),
+                format!("{cost} steps between pauses, at most {MAX_STEPS}"),
+            ));
         }
-    };
-    path.pop();
-    if cost > MAX_STEPS {
-        return Err(fail(
-            "too many steps",
-            Some(names[node]),
-            format!("{cost} steps between pauses, at most {MAX_STEPS}"),
-        ));
+        self.memo.insert(node, cost);
+        Ok(cost)
     }
-    memo.insert(node, cost);
-    Ok(cost)
 }
 
 fn check_reveal(reveal: &[super::Reveal]) -> Result<(), (&'static str, String)> {
@@ -1057,7 +1063,6 @@ pub struct Compiler<'c, V: Vocabulary> {
     state: Vec<(Name, ValueType)>,
     locals: Vec<(Name, ValueType)>,
     node: Option<Name>,
-    has_subject: bool,
     used_vars: HashSet<Name>,
     read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
@@ -1066,6 +1071,7 @@ pub struct Compiler<'c, V: Vocabulary> {
 }
 
 type ExprError = (&'static str, String);
+type Arithmetic = (fn(i64, i64) -> i64, fn(f64, f64) -> f64);
 
 impl<'c, V: Vocabulary> Compiler<'c, V> {
     pub fn standalone(content: &'c Content) -> Compiler<'c, V> {
@@ -1077,7 +1083,6 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             state: Vec::new(),
             locals: Vec::new(),
             node: None,
-            has_subject: true,
             used_vars: HashSet::new(),
             read_slots: HashSet::new(),
             stack: Vec::new(),
@@ -1096,10 +1101,6 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
     pub fn node(&self) -> Option<Name> {
         self.node
-    }
-
-    pub fn has_subject(&self) -> bool {
-        self.has_subject
     }
 
     pub fn expr(&mut self, expr: &'static Expr<V>, want: ValueType) -> Result<Eval, ExprError> {
@@ -1167,13 +1168,6 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
     pub fn peek_place(&self, fill: &Fill<V::Place>) -> Option<V::Place> {
         self.peek(fill, |value| match value {
             Bound::Place(place) => Some(place.clone()),
-            _ => None,
-        })
-    }
-
-    pub fn peek_row(&self, fill: &Fill<V::Row>) -> Option<V::Row> {
-        self.peek(fill, |value| match value {
-            Bound::Row(row) => Some(row.clone()),
             _ => None,
         })
     }
@@ -1402,38 +1396,28 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             | Expr::Min(a, b)
             | Expr::Max(a, b) => {
                 let (a, b, integer) = self.numeric(a, b)?;
-                let op = expr.kind();
-                let eval: Eval = if integer {
-                    let f: fn(i64, i64) -> i64 = match op {
-                        "add" => i64::saturating_add,
-                        "subtract" => i64::saturating_sub,
-                        "multiply" => i64::saturating_mul,
-                        "min" => i64::min,
-                        _ => i64::max,
-                    };
-                    Box::new(move |world, cx| {
-                        Value::Int(f(a(world, cx).as_int(), b(world, cx).as_int()))
-                    })
-                } else {
-                    let f: fn(f64, f64) -> f64 = match op {
-                        "add" => |a, b| a + b,
-                        "subtract" => |a, b| a - b,
-                        "multiply" => |a, b| a * b,
-                        "min" => f64::min,
-                        _ => f64::max,
-                    };
-                    Box::new(move |world, cx| {
-                        Value::Num(f(a(world, cx).as_num(), b(world, cx).as_num()))
-                    })
+                let (on_ints, on_nums): Arithmetic = match expr {
+                    Expr::Add(..) => (i64::saturating_add, |a, b| a + b),
+                    Expr::Subtract(..) => (i64::saturating_sub, |a, b| a - b),
+                    Expr::Multiply(..) => (i64::saturating_mul, |a, b| a * b),
+                    Expr::Min(..) => (i64::min, f64::min),
+                    _ => (i64::max, f64::max),
                 };
-                (
-                    eval,
-                    if integer {
-                        ValueType::Integer
-                    } else {
-                        ValueType::Number
-                    },
-                )
+                if integer {
+                    (
+                        Box::new(move |world, cx| {
+                            Value::Int(on_ints(a(world, cx).as_int(), b(world, cx).as_int()))
+                        }),
+                        ValueType::Integer,
+                    )
+                } else {
+                    (
+                        Box::new(move |world, cx| {
+                            Value::Num(on_nums(a(world, cx).as_num(), b(world, cx).as_num()))
+                        }),
+                        ValueType::Number,
+                    )
+                }
             }
             Expr::Divide(a, b) => {
                 let (a, b, _) = self.numeric(a, b)?;
@@ -1499,18 +1483,4 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
 fn constant(value: Value) -> Eval {
     Box::new(move |_, _| value.clone())
-}
-
-pub fn script_def_check<V: Vocabulary>(def: &ScriptDef<V>) -> Result<(), String> {
-    if def.owner == OwnerKind::Any {
-        let runs = def
-            .nodes
-            .values()
-            .filter(|node| matches!(node, Node::On { event, .. } if event.is_run()))
-            .count();
-        if runs != 1 {
-            return Err("a function has exactly one run node".to_owned());
-        }
-    }
-    Ok(())
 }

@@ -5,60 +5,78 @@ pub mod lock;
 pub mod save;
 pub mod watch;
 
+pub use files::{
+    FileBytes, FileChange, GAME_FILE, ProjectFiles, hash, json_bytes, row_file, row_of, text_bytes,
+};
+pub use history::{EditHistory, EditStep, RowSelection};
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
+use game::core::content::ErrorPlace::{Json, WholeFile};
 use game::core::content::{Content, LoadError, LoadReport};
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
+use game::systems;
+use game::systems::script::condition;
 
-pub use files::{Bytes, Change, Files, hash, json_bytes, row_file, row_of};
-pub use history::{History, Selection, Step};
-
-use crate::schema::Shapes;
-use crate::usages::Usages;
+use crate::schema::SchemaShapes;
+use crate::usages::ContentUsages;
+use crate::value;
 
 #[derive(Clone, Debug, Default)]
-pub struct Edit {
+pub struct ContentEdit {
     pub label: String,
-    pub changes: Vec<Change>,
+    pub changes: Vec<FileChange>,
     pub merge: bool,
 }
 
-impl Edit {
-    pub fn new(label: impl Into<String>) -> Edit {
-        Edit {
+impl ContentEdit {
+    pub fn new(label: impl Into<String>) -> ContentEdit {
+        ContentEdit {
             label: label.into(),
             changes: Vec::new(),
             merge: false,
         }
     }
 
-    pub fn merging(mut self) -> Edit {
+    pub fn merging(mut self) -> ContentEdit {
         self.merge = true;
         self
     }
 
-    pub fn write(&mut self, file: impl Into<String>, bytes: Bytes) -> &mut Edit {
+    pub fn write(&mut self, file: impl Into<String>, bytes: FileBytes) -> &mut ContentEdit {
         let file = file.into();
         self.changes.retain(|change| change.file != file);
-        self.changes.push(Change {
+        self.changes.push(FileChange {
             file,
             bytes: Some(bytes),
         });
         self
     }
 
-    pub fn write_json(&mut self, file: impl Into<String>, value: &serde_json::Value) -> &mut Edit {
+    pub fn write_json(
+        &mut self,
+        file: impl Into<String>,
+        value: &serde_json::Value,
+    ) -> &mut ContentEdit {
         self.write(file, json_bytes(value))
     }
 
-    pub fn remove(&mut self, file: impl Into<String>) -> &mut Edit {
+    pub fn write_row<T: serde::Serialize>(
+        &mut self,
+        file: impl Into<String>,
+        row: &T,
+    ) -> &mut ContentEdit {
+        self.write_json(file, &value::json(row).unwrap_or_default())
+    }
+
+    pub fn remove(&mut self, file: impl Into<String>) -> &mut ContentEdit {
         let file = file.into();
         self.changes.retain(|change| change.file != file);
-        self.changes.push(Change { file, bytes: None });
+        self.changes.push(FileChange { file, bytes: None });
         self
     }
 
@@ -68,7 +86,7 @@ impl Edit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Refusal {
+pub struct EditRefusal {
     pub file: String,
     pub pointer: String,
     pub rule: &'static str,
@@ -78,22 +96,22 @@ pub struct Refusal {
     pub errors: usize,
 }
 
-impl Refusal {
-    pub fn of(report: &LoadReport) -> Refusal {
+impl EditRefusal {
+    pub fn of(report: &LoadReport) -> EditRefusal {
         let errors = report.errors.len();
         let first = report.errors.first().cloned().unwrap_or(LoadError {
             file: String::new(),
-            at: game::core::content::ErrorPlace::WholeFile,
+            at: WholeFile,
             rule: "not loaded",
             found: String::new(),
             expected: "a folder that loads".to_owned(),
             nearest: None,
         });
         let pointer = match &first.at {
-            game::core::content::ErrorPlace::Json { pointer, .. } => pointer.clone(),
+            Json { pointer, .. } => pointer.clone(),
             _ => String::new(),
         };
-        Refusal {
+        EditRefusal {
             file: first.file,
             pointer,
             rule: first.rule,
@@ -117,48 +135,49 @@ impl Refusal {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Viewpoint {
-    pub selection: Selection,
-    pub camera: Option<CameraState>,
+pub struct EditViewpoint {
+    pub selection: RowSelection,
+    pub camera: Option<AreaCameraState>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CameraState {
+pub struct AreaCameraState {
     pub area: String,
     pub center: Pos<Tiles>,
     pub zoom: f32,
 }
 
-pub struct Applied {
-    pub viewpoint: Viewpoint,
+pub struct AppliedStep {
+    pub viewpoint: EditViewpoint,
     pub label: String,
 }
 
 pub struct Project {
     pub root: PathBuf,
-    pub files: Files,
+    pub files: ProjectFiles,
     pub disk: BTreeMap<String, String>,
     unsaved: Vec<String>,
     pub content: Option<Content>,
+    retired: Vec<Content>,
     pub report: Option<LoadReport>,
-    pub history: History,
+    pub history: EditHistory,
     pub saved_at: Option<usize>,
-    pub usages: Usages,
-    pub shapes: Arc<Shapes>,
+    pub usages: ContentUsages,
+    pub shapes: Arc<SchemaShapes>,
     pub read_only: Option<String>,
-    pub last_load: Option<std::time::Duration>,
-    pub last_usages: Option<std::time::Duration>,
+    pub last_load: Option<Duration>,
+    pub last_usages: Option<Duration>,
     pub generation: u64,
     pub outside_rewrote: usize,
 }
 
 impl Project {
-    pub fn open(root: &Path, shapes: Arc<Shapes>) -> Result<Project, String> {
-        if !root.join("game.json").is_file() {
-            return Err("No game.json in this folder".to_owned());
+    pub fn open(root: &Path, shapes: Arc<SchemaShapes>) -> Result<Project, String> {
+        if !root.join(GAME_FILE).is_file() {
+            return Err(format!("No {GAME_FILE} in this folder"));
         }
         save::clean_leftovers(root);
-        let files = Files::read_dir(root).map_err(|error| error.to_string())?;
+        let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
         let mut project = Project {
             root: root.to_path_buf(),
@@ -166,10 +185,11 @@ impl Project {
             disk,
             unsaved: Vec::new(),
             content: None,
+            retired: Vec::new(),
             report: None,
-            history: History::default(),
+            history: EditHistory::default(),
             saved_at: Some(0),
-            usages: Usages::default(),
+            usages: ContentUsages::default(),
             shapes,
             read_only: None,
             last_load: None,
@@ -184,7 +204,7 @@ impl Project {
 
     pub fn name(&self) -> String {
         self.files
-            .json("game.json")
+            .json(GAME_FILE)
             .and_then(|game| game["name"].as_str().map(str::to_owned))
             .unwrap_or_else(|| {
                 self.root
@@ -209,9 +229,13 @@ impl Project {
         }
     }
 
-    pub fn apply(&mut self, edit: Edit, viewpoint: Viewpoint) -> Result<(), Box<Refusal>> {
+    pub fn apply(
+        &mut self,
+        edit: ContentEdit,
+        viewpoint: EditViewpoint,
+    ) -> Result<(), Box<EditRefusal>> {
         if let Some(reason) = &self.read_only {
-            return Err(Box::new(Refusal {
+            return Err(Box::new(EditRefusal {
                 file: String::new(),
                 pointer: String::new(),
                 rule: "read-only",
@@ -221,7 +245,7 @@ impl Project {
                 errors: 1,
             }));
         }
-        let changes: Vec<Change> = edit
+        let changes: Vec<FileChange> = edit
             .changes
             .into_iter()
             .filter(
@@ -235,23 +259,17 @@ impl Project {
         if changes.is_empty() {
             return Ok(());
         }
-        let next = self.files.with(&changes);
-        let (content, took) = load(&next, &self.root.display().to_string())
-            .map_err(|report| Box::new(Refusal::of(&report)))?;
-        let before: Vec<Change> = changes
+        let before: Vec<FileChange> = changes
             .iter()
-            .map(|change| Change {
+            .map(|change| FileChange {
                 file: change.file.clone(),
                 bytes: self.files.get(&change.file).cloned(),
             })
             .collect();
-        self.files = next;
-        self.refresh_unsaved();
-        self.last_load = Some(took);
-        self.report = None;
-        self.swap(content);
+        let next = self.files.with(&changes);
+        self.adopt(next)?;
         if !(edit.merge && self.history.merge_into_last(&edit.label, changes.clone())) {
-            self.history.push(Step {
+            self.history.push(EditStep {
                 label: edit.label,
                 before,
                 after: changes,
@@ -263,11 +281,11 @@ impl Project {
         Ok(())
     }
 
-    pub fn undo(&mut self) -> Result<Option<Applied>, Box<Refusal>> {
+    pub fn undo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
         let Some(step) = self.history.undo_step() else {
             return Ok(None);
         };
-        let viewpoint = Viewpoint {
+        let viewpoint = EditViewpoint {
             selection: step.selection.clone(),
             camera: step.camera.clone(),
         };
@@ -275,14 +293,14 @@ impl Project {
         let changes = step.before.clone();
         self.restore(&changes)?;
         self.history.undone();
-        Ok(Some(Applied { viewpoint, label }))
+        Ok(Some(AppliedStep { viewpoint, label }))
     }
 
-    pub fn redo(&mut self) -> Result<Option<Applied>, Box<Refusal>> {
+    pub fn redo(&mut self) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
         let Some(step) = self.history.redo_step() else {
             return Ok(None);
         };
-        let viewpoint = Viewpoint {
+        let viewpoint = EditViewpoint {
             selection: step.selection.clone(),
             camera: step.camera.clone(),
         };
@@ -290,10 +308,10 @@ impl Project {
         let changes = step.after.clone();
         self.restore(&changes)?;
         self.history.redone();
-        Ok(Some(Applied { viewpoint, label }))
+        Ok(Some(AppliedStep { viewpoint, label }))
     }
 
-    pub fn jump(&mut self, index: usize) -> Result<Option<Applied>, Box<Refusal>> {
+    pub fn jump(&mut self, index: usize) -> Result<Option<AppliedStep>, Box<EditRefusal>> {
         let mut last = None;
         while self.history.applied() > index {
             match self.undo()? {
@@ -310,10 +328,23 @@ impl Project {
         Ok(last)
     }
 
-    fn restore(&mut self, changes: &[Change]) -> Result<(), Box<Refusal>> {
+    fn restore(&mut self, changes: &[FileChange]) -> Result<(), Box<EditRefusal>> {
         let next = self.files.with(changes);
+        self.adopt(next)
+    }
+
+    pub fn check(&self, edit: &ContentEdit) -> Result<(), Box<EditRefusal>> {
+        let next = self.files.with(&edit.changes);
+        let (content, _) = load(&next, &self.root.display().to_string())
+            .map_err(|report| Box::new(EditRefusal::of(&report)))?;
+        // SAFETY: the content was loaded only to check the edit and nothing was taken out of it.
+        unsafe { content.release() };
+        Ok(())
+    }
+
+    fn adopt(&mut self, next: ProjectFiles) -> Result<(), Box<EditRefusal>> {
         let (content, took) = load(&next, &self.root.display().to_string())
-            .map_err(|report| Box::new(Refusal::of(&report)))?;
+            .map_err(|report| Box::new(EditRefusal::of(&report)))?;
         self.files = next;
         self.refresh_unsaved();
         self.last_load = Some(took);
@@ -333,33 +364,19 @@ impl Project {
     }
 
     fn refresh_unsaved(&mut self) {
-        let mut paths: Vec<String> = Vec::new();
-        let mut here = self.files.paths().peekable();
-        let mut known = self.disk.iter().peekable();
-        loop {
-            match (here.peek(), known.peek()) {
-                (Some(path), Some((on_disk, hash))) => match path.as_str().cmp(on_disk.as_str()) {
-                    std::cmp::Ordering::Less => {
-                        paths.push(here.next().cloned().unwrap_or_default())
-                    }
-                    std::cmp::Ordering::Greater => {
-                        paths.push(known.next().map(|(p, _)| p.clone()).unwrap_or_default())
-                    }
-                    std::cmp::Ordering::Equal => {
-                        if self.files.hash_of(path) != Some(hash.as_str()) {
-                            paths.push((*path).clone());
-                        }
-                        here.next();
-                        known.next();
-                    }
-                },
-                (Some(_), None) => paths.push(here.next().cloned().unwrap_or_default()),
-                (None, Some(_)) => {
-                    paths.push(known.next().map(|(p, _)| p.clone()).unwrap_or_default())
-                }
-                (None, None) => break,
-            }
-        }
+        let mut paths: Vec<String> = self
+            .files
+            .paths()
+            .filter(|path| self.files.hash_of(path) != self.disk.get(*path).map(String::as_str))
+            .cloned()
+            .collect();
+        paths.extend(
+            self.disk
+                .keys()
+                .filter(|path| self.files.get(path).is_none())
+                .cloned(),
+        );
+        paths.sort();
         self.unsaved = paths;
     }
 
@@ -377,7 +394,7 @@ impl Project {
         let mut conflicts = Vec::new();
         let candidates: Vec<String> = match paths {
             Some(paths) => paths,
-            None => Files::read_dir(&self.root)
+            None => ProjectFiles::read_dir(&self.root)
                 .map(|files| {
                     let mut all: Vec<String> = files.paths().cloned().collect();
                     all.extend(self.disk.keys().cloned());
@@ -388,7 +405,9 @@ impl Project {
                 .unwrap_or_default(),
         };
         for path in candidates {
-            let on_disk = std::fs::read(self.root.join(&path)).ok().map(Bytes::from);
+            let on_disk = std::fs::read(self.root.join(&path))
+                .ok()
+                .map(FileBytes::from);
             let disk_hash = on_disk.as_ref().map(|bytes| hash(bytes));
             if disk_hash == self.disk.get(&path).cloned() {
                 continue;
@@ -399,7 +418,7 @@ impl Project {
                 None => self.disk.remove(&path),
             };
             if edited_here {
-                conflicts.push(Conflict {
+                conflicts.push(FileConflict {
                     file: path,
                     disk: on_disk,
                 });
@@ -423,7 +442,7 @@ impl Project {
         OutsideChanges { taken, conflicts }
     }
 
-    pub fn take_disk(&mut self, conflict: &Conflict) {
+    pub fn take_disk(&mut self, conflict: &FileConflict) {
         match &conflict.disk {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
             None => self.files.remove(&conflict.file),
@@ -434,15 +453,26 @@ impl Project {
         self.reload();
     }
 
+    pub fn has_retired(&self) -> bool {
+        !self.retired.is_empty()
+    }
+
+    pub fn release_retired(&mut self) {
+        for content in self.retired.drain(..) {
+            // SAFETY: content retires mid-frame, while that frame may still read it, and is only
+            // released by `Editor::release_retired` at the start of a later frame, when no
+            // frame-local handle survives and after the views dropped the worlds built on it.
+            unsafe { content.release() };
+        }
+    }
+
     fn swap(&mut self, content: Content) {
         if let Some(old) = self.content.take() {
-            game::systems::script::condition::forget_compiled();
-            // SAFETY: the editor reads rows from the current content only within a frame and keeps
-            // no `&'static` across a swap; worlds built on this content are dropped before it.
-            unsafe { old.release() };
+            condition::forget_compiled();
+            self.retired.push(old);
         }
         let started = Instant::now();
-        self.usages = Usages::build(&content, &self.files);
+        self.usages = ContentUsages::build(&content, &self.files);
         self.last_usages = Some(started.elapsed());
         self.content = Some(content);
         self.generation += 1;
@@ -451,18 +481,18 @@ impl Project {
 
 pub struct OutsideChanges {
     pub taken: Vec<String>,
-    pub conflicts: Vec<Conflict>,
+    pub conflicts: Vec<FileConflict>,
 }
 
 #[derive(Clone)]
-pub struct Conflict {
+pub struct FileConflict {
     pub file: String,
-    pub disk: Option<Bytes>,
+    pub disk: Option<FileBytes>,
 }
 
-pub fn load(files: &Files, name: &str) -> Result<(Content, std::time::Duration), LoadReport> {
+pub fn load(files: &ProjectFiles, name: &str) -> Result<(Content, Duration), LoadReport> {
     let started = Instant::now();
     let folder = Arc::new(files.folder(name));
-    game::systems::load_content(folder, "the folder did not load")
+    systems::load_content(folder, "the folder did not load")
         .map(|content| (content, started.elapsed()))
 }

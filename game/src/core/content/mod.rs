@@ -18,7 +18,7 @@ pub use id::{ContentId, ContentScope, UnknownRow, with_content};
 pub use key::{KeyBuf, key_of};
 pub use load::{
     ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
-    LoadStep, Loading, MemoryFolder, Reference, Settings, load, write,
+    LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
 };
 pub use report::{ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};

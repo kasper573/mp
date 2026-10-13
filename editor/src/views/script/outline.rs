@@ -3,29 +3,31 @@ use std::collections::{HashMap, HashSet};
 use egui::{Align2, Color32, FontId, Sense, Ui};
 use serde_json::Value;
 
-use super::graph::{self, GraphAction};
-use super::nodes::{self, OutlineRow};
-use super::{Doc, select_nodes};
-use crate::app::Editor;
-use crate::project::Selection;
-use crate::ui::theme;
+use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
+use super::nodes::{self, LineSpeaker, OutlineRow};
+use super::{ScriptDoc, select_nodes};
+use crate::app::{Editor, RightTab};
+use crate::project::RowSelection;
+use crate::spans;
+use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 
 const ROW: f32 = 22.0;
 const INDENT: f32 = 26.0;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<GraphAction>) {
+pub fn show(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    doc: &ScriptDoc,
+    actions: &mut Vec<ScriptGraphAction>,
+) {
     let owner = doc.owner.clone();
-    let rows: Vec<OutlineRow> = {
-        let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
-        nodes::outline(doc.nodes(), catalogue)
-    };
+    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), &editor.views.script.catalogue);
     let summaries = summaries(editor, doc);
     let (focus, folded) = editor
         .views
         .script
-        .views
-        .get(&owner)
+        .view(&owner)
         .map(|view| (view.outline_focus.clone(), view.folded.clone()))
         .unwrap_or_default();
     let keys = editor.views.script.keys;
@@ -59,7 +61,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
             ui.add_space(8.0);
             for line in &lines {
                 let row = &rows[line.row];
-                if row.via.as_deref() == Some("unreachable") && !unreachable_shown {
+                if !row.reachable && !unreachable_shown {
                     unreachable_shown = true;
                     ui.add_space(8.0);
                     ui.label(
@@ -82,18 +84,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
     if let Some(key) = clicked {
         next_focus = Some(key);
     }
-    if let Some((key, fold)) = fold
-        && let Some(view) = editor.views.script.views.get_mut(&owner)
-    {
+    let view = editor.views.script.view_mut(&owner);
+    if let Some((key, fold)) = fold {
         if fold {
             view.folded.insert(key);
         } else {
             view.folded.remove(&key);
         }
     }
-    if let Some(view) = editor.views.script.views.get_mut(&owner) {
-        view.outline_focus = next_focus.clone();
-    }
+    view.outline_focus = next_focus.clone();
     let Some(line) = next_focus
         .as_ref()
         .and_then(|key| lines.iter().find(|line| line.key == *key))
@@ -110,10 +109,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
             Some(target) => select_nodes(editor, doc, std::slice::from_ref(target)),
             None => select(editor, doc, row),
         }
-        editor.panels.right = crate::app::RightTab::Inspector;
+        editor.panels.right = RightTab::Inspector;
     }
     if keys.tab {
-        let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
+        let catalogue = &editor.views.script.catalogue;
         let link = match row.choice {
             Some(index) => target
                 .is_none()
@@ -125,16 +124,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
                     .map(|port| (row.name.clone(), port.field))
             }),
         };
-        actions.push(GraphAction::Palette {
-            place: None,
+        actions.push(ScriptGraphAction::Palette(NodePaletteOpen {
             at: ui.max_rect().left_top() + egui::vec2(60.0 + row.depth as f32 * INDENT, 40.0),
+            placed: false,
             link,
-        });
+        }));
     }
-    if keys.link
-        && let Some(view) = editor.views.script.views.get_mut(&owner)
-    {
-        view.link_by_name = Some((row.name.clone(), String::new()));
+    if keys.link {
+        super::link_by_name(editor, &owner, row.name.clone());
     }
     if keys.delete {
         match row.choice {
@@ -144,15 +141,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, actions: &mut Vec<Graph
                     && index < choices.len()
                 {
                     choices.remove(index);
-                    super::write(
-                        editor,
-                        doc,
-                        script,
-                        format!("Remove a choice in {}", doc.owner.title()),
-                    );
+                    let label = format!("Remove a choice in {}", doc.owner.title());
+                    super::write(editor, doc, script, label);
                 }
             }
-            None => actions.push(GraphAction::Delete(row.name.clone())),
+            None => actions.push(ScriptGraphAction::Delete(row.name.clone())),
         }
     }
 }
@@ -173,7 +166,7 @@ fn key_of(row: &OutlineRow, index: usize) -> String {
 }
 
 fn lines(rows: &[OutlineRow], folded: &HashSet<String>) -> Vec<Line> {
-    let mut lines = Vec::new();
+    let mut lines: Vec<Line> = Vec::new();
     let mut hide_below: Option<usize> = None;
     let mut index = 0;
     while index < rows.len() {
@@ -181,7 +174,6 @@ fn lines(rows: &[OutlineRow], folded: &HashSet<String>) -> Vec<Line> {
         if let Some(depth) = hide_below {
             if row.depth > depth {
                 if let Some(last) = lines.last_mut() {
-                    let last: &mut Line = last;
                     last.hidden += 1;
                 }
                 index += 1;
@@ -214,7 +206,7 @@ fn lines(rows: &[OutlineRow], folded: &HashSet<String>) -> Vec<Line> {
 
 fn draw(
     ui: &mut Ui,
-    doc: &Doc,
+    doc: &ScriptDoc,
     rows: &[OutlineRow],
     line: &Line,
     summaries: &HashMap<String, String>,
@@ -248,7 +240,7 @@ fn draw(
         );
         x = drawn.right();
     };
-    if let Some(via) = row.via.as_deref().filter(|via| *via != "unreachable") {
+    if let Some(via) = row.via.as_deref() {
         put(ui, via, &mono, theme::CODE);
         put(ui, " → ", &mono, theme::FAINT);
     }
@@ -257,9 +249,9 @@ fn draw(
             let label = doc
                 .nodes()
                 .get(&row.name)
-                .map(|node| nodes::plain_text(&node["choices"][index]["label"]))
+                .map(|node| spans::plain(&node["choices"][index]["label"]))
                 .unwrap_or_default();
-            put(ui, &nodes::clip(&label, 60), &mono, theme::TEXT);
+            put(ui, &widgets::clip(&label, 60), &mono, theme::TEXT);
             put(ui, " → ", &mono, theme::FAINT);
             match line.target {
                 Some(target) => Some(&rows[target]),
@@ -276,8 +268,7 @@ fn draw(
             put(ui, "↑ back to ", &mono, theme::FAINT);
             put(ui, &target.name, &mono, theme::CODE);
         } else if let Some(node) = doc.nodes().get(&target.name) {
-            let kind = nodes::kind(node);
-            let (glyph, colour) = graph::kind_glyph(kind);
+            let (glyph, colour) = graph::kind_glyph(node);
             put(ui, glyph, &FontId::proportional(12.0), colour);
             put(ui, " ", &mono, theme::TEXT);
             put(
@@ -308,71 +299,59 @@ fn draw(
     response
 }
 
-fn summaries(editor: &Editor, doc: &Doc) -> HashMap<String, String> {
-    let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
+fn summaries(editor: &Editor, doc: &ScriptDoc) -> HashMap<String, String> {
+    let catalogue = &editor.views.script.catalogue;
     doc.nodes()
         .iter()
         .map(|(name, node)| {
-            let summary = match nodes::kind(node) {
-                "dialogue" => dialogue_summary(editor, node),
-                _ => nodes::pieces(node, catalogue)
-                    .into_iter()
-                    .map(|line| line.into_iter().map(|piece| piece.text).collect::<String>())
-                    .filter(|line| !line.trim().is_empty())
-                    .collect::<Vec<_>>()
-                    .join(" · "),
+            let summary = if nodes::is_dialogue(node) {
+                dialogue_summary(editor, node)
+            } else {
+                nodes::summary(node, catalogue)
             };
-            (name.clone(), nodes::clip(&summary, 70))
+            (name.clone(), widgets::clip(&summary, 70))
         })
         .collect()
 }
 
 fn dialogue_summary(editor: &Editor, node: &Value) -> String {
     let lines = node["lines"].as_array().cloned().unwrap_or_default();
-    let speaker = lines.first().map(|line| {
-        let by = &line["by"];
-        match by["type"].as_str() {
-            Some("npc") => {
-                let key = by.text("npc");
+    let speaker = lines
+        .first()
+        .map(|line| match LineSpeaker::of(&line["by"]) {
+            Some(LineSpeaker::Npc { npc, face }) => {
                 let name = editor
-                    .row_value("npc", key)
-                    .and_then(|row| row["name"].as_str().map(str::to_owned))
-                    .unwrap_or_else(|| key.to_owned());
-                match by["face"].as_str() {
+                    .row_value("npc", &npc)
+                    .map(|row| row.text_or("name", &npc).to_owned())
+                    .unwrap_or(npc);
+                match face {
                     Some(face) => format!("{name}, {face}"),
                     None => name,
                 }
             }
-            Some("object") => "the object".to_owned(),
+            Some(LineSpeaker::Object) => "the object".to_owned(),
             _ => "narrator".to_owned(),
-        }
-    });
-    let count = format!(
-        "{} {}",
-        lines.len(),
-        if lines.len() == 1 { "line" } else { "lines" }
-    );
+        });
+    let count = format!("{} line{}", lines.len(), widgets::plural(lines.len()));
     match speaker {
         Some(speaker) => format!("{speaker} · {count}"),
         None => count,
     }
 }
 
-fn select(editor: &mut Editor, doc: &Doc, row: &OutlineRow) {
+fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
             editor.views.script.focus = Some(doc.owner.clone());
-            editor.select(Selection {
-                table: doc.owner.table().to_owned(),
-                keys: vec![doc.owner.key().to_owned()],
-                parts: vec![
+            editor.select(RowSelection::parts(
+                doc.owner.table(),
+                doc.owner.key(),
+                vec![
                     format!("node:{}", row.name),
                     format!("choice:{}#{index}", row.name),
                 ],
-            });
-            if let Some(view) = editor.views.script.views.get_mut(&doc.owner) {
-                view.selected = vec![row.name.clone()];
-            }
+            ));
+            editor.views.script.view_mut(&doc.owner).selected = vec![row.name.clone()];
         }
         None if !row.link => select_nodes(editor, doc, std::slice::from_ref(&row.name)),
         None => {}

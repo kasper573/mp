@@ -13,37 +13,49 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Direction, Pos, Rect, Rng};
 use crate::core::script::{Owner, OwnerKind, OwnerRow};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, Hitbox, Rgba, Tint};
+use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint, model};
 use crate::systems::area::{self, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Died};
 use crate::systems::dialogue;
 use crate::systems::effect::{self, Effect, TimedEffects};
-use crate::systems::interact::{self, Interactive};
-use crate::systems::item::Reservation;
+use crate::systems::interact::Interactive;
+use crate::systems::item::{Id as ItemId, Reservation, ReservedBy};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Players;
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::ActorRoster;
-use crate::systems::script::{EventKind, RiftEvent, RiftInstances, RiftScripts, ScriptModule};
-use crate::systems::stat::{self, StatKind, Stats};
+use crate::systems::script::{
+    EventKind, Reach, RiftEvent, RiftInstances, RiftScripts, ScriptModule,
+};
+use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
 pub type Id = ContentId<NpcDef>;
 
 const CORPSE_LINGER: Seconds = Seconds(5.0);
-pub const FARTHEST_NEAR: Tiles = Tiles(32.0);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Npc>();
     effect::source(app, chase);
+}
+
+pub fn can_be_fought(scripts: &RiftScripts, npc: Id) -> bool {
+    scripts
+        .may_do(OwnerRow {
+            kind: OwnerKind::Npc,
+            row: npc.raw(),
+            object: None,
+        })
+        .reaches
+        .contains(&Reach::Hostile)
 }
 
 pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
@@ -58,7 +70,7 @@ pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Npc {
-    pub def: crate::systems::npc::Id,
+    pub def: Id,
 }
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -81,9 +93,9 @@ pub struct Near(Vec<Entity>);
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct NpcDef {
     pub name: String,
-    pub model: crate::systems::actor::bust::Id,
+    pub model: model::Id,
     #[schemars(transform = crate::systems::stat::schema_with_units)]
-    pub stats: crate::systems::stat::StatMap,
+    pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,
 }
@@ -143,11 +155,8 @@ pub struct Loot {
 
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct LootItem {
-    pub item: crate::systems::item::Id,
-    #[serde(
-        default = "crate::core::content::serial::one",
-        skip_serializing_if = "crate::core::content::serial::is_one"
-    )]
+    pub item: ItemId,
+    #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub amount: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chance: Option<f32>,
@@ -216,7 +225,6 @@ pub fn next_pack(world: &mut World) -> Pack {
 pub fn spawn_all(world: &mut World) {
     let content = *world.resource::<Content>();
     let area_id = world.resource::<WorldArea>().0;
-    let assets = *world.resource::<Content>();
     for module in area::modules(&content, area_id) {
         match module {
             AreaModule::Population(population) => {
@@ -224,7 +232,7 @@ pub fn spawn_all(world: &mut World) {
                 for _ in 0..population.count {
                     spawn_wild(
                         world,
-                        &assets,
+                        &content,
                         area_id,
                         population.npc,
                         population.roams,
@@ -237,7 +245,7 @@ pub fn spawn_all(world: &mut World) {
                 let entity = spawn(world, resident.npc, resident.at, area_id, pack);
                 world.entity_mut(entity).insert(Home(resident.at));
                 if let Some(shown) = &resident.shown {
-                    let shown = CompiledCondition::new(world.resource::<Content>(), shown);
+                    let shown = CompiledCondition::new(&content, shown);
                     world.entity_mut(entity).insert(Presence::When(shown));
                 }
             }
@@ -248,13 +256,13 @@ pub fn spawn_all(world: &mut World) {
 
 fn spawn_wild(
     world: &mut World,
-    assets: &Content,
+    content: &Content,
     area_id: area::Id,
-    npc: crate::systems::npc::Id,
+    npc: Id,
     roams: Option<Rect<Tiles>>,
     pack: Pack,
 ) {
-    let area = area::load(assets, area_id);
+    let area = area::load(content, area_id);
     let at = {
         let mut rng = world.resource_mut::<Rng>();
         match roams {
@@ -271,21 +279,15 @@ fn spawn_wild(
 }
 
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Entity {
-    let assets = *world.resource::<Content>();
-    let entity = world.spawn(character(&assets, def, at, area)).id();
+    let content = *world.resource::<Content>();
+    let entity = world.spawn(character(&content, def, at, area)).id();
     world
         .entity_mut(entity)
         .insert(Stats(stat::listed(&def.stats).collect()));
     entity
 }
 
-pub fn spawn(
-    world: &mut World,
-    def: crate::systems::npc::Id,
-    at: Pos<Tiles>,
-    area: area::Id,
-    pack: Pack,
-) -> Entity {
+pub fn spawn(world: &mut World, def: Id, at: Pos<Tiles>, area: area::Id, pack: Pack) -> Entity {
     let content = *world.resource::<Content>();
     let entity = spawn_actor(world, def.get(&content), at, area);
     world.entity_mut(entity).insert((
@@ -347,10 +349,8 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
         }
         let credited = match world.get::<Reservation>(died.entity) {
             Some(reservation) if !reservation.expired(now) => match reservation.by {
-                crate::systems::item::ReservedBy::Account(client) => {
-                    world.resource::<Players>().0.get(&client).copied()
-                }
-                crate::systems::item::ReservedBy::None => None,
+                ReservedBy::Account(client) => world.resource::<Players>().0.get(&client).copied(),
+                ReservedBy::None => None,
             },
             _ => None,
         };
@@ -457,7 +457,7 @@ pub fn approach(world: &mut World) {
     }
 }
 
-fn character(assets: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Character {
+fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Character {
     Character {
         replicated: Replicated,
         position: Position { pos: at },
@@ -469,13 +469,13 @@ fn character(assets: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> 
             attack_rate: PlaybackRate(stat::of_map(&def.stats, StatKind::AttackSpeed)),
         },
         hitbox: Hitbox {
-            size: actor::model(assets, def.model).hitbox(),
+            size: ActorModel::get(content, def.model).hitbox(),
         },
         area: AreaTag { area },
     }
 }
 
-fn start_scripts(world: &mut World, entity: Entity, def: crate::systems::npc::Id) {
+fn start_scripts(world: &mut World, entity: Entity, def: Id) {
     let procedures = world
         .resource::<RiftScripts>()
         .of(OwnerRow {
@@ -567,8 +567,4 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
             start_scripts(world, id, npc);
         }
     });
-}
-
-pub fn interaction_of(world: &World, entity: Entity) -> Option<Interactive> {
-    interact::interaction_of(world, entity)
 }

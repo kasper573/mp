@@ -1,12 +1,12 @@
+use bevy::prelude::*;
+use ui::text_colored;
+
+use crate::systems::hud::{HudAudience, Window, single_tab};
+use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::job;
 use crate::systems::player::session;
 use crate::systems::stat;
-use bevy::prelude::*;
-use ui::text_colored;
-
-use crate::systems::hud::{HudAudience, Window};
-use crate::systems::input::map::InputAction;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct StatsText;
@@ -30,7 +30,7 @@ impl Window for StatsWindow {
         2
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content()))
+        single_tab(self.title(), ui::scrolled(content()))
     }
     fn sync(&self, world: &mut World) {
         sync_stats(world)

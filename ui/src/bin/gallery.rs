@@ -235,8 +235,7 @@ fn scene_index(name: &str) -> usize {
         })
 }
 
-fn setup(current: Res<CurrentScene>, assets: Res<AssetServer>, mut commands: Commands) {
-    let _ = GALLERY_ASSETS.set(assets.clone());
+fn setup(current: Res<CurrentScene>, mut commands: Commands) {
     commands.spawn((Camera2d, IsDefaultUiCamera));
     commands.insert_resource(sample_inputs());
     let tab_buttons: Vec<Box<dyn Scene>> = SCENES
@@ -286,6 +285,7 @@ fn on_tab(event: On<ui::Activate>, tabs: Query<&SceneTab>, mut current: ResMut<C
 
 fn rebuild_scene(
     current: Res<CurrentScene>,
+    assets: Res<AssetServer>,
     root: Query<Entity, With<GalleryRoot>>,
     scenes: Query<Entity, With<SceneRoot>>,
     mut shown: Local<Option<usize>>,
@@ -301,7 +301,7 @@ fn rebuild_scene(
     for scene in &scenes {
         commands.entity(scene).despawn();
     }
-    let content = (SCENES[current.0].1)();
+    let content = (SCENES[current.0].1)(&assets);
     commands
         .spawn_scene(bsn! {
             SceneRoot
@@ -351,7 +351,7 @@ fn show_toast(
         .insert(ChildOf(toaster));
 }
 
-type SceneBuilder = fn() -> Box<dyn Scene>;
+type SceneBuilder = fn(&AssetServer) -> Box<dyn Scene>;
 
 const SCENES: &[(&str, SceneBuilder)] = &[
     ("Button intents", button_intents_scene),
@@ -434,7 +434,7 @@ fn col(width: f32, kids: Vec<Box<dyn Scene>>) -> Box<dyn Scene> {
     })
 }
 
-fn button_intents_scene() -> Box<dyn Scene> {
+fn button_intents_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let mut buttons: Vec<Box<dyn Scene>> = BUTTON_INTENTS
         .iter()
         .map(|&(intent, label)| boxed(button_styled(intent, ButtonSize::Md, label)))
@@ -446,7 +446,7 @@ fn button_intents_scene() -> Box<dyn Scene> {
     wrap(buttons)
 }
 
-fn button_sizes_scene() -> Box<dyn Scene> {
+fn button_sizes_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(
         BUTTON_SIZES
             .iter()
@@ -455,7 +455,7 @@ fn button_sizes_scene() -> Box<dyn Scene> {
     )
 }
 
-fn tabs_scene() -> Box<dyn Scene> {
+fn tabs_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         520.0,
         vec![boxed(bsn! {
@@ -474,7 +474,7 @@ fn tabs_scene() -> Box<dyn Scene> {
     )
 }
 
-fn checkbox_scene() -> Box<dyn Scene> {
+fn checkbox_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(vec![
         boxed(bsn! { @{checkbox(Check::Off)} Children [ @{checkbox_indicator()} ] }),
         boxed(bsn! { @{checkbox(Check::On)} Children [ @{checkbox_indicator()} ] }),
@@ -488,14 +488,14 @@ fn checkbox_scene() -> Box<dyn Scene> {
     ])
 }
 
-fn switch_scene() -> Box<dyn Scene> {
+fn switch_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(vec![
         boxed(bsn! { @{switch(false)} Children [ @{switch_thumb()} ] }),
         boxed(bsn! { @{switch(true)} Children [ @{switch_thumb()} ] }),
     ])
 }
 
-fn radio_scene() -> Box<dyn Scene> {
+fn radio_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items = ["apple", "banana", "cherry"].map(|name| {
         let label = format!("{}{}", name[..1].to_uppercase(), &name[1..]);
         boxed(bsn! {
@@ -516,7 +516,7 @@ fn radio_scene() -> Box<dyn Scene> {
     )
 }
 
-fn dropdown_scene() -> Box<dyn Scene> {
+fn dropdown_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = ["Apple", "Banana", "Cherry", "Durian"]
         .into_iter()
         .map(|name| boxed(dropdown_item(name, name)))
@@ -534,7 +534,7 @@ fn dropdown_scene() -> Box<dyn Scene> {
     )
 }
 
-fn slider_scene() -> Box<dyn Scene> {
+fn slider_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -547,7 +547,7 @@ fn slider_scene() -> Box<dyn Scene> {
     )
 }
 
-fn progress_scene() -> Box<dyn Scene> {
+fn progress_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -557,7 +557,7 @@ fn progress_scene() -> Box<dyn Scene> {
     )
 }
 
-fn avatar_scene() -> Box<dyn Scene> {
+fn avatar_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let one = |initials: &'static str| {
         boxed(bsn! {
             @{avatar()}
@@ -569,7 +569,7 @@ fn avatar_scene() -> Box<dyn Scene> {
     wrap(vec![one("KS"), one("AB")])
 }
 
-fn separator_scene() -> Box<dyn Scene> {
+fn separator_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![
@@ -580,7 +580,7 @@ fn separator_scene() -> Box<dyn Scene> {
     )
 }
 
-fn accordion_scene() -> Box<dyn Scene> {
+fn accordion_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let item = |value: &'static str, q: &'static str, a: &'static str| {
         boxed(bsn! {
             @{accordion_item()}
@@ -608,7 +608,7 @@ fn accordion_scene() -> Box<dyn Scene> {
     )
 }
 
-fn collapsible_scene() -> Box<dyn Scene> {
+fn collapsible_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -638,7 +638,7 @@ fn dialog_actions(kids: Vec<Box<dyn Scene>>) -> Box<dyn Scene> {
     })
 }
 
-fn dialog_scene() -> Box<dyn Scene> {
+fn dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(dialog(
         false,
         button_styled(button_intent::PRIMARY, ButtonSize::Md, "Delete project"),
@@ -660,7 +660,7 @@ fn dialog_scene() -> Box<dyn Scene> {
     ))
 }
 
-fn alert_dialog_scene() -> Box<dyn Scene> {
+fn alert_dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(alert_dialog(
         false,
         button_styled(button_intent::DANGER, ButtonSize::Md, "Reset everything"),
@@ -685,7 +685,7 @@ fn alert_dialog_scene() -> Box<dyn Scene> {
     ))
 }
 
-fn card_scene() -> Box<dyn Scene> {
+fn card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let variants: [(&str, &str, Color, CardOptions); 8] = [
         (
             "Surface",
@@ -841,23 +841,31 @@ fn in_card(panel: Box<dyn Scene>) -> Box<dyn Scene> {
     })
 }
 
-fn tooltip_scene() -> Box<dyn Scene> {
+fn tooltip_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| tooltip_overlay(side, note_panel()))
 }
 
-fn popover_scene() -> Box<dyn Scene> {
+fn popover_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| popover_overlay(side, dimensions_panel()))
 }
 
-fn tooltip_card_scene() -> Box<dyn Scene> {
+fn tooltip_card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| tooltip_overlay(side, in_card(note_panel())))
 }
 
-fn popover_card_scene() -> Box<dyn Scene> {
+fn popover_card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| popover_overlay(side, in_card(dimensions_panel())))
 }
 
-fn toasts_scene() -> Box<dyn Scene> {
+fn toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
+    toaster_scene(SonnerPosition::BottomRight)
+}
+
+fn top_toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
+    toaster_scene(SonnerPosition::TopCenter)
+}
+
+fn toaster_scene(position: SonnerPosition) -> Box<dyn Scene> {
     boxed(bsn! {
         Node {
             width: Val::Percent(100.0),
@@ -868,28 +876,12 @@ fn toasts_scene() -> Box<dyn Scene> {
         Children [
             @{button("Show toast")} on(show_toast)
             --
-            @{toaster(SonnerPosition::BottomRight)} ToasterEntity
+            @{toaster(position)} ToasterEntity
         ]
     })
 }
 
-fn top_toasts_scene() -> Box<dyn Scene> {
-    boxed(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-        }
-        Children [
-            @{button("Show toast")} on(show_toast)
-            --
-            @{toaster(SonnerPosition::TopCenter)} ToasterEntity
-        ]
-    })
-}
-
-fn widget_scene() -> Box<dyn Scene> {
+fn widget_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         160.0,
         vec![boxed(bsn! {
@@ -918,7 +910,7 @@ struct PinnedLog;
 #[derive(Component, Default, Clone)]
 struct SubmittedText;
 
-fn pinned_scroll_scene() -> Box<dyn Scene> {
+fn pinned_scroll_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let mut items: Vec<Box<dyn Scene>> = (1..=30)
         .map(|n| {
             boxed(text_colored(
@@ -969,7 +961,7 @@ fn pinned_scroll_scene() -> Box<dyn Scene> {
     )
 }
 
-fn text_input_scene() -> Box<dyn Scene> {
+fn text_input_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -996,7 +988,7 @@ fn text_input_scene() -> Box<dyn Scene> {
     )
 }
 
-fn window_scene() -> Box<dyn Scene> {
+fn window_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -1096,7 +1088,7 @@ fn log_tab() -> ui::WindowContent {
     }
 }
 
-fn scroll_area_scene() -> Box<dyn Scene> {
+fn scroll_area_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = (1..=16)
         .map(|n| boxed(text_colored(format!("Item {n}"), theme().surface_canvas.on)))
         .collect();
@@ -1232,7 +1224,7 @@ fn pell_line() -> Vec<RichPiece> {
     ]
 }
 
-fn rich_text_scene() -> Box<dyn Scene> {
+fn rich_text_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let rows: Vec<Box<dyn Scene>> = effect_rows()
         .into_iter()
         .map(|(label, pieces)| {
@@ -1269,7 +1261,7 @@ fn rich_text_scene() -> Box<dyn Scene> {
 #[derive(Component, Default, Clone)]
 struct ReplayLine;
 
-fn typewriter_scene() -> Box<dyn Scene> {
+fn typewriter_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText {
         size: 20.0,
         ..RichText::new(pell_line())
@@ -1399,16 +1391,7 @@ fn sample_choices(assets: &AssetServer) -> Vec<ChoiceOptions> {
     .collect()
 }
 
-static GALLERY_ASSETS: std::sync::OnceLock<AssetServer> = std::sync::OnceLock::new();
-
-fn assets() -> &'static AssetServer {
-    GALLERY_ASSETS
-        .get()
-        .expect("gallery assets are ready before scenes are built")
-}
-
-fn chips_scene() -> Box<dyn Scene> {
-    let assets = assets();
+fn chips_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let chips: Vec<Box<dyn Scene>> = [
         tag("QUEST", palette::AMBER_70),
         tag("SHOP", palette::AMBER_80),
@@ -1429,14 +1412,14 @@ fn chips_scene() -> Box<dyn Scene> {
     wrap(chips)
 }
 
-fn choices_scene() -> Box<dyn Scene> {
+fn choices_scene(assets: &AssetServer) -> Box<dyn Scene> {
     col(
         720.0,
-        vec![boxed(choice_list(sample_choices(assets()), PICK))],
+        vec![boxed(choice_list(sample_choices(assets), PICK))],
     )
 }
 
-fn dialogue_box_scene() -> Box<dyn Scene> {
+fn dialogue_box_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText::new(vec![
         plain("The forest road is "),
         ink("closed", palette::CRIMSON_80),
@@ -1460,7 +1443,7 @@ fn dialogue_box_scene() -> Box<dyn Scene> {
                 speaker: Some(("Ilsa".to_owned(), Side::Right)),
                 line,
                 typed: true,
-                choices: sample_choices(assets()),
+                choices: sample_choices(assets),
                 hint: choice_hint(),
                 advance: NEXT,
                 pick: PICK,
@@ -1471,7 +1454,7 @@ fn dialogue_box_scene() -> Box<dyn Scene> {
 
 const CAST_SECONDS: f32 = 3.0;
 
-fn cast_scene() -> Box<dyn Scene> {
+fn cast_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText::new(vec![
         plain("Do you know what a crate of silk costs? I do. "),
         RichSpan::plain("To the copper.").slow().into(),
@@ -1542,7 +1525,7 @@ fn notification_round(time: &Time, rounds: u64) -> u64 {
     (time.elapsed_secs() / NOTIFICATION_SECONDS) as u64 % rounds
 }
 
-fn bubbles_scene() -> Box<dyn Scene> {
+fn bubbles_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let anchors: Vec<Box<dyn Scene>> = bubble_round(0)
         .into_iter()
         .enumerate()
@@ -1700,12 +1683,8 @@ fn labelled(key: u64, label: &str, replaced: u32, text: &str) -> LabelledLine {
         key,
         label: label.to_owned(),
         replaced,
-        text: RichText::new(vec![plain_owned(text)]),
+        text: RichText::new(vec![RichPiece::text(text.to_owned())]),
     }
-}
-
-fn plain_owned(text: &str) -> RichPiece {
-    RichPiece::text(text.to_owned())
 }
 
 fn more(count: u32) -> Option<RichText> {
@@ -1716,7 +1695,7 @@ fn more(count: u32) -> Option<RichText> {
     ]))
 }
 
-fn captions_scene() -> Box<dyn Scene> {
+fn captions_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(captions()))
 }
 
@@ -1772,7 +1751,7 @@ fn cycle_captions(time: Res<Time>, mut captions: Query<&mut Captions>) {
     }
 }
 
-fn alert_bar_scene() -> Box<dyn Scene> {
+fn alert_bar_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(alert_bar()))
 }
 
@@ -1815,7 +1794,7 @@ fn cycle_alerts(time: Res<Time>, mut bars: Query<&mut AlertBar>) {
     }
 }
 
-fn milestones_scene() -> Box<dyn Scene> {
+fn milestones_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(milestones()))
 }
 
@@ -1847,7 +1826,7 @@ fn cycle_milestones(time: Res<Time>, mut milestones: Query<&mut Milestones>) {
     }
 }
 
-fn intro_scene() -> Box<dyn Scene> {
+fn intro_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(bsn! {
         GalleryIntroHost
         Node { display: Display::Grid, justify_items: JustifyItems::Center }
@@ -1892,7 +1871,7 @@ fn cycle_intro(
     }
 }
 
-fn notification_toasts_scene() -> Box<dyn Scene> {
+fn notification_toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), justify_content: JustifyContent::Center }
         Children [
@@ -1959,7 +1938,7 @@ fn feed_toasts(
     }
 }
 
-fn list_detail_scene() -> Box<dyn Scene> {
+fn list_detail_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let rows = |titles: &[&str]| -> Vec<Box<dyn Scene>> {
         titles
             .iter()
@@ -2001,7 +1980,7 @@ fn list_detail_scene() -> Box<dyn Scene> {
 #[derive(Component, Default, Clone)]
 struct ConfirmHost;
 
-fn confirm_dialog_scene() -> Box<dyn Scene> {
+fn confirm_dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(bsn! {
         ConfirmHost
         Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center }
@@ -2031,8 +2010,7 @@ fn confirm_dialog_scene() -> Box<dyn Scene> {
 #[derive(Component, Default, Clone)]
 struct DropLog;
 
-fn drag_and_drop_scene() -> Box<dyn Scene> {
-    let assets = assets();
+fn drag_and_drop_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = [
         ("icons/monster_part/bone.png", 1),
         ("icons/monster_part/feather.png", 2),

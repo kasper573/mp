@@ -32,8 +32,22 @@ pub type Name = &'static str;
 pub type Arrow = Option<String>;
 pub type Link = Option<Name>;
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    IntoStaticStr,
+    VariantArray,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum OwnerKind {
     Object,
     Npc,
@@ -58,16 +72,7 @@ impl OwnerKind {
     }
 
     pub fn name(self) -> &'static str {
-        match self {
-            OwnerKind::Object => "object",
-            OwnerKind::Npc => "npc",
-            OwnerKind::Item => "item",
-            OwnerKind::Area => "area",
-            OwnerKind::Quest => "quest",
-            OwnerKind::Shop => "shop",
-            OwnerKind::Blueprint => "blueprint",
-            OwnerKind::Any => "any",
-        }
+        self.into()
     }
 }
 

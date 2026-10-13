@@ -1,11 +1,17 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
+use bevy::prelude::*;
+use ui::{RichPiece, RichText};
+
+use super::despawn_all;
 use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
 use crate::core::content::media::ImageSizes;
 use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
+use crate::core::render::dynamic_z;
+use crate::core::render::screen::ToScreen;
 use crate::core::render::transition::{self, WorldViewSystems};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
@@ -16,11 +22,6 @@ use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::AreaDrawn;
 use crate::systems::player::session::{self, Viewpoint};
-use bevy::prelude::*;
-use ui::{RichPiece, RichText};
-
-use crate::core::render::dynamic_z;
-use crate::core::render::screen::ToScreen;
 
 pub struct AreaPlugin;
 
@@ -43,11 +44,7 @@ impl Plugin for AreaPlugin {
             .add_systems(OnEnter(super::Scene::Area), restart_patience)
             .add_systems(
                 OnExit(super::Scene::Area),
-                (
-                    crate::systems::scene::despawn_all::<DeathBanner>,
-                    silence_soundscape,
-                    leave_area,
-                ),
+                (despawn_all::<DeathBanner>, silence_soundscape, leave_area),
             );
     }
 }
@@ -58,7 +55,7 @@ const ARRIVAL_PATIENCE: Seconds = Seconds(5.0);
 
 #[derive(Resource, Default)]
 struct SpawnedArea {
-    area: Option<crate::systems::area::Id>,
+    area: Option<area::Id>,
     images: Vec<Handle<Image>>,
 }
 
@@ -269,7 +266,7 @@ fn spawn_area_tiles(
     viewpoint: Res<Viewpoint>,
     areas: Query<&AreaTag>,
     assets: Res<AssetServer>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut spawned: ResMut<SpawnedArea>,
     tiles: Query<Entity, With<bevy_tilemap::MapTile>>,
     mut images: ResMut<bevy::asset::Assets<Image>>,
@@ -290,10 +287,19 @@ fn spawn_area_tiles(
     for tile in &tiles {
         commands.entity(tile).despawn();
     }
-    let content = &service;
-    let area = area::load(content, area_id);
+    let area = area::load(&content, area_id);
     let origin = area.size.bounds().min().to_screen();
-    let sheets = AreaSheets::new(content, area, &assets);
+    let mut loaded = Vec::new();
+    let sheets = TileSheets::new(
+        &content,
+        area.grids,
+        area.scenery.iter().map(|scenery| scenery.tileset),
+        |def| {
+            let image = assets.load(def.image.path());
+            loaded.push(image.clone());
+            image
+        },
+    );
     let grids = area.grids;
     let size = grids.size;
     for (index, layer) in grids.ground.iter().enumerate() {
@@ -312,9 +318,11 @@ fn spawn_area_tiles(
             .collect();
         bevy_tilemap::spawn_grid_layer(
             &mut commands,
-            &mut images,
-            &mut meshes,
-            &mut materials,
+            &mut bevy_tilemap::TilemapAssets {
+                images: &mut images,
+                meshes: &mut meshes,
+                materials: &mut materials,
+            },
             &sheets.sheets,
             &bevy_tilemap::GridLayer {
                 width: size.width,
@@ -326,6 +334,7 @@ fn spawn_area_tiles(
                 tile_px: TILE.0,
                 z: index as f32,
             },
+            (),
         );
     }
     let flat_count = area
@@ -364,20 +373,21 @@ fn spawn_area_tiles(
                         z,
                     },
                     TILE.0,
+                    (),
                 );
             }
         }
     }
     *spawned = SpawnedArea {
         area: Some(area_id),
-        images: sheets.images,
+        images: loaded,
     };
 }
 
 fn play_area_soundscape(
     viewpoint: Res<Viewpoint>,
     areas: Query<&AreaTag>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut soundscape: ResMut<Soundscape>,
 ) {
     let Some(area_id) = viewpoint
@@ -387,7 +397,7 @@ fn play_area_soundscape(
     else {
         return;
     };
-    let zones = area::load(&service, area_id).soundscape.as_slice();
+    let zones = area::load(&content, area_id).soundscape.as_slice();
     if !std::ptr::eq(soundscape.0, zones) {
         soundscape.0 = zones;
     }
@@ -397,40 +407,39 @@ fn silence_soundscape(mut soundscape: ResMut<Soundscape>) {
     soundscape.0 = &[];
 }
 
-struct AreaSheets {
-    tilesets: Vec<tileset::Id>,
-    sheets: Vec<bevy_tilemap::TileSheet>,
-    images: Vec<Handle<Image>>,
+pub struct TileSheets {
+    pub tilesets: Vec<tileset::Id>,
+    pub sheets: Vec<bevy_tilemap::TileSheet>,
 }
 
-impl AreaSheets {
-    fn new(content: &Content, area: &area::Area, assets: &AssetServer) -> AreaSheets {
+impl TileSheets {
+    pub fn new(
+        content: &Content,
+        grids: &area::AreaGrids,
+        scenery: impl Iterator<Item = tileset::Id>,
+        mut image_of: impl FnMut(&tileset::TilesetDef) -> Handle<Image>,
+    ) -> TileSheets {
         let sizes = content.built::<ImageSizes>();
-        let mut tilesets: Vec<tileset::Id> = area
-            .grids
+        let mut tilesets: Vec<tileset::Id> = grids
             .palette
             .iter()
             .map(|entry| entry.tileset)
-            .chain(area.scenery.iter().map(|scenery| scenery.tileset))
+            .chain(scenery)
             .collect();
         tilesets.sort_by_key(|id| id.index());
         tilesets.dedup();
-        let mut sheets = Vec::new();
-        let mut images = Vec::new();
-        for &id in &tilesets {
-            let def = id.get(content);
-            let image = assets.load(def.image.path());
-            images.push(image.clone());
-            let (width, height) = sizes.0.get(def.image.as_str()).copied().unwrap_or((0, 0));
-            let grid = def.grid(width, height);
-            sheets.push(bevy_tilemap::TileSheet {
-                image,
-                size: Vec2::new(width as f32, height as f32),
-                tile: Vec2::splat(def.tile as f32),
-                animations: (0..grid.count())
-                    .filter_map(|tile| {
-                        let frames = def.animation(tile);
-                        (!frames.is_empty()).then(|| bevy_tilemap::TileAnimation {
+        let sheets = tilesets
+            .iter()
+            .map(|&id| {
+                let def = id.get(content);
+                let (width, height) = sizes.0.get(def.image.as_str()).copied().unwrap_or((0, 0));
+                bevy_tilemap::TileSheet {
+                    image: image_of(def),
+                    size: Vec2::new(width as f32, height as f32),
+                    tile: Vec2::splat(def.tile as f32),
+                    animations: def
+                        .animations(width, height)
+                        .map(|(tile, frames)| bevy_tilemap::TileAnimation {
                             tile,
                             frames: frames
                                 .iter()
@@ -440,18 +449,14 @@ impl AreaSheets {
                                 })
                                 .collect(),
                         })
-                    })
-                    .collect(),
-            });
-        }
-        AreaSheets {
-            tilesets,
-            sheets,
-            images,
-        }
+                        .collect(),
+                }
+            })
+            .collect();
+        TileSheets { tilesets, sheets }
     }
 
-    fn index(&self, tileset: tileset::Id) -> Option<usize> {
+    pub fn index(&self, tileset: tileset::Id) -> Option<usize> {
         self.tilesets.iter().position(|&id| id == tileset)
     }
 }

@@ -1059,6 +1059,7 @@ dependencies = [
  "indexmap 2.14.2",
  "log",
  "nonmax",
+ "rand 0.10.3",
  "serde",
  "slotmap",
  "smallvec",
@@ -1807,6 +1808,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_renet2"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64e05a177d17dac54c7b70163be7a57772c5eff0edaaf5404d1df7f526a02521"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_time",
+ "renet2",
+]
+
+[[package]]
 name = "bevy_replicon"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1825,6 +1838,17 @@ dependencies = [
  "typeid",
  "variadics_please",
  "xxhash-rust",
+]
+
+[[package]]
+name = "bevy_replicon_renet2"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eca57b9b9d9e316d5ff44d5d2012cc01b697701b1860178474ea53aad2d8ac71"
+dependencies = [
+ "bevy",
+ "bevy_renet2",
+ "bevy_replicon",
 ]
 
 [[package]]
@@ -3465,7 +3489,6 @@ dependencies = [
  "serde_json",
  "strip-ansi-escapes",
  "strum",
- "symphonia",
  "ui",
  "ureq",
 ]
@@ -4046,6 +4069,7 @@ dependencies = [
  "bevy_picking",
  "bevy_platform",
  "bevy_replicon",
+ "bevy_replicon_renet2",
  "bevy_state",
  "bevy_terminal",
  "bevy_tilemap",
@@ -4059,6 +4083,7 @@ dependencies = [
  "derive_more",
  "envy",
  "euclid",
+ "fixedbitset",
  "flate2",
  "futures-timer",
  "futures-util",
@@ -7513,10 +7538,11 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "renet2"
-version = "0.17.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8326243f1f68c2fe78fad62d282b94da9b25b11d641153fb5631ba0db0e61f56"
+checksum = "401668b580e0086b095f47f7f4cf2fe4212529268322742a1a38dc5b16e6498a"
 dependencies = [
+ "bevy_ecs",
  "bytes",
  "log",
  "octets",

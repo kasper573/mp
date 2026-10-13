@@ -1,6 +1,25 @@
-use crate::app::{Dialog, Editor};
-use crate::project::Selection;
-use crate::tabs::Tab;
+use game::systems::area;
+use game::systems::area::AreaDef;
+use game::systems::area::world_map::{Note, Region};
+
+use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
+use crate::project::{ContentEdit, RowSelection};
+use crate::tabs::EditorTab;
+use crate::views::area::resize::ResizeDialog;
+use crate::views::area::{blueprint, shapes};
+use crate::views::character::CharacterSection;
+use crate::views::model::strip::TimingSetBy;
+use crate::views::model::{FrameCueKind, ModelPage, ModelStrip, busts};
+use crate::views::script::{PendingScriptAction, ScriptOwner};
+use crate::views::tileset::{
+    NewSurfaceDialog, NewTerrainSetDialog, SheetRect, TileBlueprintDialog, TileSheetDialog,
+    TilesetMode, WalkBrush,
+};
+use crate::views::world::{
+    ColourBy, ColourField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
+};
+use crate::views::{model, tileset, world};
+use crate::{rows, ui};
 
 pub fn open(editor: &mut Editor, name: &str) {
     for step in name.split(';') {
@@ -12,8 +31,8 @@ fn open_one(editor: &mut Editor, name: &str) {
     let (kind, rest) = name.split_once(':').unwrap_or((name, ""));
     match kind {
         "area" => {
-            editor.select(Selection::row("area", rest));
-            editor.open_tab(Tab::Area {
+            editor.select(RowSelection::row("area", rest));
+            editor.open_tab(EditorTab::Area {
                 key: rest.to_owned(),
             });
         }
@@ -25,12 +44,12 @@ fn open_one(editor: &mut Editor, name: &str) {
                     .split(',')
                     .map(|i| format!("/modules/{i}"))
                     .collect();
-                editor.select(Selection {
+                editor.select(RowSelection {
                     table: table.to_owned(),
                     keys: vec![key.to_owned()],
                     parts,
                 });
-                editor.open_tab(Tab::for_row(table, key));
+                editor.open_tab(EditorTab::for_row(table, key));
             }
         }
         "resize" => {
@@ -39,41 +58,38 @@ fn open_one(editor: &mut Editor, name: &str) {
                     .project
                     .as_ref()
                     .and_then(|p| p.content)
-                    .and_then(|c| {
-                        c.by_key::<game::systems::area::AreaDef>(key)
-                            .map(|id| game::systems::area::load(&c, id).size)
-                    });
-                editor.open_tab(Tab::Area {
+                    .and_then(|c| c.by_key::<AreaDef>(key).map(|id| area::load(&c, id).size));
+                editor.open_tab(EditorTab::Area {
                     key: key.to_owned(),
                 });
-                editor.dialogs.push(crate::app::Dialog::Resize(
-                    crate::views::area::resize::ResizeDialog {
+                editor
+                    .dialogs
+                    .push(crate::app::ModalDialog::Resize(ResizeDialog {
                         area: key.to_owned(),
                         width: size.map_or(0, |s| s.width as u32),
                         height: size.map_or(0, |s| s.height as u32),
                         anchor: (-1, -1),
                         error: None,
-                    },
-                ));
+                    }));
             }
         }
         "blueprint" => {
-            editor.select(Selection::row("blueprint", rest));
-            editor.open_tab(Tab::Blueprint {
+            editor.select(RowSelection::row("blueprint", rest));
+            editor.open_tab(EditorTab::Blueprint {
                 key: rest.to_owned(),
             });
         }
         "row" => {
             if let Some((table, key)) = rest.split_once('/') {
-                editor.select(Selection::row(table, key));
-                editor.open_tab(Tab::for_row(table, key));
+                editor.select(RowSelection::row(table, key));
+                editor.open_tab(EditorTab::for_row(table, key));
             }
         }
         "rows" => {
             if let Some((table, keys)) = rest.split_once('/') {
                 let keys: Vec<String> = keys.split(',').map(str::to_owned).collect();
-                editor.select(Selection::rows(table, keys.clone()));
-                editor.open_tab(Tab::Rows {
+                editor.select(RowSelection::rows(table, keys.clone()));
+                editor.open_tab(EditorTab::Rows {
                     table: table.to_owned(),
                     keys,
                 });
@@ -97,7 +113,12 @@ fn open_one(editor: &mut Editor, name: &str) {
         }
         "delete" => {
             if let Some((table, key)) = rest.split_once('/') {
-                crate::rows::delete_dialog(editor, table, vec![key.to_owned()]);
+                rows::delete_dialog(editor, table, vec![key.to_owned()]);
+            }
+        }
+        "duplicate" => {
+            if let Some((table, key)) = rest.split_once('/') {
+                rows::duplicate(editor, table, key);
             }
         }
         "clipboard" => {
@@ -110,67 +131,50 @@ fn open_one(editor: &mut Editor, name: &str) {
                 })
             {
                 let origin =
-                    crate::views::area::blueprint::selection_origin(std::slice::from_ref(&module))
-                        .unwrap_or_default();
+                    blueprint::selection_origin(std::slice::from_ref(&module)).unwrap_or_default();
                 let mut relative = module;
-                crate::views::area::shapes::shift(&mut relative, -origin.x, -origin.y);
-                editor.clipboard = Some(
-                    serde_json::json!({ "rift": "modules", "table": table, "from": key, "modules": [relative], "origin": { "x": origin.x, "y": origin.y } }),
-                );
+                shapes::shift(&mut relative, -origin.x, -origin.y);
+                editor.clipboard = Some(Clipboard {
+                    table: table.to_string(),
+                    from: key.to_string(),
+                    modules: vec![relative],
+                    origin: Some(origin),
+                });
             }
         }
         "script" => match rest.split_once('#') {
             Some((row, pointer)) => {
-                if let Some((table, key)) = row.split_once('/') {
-                    editor.select(Selection::row(table, key));
-                    editor.open_tab(Tab::Script(crate::views::script::ScriptOwner::inline(
-                        table, key, pointer,
-                    )));
+                if let Some((table, key)) = row.split_once('/')
+                    && let Some(owner) = ScriptOwner::inline(table, key, pointer)
+                {
+                    editor.select(RowSelection::row(table, key));
+                    editor.open_tab(EditorTab::Script(owner));
                 }
             }
             None => {
-                editor.select(Selection::row("script", rest));
-                editor.open_tab(Tab::Script(crate::views::script::ScriptOwner::Shared {
+                editor.select(RowSelection::row("script", rest));
+                editor.open_tab(EditorTab::Script(ScriptOwner::Shared {
                     key: rest.to_owned(),
                 }));
             }
         },
         "node" => {
-            let owner = editor
-                .open_tabs
-                .iter()
-                .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
-                .filter_map(|tab| match tab {
-                    Tab::Script(owner) => Some(owner.clone()),
-                    _ => None,
-                })
-                .last();
+            let owner = last_script_owner(editor);
             if let Some(owner) = owner {
                 editor.views.script.focus = Some(owner.clone());
-                editor.select(Selection {
-                    table: owner.table().to_owned(),
-                    keys: vec![owner.key().to_owned()],
-                    parts: rest.split(',').map(|name| format!("node:{name}")).collect(),
-                });
+                let parts = rest.split(',').map(|name| format!("node:{name}")).collect();
+                editor.select(RowSelection::parts(owner.table(), owner.key(), parts));
             }
         }
         "make-shared" | "make-inline" | "connect" => {
-            let owner = editor
-                .open_tabs
-                .iter()
-                .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
-                .filter_map(|tab| match tab {
-                    Tab::Script(owner) => Some(owner.clone()),
-                    _ => None,
-                })
-                .last();
+            let owner = last_script_owner(editor);
             let pending = match kind {
-                "make-shared" => Some(crate::views::script::Pending::MakeShared),
-                "make-inline" => Some(crate::views::script::Pending::MakeInline),
+                "make-shared" => Some(PendingScriptAction::MakeShared),
+                "make-inline" => Some(PendingScriptAction::MakeInline),
                 _ => {
                     let parts: Vec<&str> = rest.split(':').collect();
                     match parts.as_slice() {
-                        [from, field, to] => Some(crate::views::script::Pending::Connect {
+                        [from, field, to] => Some(PendingScriptAction::Connect {
                             from: (*from).to_owned(),
                             field: format!("/{field}"),
                             to: (*to).to_owned(),
@@ -185,167 +189,84 @@ fn open_one(editor: &mut Editor, name: &str) {
         }
         "bottom" => {
             editor.panels.bottom = match rest {
-                "may-do" => crate::app::BottomTab::MayDo,
-                "used-by" => crate::app::BottomTab::UsedBy,
-                "run" => crate::app::BottomTab::Run,
-                "output" => crate::app::BottomTab::Output,
-                _ => crate::app::BottomTab::History,
+                "may-do" => BottomTab::MayDo,
+                "used-by" => BottomTab::UsedBy,
+                "run" => BottomTab::Run,
+                "output" => BottomTab::Output,
+                _ => BottomTab::History,
             };
         }
         "model" => {
-            editor.select(Selection::row("model", rest));
-            editor.open_tab(Tab::Model {
+            editor.select(RowSelection::row("model", rest));
+            editor.open_tab(EditorTab::Model {
                 key: rest.to_owned(),
             });
         }
         "tileset" => {
-            editor.select(Selection::row("tileset", rest));
-            editor.open_tab(Tab::Tileset {
+            editor.select(RowSelection::row("tileset", rest));
+            editor.open_tab(EditorTab::Tileset {
                 key: rest.to_owned(),
             });
         }
-        "sheet" => editor.open_tab(Tab::Sheet {
+        "sheet" => editor.open_tab(EditorTab::Spreadsheet {
             table: rest.to_owned(),
         }),
-        "world" => editor.open_tab(Tab::World),
+        "world" => editor.open_tab(EditorTab::World),
         "mp" => model_step(editor, rest),
         "tp" => tileset_step(editor, rest),
         "imp" => editor.jobs.script.push_back(rest.to_owned()),
         "sh" => sheet_step(editor, rest),
         "wm" => {
-            use crate::views::world::{ColourBy, ColourOf, ColourShow, Lens, Part};
-            editor.open_tab(Tab::World);
-            let view = &mut editor.views.world;
+            editor.open_tab(EditorTab::World);
             let (what, arg) = rest.split_once(':').unwrap_or((rest, ""));
-            match what {
-                "lens" => view.lenses.push(match arg.split_once('/') {
-                    Some((table, key)) => Lens::Row {
-                        table: table.to_owned(),
-                        key: key.to_owned(),
-                    },
-                    None => Lens::Text(arg.to_owned()),
-                }),
-                "colour" => {
-                    view.colour = Some(ColourBy {
-                        value: arg.to_owned(),
-                        of: if arg.starts_with("npc.") {
-                            ColourOf::Hostile
-                        } else {
-                            ColourOf::Placed
-                        },
-                        show: ColourShow::Highest,
-                    })
-                }
-                "line" => view.quest_line = Some(arg.to_owned()),
-                "route" => {
-                    if let Some((from, to)) = arg.split_once('/') {
-                        view.route = Some((from.to_owned(), to.to_owned()));
-                    }
-                }
-                "look" => {
-                    if let Some((area, zoom)) = arg.split_once('/') {
-                        view.pending_look = Some((area.to_owned(), zoom.parse().unwrap_or(0.5)));
-                    }
-                }
-                "select" => {
-                    let parts: Vec<Part> = arg
-                        .split(',')
-                        .map(|item| Part::parse(item).unwrap_or(Part::Card(item.to_owned())))
-                        .collect();
-                    crate::views::world::select(editor, parts);
-                }
-                "layer" => match arg {
-                    "residents" => view.layers.residents = true,
-                    "populations" => view.layers.populations = true,
-                    "givers" => view.layers.givers = true,
-                    _ => {}
-                },
-                "arrange" => crate::views::world::arrange::open(editor),
-                "arrange-apply" => {
-                    let atlas = editor.project.as_ref().and_then(|project| {
-                        project.content.map(|content| {
-                            crate::views::world::atlas::Atlas::build(content, &project.files)
-                        })
-                    });
-                    if let Some(atlas) = atlas {
-                        let layout = crate::views::world::with_defaults(
-                            &atlas,
-                            crate::views::world::layout_of(editor),
-                        );
-                        let solved =
-                            crate::views::world::arrange::solve(&layout, &atlas, true, true);
-                        let mut edit = crate::project::Edit::new("Arrange the world map");
-                        edit.write_json(
-                            crate::project::row_file("world_map", "world"),
-                            &crate::value::json(&solved).unwrap_or_default(),
-                        );
-                        editor.apply(edit);
-                        editor.views.world.fitted = false;
-                    }
-                }
-                "region" | "note" => {
-                    let mut layout = crate::views::world::layout_of(editor);
-                    let (name, cards) = arg.split_once('=').unwrap_or((arg, ""));
-                    if what == "region" {
-                        layout.regions.push(crate::views::world::Region {
-                            name: name.to_owned(),
-                            cards: cards.split(',').map(str::to_owned).collect(),
-                            colour: None,
-                        });
-                    } else {
-                        let (x, y) = cards.split_once(',').unwrap_or(("0", "0"));
-                        layout.notes.push(crate::views::world::Note {
-                            text: name.to_owned(),
-                            x: x.parse().unwrap_or(0.0),
-                            y: y.parse().unwrap_or(0.0),
-                        });
-                    }
-                    let mut edit = crate::project::Edit::new(format!("Add {name}"));
-                    edit.write_json(
-                        crate::project::row_file("world_map", "world"),
-                        &crate::value::json(&layout).unwrap_or_default(),
-                    );
-                    editor.apply(edit);
-                }
-                _ => {}
-            }
+            world_step(editor, what, arg);
         }
         "section" => {
-            use crate::views::character::Section;
             editor.views.character.section = match rest {
-                "stats" => Section::Stats,
-                "bag" => Section::Bag,
-                "equipment" => Section::Equipment,
-                "start" => Section::Start,
-                "areas" => Section::AreasKnown,
-                "quests" => Section::Quests,
-                "memories" => Section::Memories,
-                "lines" => Section::LinesHeard,
-                "shops" => Section::Shops,
-                "history" => Section::History,
-                _ => Section::Identity,
+                "stats" => CharacterSection::Stats,
+                "bag" => CharacterSection::Bag,
+                "equipment" => CharacterSection::Equipment,
+                "start" => CharacterSection::Start,
+                "areas" => CharacterSection::AreasKnown,
+                "quests" => CharacterSection::Quests,
+                "memories" => CharacterSection::Memories,
+                "lines" => CharacterSection::LinesHeard,
+                "shops" => CharacterSection::Shops,
+                "history" => CharacterSection::History,
+                _ => CharacterSection::Identity,
             };
         }
         "save" => {
             editor.save();
         }
         "dialog" => match rest {
-            "keys" => editor.dialogs.push(Dialog::Keys),
-            "binaries" => editor.dialogs.push(Dialog::Binaries),
+            "keys" => editor.dialogs.push(ModalDialog::Keys),
+            "binaries" => editor.dialogs.push(ModalDialog::Binaries),
             _ => {}
         },
-        "start" => {}
         other => editor.say(format!("unknown scene {other}")),
     }
 }
 
+fn last_script_owner(editor: &Editor) -> Option<ScriptOwner> {
+    editor
+        .open_tabs
+        .iter()
+        .chain(editor.dock.iter_all_tabs().map(|(_, tab)| tab))
+        .filter_map(|tab| match tab {
+            EditorTab::Script(owner) => Some(owner.clone()),
+            _ => None,
+        })
+        .last()
+}
+
 fn sheet_step(editor: &mut Editor, rest: &str) {
     let pending = editor.open_tabs.iter().rev().find_map(|tab| match tab {
-        Tab::Sheet { table } => Some(table.clone()),
+        EditorTab::Spreadsheet { table } => Some(table.clone()),
         _ => None,
     });
-    let active = match crate::ui::active_tab(editor) {
-        Some(Tab::Sheet { table }) => Some(table),
+    let active = match ui::active_tab(editor) {
+        Some(EditorTab::Spreadsheet { table }) => Some(table),
         _ => None,
     };
     let Some(table) = pending.or(active) else {
@@ -371,10 +292,10 @@ fn sheet_step(editor: &mut Editor, rest: &str) {
                 .map(|(c, e)| (c, e == "edit"))
                 .unwrap_or((arg, false));
             if let Some((key, column)) = cell.split_once('/') {
-                let state = editor.views.sheet.views.entry(table.clone()).or_default();
+                let state = editor.views.spreadsheet.state_mut(&table);
                 state.selected = Some((key.to_owned(), column.to_owned()));
                 state.editing = edit.then(|| column.to_owned());
-                editor.select(Selection {
+                editor.select(RowSelection {
                     table: table.clone(),
                     keys: vec![key.to_owned()],
                     parts: vec![format!("#sheet/{column}")],
@@ -388,9 +309,8 @@ fn sheet_step(editor: &mut Editor, rest: &str) {
 }
 
 fn model_step(editor: &mut Editor, rest: &str) {
-    use crate::views::model::{ACTIONS, CueKind, DIRECTIONS, Page};
-    let key = match crate::ui::active_tab(editor) {
-        Some(Tab::Model { key }) => key,
+    let key = match ui::active_tab(editor) {
+        Some(EditorTab::Model { key }) => key,
         _ if editor.selection.table == "model" && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
@@ -398,29 +318,18 @@ fn model_step(editor: &mut Editor, rest: &str) {
     };
     let (what, arg) = rest.split_once(':').unwrap_or((rest, ""));
     let bits: Vec<&str> = arg.split('/').collect();
-    let action = bits
-        .first()
-        .and_then(|a| ACTIONS.iter().position(|n| n == a));
-    let direction = bits
-        .get(1)
-        .and_then(|d| DIRECTIONS.iter().position(|n| n == d));
-    crate::views::model::ensure_view(editor, &key);
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(&key)
-        .expect("the view exists");
+    let strip = ModelStrip::parse(bits.first().unwrap_or(&""), bits.get(1).unwrap_or(&""));
+    model::ensure_view(editor, &key);
+    let view = editor.views.model.view_mut(&key);
     match what {
         "strip" | "timing" | "cues" => {
-            if let (Some(a), Some(d)) = (action, direction) {
-                view.action = a;
-                view.direction = d;
+            if let Some(strip) = strip {
+                view.strip = strip;
             }
             view.page = match what {
-                "timing" => Page::Timing,
-                "cues" => Page::Cues,
-                _ => Page::Matrix,
+                "timing" => ModelPage::Timing,
+                "cues" => ModelPage::Cues,
+                _ => ModelPage::Matrix,
             };
             view.frames = bits
                 .get(2)
@@ -435,28 +344,27 @@ fn model_step(editor: &mut Editor, rest: &str) {
             view.cue = None;
             view.preview.playing = false;
             view.preview.position = 0.0;
-            let (a, d) = (view.action, view.direction);
+            let strip = view.strip;
             if let (Some(frame), Some(kind)) = (
                 view.frames.first().copied(),
-                bits.get(3).and_then(|kind| CueKind::of(kind)),
+                bits.get(3)
+                    .and_then(|kind| kind.parse::<FrameCueKind>().ok()),
             ) {
                 view.cue = Some((frame, kind));
-                crate::views::model::select_cue(editor, &key, a, d, frame, kind);
+                model::select_cue(editor, &key, strip, frame, kind);
             } else {
-                crate::views::model::select_frames(editor, &key, a, d);
+                model::select_frames(editor, &key, strip);
             }
         }
-        "hitbox" => view.page = Page::Hitbox,
+        "hitbox" => view.page = ModelPage::Hitbox,
         "busts" => {
-            view.page = Page::Busts;
+            view.page = ModelPage::Busts;
             if !arg.is_empty() {
                 view.face = Some(arg.to_owned());
                 if let Some(row) = editor.row_value("model", &key)
-                    && let Some(face) = crate::views::model::busts::faces(&row)
-                        .into_iter()
-                        .find(|face| face.name == arg)
+                    && let Some(face) = busts::faces(&row).into_iter().find(|face| face.name == arg)
                 {
-                    editor.select(Selection {
+                    editor.select(RowSelection {
                         table: "model".to_owned(),
                         keys: vec![key.clone()],
                         parts: vec![face.pointer],
@@ -466,18 +374,18 @@ fn model_step(editor: &mut Editor, rest: &str) {
         }
         "bottom" => {
             editor.panels.bottom = match arg {
-                "timeline" => crate::app::BottomTab::Timeline,
-                "sheet" => crate::app::BottomTab::Sheet,
-                "sounds" => crate::app::BottomTab::Sounds,
-                _ => crate::app::BottomTab::History,
+                "timeline" => BottomTab::Timeline,
+                "sheet" => BottomTab::Sheet,
+                "sounds" => BottomTab::Sounds,
+                _ => BottomTab::History,
             };
         }
         "setby" => {
             let (by, text) = arg.split_once('=').unwrap_or((arg, ""));
             view.timing.set_by = match by {
-                "fps" => crate::views::model::strip::SetBy::Fps,
-                "scale" => crate::views::model::strip::SetBy::Scale,
-                _ => crate::views::model::strip::SetBy::Ms,
+                "fps" => TimingSetBy::Fps,
+                "scale" => TimingSetBy::Scale,
+                _ => TimingSetBy::Ms,
             };
             view.timing.text = text.to_owned();
         }
@@ -488,145 +396,159 @@ fn model_step(editor: &mut Editor, rest: &str) {
 }
 
 fn tileset_step(editor: &mut Editor, rest: &str) {
-    use crate::views::tileset::{Mode, TileRect, TilesetDialog, WalkBrush};
-    let key = match crate::ui::active_tab(editor) {
-        Some(Tab::Tileset { key }) => key,
+    let key = match ui::active_tab(editor) {
+        Some(EditorTab::Tileset { key }) => key,
         _ if editor.selection.table == "tileset" && !editor.selection.keys.is_empty() => {
             editor.selection.keys[0].clone()
         }
         _ => return,
     };
-    crate::views::tileset::ensure_view(editor, &key);
+    tileset::ensure_view(editor, &key);
     let (what, arg) = rest.split_once(':').unwrap_or((rest, ""));
+    let view = editor.views.tileset.view_mut(&key);
     match what {
         "mode" => {
-            if let Some(mode) = Mode::of(arg) {
-                crate::views::tileset::set_mode(editor, &key, mode);
+            if let Ok(mode) = arg.parse::<TilesetMode>() {
+                tileset::set_mode(editor, &key, mode);
             }
         }
-        "brush" => {
-            let view = editor
-                .views
-                .tileset
-                .views
-                .get_mut(&key)
-                .expect("the view exists");
-            match arg {
-                "walkable" => view.walk = WalkBrush::Walkable,
-                "blocks" => view.walk = WalkBrush::Blocks,
-                "nothing" => view.walk = WalkBrush::Nothing,
-                "none" => view.surface = None,
-                other => view.surface = Some(other.to_owned()),
-            }
-        }
+        "brush" => match (arg.parse::<WalkBrush>(), arg) {
+            (Ok(walk), _) => view.walk = walk,
+            (Err(_), "none") => view.surface = None,
+            (Err(_), surface) => view.surface = Some(surface.to_owned()),
+        },
         "select" => {
             let n: Vec<u32> = arg
                 .split(',')
                 .filter_map(|v| v.trim().parse().ok())
                 .collect();
-            if n.len() == 4 {
-                let view = editor
-                    .views
-                    .tileset
-                    .views
-                    .get_mut(&key)
-                    .expect("the view exists");
-                view.selection = Some(TileRect {
-                    x: n[0],
-                    y: n[1],
-                    w: n[2].max(1),
-                    h: n[3].max(1),
+            if let [x, y, w, h] = n[..] {
+                view.selection = Some(SheetRect {
+                    x,
+                    y,
+                    w: w.max(1),
+                    h: h.max(1),
                 });
-                if view.mode == Mode::Animation {
-                    crate::views::tileset::select_parts(
-                        editor,
-                        &key,
-                        vec!["/animation".to_owned()],
-                    );
+                if view.mode == TilesetMode::Animation {
+                    tileset::select_part(editor, &key, tileset::ANIMATION_PART);
                 }
             }
         }
         "tile" => {
             if let Ok(tile) = arg.parse::<u32>() {
-                crate::views::tileset::select_tile(editor, &key, tile);
+                tileset::select_tile(editor, &key, tile);
             }
         }
-        "set" => {
-            let view = editor
-                .views
-                .tileset
-                .views
-                .get_mut(&key)
-                .expect("the view exists");
-            view.set = Some(arg.to_owned());
-            view.terrain = 1;
-        }
+        "set" => view.pick_set(arg.to_owned()),
         "terrain" => {
             if let Ok(index) = arg.parse::<usize>() {
-                let view = editor
-                    .views
-                    .tileset
-                    .views
-                    .get_mut(&key)
-                    .expect("the view exists");
                 view.terrain = index;
             }
         }
         "closeup" => {
             if let Ok(tile) = arg.parse::<u32>() {
-                let view = editor
-                    .views
-                    .tileset
-                    .views
-                    .get_mut(&key)
-                    .expect("the view exists");
                 view.closeup = Some(tile);
                 view.tile = Some(tile);
             }
         }
         "bottom" => {
             editor.panels.bottom = match arg {
-                "surfaces" => crate::app::BottomTab::Surfaces,
-                "mixes" => crate::app::BottomTab::Mixes,
-                "timeline" => crate::app::BottomTab::Timeline,
-                _ => crate::app::BottomTab::History,
+                "surfaces" => BottomTab::Surfaces,
+                "mixes" => BottomTab::Mixes,
+                "timeline" => BottomTab::Timeline,
+                _ => BottomTab::History,
             };
         }
         "zoom" => {
             if let Ok(zoom) = arg.parse::<f32>() {
-                let view = editor
-                    .views
-                    .tileset
-                    .views
-                    .get_mut(&key)
-                    .expect("the view exists");
                 view.zoom = zoom;
             }
         }
         "dialog" => {
-            let view = editor
-                .views
-                .tileset
-                .views
-                .get_mut(&key)
-                .expect("the view exists");
             view.dialog = match arg {
-                "blueprint" => Some(TilesetDialog::MakeBlueprint {
+                "blueprint" => Some(TileSheetDialog::MakeBlueprint(TileBlueprintDialog {
                     name: format!("{key}_part"),
                     error: None,
-                }),
-                "surface" => Some(TilesetDialog::NewSurface {
-                    name: String::new(),
-                    footstep: String::new(),
-                    error: None,
-                }),
-                "set" => Some(TilesetDialog::NewTerrainSet {
-                    name: String::new(),
-                    terrains: String::new(),
-                    error: None,
-                }),
+                })),
+                "surface" => Some(TileSheetDialog::NewSurface(NewSurfaceDialog::default())),
+                "set" => Some(TileSheetDialog::NewTerrainSet(
+                    NewTerrainSetDialog::default(),
+                )),
                 _ => None,
             };
+        }
+        _ => {}
+    }
+}
+
+fn world_step(editor: &mut Editor, what: &str, arg: &str) {
+    let view = &mut editor.views.world;
+    match what {
+        "lens" => view.lenses.push(match arg.split_once('/') {
+            Some((table, key)) => MapLens::Row {
+                table: table.to_owned(),
+                key: key.to_owned(),
+            },
+            None => MapLens::Text(arg.to_owned()),
+        }),
+        "colour" => view.colour = ColourField::parse(arg).map(ColourBy::new),
+        "line" => view.quest_line = Some(arg.to_owned()),
+        "route" => {
+            view.route = arg.split_once('/').map(|(from, to)| MapRoute {
+                from: from.to_owned(),
+                to: to.to_owned(),
+            });
+        }
+        "look" => {
+            if let Some((area, zoom)) = arg.split_once('/') {
+                view.pending_look = Some(MapLook {
+                    area: area.to_owned(),
+                    zoom: zoom.parse().unwrap_or(0.5),
+                });
+            }
+        }
+        "select" => {
+            let parts = arg
+                .split(',')
+                .map(|item| {
+                    item.parse()
+                        .unwrap_or_else(|_| MapPart::Card(item.to_owned()))
+                })
+                .collect();
+            world::select(editor, parts);
+        }
+        "layer" => match arg {
+            "residents" => view.layers.residents = true,
+            "populations" => view.layers.populations = true,
+            "givers" => view.layers.givers = true,
+            _ => {}
+        },
+        "arrange" => arrange::open(editor),
+        "arrange-apply" => arrange::arrange_everything(editor),
+        "region" | "note" => {
+            let Some(map) = OpenWorldMap::of(editor) else {
+                return;
+            };
+            let (name, rest) = arg.split_once('=').unwrap_or((arg, ""));
+            map.change(editor, ContentEdit::new(format!("Add {name}")), |layout| {
+                if what == "region" {
+                    layout.regions.push(Region {
+                        name: name.to_owned(),
+                        cards: rest
+                            .split(',')
+                            .filter_map(|key| map.atlas.id(key))
+                            .collect(),
+                        colour: None,
+                    });
+                } else {
+                    let (x, y) = rest.split_once(',').unwrap_or(("0", "0"));
+                    layout.notes.push(Note {
+                        text: name.to_owned(),
+                        x: x.parse().unwrap_or(0.0),
+                        y: y.parse().unwrap_or(0.0),
+                    });
+                }
+            });
         }
         _ => {}
     }

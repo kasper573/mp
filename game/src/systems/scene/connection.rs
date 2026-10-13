@@ -1,17 +1,17 @@
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_replicon::prelude::RepliconChannels;
+use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
 use ui::{Activate, button, text_colored};
 
-use super::Scene;
 use super::mode::Mode;
+use super::{Scene, despawn_all};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
 use crate::core::math::Rng;
 use crate::core::net::auth::Session;
-use crate::core::net::channels::RenetChannelsExt;
-use crate::core::net::transport::{Client, Socket};
+use crate::core::net::transport::Socket;
 use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::time::Seconds;
@@ -30,14 +30,8 @@ impl Plugin for ConnectionPlugin {
             .add_systems(OnEnter(Scene::Lost), lost)
             .add_systems(OnEnter(Scene::Area), settle)
             .add_systems(Update, retry_when_due.run_if(in_state(Scene::Lost)))
-            .add_systems(
-                OnExit(Scene::Connecting),
-                crate::systems::scene::despawn_all::<ConnectionUi>,
-            )
-            .add_systems(
-                OnExit(Scene::Lost),
-                crate::systems::scene::despawn_all::<ConnectionUi>,
-            );
+            .add_systems(OnExit(Scene::Connecting), despawn_all::<ConnectionUi>)
+            .add_systems(OnExit(Scene::Lost), despawn_all::<ConnectionUi>);
     }
 }
 
@@ -128,7 +122,7 @@ fn connect(world: &mut World, ticket: &str) {
         .resource::<ClientPlatform>()
         .0
         .connect(&format!("{ws_url}/?ticket={ticket}"));
-    world.insert_resource(Client(client));
+    world.insert_resource(client);
     world.insert_non_send(Socket(socket));
     info!("connection opened");
 }

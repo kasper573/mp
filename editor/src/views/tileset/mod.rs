@@ -4,35 +4,87 @@ pub mod sheet;
 pub mod surfaces;
 pub mod terrain;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
-use egui::{Color32, Ui};
-use serde_json::Value;
+use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
+use game::core::content::Content;
+use game::systems::area::tileset::{TileData, TilesetDef, TilesetGrid, Walk};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{Edit, Selection, row_file};
-use crate::thumbs::Thumb;
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::thumbs::{self, Thumbnail};
 use crate::ui::{theme, widgets};
-use crate::value::RowValue;
+use crate::views::area;
+use crate::views::model::preview::StripPreview;
+use crate::views::model::sounds;
+use crate::{import, value};
+use animation::OffsetUnit;
 
 pub const TABLE: &str = "tileset";
+pub const TERRAINS_PART: &str = "/terrains";
+const TILES_PART: &str = "/tiles/";
+pub const ANIMATION_PART: &str = "/animation";
 
 #[derive(Default)]
 pub struct TilesetViews {
     pub views: HashMap<String, TilesetView>,
-    pub reimports: HashMap<String, crate::import::TilesetReimport>,
-    pub counts: Option<Counts>,
+    pub reimports: HashMap<String, import::TilesetReimport>,
+    pub counts: Option<TilesetCounts>,
 }
 
-pub struct Counts {
+impl TilesetViews {
+    pub fn view(&self, key: &str) -> &TilesetView {
+        self.views
+            .get(key)
+            .expect("ensure_view ran before the tileset view was read")
+    }
+
+    pub fn view_mut(&mut self, key: &str) -> &mut TilesetView {
+        self.views.entry(key.to_owned()).or_default()
+    }
+
+    pub fn surface_use(&self, surface: &str) -> SurfaceUse {
+        self.counts
+            .as_ref()
+            .and_then(|counts| counts.surfaces.get(surface).cloned())
+            .unwrap_or_default()
+    }
+
+    pub fn areas_using(&self, tileset: &str) -> Vec<String> {
+        self.counts
+            .as_ref()
+            .and_then(|counts| counts.areas_using.get(tileset).cloned())
+            .unwrap_or_default()
+    }
+}
+
+pub struct TilesetCounts {
     pub generation: u64,
-    pub surfaces: HashMap<String, (usize, HashSet<String>)>,
+    pub surfaces: HashMap<String, SurfaceUse>,
     pub with_surface: usize,
     pub areas_using: HashMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub enum Mode {
+#[derive(Clone, Default)]
+pub struct SurfaceUse {
+    pub tiles: usize,
+    pub tilesets: BTreeSet<String>,
+}
+
+impl SurfaceUse {
+    pub fn text(&self) -> String {
+        format!(
+            "{} tiles in {} tilesets",
+            widgets::thousands(self.tiles),
+            self.tilesets.len()
+        )
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum TilesetMode {
     #[default]
     Walk,
     Surface,
@@ -40,24 +92,22 @@ pub enum Mode {
     Animation,
 }
 
-impl Mode {
-    pub const ALL: [Mode; 4] = [Mode::Walk, Mode::Surface, Mode::Terrain, Mode::Animation];
-
+impl TilesetMode {
     pub fn label(self) -> &'static str {
-        match self {
-            Mode::Walk => "walk",
-            Mode::Surface => "surface",
-            Mode::Terrain => "terrain",
-            Mode::Animation => "animation",
-        }
+        self.into()
     }
 
-    pub fn of(name: &str) -> Option<Mode> {
-        Mode::ALL.into_iter().find(|mode| mode.label() == name)
+    fn part(self) -> Option<&'static str> {
+        match self {
+            TilesetMode::Terrain => Some(TERRAINS_PART),
+            TilesetMode::Animation => Some(ANIMATION_PART),
+            TilesetMode::Walk | TilesetMode::Surface => None,
+        }
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, VariantArray)]
+#[strum(serialize_all = "snake_case")]
 pub enum WalkBrush {
     Walkable,
     #[default]
@@ -65,79 +115,139 @@ pub enum WalkBrush {
     Nothing,
 }
 
+impl WalkBrush {
+    pub fn walk(self) -> Option<Walk> {
+        match self {
+            WalkBrush::Walkable => Some(Walk::Walkable),
+            WalkBrush::Blocks => Some(Walk::Blocks),
+            WalkBrush::Nothing => None,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        walk_label(self.walk())
+    }
+}
+
+pub fn walk_label(walk: Option<Walk>) -> &'static str {
+    walk.map_or("says nothing", <&str>::from)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct TileRect {
+pub struct SheetCell {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SheetRect {
     pub x: u32,
     pub y: u32,
     pub w: u32,
     pub h: u32,
 }
 
-impl TileRect {
-    pub fn tiles(&self, columns: u32) -> Vec<Vec<u32>> {
-        (self.y..self.y + self.h)
-            .map(|row| {
-                (self.x..self.x + self.w)
-                    .map(|col| row * columns + col)
+impl SheetRect {
+    pub fn spanning(a: SheetCell, b: SheetCell) -> SheetRect {
+        SheetRect {
+            x: a.x.min(b.x),
+            y: a.y.min(b.y),
+            w: a.x.abs_diff(b.x) + 1,
+            h: a.y.abs_diff(b.y) + 1,
+        }
+    }
+
+    pub fn offsets(self) -> impl Iterator<Item = SheetCell> {
+        (0..self.h).flat_map(move |y| (0..self.w).map(move |x| SheetCell { x, y }))
+    }
+
+    pub fn tile_at(self, offset: SheetCell, columns: u32) -> u32 {
+        (self.y + offset.y) * columns + self.x + offset.x
+    }
+
+    pub fn tiles(self, columns: u32) -> impl Iterator<Item = u32> {
+        self.offsets()
+            .map(move |offset| self.tile_at(offset, columns))
+    }
+
+    pub fn rows(self, columns: u32) -> Vec<Vec<u32>> {
+        (0..self.h)
+            .map(|y| {
+                (0..self.w)
+                    .map(|x| self.tile_at(SheetCell { x, y }, columns))
                     .collect()
             })
             .collect()
     }
 
-    pub fn contains(&self, tile: u32, columns: u32) -> bool {
-        let (x, y) = (tile % columns, tile / columns);
-        x >= self.x && x < self.x + self.w && y >= self.y && y < self.y + self.h
+    pub fn count(self) -> u32 {
+        self.w * self.h
     }
 
-    pub fn count(&self) -> u32 {
-        self.w * self.h
+    pub fn text(self) -> String {
+        format!(
+            "{} tiles · {}, {} · {} × {}",
+            self.count(),
+            self.x,
+            self.y,
+            self.w,
+            self.h
+        )
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum TilesetDialog {
-    MakeBlueprint {
-        name: String,
-        error: Option<String>,
-    },
-    NewSurface {
-        name: String,
-        footstep: String,
-        error: Option<String>,
-    },
-    NewTerrainSet {
-        name: String,
-        terrains: String,
-        error: Option<String>,
-    },
+pub enum TileSheetDialog {
+    MakeBlueprint(TileBlueprintDialog),
+    NewSurface(NewSurfaceDialog),
+    NewTerrainSet(NewTerrainSetDialog),
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct TileBlueprintDialog {
+    pub name: String,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct NewSurfaceDialog {
+    pub name: String,
+    pub footstep: String,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct NewTerrainSetDialog {
+    pub name: String,
+    pub terrains: String,
+    pub error: Option<String>,
 }
 
 pub struct TilesetView {
-    pub mode: Mode,
+    pub mode: TilesetMode,
     pub zoom: f32,
     pub walk: WalkBrush,
     pub surface: Option<String>,
     pub set: Option<String>,
     pub terrain: usize,
-    pub selection: Option<TileRect>,
-    pub anchor: Option<(u32, u32)>,
+    pub selection: Option<SheetRect>,
+    pub anchor: Option<SheetCell>,
     pub tile: Option<u32>,
     pub closeup: Option<u32>,
-    pub stroke: Vec<u32>,
-    pub painting: bool,
-    pub selecting: bool,
-    pub dialog: Option<TilesetDialog>,
-    pub preview: crate::views::model::preview::Preview,
+    pub stroke: Option<Vec<u32>>,
+    pub dialog: Option<TileSheetDialog>,
+    pub preview: StripPreview,
     pub frame: Option<usize>,
-    pub each_draft: String,
+    pub offsets_in: OffsetUnit,
+    pub missing_shown: BTreeSet<String>,
 }
 
 impl Default for TilesetView {
     fn default() -> TilesetView {
         TilesetView {
-            mode: Mode::Walk,
+            mode: TilesetMode::default(),
             zoom: 1.0,
-            walk: WalkBrush::Blocks,
+            walk: WalkBrush::default(),
             surface: None,
             set: None,
             terrain: 1,
@@ -145,156 +255,402 @@ impl Default for TilesetView {
             anchor: None,
             tile: None,
             closeup: None,
-            stroke: Vec::new(),
-            painting: false,
-            selecting: false,
+            stroke: None,
             dialog: None,
-            preview: crate::views::model::preview::Preview::default(),
+            preview: StripPreview::default(),
             frame: None,
-            each_draft: String::new(),
+            offsets_in: OffsetUnit::default(),
+            missing_shown: BTreeSet::new(),
         }
+    }
+}
+
+impl TilesetView {
+    pub fn toggle_frame(&mut self, index: usize) {
+        self.frame = (self.frame != Some(index)).then_some(index);
+    }
+
+    pub fn pick_set(&mut self, set: String) {
+        self.set = Some(set);
+        self.terrain = 1;
     }
 }
 
 #[derive(Clone)]
-pub struct Grid {
-    pub tile_px: u32,
-    pub columns: u32,
-    pub rows: u32,
-    pub thumb: Option<Thumb>,
+pub struct TilesetSheet {
+    pub grid: TilesetGrid,
+    pub thumb: Option<Thumbnail>,
 }
 
-impl Grid {
-    pub fn count(&self) -> u32 {
-        self.columns * self.rows
-    }
-
-    pub fn uv(&self, tile: u32) -> egui::Rect {
-        let Some(thumb) = &self.thumb else {
-            return egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
+impl TilesetSheet {
+    pub fn of(editor: &mut Editor, ctx: &egui::Context, def: &TilesetDef) -> TilesetSheet {
+        let thumb = editor.thumb(ctx, def.image.as_str());
+        let grid = match &thumb {
+            Some(thumb) => def.grid(thumb.size[0] as u32, thumb.size[1] as u32),
+            None => def.grid(def.tile, def.tile),
         };
-        crate::thumbs::uv(
-            thumb.size,
-            (tile % self.columns * self.tile_px) as f32,
-            (tile / self.columns * self.tile_px) as f32,
-            self.tile_px as f32,
-            self.tile_px as f32,
-        )
+        TilesetSheet { grid, thumb }
     }
 
-    pub fn draw(&self, painter: &egui::Painter, rect: egui::Rect, tile: u32) {
-        if let Some(thumb) = &self.thumb {
-            painter.image(thumb.texture.id(), rect, self.uv(tile), Color32::WHITE);
+    pub fn columns(&self) -> u32 {
+        self.grid.columns
+    }
+
+    pub fn count(&self) -> u32 {
+        self.grid.count()
+    }
+
+    pub fn cell(&self, tile: u32) -> SheetCell {
+        SheetCell {
+            x: tile % self.grid.columns,
+            y: tile / self.grid.columns,
         }
     }
 
-    pub fn xy(&self, tile: u32) -> (u32, u32) {
-        (tile % self.columns, tile / self.columns)
+    pub fn tile(&self, cell: SheetCell) -> Option<u32> {
+        (cell.x < self.grid.columns && cell.y < self.grid.rows)
+            .then_some(cell.y * self.grid.columns + cell.x)
+    }
+
+    pub fn fit(&self, width: f32, smallest: f32) -> f32 {
+        (width / self.grid.columns as f32)
+            .clamp(smallest, 34.0)
+            .floor()
+    }
+
+    pub fn size(&self, shown: f32) -> Vec2 {
+        Vec2::new(
+            self.grid.columns as f32 * shown,
+            self.grid.rows as f32 * shown,
+        )
+    }
+
+    pub fn draw(&self, painter: &egui::Painter, rect: ERect, tile: u32) {
+        if let Some(thumb) = &self.thumb {
+            let region = self.grid.region(tile);
+            let uv = thumbs::uv(
+                thumb.size,
+                region.origin.x,
+                region.origin.y,
+                region.size.width,
+                region.size.height,
+            );
+            painter.image(thumb.texture.id(), rect, uv, Color32::WHITE);
+        }
+    }
+
+    pub fn draw_sheet(&self, painter: &egui::Painter, rect: ERect) {
+        if let Some(thumb) = &self.thumb {
+            let used = (self.grid.columns * self.grid.tile) as f32;
+            let tall = (self.grid.rows * self.grid.tile) as f32;
+            let uv = thumbs::uv(thumb.size, 0.0, 0.0, used, tall);
+            painter.image(thumb.texture.id(), rect, uv, Color32::WHITE);
+        }
     }
 }
 
-pub fn grid_of(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> Grid {
-    let image = row.text("image").to_owned();
-    let tile_px = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
-    let Editor { project, form, .. } = editor;
-    let thumb = project
-        .as_ref()
-        .and_then(|project| form.thumbnails.image(ctx, &project.files, &image));
-    let (columns, rows) = thumb
-        .as_ref()
-        .map(|thumb| {
-            (
-                (thumb.size[0] as u32 / tile_px).max(1),
-                (thumb.size[1] as u32 / tile_px).max(1),
-            )
-        })
-        .unwrap_or((1, 1));
-    Grid {
-        tile_px,
-        columns,
-        rows,
-        thumb,
+#[derive(Clone, Copy)]
+pub struct SheetLayout {
+    pub rect: ERect,
+    pub shown: f32,
+}
+
+impl SheetLayout {
+    pub fn cell_rect(&self, cell: SheetCell) -> ERect {
+        ERect::from_min_size(
+            self.rect.min + Vec2::new(cell.x as f32 * self.shown, cell.y as f32 * self.shown),
+            Vec2::splat(self.shown),
+        )
     }
+
+    pub fn tile_rect(&self, sheet: &TilesetSheet, tile: u32) -> ERect {
+        self.cell_rect(sheet.cell(tile))
+    }
+
+    pub fn block_rect(&self, block: SheetRect) -> ERect {
+        ERect::from_min_size(
+            self.cell_rect(SheetCell {
+                x: block.x,
+                y: block.y,
+            })
+            .min,
+            Vec2::new(block.w as f32 * self.shown, block.h as f32 * self.shown),
+        )
+    }
+
+    pub fn tile_at(&self, sheet: &TilesetSheet, pos: Pos2) -> Option<u32> {
+        if !self.rect.contains(pos) {
+            return None;
+        }
+        sheet.tile(self.unclamped_cell(pos))
+    }
+
+    pub fn clamped_cell(&self, sheet: &TilesetSheet, pos: Pos2) -> SheetCell {
+        let cell = self.unclamped_cell(pos.clamp(self.rect.min, self.rect.max));
+        SheetCell {
+            x: cell.x.min(sheet.grid.columns - 1),
+            y: cell.y.min(sheet.grid.rows - 1),
+        }
+    }
+
+    pub fn draw_lines(&self, painter: &egui::Painter, sheet: &TilesetSheet, stroke: Stroke) {
+        for x in 0..=sheet.grid.columns {
+            let sx = self.rect.min.x + x as f32 * self.shown;
+            painter.line_segment(
+                [
+                    Pos2::new(sx, self.rect.min.y),
+                    Pos2::new(sx, self.rect.max.y),
+                ],
+                stroke,
+            );
+        }
+        for y in 0..=sheet.grid.rows {
+            let sy = self.rect.min.y + y as f32 * self.shown;
+            painter.line_segment(
+                [
+                    Pos2::new(self.rect.min.x, sy),
+                    Pos2::new(self.rect.max.x, sy),
+                ],
+                stroke,
+            );
+        }
+    }
+
+    fn unclamped_cell(&self, pos: Pos2) -> SheetCell {
+        let offset = (pos - self.rect.min) / self.shown;
+        SheetCell {
+            x: offset.x.max(0.0) as u32,
+            y: offset.y.max(0.0) as u32,
+        }
+    }
+}
+
+pub struct OpenTileset {
+    pub key: String,
+    pub def: TilesetDef,
+    pub content: Content,
+    pub sheet: TilesetSheet,
+}
+
+impl OpenTileset {
+    pub fn read(editor: &mut Editor, ctx: &egui::Context, key: &str) -> Option<OpenTileset> {
+        let content = editor.loaded()?;
+        let def = typed_def(editor, content, key)?;
+        let sheet = TilesetSheet::of(editor, ctx, &def);
+        Some(OpenTileset {
+            key: key.to_owned(),
+            def,
+            content,
+            sheet,
+        })
+    }
+
+    pub fn surface(&self, tile: u32) -> Option<&'static str> {
+        self.def
+            .surface(tile)
+            .map(|surface| surface.key(&self.content))
+    }
+
+    pub fn terrains(&self, set: &str) -> &[String] {
+        self.def.terrains.get(set).map_or(&[], Vec::as_slice)
+    }
+
+    pub fn corners(&self, tile: u32, set: &str) -> Option<&[String; 4]> {
+        self.def.data(tile)?.corners.get(set)
+    }
+
+    pub fn animated(&self, tile: u32) -> bool {
+        !self.def.animation(tile).is_empty()
+    }
+}
+
+pub fn change_tileset(
+    editor: &mut Editor,
+    key: &str,
+    edit: ContentEdit,
+    change: impl FnOnce(&mut TilesetDef),
+) -> bool {
+    try_change_tileset(editor, key, edit, change).is_ok()
+}
+
+pub fn try_change_tileset(
+    editor: &mut Editor,
+    key: &str,
+    mut edit: ContentEdit,
+    change: impl FnOnce(&mut TilesetDef),
+) -> Result<(), String> {
+    let content = editor.loaded().ok_or("the folder does not load")?;
+    let mut def = typed_def(editor, content, key).ok_or_else(|| unreadable(editor, key))?;
+    change(&mut def);
+    def.tiles.retain(|_, data| !is_blank(data));
+    let json = value::untyped(content, &def).ok_or("the tileset does not write")?;
+    edit.write_json(row_file(TABLE, key), &json);
+    editor.try_apply(edit)
+}
+
+pub fn tile_mut(def: &mut TilesetDef, tile: u32) -> &mut TileData {
+    def.tiles.entry(tile).or_default()
 }
 
 pub fn ensure_view(editor: &mut Editor, key: &str) {
-    if !editor.views.tileset.views.contains_key(key) {
-        editor
-            .views
-            .tileset
-            .views
-            .insert(key.to_owned(), TilesetView::default());
+    if editor.views.tileset.views.contains_key(key) {
+        return;
     }
+    let surface = sounds::surfaces(editor)
+        .into_iter()
+        .next()
+        .map(|surface| surface.key);
+    let view = TilesetView {
+        surface,
+        ..TilesetView::default()
+    };
+    editor.views.tileset.views.insert(key.to_owned(), view);
 }
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(row) = editor.row_value(TABLE, key) else {
-        ui.label(theme::muted(format!("tileset/{key} is gone")));
-        return;
-    };
     ensure_view(editor, key);
     refresh_counts(editor);
     let ctx = ui.ctx().clone();
-    let grid = grid_of(editor, &ctx, &row);
-    dialogs(editor, &ctx, key, &row, &grid);
+    let Some(tileset) = OpenTileset::read(editor, &ctx, key) else {
+        ui.label(theme::muted(unreadable(editor, key)));
+        return;
+    };
+    let reimporting = editor.views.tileset.reimports.contains_key(key);
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
             ui.set_min_size(ui.available_size());
-            if editor.views.tileset.reimports.contains_key(key) {
-                crate::import::show_tileset_reimport(editor, ui, key);
+            if reimporting {
+                import::show_tileset_reimport(editor, ui, key);
                 return;
             }
-            header(editor, ui, key, &row);
+            header(editor, ui, &tileset);
             ui.add_space(6.0);
-            let mode = editor.views.tileset.views[key].mode;
-            match mode {
-                Mode::Terrain => terrain::show(editor, ui, key, &row, &grid),
-                Mode::Animation => animation::show(editor, ui, key, &row, &grid),
-                _ => {
-                    sheet::show(editor, ui, key, &row, &grid);
-                }
+            match editor.views.tileset.view(key).mode {
+                TilesetMode::Terrain => terrain::show(editor, ui, &tileset),
+                TilesetMode::Animation => animation::show(editor, ui, &tileset),
+                TilesetMode::Walk | TilesetMode::Surface => sheet::show(editor, ui, &tileset),
             }
         });
-    if !editor.views.tileset.reimports.contains_key(key) {
-        status(editor, key, &row, &grid);
+    if !reimporting {
+        status(editor, &tileset);
+    }
+    dialogs(editor, &ctx, &tileset);
+}
+
+pub fn set_mode(editor: &mut Editor, key: &str, mode: TilesetMode) {
+    let view = editor.views.tileset.view_mut(key);
+    view.mode = mode;
+    view.anchor = None;
+    view.stroke = None;
+    let tile = view.tile;
+    match (mode.part(), tile) {
+        (Some(part), _) => select_part(editor, key, part),
+        (None, Some(tile)) => select_tile(editor, key, tile),
+        (None, None) => editor.select(RowSelection::row(TABLE, key)),
     }
 }
 
-fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
-    let mode = editor.views.tileset.views[key].mode;
+pub fn select_tile(editor: &mut Editor, key: &str, tile: u32) {
+    editor.views.tileset.view_mut(key).tile = Some(tile);
+    select_part(editor, key, &format!("{TILES_PART}{tile}"));
+}
+
+pub fn tile_of_part(part: &str) -> Option<u32> {
+    part.strip_prefix(TILES_PART)?.parse().ok()
+}
+
+pub fn select_part(editor: &mut Editor, key: &str, part: &str) {
+    editor.select(RowSelection::parts(TABLE, key, vec![part.to_owned()]));
+}
+
+pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
+    if let Some(key) = selection.keys.first()
+        && selection
+            .parts
+            .first()
+            .is_some_and(|part| part == import::IMPORT_PART)
+    {
+        let key = key.clone();
+        egui::ScrollArea::vertical()
+            .id_salt(("tileset-import", &key))
+            .show(ui, |ui| import::inspect_tileset_reimport(editor, ui, &key));
+        return;
+    }
+    inspect::show(editor, ui, selection);
+}
+
+pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
+    match editor.views.tileset.views.get(key).map(|view| view.mode) {
+        Some(TilesetMode::Surface) => vec![BottomTab::Surfaces],
+        Some(TilesetMode::Terrain) => vec![BottomTab::Mixes],
+        Some(TilesetMode::Animation) => vec![BottomTab::Timeline],
+        Some(TilesetMode::Walk) | None => Vec::new(),
+    }
+}
+
+pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
+    ensure_view(editor, key);
+    let ctx = ui.ctx().clone();
+    let Some(tileset) = OpenTileset::read(editor, &ctx, key) else {
+        return;
+    };
+    match tab {
+        BottomTab::Surfaces => surfaces::bottom(editor, ui, key),
+        BottomTab::Mixes => terrain::mixes(editor, ui, &tileset),
+        BottomTab::Timeline => animation::timeline(editor, ui, &tileset),
+        _ => {}
+    }
+}
+
+fn typed_def(editor: &Editor, content: Content, key: &str) -> Option<TilesetDef> {
+    value::typed(content, editor.row_value(TABLE, key)?)
+}
+
+fn is_blank(data: &TileData) -> bool {
+    data.walk.is_none()
+        && data.surface.is_none()
+        && data.corners.is_empty()
+        && data.animation.is_empty()
+}
+
+fn unreadable(editor: &Editor, key: &str) -> String {
+    if editor.row(TABLE, key).is_none() {
+        format!("tileset/{key} is gone")
+    } else {
+        format!("tileset/{key} does not read as a tileset; the inspector shows why")
+    }
+}
+
+fn header(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
+    let key = tileset.key.as_str();
+    let mode = editor.views.tileset.view(key).mode;
     let mut picked = None;
     let mut import = None;
     ui.horizontal(|ui| {
         ui.label(theme::mono(format!("tileset/{key}")).color(theme::CODE));
         ui.add_space(8.0);
-        for option in Mode::ALL {
-            let on = option == mode;
-            let (fill, ink) = if on {
-                (theme::ACCENT, Color32::WHITE)
-            } else {
-                (theme::RAISED, theme::TEXT)
-            };
-            if widgets::chip_coloured(ui, option.label(), fill, ink).clicked() {
-                picked = Some(option);
+        for option in TilesetMode::VARIANTS {
+            if widgets::mode_chip(ui, option.label(), *option == mode).clicked() {
+                picked = Some(*option);
             }
         }
         ui.add_space(12.0);
         match mode {
-            Mode::Walk => sheet::walk_legend(editor, ui, key),
-            Mode::Surface => sheet::surface_legend(editor, ui, key),
-            Mode::Terrain => terrain::legend(editor, ui, key, row),
-            Mode::Animation => animation::legend(ui),
+            TilesetMode::Walk => sheet::walk_legend(editor, ui, key),
+            TilesetMode::Surface => sheet::surface_legend(editor, ui, key),
+            TilesetMode::Terrain => terrain::legend(editor, ui, tileset),
+            TilesetMode::Animation => animation::legend(ui),
         }
         if ui.available_width() > 120.0 {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.menu_button("🗋 Import ▾", |ui| {
                     if ui.button("Onto this tileset…").clicked() {
-                        import = Some(true);
+                        import = Some(Reimport::Tiles);
                         ui.close();
                     }
                     if ui.button("An animation onto its tiles…").clicked() {
-                        import = Some(false);
+                        import = Some(Reimport::Animation);
                         ui.close();
                     }
                 });
@@ -305,148 +661,22 @@ fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         set_mode(editor, key, mode);
     }
     match import {
-        Some(true) => crate::import::start_for_tileset(editor, key),
-        Some(false) => crate::import::start_animation(editor, key),
+        Some(Reimport::Tiles) => import::start_for_tileset(editor, key),
+        Some(Reimport::Animation) => import::start_animation(editor, key),
         None => {}
     }
 }
 
-pub fn set_mode(editor: &mut Editor, key: &str, mode: Mode) {
-    let view = editor
-        .views
-        .tileset
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.mode = mode;
-    view.anchor = None;
-    view.painting = false;
-    match mode {
-        Mode::Terrain => select_parts(editor, key, vec!["/terrains".to_owned()]),
-        Mode::Animation => select_parts(editor, key, vec!["/animation".to_owned()]),
-        _ => {
-            let tile = editor.views.tileset.views[key].tile;
-            match tile {
-                Some(tile) => select_tile(editor, key, tile),
-                None => editor.select(Selection::row(TABLE, key)),
-            }
-        }
-    }
-}
-
-pub fn select_tile(editor: &mut Editor, key: &str, tile: u32) {
-    let view = editor
-        .views
-        .tileset
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.tile = Some(tile);
-    select_parts(editor, key, vec![format!("/tiles/{tile}")]);
-}
-
-pub fn select_parts(editor: &mut Editor, key: &str, parts: Vec<String>) {
-    editor.select(Selection {
-        table: TABLE.to_owned(),
-        keys: vec![key.to_owned()],
-        parts,
-    });
-}
-
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
-    if selection
-        .parts
-        .first()
-        .is_some_and(|part| part == "/import")
-        && let Some(key) = selection.keys.first()
-    {
-        let key = key.clone();
-        egui::ScrollArea::vertical()
-            .id_salt(("tileset-import", &key))
-            .show(ui, |ui| {
-                crate::import::inspect_tileset_reimport(editor, ui, &key)
-            });
-        return;
-    }
-    inspect::show(editor, ui, selection);
-}
-
-pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
-    match editor.views.tileset.views.get(key).map(|view| view.mode) {
-        Some(Mode::Surface) => vec![BottomTab::Surfaces],
-        Some(Mode::Terrain) => vec![BottomTab::Mixes],
-        Some(Mode::Animation) => vec![BottomTab::Timeline],
-        _ => Vec::new(),
-    }
-}
-
-pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
-    let Some(row) = editor.row_value(TABLE, key) else {
-        return;
-    };
-    ensure_view(editor, key);
-    let ctx = ui.ctx().clone();
-    let grid = grid_of(editor, &ctx, &row);
-    match tab {
-        BottomTab::Surfaces => surfaces::bottom(editor, ui, key, &row),
-        BottomTab::Mixes => terrain::mixes(editor, ui, key, &row, &grid),
-        BottomTab::Timeline => animation::timeline(editor, ui, key, &row, &grid),
-        _ => {}
-    }
-}
-
-pub fn tile_data(row: &Value, tile: u32) -> Value {
-    row["tiles"][tile.to_string()].clone()
-}
-
-pub fn set_tile_field(row: &mut Value, tile: u32, field: &str, value: Value) {
-    if !row["tiles"].is_object() {
-        row["tiles"] = Value::Object(serde_json::Map::new());
-    }
-    let key = tile.to_string();
-    let tiles = row["tiles"].as_object_mut().expect("an object");
-    let entry = tiles
-        .entry(key.clone())
-        .or_insert_with(|| Value::Object(serde_json::Map::new()));
-    match value {
-        Value::Null => {
-            if let Some(object) = entry.as_object_mut() {
-                object.remove(field);
-            }
-        }
-        other => entry[field] = other,
-    }
-    let empty = entry.as_object().is_none_or(|object| {
-        object.is_empty()
-            || object.values().all(|value| match value {
-                Value::Null => true,
-                Value::Array(items) => items.is_empty(),
-                Value::Object(fields) => fields.is_empty(),
-                _ => false,
-            })
-    });
-    if empty {
-        tiles.remove(&key);
-    }
-}
-
-pub fn write_row(
-    editor: &mut Editor,
-    key: &str,
-    row: &Value,
-    label: impl Into<String>,
-    merge: bool,
-) -> bool {
-    let mut edit = Edit::new(label);
-    if merge {
-        edit = edit.merging();
-    }
-    edit.write_json(row_file(TABLE, key), row);
-    editor.apply(edit)
+enum Reimport {
+    Tiles,
+    Animation,
 }
 
 fn refresh_counts(editor: &mut Editor) {
     let Some(project) = editor.project.as_ref() else {
+        return;
+    };
+    let Some(content) = project.content else {
         return;
     };
     if editor
@@ -458,59 +688,38 @@ fn refresh_counts(editor: &mut Editor) {
     {
         return;
     }
-    let mut surfaces: HashMap<String, (usize, HashSet<String>)> = HashMap::new();
+    let mut surfaces: HashMap<String, SurfaceUse> = HashMap::new();
     let mut with_surface = 0;
-    for path in project.files.paths_under("tables/tileset/") {
-        let Some((_, key)) = crate::project::row_of(path) else {
-            continue;
-        };
-        let Some(row) = project.files.json(path) else {
-            continue;
-        };
-        for data in row["tiles"]
-            .as_object()
-            .into_iter()
-            .flat_map(|tiles| tiles.values())
+    for id in content.ids::<TilesetDef>() {
+        let tileset = id.key(&content);
+        for surface in id
+            .get(&content)
+            .tiles
+            .values()
+            .filter_map(|data| data.surface)
         {
-            if let Some(surface) = data["surface"].as_str() {
-                with_surface += 1;
-                let entry = surfaces.entry(surface.to_owned()).or_default();
-                entry.0 += 1;
-                entry.1.insert(key.to_owned());
-            }
+            with_surface += 1;
+            let entry = surfaces
+                .entry(surface.key(&content).to_owned())
+                .or_default();
+            entry.tiles += 1;
+            entry.tilesets.insert(tileset.to_owned());
         }
     }
     let mut areas_using: HashMap<String, Vec<String>> = HashMap::new();
-    for path in project.files.paths_under("tables/area/") {
-        if !path.ends_with("/palette.csv") {
-            continue;
-        }
-        let Some(area) = path
-            .strip_prefix("tables/area/")
-            .and_then(|rest| rest.strip_suffix("/palette.csv"))
-        else {
-            continue;
-        };
-        let Some(text) = project.files.text(path) else {
-            continue;
-        };
-        let mut seen: BTreeMap<String, ()> = BTreeMap::new();
-        for line in text.lines().skip(1) {
-            if let Some((tileset, _)) = line.split_once(',') {
-                seen.insert(tileset.to_owned(), ());
-            }
-        }
-        for tileset in seen.keys() {
+    for (area, rows) in area::grid::palettes(&project.files) {
+        let seen: BTreeSet<&str> = rows.iter().map(|row| row.tileset.as_str()).collect();
+        for tileset in seen {
             areas_using
-                .entry(tileset.clone())
+                .entry(tileset.to_owned())
                 .or_default()
-                .push(area.to_owned());
+                .push(area.clone());
         }
     }
     for areas in areas_using.values_mut() {
         areas.sort();
     }
-    editor.views.tileset.counts = Some(Counts {
+    editor.views.tileset.counts = Some(TilesetCounts {
         generation: project.generation,
         surfaces,
         with_surface,
@@ -518,98 +727,66 @@ fn refresh_counts(editor: &mut Editor) {
     });
 }
 
-pub fn areas_using(editor: &Editor, key: &str) -> Vec<String> {
-    editor
-        .views
-        .tileset
-        .counts
-        .as_ref()
-        .and_then(|counts| counts.areas_using.get(key).cloned())
-        .unwrap_or_default()
-}
-
-fn status(editor: &mut Editor, key: &str, row: &Value, grid: &Grid) {
-    let view = &editor.views.tileset.views[key];
+fn status(editor: &mut Editor, tileset: &OpenTileset) {
+    let view = editor.views.tileset.view(&tileset.key);
+    let tiles = || tileset.def.tiles.values();
     let mut left = Vec::new();
     if let Some(tile) = view.tile {
-        let (x, y) = grid.xy(tile);
-        left.push(format!("tile {tile} · {x}, {y}"));
+        let cell = tileset.sheet.cell(tile);
+        left.push(format!("tile {tile} · {}, {}", cell.x, cell.y));
     }
-    let tiles = row["tiles"].as_object();
-    let walk_said = tiles.map_or(0, |tiles| {
-        tiles.values().filter(|d| d["walk"].is_string()).count()
-    });
-    let with_surface = tiles.map_or(0, |tiles| {
-        tiles.values().filter(|d| d["surface"].is_string()).count()
-    });
     match view.mode {
-        Mode::Walk => {
-            left.push(format!(
-                "painting walk: {}",
-                match view.walk {
-                    WalkBrush::Walkable => "walkable",
-                    WalkBrush::Blocks => "blocks",
-                    WalkBrush::Nothing => "says nothing",
-                }
-            ));
+        TilesetMode::Walk => {
+            let walk_said = tiles().filter(|data| data.walk.is_some()).count();
+            let with_surface = tiles().filter(|data| data.surface.is_some()).count();
+            left.push(format!("painting walk: {}", view.walk.label()));
             left.push(format!(
                 "{} tiles · {walk_said} say walkable or blocks · {with_surface} have a surface",
-                grid.count()
+                tileset.sheet.count()
             ));
         }
-        Mode::Surface => {
+        TilesetMode::Surface => {
             if let Some(tile) = view.tile {
-                let surface = tile_data(row, tile)["surface"]
-                    .as_str()
-                    .unwrap_or("none")
-                    .to_owned();
-                left.push(format!("surface: {surface}"));
-            }
-            left.push(format!(
-                "brush: {}",
-                view.surface.clone().unwrap_or_else(|| "none".to_owned())
-            ));
-            let counts = editor.views.tileset.counts.as_ref();
-            left.push(format!(
-                "{} surfaces · {} tiles have one",
-                crate::views::model::sounds::surfaces(editor).len(),
-                surfaces::thousands(counts.map_or(0, |counts| counts.with_surface))
-            ));
-        }
-        Mode::Terrain => {
-            let sets = row["terrains"].as_object().map_or(0, |sets| sets.len());
-            let with_corners = tiles.map_or(0, |tiles| {
-                tiles
-                    .values()
-                    .filter(|d| {
-                        d["corners"].is_object()
-                            && !d["corners"].as_object().expect("an object").is_empty()
-                    })
-                    .count()
-            });
-            if let Some(set) = &view.set {
-                let terrains = terrain::terrains_of(row, set);
                 left.push(format!(
-                    "terrain: {} · painting {}",
-                    set,
-                    terrains.get(view.terrain).cloned().unwrap_or_default()
+                    "surface: {}",
+                    tileset.surface(tile).unwrap_or("none")
                 ));
             }
             left.push(format!(
-                "{sets} terrain sets · {with_corners} tiles with corners"
+                "brush: {}",
+                view.surface.as_deref().unwrap_or("none")
+            ));
+            let with_surface = editor
+                .views
+                .tileset
+                .counts
+                .as_ref()
+                .map_or(0, |counts| counts.with_surface);
+            left.push(format!(
+                "{} surfaces · {} tiles have one",
+                sounds::surfaces(editor).len(),
+                widgets::thousands(with_surface)
             ));
         }
-        Mode::Animation => {
+        TilesetMode::Terrain => {
+            if let Some(set) = &view.set {
+                let painting = tileset
+                    .terrains(set)
+                    .get(view.terrain)
+                    .map_or("", String::as_str);
+                left.push(format!("terrain: {set} · painting {painting}"));
+            }
+            let with_corners = tiles().filter(|data| !data.corners.is_empty()).count();
+            left.push(format!(
+                "{} terrain sets · {with_corners} tiles with corners",
+                tileset.def.terrains.len()
+            ));
+        }
+        TilesetMode::Animation => {
             if let Some(selection) = view.selection {
                 let animated = selection
-                    .tiles(grid.columns)
-                    .into_iter()
-                    .flatten()
-                    .filter(|tile| {
-                        tile_data(row, *tile)["animation"]
-                            .as_array()
-                            .is_some_and(|a| !a.is_empty())
-                    })
+                    .tiles(tileset.sheet.columns())
+                    .filter(|tile| tileset.animated(*tile))
                     .count();
                 left.push(format!(
                     "{animated} animated tiles selected · {}, {} to {}, {}",
@@ -619,47 +796,30 @@ fn status(editor: &mut Editor, key: &str, row: &Value, grid: &Grid) {
                     selection.y + selection.h - 1
                 ));
             }
-            let animated = tiles.map_or(0, |tiles| {
-                tiles
-                    .values()
-                    .filter(|d| d["animation"].as_array().is_some_and(|a| !a.is_empty()))
-                    .count()
-            });
+            let animated = tiles().filter(|data| !data.animation.is_empty()).count();
             left.push(format!("{animated} animated tiles in this tileset"));
         }
     }
     editor.status.left.extend(left);
 }
 
-fn dialogs(editor: &mut Editor, ctx: &egui::Context, key: &str, row: &Value, grid: &Grid) {
-    let Some(dialog) = editor.views.tileset.views[key].dialog.clone() else {
+fn dialogs(editor: &mut Editor, ctx: &egui::Context, tileset: &OpenTileset) {
+    let Some(dialog) = editor.views.tileset.view(&tileset.key).dialog.clone() else {
         return;
     };
-    let mut next = Some(dialog.clone());
-    match dialog {
-        TilesetDialog::MakeBlueprint { name, error } => {
-            sheet::make_blueprint_dialog(editor, ctx, key, grid, name, error, &mut next);
+    let next = match dialog {
+        TileSheetDialog::MakeBlueprint(dialog) => {
+            sheet::blueprint_dialog(editor, ctx, tileset, dialog)
+                .map(TileSheetDialog::MakeBlueprint)
         }
-        TilesetDialog::NewSurface {
-            name,
-            footstep,
-            error,
-        } => {
-            surfaces::new_surface_dialog(editor, ctx, key, name, footstep, error, &mut next);
+        TileSheetDialog::NewSurface(dialog) => {
+            surfaces::new_surface_dialog(editor, ctx, &tileset.key, dialog)
+                .map(TileSheetDialog::NewSurface)
         }
-        TilesetDialog::NewTerrainSet {
-            name,
-            terrains,
-            error,
-        } => {
-            terrain::new_set_dialog(editor, ctx, key, row, name, terrains, error, &mut next);
+        TileSheetDialog::NewTerrainSet(dialog) => {
+            terrain::new_set_dialog(editor, ctx, tileset, dialog)
+                .map(TileSheetDialog::NewTerrainSet)
         }
-    }
-    let view = editor
-        .views
-        .tileset
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.dialog = next;
+    };
+    editor.views.tileset.view_mut(&tileset.key).dialog = next;
 }

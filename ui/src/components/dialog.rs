@@ -1,13 +1,12 @@
 use bevy_ecs::hierarchy::Children;
 use bevy_picking::prelude::Pickable;
 use bevy_scene::{Scene, bsn};
-
-use crate::components::confirm::Modal;
 use bevy_ui::{
     AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, Overflow, PositionType, UiRect,
     Val,
 };
 
+use crate::components::confirm::Modal;
 use crate::motion::Transform2d;
 use crate::overlay::{Open, OverlayAction, OverlayContent, POPPER_ENTER, POPPER_EXIT, Portal};
 use crate::style::Style;

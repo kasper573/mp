@@ -4,14 +4,16 @@ use std::path::PathBuf;
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 
-use super::formats::{self, Export, MAX_IMAGE_PX};
+use super::formats::{self, AnimationExport, MAX_IMAGE_PX};
 use super::records::ImportRecord;
-use crate::views::model::{ACTIONS, DIRECTIONS, FrameData};
+use crate::views::model;
+use crate::views::model::{ModelStrip, StripFrame};
+use game::systems::actor::model::ActionName;
 
-pub type Mapping = BTreeMap<String, Option<String>>;
+pub type StripMapping = BTreeMap<String, Option<String>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Note {
+pub enum MappingNote {
     ByName,
     Normalised,
     ByOrder,
@@ -19,20 +21,20 @@ pub enum Note {
     Picked,
 }
 
-impl Note {
+impl MappingNote {
     pub fn text(&self) -> String {
         match self {
-            Note::ByName => "by name".to_owned(),
-            Note::Normalised => "case and spaces ignored".to_owned(),
-            Note::ByOrder => "by order".to_owned(),
-            Note::NoStrip(action) => format!("the engine has no {action} action"),
-            Note::Picked => "picked".to_owned(),
+            MappingNote::ByName => "by name".to_owned(),
+            MappingNote::Normalised => "case and spaces ignored".to_owned(),
+            MappingNote::ByOrder => "by order".to_owned(),
+            MappingNote::NoStrip(action) => format!("the engine has no {action} action"),
+            MappingNote::Picked => "picked".to_owned(),
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Plan {
+pub struct ModelImportPlan {
     pub strips: Vec<StripPlan>,
     pub missing: Vec<String>,
     pub frame: (u32, u32),
@@ -48,22 +50,22 @@ pub struct StripPlan {
     pub action: String,
     pub direction: String,
     pub tag: Option<String>,
-    pub before: Vec<FrameData>,
+    pub before: Vec<StripFrame>,
     pub lengths: Vec<u32>,
-    pub retimed: Option<Retimed>,
+    pub retimed: Option<StripRetiming>,
     pub cues: Vec<CueMove>,
     pub origins: Vec<Option<usize>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Retimed {
+pub struct StripRetiming {
     pub here: Vec<u32>,
     pub recorded: Vec<u32>,
     pub export: Vec<u32>,
     pub keep_here: bool,
 }
 
-impl Retimed {
+impl StripRetiming {
     pub fn frames(&self) -> Vec<usize> {
         self.here
             .iter()
@@ -76,32 +78,32 @@ impl Retimed {
 
 #[derive(Clone, Debug)]
 pub struct CueMove {
-    pub cue: Cue,
+    pub cue: FrameCue,
     pub from: usize,
     pub to: Option<usize>,
     pub by_pixels: bool,
-    pub choice: Option<Placement>,
+    pub choice: Option<CuePlacement>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Cue {
+pub enum FrameCue {
     Apex,
     Step,
     Sound(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Placement {
+pub enum CuePlacement {
     Frame(usize),
     Remove,
 }
 
-impl Cue {
+impl FrameCue {
     pub fn label(&self) -> String {
         match self {
-            Cue::Apex => "apex".to_owned(),
-            Cue::Step => "step".to_owned(),
-            Cue::Sound(sound) => sound.clone(),
+            FrameCue::Apex => "apex".to_owned(),
+            FrameCue::Step => "step".to_owned(),
+            FrameCue::Sound(sound) => sound.clone(),
         }
     }
 }
@@ -114,7 +116,7 @@ impl CueMove {
     pub fn lands(&self) -> Option<usize> {
         match (self.to, self.choice) {
             (Some(to), _) => Some(to),
-            (None, Some(Placement::Frame(frame))) => Some(frame),
+            (None, Some(CuePlacement::Frame(frame))) => Some(frame),
             _ => None,
         }
     }
@@ -152,11 +154,11 @@ impl StripPlan {
         }
     }
 
-    pub fn after(&self) -> Vec<FrameData> {
+    pub fn after(&self) -> Vec<StripFrame> {
         let lengths = self.final_lengths();
-        let mut frames: Vec<FrameData> = lengths
+        let mut frames: Vec<StripFrame> = lengths
             .iter()
-            .map(|ms| FrameData {
+            .map(|ms| StripFrame {
                 frame: 0,
                 ms: *ms,
                 apex: false,
@@ -172,16 +174,16 @@ impl StripPlan {
                 continue;
             };
             match &cue.cue {
-                Cue::Apex => frame.apex = true,
-                Cue::Step => frame.step = true,
-                Cue::Sound(sound) => frame.sound = Some(sound.clone()),
+                FrameCue::Apex => frame.apex = true,
+                FrameCue::Step => frame.step = true,
+                FrameCue::Sound(sound) => frame.sound = Some(sound.clone()),
             }
         }
         frames
     }
 }
 
-impl Plan {
+impl ModelImportPlan {
     pub fn ready(&self) -> Result<(), String> {
         if let Some(missing) = self.missing.first() {
             return Err(format!("{} needs a tag", pretty(missing)));
@@ -230,14 +232,7 @@ impl Plan {
 }
 
 pub fn strip_names() -> Vec<String> {
-    ACTIONS
-        .iter()
-        .flat_map(|action| {
-            DIRECTIONS
-                .iter()
-                .map(move |direction| format!("{action}_{direction}"))
-        })
-        .collect()
+    ModelStrip::all().map(ModelStrip::record_key).collect()
 }
 
 pub fn pretty(strip: &str) -> String {
@@ -264,27 +259,28 @@ pub fn strip_of_tag(tag: &str) -> Option<String> {
         "w" | "west" | "left" => "w",
         _ => return None,
     };
-    ACTIONS
-        .contains(&action.as_str())
-        .then(|| format!("{action}_{direction}"))
+    action
+        .parse::<ActionName>()
+        .ok()
+        .map(|_| format!("{action}_{direction}"))
 }
 
 fn exact(tag: &str) -> bool {
     strip_names().iter().any(|name| name == tag)
 }
 
-pub fn default_mapping(export: &Export) -> (Mapping, BTreeMap<String, Note>) {
-    let mut mapping = Mapping::new();
+pub fn default_mapping(export: &AnimationExport) -> (StripMapping, BTreeMap<String, MappingNote>) {
+    let mut mapping = StripMapping::new();
     let mut notes = BTreeMap::new();
     let names = strip_names();
-    let by_order = export.kind == formats::Kind::Grid && export.strips.len() == names.len();
+    let by_order = export.kind == formats::ExportFormat::Grid && export.strips.len() == names.len();
     for (index, strip) in export.strips.iter().enumerate() {
         let (target, note) = if by_order {
-            (Some(names[index].clone()), Note::ByOrder)
+            (Some(names[index].clone()), MappingNote::ByOrder)
         } else if exact(&strip.tag) {
-            (Some(strip.tag.clone()), Note::ByName)
+            (Some(strip.tag.clone()), MappingNote::ByName)
         } else if let Some(name) = strip_of_tag(&strip.tag) {
-            (Some(name), Note::Normalised)
+            (Some(name), MappingNote::Normalised)
         } else {
             let action = strip
                 .tag
@@ -292,7 +288,7 @@ pub fn default_mapping(export: &Export) -> (Mapping, BTreeMap<String, Note>) {
                 .find(|word| !word.is_empty())
                 .unwrap_or(&strip.tag)
                 .to_lowercase();
-            (None, Note::NoStrip(action))
+            (None, MappingNote::NoStrip(action))
         };
         mapping.insert(strip.tag.clone(), target);
         notes.insert(strip.tag.clone(), note);
@@ -300,8 +296,8 @@ pub fn default_mapping(export: &Export) -> (Mapping, BTreeMap<String, Note>) {
     (mapping, notes)
 }
 
-pub fn recorded_mapping(record: &ImportRecord, export: &Export) -> Mapping {
-    let mut mapping = Mapping::new();
+pub fn recorded_mapping(record: &ImportRecord, export: &AnimationExport) -> StripMapping {
+    let mut mapping = StripMapping::new();
     for strip in &export.strips {
         let target = record
             .mapping
@@ -316,7 +312,7 @@ pub fn recorded_mapping(record: &ImportRecord, export: &Export) -> Mapping {
     mapping
 }
 
-pub fn mapping_value(mapping: &Mapping) -> Value {
+pub fn mapping_value(mapping: &StripMapping) -> Value {
     Value::Object(
         mapping
             .iter()
@@ -330,7 +326,7 @@ pub fn mapping_value(mapping: &Mapping) -> Value {
     )
 }
 
-fn targets(mapping: &Mapping, export: &Export) -> BTreeMap<String, String> {
+fn targets(mapping: &StripMapping, export: &AnimationExport) -> BTreeMap<String, String> {
     let mut targets = BTreeMap::new();
     for strip in &export.strips {
         if let Some(Some(target)) = mapping.get(&strip.tag)
@@ -353,10 +349,10 @@ pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String
         return hashes;
     }
     let columns = sheet.width() / width;
-    for action in ACTIONS {
-        for direction in DIRECTIONS {
-            let frames = crate::views::model::strip_of(row, action, direction);
-            let strip: Vec<String> = frames
+    for strip in ModelStrip::all() {
+        {
+            let frames = model::strip_of(row, strip);
+            let hashed: Vec<String> = frames
                 .iter()
                 .map(|frame| {
                     if columns == 0 {
@@ -372,7 +368,7 @@ pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String
                     )
                 })
                 .collect();
-            hashes.insert(format!("{action}_{direction}"), strip);
+            hashes.insert(strip.record_key(), hashed);
         }
     }
     hashes
@@ -381,11 +377,11 @@ pub fn current_frames(row: &Value, sheet: Option<&RgbaImage>) -> BTreeMap<String
 pub fn plan(
     row: Option<&Value>,
     sheet: Option<&RgbaImage>,
-    export: &Export,
-    mapping: &Mapping,
+    export: &AnimationExport,
+    mapping: &StripMapping,
     asked: &BTreeMap<String, u32>,
     record: Option<&ImportRecord>,
-) -> Plan {
+) -> ModelImportPlan {
     let targets = targets(mapping, export);
     let current = row
         .map(|row| current_frames(row, sheet))
@@ -393,11 +389,12 @@ pub fn plan(
     let mut strips = Vec::new();
     let mut missing = Vec::new();
     let mut cues_total = 0;
-    for action in ACTIONS {
-        for direction in DIRECTIONS {
-            let name = format!("{action}_{direction}");
+    for strip in ModelStrip::all() {
+        {
+            let name = strip.record_key();
+            let (action, direction) = (strip.action.key(), strip.direction.key());
             let before = row
-                .map(|row| crate::views::model::strip_of(row, action, direction))
+                .map(|row| model::strip_of(row, strip))
                 .unwrap_or_default();
             let tag = targets.get(&name).cloned();
             let Some(tag) = tag else {
@@ -435,13 +432,13 @@ pub fn plan(
             for (from, frame) in before.iter().enumerate() {
                 let mut kinds = Vec::new();
                 if frame.apex {
-                    kinds.push(Cue::Apex);
+                    kinds.push(FrameCue::Apex);
                 }
                 if frame.step {
-                    kinds.push(Cue::Step);
+                    kinds.push(FrameCue::Step);
                 }
                 if let Some(sound) = &frame.sound {
-                    kinds.push(Cue::Sound(sound.clone()));
+                    kinds.push(FrameCue::Sound(sound.clone()));
                 }
                 for cue in kinds {
                     cues_total += 1;
@@ -462,11 +459,11 @@ pub fn plan(
             let retimed = record
                 .and_then(|record| record.strips.get(&name))
                 .filter(|recorded| {
-                    let here = crate::views::model::lengths(&before);
+                    let here = model::lengths(&before);
                     !before.is_empty() && here != **recorded && here != lengths
                 })
-                .map(|recorded| Retimed {
-                    here: crate::views::model::lengths(&before),
+                .map(|recorded| StripRetiming {
+                    here: model::lengths(&before),
                     recorded: recorded.clone(),
                     export: lengths.clone(),
                     keep_here: true,
@@ -505,7 +502,7 @@ pub fn plan(
                 .count()
         })
         .unwrap_or(0);
-    Plan {
+    ModelImportPlan {
         strips,
         missing,
         frame: export.frame,
@@ -528,7 +525,7 @@ fn follow(old: &[String], from: usize, new: &[&str]) -> Option<usize> {
         .map(|(index, _)| index)
 }
 
-pub struct Built {
+pub struct BuiltModel {
     pub png: Vec<u8>,
     pub image: String,
     pub row: Value,
@@ -536,11 +533,11 @@ pub struct Built {
 }
 
 pub fn build(
-    plan: &Plan,
-    export: &Export,
+    plan: &ModelImportPlan,
+    export: &AnimationExport,
     row: Option<&Value>,
     key: &str,
-) -> Result<Built, String> {
+) -> Result<BuiltModel, String> {
     plan.ready()?;
     let columns = plan
         .strips
@@ -578,14 +575,14 @@ pub fn build(
                 .map_err(|error| error.to_string())?;
             frame.frame = row_index as u32 * columns + column as u32;
         }
-        lengths.insert(strip.name.clone(), crate::views::model::lengths(&frames));
-        let values: Vec<Value> = frames.iter().map(FrameData::to_value).collect();
+        lengths.insert(strip.name.clone(), model::lengths(&frames));
+        let values = model::frames_json(&frames);
         actions
             .entry(strip.action.clone())
             .or_insert_with(|| Value::Object(serde_json::Map::new()))
             .as_object_mut()
             .expect("an object")
-            .insert(strip.direction.clone(), Value::Array(values));
+            .insert(strip.direction.clone(), values);
     }
     let image = row
         .and_then(|row| row["sprites"]["image"].as_str())
@@ -598,7 +595,7 @@ pub fn build(
         "frame_size": { "width": fw, "height": fh },
         "actions": Value::Object(actions),
     });
-    Ok(Built {
+    Ok(BuiltModel {
         png: formats::encode_png(&sheet)?,
         image,
         row,
@@ -607,9 +604,9 @@ pub fn build(
 }
 
 pub fn record(
-    export: &Export,
+    export: &AnimationExport,
     key: &str,
-    mapping: &Mapping,
+    mapping: &StripMapping,
     lengths: BTreeMap<String, Vec<u32>>,
 ) -> ImportRecord {
     let mut record = ImportRecord::of_files(&export.files, "model", key);

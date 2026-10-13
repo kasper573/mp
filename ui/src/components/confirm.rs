@@ -11,7 +11,7 @@ use crate::components::button::{ButtonSize, button_styled, intent};
 use crate::components::dialog::modal;
 use crate::components::input::{InputCatalog, InputRef};
 use crate::components::text::styled_text;
-use crate::drag::OnTap;
+use crate::drag::{OnTap, Tap};
 use crate::overlay::{OVERLAY_EXIT, Open};
 use crate::theme::theme;
 use crate::tokens::{spacing, typography};
@@ -73,22 +73,12 @@ pub fn confirm_dialog(options: ConfirmOptions) -> impl Scene {
             Children [
                 @{button_styled(intent::DANGER, ButtonSize::Md, confirm)}
                 on(move |activate: On<Activate>, mut commands: Commands| {
-                    let tap = confirm_tap.clone();
-                    let button = activate.entity;
-                    commands.queue(move |world: &mut World| {
-                        overlay::set_overlay_open(world, button, false);
-                        tap(world);
-                    });
+                    commands.queue(closing(activate.entity, confirm_tap.clone()));
                 })
                 --
                 @{button_styled(intent::PRIMARY, ButtonSize::Md, cancel)}
                 on(move |activate: On<Activate>, mut commands: Commands| {
-                    let tap = cancel_tap.clone();
-                    let button = activate.entity;
-                    commands.queue(move |world: &mut World| {
-                        overlay::set_overlay_open(world, button, false);
-                        tap(world);
-                    });
+                    commands.queue(closing(activate.entity, cancel_tap.clone()));
                 })
             ]
         ]
@@ -156,6 +146,13 @@ pub(crate) fn despawn_closed(
         if now.saturating_sub(since) >= OVERLAY_EXIT {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+fn closing(button: Entity, tap: Tap) -> impl FnOnce(&mut World) + Send + 'static {
+    move |world: &mut World| {
+        overlay::set_overlay_open(world, button, false);
+        tap(world);
     }
 }
 

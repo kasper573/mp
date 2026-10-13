@@ -1,27 +1,47 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use game::core::content::Content;
+use game::core::math::Direction;
+use game::core::script::dialogue::Reveal;
+use game::core::time::{PlaybackRate, Seconds};
+use game::systems::GameSettings;
+use game::systems::actor::model::{DirectionName, ModelDef};
+use game::systems::actor::{Action, ActorModel};
+use game::systems::quest::{ActiveQuest, Parties, QuestDef};
+use game::systems::script::{Reach, RiftScripts};
 use serde_json::Value;
 
 use super::quests::quest_parties_sections;
 use super::usages::show_usages_grouped;
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::project::ProjectFiles;
+use crate::views::character;
+use crate::views::model::preview;
+use crate::views::script::panel;
+use crate::{forms, thumbs, value};
 
-pub struct PreviewState {
-    pub action: String,
-    pub direction: String,
+pub struct InspectorPreviewState {
+    pub action: Action,
+    pub direction: Direction,
     pub playing: bool,
     pub started: f64,
 }
 
-impl Default for PreviewState {
-    fn default() -> PreviewState {
-        PreviewState {
-            action: "idle".to_owned(),
-            direction: "s".to_owned(),
+impl Default for InspectorPreviewState {
+    fn default() -> InspectorPreviewState {
+        InspectorPreviewState {
+            action: Action::Idle,
+            direction: Direction::S,
             playing: true,
             started: 0.0,
         }
     }
+}
+
+pub(super) struct Pose {
+    action: Action,
+    direction: Direction,
+    elapsed: f32,
 }
 
 pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
@@ -41,8 +61,11 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
     } else {
         0.0
     };
-    let (action, direction) = (state.action.clone(), state.direction.clone());
-    let mut nameplates: Vec<String> = Vec::new();
+    let pose = Pose {
+        action: state.action,
+        direction: state.direction,
+        elapsed: elapsed as f32,
+    };
     egui::Grid::new("previews")
         .num_columns(columns)
         .spacing([8.0, 8.0])
@@ -58,10 +81,7 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
                     key,
                     &value,
                     Vec2::new(width, height),
-                    &action,
-                    &direction,
-                    elapsed as f32,
-                    &mut nameplates,
+                    &pose,
                 );
                 if (index + 1) % columns == 0 {
                     ui.end_row();
@@ -72,25 +92,29 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
         quest_parties_sections(editor, ui, &keys[0]);
     }
     if selection.table == "test_character" && keys.len() == 1 {
-        crate::views::character::preview_extras(editor, ui, &keys[0]);
+        character::preview_extras(editor, ui, &keys[0]);
     }
     if matches!(selection.table.as_str(), "npc" | "player" | "model") {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
             egui::ComboBox::from_id_salt("preview-action")
-                .selected_text(&state.action)
+                .selected_text(state.action.name())
                 .width(80.0)
                 .show_ui(ui, |ui| {
-                    for action in ["idle", "walk", "run", "attack", "death"] {
-                        ui.selectable_value(&mut state.action, action.to_owned(), action);
+                    for action in Action::ALL {
+                        ui.selectable_value(&mut state.action, action, action.name());
                     }
                 });
             egui::ComboBox::from_id_salt("preview-direction")
-                .selected_text(&state.direction)
+                .selected_text(DirectionName::of(state.direction).key())
                 .width(56.0)
                 .show_ui(ui, |ui| {
-                    for direction in ["s", "sw", "w", "nw", "n", "ne", "e", "se"] {
-                        ui.selectable_value(&mut state.direction, direction.to_owned(), direction);
+                    for direction in Direction::ALL {
+                        ui.selectable_value(
+                            &mut state.direction,
+                            direction,
+                            DirectionName::of(direction).key(),
+                        );
                     }
                 });
             if ui.button(if state.playing { "⏸" } else { "▸" }).clicked() {
@@ -108,7 +132,6 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_preview(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -116,10 +139,7 @@ pub(super) fn draw_preview(
     key: &str,
     value: &Value,
     size: Vec2,
-    action: &str,
-    direction: &str,
-    elapsed: f32,
-    nameplates: &mut Vec<String>,
+    pose: &Pose,
 ) {
     let ctx = ui.ctx().clone();
     let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
@@ -164,7 +184,7 @@ pub(super) fn draw_preview(
         "model" => Some(key.to_owned()),
         "test_character" => Some(
             content
-                .built::<game::systems::GameSettings>()
+                .built::<GameSettings>()
                 .player
                 .get(&content)
                 .model
@@ -173,72 +193,46 @@ pub(super) fn draw_preview(
         ),
         _ => value["model"].as_str().map(str::to_owned),
     };
-    let Some(id) = model_key
-        .and_then(|model_key| content.by_key::<game::systems::actor::bust::ModelDef>(&model_key))
-    else {
+    let Some(id) = model_key.and_then(|model_key| content.by_key::<ModelDef>(&model_key)) else {
         return;
     };
-    let model = game::systems::actor::model(&content, id);
+    let model = ActorModel::get(&content, id);
     let Some(thumb) = form
         .thumbnails
         .image(&ctx, &project.files, model.sheet().as_str())
     else {
         return;
     };
-    let action = match action {
-        "walk" => game::systems::actor::Action::Walk,
-        "run" => game::systems::actor::Action::Run,
-        "attack" => game::systems::actor::Action::Attack,
-        "death" => game::systems::actor::Action::Dead,
-        _ => game::systems::actor::Action::Idle,
-    };
-    let dir = match direction {
-        "sw" => game::core::math::Direction::SW,
-        "w" => game::core::math::Direction::W,
-        "nw" => game::core::math::Direction::NW,
-        "n" => game::core::math::Direction::N,
-        "ne" => game::core::math::Direction::NE,
-        "e" => game::core::math::Direction::E,
-        "se" => game::core::math::Direction::SE,
-        _ => game::core::math::Direction::S,
-    };
     let region = model.frame(
-        action,
-        dir,
-        game::core::time::Seconds(elapsed),
-        game::core::time::PlaybackRate(1.0),
+        pose.action,
+        pose.direction,
+        Seconds(pose.elapsed),
+        PlaybackRate(1.0),
     );
     let drawn = model.drawn_size(region);
     let scale = (size.y * 0.6 / drawn.height.max(1.0))
         .clamp(1.0, 4.0)
         .floor();
     let shown = Vec2::new(drawn.width * scale, drawn.height * scale);
-    let feet = crate::views::model::preview::spawn_backdrop(
+    let feet = preview::backdrop(
         editor,
         &painter,
         rect,
         format!("inspector-preview:{table}/{key}"),
         scale,
-    )
-    .unwrap_or(rect.center() + Vec2::new(0.0, size.y * 0.22));
-    let sprite = crate::views::model::preview::sprite_rect(feet, shown);
+    );
+    let sprite = preview::sprite_rect(feet, shown);
     let tint = value["modules"]
         .as_array()
         .into_iter()
         .flatten()
         .find(|m| m["type"] == "tint")
-        .and_then(|m| {
-            m["rgba"].as_array().map(|rgba| {
-                Color32::from_rgba_unmultiplied(
-                    rgba[0].as_u64().unwrap_or(255) as u8,
-                    rgba[1].as_u64().unwrap_or(255) as u8,
-                    rgba[2].as_u64().unwrap_or(255) as u8,
-                    rgba[3].as_u64().unwrap_or(255) as u8,
-                )
-            })
+        .map(|m| {
+            let [r, g, b, a] = value::rgba(&m["rgba"]);
+            Color32::from_rgba_unmultiplied(r, g, b, a)
         })
         .unwrap_or(Color32::WHITE);
-    let uv = crate::thumbs::uv(
+    let uv = thumbs::uv(
         thumb.size,
         region.min().x,
         region.min().y,
@@ -247,7 +241,7 @@ pub(super) fn draw_preview(
     );
     painter.image(thumb.texture.id(), sprite, uv, tint);
     if let Some(name) = value["name"].as_str() {
-        let colour = match attitude(Some(content), table, key, value) {
+        let colour = match attitude(content, table, key, value) {
             Some(true) => game_colour(ui::tokens::palette::CRIMSON_80),
             _ => Color32::WHITE,
         };
@@ -258,7 +252,6 @@ pub(super) fn draw_preview(
             egui::FontId::proportional(13.0),
             colour,
         );
-        nameplates.push(name.to_owned());
     }
 }
 
@@ -275,25 +268,20 @@ pub(super) fn game_colour(colour: bevy::prelude::Color) -> Color32 {
 pub(super) fn quest_card(
     ui: &mut Ui,
     ctx: &egui::Context,
-    form: &mut crate::forms::FormState,
-    files: &crate::project::Files,
-    content: game::core::content::Content,
+    form: &mut forms::FormState,
+    files: &ProjectFiles,
+    content: Content,
     key: &str,
     width: f32,
 ) {
-    use game::core::script::dialogue::Reveal;
-    use game::systems::quest::{ActiveQuest, Parties, QuestDef};
     let Some(id) = content.by_key::<QuestDef>(key) else {
         return;
     };
-    if !content.has_built::<game::systems::script::RiftScripts>() {
+    if !content.has_built::<RiftScripts>() {
         return;
     }
     let def = id.get(&content);
-    let parties = Parties::of(
-        &content,
-        content.built::<game::systems::script::RiftScripts>(),
-    );
+    let parties = Parties::of(&content, content.built::<RiftScripts>());
     let progress = def.progress(&content, &parties, &ActiveQuest::fresh(&content, id), None);
     let ink = Color32::from_rgb(236, 230, 214);
     let soft = Color32::from_rgba_unmultiplied(236, 230, 214, 150);
@@ -386,17 +374,11 @@ pub(super) fn quest_card(
         });
 }
 
-pub(super) fn attitude(
-    content: Option<game::core::content::Content>,
-    table: &str,
-    key: &str,
-    value: &Value,
-) -> Option<bool> {
-    let content = content?;
-    if !content.has_built::<game::systems::script::RiftScripts>() {
+fn attitude(content: Content, table: &str, key: &str, value: &Value) -> Option<bool> {
+    if !content.has_built::<RiftScripts>() {
         return None;
     }
-    let scripts = content.built::<game::systems::script::RiftScripts>();
+    let scripts = content.built::<RiftScripts>();
     let mut friendly = false;
     for (index, module) in value["modules"]
         .as_array()
@@ -410,18 +392,14 @@ pub(super) fn attitude(
         {
             continue;
         }
-        let Some(bound) = crate::views::script::panel::owner_row(
-            &content,
-            table,
-            key,
-            &format!("/modules/{index}"),
-        ) else {
+        let Some(bound) = panel::owner_row(&content, table, key, &format!("/modules/{index}"))
+        else {
             continue;
         };
         for reach in scripts.may_do(bound.row).reaches {
             match reach {
-                game::systems::script::Reach::Hostile => return Some(true),
-                game::systems::script::Reach::Friendly => friendly = true,
+                Reach::Hostile => return Some(true),
+                Reach::Friendly => friendly = true,
                 _ => {}
             }
         }

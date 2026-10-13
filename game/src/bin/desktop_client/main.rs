@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use bevy::window::Window;
 use game::core::platform::{StartParams, exit_when_stdin_closes};
+use game::systems::client_app;
 use game::systems::launch::{BUILD_INFO_FLAG, CLIENT_ENV_PREFIX, ClientConfig, build_info_line};
 
 fn main() {
@@ -23,7 +24,7 @@ fn main() {
         game_server_url: config.game_server_url,
         game_server_ws_url: config.game_server_ws_url,
     };
-    game::systems::client_app(
+    client_app(
         Arc::new(platform::DesktopPlatform::new(config.profile_dir)),
         params,
         Window {

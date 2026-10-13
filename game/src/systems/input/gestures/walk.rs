@@ -1,17 +1,17 @@
 use std::time::Duration;
 
-use crate::core::math::Pos;
-use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::player::session;
-use crate::systems::{area, combat};
 use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
 use crate::core::content::{Content, Fixture};
+use crate::core::math::Pos;
 use crate::core::render;
+use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::input::gestures::{ActiveTileHighlight, Gesture, content_cursor};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::{CursorShape, InterfaceIcon};
+use crate::systems::player::session;
+use crate::systems::{area, combat};
 
 const MOVE_REPEAT: Duration = Duration::from_millis(333);
 

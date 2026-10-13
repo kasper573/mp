@@ -7,17 +7,19 @@
 
 mod search;
 
+use std::cell::{Cell, RefCell};
 use std::io::ErrorKind;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
-use bevy_app::App;
+use bevy_app::{App, Update};
 use bevy_ecs::prelude::*;
-use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_replicon::prelude::*;
+use bevy_replicon_renet2::RenetChannelsExt;
 use bevy_state::prelude::*;
 use game::core::content::sync::Manifest;
-use game::core::net::channels::RenetChannelsExt;
+use game::core::net::transport::{Socket, SocketClientPlugin};
+use game::core::platform::ServerSocket;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
 use tungstenite::Message;
@@ -226,17 +228,17 @@ fn build_client(http_url: &str, ws_url: &str, index: usize) -> Option<App> {
     let mut app = App::new();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     app.add_plugins(ClientSessionPlugin);
-    app.add_plugins(BridgePlugin);
+    app.add_plugins(SocketClientPlugin);
     app.init_resource::<Joined>();
-    app.add_systems(bevy_app::Update, announce_join);
+    app.add_systems(Update, announce_join);
 
     let config = {
         let channels = app.world().resource::<RepliconChannels>();
         ConnectionConfig::from_channels(channels.server_configs(), channels.client_configs())
     };
     // The websocket is reliable+ordered (TCP), matching the server side.
-    app.insert_resource(Client(RenetClient::new(config, true)));
-    app.insert_non_send(Socket(socket));
+    app.insert_resource(RenetClient::new(config, true));
+    app.insert_non_send(Socket(Box::new(socket)));
     app.finish();
     app.cleanup();
     Some(app)
@@ -260,8 +262,8 @@ fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
 }
 
 struct WsSocket {
-    ws: tungstenite::WebSocket<MaybeTlsStream<TcpStream>>,
-    open: bool,
+    ws: RefCell<tungstenite::WebSocket<MaybeTlsStream<TcpStream>>>,
+    open: Cell<bool>,
 }
 
 impl WsSocket {
@@ -272,90 +274,49 @@ impl WsSocket {
         if let MaybeTlsStream::Plain(tcp) = ws.get_ref() {
             tcp.set_nonblocking(true).ok()?;
         }
-        Some(WsSocket { ws, open: true })
+        Some(WsSocket {
+            ws: RefCell::new(ws),
+            open: Cell::new(true),
+        })
     }
+}
 
-    fn recv(&mut self) -> Option<Vec<u8>> {
-        match self.ws.read() {
+impl ServerSocket for WsSocket {
+    fn recv(&self) -> Option<Vec<u8>> {
+        match self.ws.borrow_mut().read() {
             Ok(Message::Binary(data)) => Some(data.to_vec()),
             Ok(Message::Close(_)) => {
-                self.open = false;
+                self.open.set(false);
                 None
             }
             Ok(_) => None,
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => None,
             Err(_) => {
-                self.open = false;
+                self.open.set(false);
                 None
             }
         }
     }
 
-    fn send(&mut self, packet: Vec<u8>) {
-        match self.ws.send(Message::Binary(packet.into())) {
+    fn send(&self, packet: &[u8]) {
+        match self
+            .ws
+            .borrow_mut()
+            .send(Message::Binary(packet.to_vec().into()))
+        {
             Ok(()) => {}
-            // A non-blocking write that couldn't flush fully is buffered for the next flush.
+            // A non-blocking write that couldn't flush fully is buffered for the next send.
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {}
-            Err(_) => self.open = false,
+            Err(_) => self.open.set(false),
         }
     }
 
-    fn flush(&mut self) {
-        let _ = self.ws.flush();
+    fn is_open(&self) -> bool {
+        self.open.get()
     }
-}
 
-// Mirrors the client's replicon<->renet2 bridge
-#[derive(Resource)]
-struct Client(RenetClient);
-
-struct Socket(WsSocket);
-
-struct BridgePlugin;
-
-impl bevy_app::Plugin for BridgePlugin {
-    fn build(&self, app: &mut App) {
-        use bevy_app::{PostUpdate, PreUpdate};
-        app.add_systems(
-            PreUpdate,
-            (
-                drive,
-                set_connecting.run_if(in_state(ClientState::Disconnected).and_then(connecting)),
-                promote.run_if(in_state(ClientState::Connecting).and_then(connecting)),
-                set_connected.run_if(in_state(ClientState::Connecting).and_then(connected)),
-                set_disconnected.run_if(connection_lost),
-                receive_packets.run_if(connected),
-            )
-                .chain()
-                .in_set(ClientSystems::ReceivePackets),
-        )
-        .add_systems(
-            PostUpdate,
-            send_packets
-                .run_if(connected)
-                .in_set(ClientSystems::SendPackets),
-        );
-    }
-}
-
-fn drive(mut socket: NonSendMut<Socket>, mut client: ResMut<Client>, time: Res<bevy_time::Time>) {
-    client.0.update(time.delta());
-    while let Some(packet) = socket.0.recv() {
-        client.0.process_packet(&packet);
-    }
-    // renet has no internal timeout, so a closed socket is the only liveness signal — otherwise a
-    // server-reaped client would stay "connected" and inflate the measured player count.
-    if !socket.0.open {
-        client.0.disconnect_due_to_transport();
-    }
-}
-
-// renet2's core opens in `Connecting` and stays there until told otherwise; with no netcode layer the
-// transport promotes it once the socket is up and replicon has reached `Connecting`, so the state
-// machine advances Disconnected -> Connecting -> Connected in order.
-fn promote(socket: NonSend<Socket>, mut client: ResMut<Client>) {
-    if socket.0.open {
-        client.0.set_connected();
+    fn is_closed(&self) -> bool {
+        !self.open.get()
     }
 }
 
@@ -371,55 +332,4 @@ fn announce_join(world: &mut World) {
     }
     session::join(world);
     world.resource_mut::<Joined>().0 = true;
-}
-
-fn set_connecting(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Connecting);
-}
-
-fn set_connected(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Connected);
-}
-
-fn set_disconnected(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Disconnected);
-}
-
-fn receive_packets(
-    channels: Res<RepliconChannels>,
-    mut client: ResMut<Client>,
-    mut messages: ResMut<ClientMessages>,
-) {
-    for channel_id in 0..channels.server_channels().len() as u8 {
-        while let Some(message) = client.0.receive_message(channel_id) {
-            messages.insert_received(channel_id, message);
-        }
-    }
-}
-
-fn send_packets(
-    mut socket: NonSendMut<Socket>,
-    mut client: ResMut<Client>,
-    mut messages: ResMut<ClientMessages>,
-) {
-    for (channel_id, message) in messages.drain_sent() {
-        client.0.send_message(channel_id as u8, message);
-    }
-    for packet in client.0.get_packets_to_send() {
-        socket.0.send(packet);
-    }
-    socket.0.flush();
-}
-
-fn connecting(client: Option<Res<Client>>) -> bool {
-    client.is_some_and(|client| client.0.is_connecting())
-}
-
-fn connected(client: Option<Res<Client>>) -> bool {
-    client.is_some_and(|client| client.0.is_connected())
-}
-
-fn connection_lost(state: Res<State<ClientState>>, client: Option<Res<Client>>) -> bool {
-    !matches!(state.get(), ClientState::Disconnected)
-        && client.is_some_and(|client| client.0.is_disconnected())
 }

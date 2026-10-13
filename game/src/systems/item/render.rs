@@ -1,16 +1,17 @@
+use bevy::prelude::*;
+
 use crate::core::audio::playback::SfxId;
+use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::Content;
 use crate::core::math::{Pos, WorldPx};
+use crate::core::render::transition::WorldViewSystems;
+use crate::core::render::{ToScreen, dynamic_z, sprite_transform};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::item::{DroppedItem, ItemConsumed, ItemsDropped};
 use crate::systems::movement::Position;
-use bevy::prelude::*;
-
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{ToScreen, dynamic_z, sprite_transform};
+use crate::systems::scene::Scene as GameScene;
 
 const DROP_SIZE: WorldPx = WorldPx(12.0);
 const DROP_STAGGER: Seconds = Seconds(0.06);
@@ -32,7 +33,7 @@ impl Plugin for ItemsPlugin {
                         .chain()
                         .in_set(WorldViewSystems),
                 )
-                    .run_if(in_state(crate::systems::scene::Scene::Area)),
+                    .run_if(in_state(GameScene::Area)),
             );
     }
 }
@@ -138,17 +139,17 @@ fn start_drops(
 }
 
 fn place_drops(
-    service: Res<Content>,
+    content: Res<Content>,
     mut drops: Query<(&Position, &AreaTag, &mut Transform), With<DroppedItem>>,
 ) {
     for (position, tag, mut transform) in &mut drops {
-        *transform = sprite_transform(position.pos, drop_z(&service, tag, position.pos));
+        *transform = sprite_transform(position.pos, drop_z(&content, tag, position.pos));
     }
 }
 
 fn animate_drops(
     time: Res<Time>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut drops: Query<(Entity, &Position, &AreaTag, &mut DropAnim, &mut Transform)>,
     mut play: MessageWriter<PlaySfx>,
     mut commands: Commands,
@@ -164,7 +165,7 @@ fn animate_drops(
         transform.translation = Vec3::new(
             ground.x,
             ground.y + hop,
-            drop_z(&service, tag, position.pos),
+            drop_z(&content, tag, position.pos),
         );
         if anim.elapsed - anim.delay >= DROP_DURATION {
             play.write(PlaySfx {
@@ -176,8 +177,8 @@ fn animate_drops(
     }
 }
 
-fn drop_z(service: &Content, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
-    let area = area::load(service, tag.area);
+fn drop_z(content: &Content, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
+    let area = area::load(content, tag.area);
     dynamic_z(area.size.height, area.sort_base(), Tiles(pos.y))
 }
 

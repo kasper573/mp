@@ -1,8 +1,11 @@
 use egui::{Align, Layout, Sense, Ui, Vec2};
+use game::core::audio;
 use serde_json::Value;
 
 use crate::forms::FormCx;
 use crate::ui::{theme, widgets};
+use crate::views::sound;
+use crate::{forms, picker};
 
 pub(super) fn soundscape_extras(
     ui: &mut Ui,
@@ -23,7 +26,7 @@ pub(super) fn soundscape_extras(
         let number = channel["channel"].as_u64().unwrap_or(0);
         widgets::kv(ui, &format!("channel {number}"), |ui| {
             let mut file = channel["file"].as_str().unwrap_or_default().to_owned();
-            if crate::picker::asset(ui, cx, &mut file, &format!("{channel_path}/file")) {
+            if picker::asset(ui, cx, &mut file, &format!("{channel_path}/file")) {
                 channel["file"] = Value::String(file);
                 changed = true;
             }
@@ -32,7 +35,7 @@ pub(super) fn soundscape_extras(
             ui.scope(|ui| {
                 ui.set_max_width(96.0);
                 let mut volume = channel.get("volume").cloned().unwrap_or(Value::from(1.0));
-                if crate::forms::value(
+                if forms::value(
                     ui,
                     cx,
                     &serde_json::json!({ "type": "number", "minimum": 0.0, "maximum": 1.0 }),
@@ -48,7 +51,7 @@ pub(super) fn soundscape_extras(
             ui.scope(|ui| {
                 ui.set_max_width(72.0);
                 let mut renumber = Value::from(number);
-                if crate::forms::value(
+                if forms::value(
                     ui,
                     cx,
                     &serde_json::json!({ "type": "integer", "minimum": 1, "x-unit": "ch" }),
@@ -106,52 +109,70 @@ pub(super) fn soundscape_extras(
             .files
             .get(&format!("assets/{file}"))
             .cloned()
-            .and_then(|bytes| crate::views::sound::measure(&bytes));
+            .and_then(|bytes| sound::measure(&bytes));
         ui.label(theme::mono(format!("{number} · {file}")).size(12.5));
         let Some(loudness) = loudness else {
             widgets::hint(ui, "not measured: the file does not decode");
             continue;
         };
-        let effective = loudness.integrated + 20.0 * volume.max(1e-6).log10();
-        let (low, high, band) = if number == 1 {
-            (-33.0, -27.0, "music band -33 to -27 LUFS")
+        let effective = loudness.integrated + f64::from(audio::decibels(volume as f32).0);
+        let band = if number == 1 {
+            MUSIC_BAND
         } else {
-            (-37.0, -33.0, "ambience band -37 to -33 LUFS")
+            AMBIENCE_BAND
         };
         meter(
             ui,
             "loudness",
-            effective,
-            -60.0,
-            0.0,
-            Some((low, high)),
-            &format!("{effective:.1} LUFS"),
+            &Meter {
+                value: effective,
+                band: Some(band.range),
+                text: &format!("{effective:.1} LUFS"),
+            },
         );
-        ui.label(theme::faint(band).size(11.5));
+        ui.label(theme::faint(band.label).size(11.5));
         meter(
             ui,
             "true peak",
-            loudness.peak_dbfs,
-            -60.0,
-            0.0,
-            Some((-60.0, -12.0)),
-            &format!("{:.1} dBFS", loudness.peak_dbfs),
+            &Meter {
+                value: loudness.peak_dbfs,
+                band: Some(PEAK_BAND.range),
+                text: &format!("{:.1} dBFS", loudness.peak_dbfs),
+            },
         );
-        ui.label(theme::faint("limit -12 dBFS").size(11.5));
+        ui.label(theme::faint(PEAK_BAND.label).size(11.5));
         ui.add_space(4.0);
     }
     changed
 }
 
-pub(super) fn meter(
-    ui: &mut Ui,
-    name: &str,
-    value: f64,
-    min: f64,
-    max: f64,
-    band: Option<(f64, f64)>,
-    text: &str,
-) {
+pub(super) struct Band {
+    pub range: (f64, f64),
+    pub label: &'static str,
+}
+
+pub(super) const MUSIC_BAND: Band = Band {
+    range: (-33.0, -27.0),
+    label: "music band -33 to -27 LUFS",
+};
+pub(super) const AMBIENCE_BAND: Band = Band {
+    range: (-37.0, -33.0),
+    label: "ambience band -37 to -33 LUFS",
+};
+pub(super) const PEAK_BAND: Band = Band {
+    range: (-60.0, -12.0),
+    label: "limit -12 dBFS",
+};
+
+pub(super) struct Meter<'a> {
+    pub value: f64,
+    pub band: Option<(f64, f64)>,
+    pub text: &'a str,
+}
+
+pub(super) fn meter(ui: &mut Ui, name: &str, meter: &Meter) {
+    let Meter { value, band, text } = *meter;
+    let (min, max) = (-60.0, 0.0);
     ui.horizontal(|ui| {
         ui.label(theme::muted(name).size(12.5));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

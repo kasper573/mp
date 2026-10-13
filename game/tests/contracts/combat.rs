@@ -1,7 +1,11 @@
-use game::core::tiling::Tiles;
-use game::systems::combat::AttackRequest;
+use bevy_ecs::prelude::*;
+use game::core::content::Content;
+use game::core::math::Rng;
+use game::core::tiling::{TilePos, Tiles};
+use game::systems::actor::{Actor, ActorModel};
+use game::systems::combat::{AttackRequest, Attitude};
 use game::systems::movement::position;
-use game::systems::npc::{self, Pack};
+use game::systems::npc::{self, Npc, Pack};
 use game::systems::stat::{self, StatKind};
 
 use crate::support::{Sim, row, spawn_area};
@@ -26,25 +30,17 @@ fn an_attack_walks_into_range_and_strikes() {
 
 #[test]
 fn an_attacked_monster_is_fought_until_it_falls() {
-    use bevy_ecs::prelude::*;
-    use game::core::content::Content;
-    use game::core::tiling::TilePos;
-    use game::systems::actor::{self, Actor};
-    use game::systems::combat::Attitude;
-    use game::systems::npc::Npc;
-
     for seed in 0..6 {
         let mut sim = Sim::area(spawn_area());
-        sim.world()
-            .insert_resource(game::core::math::Rng::new(seed));
+        sim.world().insert_resource(Rng::new(seed));
         let player = sim.join(1);
         sim.run_until(2.0, |_| false);
         let at = position(sim.world(), player).expect("position");
         let world = sim.world();
-        let assets = *world.resource::<Content>();
+        let content = *world.resource::<Content>();
         let walks = |world: &World, npc: Entity| {
             let model = world.get::<Actor>(npc).expect("actor").model;
-            !actor::model(&assets, model).airborne()
+            !ActorModel::get(&content, model).airborne()
         };
         let foe = world
             .query_filtered::<Entity, With<Npc>>()

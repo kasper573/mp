@@ -1,19 +1,21 @@
-use crate::core::content::Content;
-use crate::systems::interface::InterfaceIcon;
-use crate::systems::item::Id as ItemId;
-use crate::systems::item::{INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, card};
-use crate::systems::player::session;
+use std::hash::{Hash, Hasher};
+
 use bevy::ecs::template::template;
 use bevy::prelude::*;
-use std::hash::{Hash, Hasher};
+use ui::RichPiece;
 use ui::tokens::palette;
 use ui::{Align, Carriable, Side, TooltipText, text_colored, tooltip, tooltip_content};
 
+use crate::core::content::Content;
 use crate::systems::hud::{
-    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, slot_node,
+    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
 };
 use crate::systems::input::map::{ActionInput, InputAction, InputMap, input};
-use ui::RichPiece;
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::item::{
+    INVENTORY_MAX, Id as ItemId, Inventory, ItemDef, ItemFlag, ItemStack, card,
+};
+use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct InventoryGrid;
@@ -85,7 +87,7 @@ impl Window for InventoryWindow {
         0
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content()))
+        single_tab(self.title(), ui::scrolled(content()))
     }
     fn sync(&self, world: &mut World) {
         sync_inventory(world)

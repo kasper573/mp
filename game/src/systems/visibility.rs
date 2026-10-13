@@ -192,11 +192,15 @@ pub fn private_viewers(world: &mut World, player: Entity) -> Vec<Entity> {
 
 pub fn send_private<M: Message + Clone>(world: &mut World, player: Entity, message: M) {
     for conn in private_viewers(world, player) {
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
-            message: message.clone(),
-        });
+        send_to(world, conn, message.clone());
     }
+}
+
+pub fn send_to<M: Message>(world: &mut World, conn: Entity, message: M) {
+    world.write_message(ToClients {
+        targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
+        message,
+    });
 }
 
 impl PrivateSight {

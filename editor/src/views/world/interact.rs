@@ -1,36 +1,41 @@
-use std::sync::Arc;
+use egui::{Key, Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
+use game::core::tiling::TilePos;
+use game::systems::area;
+use game::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
+use game::systems::script::Place;
 
-use egui::{Key, Pos2, Rect, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::Pos;
-use game::core::tiling::{TilePos, Tiles};
-
-use super::atlas::Atlas;
-use super::canvas::{
-    Frame, Placed, card_at, edge_at, edge_segments, note_rect, placed_of, tile_at,
-};
+use super::canvas::{MapCanvas, corners};
 use super::{
-    Layout, Part, card_rect, round2, select, tidy_regions, write_layout, write_layout_merging,
+    GAP, MapPart, MapRoute, MapTileHit, OpenWorldMap, card_at, hundredths, move_card, select,
+    selected, tidy_regions,
 };
 use crate::app::Editor;
+use crate::play;
+use crate::project::ContentEdit;
 use crate::views::area as area_view;
 
 const SNAP_PX: f32 = 8.0;
+const DRAG_SLOP: f32 = 3.0;
+const CORNER_HIT: f32 = 8.0;
+const SIZE_STEP: f32 = 5.0;
 
-pub enum Drag {
+pub enum MapDrag {
     Cards {
         from: Pos2,
-        origin: Layout,
+        cards: Vec<String>,
         moved: bool,
+        offset: Vec2,
+        snap: Option<String>,
     },
     Note {
         index: usize,
         from: Pos2,
-        origin: Pos2,
+        offset: Vec2,
     },
     Resize {
-        key: String,
+        area: String,
         start_size: u32,
+        size: u32,
         from: Pos2,
         center: Pos2,
     },
@@ -39,353 +44,310 @@ pub enum Drag {
     },
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn run(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    response: &egui::Response,
-    atlas: &Arc<Atlas>,
-    stored: &Layout,
-    frame: &Frame,
-    placed: &[Placed],
-    hovered: Option<String>,
-    typing: bool,
-    content: Content,
-) {
+impl MapDrag {
+    pub fn preview(&self, map: &OpenWorldMap) -> Option<WorldMapDef> {
+        let mut layout = map.layout.clone();
+        match self {
+            MapDrag::Cards {
+                cards,
+                moved: true,
+                offset,
+                ..
+            } => {
+                for id in cards.iter().filter_map(|key| map.atlas.id(key)) {
+                    if let Some(card) = layout.cards.get_mut(&id) {
+                        move_card(card, card_at(card) + *offset);
+                    }
+                }
+            }
+            MapDrag::Note { index, offset, .. } => {
+                let note = layout.notes.get_mut(*index)?;
+                note.x = hundredths(note.x + offset.x);
+                note.y = hundredths(note.y + offset.y);
+            }
+            MapDrag::Resize { area, size, .. } => {
+                layout.cards.get_mut(&map.atlas.id(area)?)?.size = *size;
+            }
+            MapDrag::Cards { .. } | MapDrag::Box { .. } => return None,
+        }
+        Some(layout)
+    }
+
+    fn follow(&mut self, map: &OpenWorldMap, p: Pos2, scale: f32, modifiers: Modifiers) {
+        match self {
+            MapDrag::Cards {
+                from,
+                cards,
+                moved,
+                offset,
+                snap,
+            } => {
+                *moved |= (p - *from).length() > DRAG_SLOP;
+                let delta = (p - *from) / scale;
+                (*offset, *snap) = match modifiers.alt {
+                    true => (delta, None),
+                    false => snapped(map, cards, delta, scale),
+                };
+            }
+            MapDrag::Note { from, offset, .. } => *offset = (p - *from) / scale,
+            MapDrag::Resize {
+                start_size,
+                size,
+                from,
+                center,
+                ..
+            } => {
+                let raw = *start_size as f32 * (p - *center).length()
+                    / (*from - *center).length().max(1.0);
+                let stepped = match modifiers.shift {
+                    true => raw.round(),
+                    false => (raw / SIZE_STEP).round() * SIZE_STEP,
+                };
+                *size = (stepped as u32).clamp(MIN_SIZE, MAX_SIZE);
+            }
+            MapDrag::Box { .. } => {}
+        }
+    }
+
+    fn label(&self) -> String {
+        match self {
+            MapDrag::Cards { cards, .. } => match cards.as_slice() {
+                [one] => format!("Move {one} on the world map"),
+                _ => format!("Move {} world map cards", cards.len()),
+            },
+            MapDrag::Note { .. } => "Move a note".to_owned(),
+            MapDrag::Resize { area, .. } => format!("Resize {area} on the world map"),
+            MapDrag::Box { .. } => "Select on the world map".to_owned(),
+        }
+    }
+}
+
+pub fn run(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, canvas: &MapCanvas) {
+    let response = &canvas.response;
     let modifiers = ui.input(|i| i.modifiers);
     let space = ui.input(|i| i.key_down(Key::Space));
-    let pointer = response.hover_pos();
-    let selected = editor.views.world.selected.clone();
-    if ui.input(|i| i.key_pressed(Key::Escape)) && editor.views.world.drag.is_some() {
-        editor.views.world.drag = None;
-        editor.views.world.preview = None;
-        editor.views.world.drag_note = None;
-    }
-    if response.drag_started_by(egui::PointerButton::Primary) && !space {
+    let pointer = response
+        .hover_pos()
+        .or_else(|| response.interact_pointer_pos());
+    if response.drag_started_by(PointerButton::Primary) && !space {
         let from = ui
             .input(|i| i.pointer.press_origin())
-            .or_else(|| response.interact_pointer_pos())
+            .or(pointer)
             .unwrap_or_default();
-        if let Some((key, center)) = corner_at(placed, &selected, from) {
-            let start_size = stored.cards[&key].size;
-            editor.views.world.drag = Some(Drag::Resize {
-                key,
-                start_size,
-                from,
-                center,
-            });
-        } else if let Some(index) = note_at(stored, frame, from) {
-            let note = &stored.notes[index];
-            select(editor, vec![Part::Note(index)]);
-            editor.views.world.drag = Some(Drag::Note {
-                index,
-                from,
-                origin: Pos2::new(note.x, note.y),
-            });
-        } else if let Some(key) = card_at(placed, from) {
-            let part = Part::Card(key);
-            if !editor.views.world.selected.contains(&part) {
-                select(editor, vec![part]);
-            }
-            editor.views.world.drag = Some(Drag::Cards {
-                from,
-                origin: stored.clone(),
-                moved: false,
-            });
-        } else if let Some((a, b)) = edge_at(&edge_segments(atlas, placed), from) {
-            select(editor, vec![Part::Edge(a, b)]);
-            editor.views.world.drag = None;
-        } else if let Some(index) = region_label_at(atlas, stored, frame, from) {
-            let keys = stored.regions[index]
-                .cards
-                .iter()
-                .map(|key| Part::Card(key.clone()))
-                .collect();
-            select(editor, keys);
-            editor.views.world.drag = Some(Drag::Cards {
-                from,
-                origin: stored.clone(),
-                moved: false,
-            });
-        } else {
-            editor.views.world.drag = Some(Drag::Box { from });
-        }
+        editor.views.world.drag = start_drag(editor, map, canvas, from);
     }
-    if response.dragged_by(egui::PointerButton::Primary)
-        && let Some(p) = pointer.or_else(|| response.interact_pointer_pos())
+    if response.dragged_by(PointerButton::Primary)
+        && let Some(p) = pointer
+        && let Some(drag) = &mut editor.views.world.drag
     {
-        match editor.views.world.drag.take() {
-            Some(Drag::Cards {
-                from,
-                origin,
-                moved,
-            }) => {
-                let moved = moved || (p - from).length() > 3.0;
-                let keys: Vec<String> = editor
-                    .views
-                    .world
-                    .selected
-                    .iter()
-                    .filter_map(|part| match part {
-                        Part::Card(key) => Some(key.clone()),
-                        _ => None,
-                    })
-                    .collect();
-                let delta = (p - from) / frame.zoom;
-                let (snapped, note) = if modifiers.alt {
-                    (delta, None)
-                } else {
-                    snap_delta(atlas, &origin, &keys, delta, frame.zoom)
-                };
-                let mut next = origin.clone();
-                for key in &keys {
-                    if let (Some(card), Some(was)) =
-                        (next.cards.get_mut(key), origin.cards.get(key))
-                    {
-                        card.x = round2(was.x + snapped.x);
-                        card.y = round2(was.y + snapped.y);
-                    }
-                }
-                editor.views.world.preview = moved.then_some(next);
-                editor.views.world.drag_note = note;
-                editor.views.world.drag = Some(Drag::Cards {
-                    from,
-                    origin,
-                    moved,
-                });
-            }
-            Some(Drag::Note {
-                index,
-                from,
-                origin,
-            }) => {
-                let delta = (p - from) / frame.zoom;
-                let mut next = stored.clone();
-                if let Some(note) = next.notes.get_mut(index) {
-                    note.x = round2(origin.x + delta.x);
-                    note.y = round2(origin.y + delta.y);
-                }
-                editor.views.world.preview = Some(next);
-                editor.views.world.drag = Some(Drag::Note {
-                    index,
-                    from,
-                    origin,
-                });
-            }
-            Some(Drag::Resize {
-                key,
-                start_size,
-                from,
-                center,
-            }) => {
-                let was = (from - center).length().max(1.0);
-                let now = (p - center).length();
-                let raw = start_size as f32 * now / was;
-                let size = if modifiers.shift {
-                    raw.round()
-                } else {
-                    (raw / 5.0).round() * 5.0
-                };
-                let size = (size as u32).clamp(10, 400);
-                let mut next = stored.clone();
-                if let Some(card) = next.cards.get_mut(&key) {
-                    card.size = size;
-                }
-                editor.views.world.preview = Some(next);
-                editor.views.world.drag = Some(Drag::Resize {
-                    key,
-                    start_size,
-                    from,
-                    center,
-                });
-            }
-            other => editor.views.world.drag = other,
-        }
+        drag.follow(map, p, canvas.viewport.scale(), modifiers);
     }
-    if response.drag_stopped()
-        || (editor.views.world.drag.is_some() && ui.input(|i| i.pointer.any_released()))
+    if (response.drag_stopped() || ui.input(|i| i.pointer.any_released()))
+        && let Some(drag) = editor.views.world.drag.take()
     {
-        editor.views.world.drag_note = None;
-        match editor.views.world.drag.take() {
-            Some(Drag::Cards { moved, .. }) => {
-                if moved && let Some(next) = editor.views.world.preview.take() {
-                    let keys: Vec<String> = editor
-                        .views
-                        .world
-                        .selected
-                        .iter()
-                        .filter_map(|part| match part {
-                            Part::Card(key) => Some(key.clone()),
-                            _ => None,
-                        })
-                        .collect();
-                    let label = match keys.as_slice() {
-                        [one] => format!("Move {one} on the world map"),
-                        _ => format!("Move {} world map cards", keys.len()),
-                    };
-                    write_layout(editor, next, label);
-                }
-                editor.views.world.preview = None;
-            }
-            Some(Drag::Note { .. }) => {
-                if let Some(next) = editor.views.world.preview.take() {
-                    write_layout(editor, next, "Move a note".to_owned());
-                }
-            }
-            Some(Drag::Resize { key, .. }) => {
-                if let Some(next) = editor.views.world.preview.take() {
-                    write_layout(editor, next, format!("Resize {key} on the world map"));
-                }
-            }
-            Some(Drag::Box { from }) => {
-                if let Some(p) = pointer.or_else(|| response.interact_pointer_pos()) {
-                    let r = Rect::from_two_pos(from, p);
-                    let mut parts: Vec<Part> = placed
-                        .iter()
-                        .filter(|card| r.intersects(card.frame))
-                        .map(|card| Part::Card(card.key.clone()))
-                        .collect();
-                    if modifiers.shift || modifiers.command {
-                        for part in &selected {
-                            if !parts.contains(part) {
-                                parts.push(part.clone());
-                            }
-                        }
-                    }
-                    select(editor, parts);
-                }
-            }
-            None => {}
-        }
+        finish_drag(editor, map, canvas, drag, pointer, modifiers);
     }
-    if response.clicked_by(egui::PointerButton::Primary) && !space {
-        let p = response.interact_pointer_pos().unwrap_or_default();
-        if modifiers.alt
-            && let Some(key) = hovered.clone()
-        {
-            match editor.views.world.route_from.take() {
-                Some(from) if from != key => {
-                    editor.views.world.route = Some((from, key));
-                }
-                _ => {
-                    editor.views.world.route_from = Some(key.clone());
-                    editor.toast(format!("route from {key} · Alt-click where it goes"));
-                }
-            }
-        } else {
-            let part = note_at(stored, frame, p)
-                .map(Part::Note)
-                .or_else(|| hovered.clone().map(Part::Card));
-            match part {
-                Some(part) => {
-                    let mut next = if modifiers.shift || modifiers.command {
-                        selected.clone()
-                    } else {
-                        Vec::new()
-                    };
-                    if modifiers.command && next.contains(&part) {
-                        next.retain(|known| *known != part);
-                    } else if !next.contains(&part) {
-                        next.push(part);
-                    }
-                    select(editor, next);
-                }
-                None => {
-                    if !(modifiers.shift || modifiers.command) {
-                        let region = region_at(atlas, stored, frame, p);
-                        select(editor, region.map(Part::Region).into_iter().collect());
-                    }
-                }
-            }
-        }
+    if response.clicked_by(PointerButton::Primary) && !space {
+        click(editor, map, canvas, modifiers);
     }
     if response.double_clicked()
-        && let Some(key) = &hovered
+        && let Some(area) = canvas.hovered
     {
-        area_view::open_area_at(editor, key, None, None);
+        area_view::open_area_at(editor, map.atlas.key(area), None, None);
     }
-    let hover_tile = pointer.and_then(|p| tile_at(atlas, placed, p));
-    editor.views.world.hover = hover_tile.clone();
+    let hover = response
+        .hover_pos()
+        .and_then(|p| canvas.tile_at(&map.atlas, p));
+    editor.views.world.hover = hover.clone();
     if response.secondary_clicked() {
-        editor.views.world.menu_target = hover_tile.clone();
+        editor.views.world.menu_target = hover.clone();
     }
     let menu_target = editor.views.world.menu_target.clone();
     response.context_menu(|ui| {
         ui.set_min_width(240.0);
         match &menu_target {
-            Some((area, tile)) => card_menu(editor, ui, atlas, stored, content, area, *tile),
-            None => {
-                if ui.button("Add note here").clicked() {
-                    let at = ui
-                        .input(|i| i.pointer.latest_pos())
-                        .map(|p| frame.to_map(p))
-                        .unwrap_or(frame.center);
-                    super::add_note(editor, stored, at);
-                    ui.close();
-                }
-                if ui.button("Region from selection").clicked() {
-                    super::region_from_selection(editor, stored);
-                    ui.close();
-                }
-                if ui.button("Arrange…").clicked() {
-                    super::arrange::open(editor);
-                    ui.close();
-                }
-            }
+            Some(hit) => card_menu(editor, ui, map, hit),
+            None => canvas_menu(editor, ui, map, canvas),
         }
     });
-    if response.hovered() && !typing {
-        keys(
-            editor, ui, atlas, stored, placed, &hovered, hover_tile, content,
-        );
+    if response.hovered() && !canvas.typing {
+        keys(editor, ui, map, canvas, hover);
     }
 }
 
-fn card_menu(
+fn start_drag(
     editor: &mut Editor,
-    ui: &mut Ui,
-    atlas: &Atlas,
-    stored: &Layout,
-    content: Content,
-    area: &str,
-    tile: Pos<Tiles>,
+    map: &OpenWorldMap,
+    canvas: &MapCanvas,
+    from: Pos2,
+) -> Option<MapDrag> {
+    let atlas = &map.atlas;
+    let selected = selected(editor);
+    if let Some((area, center)) = corner_at(map, canvas, &selected, from) {
+        let size = map.layout.cards[&atlas.id(&area)?].size;
+        return Some(MapDrag::Resize {
+            area,
+            start_size: size,
+            size,
+            from,
+            center,
+        });
+    }
+    if let Some(index) = canvas.note_at(from) {
+        select(editor, vec![MapPart::Note(index)]);
+        return Some(MapDrag::Note {
+            index,
+            from,
+            offset: Vec2::ZERO,
+        });
+    }
+    if let Some(area) = canvas.card_at(from) {
+        let part = MapPart::Card(atlas.key(area).to_owned());
+        if !selected.contains(&part) {
+            select(editor, vec![part]);
+        }
+        return Some(cards_drag(editor, map, from));
+    }
+    if let Some(edge) = canvas.edge_at(from) {
+        let part = MapPart::Edge(
+            atlas.key(edge.from).to_owned(),
+            atlas.key(edge.to).to_owned(),
+        );
+        select(editor, vec![part]);
+        return None;
+    }
+    if let Some(index) = canvas.region_label_at(from) {
+        let parts = map.layout.regions[index]
+            .cards
+            .iter()
+            .map(|area| MapPart::Card(atlas.key(*area).to_owned()))
+            .collect();
+        select(editor, parts);
+        return Some(cards_drag(editor, map, from));
+    }
+    Some(MapDrag::Box { from })
+}
+
+fn cards_drag(editor: &Editor, map: &OpenWorldMap, from: Pos2) -> MapDrag {
+    MapDrag::Cards {
+        from,
+        cards: map
+            .card_ids(&selected(editor))
+            .into_iter()
+            .map(|area| map.atlas.key(area).to_owned())
+            .collect(),
+        moved: false,
+        offset: Vec2::ZERO,
+        snap: None,
+    }
+}
+
+fn finish_drag(
+    editor: &mut Editor,
+    map: &OpenWorldMap,
+    canvas: &MapCanvas,
+    drag: MapDrag,
+    pointer: Option<Pos2>,
+    modifiers: Modifiers,
 ) {
-    let Some(info) = atlas.areas.get(area) else {
+    if let MapDrag::Box { from } = drag {
+        let Some(p) = pointer else {
+            return;
+        };
+        let region = Rect::from_two_pos(from, p);
+        let mut parts: Vec<MapPart> = canvas
+            .cards
+            .iter()
+            .filter(|card| region.intersects(card.frame))
+            .map(|card| MapPart::Card(map.atlas.key(card.area).to_owned()))
+            .collect();
+        if modifiers.shift || modifiers.command {
+            for part in selected(editor) {
+                if !parts.contains(&part) {
+                    parts.push(part);
+                }
+            }
+        }
+        select(editor, parts);
+        return;
+    }
+    if let Some(next) = drag.preview(map) {
+        map.write(editor, ContentEdit::new(drag.label()), &next);
+    }
+}
+
+fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers: Modifiers) {
+    let p = canvas.response.interact_pointer_pos().unwrap_or_default();
+    if modifiers.alt
+        && let Some(area) = canvas.hovered
+    {
+        let key = map.atlas.key(area).to_owned();
+        match editor.views.world.route_from.take() {
+            Some(from) if from != key => {
+                editor.views.world.route = Some(MapRoute { from, to: key });
+            }
+            _ => start_route(editor, key),
+        }
+        return;
+    }
+    let extend = modifiers.shift || modifiers.command;
+    let part = canvas.note_at(p).map(MapPart::Note).or_else(|| {
+        canvas
+            .hovered
+            .map(|area| MapPart::Card(map.atlas.key(area).to_owned()))
+    });
+    match part {
+        Some(part) => {
+            let mut next = match extend {
+                true => selected(editor),
+                false => Vec::new(),
+            };
+            if modifiers.command && next.contains(&part) {
+                next.retain(|known| *known != part);
+            } else if !next.contains(&part) {
+                next.push(part);
+            }
+            select(editor, next);
+        }
+        None if !extend => {
+            let region = map.layout.regions.iter().position(|region| {
+                map.region_rect(&map.layout, region)
+                    .is_some_and(|rect| canvas.viewport.rect(rect).contains(p))
+            });
+            select(editor, region.map(MapPart::Region).into_iter().collect());
+        }
+        None => {}
+    }
+}
+
+fn start_route(editor: &mut Editor, from: String) {
+    editor.toast(format!("route from {from} · Alt-click where it goes"));
+    editor.views.world.route_from = Some(from);
+}
+
+fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTileHit) {
+    let Some(id) = map.atlas.id(&hit.area) else {
         return;
     };
-    let cell = tile.snap();
-    let walkable = game::systems::area::load(&content, info.id)
-        .grid
-        .walkable(cell);
-    let place = game::systems::script::Place {
-        area: info.id,
-        at: cell,
-    };
-    if walkable {
-        let character = editor
-            .views
-            .world
-            .play_character
-            .clone()
-            .or_else(|| crate::play::current_character(editor))
-            .unwrap_or_else(|| "…".to_owned());
+    let cell = hit.at.snap();
+    let place = Place { area: id, at: cell };
+    if area::load(&map.content, id).grid.walkable(cell) {
+        let character = play::current_character(editor).unwrap_or_else(|| "…".to_owned());
         if ui
             .add(egui::Button::new(format!("▸ Play here as {character}")).shortcut_text("F6"))
             .clicked()
         {
-            editor.play.character = Some(character);
-            crate::play::start(editor, Some(place));
+            play::start(editor, Some(place));
             ui.close();
         }
         ui.menu_button("Play here as…", |ui| {
-            for test in crate::play::test_characters(editor) {
+            for test in play::test_characters(editor) {
                 if ui
                     .button(format!("{} · level {}", test.key, test.level))
                     .clicked()
                 {
-                    editor.play.character = Some(test.key.clone());
-                    editor.views.world.play_character = Some(test.key);
-                    crate::play::start(editor, Some(place));
+                    editor.play.character = Some(test.key);
+                    play::start(editor, Some(place));
                     ui.close();
                 }
             }
@@ -393,10 +355,10 @@ fn card_menu(
         ui.separator();
     }
     if ui
-        .add(egui::Button::new(format!("Open {area} at this tile")).shortcut_text("Enter"))
+        .add(egui::Button::new(format!("Open {} at this tile", hit.area)).shortcut_text("Enter"))
         .clicked()
     {
-        area_view::open_area_at(editor, area, Some(cell), None);
+        area_view::open_area_at(editor, &hit.area, Some(cell), None);
         ui.close();
     }
     if ui
@@ -407,332 +369,325 @@ fn card_menu(
         ui.close();
     }
     ui.separator();
-    let pinned = stored.cards.get(area).is_some_and(|card| card.pinned);
-    if ui
-        .add(egui::Button::new(if pinned { "Unpin" } else { "Pin" }).shortcut_text("P"))
-        .clicked()
-    {
-        let mut next = stored.clone();
-        if let Some(card) = next.cards.get_mut(area) {
-            card.pinned = !pinned;
-        }
-        write_layout(
+    let pinned = map.layout.cards.get(&id).is_some_and(|card| card.pinned);
+    let verb = if pinned { "Unpin" } else { "Pin" };
+    if ui.add(egui::Button::new(verb).shortcut_text("P")).clicked() {
+        map.change(
             editor,
-            next,
-            format!("{} {area}", if pinned { "Unpin" } else { "Pin" }),
+            ContentEdit::new(format!("{verb} {}", hit.area)),
+            |layout| {
+                if let Some(card) = layout.cards.get_mut(&id) {
+                    card.pinned = !pinned;
+                }
+            },
         );
         ui.close();
     }
     if ui.button("Route from here").clicked() {
-        editor.views.world.route_from = Some(area.to_owned());
-        editor.toast(format!("route from {area} · Alt-click where it goes"));
+        start_route(editor, hit.area.clone());
         ui.close();
     }
     if let Some(from) = editor.views.world.route_from.clone()
-        && from != area
+        && from != hit.area
         && ui.button(format!("Route from {from} to here")).clicked()
     {
-        editor.views.world.route = Some((from, area.to_owned()));
+        editor.views.world.route = Some(MapRoute {
+            from,
+            to: hit.area.clone(),
+        });
         editor.views.world.route_from = None;
-        ui.close();
-    }
-    if ui.button("Remove card").clicked() {
-        let mut next = stored.clone();
-        next.cards.remove(area);
-        tidy_regions(&mut next);
-        write_layout(editor, next, format!("Remove {area} from the world map"));
         ui.close();
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+fn canvas_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, canvas: &MapCanvas) {
+    if ui.button("Add note here").clicked() {
+        let at = ui
+            .input(|i| i.pointer.latest_pos())
+            .map_or(canvas.viewport.center, |p| canvas.viewport.to_map(p));
+        super::add_note(editor, map, at);
+        ui.close();
+    }
+    if ui.button("Region from selection").clicked() {
+        super::region_from_selection(editor, map);
+        ui.close();
+    }
+    if ui.button("Arrange…").clicked() {
+        super::arrange::open(editor);
+        ui.close();
+    }
+}
+
+struct WorldKeys {
+    nudge: Vec2,
+    resize: i32,
+    pin: bool,
+    all: bool,
+    enter: bool,
+    play: bool,
+    escape: bool,
+    delete: bool,
+}
+
+impl WorldKeys {
+    fn read(ui: &Ui) -> WorldKeys {
+        ui.input(|i| {
+            let step = if i.modifiers.shift { 1 } else { 10 };
+            let axis = |less: Key, more: Key| {
+                if i.key_pressed(less) {
+                    -1
+                } else if i.key_pressed(more) {
+                    1
+                } else {
+                    0
+                }
+            };
+            let nudge = Vec2::new(
+                axis(Key::ArrowLeft, Key::ArrowRight) as f32,
+                axis(Key::ArrowUp, Key::ArrowDown) as f32,
+            );
+            let grow = i.key_pressed(Key::Equals) || i.key_pressed(Key::Plus);
+            WorldKeys {
+                nudge: nudge * step as f32,
+                resize: step
+                    * if i.key_pressed(Key::Minus) {
+                        -1
+                    } else if grow {
+                        1
+                    } else {
+                        0
+                    },
+                pin: i.key_pressed(Key::P),
+                all: i.modifiers.command && i.key_pressed(Key::A),
+                enter: i.key_pressed(Key::Enter),
+                play: i.key_pressed(Key::F6),
+                escape: i.key_pressed(Key::Escape),
+                delete: i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
+            }
+        })
+    }
+}
+
 fn keys(
     editor: &mut Editor,
     ui: &Ui,
-    atlas: &Atlas,
-    stored: &Layout,
-    placed: &[Placed],
-    hovered: &Option<String>,
-    hover_tile: Option<(String, Pos<Tiles>)>,
-    content: Content,
+    map: &OpenWorldMap,
+    canvas: &MapCanvas,
+    hover: Option<MapTileHit>,
 ) {
-    let (left, right, up, down, minus, equals, delete, pin, all, enter, play, escape, shift) = ui
-        .input(|i| {
-            (
-                i.key_pressed(Key::ArrowLeft),
-                i.key_pressed(Key::ArrowRight),
-                i.key_pressed(Key::ArrowUp),
-                i.key_pressed(Key::ArrowDown),
-                i.key_pressed(Key::Minus),
-                i.key_pressed(Key::Equals) || i.key_pressed(Key::Plus),
-                i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
-                i.key_pressed(Key::P),
-                i.modifiers.command && i.key_pressed(Key::A),
-                i.key_pressed(Key::Enter),
-                i.key_pressed(Key::F6),
-                i.key_pressed(Key::Escape),
-                i.modifiers.shift,
-            )
-        });
-    let keys: Vec<String> = editor
-        .views
-        .world
-        .selected
-        .iter()
-        .filter_map(|part| match part {
-            Part::Card(key) => Some(key.clone()),
-            _ => None,
-        })
-        .collect();
-    let step = if shift { 1.0 } else { 10.0 };
-    let delta = Vec2::new(
-        if left {
-            -step
-        } else if right {
-            step
-        } else {
-            0.0
-        },
-        if up {
-            -step
-        } else if down {
-            step
-        } else {
-            0.0
-        },
-    );
-    if delta != Vec2::ZERO && !keys.is_empty() {
-        let mut next = stored.clone();
-        for key in &keys {
-            if let Some(card) = next.cards.get_mut(key) {
-                card.x = round2(card.x + delta.x);
-                card.y = round2(card.y + delta.y);
+    let keys = WorldKeys::read(ui);
+    let parts = selected(editor);
+    let cards = map.card_ids(&parts);
+    let mut next = map.layout.clone();
+    let mut labels: Vec<String> = Vec::new();
+    let mut merging = true;
+    if keys.nudge != Vec2::ZERO && !cards.is_empty() {
+        for id in &cards {
+            if let Some(card) = next.cards.get_mut(id) {
+                move_card(card, card_at(card) + keys.nudge);
             }
         }
-        write_layout_merging(editor, next, format!("Move {} world map cards", keys.len()));
+        labels.push(format!("Move {} world map cards", cards.len()));
     }
-    if (minus || equals) && !keys.is_empty() {
-        let by: i32 = if shift { 1 } else { 10 } * if minus { -1 } else { 1 };
-        let mut next = stored.clone();
-        for key in &keys {
-            if let Some(card) = next.cards.get_mut(key) {
-                card.size = (card.size as i32 + by).clamp(10, 400) as u32;
+    if keys.resize != 0 && !cards.is_empty() {
+        for id in &cards {
+            if let Some(card) = next.cards.get_mut(id) {
+                card.size = card
+                    .size
+                    .saturating_add_signed(keys.resize)
+                    .clamp(MIN_SIZE, MAX_SIZE);
             }
         }
-        write_layout_merging(
-            editor,
-            next,
-            format!("Resize {} world map cards", keys.len()),
-        );
+        labels.push(format!("Resize {} world map cards", cards.len()));
     }
-    if pin && !keys.is_empty() {
-        let pinned = !keys.iter().all(|key| stored.cards[key].pinned);
-        let mut next = stored.clone();
-        for key in &keys {
-            if let Some(card) = next.cards.get_mut(key) {
+    if keys.pin && !cards.is_empty() {
+        let pinned = !cards.iter().all(|id| map.layout.cards[id].pinned);
+        for id in &cards {
+            if let Some(card) = next.cards.get_mut(id) {
                 card.pinned = pinned;
             }
         }
-        write_layout(
-            editor,
-            next,
-            format!(
-                "{} {} cards",
-                if pinned { "Pin" } else { "Unpin" },
-                keys.len()
-            ),
-        );
+        let verb = if pinned { "Pin" } else { "Unpin" };
+        labels.push(format!("{verb} {} cards", cards.len()));
+        merging = false;
     }
-    if all {
-        let parts = placed
-            .iter()
-            .map(|card| Part::Card(card.key.clone()))
-            .collect();
-        select(editor, parts);
-    }
-    if enter && let Some((area, tile)) = &hover_tile {
-        area_view::open_area_at(editor, area, Some(tile.snap()), None);
-    } else if enter && let Some(key) = hovered {
-        area_view::open_area_at(editor, key, None, None);
-    }
-    if play
-        && let Some((area, tile)) = &hover_tile
-        && let Some(info) = atlas.areas.get(area)
-        && game::systems::area::load(&content, info.id)
-            .grid
-            .walkable(tile.snap())
-    {
-        crate::play::start(
-            editor,
-            Some(game::systems::script::Place {
-                area: info.id,
-                at: tile.snap(),
-            }),
-        );
-    }
-    if escape {
-        editor.views.world.route_from = None;
-        if editor.views.world.drag.is_none() {
-            select(editor, Vec::new());
-        }
-    }
-    if delete && !editor.views.world.selected.is_empty() {
-        let mut next = stored.clone();
-        let parts = editor.views.world.selected.clone();
+    let mut removed = false;
+    if keys.delete {
         let mut notes: Vec<usize> = Vec::new();
         let mut regions: Vec<usize> = Vec::new();
         for part in &parts {
             match part {
-                Part::Card(key) => {
-                    next.cards.remove(key);
-                }
-                Part::Note(index) => notes.push(*index),
-                Part::Region(index) => regions.push(*index),
-                Part::Edge(..) => {}
+                MapPart::Note(index) => notes.push(*index),
+                MapPart::Region(index) => regions.push(*index),
+                MapPart::Card(_) | MapPart::Edge(..) => {}
             }
         }
         notes.sort_unstable_by(|a, b| b.cmp(a));
         regions.sort_unstable_by(|a, b| b.cmp(a));
+        let mut count = 0;
         for index in notes {
             if index < next.notes.len() {
                 next.notes.remove(index);
+                count += 1;
             }
         }
         for index in regions {
             if index < next.regions.len() {
                 next.regions.remove(index);
+                count += 1;
             }
         }
         tidy_regions(&mut next);
-        if write_layout(
-            editor,
-            next,
-            format!("Remove {} from the world map", parts.len()),
-        ) {
+        if count > 0 {
+            labels.push(format!("Remove {count} from the world map"));
+            merging = false;
+            removed = true;
+        }
+    }
+    if !labels.is_empty() {
+        let edit = ContentEdit::new(labels.join(" · "));
+        let edit = if merging { edit.merging() } else { edit };
+        if map.write(editor, edit, &next) && removed {
             select(editor, Vec::new());
         }
     }
+    if keys.all {
+        let parts = canvas
+            .cards
+            .iter()
+            .map(|card| MapPart::Card(map.atlas.key(card.area).to_owned()))
+            .collect();
+        select(editor, parts);
+    }
+    if keys.enter {
+        match (&hover, canvas.hovered) {
+            (Some(hit), _) => area_view::open_area_at(editor, &hit.area, Some(hit.at.snap()), None),
+            (None, Some(area)) => area_view::open_area_at(editor, map.atlas.key(area), None, None),
+            (None, None) => {}
+        }
+    }
+    if keys.play
+        && let Some(hit) = &hover
+        && let Some(id) = map.atlas.id(&hit.area)
+        && area::load(&map.content, id).grid.walkable(hit.at.snap())
+    {
+        play::start(
+            editor,
+            Some(Place {
+                area: id,
+                at: hit.at.snap(),
+            }),
+        );
+    }
+    if keys.escape && editor.views.world.drag.take().is_none() {
+        editor.views.world.route_from = None;
+        select(editor, Vec::new());
+    }
 }
 
-fn corner_at(placed: &[Placed], selected: &[Part], p: Pos2) -> Option<(String, Pos2)> {
-    let [Part::Card(key)] = selected else {
+fn corner_at(
+    map: &OpenWorldMap,
+    canvas: &MapCanvas,
+    selected: &[MapPart],
+    p: Pos2,
+) -> Option<(String, Pos2)> {
+    let [MapPart::Card(key)] = selected else {
         return None;
     };
-    let card = placed_of(placed, key)?;
-    let screen = card.frame;
-    for corner in [
-        screen.left_top(),
-        screen.right_top(),
-        screen.left_bottom(),
-        screen.right_bottom(),
-    ] {
-        if (corner - p).length() <= 8.0 {
-            return Some((key.clone(), screen.center()));
+    let card = canvas.card(map.atlas.id(key)?)?;
+    corners(card.frame)
+        .into_iter()
+        .any(|corner| (corner - p).length() <= CORNER_HIT)
+        .then(|| (key.clone(), card.frame.center()))
+}
+
+struct Snap {
+    shift: f32,
+    note: String,
+}
+
+#[derive(Clone, Copy)]
+enum Axis {
+    X,
+    Y,
+}
+
+impl Axis {
+    fn of(self, p: Pos2) -> f32 {
+        match self {
+            Axis::X => p.x,
+            Axis::Y => p.y,
         }
     }
-    None
+
+    fn lines(self, mine: Rect, theirs: Rect) -> [(f32, f32, &'static str); 5] {
+        let (after, before) = match self {
+            Axis::X => ("right of", "left of"),
+            Axis::Y => ("under", "above"),
+        };
+        [
+            (self.of(mine.min), self.of(theirs.min), "aligned with"),
+            (self.of(mine.max), self.of(theirs.max), "aligned with"),
+            (
+                self.of(mine.center()),
+                self.of(theirs.center()),
+                "centred on",
+            ),
+            (self.of(mine.min), self.of(theirs.max) + GAP, after),
+            (self.of(mine.max), self.of(theirs.min) - GAP, before),
+        ]
+    }
 }
 
-fn note_at(layout: &Layout, frame: &Frame, p: Pos2) -> Option<usize> {
-    layout
-        .notes
-        .iter()
-        .position(|note| note_rect(frame, note).contains(p))
-}
-
-fn region_at(atlas: &Atlas, layout: &Layout, frame: &Frame, p: Pos2) -> Option<usize> {
-    layout
-        .regions
-        .iter()
-        .enumerate()
-        .find(|(_, region)| {
-            super::region_rect(atlas, layout, region).is_some_and(|r| frame.rect(r).contains(p))
-        })
-        .map(|(index, _)| index)
-}
-
-fn region_label_at(atlas: &Atlas, layout: &Layout, frame: &Frame, p: Pos2) -> Option<usize> {
-    layout
-        .regions
-        .iter()
-        .enumerate()
-        .find(|(_, region)| {
-            super::region_rect(atlas, layout, region).is_some_and(|r| {
-                let screen = frame.rect(r);
-                Rect::from_min_size(
-                    screen.left_top() + Vec2::new(0.0, -10.0),
-                    Vec2::new(16.0 + region.name.chars().count() as f32 * 7.0, 20.0),
-                )
-                .contains(p)
-            })
-        })
-        .map(|(index, _)| index)
-}
-
-fn snap_delta(
-    atlas: &Atlas,
-    origin: &Layout,
+fn snapped(
+    map: &OpenWorldMap,
     moving: &[String],
     delta: Vec2,
-    zoom: f32,
+    scale: f32,
 ) -> (Vec2, Option<String>) {
-    let threshold = SNAP_PX / zoom;
-    let resting: Vec<(&String, Rect)> = origin
-        .cards
+    let threshold = SNAP_PX / scale;
+    let atlas = &map.atlas;
+    let moving: Vec<area::Id> = moving.iter().filter_map(|key| atlas.id(key)).collect();
+    let rect = |area: &area::Id| map.card_rect(*area, &map.layout.cards[area]);
+    let mut best: [Option<Snap>; 2] = [None, None];
+    for mover in moving
         .iter()
-        .filter(|(key, _)| !moving.contains(key))
-        .filter_map(|(key, card)| card_rect(atlas, key, card).map(|r| (key, r)))
-        .collect();
-    let mut best_x: Option<(f32, f32, String)> = None;
-    let mut best_y: Option<(f32, f32, String)> = None;
-    for key in moving {
-        let Some(card) = origin.cards.get(key) else {
-            continue;
-        };
-        let Some(r) = card_rect(atlas, key, card) else {
-            continue;
-        };
-        let r = r.translate(delta);
-        for (other, o) in &resting {
-            for (mine, theirs, how) in [
-                (r.min.x, o.min.x, "aligned with"),
-                (r.max.x, o.max.x, "aligned with"),
-                (r.center().x, o.center().x, "centred on"),
-                (r.min.x, o.max.x + super::GAP, "right of"),
-                (r.max.x, o.min.x - super::GAP, "left of"),
-            ] {
-                let d = theirs - mine;
-                if d.abs() <= threshold
-                    && best_x.as_ref().is_none_or(|(_, best, _)| d.abs() < *best)
-                {
-                    best_x = Some((d, d.abs(), format!("{key} snapped {how} {other}")));
-                }
-            }
-            for (mine, theirs, how) in [
-                (r.min.y, o.min.y, "aligned with"),
-                (r.max.y, o.max.y, "aligned with"),
-                (r.center().y, o.center().y, "centred on"),
-                (r.min.y, o.max.y + super::GAP, "under"),
-                (r.max.y, o.min.y - super::GAP, "above"),
-            ] {
-                let d = theirs - mine;
-                if d.abs() <= threshold
-                    && best_y.as_ref().is_none_or(|(_, best, _)| d.abs() < *best)
-                {
-                    best_y = Some((d, d.abs(), format!("{key} snapped {how} {other}")));
+        .filter(|area| map.layout.cards.contains_key(area))
+    {
+        let mine = rect(mover).translate(delta);
+        for other in map
+            .layout
+            .cards
+            .keys()
+            .filter(|area| !moving.contains(area))
+        {
+            let theirs = rect(other);
+            for (slot, axis) in best.iter_mut().zip([Axis::X, Axis::Y]) {
+                for (at, target, how) in axis.lines(mine, theirs) {
+                    let shift = target - at;
+                    if shift.abs() <= threshold
+                        && slot
+                            .as_ref()
+                            .is_none_or(|known| shift.abs() < known.shift.abs())
+                    {
+                        *slot = Some(Snap {
+                            shift,
+                            note: format!(
+                                "{} snapped {how} {}",
+                                atlas.key(*mover),
+                                atlas.key(*other)
+                            ),
+                        });
+                    }
                 }
             }
         }
     }
-    let note = best_y
-        .as_ref()
-        .map(|(_, _, note)| note.clone())
-        .or_else(|| best_x.as_ref().map(|(_, _, note)| note.clone()));
-    (
-        Vec2::new(
-            delta.x + best_x.map_or(0.0, |(d, _, _)| d),
-            delta.y + best_y.map_or(0.0, |(d, _, _)| d),
-        ),
-        note,
-    )
+    let [x, y] = best;
+    let note = y.as_ref().or(x.as_ref()).map(|snap| snap.note.clone());
+    let shift = Vec2::new(
+        x.map_or(0.0, |snap| snap.shift),
+        y.map_or(0.0, |snap| snap.shift),
+    );
+    (delta + shift, note)
 }

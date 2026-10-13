@@ -1,6 +1,8 @@
 use bevy_color::Color;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
+use bevy_math::Vec2;
+use bevy_picking::prelude::PointerDrag;
 use bevy_scene::{Scene, bsn};
 use bevy_ui::{
     AlignItems, BorderRadius, BoxShadow, ComputedNode, Display, Node, PositionType, ShadowStyle,
@@ -8,9 +10,6 @@ use bevy_ui::{
 };
 use bevy_ui_widgets::ValueChange;
 use bevy_window::{PrimaryWindow, Window};
-
-use bevy_math::Vec2;
-use bevy_picking::prelude::PointerDrag;
 
 use crate::cursor::CursorStyle;
 use crate::state::ancestor_with;
@@ -33,7 +32,6 @@ pub struct SliderRange;
 pub struct SliderThumb;
 
 pub fn slider(value: f32, min: f32, max: f32) -> impl Scene {
-    let max = if max > 0.0 { max } else { 100.0 };
     bsn! {
         SliderState {
             value: {value.clamp(min, max)},
@@ -97,16 +95,24 @@ pub fn slider_thumb() -> impl Scene {
 }
 
 fn fraction(state: &SliderState) -> f32 {
-    ((state.value - state.min) / (state.max - state.min)).clamp(0.0, 1.0)
+    if state.max > state.min {
+        ((state.value - state.min) / (state.max - state.min)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
-#[allow(clippy::type_complexity)]
+type Ranges<'w, 's> =
+    Query<'w, 's, (Entity, &'static mut Node), (With<SliderRange>, Without<SliderThumb>)>;
+type Thumbs<'w, 's> =
+    Query<'w, 's, (Entity, &'static mut Node), (With<SliderThumb>, Without<SliderRange>)>;
+
 pub(crate) fn sync_slider(
     states: Query<&SliderState>,
     parents: Query<&ChildOf>,
     has_state: Query<(), With<SliderState>>,
-    mut ranges: Query<(Entity, &mut Node), (With<SliderRange>, Without<SliderThumb>)>,
-    mut thumbs: Query<(Entity, &mut Node), (With<SliderThumb>, Without<SliderRange>)>,
+    mut ranges: Ranges,
+    mut thumbs: Thumbs,
 ) {
     let fraction_of = |entity: Entity| {
         ancestor_with::<SliderState>(entity, &parents, &has_state)

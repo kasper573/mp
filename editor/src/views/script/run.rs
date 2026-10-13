@@ -1,24 +1,25 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
 use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
 use bevy::time::TimeUpdateStrategy;
-use bevy_replicon::prelude::{ClientId as Sender, FromClient, SendTargets, ServerState, ToClients};
+use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use egui::{RichText, Ui};
-use game::core::content::{Content, ContentScope, with_content};
+use game::core::content::Content;
 use game::core::math::{Pos, Rng};
 use game::core::script::{
-    FlowKey, FlowSteering, FlowTrace, Owner, OwnerKind, Pause, Value as ScriptValue, ValueType,
+    FlowKey, FlowSteering, FlowTrace, Owner, OwnerKind, Pause, TraceStep, Value as ScriptValue,
+    ValueType,
 };
 use game::core::tiling::Tiles;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::TICK_HZ;
+use game::systems::actor::Name;
 use game::systems::area::{self, AreaDef, AreaModule, AreaObject};
-use game::systems::dialogue::{Conversation, ConversationRequest};
+use game::systems::dialogue::{self, Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
-use game::systems::item::{self, Inventory, ItemDef, ItemStack};
+use game::systems::item::{Inventory, ItemDef, ItemStack};
 use game::systems::job::{self, Job, JobDef};
 use game::systems::memory::{Memory, MemoryDef};
 use game::systems::notification::NotificationSent;
@@ -29,19 +30,23 @@ use game::systems::player::{
 };
 use game::systems::quest::{self, ActiveQuest, FinishedQuest, QuestDef, QuestLog, QuestResult};
 use game::systems::script::{EventKind, Place, Reach, RiftInstances, RiftScripts};
+use game::systems::{self, GameSettings, TICK_HZ, memory, npc};
 
-use super::panel::{Bound, bindings};
-use super::{Doc, ScriptOwner, nodes};
+use super::nodes::{self, NodeReads};
+use super::panel::{ScriptBinding, bindings};
+use super::{ScriptDoc, ScriptOwner, inspect};
 use crate::app::Editor;
-use crate::project::Selection;
-use crate::tabs::Tab;
+use crate::project::{ProjectFiles, RowSelection, row_file, row_of};
+use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
+use crate::value;
+use crate::value::RowValue;
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;
 
 #[derive(Clone, Debug)]
-pub struct Setup {
+pub struct RunSetup {
     pub event: String,
     pub owner: usize,
     pub character: Option<String>,
@@ -50,9 +55,9 @@ pub struct Setup {
     pub step: bool,
 }
 
-impl Default for Setup {
-    fn default() -> Setup {
-        Setup {
+impl Default for RunSetup {
+    fn default() -> RunSetup {
+        RunSetup {
             event: "interacted".to_owned(),
             owner: 0,
             character: None,
@@ -64,7 +69,7 @@ impl Default for Setup {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum RunState {
+pub enum ScriptRunState {
     Running,
     Dialogue,
     Waiting { seconds: f64 },
@@ -73,7 +78,21 @@ pub enum RunState {
     Ended,
 }
 
-pub struct Run {
+pub enum RunLogLine {
+    Node { name: String, procedure: String },
+    Note(String),
+}
+
+impl RunLogLine {
+    fn node(&self) -> Option<&str> {
+        match self {
+            RunLogLine::Node { name, .. } => Some(name),
+            RunLogLine::Note(_) => None,
+        }
+    }
+}
+
+pub struct ScriptRun {
     pub doc_owner: ScriptOwner,
     pub label: String,
     world: World,
@@ -83,8 +102,8 @@ pub struct Run {
     cursor: MessageCursor<ToClients<NotificationSent>>,
     traced: usize,
     pub visited: Vec<String>,
-    pub log: Vec<String>,
-    pub state: RunState,
+    pub log: Vec<RunLogLine>,
+    pub state: ScriptRunState,
     flow: Option<FlowKey>,
     inputs: InputMap,
     pub conversation: Option<Conversation>,
@@ -99,11 +118,10 @@ struct Watched {
     items: Vec<String>,
 }
 
-pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let _ = super::catalogue(editor);
+pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let bound = bindings(editor, doc);
     let owner_key = doc.owner.clone();
-    let mut setup: Setup = editor
+    let mut setup: RunSetup = editor
         .views
         .script
         .setups
@@ -115,7 +133,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         .values()
         .filter_map(nodes::event_of)
         .map(str::to_owned)
-        .collect::<std::collections::BTreeSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     if !events.contains(&setup.event) {
@@ -124,34 +142,21 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let randoms: Vec<(String, usize)> = doc
         .nodes()
         .iter()
-        .filter(|(_, node)| nodes::kind(node) == "random")
+        .filter(|(_, node)| node.kind() == "random")
         .map(|(name, node)| (name.clone(), node["weights"].as_array().map_or(0, Vec::len)))
         .collect();
     let characters: Vec<(String, String)> = editor
         .project
         .as_ref()
-        .map(|project| {
-            project
-                .files
-                .paths_under("tables/test_character/")
-                .filter_map(|file| {
-                    let (_, key) = crate::project::row_of(file)?;
-                    let name = project
-                        .files
-                        .json(file)
-                        .and_then(|row| row["name"].as_str().map(str::to_owned))
-                        .unwrap_or_else(|| key.to_owned());
-                    Some((key.to_owned(), name))
-                })
+        .and_then(|project| project.content)
+        .map(|content| {
+            content
+                .ids::<CharacterSnapshot>()
+                .map(|id| (id.key(&content).to_owned(), id.get(&content).name.clone()))
                 .collect()
         })
         .unwrap_or_default();
-    let running = editor
-        .views
-        .script
-        .run
-        .as_ref()
-        .is_some_and(|run| run.doc_owner == doc.owner);
+    let running = editor.views.script.run_of(&doc.owner).is_some();
     let mut start = editor
         .views
         .script
@@ -163,17 +168,10 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let mut step = false;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
+        let can_fire = !bound.is_empty() && !events.is_empty();
         if ui
-            .add_enabled(
-                !bound.is_empty() && !events.is_empty(),
-                egui::Button::new(
-                    RichText::new("▶ Fire")
-                        .color(egui::Color32::WHITE)
-                        .family(egui::FontFamily::Name("medium".into())),
-                )
-                .fill(theme::ACCENT)
-                .stroke(egui::Stroke::NONE),
-            )
+            .add_enabled_ui(can_fire, |ui| widgets::primary(ui, "▶ Fire"))
+            .inner
             .clicked()
         {
             start = true;
@@ -319,10 +317,10 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         .setups
         .insert(owner_key.clone(), setup.clone());
     if let Some(file) = open_owner
-        && let Some((table, key)) = crate::project::row_of(&file)
+        && let Some((table, key)) = row_of(&file)
     {
-        editor.select(crate::project::Selection::row(table, key));
-        editor.open_tab(crate::tabs::Tab::for_row(table, key));
+        editor.select(RowSelection::row(table, key));
+        editor.open_tab(EditorTab::for_row(table, key));
     }
     if stop {
         editor.views.script.run = None;
@@ -344,18 +342,13 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
             editor.views.script.run = Some(run);
         }
     }
-    let catalogue_pieces: Vec<(String, String, String)> = doc
+    let cards: Vec<NodeCard> = doc
         .nodes()
         .iter()
-        .map(|(name, node)| {
-            let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
-            let title = super::graph::card_title(name, node);
-            let detail = nodes::pieces(node, catalogue)
-                .into_iter()
-                .map(|line| line.into_iter().map(|p| p.text).collect::<String>())
-                .collect::<Vec<_>>()
-                .join(" · ");
-            (name.clone(), title, detail)
+        .map(|(name, node)| NodeCard {
+            name: name.clone(),
+            title: super::graph::card_title(name, node),
+            detail: nodes::summary(node, &editor.views.script.catalogue),
         })
         .collect();
     let owner_label = bound
@@ -363,13 +356,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         .or(bound.first())
         .map(|b| b.label.clone())
         .unwrap_or_default();
-    let Some(run) = editor
-        .views
-        .script
-        .run
-        .as_mut()
-        .filter(|run| run.doc_owner == owner_key)
-    else {
+    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
         if bound.is_empty() {
             widgets::hint(
                 ui,
@@ -385,78 +372,92 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
     ui.add_space(4.0);
     let state = match &run.state {
-        RunState::Running => "running".to_owned(),
-        RunState::Dialogue => "waiting for a choice".to_owned(),
-        RunState::Waiting { seconds } => format!("waiting {seconds:.1} s"),
-        RunState::Paused { what } => format!("paused in {what}"),
-        RunState::Stepping => "stepping".to_owned(),
-        RunState::Ended => "ended".to_owned(),
+        ScriptRunState::Running => "running".to_owned(),
+        ScriptRunState::Dialogue => "waiting for a choice".to_owned(),
+        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.1} s"),
+        ScriptRunState::Paused { what } => format!("paused in {what}"),
+        ScriptRunState::Stepping => "stepping".to_owned(),
+        ScriptRunState::Ended => "ended".to_owned(),
     };
     let mut skip = false;
     let mut resume = false;
-    egui::ScrollArea::vertical().id_salt(("run-trace", doc.owner.slug())).stick_to_bottom(true).show(ui, |ui| {
-        let mut row_number = 0;
-        let total = run.log.len();
-        for (index, line) in run.log.iter().enumerate() {
-            let last = index + 1 == total;
-            let (node, extra) = match line.split_once("  ·  ") {
-                Some((node, procedure)) => (Some(node.to_owned()), Some(procedure.to_owned())),
-                None => (None, None),
-            };
-            let (title, detail) = match &node {
-                Some(node) => {
-                    row_number += 1;
-                    let (title, pieces) = catalogue_pieces.iter().find(|(name, _, _)| name == node).map(|(_, title, detail)| (title.clone(), detail.clone())).unwrap_or_else(|| (node.clone(), String::new()));
-                    let mut parts: Vec<String> = Vec::new();
-                    if title.starts_with("on ") {
-                        parts.push(format!("{owner_label} · {pieces} · a new flow, subject the pretend character"));
-                    } else if !pieces.is_empty() {
-                        parts.push(pieces);
-                    } else if let Some(source) = doc.nodes().get(node).filter(|source| source["type"] == "dialogue") {
-                        let lines = source["lines"].as_array().map_or(0, Vec::len);
-                        let choices = source["choices"].as_array().map_or(0, Vec::len);
-                        parts.push(format!("{lines} {} · {choices} {}", if lines == 1 { "line" } else { "lines" }, if choices == 1 { "choice" } else { "choices" }));
+    egui::ScrollArea::vertical()
+        .id_salt(("run-trace", doc.owner.slug()))
+        .stick_to_bottom(true)
+        .show(ui, |ui| {
+            let mut row_number = 0;
+            let total = run.log.len();
+            for (index, line) in run.log.iter().enumerate() {
+                let last = index + 1 == total;
+                let (number, title, detail) = match line {
+                    RunLogLine::Node { name, procedure } => {
+                        row_number += 1;
+                        let card = cards.iter().find(|card| card.name == *name);
+                        let title = card.map_or_else(|| name.clone(), |card| card.title.clone());
+                        let pieces = card.map(|card| card.detail.clone()).unwrap_or_default();
+                        let mut parts: Vec<String> = Vec::new();
+                        if title.starts_with("on ") {
+                            parts.push(format!(
+                                "{owner_label} · {pieces} · a new flow, subject the pretend character"
+                            ));
+                        } else if !pieces.is_empty() {
+                            parts.push(pieces);
+                        }
+                        if let Some(branch) = branch_taken(doc, name, run.log.get(index + 1)) {
+                            parts.push(format!("→ {branch}"));
+                        }
+                        if !procedure.is_empty() && !procedure.ends_with(&owner_label) {
+                            parts.push(format!("in {procedure}"));
+                        }
+                        if last {
+                            parts.push(match (&run.state, &run.conversation) {
+                                (ScriptRunState::Dialogue, Some(c)) => format!(
+                                    "waiting for a choice · {} shown, {} locked",
+                                    c.choices.len(),
+                                    c.choices.iter().filter(|c| c.locked).count()
+                                ),
+                                _ => state.clone(),
+                            });
+                        }
+                        (row_number.to_string(), title, parts.join(" · "))
                     }
-                    if let Some(branch) = branch_taken(doc, node, run.log.get(index + 1)) {
-                        parts.push(format!("→ {branch}"));
+                    RunLogLine::Note(note) => (String::new(), String::new(), note.clone()),
+                };
+                ui.horizontal(|ui| {
+                    ui.add_sized(
+                        egui::vec2(24.0, 18.0),
+                        egui::Label::new(theme::faint(number).monospace().size(12.5)),
+                    );
+                    if !title.is_empty() {
+                        ui.add_sized(
+                            egui::vec2(120.0, 18.0),
+                            egui::Label::new(theme::mono(&title).size(13.0)).truncate(),
+                        );
                     }
-                    if let Some(procedure) = extra.filter(|p| !p.is_empty() && !p.ends_with(&owner_label)) {
-                        parts.push(format!("in {procedure}"));
-                    }
-                    if last {
-                        parts.push(match &run.state {
-                            RunState::Dialogue => run.conversation.as_ref().map(|c| format!("waiting for a choice · {} shown, {} locked", c.choices.len(), c.choices.iter().filter(|c| c.locked).count())).unwrap_or_else(|| "waiting for a choice".to_owned()),
-                            _ => state.clone(),
-                        });
-                    }
-                    (title, parts.join(" · "))
-                }
-                None => (String::new(), line.clone()),
-            };
+                    ui.add(egui::Label::new(theme::muted(detail).monospace().size(12.5)).wrap());
+                });
+                widgets::rule(ui);
+            }
+            ui.add_space(4.0);
             ui.horizontal(|ui| {
-                ui.add_sized(egui::vec2(24.0, 18.0), egui::Label::new(theme::faint(if node.is_some() { row_number.to_string() } else { String::new() }).monospace().size(12.5)));
-                if !title.is_empty() {
-                    ui.add_sized(egui::vec2(120.0, 18.0), egui::Label::new(theme::mono(&title).size(13.0)).truncate());
+                if matches!(run.state, ScriptRunState::Waiting { .. })
+                    && ui.button("⏩ Skip the wait").clicked()
+                {
+                    skip = true;
                 }
-                ui.add(egui::Label::new(theme::muted(detail).monospace().size(12.5)).wrap());
+                if matches!(run.state, ScriptRunState::Stepping | ScriptRunState::Paused { .. })
+                    && ui.button("▶ Run on").clicked()
+                {
+                    resume = true;
+                }
+                if run.state == ScriptRunState::Ended {
+                    ui.label(
+                        theme::muted("The flow ended. Fire again or pick another event.")
+                            .size(12.5),
+                    );
+                }
             });
-            let rect = ui.max_rect();
-            let y = ui.cursor().min.y;
-            ui.painter().line_segment([egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)], egui::Stroke::new(1.0, theme::BORDER));
-        }
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            if matches!(run.state, RunState::Waiting { .. }) && ui.button("⏩ Skip the wait").clicked() {
-                skip = true;
-            }
-            if matches!(run.state, RunState::Stepping | RunState::Paused { .. }) && ui.button("▶ Run on").clicked() {
-                resume = true;
-            }
-            if run.state == RunState::Ended {
-                ui.label(theme::muted("The flow ended. Fire again or pick another event.").size(12.5));
-            }
         });
-    });
     if resume {
         run.set_step(false);
         run.go();
@@ -467,49 +468,33 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+struct NodeCard {
+    name: String,
+    title: String,
+    detail: String,
+}
+
+pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let owner = doc.owner.clone();
-    let Some(run) = editor
-        .views
-        .script
-        .run
-        .as_mut()
-        .filter(|run| run.doc_owner == owner)
-    else {
+    let Some(run) = editor.views.script.run_of_mut(&owner) else {
         return;
     };
     let Some(conversation) = run.conversation.clone() else {
         return;
     };
-    let content = run_content(run);
     let inputs = run.inputs.clone();
     let mut pick: Option<usize> = None;
     let mut leave = false;
-    let digits = [
-        egui::Key::Num1,
-        egui::Key::Num2,
-        egui::Key::Num3,
-        egui::Key::Num4,
-        egui::Key::Num5,
-        egui::Key::Num6,
-        egui::Key::Num7,
-        egui::Key::Num8,
-        egui::Key::Num9,
-    ];
     if !ui.ctx().text_edit_focused() {
-        ui.input(|i| {
-            for (index, key) in digits.iter().enumerate() {
-                if i.key_pressed(*key)
-                    && index < conversation.choices.len()
-                    && !conversation.choices[index].locked
-                {
-                    pick = Some(index);
-                }
-            }
-            if i.key_pressed(egui::Key::Escape) {
-                leave = true;
-            }
-        });
+        if let Some(index) = widgets::digit_pressed(ui)
+            && index < conversation.choices.len()
+            && !conversation.choices[index].locked
+        {
+            pick = Some(index);
+        }
+        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            leave = true;
+        }
     }
     let rect = ui.max_rect();
     let width = 360.0_f32.min(rect.width() - 32.0);
@@ -519,7 +504,7 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         .pivot(egui::Align2::LEFT_BOTTOM)
         .show(ui.ctx(), |ui| {
             egui::Frame::new()
-                .fill(egui::Color32::from_rgba_unmultiplied(14, 14, 18, 235))
+                .fill(theme::OVERLAY)
                 .stroke(egui::Stroke::new(1.0, theme::BORDER))
                 .corner_radius(6.0)
                 .inner_margin(12.0)
@@ -531,33 +516,25 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                             .color(theme::FAINT),
                     );
                     for line in &conversation.lines {
-                        let who = match &line.by {
-                            game::systems::script::Speaker::Npc(npc) => content
-                                .by_key::<game::systems::npc::NpcDef>(npc.key(&content))
-                                .map(|id| id.get(&content).name.clone())
-                                .unwrap_or_else(|| npc.key(&content).to_owned()),
-                            game::systems::script::Speaker::Object => "—".to_owned(),
-                            game::systems::script::Speaker::Narrator => String::new(),
-                            game::systems::script::Speaker::Player => "You".to_owned(),
-                        };
+                        let who = dialogue::speaker_name(run.world(), run.subject, line.by);
                         let text = line.text.words(&inputs);
-                        if who.is_empty() {
+                        let Some(who) = who else {
                             ui.add(
                                 egui::Label::new(
                                     RichText::new(text).size(13.5).color(theme::TEXT).italics(),
                                 )
                                 .wrap(),
                             );
-                        } else {
-                            ui.add(
-                                egui::Label::new(
-                                    RichText::new(format!("{who}: {text}"))
-                                        .size(13.5)
-                                        .color(theme::TEXT),
-                                )
-                                .wrap(),
-                            );
-                        }
+                            continue;
+                        };
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!("{who}: {text}"))
+                                    .size(13.5)
+                                    .color(theme::TEXT),
+                            )
+                            .wrap(),
+                        );
                     }
                     ui.add_space(6.0);
                     for (index, choice) in conversation.choices.iter().enumerate() {
@@ -603,15 +580,9 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
+pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
     let owner_key = doc.owner.clone();
-    if !editor
-        .views
-        .script
-        .run
-        .as_ref()
-        .is_some_and(|run| run.doc_owner == owner_key)
-    {
+    if editor.views.script.run_of(&owner_key).is_none() {
         return false;
     }
     let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
@@ -630,21 +601,26 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
         .or(bound.first())
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
-    let read_memories = memories_read(doc);
+    let read_memories = NodeReads::of(doc.nodes()).memories;
     let kind = doc.kind.name().to_owned();
-    let state_names = super::inspect::names_text(&doc.script["state"]);
-    let mut open: Option<Tab> = None;
-    let run = editor.views.script.run.as_mut().expect("a live run");
+    let state_names = inspect::names_of(&doc.script["state"]);
+    let mut open: Option<EditorTab> = None;
+    let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
+        return false;
+    };
     let label = run.label.split(" · ").next().unwrap_or("").to_owned();
-    let flows = run.world.resource::<RiftInstances>().live_flows(run.owner);
+    let flows = run
+        .world()
+        .resource::<RiftInstances>()
+        .live_flows(run.owner);
     let waiting = match &run.state {
-        RunState::Dialogue => run
+        ScriptRunState::Dialogue => run
             .visited
             .last()
             .map(|node| format!("waiting at {node}"))
             .unwrap_or_default(),
-        RunState::Waiting { seconds } => format!("waiting {seconds:.0} s"),
-        RunState::Ended => "ended".to_owned(),
+        ScriptRunState::Waiting { seconds } => format!("waiting {seconds:.0} s"),
+        ScriptRunState::Ended => "ended".to_owned(),
         _ => run
             .visited
             .last()
@@ -654,7 +630,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
     widgets::section(ui, "Owner");
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, &kind, &label, "", |_| {});
+        widgets::card_title(ui, &kind, &label);
         widgets::kv_text(ui, "state", state_names);
         widgets::kv_text(
             ui,
@@ -673,22 +649,27 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) -> bool {
     bag_card(ui, run, &content, &reaches, &mut open);
     if let Some(tab) = open {
         if let Some((table, key)) = tab.row() {
-            editor.select(Selection::row(&table, &key));
+            editor.select(RowSelection::row(&table, &key));
         }
         editor.open_tab(tab);
     }
     true
 }
 
-fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Option<Tab>) {
+fn character_card(
+    ui: &mut Ui,
+    run: &mut ScriptRun,
+    content: &Content,
+    open: &mut Option<EditorTab>,
+) {
     let subject = run.subject;
     let name = run
-        .world
-        .get::<game::systems::actor::Name>(subject)
+        .world()
+        .get::<Name>(subject)
         .map(|n| n.name.clone())
         .unwrap_or_else(|| "character".to_owned());
-    let job = run.world.get::<Job>(subject).map(|job| job.def);
-    let level = game::systems::job::level(&run.world, subject);
+    let job = run.world().get::<Job>(subject).map(|job| job.def);
+    let level = job::level(run.world(), subject);
     let jobs: Vec<(job::Id, String)> = content
         .table::<JobDef>()
         .ids()
@@ -698,7 +679,7 @@ fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Opti
     let area_key = run.area.key(content).to_owned();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "player", &name, "", |_| {});
+        widgets::card_title(ui, "player", &name);
         widgets::kv(ui, "level", |ui| {
             let mut picked = level;
             egui::ComboBox::from_id_salt("run-level")
@@ -713,7 +694,7 @@ fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Opti
                 let xp = job
                     .and_then(|job| job.get(content).levels.get(picked as usize - 1))
                     .map_or(0, |tier| tier.xp);
-                if let Some(mut held) = run.world.get_mut::<Xp>(subject) {
+                if let Some(mut held) = run.world_mut().get_mut::<Xp>(subject) {
                     held.amount = xp;
                 }
             }
@@ -732,7 +713,8 @@ fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Opti
                     }
                 });
             if picked != job
-                && let (Some(def), Some(mut held)) = (picked, run.world.get_mut::<Job>(subject))
+                && let (Some(def), Some(mut held)) =
+                    (picked, run.world_mut().get_mut::<Job>(subject))
             {
                 held.def = def;
             }
@@ -742,7 +724,7 @@ fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Opti
                 .on_hover_text("Open the area the run plays in")
                 .clicked()
             {
-                *open = Some(Tab::Area {
+                *open = Some(EditorTab::Area {
                     key: area_key.clone(),
                 });
             }
@@ -750,13 +732,12 @@ fn character_card(ui: &mut Ui, run: &mut Run, content: &Content, open: &mut Opti
     });
 }
 
-fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String]) {
+fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[String]) {
     let subject = run.subject;
     let set: Vec<String> = run
-        .world
+        .world()
         .get::<Memory>(subject)
-        .and_then(|memory| crate::value::json(memory).ok())
-        .and_then(|json| json.as_object().map(|map| map.keys().cloned().collect()))
+        .map(|memory| memory.keys().map(|id| id.key(content).to_owned()).collect())
         .unwrap_or_default();
     let mut shown: Vec<String> = read.to_vec();
     for key in set.iter().chain(&run.watched.memories) {
@@ -768,7 +749,7 @@ fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String])
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "memory", "memories", "", |_| {});
+        widgets::card_title(ui, "memory", "memories");
         if shown.is_empty() {
             ui.label(theme::muted("none set · unset reads as zero").size(13.0));
         }
@@ -778,7 +759,7 @@ fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String])
             };
             let ty = id.get(content).ty;
             let is_set = set.contains(key);
-            let value = game::systems::memory::get(&run.world, subject, id);
+            let value = memory::get(run.world(), subject, id);
             widgets::kv(ui, key, |ui| {
                 let mut changed = None;
                 match (ty, value) {
@@ -826,34 +807,20 @@ fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String])
                     }
                 }
                 if let Some(value) = changed {
-                    game::systems::memory::set(&mut run.world, subject, id, value);
+                    memory::set(run.world_mut(), subject, id, value);
                 }
                 if is_set
                     && ui
                         .add(egui::Button::new(theme::faint("✕").size(12.0)).frame(false))
                         .on_hover_text("Forget it · reads as unset")
                         .clicked()
-                    && let Some(mut memory) = run.world.get_mut::<Memory>(subject)
+                    && let Some(mut memory) = run.world_mut().get_mut::<Memory>(subject)
                 {
                     memory.forget(id);
                 }
             });
         }
-        let response = ui.add(egui::Button::new(theme::muted("+ memory").size(12.5)));
-        egui::Popup::from_toggle_button_response(&response).show(|ui| {
-            ui.set_min_width(180.0);
-            for key in all.iter().filter(|key| !shown.contains(key)) {
-                if ui
-                    .selectable_label(false, theme::mono(key).size(12.5))
-                    .clicked()
-                {
-                    add = Some(key.clone());
-                }
-            }
-            if all.iter().all(|key| shown.contains(key)) {
-                ui.label(theme::faint("every memory is listed").size(12.0));
-            }
-        });
+        add = add_popup(ui, "+ memory", &all, &shown);
     });
     if let Some(key) = add {
         run.watched.memories.push(key);
@@ -862,14 +829,14 @@ fn memories_card(ui: &mut Ui, run: &mut Run, content: &Content, read: &[String])
 
 fn quests_card(
     ui: &mut Ui,
-    run: &mut Run,
+    run: &mut ScriptRun,
     content: &Content,
     reaches: &[Reach],
-    open: &mut Option<Tab>,
+    open: &mut Option<EditorTab>,
 ) {
     let subject = run.subject;
     let log = run
-        .world
+        .world()
         .get::<QuestLog>(subject)
         .cloned()
         .unwrap_or_default();
@@ -900,7 +867,7 @@ fn quests_card(
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "quest", "quests", "", |_| {});
+        widgets::card_title(ui, "quest", "quests");
         if shown.is_empty() {
             ui.label(theme::muted("none taken").size(13.0));
         }
@@ -911,7 +878,7 @@ fn quests_card(
             let standing = quest_standing(&log, id);
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("quest/ {key}"), "", true).clicked() {
-                    *open = Some(Tab::for_row("quest", key));
+                    *open = Some(EditorTab::for_row("quest", key));
                 }
                 let mut picked = standing;
                 egui::ComboBox::from_id_salt(("run-quest", key))
@@ -922,22 +889,11 @@ fn quests_card(
                         }
                     });
                 if picked != standing {
-                    set_quest_standing(&mut run.world, subject, content, id, picked);
+                    set_quest_standing(run.world_mut(), subject, content, id, picked);
                 }
             });
         }
-        let response = ui.add(egui::Button::new(theme::muted("+ quest").size(12.5)));
-        egui::Popup::from_toggle_button_response(&response).show(|ui| {
-            ui.set_min_width(180.0);
-            for key in all.iter().filter(|key| !shown.contains(key)) {
-                if ui
-                    .selectable_label(false, theme::mono(key).size(12.5))
-                    .clicked()
-                {
-                    add = Some(key.clone());
-                }
-            }
-        });
+        add = add_popup(ui, "+ quest", &all, &shown);
     });
     if let Some(key) = add {
         run.watched.quests.push(key);
@@ -946,14 +902,14 @@ fn quests_card(
 
 fn bag_card(
     ui: &mut Ui,
-    run: &mut Run,
+    run: &mut ScriptRun,
     content: &Content,
     reaches: &[Reach],
-    open: &mut Option<Tab>,
+    open: &mut Option<EditorTab>,
 ) {
     let subject = run.subject;
     let held: Vec<ItemStack> = run
-        .world
+        .world()
         .get::<Inventory>(subject)
         .map(|bag| bag.slots.clone())
         .unwrap_or_default();
@@ -978,7 +934,7 @@ fn bag_card(
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "item", "bag", "", |_| {});
+        widgets::card_title(ui, "item", "bag");
         if shown.is_empty() {
             ui.label(theme::muted("empty").size(13.0));
         }
@@ -993,38 +949,50 @@ fn bag_card(
                 .sum::<u32>();
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("item/ {key}"), "", true).clicked() {
-                    *open = Some(Tab::for_row("item", key));
+                    *open = Some(EditorTab::for_row("item", key));
                 }
                 let mut picked = count;
                 if ui
                     .add(egui::DragValue::new(&mut picked).speed(0.1).range(0..=999))
                     .changed()
                     && picked != count
+                    && let Some(mut bag) = run.world_mut().get_mut::<Inventory>(subject)
                 {
-                    set_held(&mut run.world, subject, id, picked);
+                    bag.set_count(id, picked);
                 }
             });
         }
-        let response = ui.add(egui::Button::new(theme::muted("+ item").size(12.5)));
-        egui::Popup::from_toggle_button_response(&response).show(|ui| {
-            ui.set_min_width(180.0);
-            egui::ScrollArea::vertical()
-                .max_height(240.0)
-                .show(ui, |ui| {
-                    for key in all.iter().filter(|key| !shown.contains(key)) {
-                        if ui
-                            .selectable_label(false, theme::mono(key).size(12.5))
-                            .clicked()
-                        {
-                            add = Some(key.clone());
-                        }
-                    }
-                });
-        });
+        add = add_popup(ui, "+ item", &all, &shown);
     });
     if let Some(key) = add {
         run.watched.items.push(key);
     }
+}
+
+fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Option<String> {
+    let mut add = None;
+    let response = ui.add(egui::Button::new(theme::muted(label).size(12.5)));
+    egui::Popup::from_toggle_button_response(&response).show(|ui| {
+        ui.set_min_width(180.0);
+        egui::ScrollArea::vertical()
+            .max_height(240.0)
+            .show(ui, |ui| {
+                let mut any = false;
+                for key in all.iter().filter(|key| !shown.contains(key)) {
+                    any = true;
+                    if ui
+                        .selectable_label(false, theme::mono(key).size(12.5))
+                        .clicked()
+                    {
+                        add = Some(key.clone());
+                    }
+                }
+                if !any {
+                    ui.label(theme::faint("everything is listed").size(12.0));
+                }
+            });
+    });
+    add
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1081,92 +1049,40 @@ fn set_quest_standing(
     match standing {
         QuestStanding::NotTaken => {}
         QuestStanding::Active => log.active.push(ActiveQuest::fresh(content, quest)),
-        QuestStanding::Completed | QuestStanding::Failed => log.finished.push(FinishedQuest {
-            quest,
-            result: if standing == QuestStanding::Completed {
-                QuestResult::Completed
-            } else {
-                QuestResult::Failed
-            },
-            day,
-            resets_in: None,
-            offered_again: false,
-        }),
+        QuestStanding::Completed => {
+            log.finished
+                .push(FinishedQuest::new(quest, QuestResult::Completed, day))
+        }
+        QuestStanding::Failed => {
+            log.finished
+                .push(FinishedQuest::new(quest, QuestResult::Failed, day))
+        }
     }
 }
 
-fn set_held(world: &mut World, subject: Entity, item: item::Id, count: u32) {
-    let Some(mut bag) = world.get_mut::<Inventory>(subject) else {
-        return;
-    };
-    bag.slots.retain(|stack| stack.item != item);
-    if count > 0 {
-        bag.slots.push(ItemStack { item, count });
-    }
-}
-
-fn memories_read(doc: &Doc) -> Vec<String> {
-    fn walk(value: &serde_json::Value, out: &mut Vec<String>) {
-        match value {
-            serde_json::Value::Object(map) => {
-                if matches!(
-                    map.get("type").and_then(serde_json::Value::as_str),
-                    Some("memory") | Some("set_within")
-                ) && let Some(name) = map.get("memory").and_then(serde_json::Value::as_str)
-                    && !out.iter().any(|known| known == name)
-                {
-                    out.push(name.to_owned());
-                }
-                map.values().for_each(|child| walk(child, out));
-            }
-            serde_json::Value::Array(list) => list.iter().for_each(|child| walk(child, out)),
-            _ => {}
-        }
-    }
-    let mut out = Vec::new();
-    for node in doc.nodes().values() {
-        if let Some(test) = node.get("test") {
-            walk(test, &mut out);
-        }
-        for choice in node["choices"].as_array().into_iter().flatten() {
-            if let Some(requires) = choice.get("requires") {
-                walk(requires, &mut out);
-            }
-        }
-    }
-    out
-}
-
-fn branch_taken(doc: &Doc, node: &str, next: Option<&String>) -> Option<String> {
-    let next = next?.split("  ·  ").next()?;
+fn branch_taken(doc: &ScriptDoc, node: &str, next: Option<&RunLogLine>) -> Option<String> {
+    let next = next?.node()?;
     let source = doc.nodes().get(node)?;
-    let kind = source["type"].as_str()?;
-    if kind == "if" {
-        return ["yes", "no"]
+    match nodes::FlowKind::of(source)? {
+        nodes::FlowKind::If => ["yes", "no"]
             .into_iter()
             .find(|arrow| source[arrow].as_str() == Some(next))
-            .map(str::to_owned);
-    }
-    if kind == "random" {
-        return source["outputs"]
+            .map(str::to_owned),
+        nodes::FlowKind::Random => source["outputs"]
             .as_array()?
             .iter()
             .position(|arrow| arrow.as_str() == Some(next))
-            .map(|index| format!("output {}", index + 1));
+            .map(|index| format!("output {}", index + 1)),
+        _ => None,
     }
-    None
 }
 
-fn run_content(run: &Run) -> Content {
-    *run.world.resource::<Content>()
-}
-
-fn step(world: &mut World) {
-    world.run_schedule(Main);
-    world.clear_trackers();
-}
-
-fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Result<Run, String> {
+fn start_run(
+    editor: &mut Editor,
+    doc: &ScriptDoc,
+    owner: &ScriptBinding,
+    setup: &RunSetup,
+) -> Result<ScriptRun, String> {
     let project = editor.project.as_ref().ok_or("no project")?;
     let content = project.content.ok_or("the folder does not load")?;
     let (area_id, near) = area_for(&content, owner).ok_or("no area to run in")?;
@@ -1174,7 +1090,7 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
         reset: UtcHour::MIDNIGHT,
     };
-    let mut app = game::systems::server_app(area_id, 0, clock, &content);
+    let mut app = systems::server_app(area_id, 0, clock, &content);
     app.insert_resource(Rng::new(1));
     app.insert_resource(SpawnRules {
         policy: SpawnPolicy::Map,
@@ -1183,12 +1099,7 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
     app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
     app.insert_resource(FlowTrace::default());
     app.insert_resource(FlowSteering::default());
-    app.finish();
-    app.cleanup();
-    app.world_mut()
-        .resource_mut::<bevy::state::prelude::NextState<ServerState>>()
-        .set(ServerState::Running);
-    app.update();
+    systems::start_server(&mut app);
     let mut world = std::mem::take(app.world_mut());
     let snapshot = snapshot_for(&content, setup.character.as_deref(), &project.files)?;
     let area = area::load(&content, area_id);
@@ -1205,9 +1116,9 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
             },
         ))
         .id();
-    send(&mut world, conn, JoinRequest);
+    systems::from_client(&mut world, conn, JoinRequest);
     step(&mut world);
-    send(&mut world, conn, AreaDrawn);
+    systems::from_client(&mut world, conn, AreaDrawn);
     step(&mut world);
     let subject = *world
         .resource::<Players>()
@@ -1216,7 +1127,7 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
         .ok_or("the pretend character did not join")?;
     let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
-    let mut run = Run {
+    let mut run = ScriptRun {
         doc_owner: doc.owner.clone(),
         label: format!("{} · {}", owner.label, setup.event),
         world,
@@ -1227,7 +1138,7 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
         traced: 0,
         visited: Vec::new(),
         log: Vec::new(),
-        state: RunState::Running,
+        state: ScriptRunState::Running,
         flow: None,
         inputs,
         conversation: None,
@@ -1235,32 +1146,32 @@ fn start_run(editor: &mut Editor, doc: &Doc, owner: &Bound, setup: &Setup) -> Re
         watched: Watched::default(),
     };
     run.read();
-    run.traced = run.world.resource::<FlowTrace>().steps.len();
+    run.traced = run.world().resource::<FlowTrace>().steps.len();
     run.visited.clear();
     run.log.clear();
     let event =
         EventKind::from_str(&setup.event).map_err(|_| format!("unknown event {}", setup.event))?;
     let subject = (event != EventKind::Started).then_some(run.subject);
-    run.world
-        .resource_mut::<RiftInstances>()
-        .raise(run.owner, event, subject, Vec::new(), |_| true);
-    run.log
-        .push(format!("▶ {} raised on {}", setup.event, owner.label));
+    let raised_on = run.owner;
+    run.world_mut().resource_mut::<RiftInstances>().raise(
+        raised_on,
+        event,
+        subject,
+        Vec::new(),
+        |_| true,
+    );
+    run.log.push(RunLogLine::Note(format!(
+        "▶ {} raised on {}",
+        setup.event, owner.label
+    )));
     Ok(run)
 }
 
-fn send<M: bevy::ecs::message::Message>(world: &mut World, conn: Entity, message: M) {
-    world.write_message(FromClient {
-        client_id: Sender::Client(conn),
-        message,
-    });
-}
-
-fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> {
-    let spawn = content.built::<game::systems::GameSettings>().initial_spawn;
+fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(area::Id, Pos<Tiles>)> {
+    let spawn = content.built::<GameSettings>().initial_spawn;
     match owner.row.kind {
         OwnerKind::Area | OwnerKind::Object | OwnerKind::Blueprint => {
-            let area: area::Id = game::core::content::ContentId::new(owner.row.row);
+            let area: area::Id = owner.row.id();
             let placed = area::placed(content, area);
             let near = match (owner.row.kind, owner.row.object) {
                 (OwnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
@@ -1275,7 +1186,7 @@ fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> 
             Some((area, near))
         }
         OwnerKind::Npc => {
-            let npc: game::systems::npc::Id = game::core::content::ContentId::new(owner.row.row);
+            let npc: npc::Id = owner.row.id();
             for area in content.ids::<AreaDef>() {
                 for placed in area::placed(content, area) {
                     if let AreaModule::Resident(resident) = &placed.module
@@ -1293,7 +1204,7 @@ fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> 
 
 fn locate_owner(
     world: &mut World,
-    owner: &Bound,
+    owner: &ScriptBinding,
     area_id: area::Id,
     at: Pos<Tiles>,
 ) -> Result<Owner, String> {
@@ -1310,7 +1221,7 @@ fn locate_owner(
             Owner::Entity(OwnerKind::Object, entity)
         }
         OwnerKind::Npc => {
-            let def: game::systems::npc::Id = game::core::content::ContentId::new(owner.row.row);
+            let def: npc::Id = owner.row.id();
             let found = world
                 .query::<(Entity, &Npc)>()
                 .iter(world)
@@ -1319,8 +1230,8 @@ fn locate_owner(
             let entity = match found {
                 Some(entity) => entity,
                 None => {
-                    let pack = game::systems::npc::next_pack(world);
-                    game::systems::npc::spawn(world, def, at, area_id, pack)
+                    let pack = npc::next_pack(world);
+                    npc::spawn(world, def, at, area_id, pack)
                 }
             };
             Owner::Entity(OwnerKind::Npc, entity)
@@ -1335,33 +1246,37 @@ fn locate_owner(
 fn snapshot_for(
     content: &Content,
     key: Option<&str>,
-    files: &crate::project::Files,
+    files: &ProjectFiles,
 ) -> Result<CharacterSnapshot, String> {
-    let json = match key {
-        Some(key) => files
-            .json_owned(&crate::project::row_file("test_character", key))
-            .ok_or_else(|| format!("no test character {key}"))?,
-        None => {
-            let job = content
-                .table::<game::systems::job::JobDef>()
-                .keys()
-                .first()
-                .cloned()
-                .ok_or("no job row for a fresh character")?;
-            serde_json::json!({ "name": "Tester", "job": job, "start": "initial_spawn" })
-        }
+    let Some(key) = key else {
+        let job = content
+            .ids::<JobDef>()
+            .next()
+            .ok_or("no job row for a fresh character")?;
+        return Ok(CharacterSnapshot::fresh("Tester", job));
     };
-    let (parsed, _) = with_content(ContentScope::of(content), || {
-        serde_json::from_value::<CharacterSnapshot>(json)
-    });
-    parsed.map_err(|error| format!("the pretend character does not read: {error}"))
+    let json = files
+        .json_owned(&row_file("test_character", key))
+        .ok_or_else(|| format!("no test character {key}"))?;
+    value::typed(*content, json).ok_or_else(|| format!("test character {key} does not read"))
 }
 
-impl Run {
-    fn apply_steering(&mut self, setup: &Setup) {
-        let content = run_content(self);
-        let _ = content;
-        let mut steering = self.world.resource_mut::<FlowSteering>();
+fn step(world: &mut World) {
+    world.run_schedule(Main);
+    world.clear_trackers();
+}
+
+impl ScriptRun {
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    fn world_mut(&mut self) -> &mut World {
+        &mut self.world
+    }
+
+    fn apply_steering(&mut self, setup: &RunSetup) {
+        let mut steering = self.world_mut().resource_mut::<FlowSteering>();
         steering.step = setup.step;
         steering.random.clear();
         for (name, index) in &setup.random {
@@ -1370,7 +1285,7 @@ impl Run {
     }
 
     fn set_step(&mut self, step: bool) {
-        self.world.resource_mut::<FlowSteering>().step = step;
+        self.world_mut().resource_mut::<FlowSteering>().step = step;
     }
 
     fn tick(&mut self) {
@@ -1382,11 +1297,11 @@ impl Run {
             self.tick();
             self.read();
             match self.state {
-                RunState::Running => {}
+                ScriptRunState::Running => {}
                 _ => return,
             }
         }
-        self.state = RunState::Paused {
+        self.state = ScriptRunState::Paused {
             what: "a run that never pauses".to_owned(),
         };
     }
@@ -1394,9 +1309,10 @@ impl Run {
     fn pick(&mut self, choice: usize) {
         if let Some(conversation) = &self.conversation {
             let step = conversation.step;
-            send(
+            let conn = self.conn;
+            systems::from_client(
                 &mut self.world,
-                self.conn,
+                conn,
                 ConversationRequest::Pick {
                     step,
                     choice: choice as u32,
@@ -1408,74 +1324,79 @@ impl Run {
     fn leave(&mut self) {
         if let Some(conversation) = &self.conversation {
             let step = conversation.step;
-            send(
-                &mut self.world,
-                self.conn,
-                ConversationRequest::Leave { step },
-            );
+            let conn = self.conn;
+            systems::from_client(&mut self.world, conn, ConversationRequest::Leave { step });
         }
     }
 
     fn skip_wait(&mut self) {
-        if let RunState::Waiting { seconds } = self.state {
+        if let ScriptRunState::Waiting { seconds } = self.state {
             let jump = std::time::Duration::from_secs_f64(seconds.max(0.0) + 0.05);
-            self.world
+            self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(jump));
             self.tick();
-            self.world
+            self.world_mut()
                 .insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
-            self.log.push(format!("⏩ skipped {seconds:.1} s"));
+            self.log
+                .push(RunLogLine::Note(format!("⏩ skipped {seconds:.1} s")));
         }
     }
 
     fn read(&mut self) {
-        let content = run_content(self);
-        let steps: Vec<(FlowKey, String, &'static str)> = {
-            let trace = self.world.resource::<FlowTrace>();
-            trace.steps[self.traced.min(trace.steps.len())..]
-                .iter()
-                .map(|step| (step.key, step.procedure.clone(), step.node))
-                .collect()
+        let steps: Vec<TraceStep> = {
+            let trace = self.world().resource::<FlowTrace>();
+            trace.steps[self.traced.min(trace.steps.len())..].to_vec()
         };
         self.traced += steps.len();
-        for (key, procedure, node) in steps.iter().filter(|(key, _, _)| key.owner == self.owner) {
-            self.flow = Some(*key);
-            self.visited.push((*node).to_owned());
-            self.log.push(format!("{node}  ·  {procedure}"));
+        for step in steps.iter().filter(|step| step.key.owner == self.owner) {
+            self.flow = Some(step.key);
+            self.visited.push(step.node.to_owned());
+            self.log.push(RunLogLine::Node {
+                name: step.node.to_owned(),
+                procedure: step.procedure.clone(),
+            });
         }
-        let notices: Vec<String> = {
+        let notices: Vec<RunLogLine> = {
             let messages = self
                 .world
                 .resource::<Messages<ToClients<NotificationSent>>>();
+            let (conn, inputs) = (self.conn, &self.inputs);
             self.cursor
                 .read(messages)
-                .filter(|message| matches!(message.targets, SendTargets::Single(Sender::Client(conn)) if conn == self.conn))
-                .map(|message| format!("🔔 {}", message.message.notification.text.words(&self.inputs)))
+                .filter(|message| {
+                    matches!(message.targets, SendTargets::Single(Sender::Client(sent)) if sent == conn)
+                })
+                .map(|message| {
+                    let text = message.message.notification.text.words(inputs);
+                    RunLogLine::Note(format!("🔔 {text}"))
+                })
                 .collect()
         };
         self.log.extend(notices);
-        self.conversation = self.world.get::<Conversation>(self.subject).cloned();
-        let now = self.world.resource::<bevy::time::Time>().elapsed_secs_f64();
-        let instances = self.world.resource::<RiftInstances>();
+        self.conversation = self.world().get::<Conversation>(self.subject).cloned();
+        let now = self
+            .world()
+            .resource::<bevy::time::Time>()
+            .elapsed_secs_f64();
+        let instances = self.world().resource::<RiftInstances>();
         let live = instances.live_flows(self.owner);
         let pause = self.flow.and_then(|key| instances.pause_of(key));
         self.state = if self.conversation.is_some() {
-            RunState::Dialogue
+            ScriptRunState::Dialogue
         } else {
             match pause {
-                Some(Pause::Wait { until }) => RunState::Waiting {
+                Some(Pause::Wait { until }) => ScriptRunState::Waiting {
                     seconds: (until - now).max(0.0),
                 },
-                Some(Pause::NextTick { .. }) => RunState::Running,
-                Some(Pause::Step { .. }) => RunState::Stepping,
-                Some(Pause::Dialogue) => RunState::Dialogue,
-                Some(Pause::Effect { .. }) => RunState::Paused {
+                Some(Pause::NextTick { .. }) => ScriptRunState::Running,
+                Some(Pause::Step { .. }) => ScriptRunState::Stepping,
+                Some(Pause::Dialogue) => ScriptRunState::Dialogue,
+                Some(Pause::Effect { .. }) => ScriptRunState::Paused {
                     what: self.visited.last().cloned().unwrap_or_default(),
                 },
-                None if live == 0 => RunState::Ended,
-                None => RunState::Running,
+                None if live == 0 => ScriptRunState::Ended,
+                None => ScriptRunState::Running,
             }
         };
-        let _ = content;
     }
 }

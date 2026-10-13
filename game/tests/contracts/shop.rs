@@ -5,6 +5,7 @@ use game::systems::interact::InteractRequest;
 use game::systems::item::Id as ItemId;
 use game::systems::item::{Inventory, ItemStack};
 use game::systems::movement::{Position, position};
+use game::systems::npc::Id as NpcId;
 use game::systems::script::Speaker;
 use game::systems::shop::{Id as ShopId, ShopRequest, ShopView};
 
@@ -17,7 +18,7 @@ fn shown(sim: &mut Sim, player: Entity) -> Option<ShopView> {
     sim.world().get::<ShopView>(player).cloned()
 }
 
-fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: game::systems::npc::Id) -> ShopView {
+fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: NpcId) -> ShopView {
     talk(sim, client, player, keeper);
     pick(sim, client, player, ask_of(keeper));
     assert!(
@@ -27,7 +28,7 @@ fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: game::systems::npc
     shown(sim, player).expect("the shop opened")
 }
 
-fn ask_of(keeper: game::systems::npc::Id) -> &'static str {
+fn ask_of(keeper: NpcId) -> &'static str {
     if keeper == row("Mara") {
         "Show me your wares."
     } else if keeper == row("Wren") {

@@ -1,5 +1,7 @@
 pub mod stage;
 
+pub use crate::core::script::Reveal as ChoiceReveal;
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -14,16 +16,15 @@ use crate::core::script::{
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
-use crate::systems::actor::bust::Face;
-use crate::systems::attention;
-use crate::systems::attention::AttentionMark;
-use crate::systems::attention::Id as AttentionId;
+use crate::systems::actor::model::Face;
+use crate::systems::attention::{AttentionMark, Id as AttentionId};
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::{Inventory, ItemStack};
+use crate::systems::item::{Id as ItemId, Inventory, ItemStack};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::{CommandLock, sender_player};
+use crate::systems::quest::Id as QuestId;
 use crate::systems::reach::Tether;
 use crate::systems::script::condition;
 use crate::systems::script::{
@@ -31,8 +32,7 @@ use crate::systems::script::{
 };
 use crate::systems::stat;
 use crate::systems::text::LineText;
-
-pub use crate::core::script::Reveal as ChoiceReveal;
+use crate::systems::{attention, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -67,9 +67,9 @@ pub struct Conversation {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConversationPanel {
-    QuestOffer(crate::systems::quest::Id),
-    QuestTurnIn(crate::systems::quest::Id),
-    QuestDecision(crate::systems::quest::Id),
+    QuestOffer(QuestId),
+    QuestTurnIn(QuestId),
+    QuestDecision(QuestId),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -103,19 +103,9 @@ pub struct ChoiceView {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ChoiceChip {
-    Needs {
-        what: String,
-        met: bool,
-    },
-    Pays {
-        item: crate::systems::item::Id,
-        count: u32,
-        have: u32,
-    },
-    Gets {
-        item: crate::systems::item::Id,
-        count: u32,
-    },
+    Needs { what: String, met: bool },
+    Pays { item: ItemId, count: u32, have: u32 },
+    Gets { item: ItemId, count: u32 },
 }
 
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -335,13 +325,6 @@ pub fn counterparts(world: &World, sessions: &mut Sessions) -> Vec<Entity> {
         .collect()
 }
 
-pub fn engaged_with(world: &World, player: Entity, with: Option<Entity>) -> bool {
-    world
-        .get::<ConversationSession>(player)
-        .is_some_and(|session| session.with == with)
-        && broken(world, player).is_none()
-}
-
 pub fn flow_of(world: &World, player: Entity) -> Option<FlowKey> {
     world
         .get::<ConversationSession>(player)
@@ -355,7 +338,7 @@ pub fn counterpart_of(world: &World, player: Entity) -> Option<Entity> {
 }
 
 pub fn requests(world: &mut World) {
-    for request in crate::systems::requests::<ConversationRequest>(world) {
+    for request in drain_requests::<ConversationRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };

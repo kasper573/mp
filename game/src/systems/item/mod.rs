@@ -1,8 +1,9 @@
-use std::borrow::Cow;
 pub mod card;
 pub mod effects;
 pub mod render;
 pub mod widget;
+
+use std::borrow::Cow;
 
 use bevy_app::App;
 use bevy_ecs::component::Component;
@@ -10,21 +11,20 @@ use bevy_ecs::entity::{Entity, MapEntities};
 use bevy_ecs::message::Message;
 use bevy_ecs::query::{QueryState, With};
 use bevy_ecs::world::World;
-use bevy_replicon::prelude::{Replicated, SendTargets, ToClients};
+use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
+use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Owner as ScriptOwner, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
-use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
@@ -35,6 +35,7 @@ use crate::systems::script::{Condition, EventKind, RiftInstances};
 use crate::systems::stat::{self, Stat};
 use crate::systems::text::LineText;
 use crate::systems::visibility::{self, Presence, seen_by};
+use crate::systems::{drain_requests, equipment};
 
 pub const INVENTORY_MAX: u32 = 25;
 const RESERVATION_TTL: Seconds = Seconds(60.0);
@@ -74,10 +75,7 @@ pub struct ItemStack {
 #[serde(deny_unknown_fields)]
 struct ItemStackRow {
     item: Id,
-    #[serde(
-        default = "crate::core::content::serial::one",
-        skip_serializing_if = "crate::core::content::serial::is_one"
-    )]
+    #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     count: u32,
 }
 
@@ -168,6 +166,13 @@ impl Inventory {
 
     pub fn free_slots(&self) -> u32 {
         self.max.saturating_sub(self.slots.len() as u32)
+    }
+
+    pub fn set_count(&mut self, item: Id, count: u32) {
+        self.slots.retain(|slot| slot.item != item);
+        if count > 0 {
+            self.slots.push(ItemStack { item, count });
+        }
     }
 
     pub fn exchange(
@@ -510,7 +515,7 @@ pub struct ItemSfx {
 }
 
 pub fn use_item(world: &mut World) {
-    for request in crate::systems::requests::<UseItemRequest>(world) {
+    for request in drain_requests::<UseItemRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -581,7 +586,7 @@ fn raise(world: &mut World, item: Id, kind: EventKind, actor: Entity) {
 
 pub fn drop_item(world: &mut World) {
     let content = *world.resource::<Content>();
-    for request in crate::systems::requests::<DropItemRequest>(world) {
+    for request in drain_requests::<DropItemRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -614,7 +619,7 @@ pub fn drop_item(world: &mut World) {
 }
 
 pub fn pickup_request(world: &mut World) {
-    for request in crate::systems::requests::<PickupRequest>(world) {
+    for request in drain_requests::<PickupRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -751,13 +756,14 @@ pub fn scatter_at(
         items.push(entity);
     }
     for client in seen_by(world, items[0]) {
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
-            message: ItemsDropped {
+        visibility::send_to(
+            world,
+            client,
+            ItemsDropped {
                 items: items.clone(),
                 from,
             },
-        });
+        );
     }
 }
 
@@ -779,10 +785,7 @@ fn carried(world: &World, entity: Entity) -> Vec<Effect> {
 
 fn announce_consumed(world: &mut World, actor: Entity, item: Id) {
     for client in seen_by(world, actor) {
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
-            message: ItemConsumed { item, actor },
-        });
+        visibility::send_to(world, client, ItemConsumed { item, actor });
     }
 }
 

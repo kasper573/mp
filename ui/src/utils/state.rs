@@ -1,21 +1,37 @@
-use bevy_ecs::hierarchy::ChildOf;
+use bevy_ecs::hierarchy::{ChildOf, Children};
 use bevy_ecs::prelude::*;
 use bevy_picking::prelude::{PointerOut, PointerPress, PointerRelease};
 use bevy_ui::{Checkable, Checked, Display, Node, Pressed};
 use bevy_ui_widgets::Activate;
+
+/// The entity itself, then each parent up to the root.
+pub(crate) fn ancestry<'a>(
+    entity: Entity,
+    parents: &'a Query<&ChildOf>,
+) -> impl Iterator<Item = Entity> + 'a {
+    std::iter::successors(Some(entity), move |&entity| {
+        parents.get(entity).ok().map(ChildOf::parent)
+    })
+}
+
+/// The root, then every entity below it, depth first.
+pub(crate) fn descendants(world: &World, root: Entity) -> impl Iterator<Item = Entity> + '_ {
+    let mut stack = vec![root];
+    std::iter::from_fn(move || {
+        let entity = stack.pop()?;
+        if let Some(kids) = world.get::<Children>(entity) {
+            stack.extend(kids.iter());
+        }
+        Some(entity)
+    })
+}
 
 pub(crate) fn ancestor_with<C: Component>(
     entity: Entity,
     parents: &Query<&ChildOf>,
     has: &Query<(), With<C>>,
 ) -> Option<Entity> {
-    let mut current = entity;
-    loop {
-        if has.get(current).is_ok() {
-            return Some(current);
-        }
-        current = parents.get(current).ok()?.parent();
-    }
+    ancestry(entity, parents).find(|&entity| has.contains(entity))
 }
 
 #[derive(Component, Default, Clone)]

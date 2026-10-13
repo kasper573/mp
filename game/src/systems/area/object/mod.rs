@@ -1,5 +1,6 @@
-use std::borrow::Cow;
 pub mod render;
+
+use std::borrow::Cow;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -9,11 +10,10 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
-use crate::core::script::{Owner, OwnerKind};
+use crate::core::script::{Owner, OwnerKind, OwnerRow};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
 use crate::systems::actor::{Hitbox, Name as ActorName};
 use crate::systems::area::{self, AreaTag};
-use crate::systems::dialogue;
 use crate::systems::interact::Interactive;
 use crate::systems::movement::Position;
 use crate::systems::npc::Npc;
@@ -23,6 +23,7 @@ use crate::systems::script::{
     self, Condition, EventKind, Place, RiftEvent, RiftInstances, ScriptModule,
 };
 use crate::systems::visibility::Presence;
+use crate::systems::{WorldArea, dialogue};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -32,6 +33,7 @@ pub fn register(app: &mut App) {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ObjectDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("x-name" = true))]
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -200,12 +202,12 @@ pub struct InsideObjects(Vec<Entity>);
 pub struct StandingOn(Vec<Entity>);
 
 pub fn spawn_all(world: &mut World) {
-    let zone = world.resource::<crate::systems::WorldArea>().0;
+    let zone = world.resource::<WorldArea>().0;
     let content = *world.resource::<Content>();
     let scripts = world.resource::<script::RiftScripts>().clone();
     for (index, object) in area::objects(area::placed(&content, zone)) {
         let index = index as usize;
-        let owner_row = crate::core::script::OwnerRow {
+        let owner_row = OwnerRow {
             kind: OwnerKind::Object,
             row: zone.raw(),
             object: Some(index as u32),
@@ -251,9 +253,7 @@ pub fn spawn_all(world: &mut World) {
             entity.insert(bevy_replicon::prelude::Replicated);
         }
         if object.look.is_some() || interactive.is_some() {
-            entity.insert(Hitbox {
-                size: Size::new(bounds.size.width, bounds.size.height),
-            });
+            entity.insert(Hitbox { size: bounds.size });
         }
         if let Some(label) = &object.label {
             entity.insert(ActorName {

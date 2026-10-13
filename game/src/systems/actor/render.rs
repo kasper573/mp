@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
-use crate::core::content::Content;
-use crate::core::interpolate::{Interpolate, InterpolatePlugin};
-use crate::core::math::Direction;
-use crate::core::tiling::{TilePos, Tiles};
-use crate::core::time::{PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, ActorModel};
-use crate::systems::area::{self, AreaTag};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
+use crate::core::content::Content;
+use crate::core::interpolate::{Interpolate, InterpolatePlugin};
+use crate::core::math::Direction;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::render::{Animator, atlas_rect, dynamic_z, sprite_transform};
+use crate::core::tiling::{TilePos, Tiles};
+use crate::core::time::{PlaybackRate, Seconds};
+use crate::systems::actor::{Action, Actor, ActorModel};
+use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::RenderPosition;
+use crate::systems::scene::Scene as GameScene;
 
 pub struct ActorPlugin;
 
@@ -26,7 +27,7 @@ impl Plugin for ActorPlugin {
                 (attach_sprites, sync_actors, actor_cues)
                     .chain()
                     .in_set(WorldViewSystems)
-                    .run_if(in_state(crate::systems::scene::Scene::Area)),
+                    .run_if(in_state(GameScene::Area)),
             );
     }
 }
@@ -72,11 +73,11 @@ impl Interpolate for RenderActor {
 fn attach_sprites(
     actors: Query<(Entity, &Actor), Without<Sprite>>,
     assets: Res<AssetServer>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut commands: Commands,
 ) {
     for (entity, actor) in &actors {
-        let image = assets.load(actor::model(&service, actor.model).sheet().path());
+        let image = assets.load(ActorModel::get(&content, actor.model).sheet().path());
         commands.entity(entity).insert((
             Sprite { image, ..default() },
             ACTOR_ANCHOR,
@@ -99,7 +100,7 @@ type ActorView = (
 
 fn sync_actors(
     time: Res<Time>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut animator: ResMut<Animator>,
     mut actors: Query<ActorView>,
 ) {
@@ -108,7 +109,7 @@ fn sync_actors(
     for (entity, actor, render, pose, tag, mut sprite, mut transform, mut visibility) in &mut actors
     {
         let elapsed = animator.elapsed(entity, pose.action as u64, clock);
-        let model = actor::model(&service, actor.model);
+        let model = ActorModel::get(&content, actor.model);
         draw_actor_frame(
             &mut sprite,
             model,
@@ -118,7 +119,7 @@ fn sync_actors(
             actor.attack_rate,
         );
         sprite.color = actor.color.color();
-        let area = area::load(&service, tag.area);
+        let area = area::load(&content, tag.area);
         let at = render.0;
         *transform = sprite_transform(
             at,
@@ -135,7 +136,7 @@ struct Seen(HashMap<Entity, (Action, Seconds)>);
 
 fn actor_cues(
     time: Res<Time>,
-    service: Res<Content>,
+    content: Res<Content>,
     mut animator: ResMut<Animator>,
     mut seen: ResMut<Seen>,
     actors: Query<(Entity, &Actor, &RenderPosition, &RenderActor, &AreaTag)>,
@@ -150,7 +151,7 @@ fn actor_cues(
             continue;
         };
         let since = (was == pose.action).then_some(then);
-        let model = actor::model(&service, actor.model);
+        let model = ActorModel::get(&content, actor.model);
         let (cues, stepped) = model.cues(pose.action, pose.dir, since, now, actor.attack_rate);
         for id in cues {
             play.write(PlaySfx {
@@ -158,7 +159,7 @@ fn actor_cues(
                 place: SfxPlace::World(at),
             });
         }
-        if stepped && let Some(id) = area::load(&service, tag.area).footstep_at(at.cell()) {
+        if stepped && let Some(id) = area::load(&content, tag.area).footstep_at(at.cell()) {
             play.write(PlaySfx {
                 id: *id,
                 place: SfxPlace::World(at),

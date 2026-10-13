@@ -1,70 +1,83 @@
+use game::core::content::{ContentRow, Fixture};
+use game::systems::area::world_map::{WorldMap, WorldMapDef};
+
+use crate::views::character;
+use crate::views::script::ScriptOwner;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Tab {
+pub enum EditorTab {
     World,
     Row { table: String, key: String },
     Rows { table: String, keys: Vec<String> },
     Area { key: String },
     Blueprint { key: String },
-    Script(crate::views::script::ScriptOwner),
+    Script(ScriptOwner),
     Model { key: String },
     Tileset { key: String },
-    Sheet { table: String },
+    Spreadsheet { table: String },
 }
 
-impl Tab {
+impl EditorTab {
     pub fn title(&self) -> String {
         match self {
-            Tab::World => "World".to_owned(),
-            Tab::Row { table, .. } if table == crate::views::character::TABLE => {
+            EditorTab::World => "World".to_owned(),
+            EditorTab::Row { table, .. } if table == character::TABLE => {
                 "Test characters".to_owned()
             }
-            Tab::Row { table, key } => format!("{table}/{key}"),
-            Tab::Rows { table, keys } => format!("{} {table}s", keys.len()),
-            Tab::Area { key } => format!("area/{key}"),
-            Tab::Blueprint { key } => format!("blueprint/{key}"),
-            Tab::Script(owner) => owner.title(),
-            Tab::Model { key } => format!("model/{key}"),
-            Tab::Tileset { key } => format!("tileset/{key}"),
-            Tab::Sheet { table } => format!("{table} table"),
+            EditorTab::Row { table, key } => format!("{table}/{key}"),
+            EditorTab::Rows { table, keys } => format!("{} {table}s", keys.len()),
+            EditorTab::Area { key } => format!("area/{key}"),
+            EditorTab::Blueprint { key } => format!("blueprint/{key}"),
+            EditorTab::Script(owner) => owner.title(),
+            EditorTab::Model { key } => format!("model/{key}"),
+            EditorTab::Tileset { key } => format!("tileset/{key}"),
+            EditorTab::Spreadsheet { table } => format!("{table} table"),
         }
     }
 
     pub fn row(&self) -> Option<(String, String)> {
         match self {
-            Tab::World => Some((
-                "world_map".to_owned(),
-                crate::views::world::ROW_KEY.to_owned(),
+            EditorTab::World => Some((
+                WorldMapDef::TABLE.to_owned(),
+                WorldMap::World.key().to_owned(),
             )),
-            Tab::Row { table, key } => Some((table.clone(), key.clone())),
-            Tab::Rows { .. } => None,
-            Tab::Area { key } => Some(("area".to_owned(), key.clone())),
-            Tab::Blueprint { key } => Some(("blueprint".to_owned(), key.clone())),
-            Tab::Script(owner) => owner.row(),
-            Tab::Model { key } => Some(("model".to_owned(), key.clone())),
-            Tab::Tileset { key } => Some(("tileset".to_owned(), key.clone())),
-            Tab::Sheet { .. } => None,
+            EditorTab::Row { table, key } => Some((table.clone(), key.clone())),
+            EditorTab::Rows { .. } => None,
+            EditorTab::Area { key } => Some(("area".to_owned(), key.clone())),
+            EditorTab::Blueprint { key } => Some(("blueprint".to_owned(), key.clone())),
+            EditorTab::Script(owner) => Some(owner.row()),
+            EditorTab::Model { key } => Some(("model".to_owned(), key.clone())),
+            EditorTab::Tileset { key } => Some(("tileset".to_owned(), key.clone())),
+            EditorTab::Spreadsheet { .. } => None,
         }
     }
 
-    pub fn for_row(table: &str, key: &str) -> Tab {
+    pub fn is_row(&self, table: &str, key: &str) -> bool {
+        match self {
+            EditorTab::Script(owner) => owner.is_row(table, key),
+            other => other.row().is_some_and(|(t, k)| t == table && k == key),
+        }
+    }
+
+    pub fn for_row(table: &str, key: &str) -> EditorTab {
         match table {
-            "area" => Tab::Area {
+            "area" => EditorTab::Area {
                 key: key.to_owned(),
             },
-            "blueprint" => Tab::Blueprint {
+            "blueprint" => EditorTab::Blueprint {
                 key: key.to_owned(),
             },
-            "model" => Tab::Model {
+            "model" => EditorTab::Model {
                 key: key.to_owned(),
             },
-            "tileset" => Tab::Tileset {
+            "tileset" => EditorTab::Tileset {
                 key: key.to_owned(),
             },
-            "script" => Tab::Script(crate::views::script::ScriptOwner::Shared {
+            "script" => EditorTab::Script(ScriptOwner::Shared {
                 key: key.to_owned(),
             }),
-            "world_map" => Tab::World,
-            _ => Tab::Row {
+            WorldMapDef::TABLE => EditorTab::World,
+            _ => EditorTab::Row {
                 table: table.to_owned(),
                 key: key.to_owned(),
             },

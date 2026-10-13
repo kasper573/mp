@@ -241,13 +241,10 @@ struct Progress {
 impl Cut {
     fn progress(&self) -> Progress {
         let pace = self.style.pace();
-        let uncover_from = self.arrival.as_ref().map(|arrival| {
-            if arrival.at > pace.cover {
-                arrival.at
-            } else {
-                pace.cover
-            }
-        });
+        let uncover_from = self
+            .arrival
+            .as_ref()
+            .map(|arrival| Seconds(arrival.at.0.max(pace.cover.0)));
         let cover = fraction(self.played, pace.cover);
         let uncover = uncover_from.map_or(0.0, |from| fraction(self.played - from, pace.uncover));
         let phase = if cover < 1.0 {

@@ -1,185 +1,79 @@
 pub mod arrange;
 pub mod atlas;
 mod canvas;
+mod filters;
 mod inspect;
 mod interact;
 mod toolbar;
 
-use std::collections::BTreeMap;
+pub use arrange::{ArrangeDialog, dialog as arrange_dialog};
+pub use filters::{ColourBy, ColourField, MapLens};
+pub use inspect::inspect_parts;
+
+use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use bevy::prelude::World;
-use egui::{Pos2, Rect, Ui, Vec2};
-use game::core::math::Pos;
+use egui::{Color32, Pos2, Rect, Ui, Vec2};
+use game::core::content::{Content, ContentRow, Fixture};
+use game::core::math::{Pos, Size};
 use game::core::tiling::Tiles;
-use serde::{Deserialize, Serialize};
-
-pub use arrange::{ArrangeDialog, dialog as arrange_dialog};
-use atlas::Atlas;
-pub use inspect::{inspect_parts, inspect_world};
+use game::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
+use game::systems::area::{self, AreaDef};
 
 use crate::app::Editor;
-use crate::project::{Edit, Project, Selection, row_file};
+use crate::project::{ContentEdit, Project, RowSelection, row_file};
 use crate::ui::theme;
+use crate::value;
+use crate::views::area::TILE_PX;
+use atlas::WorldAtlas;
 
-pub const TABLE: &str = "world_map";
-pub const ROW_KEY: &str = "world";
-pub const TILE_UNITS: f32 = 16.0;
-pub const AREA_ZOOM: f32 = 0.35;
-const REGION_PAD: f32 = 20.0;
-const GAP: f32 = 48.0;
+const AREA_PX_PER_TILE: f32 = 2.0;
+const MIN_FOOTPRINT: Vec2 = Vec2::new(62.5, 38.75);
+const NEW_CARD_SIZE: u32 = 100;
+const REGION_PAD: f32 = 24.0;
+const GAP: f32 = 3.0;
 const MIN_ZOOM: f32 = 0.01;
 const MAX_ZOOM: f32 = 8.0;
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct Layout {
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub cards: BTreeMap<String, Card>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub regions: Vec<Region>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub notes: Vec<Note>,
+#[derive(Default)]
+pub struct WorldView {
+    pub center: Pos2,
+    pub zoom: f32,
+    pub fitted: bool,
+    pub lenses: Vec<MapLens>,
+    pub search: String,
+    pub colour: Option<ColourBy>,
+    pub route: Option<MapRoute>,
+    pub route_from: Option<String>,
+    pub quest_line: Option<String>,
+    pub layers: MapLayers,
+    pub hover: Option<MapTileHit>,
+    pub menu_target: Option<MapTileHit>,
+    pub pending_look: Option<MapLook>,
+    atlas: Option<Arc<WorldAtlas>>,
+    drag: Option<interact::MapDrag>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Card {
-    pub x: f32,
-    pub y: f32,
-    pub size: u32,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub pinned: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Region {
-    pub name: String,
-    pub cards: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub colour: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Note {
-    pub text: String,
-    pub x: f32,
-    pub y: f32,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Part {
-    Card(String),
-    Edge(String, String),
-    Region(usize),
-    Note(usize),
-}
-
-impl Part {
-    pub fn parse(text: &str) -> Option<Part> {
-        let (kind, rest) = text.split_once(':')?;
-        match kind {
-            "card" => Some(Part::Card(rest.to_owned())),
-            "edge" => rest
-                .split_once('/')
-                .map(|(a, b)| Part::Edge(a.to_owned(), b.to_owned())),
-            "region" => rest.parse().ok().map(Part::Region),
-            "note" => rest.parse().ok().map(Part::Note),
-            _ => None,
-        }
-    }
-
-    fn text(&self) -> String {
-        match self {
-            Part::Card(key) => format!("card:{key}"),
-            Part::Edge(a, b) => format!("edge:{a}/{b}"),
-            Part::Region(index) => format!("region:{index}"),
-            Part::Note(index) => format!("note:{index}"),
-        }
-    }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MapRoute {
+    pub from: String,
+    pub to: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Lens {
-    Row { table: String, key: String },
-    Module(String),
-    Text(String),
+pub struct MapTileHit {
+    pub area: String,
+    pub at: Pos<Tiles>,
 }
 
-impl Lens {
-    fn kind(&self) -> &'static str {
-        match self {
-            Lens::Row { table, .. } => match table.as_str() {
-                "npc" => "people",
-                "item" => "items",
-                "quest" => "quests",
-                "area" => "areas",
-                _ => "rows",
-            },
-            Lens::Module(_) => "modules",
-            Lens::Text(_) => "text",
-        }
-    }
-
-    pub fn chip(&self) -> String {
-        match self {
-            Lens::Row { table, key } => format!("{table}: {key}"),
-            Lens::Module(module) => format!("module: {module}"),
-            Lens::Text(text) => format!("text: {text}"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ColourBy {
-    pub value: String,
-    pub of: ColourOf,
-    pub show: ColourShow,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColourOf {
-    Placed,
-    Hostile,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColourShow {
-    Highest,
-    Lowest,
-}
-
-impl ColourBy {
-    pub fn chip(&self) -> String {
-        let (table, field) = self
-            .value
-            .split_once('.')
-            .unwrap_or((self.value.as_str(), ""));
-        let field = field.rsplit('.').next().unwrap_or(field);
-        match (table, self.of) {
-            ("npc", ColourOf::Hostile) => format!("colour: hostile npc {field}"),
-            _ => format!("colour: {table} {field}"),
-        }
-    }
-
-    pub fn sentence(&self) -> String {
-        let (table, field) = self
-            .value
-            .split_once('.')
-            .unwrap_or((self.value.as_str(), ""));
-        let field = field.rsplit('.').next().unwrap_or(field);
-        let which = match self.show {
-            ColourShow::Highest => "the highest",
-            ColourShow::Lowest => "the lowest",
-        };
-        let of = match (table, self.of) {
-            ("npc", ColourOf::Hostile) => "hostile npcs".to_owned(),
-            _ => format!("{table}s"),
-        };
-        format!("coloured by {which} {field} of {of}")
-    }
+pub struct MapLook {
+    pub area: String,
+    pub zoom: f32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Layers {
+pub struct MapLayers {
     pub warps: bool,
     pub residents: bool,
     pub populations: bool,
@@ -187,9 +81,9 @@ pub struct Layers {
     pub regions: bool,
 }
 
-impl Default for Layers {
-    fn default() -> Layers {
-        Layers {
+impl Default for MapLayers {
+    fn default() -> MapLayers {
+        MapLayers {
             warps: true,
             residents: false,
             populations: false,
@@ -199,287 +93,353 @@ impl Default for Layers {
     }
 }
 
-#[derive(Default)]
-pub struct WorldView {
-    pub center: Pos2,
-    pub zoom: f32,
-    pub fitted: bool,
-    pub selected: Vec<Part>,
-    pub lenses: Vec<Lens>,
-    pub search: String,
-    pub colour: Option<ColourBy>,
-    pub route: Option<(String, String)>,
-    pub route_from: Option<String>,
-    pub quest_line: Option<String>,
-    pub layers: Layers,
-    pub atlas: Option<Arc<Atlas>>,
-    pub atlas_for: Option<u64>,
-    pub hover: Option<(String, Pos<Tiles>)>,
-    pub preview: Option<Layout>,
-    pub menu_target: Option<(String, Pos<Tiles>)>,
-    pub play_character: Option<String>,
-    pub pending_look: Option<(String, f32)>,
-    pub canvas: Vec2,
-    drag: Option<interact::Drag>,
-    drag_note: Option<String>,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum MapPart {
+    Card(String),
+    Edge(String, String),
+    Region(usize),
+    Note(usize),
 }
 
-impl WorldView {
-    pub fn content_changed(&mut self) {
-        self.atlas_for = None;
-    }
-
-    pub fn look_at(&mut self, atlas: &Atlas, layout: &Layout, key: &str, zoom: f32) {
-        if let Some(card) = layout.cards.get(key)
-            && let Some(rect) = card_rect(atlas, key, card)
-        {
-            self.center = rect.center();
-            self.zoom = zoom;
-            self.fitted = true;
+impl fmt::Display for MapPart {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MapPart::Card(key) => write!(f, "card:{key}"),
+            MapPart::Edge(from, to) => write!(f, "edge:{from}/{to}"),
+            MapPart::Region(index) => write!(f, "region:{index}"),
+            MapPart::Note(index) => write!(f, "note:{index}"),
         }
     }
 }
 
-pub fn layout_of(editor: &Editor) -> Layout {
-    editor
-        .project
-        .as_ref()
-        .and_then(|project| project.files.json_owned(&row_file("world_map", ROW_KEY)))
-        .and_then(|value| serde_json::from_value(value).ok())
-        .unwrap_or_default()
-}
+impl FromStr for MapPart {
+    type Err = String;
 
-pub fn with_defaults(atlas: &Atlas, mut layout: Layout) -> Layout {
-    let missing: Vec<String> = atlas
-        .areas
-        .keys()
-        .filter(|key| !layout.cards.contains_key(*key))
-        .cloned()
-        .collect();
-    for key in missing {
-        let beside = atlas.neighbours(&key).into_iter().find_map(|other| {
-            layout
-                .cards
-                .get(other)
-                .copied()
-                .and_then(|card| card_rect(atlas, other, &card))
-        });
-        let at = match beside {
-            Some(rect) => {
-                let width = (atlas.areas[&key].size.width * TILE_UNITS).max(MIN_FOOTPRINT.x);
-                Pos2::new(rect.max.x + GAP + width / 2.0, rect.center().y)
-            }
-            None => {
-                let bounds = layout
-                    .cards
-                    .iter()
-                    .filter_map(|(k, card)| card_rect(atlas, k, card))
-                    .reduce(|a, b| a.union(b));
-                let width = (atlas.areas[&key].size.width * TILE_UNITS).max(MIN_FOOTPRINT.x);
-                match bounds {
-                    Some(bounds) => Pos2::new(
-                        bounds.max.x + GAP + width / 2.0,
-                        bounds.min.y + atlas.areas[&key].size.height * TILE_UNITS / 2.0,
-                    ),
-                    None => Pos2::ZERO,
-                }
-            }
-        };
-        layout.cards.insert(
-            key,
-            Card {
-                x: round2(at.x),
-                y: round2(at.y),
-                size: 100,
-                pinned: false,
-            },
-        );
+    fn from_str(text: &str) -> Result<MapPart, String> {
+        let unknown = || format!("{text:?} is not a part of the world map");
+        let (kind, rest) = text.split_once(':').ok_or_else(unknown)?;
+        match kind {
+            "card" => Ok(MapPart::Card(rest.to_owned())),
+            "edge" => rest
+                .split_once('/')
+                .map(|(from, to)| MapPart::Edge(from.to_owned(), to.to_owned()))
+                .ok_or_else(unknown),
+            "region" => rest.parse().map(MapPart::Region).map_err(|_| unknown()),
+            "note" => rest.parse().map(MapPart::Note).map_err(|_| unknown()),
+            _ => Err(unknown()),
+        }
     }
-    layout
 }
 
-pub const MIN_FOOTPRINT: Vec2 = Vec2::new(1000.0, 620.0);
-
-pub fn card_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
-    let info = atlas.areas.get(key)?;
-    let scale = card.size as f32 / 100.0 * TILE_UNITS;
-    let size = Vec2::new(info.size.width * scale, info.size.height * scale).max(MIN_FOOTPRINT);
-    Some(Rect::from_center_size(Pos2::new(card.x, card.y), size))
+pub fn region_colour(colour: Option<RegionColour>) -> Color32 {
+    match colour {
+        None => Color32::from_rgb(150, 150, 170),
+        Some(RegionColour::Amber) => theme::WARN,
+        Some(RegionColour::Green) => theme::OK,
+        Some(RegionColour::Blue) => Color32::from_rgb(90, 160, 255),
+        Some(RegionColour::Red) => theme::DANGER,
+        Some(RegionColour::Violet) => Color32::from_rgb(170, 120, 240),
+    }
 }
 
-pub fn art_rect(atlas: &Atlas, key: &str, card: &Card) -> Option<Rect> {
-    let info = atlas.areas.get(key)?;
-    let scale = card.size as f32 / 100.0 * TILE_UNITS;
-    let size = Vec2::new(info.size.width * scale, info.size.height * scale);
-    Some(Rect::from_center_size(Pos2::new(card.x, card.y), size))
+pub fn region_colour_name(colour: Option<RegionColour>) -> &'static str {
+    colour.map_or("grey", <&str>::from)
 }
 
-pub fn card_beside(project: &Project, edit: &mut Edit, key: &str, copy: &str) {
-    let Some(value) = project.files.json_owned(&row_file("world_map", ROW_KEY)) else {
-        return;
-    };
-    let Ok(mut layout) = serde_json::from_value::<Layout>(value) else {
-        return;
-    };
-    let Some(original) = layout.cards.get(key).copied() else {
-        return;
-    };
-    let width = project
-        .content
-        .and_then(|content| {
-            content
-                .by_key::<game::systems::area::AreaDef>(key)
-                .map(|id| game::systems::area::load(&content, id).size.width)
+pub struct OpenWorldMap {
+    pub content: Content,
+    pub atlas: Arc<WorldAtlas>,
+    pub layout: WorldMapDef,
+}
+
+impl OpenWorldMap {
+    pub fn of(editor: &mut Editor) -> Option<OpenWorldMap> {
+        let project = editor.project.as_ref()?;
+        let content = project.content?;
+        let atlas = editor.views.world.atlas(project, content);
+        let layout = laid_out(&atlas, WorldMap::World.get(&content));
+        Some(OpenWorldMap {
+            content,
+            atlas,
+            layout,
         })
-        .unwrap_or(32.0);
-    layout.cards.insert(
-        copy.to_owned(),
-        Card {
-            x: original.x + width * TILE_UNITS * original.size as f32 / 100.0 + GAP,
-            y: original.y,
-            size: 100,
-            pinned: false,
-        },
-    );
-    edit.write_json(
-        row_file("world_map", ROW_KEY),
-        &crate::value::json(&layout).unwrap_or_default(),
-    );
+    }
+
+    pub fn card_rect(&self, area: area::Id, card: &Card) -> Rect {
+        card_rect(self.atlas.size(area), card)
+    }
+
+    pub fn art_rect(&self, area: area::Id, card: &Card) -> Rect {
+        art_rect(self.atlas.size(area), card)
+    }
+
+    pub fn bounds(&self, layout: &WorldMapDef) -> Option<Rect> {
+        layout
+            .cards
+            .iter()
+            .map(|(area, card)| self.card_rect(*area, card))
+            .reduce(|a, b| a.union(b))
+    }
+
+    pub fn region_rect(&self, layout: &WorldMapDef, region: &Region) -> Option<Rect> {
+        region
+            .cards
+            .iter()
+            .filter_map(|area| {
+                layout
+                    .cards
+                    .get(area)
+                    .map(|card| self.card_rect(*area, card))
+            })
+            .reduce(|a, b| a.union(b))
+            .map(|rect| rect.expand(REGION_PAD))
+    }
+
+    pub fn card_ids(&self, parts: &[MapPart]) -> Vec<area::Id> {
+        parts
+            .iter()
+            .filter_map(|part| match part {
+                MapPart::Card(key) => self.atlas.id(key),
+                _ => None,
+            })
+            .filter(|area| self.layout.cards.contains_key(area))
+            .collect()
+    }
+
+    pub fn change(
+        &self,
+        editor: &mut Editor,
+        edit: ContentEdit,
+        change: impl FnOnce(&mut WorldMapDef),
+    ) -> bool {
+        let mut next = self.layout.clone();
+        change(&mut next);
+        self.write(editor, edit, &next)
+    }
+
+    pub fn write(&self, editor: &mut Editor, mut edit: ContentEdit, layout: &WorldMapDef) -> bool {
+        let Some(json) = value::untyped(self.content, layout) else {
+            return false;
+        };
+        edit.write_json(layout_file(), &json);
+        editor.apply(edit)
+    }
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, _world: &mut World) {
-    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
+impl WorldView {
+    pub fn look_at(&mut self, map: &OpenWorldMap, area: area::Id, zoom: f32) {
+        if let Some(card) = map.layout.cards.get(&area) {
+            self.center = map.card_rect(area, card).center();
+            self.zoom = zoom;
+            self.fitted = true;
+        }
+    }
+
+    fn atlas(&mut self, project: &Project, content: Content) -> Arc<WorldAtlas> {
+        match &self.atlas {
+            Some(atlas) if atlas.generation == project.generation => atlas.clone(),
+            _ => {
+                let atlas = Arc::new(WorldAtlas::build(
+                    content,
+                    &project.files,
+                    &project.usages,
+                    project.generation,
+                ));
+                self.atlas = Some(atlas.clone());
+                atlas
+            }
+        }
+    }
+}
+
+pub fn show(editor: &mut Editor, ui: &mut Ui) {
+    let Some(map) = OpenWorldMap::of(editor) else {
         ui.label(theme::muted(
             "The folder does not load; the map shows the last layout once it does.",
         ));
         return;
     };
-    let generation = editor
-        .project
-        .as_ref()
-        .map(|project| project.generation)
-        .unwrap_or(0);
-    if editor.views.world.atlas_for != Some(generation) {
-        let files = &editor.project.as_ref().expect("project").files;
-        editor.views.world.atlas = Some(Arc::new(Atlas::build(content, files)));
-        editor.views.world.atlas_for = Some(generation);
+    if let Some(look) = editor.views.world.pending_look.take()
+        && let Some(area) = map.atlas.id(&look.area)
+    {
+        editor.views.world.look_at(&map, area, look.zoom);
     }
-    let atlas = editor.views.world.atlas.clone().expect("atlas");
-    let layout = with_defaults(&atlas, layout_of(editor));
-    if let Some((area, zoom)) = editor.views.world.pending_look.take() {
-        editor.views.world.look_at(&atlas, &layout, &area, zoom);
-    }
-    toolbar::show(editor, ui, &atlas, &layout);
-    canvas::show(editor, ui, content, &atlas, layout, generation);
+    toolbar::show(editor, ui, &map);
+    canvas::show(editor, ui, &map);
 }
 
-pub fn region_colour(name: Option<&str>) -> egui::Color32 {
-    match name.unwrap_or("grey") {
-        "amber" => egui::Color32::from_rgb(242, 176, 62),
-        "green" => egui::Color32::from_rgb(86, 196, 124),
-        "blue" => egui::Color32::from_rgb(90, 160, 255),
-        "red" => egui::Color32::from_rgb(226, 90, 90),
-        "violet" => egui::Color32::from_rgb(170, 120, 240),
-        _ => egui::Color32::from_rgb(150, 150, 170),
+pub fn selected(editor: &Editor) -> Vec<MapPart> {
+    if editor.selection.table != WorldMapDef::TABLE {
+        return Vec::new();
     }
+    editor
+        .selection
+        .parts
+        .iter()
+        .filter_map(|part| part.parse().ok())
+        .collect()
 }
 
-pub const REGION_COLOURS: [&str; 6] = ["grey", "amber", "green", "blue", "red", "violet"];
+pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
+    editor.select(RowSelection::parts(
+        WorldMapDef::TABLE,
+        WorldMap::World.key(),
+        parts.iter().map(MapPart::to_string).collect(),
+    ));
+}
 
-fn round2(value: f32) -> f32 {
+pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, copy: &str) {
+    let Some(content) = project.content else {
+        return;
+    };
+    let Some(area) = content.by_key::<AreaDef>(original) else {
+        return;
+    };
+    let Some(card) = WorldMap::World.get(&content).cards.get(&area) else {
+        return;
+    };
+    let size = area::load(&content, area).size;
+    let at = right_of(card_rect(size, card), footprint(size, card.size));
+    let file = layout_file();
+    let Some(mut row) = project.files.json_owned(&file) else {
+        return;
+    };
+    let Ok(beside) = value::json(&Card {
+        size: card.size,
+        ..new_card(at)
+    }) else {
+        return;
+    };
+    row["cards"][copy] = beside;
+    edit.write_json(file, &row);
+}
+
+fn layout_file() -> String {
+    row_file(WorldMapDef::TABLE, WorldMap::World.key())
+}
+
+fn laid_out(atlas: &WorldAtlas, stored: &WorldMapDef) -> WorldMapDef {
+    let mut layout = stored.clone();
+    for &area in atlas.areas.keys() {
+        if layout.cards.contains_key(&area) {
+            continue;
+        }
+        let size = footprint(atlas.size(area), NEW_CARD_SIZE);
+        let neighbour = atlas.exits(area).iter().find_map(|other| {
+            layout
+                .cards
+                .get(other)
+                .map(|card| card_rect(atlas.size(*other), card))
+        });
+        let bounds = layout
+            .cards
+            .iter()
+            .map(|(other, card)| card_rect(atlas.size(*other), card))
+            .reduce(|a, b| a.union(b));
+        let at = match (neighbour, bounds) {
+            (Some(neighbour), _) => right_of(neighbour, size),
+            (None, Some(bounds)) => Pos2::new(
+                bounds.max.x + GAP + size.x / 2.0,
+                bounds.min.y + size.y / 2.0,
+            ),
+            (None, None) => Pos2::ZERO,
+        };
+        layout.cards.insert(area, new_card(at));
+    }
+    layout
+}
+
+fn shows_areas(zoom: f32) -> bool {
+    zoom * TILE_PX > AREA_PX_PER_TILE
+}
+
+fn card_at(card: &Card) -> Pos2 {
+    Pos2::new(card.at.x, card.at.y)
+}
+
+fn card_rect(size: Size<Tiles>, card: &Card) -> Rect {
+    Rect::from_center_size(card_at(card), footprint(size, card.size))
+}
+
+fn art_rect(size: Size<Tiles>, card: &Card) -> Rect {
+    Rect::from_center_size(card_at(card), art_size(size, card.size))
+}
+
+fn art_size(size: Size<Tiles>, percent: u32) -> Vec2 {
+    Vec2::new(size.width, size.height) * (percent as f32 / 100.0)
+}
+
+fn footprint(size: Size<Tiles>, percent: u32) -> Vec2 {
+    art_size(size, percent).max(MIN_FOOTPRINT)
+}
+
+fn right_of(rect: Rect, size: Vec2) -> Pos2 {
+    Pos2::new(rect.max.x + GAP + size.x / 2.0, rect.center().y)
+}
+
+fn new_card(at: Pos2) -> Card {
+    let mut card = Card {
+        at: Pos::origin(),
+        size: NEW_CARD_SIZE,
+        pinned: false,
+    };
+    move_card(&mut card, at);
+    card
+}
+
+fn move_card(card: &mut Card, at: Pos2) {
+    card.at = Pos::new(hundredths(at.x), hundredths(at.y));
+}
+
+fn hundredths(value: f32) -> f32 {
     (value * 100.0).round() / 100.0
 }
 
-pub fn select(editor: &mut Editor, parts: Vec<Part>) {
-    editor.views.world.selected = parts.clone();
-    editor.select(Selection {
-        table: "world_map".to_owned(),
-        keys: vec![ROW_KEY.to_owned()],
-        parts: parts.iter().map(Part::text).collect(),
-    });
-}
-
-fn write_layout(editor: &mut Editor, layout: Layout, label: String) -> bool {
-    let mut edit = Edit::new(label);
-    edit.write_json(
-        row_file("world_map", ROW_KEY),
-        &crate::value::json(&layout).unwrap_or_default(),
-    );
-    editor.apply(edit)
-}
-
-fn write_layout_merging(editor: &mut Editor, layout: Layout, label: String) -> bool {
-    let mut edit = Edit::new(label).merging();
-    edit.write_json(
-        row_file("world_map", ROW_KEY),
-        &crate::value::json(&layout).unwrap_or_default(),
-    );
-    editor.apply(edit)
-}
-
-fn tidy_regions(layout: &mut Layout) {
-    let cards: Vec<String> = layout.cards.keys().cloned().collect();
+fn tidy_regions(layout: &mut WorldMapDef) {
+    let cards = &layout.cards;
     for region in &mut layout.regions {
-        region.cards.retain(|key| cards.contains(key));
+        region.cards.retain(|area| cards.contains_key(area));
     }
     layout.regions.retain(|region| !region.cards.is_empty());
 }
 
-fn region_from_selection(editor: &mut Editor, layout: &Layout) {
-    let keys: Vec<String> = editor
-        .views
-        .world
-        .selected
-        .iter()
-        .filter_map(|part| match part {
-            Part::Card(key) => Some(key.clone()),
-            _ => None,
-        })
-        .collect();
-    if keys.is_empty() {
+fn region_from_selection(editor: &mut Editor, map: &OpenWorldMap) {
+    let cards = map.card_ids(&selected(editor));
+    if cards.is_empty() {
         editor.toast("Select the cards the region holds first");
         return;
     }
-    let mut next = layout.clone();
+    let mut next = map.layout.clone();
     for region in &mut next.regions {
-        region.cards.retain(|key| !keys.contains(key));
+        region.cards.retain(|area| !cards.contains(area));
     }
     next.regions.retain(|region| !region.cards.is_empty());
     let name = format!("Region {}", next.regions.len() + 1);
+    let index = next.regions.len();
     next.regions.push(Region {
         name: name.clone(),
-        cards: keys,
+        cards,
         colour: None,
     });
-    let index = next.regions.len() - 1;
-    if write_layout(editor, next, format!("Add {name} to the world map")) {
-        select(editor, vec![Part::Region(index)]);
+    if map.write(
+        editor,
+        ContentEdit::new(format!("Add {name} to the world map")),
+        &next,
+    ) {
+        select(editor, vec![MapPart::Region(index)]);
     }
 }
 
-fn add_note(editor: &mut Editor, layout: &Layout, at: Pos2) {
-    let mut next = layout.clone();
-    next.notes.push(Note {
-        text: "Note".to_owned(),
-        x: round2(at.x),
-        y: round2(at.y),
+fn add_note(editor: &mut Editor, map: &OpenWorldMap, at: Pos2) {
+    let index = map.layout.notes.len();
+    let added = map.change(editor, ContentEdit::new("Add a note"), |layout| {
+        layout.notes.push(Note {
+            text: "Note".to_owned(),
+            x: hundredths(at.x),
+            y: hundredths(at.y),
+        });
     });
-    let index = next.notes.len() - 1;
-    if write_layout(editor, next, "Add a note".to_owned()) {
-        select(editor, vec![Part::Note(index)]);
+    if added {
+        select(editor, vec![MapPart::Note(index)]);
     }
-}
-
-fn region_rect(atlas: &Atlas, layout: &Layout, region: &Region) -> Option<Rect> {
-    region
-        .cards
-        .iter()
-        .filter_map(|key| {
-            layout
-                .cards
-                .get(key)
-                .and_then(|card| card_rect(atlas, key, card))
-        })
-        .reduce(|a, b| a.union(b))
-        .map(|r| r.expand(REGION_PAD))
 }

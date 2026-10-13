@@ -7,6 +7,8 @@ use crate::core::script::{EventDef, Name, OwnerKind, ValueType};
 use crate::core::tiling::Tiles;
 use crate::systems::attention::Id as AttentionId;
 use crate::systems::interact::Verb;
+use crate::systems::item::Id as ItemId;
+use crate::systems::npc::Id as NpcId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
@@ -79,7 +81,7 @@ pub enum RiftEvent {
         within: Tiles,
         by: Who,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        npc: Option<crate::systems::npc::Id>,
+        npc: Option<NpcId>,
     },
     Attacked,
     Defeated,
@@ -92,11 +94,11 @@ pub enum RiftEvent {
     Failed,
     Bought {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        item: Option<crate::systems::item::Id>,
+        item: Option<ItemId>,
     },
     Sold {
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        item: Option<crate::systems::item::Id>,
+        item: Option<ItemId>,
     },
 }
 

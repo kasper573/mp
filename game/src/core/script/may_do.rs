@@ -28,10 +28,7 @@ impl<V: Vocabulary> MayDo<V> {
         self.answers.contains(&kind)
     }
 
-    pub fn absorb(&mut self, other: &MayDo<V>)
-    where
-        Reach<V>: Clone,
-    {
+    pub fn absorb(&mut self, other: &MayDo<V>) {
         self.reaches.extend(other.reaches.iter().cloned());
         self.dialogue.extend(other.dialogue.iter().copied());
         self.calls.extend(other.calls.iter().cloned());

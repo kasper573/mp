@@ -4,20 +4,28 @@ pub mod dialogs;
 pub mod history;
 pub mod inspector;
 pub mod output;
+pub mod patterns;
 pub mod report;
 pub mod start;
 pub mod theme;
 pub mod tree;
 pub mod widgets;
 
-use bevy::prelude::World;
+use std::path::Path;
+
 use egui::{Align, Context, Key, Layout, Modifiers, RichText};
 use egui_dock::{DockArea, DockState, TabViewer};
 
-use crate::app::{BottomTab, CloseDialog, CloseThen, Dialog, Editor, LeftTab, RightTab};
-use crate::tabs::Tab;
+use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog, RightTab};
+use crate::project::{RowSelection, row_file};
+use crate::tabs::EditorTab;
+use crate::views::script::ScriptKeys;
+use crate::views::{area, character, model, script, spreadsheet, tileset, world};
+use crate::{import, play, views};
+use std::mem;
+use std::time::Duration;
 
-pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
+pub fn show(editor: &mut Editor, ctx: &Context) {
     if !editor.themed {
         theme::apply(ctx);
         editor.themed = true;
@@ -26,6 +34,7 @@ pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
     }
     editor.status.right.clear();
     shortcuts(editor, ctx);
+    play::status(editor);
     let mut root = egui::Ui::new(
         ctx.clone(),
         "viewport".into(),
@@ -34,13 +43,13 @@ pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
             .max_rect(ctx.viewport_rect()),
     );
     top_bar(editor, &mut root);
-    for tab in std::mem::take(&mut editor.open_tabs) {
+    for tab in mem::take(&mut editor.open_tabs) {
         focus_tab(&mut editor.dock, tab);
     }
     if editor.project.is_some() {
-        workspace(editor, &mut root, world);
+        workspace(editor, &mut root);
         report::not_loaded(editor, ctx);
-        crate::import::tick(editor, ctx);
+        import::tick(editor, ctx);
     } else {
         start::show(editor, &mut root);
     }
@@ -49,7 +58,7 @@ pub fn show(editor: &mut Editor, ctx: &Context, world: &mut World) {
     if ctx.input(|i| i.viewport().close_requested()) && !editor.quit {
         if editor.has_unsaved() {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            editor.dialogs.push(Dialog::Close(CloseDialog {
+            editor.dialogs.push(ModalDialog::Close(CloseDialog {
                 then: CloseThen::Quit,
             }));
         } else {
@@ -71,12 +80,12 @@ pub fn panel_body(ui: &mut egui::Ui, body: impl FnOnce(&mut egui::Ui)) {
     ui.allocate_rect(rect, egui::Sense::hover());
 }
 
-pub fn focus_tab(dock: &mut DockState<Tab>, tab: Tab) {
-    if let Tab::Rows { table, .. } = &tab {
+pub fn focus_tab(dock: &mut DockState<EditorTab>, tab: EditorTab) {
+    if let EditorTab::Rows { table, .. } = &tab {
         let replaced = dock
             .iter_all_tabs_mut()
             .map(|(_, existing)| existing)
-            .find(|existing| matches!(existing, Tab::Rows { table: t, .. } if t == table))
+            .find(|existing| matches!(existing, EditorTab::Rows { table: t, .. } if t == table))
             .map(|existing| {
                 *existing = tab.clone();
             })
@@ -110,7 +119,7 @@ pub fn focus_tab(dock: &mut DockState<Tab>, tab: Tab) {
     dock.push_to_focused_leaf(tab);
 }
 
-pub fn active_tab(editor: &Editor) -> Option<Tab> {
+pub fn active_tab(editor: &Editor) -> Option<EditorTab> {
     editor
         .dock
         .focused_leaf()
@@ -129,15 +138,15 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     if ctx.text_edit_focused() {
         return;
     }
-    let script_tab = matches!(active_tab(editor), Some(Tab::Script(_)));
+    let script_tab = matches!(active_tab(editor), Some(EditorTab::Script(_)));
     let script_hovered = editor
         .views
         .script
         .shown_rect
         .zip(ctx.pointer_hover_pos())
         .is_some_and(|(rect, pos)| rect.contains(pos));
-    if script_tab || script_hovered {
-        editor.views.script.keys = crate::views::script::ScriptKeys::take(ctx);
+    if (script_tab || script_hovered) && editor.dialogs.is_empty() {
+        editor.views.script.keys = ScriptKeys::take(ctx);
     }
     let (save, undo, redo, search, quit, close) = ctx.input_mut(|i| {
         (
@@ -177,9 +186,9 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         && !editor
             .dialogs
             .iter()
-            .any(|dialog| matches!(dialog, Dialog::Keys))
+            .any(|dialog| matches!(dialog, ModalDialog::Keys))
     {
-        editor.dialogs.push(Dialog::Keys);
+        editor.dialogs.push(ModalDialog::Keys);
     }
     let (f5, shift_f5, f6, ctrl_t) = ctx.input_mut(|i| {
         (
@@ -190,27 +199,28 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
         )
     });
     if f5 {
-        crate::play::start(editor, None);
+        play::start(editor, None);
     }
     if shift_f5 {
-        crate::play::stop(editor);
+        play::stop(editor);
     }
     if f6 {
-        crate::views::play_here(editor);
+        views::play_here(editor);
     }
-    if ctrl_t && let Some(key) = crate::play::current_character(editor) {
-        editor.select(crate::project::Selection::row("test_character", &key));
-        editor.open_tab(Tab::for_row("test_character", &key));
+    if ctrl_t && let Some(key) = play::current_character(editor) {
+        editor.select(RowSelection::row("test_character", &key));
+        editor.open_tab(EditorTab::for_row("test_character", &key));
     }
     if editor.play.running.is_some() {
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ctx.request_repaint_after(Duration::from_millis(100));
     }
-    crate::play::status(editor);
 }
 
 pub fn request_close(editor: &mut Editor, then: CloseThen) {
     if editor.has_unsaved() {
-        editor.dialogs.push(Dialog::Close(CloseDialog { then }));
+        editor
+            .dialogs
+            .push(ModalDialog::Close(CloseDialog { then }));
     } else {
         finish_close(editor, then);
     }
@@ -257,14 +267,14 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     }
                     ui.separator();
                     if ui.button("Game binaries…").clicked() {
-                        editor.dialogs.push(Dialog::Binaries);
+                        editor.dialogs.push(ModalDialog::Binaries);
                         ui.close();
                     }
                     if ui
                         .add(egui::Button::new("Keys").shortcut_text("F1"))
                         .clicked()
                     {
-                        editor.dialogs.push(Dialog::Keys);
+                        editor.dialogs.push(ModalDialog::Keys);
                         ui.close();
                     }
                     if ui
@@ -286,7 +296,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     if editor.project.is_none() {
                         return;
                     }
-                    crate::play::top_bar(editor, ui);
+                    play::top_bar(editor, ui);
                     if let Some(project) = &editor.project {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {
@@ -304,7 +314,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
         });
 }
 
-pub fn pretty_path(path: &std::path::Path) -> String {
+pub fn pretty_path(path: &Path) -> String {
     let text = path.display().to_string();
     match dirs::home_dir() {
         Some(home) if path.starts_with(&home) => format!(
@@ -317,7 +327,7 @@ pub fn pretty_path(path: &std::path::Path) -> String {
     }
 }
 
-fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
+fn workspace(editor: &mut Editor, root: &mut egui::Ui) {
     status_bar(editor, root);
     egui::Panel::left("content")
         .resizable(true)
@@ -371,7 +381,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
                     });
             });
         });
-    let bottom_tabs = crate::views::bottom_tabs(editor);
+    let bottom_tabs = views::bottom_tabs(editor);
     if !bottom_tabs
         .iter()
         .any(|(tab, _)| *tab == editor.panels.bottom)
@@ -395,12 +405,12 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
                         match editor.panels.bottom {
                             BottomTab::History => history::show(editor, ui),
                             BottomTab::Output => output::show(editor, ui),
-                            other => crate::views::bottom_show(editor, ui, other),
+                            other => views::bottom_show(editor, ui, other),
                         }
                     });
             });
         });
-    let mut dock = std::mem::replace(&mut editor.dock, DockState::new(Vec::new()));
+    let mut dock = mem::replace(&mut editor.dock, DockState::new(Vec::new()));
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(theme::BG).inner_margin(0.0))
         .show(root, |ui| {
@@ -422,7 +432,7 @@ fn workspace(editor: &mut Editor, root: &mut egui::Ui, world: &mut World) {
             style.tab.tab_body.bg_fill = theme::BG;
             style.tab.tab_body.inner_margin = egui::Margin::ZERO;
             style.tab.tab_body.stroke = egui::Stroke::NONE;
-            let mut viewer = Viewer { editor, world };
+            let mut viewer = Viewer { editor };
             DockArea::new(&mut dock)
                 .style(style)
                 .show_leaf_close_all_buttons(false)
@@ -442,7 +452,7 @@ fn empty_centre(ui: &mut egui::Ui) {
 const STATUS_HEIGHT: f32 = 28.0;
 
 fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
-    let mut left = std::mem::take(&mut editor.status.left);
+    let mut left = mem::take(&mut editor.status.left);
     if let Some(project) = &editor.project
         && project.report.is_some()
     {
@@ -456,10 +466,10 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
         if selection.keys.len() == 1 && selection.parts.is_empty() {
             let (table, key) = (&selection.table, &selection.keys[0]);
             left.push(format!("{table}/{key}"));
-            left.push(crate::project::row_file(table, key));
+            left.push(row_file(table, key));
         }
     }
-    let right = std::mem::take(&mut editor.status.right);
+    let right = mem::take(&mut editor.status.right);
     egui::Panel::bottom("status")
         .exact_size(STATUS_HEIGHT)
         .frame(
@@ -495,26 +505,23 @@ fn status_bar(editor: &mut Editor, root: &mut egui::Ui) {
 
 struct Viewer<'a> {
     editor: &'a mut Editor,
-    world: &'a mut World,
 }
 
 impl TabViewer for Viewer<'_> {
-    type Tab = Tab;
+    type Tab = EditorTab;
 
-    fn id(&mut self, tab: &mut Tab) -> egui::Id {
+    fn id(&mut self, tab: &mut EditorTab) -> egui::Id {
         egui::Id::new(tab.clone())
     }
 
-    fn title(&mut self, tab: &mut Tab) -> egui::WidgetText {
+    fn title(&mut self, tab: &mut EditorTab) -> egui::WidgetText {
         let title = tab.title();
-        let unsaved =
-            self.editor
-                .project
-                .as_ref()
-                .zip(tab.row())
-                .is_some_and(|(project, (table, key))| {
-                    project.is_unsaved(&crate::project::row_file(&table, &key))
-                });
+        let unsaved = self
+            .editor
+            .project
+            .as_ref()
+            .zip(tab.row())
+            .is_some_and(|(project, (table, key))| project.is_unsaved(&row_file(&table, &key)));
         let mut job = egui::text::LayoutJob::default();
         job.append(
             &title,
@@ -531,33 +538,33 @@ impl TabViewer for Viewer<'_> {
         job.into()
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Tab) {
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut EditorTab) {
         match tab {
-            Tab::World => crate::views::world::show(self.editor, ui, self.world),
-            Tab::Row { table, key } if table == crate::views::character::TABLE => {
-                crate::views::character::show(self.editor, ui, key)
+            EditorTab::World => world::show(self.editor, ui),
+            EditorTab::Row { table, key } if table == character::TABLE => {
+                character::show(self.editor, ui, key)
             }
-            Tab::Row { table, key } => inspector::show_row_tab(self.editor, ui, table, key),
-            Tab::Rows { table, keys } => inspector::show_rows_tab(self.editor, ui, table, keys),
-            Tab::Area { key } => crate::views::area::show(self.editor, ui, self.world, key, None),
-            Tab::Blueprint { key } => {
-                crate::views::area::show_blueprint(self.editor, ui, self.world, key)
+            EditorTab::Row { table, key } => inspector::show_row_tab(self.editor, ui, table, key),
+            EditorTab::Rows { table, keys } => {
+                inspector::show_rows_tab(self.editor, ui, table, keys)
             }
-            Tab::Script(owner) => crate::views::script::show(self.editor, ui, owner),
-            Tab::Model { key } => crate::views::model::show(self.editor, ui, key),
-            Tab::Tileset { key } => crate::views::tileset::show(self.editor, ui, key),
-            Tab::Sheet { table } => crate::views::sheet::show(self.editor, ui, table),
+            EditorTab::Area { key } => area::show(self.editor, ui, key),
+            EditorTab::Blueprint { key } => area::show_blueprint(self.editor, ui, key),
+            EditorTab::Script(owner) => script::show(self.editor, ui, owner),
+            EditorTab::Model { key } => model::show(self.editor, ui, key),
+            EditorTab::Tileset { key } => tileset::show(self.editor, ui, key),
+            EditorTab::Spreadsheet { table } => spreadsheet::show(self.editor, ui, table),
         }
     }
 
-    fn scroll_bars(&self, tab: &Tab) -> [bool; 2] {
+    fn scroll_bars(&self, tab: &EditorTab) -> [bool; 2] {
         match tab {
-            Tab::Area { .. }
-            | Tab::Blueprint { .. }
-            | Tab::World
-            | Tab::Script(_)
-            | Tab::Model { .. }
-            | Tab::Tileset { .. } => [false, false],
+            EditorTab::Area { .. }
+            | EditorTab::Blueprint { .. }
+            | EditorTab::World
+            | EditorTab::Script(_)
+            | EditorTab::Model { .. }
+            | EditorTab::Tileset { .. } => [false, false],
             _ => [false, true],
         }
     }

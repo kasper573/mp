@@ -14,7 +14,7 @@ use crate::motion::transition::{EMPHASIZED_ENTER, EMPHASIZED_EXIT};
 use crate::motion::{Motion, Transform2d};
 use crate::opacity::Opacity;
 use crate::place::{Placed, Placement};
-use crate::state::ancestor_with;
+use crate::state::{ancestor_with, ancestry};
 use crate::tokens::layer;
 
 pub(crate) const OVERLAY_EXIT: Duration = Duration::from_millis(240);
@@ -131,16 +131,13 @@ fn open_holder(
     is_open: &Query<(), With<Open>>,
     owners: &Query<&PortalOwner>,
 ) -> Option<Entity> {
-    let mut current = entity;
-    loop {
-        if is_open.get(current).is_ok() {
-            return Some(current);
+    ancestry(entity, parents).find_map(|entity| {
+        if is_open.contains(entity) {
+            Some(entity)
+        } else {
+            owners.get(entity).ok().map(|owner| owner.0)
         }
-        if let Ok(owner) = owners.get(current) {
-            return Some(owner.0);
-        }
-        current = parents.get(current).ok()?.parent();
-    }
+    })
 }
 
 pub fn set_overlay_open(world: &mut World, entity: Entity, open: bool) {
@@ -210,16 +207,7 @@ pub(crate) fn dismiss_on_press(
 }
 
 fn contains(root: Entity, descendant: Entity, parents: &Query<&ChildOf>) -> bool {
-    let mut current = descendant;
-    loop {
-        if current == root {
-            return true;
-        }
-        match parents.get(current) {
-            Ok(child_of) => current = child_of.parent(),
-            Err(_) => return false,
-        }
-    }
+    ancestry(descendant, parents).any(|entity| entity == root)
 }
 
 #[allow(clippy::too_many_arguments)]

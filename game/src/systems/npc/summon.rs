@@ -2,19 +2,19 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use super::Home;
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::position;
+use crate::systems::npc::Id as NpcId;
 use crate::systems::player::{ClientId, Owner};
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
-
-use super::Home;
 
 const RING: Tiles = Tiles(1.5);
 const MAX_SPAWNED: u32 = 20;
@@ -29,7 +29,7 @@ pub struct SetAttitude {
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SpawnNpcs {
-    pub npc: crate::systems::npc::Id,
+    pub npc: NpcId,
     pub count: u32,
     pub near: SpawnNear,
     pub shown: ShownFor,
@@ -186,7 +186,7 @@ impl EffectDef<RiftScripting> for Despawn {
 
 pub fn summon(
     world: &mut World,
-    npc: crate::systems::npc::Id,
+    npc: NpcId,
     count: u32,
     beside: Entity,
     only_for: Option<ClientId>,

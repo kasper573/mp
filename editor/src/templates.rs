@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use crate::value::RowValue;
 use include_dir::{Dir, include_dir};
+
+use crate::project::files::GAME_FILE;
+use crate::value::RowValue;
 
 static TEMPLATES: Dir = include_dir!("$CARGO_MANIFEST_DIR/templates");
 
-pub struct Template {
+pub struct GameTemplate {
     pub key: String,
     pub name: String,
     pub areas: Vec<String>,
@@ -14,8 +16,8 @@ pub struct Template {
     pub tables: Vec<(String, Vec<String>)>,
 }
 
-pub fn list() -> Vec<Template> {
-    let mut templates: Vec<Template> = TEMPLATES
+pub fn list() -> Vec<GameTemplate> {
+    let mut templates: Vec<GameTemplate> = TEMPLATES
         .dirs()
         .map(|dir| {
             let key = dir
@@ -23,11 +25,13 @@ pub fn list() -> Vec<Template> {
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            let name = dir
-                .get_file(dir.path().join("game.json"))
+            let game = dir
+                .get_file(dir.path().join(GAME_FILE))
                 .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
-                .and_then(|game| game["name"].as_str().map(str::to_owned))
-                .unwrap_or_else(|| key.clone());
+                .unwrap_or_default();
+            let name = game["name"]
+                .as_str()
+                .map_or_else(|| key.clone(), str::to_owned);
             let areas = dir
                 .get_dir(dir.path().join("tables/area"))
                 .map(|areas| {
@@ -39,10 +43,6 @@ pub fn list() -> Vec<Template> {
                         })
                         .collect()
                 })
-                .unwrap_or_default();
-            let game = dir
-                .get_file(dir.path().join("game.json"))
-                .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
                 .unwrap_or_default();
             let initial_spawn = format!(
                 "{} · {}, {}",
@@ -76,11 +76,11 @@ pub fn list() -> Vec<Template> {
                         .collect()
                 })
                 .unwrap_or_default();
-            Template {
+            GameTemplate {
                 key,
                 name,
                 areas,
-                files: count_files(dir),
+                files: all_files(dir).len(),
                 initial_spawn,
                 tables,
             }
@@ -98,11 +98,7 @@ pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String>
     let dir = TEMPLATES
         .get_dir(template)
         .ok_or_else(|| format!("no built-in template {template}"))?;
-    ensure_empty(folder)?;
-    let staging = staging_dir(folder);
-    let _ = std::fs::remove_dir_all(&staging);
-    std::fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
-    let result = (|| {
+    stage(folder, name, |staging| {
         for file in all_files(dir) {
             let relative = file
                 .path()
@@ -114,25 +110,16 @@ pub fn new_game(template: &str, name: &str, folder: &Path) -> Result<(), String>
             }
             std::fs::write(&target, file.contents()).map_err(|error| error.to_string())?;
         }
-        write_name(&staging, name)?;
-        move_into_place(&staging, folder)
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_dir_all(&staging);
-    }
-    result
+        Ok(())
+    })
 }
 
 pub fn new_game_from(source: &Path, name: &str, folder: &Path) -> Result<(), String> {
-    if !source.join("game.json").is_file() {
-        return Err(format!("No game.json in {}", source.display()));
+    if !source.join(GAME_FILE).is_file() {
+        return Err(format!("No {GAME_FILE} in {}", source.display()));
     }
-    ensure_empty(folder)?;
-    let staging = staging_dir(folder);
-    let _ = std::fs::remove_dir_all(&staging);
-    std::fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
-    let result = (|| {
-        std::fs::copy(source.join("game.json"), staging.join("game.json"))
+    stage(folder, name, |staging| {
+        std::fs::copy(source.join(GAME_FILE), staging.join(GAME_FILE))
             .map_err(|error| error.to_string())?;
         for part in ["tables", "assets"] {
             let from = source.join(part);
@@ -140,9 +127,22 @@ pub fn new_game_from(source: &Path, name: &str, folder: &Path) -> Result<(), Str
                 copy_dir(&from, &staging.join(part))?;
             }
         }
-        write_name(&staging, name)?;
-        move_into_place(&staging, folder)
-    })();
+        Ok(())
+    })
+}
+
+fn stage(
+    folder: &Path,
+    name: &str,
+    fill: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<(), String> {
+    ensure_empty(folder)?;
+    let staging = staging_dir(folder);
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
+    let result = fill(&staging)
+        .and_then(|()| write_name(&staging, name))
+        .and_then(|()| move_into_place(&staging, folder));
     if result.is_err() {
         let _ = std::fs::remove_dir_all(&staging);
     }
@@ -181,7 +181,7 @@ fn move_into_place(staging: &Path, folder: &Path) -> Result<(), String> {
 }
 
 fn write_name(folder: &Path, name: &str) -> Result<(), String> {
-    let path = folder.join("game.json");
+    let path = folder.join(GAME_FILE);
     let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
     let mut game: serde_json::Value =
         serde_json::from_str(&text).map_err(|error| error.to_string())?;
@@ -211,8 +211,4 @@ fn all_files<'a>(dir: &'a Dir<'a>) -> Vec<&'a include_dir::File<'a>> {
         files.extend(all_files(sub));
     }
     files
-}
-
-fn count_files(dir: &Dir) -> usize {
-    all_files(dir).len()
 }

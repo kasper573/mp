@@ -9,6 +9,8 @@ use game::core::time::{LocalClock, Seconds, UnixMillis};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 
+use crate::store::WebStore;
+
 const CANVAS: &str = "#glcanvas";
 const STATUS: &str = "sync-status";
 const RELOADED_FOR: &str = "rift.reloaded-for";
@@ -99,7 +101,7 @@ impl Platform for WebPlatform {
     }
 
     fn content_store(&self) -> Box<dyn ContentStore> {
-        Box::new(crate::store::WebStore)
+        Box::new(WebStore)
     }
 
     fn announce(&self, status: &str) {

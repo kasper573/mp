@@ -1,5 +1,6 @@
-use crate::support::{content, row};
 use game::systems::item::{ExchangeRefusal, Inventory, ItemStack};
+
+use crate::support::{content, row};
 
 fn bag(max: u32, slots: &[ItemStack]) -> Inventory {
     Inventory {

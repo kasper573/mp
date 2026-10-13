@@ -24,6 +24,11 @@ pub mod status;
 pub mod terrain;
 pub mod tools;
 
+pub use blueprint::{
+    DeleteBlueprintDialog, MakeBlueprintDialog, delete_blueprint_dialog, make_blueprint_dialog,
+};
+pub use resize::ResizeDialog;
+
 use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::World;
@@ -34,21 +39,18 @@ use game::core::tiling::{CellPos, TilePos, TileSize, Tiles};
 use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
-use crate::app::Editor;
-use crate::project::{CameraState, Edit, Selection, row_file};
-use crate::tabs::Tab;
-use crate::value::RowValue;
-
 use self::overlays::{
-    overlay_blueprint_ghost, overlay_grid, overlay_modules, overlay_populations,
+    AreaLabels, overlay_blueprint_ghost, overlay_grid, overlay_modules, overlay_populations,
     overlay_selected_scenery, overlay_sort_lines, overlay_soundscape_reach, overlay_surfaces,
     overlay_walk,
 };
 use self::status::status_bar;
-pub use blueprint::{
-    DeleteBlueprintDialog, MakeBlueprintDialog, delete_blueprint_dialog, make_blueprint_dialog,
-};
-pub use resize::ResizeDialog;
+use crate::app::{BottomTab, Editor};
+use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_file};
+use crate::tabs::EditorTab;
+use crate::ui::{theme, widgets};
+use crate::value::RowValue;
+use crate::{play, user, value};
 
 pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;
@@ -64,27 +66,27 @@ pub fn blueprint_view_key(blueprint: &str) -> String {
     format!("blueprint:{blueprint}")
 }
 
-fn camera_key(project: &crate::project::Project, view_key: &str) -> String {
+fn camera_key(project: &Project, view_key: &str) -> String {
     format!("{}:{view_key}", project.root.display())
 }
 
 #[derive(Default)]
 pub struct AreaViews {
-    pub scenes: scene::Scenes,
-    pub requests: Vec<scene::SceneRequest>,
-    pub views: HashMap<String, ViewState>,
-    pub hover: Option<Hover>,
+    pub scenes: scene::AreaScenes,
+    pub requests: Vec<scene::AreaSceneRequest>,
+    pub views: HashMap<String, AreaViewState>,
+    pub hover: Option<AreaHover>,
     pub generation: u64,
 }
 
 #[derive(Clone, Debug)]
-pub struct Hover {
+pub struct AreaHover {
     pub area: String,
     pub tile: Pos<Tiles>,
 }
 
 #[derive(Clone, Debug)]
-pub enum Deferred {
+pub enum DeferredAreaAction {
     Copy,
     Duplicate,
     Unpack(usize),
@@ -94,8 +96,9 @@ pub enum Deferred {
     AdoptBlocks(usize),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Tool {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AreaTool {
+    #[default]
     Select,
     Paint,
     Terrain,
@@ -106,70 +109,61 @@ pub enum Tool {
     Module,
 }
 
-impl Tool {
-    pub const ALL: [Tool; 8] = [
-        Tool::Select,
-        Tool::Paint,
-        Tool::Terrain,
-        Tool::Fill,
-        Tool::Erase,
-        Tool::Eyedropper,
-        Tool::Stamp,
-        Tool::Module,
+impl AreaTool {
+    pub const ALL: [AreaTool; 8] = [
+        AreaTool::Select,
+        AreaTool::Paint,
+        AreaTool::Terrain,
+        AreaTool::Fill,
+        AreaTool::Erase,
+        AreaTool::Eyedropper,
+        AreaTool::Stamp,
+        AreaTool::Module,
     ];
 
     pub fn key(self) -> egui::Key {
         match self {
-            Tool::Select => egui::Key::V,
-            Tool::Paint => egui::Key::B,
-            Tool::Terrain => egui::Key::T,
-            Tool::Fill => egui::Key::G,
-            Tool::Erase => egui::Key::E,
-            Tool::Eyedropper => egui::Key::I,
-            Tool::Stamp => egui::Key::S,
-            Tool::Module => egui::Key::M,
+            AreaTool::Select => egui::Key::V,
+            AreaTool::Paint => egui::Key::B,
+            AreaTool::Terrain => egui::Key::T,
+            AreaTool::Fill => egui::Key::G,
+            AreaTool::Erase => egui::Key::E,
+            AreaTool::Eyedropper => egui::Key::I,
+            AreaTool::Stamp => egui::Key::S,
+            AreaTool::Module => egui::Key::M,
         }
     }
 
-    pub fn bottom_tab(self) -> Option<crate::app::BottomTab> {
+    pub fn bottom_tab(self) -> Option<BottomTab> {
         match self {
-            Tool::Paint | Tool::Terrain | Tool::Fill | Tool::Eyedropper => {
-                Some(crate::app::BottomTab::Palette)
+            AreaTool::Paint | AreaTool::Terrain | AreaTool::Fill | AreaTool::Eyedropper => {
+                Some(BottomTab::Palette)
             }
-            Tool::Stamp => Some(crate::app::BottomTab::Blueprints),
+            AreaTool::Stamp => Some(BottomTab::Blueprints),
             _ => None,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
-            Tool::Select => "Select",
-            Tool::Paint => "Paint",
-            Tool::Terrain => "Terrain",
-            Tool::Fill => "Fill",
-            Tool::Erase => "Erase",
-            Tool::Eyedropper => "Eyedropper",
-            Tool::Stamp => "Stamp",
-            Tool::Module => "Module",
+            AreaTool::Select => "Select",
+            AreaTool::Paint => "Paint",
+            AreaTool::Terrain => "Terrain",
+            AreaTool::Fill => "Fill",
+            AreaTool::Erase => "Erase",
+            AreaTool::Eyedropper => "Eyedropper",
+            AreaTool::Stamp => "Stamp",
+            AreaTool::Module => "Module",
         }
     }
 
     pub fn icon(self) -> &'static str {
-        match self {
-            Tool::Select => "V",
-            Tool::Paint => "B",
-            Tool::Terrain => "T",
-            Tool::Fill => "G",
-            Tool::Erase => "E",
-            Tool::Eyedropper => "I",
-            Tool::Stamp => "S",
-            Tool::Module => "M",
-        }
+        self.key().name()
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct InPlace {
+pub struct InPlaceBlueprint {
     pub blueprint: String,
     pub module: usize,
     pub at: Pos<Tiles>,
@@ -177,13 +171,14 @@ pub struct InPlace {
     pub values: Value,
 }
 
-pub struct ViewState {
+#[derive(Default)]
+pub struct AreaViewState {
     pub area: String,
     pub blueprint: Option<String>,
-    pub in_place: Vec<InPlace>,
+    pub in_place: Vec<InPlaceBlueprint>,
     pub center: Pos<Tiles>,
     pub zoom: f32,
-    pub tool: Tool,
+    pub tool: AreaTool,
     pub layer: usize,
     pub walk_overlay: bool,
     pub grid_lines: bool,
@@ -194,8 +189,8 @@ pub struct ViewState {
     pub overlay_modules: bool,
     pub overlay_surfaces: bool,
     pub overlay_sort_lines: bool,
-    pub drag: Option<Drag>,
-    pub stroke: Option<brush::Stroke>,
+    pub drag: Option<AreaDrag>,
+    pub stroke: Option<brush::BrushStroke>,
     pub pick: brush::TilePick,
     pub terrain: brush::TerrainPick,
     pub stamp: Option<String>,
@@ -206,9 +201,9 @@ pub struct ViewState {
     pub tileset_search: String,
     pub blueprint_search: String,
     pub blueprint_everywhere: bool,
-    pub palette_lens: palette::Lens,
-    pub deferred: Vec<Deferred>,
-    pub menu: Option<modules::MenuAnchor>,
+    pub palette_lens: palette::PaletteLens,
+    pub deferred: Vec<DeferredAreaAction>,
+    pub menu: Option<modules::AreaMenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,
     pub population_hidden: HashSet<usize>,
     pub population_seed: HashMap<usize, u64>,
@@ -218,54 +213,28 @@ pub struct ViewState {
     fitted: bool,
 }
 
-impl ViewState {
-    fn new(area: &str) -> ViewState {
-        ViewState {
+impl AreaViewState {
+    fn new(area: &str) -> AreaViewState {
+        AreaViewState {
             area: area.to_owned(),
-            blueprint: None,
-            in_place: Vec::new(),
-            center: Pos::new(0.0, 0.0),
             zoom: 2.0,
-            tool: Tool::Select,
-            layer: 0,
-            walk_overlay: false,
-            grid_lines: false,
-            layers_open: None,
-            hidden_ground: HashSet::new(),
             show_blueprints: true,
             show_scenery: true,
             overlay_modules: true,
-            overlay_surfaces: false,
-            overlay_sort_lines: false,
-            drag: None,
-            stroke: None,
-            pick: brush::TilePick::default(),
-            terrain: brush::TerrainPick::default(),
-            stamp: None,
-            stamp_values: Value::Object(Default::default()),
-            listener: None,
-            paste: None,
-            cursor_cell: None,
-            tileset_search: String::new(),
-            blueprint_search: String::new(),
-            blueprint_everywhere: false,
-            palette_lens: palette::Lens::Tiles,
-            deferred: Vec::new(),
-            menu: None,
-            ghost: None,
-            population_hidden: HashSet::new(),
-            population_seed: HashMap::new(),
+            stamp_values: value::empty_object(),
             walk_value: Some(false),
-            preview_area: None,
-            skipped: None,
-            fitted: false,
+            ..AreaViewState::default()
         }
     }
 
     pub fn layers_shown(&self) -> bool {
         self.layers_open.unwrap_or(matches!(
             self.tool,
-            Tool::Paint | Tool::Terrain | Tool::Fill | Tool::Erase | Tool::Eyedropper
+            AreaTool::Paint
+                | AreaTool::Terrain
+                | AreaTool::Fill
+                | AreaTool::Erase
+                | AreaTool::Eyedropper
         ))
     }
 
@@ -289,7 +258,7 @@ impl ViewState {
 }
 
 #[derive(Clone, Debug)]
-pub enum Drag {
+pub enum AreaDrag {
     Pan {
         last: Pos2,
     },
@@ -302,7 +271,7 @@ pub enum Drag {
     },
     Resize {
         part: String,
-        corner: Corner,
+        corner: ResizeCorner,
         start: Rect<Tiles>,
     },
     Pin {
@@ -318,7 +287,7 @@ pub enum Drag {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Corner {
+pub enum ResizeCorner {
     TopLeft,
     TopRight,
     BottomLeft,
@@ -332,13 +301,13 @@ pub struct PasteGhost {
 }
 
 #[derive(Clone, Copy)]
-pub struct Canvas {
+pub struct AreaCanvas {
     pub rect: ERect,
     pub center: Pos<Tiles>,
     pub zoom: f32,
 }
 
-impl Canvas {
+impl AreaCanvas {
     pub fn scale(&self) -> f32 {
         TILE_PX * self.zoom
     }
@@ -376,17 +345,17 @@ impl AreaViews {
         self.requests.clear();
     }
 
-    pub fn camera_state(&self) -> Option<CameraState> {
+    pub fn camera_state(&self) -> Option<AreaCameraState> {
         let hover = self.hover.as_ref()?;
         let view = self.views.get(&area_view_key(&hover.area))?;
-        Some(CameraState {
+        Some(AreaCameraState {
             area: hover.area.clone(),
             center: view.center,
             zoom: view.zoom,
         })
     }
 
-    pub fn restore_camera(&mut self, camera: &CameraState) {
+    pub fn restore_camera(&mut self, camera: &AreaCameraState) {
         if let Some(view) = self.views.get_mut(&area_view_key(&camera.area)) {
             view.center = camera.center;
             view.zoom = camera.zoom;
@@ -397,10 +366,18 @@ impl AreaViews {
         self.generation += 1;
     }
 
-    pub fn view_mut(&mut self, key: &str, area: &str) -> &mut ViewState {
+    pub fn ensure_view(&mut self, key: &str, area: &str) -> &mut AreaViewState {
         self.views
             .entry(key.to_owned())
-            .or_insert_with(|| ViewState::new(area))
+            .or_insert_with(|| AreaViewState::new(area))
+    }
+
+    pub fn view(&self, key: &str) -> &AreaViewState {
+        &self.views[key]
+    }
+
+    pub fn view_mut(&mut self, key: &str) -> &mut AreaViewState {
+        self.views.get_mut(key).expect("an open area view")
     }
 }
 
@@ -425,7 +402,7 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
         return;
     };
     layers.retain(|name| name.as_str() != Some(layer));
-    let mut edit = Edit::new(format!("Remove layer {layer} of {area}"));
+    let mut edit = ContentEdit::new(format!("Remove layer {layer} of {area}"));
     edit.write_json(row_file("area", area), &row);
     edit.remove(format!(
         "{}/{}",
@@ -439,21 +416,15 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
     }
 }
 
-pub fn show(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    _world: &mut World,
-    key: &str,
-    _in_place: Option<String>,
-) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = area_view_key(key);
     show_canvas(editor, ui, &view_key, key, None);
-    crate::play::banner(editor, ui);
+    play::banner(editor, ui);
 }
 
-pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: crate::app::BottomTab) {
+pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) {
     let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
-        ui.label(crate::ui::theme::muted("The folder does not load."));
+        ui.label(theme::muted("The folder does not load."));
         return;
     };
     let Some(area_key) = editor
@@ -469,15 +440,13 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: crate::app:
         return;
     };
     match tab {
-        crate::app::BottomTab::Palette => palette::show(editor, ui, view_key, content, area_id),
-        crate::app::BottomTab::Blueprints => {
-            stamp::stamp_panel(editor, ui, view_key, content, area_id)
-        }
+        BottomTab::Palette => palette::show(editor, ui, view_key, content, area_id),
+        BottomTab::Blueprints => stamp::stamp_panel(editor, ui, view_key, content, area_id),
         _ => {}
     }
 }
 
-pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, _world: &mut World, key: &str) {
+pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = blueprint_view_key(key);
     let preview = editor
         .views
@@ -526,7 +495,7 @@ fn show_canvas(
     let rail = ERect::from_min_size(full.min, Vec2::new(rail_width, full.height()));
     let canvas_rect = ERect::from_min_max(Pos2::new(rail.max.x, full.min.y), full.max);
     {
-        let view = editor.views.area.view_mut(view_key, area_key);
+        let view = editor.views.area.ensure_view(view_key, area_key);
         view.area = area_key.to_owned();
         view.blueprint = blueprint.map(str::to_owned);
         if !view.fitted {
@@ -558,11 +527,9 @@ fn show_canvas(
             .max_rect(rail)
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
-    rail_ui
-        .painter()
-        .rect_filled(rail, 0.0, crate::ui::theme::PANEL);
+    rail_ui.painter().rect_filled(rail, 0.0, theme::PANEL);
     tools::rail(editor, &mut rail_ui, view_key);
-    if editor.views.area.views[view_key].layers_shown() {
+    if editor.views.area.view(view_key).layers_shown() {
         let mut layers_ui = ui.new_child(
             egui::UiBuilder::new()
                 .max_rect(canvas_rect)
@@ -580,9 +547,8 @@ fn show_canvas(
 }
 
 fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, canvas_rect: ERect) {
-    use crate::ui::{theme, widgets};
     let (in_place, blueprint, area_key, preview_area) = {
-        let view = &editor.views.area.views[view_key];
+        let view = editor.views.area.view(view_key);
         (
             view.in_place.clone(),
             view.blueprint.clone(),
@@ -629,7 +595,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, c
             ui.label(
                 theme::mono(format!(
                     "Editing blueprint {name} · {count} placement{} on {area_key} change with it",
-                    crate::ui::widgets::plural(count)
+                    widgets::plural(count)
                 ))
                 .size(13.0)
                 .color(Color32::WHITE),
@@ -675,17 +641,11 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, c
             ui.label(theme::muted("· not saved").size(12.5));
         });
         if Some(&picked) != preview_area.as_ref() && picked != area_key {
-            editor
-                .views
-                .area
-                .views
-                .get_mut(view_key)
-                .expect("view")
-                .preview_area = Some(picked);
+            editor.views.area.view_mut(view_key).preview_area = Some(picked);
         }
     }
     if done {
-        let view = editor.views.area.views.get_mut(view_key).expect("view");
+        let view = editor.views.area.view_mut(view_key);
         view.in_place.pop();
         editor.selection.parts.clear();
     }
@@ -710,7 +670,7 @@ fn canvas(
         let mut hidden_ground: Vec<String> = view.hidden_ground.iter().cloned().collect();
         hidden_ground.sort();
         let spec = match &view.blueprint {
-            Some(blueprint) => scene::SceneSpec {
+            Some(blueprint) => scene::AreaSceneSpec {
                 ground: area_key.clone(),
                 scenery: scene::SceneryOf::Parts {
                     blueprint: blueprint.clone(),
@@ -721,7 +681,7 @@ fn canvas(
                 show_blueprints: true,
                 show_scenery: true,
             },
-            None => scene::SceneSpec {
+            None => scene::AreaSceneSpec {
                 ground: area_key.clone(),
                 scenery: scene::SceneryOf::Area,
                 hidden_ground,
@@ -735,12 +695,12 @@ fn canvas(
             .scenes
             .by_key
             .get(view_key)
-            .map(|scene| (scene.texture, scene.alloc, scene.shown));
+            .map(|scene| (scene.texture, scene.uv()));
         (view.center, view.zoom, spec, texture)
     };
     let width = (rect.width() * ppp).round().max(1.0) as u32;
     let height = (rect.height() * ppp).round().max(1.0) as u32;
-    editor.views.area.requests.push(scene::SceneRequest {
+    editor.views.area.requests.push(scene::AreaSceneRequest {
         key: view_key.to_owned(),
         spec,
         width,
@@ -750,21 +710,14 @@ fn canvas(
         generation,
         live: true,
     });
-    if let Some((texture, alloc, shown)) = texture {
-        let uv = ERect::from_min_max(
-            Pos2::ZERO,
-            Pos2::new(
-                shown[0] as f32 / alloc[0] as f32,
-                shown[1] as f32 / alloc[1] as f32,
-            ),
-        );
+    if let Some((texture, uv)) = texture {
         painter.image(texture, rect, uv, Color32::WHITE);
     }
-    let canvas = Canvas { rect, center, zoom };
+    let canvas = AreaCanvas { rect, center, zoom };
     let hovered = response.hover_pos().filter(|_| response.hovered());
     let pointer_tile = hovered.map(|p| canvas.to_tile(p));
     if let Some(tile) = pointer_tile {
-        editor.views.area.hover = Some(Hover {
+        editor.views.area.hover = Some(AreaHover {
             area: area_key.clone(),
             tile,
         });
@@ -772,7 +725,7 @@ fn canvas(
     let own = editor.row_value("area", &area_key).unwrap_or(Value::Null);
     let modules: Vec<Value> = own["modules"].as_array().cloned().unwrap_or_default();
     let placement_bounds = placement::placement_bounds(content, area_id);
-    let frame = Frame {
+    let frame = AreaFrame {
         canvas,
         content,
         area_id,
@@ -782,33 +735,18 @@ fn canvas(
         pointer: hovered,
         pointer_tile,
         response: &response,
+        labels: AreaLabels::default(),
     };
     overlay_grid(
         &painter,
         &frame,
         area,
-        editor.views.area.views[view_key].grid_lines,
+        editor.views.area.view(view_key).grid_lines,
     );
     tools::input(editor, ui, &painter, view_key, &frame);
-    let blueprint_tab = editor.views.area.views[view_key].blueprint.is_some();
-    for deferred in std::mem::take(
-        &mut editor
-            .views
-            .area
-            .views
-            .get_mut(view_key)
-            .expect("view")
-            .deferred,
-    ) {
-        match deferred {
-            Deferred::Copy => select::copy_selection(editor, &frame),
-            Deferred::Duplicate => select::duplicate_selection(editor, &frame),
-            Deferred::Unpack(index) => placement::unpack(editor, &frame, index),
-            Deferred::Replace(index) => placement::replace_dialog(editor, &frame, index),
-            Deferred::Split(index) => scenery::split_scenery(editor, &frame, index),
-            Deferred::ReturnDoor(index) => scenery::return_door(editor, &frame, index),
-            Deferred::AdoptBlocks(index) => scenery::adopt_blocks(editor, &frame, index),
-        }
+    let blueprint_tab = editor.views.area.view(view_key).blueprint.is_some();
+    for deferred in std::mem::take(&mut editor.views.area.view_mut(view_key).deferred) {
+        run_deferred(editor, &frame, deferred);
     }
     if !blueprint_tab {
         overlay_populations(editor, ui, &painter, view_key, &frame, area);
@@ -816,7 +754,7 @@ fn canvas(
     overlay_selected_scenery(editor, ui, &painter, view_key, &frame, area);
     overlay_soundscape_reach(editor, &painter, &frame);
     overlay_blueprint_ghost(editor, ui, &painter, view_key, &frame);
-    let view = &editor.views.area.views[view_key];
+    let view = editor.views.area.view(view_key);
     if view.overlay_surfaces {
         overlay_surfaces(&painter, &frame, area);
     }
@@ -829,13 +767,14 @@ fn canvas(
     if !blueprint_tab && (view.overlay_modules || !editor.selection.parts.is_empty()) {
         overlay_modules(editor, &painter, view_key, &frame);
     }
-    if let Some(place) = editor.views.area.views[view_key].in_place.last().cloned() {
+    if let Some(place) = editor.views.area.view(view_key).in_place.last().cloned() {
         placement::overlay_in_place(editor, &painter, &frame, &place);
     }
     if !blueprint_tab {
-        pins::overlay(editor, &painter, view_key, &frame);
+        pins::draw_arrivals(editor, &painter, &frame);
     }
     tools::overlay(editor, &painter, view_key, &frame);
+    frame.labels.draw(&painter);
     status_bar(editor, &painter, view_key, &frame);
     if response.hovered() && !ui.ctx().text_edit_focused() {
         tools::keys(editor, ui, view_key, &frame);
@@ -843,8 +782,8 @@ fn canvas(
     remember_camera(editor, view_key);
 }
 
-pub struct Frame<'a> {
-    pub canvas: Canvas,
+pub struct AreaFrame<'a> {
+    pub canvas: AreaCanvas,
     pub content: Content,
     pub area_id: area::Id,
     pub area_key: String,
@@ -853,9 +792,10 @@ pub struct Frame<'a> {
     pub pointer: Option<Pos2>,
     pub pointer_tile: Option<Pos<Tiles>>,
     pub response: &'a egui::Response,
+    pub labels: AreaLabels,
 }
 
-impl Frame<'_> {
+impl AreaFrame<'_> {
     pub fn area(&self) -> &'static area::Area {
         area::load(&self.content, self.area_id)
     }
@@ -899,11 +839,6 @@ impl Frame<'_> {
     }
 }
 
-pub fn size_cells(size: game::core::tiling::GridSize) -> impl Iterator<Item = CellPos> {
-    let (w, h) = (size.width as i32, size.height as i32);
-    (0..h).flat_map(move |y| (0..w).map(move |x| CellPos::new(x, y)))
-}
-
 pub fn selected_parts(editor: &Editor, area_key: &str) -> HashSet<String> {
     if editor.selection.table == "area" && editor.selection.keys.iter().any(|k| k == area_key) {
         editor.selection.parts.iter().cloned().collect()
@@ -916,9 +851,9 @@ fn remember_camera(editor: &mut Editor, view_key: &str) {
     let Some(project) = &editor.project else {
         return;
     };
-    let view = &editor.views.area.views[view_key];
+    let view = editor.views.area.view(view_key);
     let key = camera_key(project, view_key);
-    let camera = crate::user::CameraSettings {
+    let camera = user::CameraSettings {
         x: view.center.x,
         y: view.center.y,
         zoom: view.zoom,
@@ -936,7 +871,7 @@ fn remember_camera(editor: &mut Editor, view_key: &str) {
     }
 }
 
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
+pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     if selection.table == "blueprint" {
         let Some(key) = selection.keys.first().cloned() else {
             return;
@@ -953,19 +888,31 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
 }
 
 pub fn open_area_at(editor: &mut Editor, area: &str, at: Option<Pos<Tiles>>, part: Option<String>) {
-    editor.open_tab(Tab::Area {
+    editor.open_tab(EditorTab::Area {
         key: area.to_owned(),
     });
-    let view = editor.views.area.view_mut(&area_view_key(area), area);
+    let view = editor.views.area.ensure_view(&area_view_key(area), area);
     if let Some(at) = at {
         view.center = at;
         view.fitted = true;
     }
     if let Some(part) = part {
-        editor.selection = Selection {
+        editor.selection = RowSelection {
             table: "area".to_owned(),
             keys: vec![area.to_owned()],
             parts: vec![part],
         };
+    }
+}
+
+pub(super) fn run_deferred(editor: &mut Editor, frame: &AreaFrame, deferred: DeferredAreaAction) {
+    match deferred {
+        DeferredAreaAction::Copy => select::copy_selection(editor, frame),
+        DeferredAreaAction::Duplicate => select::duplicate_selection(editor, frame),
+        DeferredAreaAction::Unpack(index) => placement::unpack(editor, frame, index),
+        DeferredAreaAction::Replace(index) => placement::replace_dialog(editor, frame, index),
+        DeferredAreaAction::Split(index) => scenery::split_scenery(editor, frame, index),
+        DeferredAreaAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
+        DeferredAreaAction::AdoptBlocks(index) => scenery::adopt_blocks(editor, frame, index),
     }
 }

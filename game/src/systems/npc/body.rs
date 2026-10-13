@@ -5,19 +5,19 @@ use strum::IntoStaticStr;
 
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
-    Answer, Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowKey, Name, OwnerKind, Reach,
+    Answer, Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, FlowKey, Name, OwnerKind,
     ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
 use crate::systems::area::{self, AreaTag, object};
 use crate::systems::dialogue;
-use crate::systems::movement::{self, MoveTarget, Path};
+use crate::systems::movement;
 use crate::systems::npc::{Home, Roams};
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::effect::{self as effects, Arrow, Link};
 use crate::systems::script::query;
-use crate::systems::script::{Condition, Place, RiftInstances, RiftScripting};
+use crate::systems::script::{Condition, Place, Reach, RiftInstances, RiftScripting};
 use crate::systems::stat;
 use crate::systems::visibility;
 
@@ -331,10 +331,6 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
     }
 }
 
-pub fn moving(world: &World, npc: Entity) -> bool {
-    world.get::<MoveTarget>(npc).is_some() || world.get::<Path>(npc).is_some()
-}
-
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Wander {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -399,7 +395,7 @@ pub enum FaceTarget {
     Actor(Condition),
 }
 
-type Aimed<T> = Box<dyn Fn(&World, &crate::core::script::FlowCx) -> Option<T> + Send + Sync>;
+type Aimed<T> = Box<dyn Fn(&World, &FlowCx) -> Option<T> + Send + Sync>;
 
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
 const WALK_BLOCKED: usize = 1;
@@ -433,8 +429,8 @@ impl EffectDef<RiftScripting> for Wander {
             EffectStep::Output(0)
         }))
     }
-    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach<RiftScripting>> {
-        vec![crate::systems::script::Reach::Walks]
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::Walks]
     }
 }
 
@@ -499,8 +495,8 @@ impl EffectDef<RiftScripting> for WalkTo {
             EffectStep::Pause
         }))
     }
-    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach<RiftScripting>> {
-        vec![crate::systems::script::Reach::Walks]
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::Walks]
     }
 }
 
@@ -547,7 +543,7 @@ impl EffectDef<RiftScripting> for Attack {
             EffectStep::Pause
         }))
     }
-    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach<RiftScripting>> {
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
         vec![crate::systems::script::Reach::Targets]
     }
 }
@@ -574,7 +570,7 @@ impl EffectDef<RiftScripting> for Stop {
             EffectStep::Output(0)
         }))
     }
-    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach<RiftScripting>> {
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
         Vec::new()
     }
 }
@@ -612,7 +608,7 @@ impl EffectDef<RiftScripting> for FaceToward {
             EffectStep::Output(0)
         }))
     }
-    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach<RiftScripting>> {
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
         Vec::new()
     }
 }

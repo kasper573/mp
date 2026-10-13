@@ -12,16 +12,15 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ConnectedClient, RepliconChannels, ServerState};
+use bevy_replicon::prelude::{ConnectedClient, RepliconChannels};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
-use bevy_state::prelude::NextState;
+use bevy_replicon_renet2::RenetChannelsExt;
 use game::core::content::sync::{ServedContent, well_formed_hash};
 use game::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
-use game::core::net::channels::RenetChannelsExt;
+use game::core::math::Rng;
 use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::GameSettings;
-use game::systems::account::Identity;
+use game::systems::account::{Identity, Role};
 use game::systems::area::transition;
 use game::systems::area::{self, AreaDef};
 use game::systems::launch::{
@@ -31,10 +30,15 @@ use game::systems::launch::{
 use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
 use game::systems::spectate::{self, SpectatorTransfer};
+use game::systems::{
+    GameSettings, load_content, notification, server_app, start_server, step_areas,
+};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
-use rand::Rng;
+use rand::Rng as _;
 use renet2::{ConnectionConfig, DisconnectReason, RenetServer, ServerEvent};
+use serde::Deserialize;
+
 use transport::WsTransport;
 
 service::heap_profiling!();
@@ -64,7 +68,7 @@ fn main() {
     // accept/read/write tasks; it outlives `main` because `simulate` never returns.
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
-    let content = game::systems::load_content(
+    let content = load_content(
         Arc::new(FilesystemFolder(config.content_dir.clone())),
         "the server did not start",
     )
@@ -149,7 +153,7 @@ fn simulate(
     sessions: Sessions,
     online: Online,
     runtime: tokio::runtime::Handle,
-    assets: Content,
+    content: Content,
     settings: Settings,
     api: impl Future<Output = ()> + Send + 'static,
 ) {
@@ -162,12 +166,12 @@ fn simulate(
     } = settings;
     let spawn = area_ids
         .iter()
-        .position(|id| *id == assets.built::<GameSettings>().initial_spawn.area)
+        .position(|id| *id == content.built::<GameSettings>().initial_spawn.area)
         .unwrap_or(0);
     let mut worlds: Vec<App> = area_ids
         .iter()
         .enumerate()
-        .map(|(ordinal, &id)| build_world(id, &assets, rules, ordinal as u64, wall_clock(reset)))
+        .map(|(ordinal, &id)| build_world(id, &content, rules, ordinal as u64, wall_clock(reset)))
         .collect();
 
     let (connection_config, client_channels) = {
@@ -184,7 +188,7 @@ fn simulate(
     let ready = ReadyLine {
         ready: ServerReady {
             build: version::build().to_owned(),
-            content_version: assets.built::<GameSettings>().content_version.0.clone(),
+            content_version: content.built::<GameSettings>().content_version.0.clone(),
             http: http_addr.port(),
             ws: transport.local_addr().port(),
         },
@@ -297,10 +301,8 @@ fn simulate(
             }
         }
 
-        game::systems::step_areas(&mut worlds, wall_clock(reset));
-        game::systems::notification::relay(
-            &mut worlds.iter_mut().map(App::world_mut).collect::<Vec<_>>(),
-        );
+        step_areas(&mut worlds, wall_clock(reset));
+        notification::relay(&mut worlds.iter_mut().map(App::world_mut).collect::<Vec<_>>());
 
         begin_transfers(&mut worlds, &mut transfers, tick);
 
@@ -404,7 +406,7 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, areas: ServedAreas) -> Vec<game::systems::area::Id> {
+fn select_areas(content: &Content, areas: ServedAreas) -> Vec<area::Id> {
     match areas {
         ServedAreas::Real => content.ids::<AreaDef>().collect(),
         // The initial spawn's area is one template instanced `count` times; the count is bounded
@@ -416,21 +418,16 @@ fn select_areas(content: &Content, areas: ServedAreas) -> Vec<game::systems::are
 }
 
 fn build_world(
-    area: game::systems::area::Id,
-    assets: &Content,
+    area: area::Id,
+    content: &Content,
     rules: SpawnRules,
     ordinal: u64,
     clock: WallClock,
 ) -> App {
-    let mut app = game::systems::server_app(area, ordinal, clock, assets);
-    app.insert_resource(game::core::math::Rng::from_entropy());
+    let mut app = server_app(area, ordinal, clock, content);
+    app.insert_resource(Rng::from_entropy());
     app.insert_resource(rules);
-    app.finish();
-    app.cleanup();
-    app.world_mut()
-        .resource_mut::<NextState<ServerState>>()
-        .set(ServerState::Running);
-    app.update();
+    start_server(&mut app);
     app
 }
 
@@ -660,7 +657,7 @@ async fn content_file(
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct SessionRequest {
     build: String,
     rows: String,
@@ -805,7 +802,7 @@ fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
         roles: claims
             .roles
             .iter()
-            .filter_map(|role| role.parse::<game::systems::account::Role>().ok())
+            .filter_map(|role| role.parse::<Role>().ok())
             .collect(),
     })
 }
@@ -823,7 +820,7 @@ async fn health(State(http): State<Http>) -> Response {
 }
 
 fn verifier() -> Arc<Mutex<auth::Verifier>> {
-    #[derive(serde::Deserialize)]
+    #[derive(Deserialize)]
     struct AuthConfig {
         issuer: String,
         audience: String,

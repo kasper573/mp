@@ -8,7 +8,7 @@ use super::{Notification, NotificationKind, NotificationSent};
 use crate::core::time::Seconds;
 use crate::systems::dialogue::stage;
 use crate::systems::history::RecordTally;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::scene::{Scene as GameScene, despawn_all};
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
@@ -35,10 +35,7 @@ pub struct FeedPlugin;
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameScene::Area), spawn_feed)
-            .add_systems(
-                OnExit(GameScene::Area),
-                crate::systems::scene::despawn_all::<FeedRoot>,
-            )
+            .add_systems(OnExit(GameScene::Area), despawn_all::<FeedRoot>)
             .add_systems(
                 Update,
                 (count_more, fit_beside_box).run_if(in_state(GameScene::Area)),

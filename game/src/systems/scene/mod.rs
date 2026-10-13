@@ -4,9 +4,10 @@ pub mod loading;
 pub mod mode;
 
 use bevy::prelude::*;
+use renet2::RenetClient;
 
-use crate::core::net::transport::Client;
 use crate::systems::player::session;
+use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
@@ -43,7 +44,7 @@ impl Plugin for ScenePlugin {
 
 fn drive(
     pending: Option<Res<PendingSession>>,
-    client: Option<Res<Client>>,
+    client: Option<Res<RenetClient>>,
     scene: Res<State<Scene>>,
     mut next: ResMut<NextState<Scene>>,
 ) {
@@ -51,13 +52,9 @@ fn drive(
     {
         return;
     }
-    let connected = client
-        .as_ref()
-        .is_some_and(|client| client.0.is_connected());
-    let attempting = pending.is_some()
-        || client
-            .as_ref()
-            .is_some_and(|client| client.0.is_connecting());
+    let connected = client.as_ref().is_some_and(|client| client.is_connected());
+    let attempting =
+        pending.is_some() || client.as_ref().is_some_and(|client| client.is_connecting());
     let target = if connected {
         Scene::Area
     } else if attempting {
@@ -80,7 +77,7 @@ fn announce(world: &mut World) {
         if spectate { "spectate" } else { "join" }
     );
     if spectate {
-        session::spectate(world, crate::systems::spectate::SpectateRequest::Start);
+        session::spectate(world, SpectateRequest::Start);
     } else {
         session::join(world);
     }

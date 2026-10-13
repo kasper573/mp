@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use game::core::content::{ContentBuilder, ContentId, ContentScope, with_content};
+use game::core::content::{Content, ContentBuilder, ContentId, ContentScope, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
 use game::core::script::{EffectDef, OwnerKind, ScriptError};
 use game::systems::item::Id as ItemId;
 use game::systems::memory::Id as MemoryId;
-use game::systems::script::{EventKind, Place, Procedure, Reach, ScriptDef, ScriptModule};
+use game::systems::script::{
+    EventKind, Place, Procedure, Reach, ScriptDef, ScriptId, ScriptModule,
+};
 use game::systems::shop::Id as ShopId;
 use serde_json::{Value, json};
 
@@ -189,13 +191,11 @@ fn too_many_steps_between_pauses_are_refused() {
     assert_eq!(error.rule, "too many steps");
 }
 
-type ScriptId = game::systems::script::ScriptId;
-
 const HELPER: ScriptId = ContentId::new(0);
 const LOOPS: ScriptId = ContentId::new(1);
 
 /// Two shared functions, in a content of their own: one returns, the other calls itself.
-fn functions() -> game::core::content::Content {
+fn functions() -> Content {
     let keys = vec!["helper".to_owned(), "loops".to_owned()];
     let mut scope = ContentScope::new();
     scope.table::<ScriptDef>(keys.clone());

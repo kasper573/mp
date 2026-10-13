@@ -1,14 +1,14 @@
-use egui::{Sense, Ui};
+use egui::{Key, Sense, Ui};
 use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::forms::{Changed, FormCx};
-use crate::project::row_of;
+use crate::forms::FormChange;
+use crate::project::row_file;
 use crate::value::RowValue;
 
-pub(super) fn bindings_section(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
+pub(super) fn bindings_section(ui: &mut Ui, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     widgets::section(ui, "Bindings");
     if !value["bindings"].is_array() {
         value["bindings"] = Value::Array(Vec::new());
@@ -46,7 +46,7 @@ pub(super) fn bindings_section(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) 
             .as_array_mut()
             .expect("bindings")
             .remove(index);
-        changed = Changed::at("/bindings");
+        changed = FormChange::at("/bindings");
     }
     let id = ui.id().with("capture");
     let capturing = ui.ctx().data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
@@ -131,7 +131,7 @@ pub(super) fn bindings_section(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) 
                 let list = value["bindings"].as_array_mut().expect("bindings");
                 if !list.contains(&binding) {
                     list.push(binding);
-                    changed = Changed::at("/bindings");
+                    changed = FormChange::at("/bindings");
                 }
                 ui.ctx().data_mut(|d| d.insert_temp(id, false));
             }
@@ -141,7 +141,6 @@ pub(super) fn bindings_section(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) 
             None => {}
         }
     }
-    let _ = cx;
     changed
 }
 
@@ -192,7 +191,6 @@ pub fn binding_label(binding: &Value) -> (String, String) {
 }
 
 pub(super) fn key_code_name(key: egui::Key) -> String {
-    use egui::Key;
     let name = key.name();
     match key {
         Key::ArrowDown => "ArrowDown".to_owned(),
@@ -247,19 +245,20 @@ pub fn show_conflicts(editor: &mut Editor, ui: &mut Ui) {
     for binding in value["bindings"].as_array().into_iter().flatten() {
         let (label, _) = binding_label(binding);
         widgets::section(ui, &format!("Also bound to {label}"));
-        let others: Vec<String> = project
+        let others: Vec<&str> = project
             .files
-            .paths_under("tables/input/")
-            .filter_map(|file| row_of(file).map(|(_, other)| (file.clone(), other.to_owned())))
-            .filter(|(_, other)| other != key)
-            .filter(|(file, _)| {
-                project.files.json(file).is_some_and(|row| {
-                    row["bindings"]
-                        .as_array()
-                        .is_some_and(|list| list.contains(binding))
-                })
+            .keys_of("input")
+            .filter(|other| *other != key)
+            .filter(|other| {
+                project
+                    .files
+                    .json(&row_file("input", other))
+                    .is_some_and(|row| {
+                        row["bindings"]
+                            .as_array()
+                            .is_some_and(|list| list.contains(binding))
+                    })
             })
-            .map(|(_, other)| other)
             .collect();
         if others.is_empty() {
             widgets::hint(ui, &format!("No other input uses {label}."));

@@ -16,15 +16,15 @@ use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
 use crate::core::content::{Content, Fixture};
 use crate::systems::actor::Name;
-use crate::systems::actor::bust::{Busts, Face, GenericExpression};
+use crate::systems::actor::model::{Busts, Face, GenericExpression};
 use crate::systems::input::map::{self, ActionInput, InputAction, InputMap};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::card;
 use crate::systems::npc::Npc;
 use crate::systems::player;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
 use crate::systems::scene::mode::Mode;
+use crate::systems::scene::{Scene as GameScene, despawn_all};
 
 const READ_ALONG: Duration = Duration::from_millis(1800);
 const CHOICE_SHORTCUTS: [InputAction; 9] = [
@@ -47,10 +47,7 @@ impl Plugin for StagePlugin {
             .add_systems(OnEnter(GameScene::Area), spawn_stage)
             .add_systems(
                 OnExit(GameScene::Area),
-                (
-                    crate::systems::scene::despawn_all::<StageRoot>,
-                    forget_stage,
-                ),
+                (despawn_all::<StageRoot>, forget_stage),
             )
             .add_systems(
                 Update,

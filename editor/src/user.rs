@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::ui::widgets;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-/// Never inside a content folder.
+// Per-user state stays outside content folders, so it never ships with a game.
 #[derive(Clone, Debug)]
 pub struct UserFolder {
     root: PathBuf,
@@ -35,10 +38,6 @@ impl UserFolder {
         self.root.join("imports")
     }
 
-    pub fn cache_dir(&self) -> PathBuf {
-        self.root.join("cache")
-    }
-
     pub fn locks_dir(&self) -> PathBuf {
         self.root.join("locks")
     }
@@ -51,14 +50,14 @@ impl UserFolder {
         self.root.join("profiles")
     }
 
-    pub fn load_settings(&self) -> Settings {
+    pub fn load_settings(&self) -> EditorSettings {
         std::fs::read_to_string(self.settings_file())
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
             .unwrap_or_default()
     }
 
-    pub fn save_settings(&self, settings: &Settings) {
+    pub fn save_settings(&self, settings: &EditorSettings) {
         let _ = std::fs::create_dir_all(&self.root);
         if let Ok(text) = serde_json::to_string_pretty(settings) {
             let _ = std::fs::write(self.settings_file(), text + "\n");
@@ -68,11 +67,39 @@ impl UserFolder {
     pub fn folder_key(folder: &Path) -> String {
         blake3::hash(folder.to_string_lossy().as_bytes()).to_hex()[..16].to_owned()
     }
+
+    pub fn load_layout<T: DeserializeOwned + Default>(&self, project: &Path, slug: &str) -> T {
+        std::fs::read_to_string(self.layout_file(project, slug))
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save_layout<T: Serialize>(
+        &self,
+        project: &Path,
+        slug: &str,
+        layout: &T,
+    ) -> Result<PathBuf, std::io::Error> {
+        let file = self.layout_file(project, slug);
+        if let Some(dir) = file.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let text = serde_json::to_string_pretty(layout).map_err(std::io::Error::other)?;
+        std::fs::write(&file, text + "\n")?;
+        Ok(file)
+    }
+
+    fn layout_file(&self, project: &Path, slug: &str) -> PathBuf {
+        self.layouts_dir()
+            .join(UserFolder::folder_key(project))
+            .join(format!("{slug}.json"))
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct Settings {
+pub struct EditorSettings {
     pub recent: Vec<PathBuf>,
     pub recent_at: BTreeMap<String, u64>,
     pub binaries: Option<PathBuf>,
@@ -139,15 +166,12 @@ pub struct SpreadsheetView {
     pub filter: String,
 }
 
-impl Settings {
+impl EditorSettings {
     pub fn remember(&mut self, folder: &Path) {
         self.recent.retain(|known| known != folder);
         self.recent.insert(0, folder.to_path_buf());
         self.recent.truncate(12);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = unix_seconds();
         self.recent_at.insert(folder.display().to_string(), now);
         self.recent_at.retain(|path, _| {
             self.recent
@@ -165,18 +189,13 @@ impl Settings {
         let Some(at) = self.recent_at.get(&folder.display().to_string()) else {
             return String::new();
         };
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let days = now.saturating_sub(*at) / 86_400;
-        match days {
-            0 => "today".to_owned(),
-            1 => "yesterday".to_owned(),
-            2..=6 => format!("{days} days ago"),
-            7..=13 => "last week".to_owned(),
-            14..=30 => format!("{} weeks ago", days / 7),
-            _ => format!("{} months ago", days / 30),
-        }
+        widgets::ago(unix_seconds().saturating_sub(*at))
     }
+}
+
+pub fn unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }

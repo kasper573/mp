@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use game::core::content::{ContentRegistry, ContentRow};
+use game::systems::registry;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -13,13 +14,13 @@ fn the_shipped_folder_carries_the_version_of_this_build() {
     let game: serde_json::Value = serde_json::from_str(SHIPPED).expect("game.json");
     assert_eq!(
         game["content_version"].as_str(),
-        Some(game::systems::registry().version().0.as_str())
+        Some(registry().version().0.as_str())
     );
 }
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(game::systems::registry().version().0, "b105be3e");
+    assert_eq!(registry().version().0, "43bc8d55");
 }
 
 #[test]

@@ -1,58 +1,67 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
+use game::systems::area;
+use game::systems::area::world_map::WorldMapDef;
 
-use super::atlas::Atlas;
-use super::{Layout, card_rect};
-use crate::app::{Dialog, Editor};
-use crate::project::{Edit, row_file};
-use crate::ui::{dialogs, theme, widgets};
+use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
+use crate::app::{Editor, ModalDialog};
+use crate::project::ContentEdit;
+use crate::ui::dialogs::{self, DialogAnswer};
+use crate::ui::{theme, widgets};
 
-const GAP: f32 = 300.0;
-const MARGIN: f32 = 200.0;
+const GAP: f32 = 18.75;
+const MARGIN: f32 = 16.0;
 const ITERATIONS: usize = 200;
+const STILL: f32 = 1.0;
 const SETTLED: f32 = 0.0001;
+const HINT: f32 = 0.5;
+const SLACK: f32 = 0.1;
+const ROUNDS: usize = 50;
+const PREVIEW: Vec2 = Vec2::new(330.0, 250.0);
+const PREVIEW_LINK: Color32 = Color32::from_rgba_unmultiplied_const(200, 200, 220, 110);
+const PREVIEW_PINNED: Color32 = Color32::from_rgb(120, 160, 230);
+const PREVIEW_CARD: Color32 = Color32::from_rgb(110, 118, 140);
 
 pub struct ArrangeDialog {
-    pub everything: bool,
-    pub keep_regions: bool,
-    pub doors_hint: bool,
-    pub before: Layout,
-    pub selected: Vec<String>,
-    pub after: Option<Layout>,
+    everything: bool,
+    keep_regions: bool,
+    doors_hint: bool,
+    selected: Vec<String>,
+    solved: Option<Solved>,
 }
 
-impl ArrangeDialog {
-    pub fn new(before: Layout, selected: Vec<String>) -> ArrangeDialog {
-        ArrangeDialog {
-            everything: true,
-            keep_regions: true,
-            doors_hint: true,
-            before,
-            selected,
-            after: None,
-        }
-    }
+struct Solved {
+    generation: u64,
+    after: WorldMapDef,
 }
 
 pub fn open(editor: &mut Editor) {
-    let layout = match editor.views.world.atlas.clone() {
-        Some(atlas) => super::with_defaults(&atlas, super::layout_of(editor)),
-        None => super::layout_of(editor),
+    let Some(map) = OpenWorldMap::of(editor) else {
+        return;
     };
-    let selected = editor
-        .views
-        .world
-        .selected
-        .iter()
-        .filter_map(|part| match part {
-            super::Part::Card(key) => Some(key.clone()),
-            _ => None,
-        })
+    let selected = map
+        .card_ids(&selected(editor))
+        .into_iter()
+        .map(|area| map.atlas.key(area).to_owned())
         .collect();
-    editor
-        .dialogs
-        .push(Dialog::Arrange(ArrangeDialog::new(layout, selected)));
+    editor.dialogs.push(ModalDialog::Arrange(ArrangeDialog {
+        everything: true,
+        keep_regions: true,
+        doors_hint: true,
+        selected,
+        solved: None,
+    }));
+}
+
+pub fn arrange_everything(editor: &mut Editor) {
+    let Some(map) = OpenWorldMap::of(editor) else {
+        return;
+    };
+    let after = solve(&map, &map.layout, true, true);
+    if map.write(editor, ContentEdit::new("Arrange the world map"), &after) {
+        editor.views.world.fitted = false;
+    }
 }
 
 pub fn dialog(
@@ -60,78 +69,43 @@ pub fn dialog(
     ctx: &egui::Context,
     mut dialog: ArrangeDialog,
 ) -> Option<ArrangeDialog> {
-    let atlas = editor.views.world.atlas.clone()?;
-    let pinned_now = |dialog: &ArrangeDialog| -> Layout {
-        let mut before = dialog.before.clone();
-        if !dialog.everything {
-            for (key, card) in &mut before.cards {
-                if !dialog.selected.contains(key) {
-                    card.pinned = true;
-                }
-            }
-        }
-        before
+    let map = OpenWorldMap::of(editor)?;
+    let before = &map.layout;
+    let generation = map.atlas.generation;
+    let solved = match dialog.solved.take() {
+        Some(solved) if solved.generation == generation => solved,
+        _ => Solved {
+            generation,
+            after: arranged(&map, &dialog),
+        },
     };
-    if dialog.after.is_none() {
-        let mut after = solve(
-            &pinned_now(&dialog),
-            &atlas,
-            dialog.keep_regions,
-            dialog.doors_hint,
-        );
-        for (key, card) in &mut after.cards {
-            card.pinned = dialog.before.cards.get(key).is_some_and(|c| c.pinned);
-        }
-        dialog.after = Some(after);
-    }
-    let mut outcome: Option<bool> = None;
-    let unpinned = dialog
-        .before
+    let after = &solved.after;
+    let pinned = before.cards.values().filter(|card| card.pinned).count();
+    let unpinned = before.cards.len() - pinned;
+    let moved = after
         .cards
-        .values()
-        .filter(|card| !card.pinned)
+        .iter()
+        .filter(|(area, card)| before.cards.get(area).is_some_and(|was| was.at != card.at))
         .count();
-    let pinned = dialog.before.cards.len() - unpinned;
-    let moved = dialog
-        .after
-        .as_ref()
-        .map(|after| {
-            after
-                .cards
-                .iter()
-                .filter(|(key, card)| {
-                    dialog
-                        .before
-                        .cards
-                        .get(*key)
-                        .is_some_and(|before| (before.x, before.y) != (card.x, card.y))
-                })
-                .count()
-        })
-        .unwrap_or(0);
+    let mut answer = None;
+    let mut changed = false;
     dialogs::card(ctx, "arrange-world", 720.0, |ui| {
         ui.label(RichText::new("✲ Arrange the world map").size(17.0).strong());
         ui.add_space(8.0);
-        let mut changed = false;
-        let selected = dialog.selected.len();
-        let everything_label = format!("Arrange the {unpinned} unpinned cards");
-        let everything_note = if pinned == 0 {
-            "nothing is pinned".to_owned()
-        } else {
-            format!("{pinned} pinned stay put")
-        };
         changed |= toggle_row(
             ui,
             &mut dialog.everything,
-            &everything_label,
-            &everything_note,
+            &format!("Arrange the {unpinned} unpinned cards"),
+            &match pinned {
+                0 => "nothing is pinned".to_owned(),
+                _ => format!("{pinned} pinned stay put"),
+            },
         );
         if !dialog.everything {
             ui.label(
-                theme::faint(if selected == 0 {
-                    "nothing is selected, so nothing moves".to_owned()
-                } else {
-                    format!("only the {selected} selected cards move")
+                theme::faint(match dialog.selected.len() {
+                    0 => "nothing is selected, so nothing moves".to_owned(),
+                    count => format!("only the {count} selected cards move"),
                 })
                 .size(12.0),
             );
@@ -148,81 +122,84 @@ pub fn dialog(
             "Let doors hint at direction",
             "a door on the east edge pulls its area east",
         );
-        if changed {
-            dialog.after = None;
-        }
         ui.add_space(10.0);
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
                 widgets::section(ui, "Now");
-                preview(ui, &dialog.before, &atlas);
+                preview(ui, &map, before);
             });
             ui.add_space(12.0);
             ui.vertical(|ui| {
                 widgets::section(ui, "After");
-                match &dialog.after {
-                    Some(after) => preview(ui, after, &atlas),
-                    None => {
-                        ui.allocate_exact_size(Vec2::new(330.0, 250.0), egui::Sense::hover());
-                    }
-                }
+                preview(ui, &map, after);
             });
         });
         ui.add_space(10.0);
-        ui.label(RichText::new(format!("This replaces the positions of {moved} cards. Ctrl Z brings your current layout back.")).size(13.0));
+        ui.label(
+            RichText::new(format!(
+                "This replaces the positions of {moved} cards. Ctrl Z brings your current layout back."
+            ))
+            .size(13.0),
+        );
         ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled(
-                    moved > 0,
-                    egui::Button::new(
-                        RichText::new(format!("Arrange {moved} cards")).color(Color32::WHITE),
-                    )
-                    .fill(theme::ACCENT),
-                )
-                .clicked()
-                || (moved > 0 && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-            {
-                outcome = Some(true);
-            }
-            if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                outcome = Some(false);
-            }
-        });
+        answer = dialogs::answer_row(ui, &format!("Arrange {moved} cards"));
     });
     editor.status.left = vec!["World · arrange preview".to_owned()];
-    match outcome {
-        Some(true) => {
-            if let Some(after) = dialog.after.take() {
-                let mut edit = Edit::new(format!("Arrange {moved} world map cards"));
-                edit.write_json(
-                    row_file("world_map", super::ROW_KEY),
-                    &crate::value::json(&after).unwrap_or_default(),
-                );
-                editor.apply(edit);
+    match answer {
+        Some(DialogAnswer::Confirm) => {
+            if moved > 0
+                && map.write(
+                    editor,
+                    ContentEdit::new(format!("Arrange {moved} world map cards")),
+                    after,
+                )
+            {
                 editor.views.world.fitted = false;
             }
             None
         }
-        Some(false) => None,
-        None => Some(dialog),
+        Some(DialogAnswer::Cancel) => None,
+        None => {
+            dialog.solved = (!changed).then_some(solved);
+            Some(dialog)
+        }
     }
 }
 
+fn arranged(map: &OpenWorldMap, dialog: &ArrangeDialog) -> WorldMapDef {
+    let mut start = map.layout.clone();
+    if !dialog.everything {
+        for (area, card) in &mut start.cards {
+            if !dialog
+                .selected
+                .iter()
+                .any(|key| *key == map.atlas.key(*area))
+            {
+                card.pinned = true;
+            }
+        }
+    }
+    let mut after = solve(map, &start, dialog.keep_regions, dialog.doors_hint);
+    for (area, card) in &mut after.cards {
+        card.pinned = map.layout.cards.get(area).is_some_and(|was| was.pinned);
+    }
+    after
+}
+
 fn toggle_row(ui: &mut Ui, on: &mut bool, label: &str, note: &str) -> bool {
-    let mut changed = false;
     ui.horizontal(|ui| {
-        changed = widgets::toggle(ui, on).changed();
+        let changed = widgets::toggle(ui, on).changed();
         ui.label(RichText::new(label).size(13.0));
         if !note.is_empty() {
             ui.label(theme::faint(format!("· {note}")).size(12.0));
         }
-    });
-    changed
+        changed
+    })
+    .inner
 }
 
-fn preview(ui: &mut Ui, layout: &Layout, atlas: &Atlas) {
-    let (rect, _) = ui.allocate_exact_size(Vec2::new(330.0, 250.0), egui::Sense::hover());
+fn preview(ui: &mut Ui, map: &OpenWorldMap, layout: &WorldMapDef) {
+    let (rect, _) = ui.allocate_exact_size(PREVIEW, egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, theme::CANVAS);
     painter.rect_stroke(
@@ -231,176 +208,334 @@ fn preview(ui: &mut Ui, layout: &Layout, atlas: &Atlas) {
         Stroke::new(1.0, theme::BORDER),
         egui::StrokeKind::Outside,
     );
-    let rects: Vec<Rect> = layout
-        .cards
-        .iter()
-        .filter_map(|(key, card)| card_rect(atlas, key, card))
-        .collect();
-    let Some(bounds) = rects.iter().copied().reduce(|a, b| a.union(b)) else {
+    let Some(bounds) = map.bounds(layout) else {
         return;
     };
     let scale = ((rect.width() - 24.0) / bounds.width().max(1.0))
         .min((rect.height() - 24.0) / bounds.height().max(1.0));
     let to_screen = |p: Pos2| rect.center() + (p - bounds.center()) * scale;
-    for warp in &atlas.warps {
+    for warp in &map.atlas.warps {
         let (Some(a), Some(b)) = (layout.cards.get(&warp.from), layout.cards.get(&warp.to)) else {
             continue;
         };
         painter.line_segment(
-            [
-                to_screen(Pos2::new(a.x, a.y)),
-                to_screen(Pos2::new(b.x, b.y)),
-            ],
-            Stroke::new(1.0, Color32::from_rgba_unmultiplied(200, 200, 220, 110)),
+            [to_screen(card_at(a)), to_screen(card_at(b))],
+            Stroke::new(1.0, PREVIEW_LINK),
         );
     }
-    for (key, card) in &layout.cards {
-        let Some(r) = card_rect(atlas, key, card) else {
-            continue;
-        };
-        let shown = Rect::from_min_max(to_screen(r.min), to_screen(r.max)).expand(1.5);
+    for (area, card) in &layout.cards {
+        let r = map.card_rect(*area, card);
         painter.rect_filled(
-            shown,
+            Rect::from_min_max(to_screen(r.min), to_screen(r.max)).expand(1.5),
             2.0,
             if card.pinned {
-                Color32::from_rgb(120, 160, 230)
+                PREVIEW_PINNED
             } else {
-                Color32::from_rgb(110, 118, 140)
+                PREVIEW_CARD
             },
         );
     }
 }
 
-pub fn solve(layout: &Layout, atlas: &Atlas, keep_regions: bool, doors_hint: bool) -> Layout {
-    let keys: Vec<String> = layout.cards.keys().cloned().collect();
-    let index: HashMap<&str, usize> = keys
+pub fn solve(
+    map: &OpenWorldMap,
+    layout: &WorldMapDef,
+    keep_regions: bool,
+    doors_hint: bool,
+) -> WorldMapDef {
+    let areas: Vec<area::Id> = layout.cards.keys().copied().collect();
+    let graph = Graph::of(map, layout, &areas, keep_regions, doors_hint);
+    let start: Vec<Vec2> = areas
         .iter()
-        .enumerate()
-        .map(|(i, key)| (key.as_str(), i))
+        .map(|area| card_at(&layout.cards[area]).to_vec2())
         .collect();
-    let n = keys.len();
-    if n == 0 {
-        return layout.clone();
-    }
-    let sizes: Vec<Vec2> = keys
-        .iter()
-        .map(|key| {
-            card_rect(atlas, key, &layout.cards[key]).map_or(Vec2::splat(32.0), |r| r.size())
-        })
-        .collect();
-    let mut links: BTreeSet<(usize, usize)> = BTreeSet::new();
-    let mut hints: HashMap<(usize, usize), Vec2> = HashMap::new();
-    for warp in &atlas.warps {
-        let (Some(&a), Some(&b)) = (index.get(warp.from.as_str()), index.get(warp.to.as_str()))
-        else {
-            continue;
-        };
-        if a == b {
-            continue;
+    let mut positions = start.clone();
+    for _ in 0..ROUNDS {
+        let before = positions.clone();
+        graph.relax(&mut positions);
+        graph.push_apart(&mut positions);
+        for position in &mut positions {
+            *position = stored(*position);
         }
-        links.insert((a.min(b), a.max(b)));
-        if doors_hint && let (Some(at), Some(info)) = (warp.at, atlas.areas.get(&warp.from)) {
-            let half = Vec2::new(info.size.width, info.size.height) / 2.0;
-            let rel = Vec2::new(at.x - half.x, at.y - half.y);
-            let side = if rel.x.abs() / half.x.max(1.0) > rel.y.abs() / half.y.max(1.0) {
-                Vec2::new(rel.x.signum(), 0.0)
-            } else {
-                Vec2::new(0.0, rel.y.signum())
+        if graph.settled(&before, &positions) {
+            break;
+        }
+    }
+    graph.place_components(&mut positions);
+    let mut out = layout.clone();
+    for ((area, position), was) in areas.iter().zip(positions).zip(start) {
+        if let Some(card) = out.cards.get_mut(area)
+            && (position - was).length() >= STILL
+        {
+            move_card(card, position.to_pos2());
+        }
+    }
+    out
+}
+
+struct Graph {
+    sizes: Vec<Vec2>,
+    pinned: Vec<bool>,
+    hints: HashMap<(usize, usize), Vec2>,
+    components: Vec<Vec<usize>>,
+    hops: Vec<BTreeMap<(usize, usize), u32>>,
+}
+
+impl Graph {
+    fn of(
+        map: &OpenWorldMap,
+        layout: &WorldMapDef,
+        areas: &[area::Id],
+        keep_regions: bool,
+        doors_hint: bool,
+    ) -> Graph {
+        let index: HashMap<area::Id, usize> = areas
+            .iter()
+            .enumerate()
+            .map(|(i, area)| (*area, i))
+            .collect();
+        let mut links: BTreeSet<(usize, usize)> = BTreeSet::new();
+        let mut hints: HashMap<(usize, usize), Vec2> = HashMap::new();
+        for warp in &map.atlas.warps {
+            let (Some(&a), Some(&b)) = (index.get(&warp.from), index.get(&warp.to)) else {
+                continue;
             };
-            *hints.entry((a, b)).or_insert(Vec2::ZERO) += side;
+            if a == b {
+                continue;
+            }
+            links.insert((a.min(b), a.max(b)));
+            if doors_hint && let Some(at) = warp.at {
+                let size = map.atlas.size(warp.from);
+                let half = Vec2::new(size.width, size.height) / 2.0;
+                let rel = Vec2::new(at.x - half.x, at.y - half.y);
+                let side = if rel.x.abs() / half.x.max(1.0) > rel.y.abs() / half.y.max(1.0) {
+                    Vec2::new(rel.x.signum(), 0.0)
+                } else {
+                    Vec2::new(0.0, rel.y.signum())
+                };
+                *hints.entry((a, b)).or_insert(Vec2::ZERO) += side;
+            }
+        }
+        if keep_regions {
+            for region in &layout.regions {
+                let members: Vec<usize> = region
+                    .cards
+                    .iter()
+                    .filter_map(|area| index.get(area).copied())
+                    .collect();
+                for pair in members.windows(2) {
+                    links.insert((pair[0].min(pair[1]), pair[0].max(pair[1])));
+                }
+            }
+        }
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); areas.len()];
+        for &(a, b) in &links {
+            adjacency[a].push(b);
+            adjacency[b].push(a);
+        }
+        let components = components(&adjacency);
+        Graph {
+            sizes: areas
+                .iter()
+                .map(|area| map.card_rect(*area, &layout.cards[area]).size())
+                .collect(),
+            pinned: areas.iter().map(|area| layout.cards[area].pinned).collect(),
+            hints,
+            hops: components
+                .iter()
+                .map(|component| hop_distances(&adjacency, component))
+                .collect(),
+            components,
         }
     }
-    if keep_regions {
-        for region in &layout.regions {
-            let members: Vec<usize> = region
-                .cards
-                .iter()
-                .filter_map(|key| index.get(key.as_str()).copied())
-                .collect();
-            for window in members.windows(2) {
-                links.insert((window[0].min(window[1]), window[0].max(window[1])));
+
+    fn ideal(&self, a: usize, b: usize, hops: f32) -> f32 {
+        let sizes = &self.sizes;
+        let span = (sizes[a].x + sizes[b].x + sizes[a].y + sizes[b].y) / 4.0;
+        hops * (span + GAP)
+    }
+
+    fn relax(&self, positions: &mut [Vec2]) {
+        for (component, hops) in self.components.iter().zip(&self.hops) {
+            let start = centroid(component, positions);
+            for _ in 0..ITERATIONS {
+                let before = positions.to_vec();
+                for &i in component.iter().filter(|&&i| !self.pinned[i]) {
+                    let springs = self.springs(i, positions[i], component, hops, positions);
+                    if let Some(to) = centre(&springs) {
+                        positions[i] = to;
+                    }
+                }
+                if self.settled(&before, positions) {
+                    break;
+                }
+            }
+            if component.iter().all(|&i| !self.pinned[i]) {
+                let drift = start - centroid(component, positions);
+                for &i in component {
+                    positions[i] += drift;
+                }
             }
         }
     }
-    let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n];
-    for &(a, b) in &links {
-        adjacency[a].push(b);
-        adjacency[b].push(a);
-    }
-    let mut positions: Vec<Vec2> = keys
-        .iter()
-        .map(|key| Vec2::new(layout.cards[key].x, layout.cards[key].y))
-        .collect();
-    let pinned: Vec<bool> = keys.iter().map(|key| layout.cards[key].pinned).collect();
-    let components = components(&adjacency);
-    let ideal = |a: usize, b: usize, hops: f32| -> f32 {
-        let span = (sizes[a].x + sizes[b].x + sizes[a].y + sizes[b].y) / 4.0;
-        hops.powf(0.7) * (span + GAP)
-    };
-    for component in &components {
-        if component.len() < 2 {
-            continue;
-        }
-        let hops = hop_distances(&adjacency, component);
-        let bbox = component
+
+    fn settled(&self, before: &[Vec2], after: &[Vec2]) -> bool {
+        let bounds = after
             .iter()
-            .fold(0.0f32, |acc, &i| acc.max(sizes[i].x).max(sizes[i].y))
-            .max(1.0);
+            .zip(&self.sizes)
+            .map(|(at, size)| Rect::from_center_size(at.to_pos2(), *size))
+            .fold(Rect::NOTHING, |all, card| all.union(card));
+        let change = before
+            .iter()
+            .zip(after)
+            .map(|(was, now)| (*now - *was).length())
+            .fold(0.0f32, f32::max);
+        change < SETTLED * bounds.size().max_elem().max(1.0)
+    }
+
+    fn springs(
+        &self,
+        i: usize,
+        at: Vec2,
+        component: &[usize],
+        hops: &BTreeMap<(usize, usize), u32>,
+        positions: &[Vec2],
+    ) -> Vec<Spring> {
+        let mut springs = Vec::new();
+        for &j in component.iter().filter(|&&j| j != i) {
+            let Some(&d) = hops.get(&(i.min(j), i.max(j))) else {
+                continue;
+            };
+            let d = d as f32;
+            let weight = 1.0 / (d * d);
+            let delta = at - positions[j];
+            let direction = delta / delta.length().max(0.001);
+            springs.push(Spring {
+                weight,
+                rest: self.beside(i, j, d, direction, positions),
+            });
+            let pull = self.hints.get(&(j, i)).copied().unwrap_or_default()
+                - self.hints.get(&(i, j)).copied().unwrap_or_default();
+            if d == 1.0 && pull != Vec2::ZERO {
+                springs.push(Spring {
+                    weight: weight * HINT,
+                    rest: self.beside(i, j, d, pull.normalized(), positions),
+                });
+            }
+        }
+        springs
+    }
+
+    fn beside(&self, i: usize, j: usize, hops: f32, direction: Vec2, positions: &[Vec2]) -> Vec2 {
+        positions[j] + self.ideal(i, j, hops).max(self.clearance(i, j, direction)) * direction
+    }
+
+    fn overlap(&self, i: usize, at: Vec2, j: usize, other: Vec2) -> Option<Vec2> {
+        let need = (self.sizes[i] + self.sizes[j]) / 2.0 + Vec2::splat(MARGIN);
+        let delta = at - other;
+        let overlap = need - delta.abs();
+        if overlap.x <= SLACK || overlap.y <= SLACK {
+            return None;
+        }
+        let away = |d: f32| if d >= 0.0 { 1.0 } else { -1.0 };
+        Some(if overlap.x < overlap.y {
+            Vec2::new(overlap.x * away(delta.x), 0.0)
+        } else {
+            Vec2::new(0.0, overlap.y * away(delta.y))
+        })
+    }
+
+    fn clearance(&self, a: usize, b: usize, direction: Vec2) -> f32 {
+        let need = (self.sizes[a] + self.sizes[b]) / 2.0 + Vec2::splat(MARGIN);
+        (need.x / direction.x.abs().max(f32::EPSILON))
+            .min(need.y / direction.y.abs().max(f32::EPSILON))
+    }
+
+    fn push_apart(&self, positions: &mut [Vec2]) {
         for _ in 0..ITERATIONS {
-            let mut moved: f32 = 0.0;
-            for &i in component {
-                if pinned[i] {
-                    continue;
-                }
-                let mut sum = Vec2::ZERO;
-                let mut weight = 0.0;
-                for &j in component {
-                    if i == j {
+            let mut any = false;
+            for i in 0..positions.len() {
+                for j in (i + 1)..positions.len() {
+                    if self.pinned[i] && self.pinned[j] {
                         continue;
                     }
-                    let Some(&d) = hops.get(&(i.min(j), i.max(j))) else {
+                    let Some(push) = self.overlap(i, positions[i], j, positions[j]) else {
                         continue;
                     };
-                    let d = d as f32;
-                    let w = 1.0 / (d * d);
-                    let delta = positions[i] - positions[j];
-                    let length = delta.length().max(0.001);
-                    let mut direction = delta / length;
-                    if d == 1.0 {
-                        let mut pull = Vec2::ZERO;
-                        if let Some(hint) = hints.get(&(j, i)) {
-                            pull += *hint;
-                        }
-                        if let Some(hint) = hints.get(&(i, j)) {
-                            pull -= *hint;
-                        }
-                        if pull != Vec2::ZERO {
-                            direction = (direction + pull.normalized() * 0.5).normalized();
+                    any = true;
+                    match (self.pinned[i], self.pinned[j]) {
+                        (true, false) => positions[j] -= push,
+                        (false, true) => positions[i] += push,
+                        _ => {
+                            positions[i] += push / 2.0;
+                            positions[j] -= push / 2.0;
                         }
                     }
-                    sum += w * (positions[j] + ideal(i, j, d) * direction);
-                    weight += w;
-                }
-                if weight > 0.0 {
-                    let next = sum / weight;
-                    moved = moved.max((next - positions[i]).length());
-                    positions[i] = next;
+                    positions[i] = stored(positions[i]);
+                    positions[j] = stored(positions[j]);
                 }
             }
-            if moved / bbox < SETTLED {
+            if !any {
                 break;
             }
         }
     }
-    push_apart(&mut positions, &sizes, &pinned);
-    place_components(&keys, &components, &mut positions, &sizes, &pinned);
-    let mut out = layout.clone();
-    for (i, key) in keys.iter().enumerate() {
-        let card = out.cards.get_mut(key).expect("card");
-        card.x = (positions[i].x * 100.0).round() / 100.0;
-        card.y = (positions[i].y * 100.0).round() / 100.0;
+
+    fn place_components(&self, positions: &mut [Vec2]) {
+        let bounds = |component: &[usize], positions: &[Vec2]| -> Rect {
+            component
+                .iter()
+                .map(|&i| Rect::from_center_size(positions[i].to_pos2(), self.sizes[i]))
+                .reduce(|a, b| a.union(b))
+                .unwrap_or(Rect::NOTHING)
+        };
+        let mut cursor: Option<f32> = None;
+        let mut top: Option<f32> = None;
+        for component in &self.components {
+            let rect = bounds(component, positions);
+            if component.iter().any(|&i| self.pinned[i]) {
+                cursor = Some(cursor.map_or(rect.max.x, |x| x.max(rect.max.x)));
+                top = Some(top.map_or(rect.min.y, |y| y.min(rect.min.y)));
+                continue;
+            }
+            let (Some(x), Some(y)) = (cursor, top) else {
+                cursor = Some(rect.max.x);
+                top = Some(rect.min.y);
+                continue;
+            };
+            let shift = Vec2::new(x + GAP - rect.min.x, y - rect.min.y);
+            for &i in component {
+                positions[i] = stored(positions[i] + shift);
+            }
+            cursor = Some(rect.max.x + shift.x);
+        }
     }
-    out
+}
+
+fn stored(at: Vec2) -> Vec2 {
+    Vec2::new(hundredths(at.x), hundredths(at.y))
+}
+
+struct Spring {
+    weight: f32,
+    rest: Vec2,
+}
+
+fn centre(springs: &[Spring]) -> Option<Vec2> {
+    let weight: f32 = springs.iter().map(|spring| spring.weight).sum();
+    (weight > 0.0).then(|| {
+        springs
+            .iter()
+            .fold(Vec2::ZERO, |sum, spring| sum + spring.weight * spring.rest)
+            / weight
+    })
+}
+
+fn centroid(component: &[usize], positions: &[Vec2]) -> Vec2 {
+    component
+        .iter()
+        .fold(Vec2::ZERO, |sum, &i| sum + positions[i])
+        / component.len() as f32
 }
 
 fn components(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
@@ -431,9 +566,8 @@ fn components(adjacency: &[Vec<usize>]) -> Vec<Vec<usize>> {
 fn hop_distances(adjacency: &[Vec<usize>], component: &[usize]) -> BTreeMap<(usize, usize), u32> {
     let mut out = BTreeMap::new();
     for &start in component {
-        let mut distance: HashMap<usize, u32> = HashMap::new();
-        distance.insert(start, 0);
-        let mut queue = std::collections::VecDeque::from([start]);
+        let mut distance: HashMap<usize, u32> = HashMap::from([(start, 0)]);
+        let mut queue = VecDeque::from([start]);
         while let Some(node) = queue.pop_front() {
             let here = distance[&node];
             for &next in &adjacency[node] {
@@ -443,92 +577,9 @@ fn hop_distances(adjacency: &[Vec<usize>], component: &[usize]) -> BTreeMap<(usi
                 }
             }
         }
-        for (&node, &d) in &distance {
-            if node > start {
-                out.insert((start, node), d);
-            }
+        for (node, d) in distance.into_iter().filter(|(node, _)| *node > start) {
+            out.insert((start, node), d);
         }
     }
     out
-}
-
-fn push_apart(positions: &mut [Vec2], sizes: &[Vec2], pinned: &[bool]) {
-    for _ in 0..200 {
-        let mut any = false;
-        for i in 0..positions.len() {
-            for j in (i + 1)..positions.len() {
-                if pinned[i] && pinned[j] {
-                    continue;
-                }
-                let need = (sizes[i] + sizes[j]) / 2.0 + Vec2::splat(MARGIN);
-                let delta = positions[j] - positions[i];
-                let overlap = need - Vec2::new(delta.x.abs(), delta.y.abs());
-                if overlap.x <= 0.0 || overlap.y <= 0.0 {
-                    continue;
-                }
-                any = true;
-                let push = if overlap.x < overlap.y {
-                    Vec2::new(overlap.x * if delta.x >= 0.0 { 1.0 } else { -1.0 }, 0.0)
-                } else {
-                    Vec2::new(0.0, overlap.y * if delta.y >= 0.0 { 1.0 } else { -1.0 })
-                };
-                match (pinned[i], pinned[j]) {
-                    (true, false) => positions[j] += push,
-                    (false, true) => positions[i] -= push,
-                    _ => {
-                        positions[i] -= push / 2.0;
-                        positions[j] += push / 2.0;
-                    }
-                }
-            }
-        }
-        if !any {
-            break;
-        }
-    }
-}
-
-fn place_components(
-    keys: &[String],
-    components: &[Vec<usize>],
-    positions: &mut [Vec2],
-    sizes: &[Vec2],
-    pinned: &[bool],
-) {
-    let mut order: Vec<&Vec<usize>> = components.iter().collect();
-    order.sort_by_key(|component| {
-        component
-            .iter()
-            .map(|&i| keys[i].as_str())
-            .min()
-            .unwrap_or("")
-    });
-    let bounds = |component: &[usize], positions: &[Vec2]| -> Rect {
-        component
-            .iter()
-            .map(|&i| Rect::from_center_size(positions[i].to_pos2(), sizes[i]))
-            .reduce(|a, b| a.union(b))
-            .unwrap_or(Rect::NOTHING)
-    };
-    let mut cursor: Option<f32> = None;
-    let mut top: Option<f32> = None;
-    for component in order {
-        let anchored = component.iter().any(|&i| pinned[i]);
-        let rect = bounds(component, positions);
-        if anchored {
-            cursor = Some(cursor.map_or(rect.max.x, |x| x.max(rect.max.x)));
-            top = Some(top.map_or(rect.min.y, |y| y.min(rect.min.y)));
-            continue;
-        }
-        let (Some(x), Some(y)) = (cursor, top) else {
-            cursor = Some(rect.max.x);
-            top = Some(rect.min.y);
-            continue;
-        };
-        let shift = Vec2::new(x + GAP - rect.min.x, y - rect.min.y);
-        for &i in component {
-            positions[i] += shift;
-        }
-        cursor = Some(rect.max.x + shift.x);
-    }
 }

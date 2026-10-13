@@ -1,7 +1,8 @@
+use std::borrow::Cow;
+
 use bevy_ecs::prelude::*;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 
 use super::{Stat, StatKind};
 use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};

@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 
-use serde_json::{Map, Value};
+use game::core::script::VariableType;
+use serde_json::{Map, Value, json};
 
-pub struct Shapes {
+use crate::app::registry;
+
+pub struct SchemaShapes {
     pub tables: BTreeMap<String, TableShape>,
     pub order: Vec<String>,
     pub settings: Value,
@@ -14,11 +17,15 @@ pub struct TableShape {
     pub folders: bool,
 }
 
-impl Shapes {
-    pub fn new() -> Shapes {
-        let settings = schemars::generate::SchemaSettings::draft2020_12()
-            .with(|settings| settings.inline_subschemas = true);
-        let shapes = game::systems::registry().shapes(&settings);
+pub fn shapes_json() -> Value {
+    let settings = schemars::generate::SchemaSettings::draft2020_12()
+        .with(|settings| settings.inline_subschemas = true);
+    registry().shapes(&settings)
+}
+
+impl SchemaShapes {
+    pub fn load() -> SchemaShapes {
+        let shapes = shapes_json();
         let mut tables = BTreeMap::new();
         let mut order = Vec::new();
         for table in shapes["tables"].as_array().into_iter().flatten() {
@@ -38,7 +45,7 @@ impl Shapes {
                 },
             );
         }
-        Shapes {
+        SchemaShapes {
             tables,
             order,
             settings: shapes["settings"].clone(),
@@ -71,13 +78,23 @@ impl Shapes {
         let items = shape.get("properties")?.get("modules")?.get("items")?;
         Some(items)
     }
+
+    pub fn module_variants(&self, table: &str) -> Vec<SchemaVariant<'_>> {
+        let Some(shape) = self.tables.get(table).map(|table| &table.shape) else {
+            return Vec::new();
+        };
+        match self.modules_of(table).map(|items| kind(shape, items)) {
+            Some(SchemaKind::Union(variants)) => variants,
+            _ => Vec::new(),
+        }
+    }
 }
 
-pub enum Kind<'a> {
+pub enum SchemaKind<'a> {
     Object,
     Array(&'a Value),
     Map(&'a Value),
-    Union(Vec<Variant<'a>>),
+    Union(Vec<SchemaVariant<'a>>),
     Choice(Vec<&'a Value>),
     Enum(Vec<String>),
     Const(&'a Value),
@@ -89,7 +106,7 @@ pub enum Kind<'a> {
     Any,
 }
 
-pub struct Variant<'a> {
+pub struct SchemaVariant<'a> {
     pub field: String,
     pub tag: String,
     pub schema: &'a Value,
@@ -111,13 +128,13 @@ pub fn resolve<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
     schema
 }
 
-pub fn kind<'a>(root: &'a Value, schema: &'a Value) -> Kind<'a> {
+pub fn kind<'a>(root: &'a Value, schema: &'a Value) -> SchemaKind<'a> {
     let schema = resolve(root, schema);
     if let Some(value) = schema.get("const") {
-        return Kind::Const(value);
+        return SchemaKind::Const(value);
     }
     if let Some(values) = schema.get("enum").and_then(Value::as_array) {
-        return Kind::Enum(
+        return SchemaKind::Enum(
             values
                 .iter()
                 .filter_map(|value| value.as_str().map(str::to_owned))
@@ -135,48 +152,48 @@ pub fn kind<'a>(root: &'a Value, schema: &'a Value) -> Kind<'a> {
             collect_variants(root, alternative, &mut variants, &mut plain);
         }
         if !variants.is_empty() && plain.is_empty() {
-            return Kind::Union(variants);
+            return SchemaKind::Union(variants);
         }
         if variants.is_empty() {
-            return Kind::Choice(plain);
+            return SchemaKind::Choice(plain);
         }
         let mut all = plain;
         all.extend(variants.into_iter().map(|variant| variant.schema));
-        return Kind::Choice(all);
+        return SchemaKind::Choice(all);
     }
     let types = type_names(schema);
     let base = types.iter().find(|name| **name != "null").copied();
     match base {
         Some("object") => {
             if schema.get("properties").is_some() {
-                Kind::Object
+                SchemaKind::Object
             } else if let Some(values) = schema.get("additionalProperties")
                 && values.is_object()
             {
-                Kind::Map(values)
+                SchemaKind::Map(values)
             } else if let Some(patterns) =
                 schema.get("patternProperties").and_then(Value::as_object)
                 && let Some((_, values)) = patterns.iter().next()
             {
-                Kind::Map(values)
+                SchemaKind::Map(values)
             } else {
-                Kind::Object
+                SchemaKind::Object
             }
         }
-        Some("array") => Kind::Array(schema.get("items").unwrap_or(&Value::Null)),
-        Some("string") => Kind::Text,
-        Some("integer") => Kind::Integer,
-        Some("number") => Kind::Number,
-        Some("boolean") => Kind::Boolean,
-        Some("null") => Kind::Null,
-        _ => Kind::Any,
+        Some("array") => SchemaKind::Array(schema.get("items").unwrap_or(&Value::Null)),
+        Some("string") => SchemaKind::Text,
+        Some("integer") => SchemaKind::Integer,
+        Some("number") => SchemaKind::Number,
+        Some("boolean") => SchemaKind::Boolean,
+        Some("null") => SchemaKind::Null,
+        _ => SchemaKind::Any,
     }
 }
 
 fn collect_variants<'a>(
     root: &'a Value,
     schema: &'a Value,
-    variants: &mut Vec<Variant<'a>>,
+    variants: &mut Vec<SchemaVariant<'a>>,
     plain: &mut Vec<&'a Value>,
 ) {
     let schema = resolve(root, schema);
@@ -192,7 +209,7 @@ fn collect_variants<'a>(
         return;
     }
     if let Some((field, tag)) = tag_of(schema) {
-        variants.push(Variant { field, tag, schema });
+        variants.push(SchemaVariant { field, tag, schema });
     } else {
         plain.push(schema);
     }
@@ -236,6 +253,14 @@ pub fn properties(schema: &Value) -> Vec<(&String, &Value)> {
         .unwrap_or_default()
 }
 
+pub fn number_paths(root: &Value) -> Vec<Vec<String>> {
+    let mut out = Vec::new();
+    number_paths_in(root, root, &mut Vec::new(), &mut out, 0);
+    out.sort();
+    out.dedup();
+    out
+}
+
 pub fn required(schema: &Value) -> Vec<&str> {
     schema
         .get("required")
@@ -277,13 +302,13 @@ pub fn template(root: &Value, schema: &Value) -> Value {
     }
     let schema = resolve(root, schema);
     match kind(root, schema) {
-        Kind::Const(value) => value.clone(),
-        Kind::Enum(values) => Value::String(values.first().cloned().unwrap_or_default()),
-        Kind::Union(variants) => variants
+        SchemaKind::Const(value) => value.clone(),
+        SchemaKind::Enum(values) => Value::String(values.first().cloned().unwrap_or_default()),
+        SchemaKind::Union(variants) => variants
             .first()
             .map(|variant| variant_template(root, variant))
             .unwrap_or(Value::Null),
-        Kind::Choice(alternatives) => alternatives
+        SchemaKind::Choice(alternatives) => alternatives
             .iter()
             .find(|alternative| {
                 !type_names(alternative).contains(&"null") && !is_var_fill(alternative)
@@ -295,7 +320,7 @@ pub fn template(root: &Value, schema: &Value) -> Value {
             })
             .map(|alternative| template(root, alternative))
             .unwrap_or(Value::Null),
-        Kind::Object => {
+        SchemaKind::Object => {
             let required = required(schema);
             let mut object = Map::new();
             for (name, field) in properties(schema) {
@@ -305,20 +330,20 @@ pub fn template(root: &Value, schema: &Value) -> Value {
             }
             Value::Object(object)
         }
-        Kind::Array(items) => {
+        SchemaKind::Array(items) => {
             let least = schema["minItems"].as_u64().unwrap_or(0);
             Value::Array((0..least).map(|_| template(root, items)).collect())
         }
-        Kind::Map(_) => Value::Object(Map::new()),
-        Kind::Text => Value::String(String::new()),
-        Kind::Integer => Value::from(minimum(schema).unwrap_or(0.0) as i64),
-        Kind::Number => Value::from(minimum(schema).unwrap_or(0.0)),
-        Kind::Boolean => Value::Bool(false),
-        Kind::Null | Kind::Any => Value::Null,
+        SchemaKind::Map(_) => Value::Object(Map::new()),
+        SchemaKind::Text => Value::String(String::new()),
+        SchemaKind::Integer => Value::from(minimum(schema).unwrap_or(0.0) as i64),
+        SchemaKind::Number => Value::from(minimum(schema).unwrap_or(0.0)),
+        SchemaKind::Boolean => Value::Bool(false),
+        SchemaKind::Null | SchemaKind::Any => Value::Null,
     }
 }
 
-pub fn variant_template(root: &Value, variant: &Variant) -> Value {
+pub fn variant_template(root: &Value, variant: &SchemaVariant) -> Value {
     let mut value = template(root, variant.schema);
     if let Some(object) = value.as_object_mut() {
         object.insert(variant.field.clone(), Value::String(variant.tag.clone()));
@@ -326,13 +351,38 @@ pub fn variant_template(root: &Value, variant: &Variant) -> Value {
     value
 }
 
-pub fn variant_of<'a>(variants: &'a [Variant<'a>], value: &Value) -> Option<&'a Variant<'a>> {
+pub fn variant_of<'a>(
+    variants: &'a [SchemaVariant<'a>],
+    value: &Value,
+) -> Option<&'a SchemaVariant<'a>> {
     variants.iter().find(|variant| {
         value
             .get(&variant.field)
             .and_then(Value::as_str)
             .is_some_and(|tag| tag == variant.tag)
     })
+}
+
+pub fn variable_schema(ty: VariableType, table: Option<&str>) -> Value {
+    match ty {
+        VariableType::Integer => json!({ "type": "integer" }),
+        VariableType::Number => json!({ "type": "number" }),
+        VariableType::Boolean => json!({ "type": "boolean" }),
+        VariableType::Text | VariableType::Name => json!({ "type": "string" }),
+        VariableType::Row => json!({ "type": "string", "x-table": table.unwrap_or_default() }),
+        VariableType::Audio => json!({ "type": "string", "x-asset": "audio" }),
+        VariableType::Place => json!({
+            "type": "object",
+            "x-place": true,
+            "properties": {
+                "area": { "type": "string", "x-table": "area" },
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+            },
+            "required": ["area", "x", "y"]
+        }),
+        VariableType::Condition => json!({ "x-condition": true }),
+    }
 }
 
 pub fn title(name: &str) -> String {
@@ -352,4 +402,59 @@ pub fn title(name: &str) -> String {
         }
     }
     out
+}
+
+const NUMBER_DEPTH: usize = 5;
+
+fn number_paths_in(
+    root: &Value,
+    schema: &Value,
+    path: &mut Vec<String>,
+    out: &mut Vec<Vec<String>>,
+    depth: usize,
+) {
+    if depth > NUMBER_DEPTH {
+        return;
+    }
+    let schema = resolve(root, schema);
+    if type_names(schema)
+        .iter()
+        .any(|name| matches!(*name, "number" | "integer"))
+    {
+        out.push(path.clone());
+        return;
+    }
+    if let Some(items) = schema.get("items") {
+        number_paths_in(root, items, path, out, depth + 1);
+    }
+    for (name, field) in properties(schema) {
+        if name == "modules" || name == "type" {
+            continue;
+        }
+        path.push(name.clone());
+        number_paths_in(root, field, path, out, depth + 1);
+        path.pop();
+    }
+    for variant in ["oneOf", "anyOf"]
+        .iter()
+        .filter_map(|key| schema.get(*key))
+        .filter_map(Value::as_array)
+        .flatten()
+    {
+        let variant = resolve(root, variant);
+        match tag_of(variant) {
+            Some((_, tag)) => {
+                path.push(tag);
+                number_paths_in(root, variant, path, out, depth + 1);
+                path.pop();
+            }
+            None => number_paths_in(root, variant, path, out, depth + 1),
+        }
+    }
+    if let Some(modules) = schema
+        .get("properties")
+        .and_then(|properties| properties.get("modules"))
+    {
+        number_paths_in(root, modules, path, out, depth + 1);
+    }
 }

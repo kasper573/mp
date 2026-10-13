@@ -1,29 +1,34 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
-use game::core::script::OwnerKind;
+use game::core::script::{OwnerKind, VariableType};
+use game::systems::area;
+use game::systems::area::blueprint::holes;
+use game::systems::area::{AreaDef, AreaModule};
 use serde_json::{Map, Value};
+use strum::VariantArray;
 
-use super::nodes;
-use super::{Doc, ScriptOwner, select_nodes, write};
-use crate::app::{Dialog, Editor};
-use crate::forms::{Changed, FormAction, FormCx};
-use crate::project::{Edit, Selection, row_file, row_of};
-use crate::schema;
-use crate::tabs::Tab;
-use crate::ui::{theme, widgets};
+use super::nodes::{self, LineSpeaker};
+use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
+use crate::app::{BottomTab, Editor, ModalDialog};
+use crate::forms::{FormAction, FormChange, FormCx};
+use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::tabs::EditorTab;
+use crate::ui::{dialogs, inspector, theme, widgets};
 use crate::value::RowValue;
+use crate::views::area::holes::fill_holes;
+use crate::{condition, forms, picker, rows, schema, spans, thumbs};
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(owner) = editor.views.script.focus.clone() else {
         ui.label(theme::muted("No script in view"));
         return;
     };
-    let Some(doc) = Doc::load(editor, &owner) else {
+    let Some(doc) = ScriptDoc::load(editor, &owner) else {
         ui.label(theme::muted(format!("{} is gone", owner.title())));
         return;
     };
-    let _ = super::catalogue(editor);
+    super::ensure_catalogue(editor);
     let names: Vec<String> = selection
         .parts
         .iter()
@@ -36,12 +41,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         .find_map(|part| part.strip_prefix("choice:"))
         .and_then(|rest| rest.rsplit_once('#'))
         .and_then(|(name, index)| Some((name.to_owned(), index.parse().ok()?)));
-    let outline = editor
-        .views
-        .script
-        .views
-        .get(&owner)
-        .is_some_and(|view| view.layout.outline);
     egui::ScrollArea::vertical()
         .id_salt(("script-inspector", owner.slug()))
         .show(ui, |ui| match names.as_slice() {
@@ -54,7 +53,6 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                     }
                     _ => node_inspector(editor, ui, &doc, &name),
                 }
-                if outline {}
             }
             many => {
                 breadcrumb(
@@ -63,20 +61,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                 );
                 widgets::card_frame(true).show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    widgets::card_header(
-                        ui,
-                        "script",
-                        &format!("{} nodes", many.len()),
-                        "",
-                        |_| {},
-                    );
+                    widgets::card_title(ui, "script", &format!("{} nodes", many.len()));
                     for name in many {
                         if let Some(node) = doc.nodes().get(name) {
+                            let summary = nodes::summary(node, &editor.views.script.catalogue);
                             ui.horizontal(|ui| {
                                 ui.label(theme::mono(name).size(12.5));
-                                ui.label(
-                                    theme::muted(nodes::clip(&nodes::summary(node), 50)).size(12.5),
-                                );
+                                ui.label(theme::muted(widgets::clip(&summary, 50)).size(12.5));
                             });
                         }
                     }
@@ -94,7 +85,7 @@ fn breadcrumb(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
 }
 
-fn owner_short(editor: &Editor, doc: &Doc) -> String {
+fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
     let label = super::owner_label(editor, doc);
     match label.rsplit_once(" · object ") {
         Some((_, object)) => object.to_owned(),
@@ -102,30 +93,8 @@ fn owner_short(editor: &Editor, doc: &Doc) -> String {
     }
 }
 
-fn form_cx<'a>(
-    editor: &'a mut Editor,
-    root: &'a Value,
-    actions: &'a mut Vec<FormAction>,
-    doc: &Doc,
-) -> FormCx<'a> {
-    let Editor {
-        project,
-        form,
-        shapes,
-        ..
-    } = editor;
-    let project = project.as_ref().expect("a project");
-    let mut cx = FormCx::new(project, root, shapes, form, actions);
-    cx.speaker = match (&doc.kind, &doc.owner) {
-        (OwnerKind::Npc, ScriptOwner::Inline { key, .. }) => Some(key.clone()),
-        _ => None,
-    };
-    cx.owner_table = Some(doc.owner.table().to_owned());
-    cx
-}
-
-pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let _ = super::catalogue(editor);
+pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+    super::ensure_catalogue(editor);
     if super::run::inspector(editor, ui, doc) {
         return;
     }
@@ -136,11 +105,7 @@ pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-pub fn names_text(map: &Value) -> String {
-    names_of(map)
-}
-
-fn names_of(map: &Value) -> String {
+pub fn names_of(map: &Value) -> String {
     let names: Vec<&str> = map
         .as_object()
         .into_iter()
@@ -154,12 +119,12 @@ fn names_of(map: &Value) -> String {
     }
 }
 
-fn nodes_line(doc: &Doc) -> String {
+fn nodes_line(doc: &ScriptDoc) -> String {
     let count = doc.nodes().len();
     let dialogue = doc
         .nodes()
         .values()
-        .filter(|node| nodes::kind(node) == "dialogue")
+        .filter(|node| nodes::is_dialogue(node))
         .count();
     if dialogue > 0 {
         format!("{count} · {dialogue} dialogue")
@@ -168,12 +133,8 @@ fn nodes_line(doc: &Doc) -> String {
     }
 }
 
-fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let owner_key = super::owner_label(editor, doc)
-        .split(" · ")
-        .next()
-        .unwrap_or("")
-        .to_owned();
+fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+    let owner_key = doc.owner.row_label();
     breadcrumb(ui, &format!("{} › inline script", owner_short(editor, doc)));
     let mut open_owner = false;
     let mut make = false;
@@ -216,15 +177,15 @@ fn inline_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     owner_section(editor, ui, doc);
     action_buttons(editor, ui, doc);
     if open_owner {
-        editor.select(Selection::row(doc.owner.table(), doc.owner.key()));
-        editor.open_tab(Tab::for_row(doc.owner.table(), doc.owner.key()));
+        editor.select(RowSelection::row(doc.owner.table(), doc.owner.key()));
+        editor.open_tab(EditorTab::for_row(doc.owner.table(), doc.owner.key()));
     }
     if make {
         make_shared_dialog(editor, doc);
     }
 }
 
-fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let key = doc.owner.key().to_owned();
     breadcrumb(ui, &format!("script/{key}"));
     let shapes = editor.shapes.clone();
@@ -237,7 +198,7 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let mut actions = Vec::new();
     let mut make = false;
     let changed = {
-        let mut cx = form_cx(editor, root, &mut actions, doc);
+        let mut cx = doc.form_cx(editor, root, &mut actions);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -247,14 +208,12 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                         ui.close();
                     }
                 });
-                let mut changed = Changed::default();
+                let mut changed = FormChange::default();
                 widgets::kv(ui, "owner", |ui| {
                     let mut owner = script["owner"].clone();
-                    if crate::forms::value(ui, &mut cx, &owner_schema, &mut owner, "/owner")
-                        .is_some()
-                    {
+                    if forms::value(ui, &mut cx, &owner_schema, &mut owner, "/owner").is_some() {
                         script["owner"] = owner;
-                        changed = Changed::at("/owner");
+                        changed = FormChange::at("/owner");
                     }
                 });
                 let variables = script["variables"].as_object().map_or(0, |v| v.len());
@@ -272,7 +231,7 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 }
                 widgets::kv_text(ui, "locals", names_of(&script["locals"]));
                 let returns = doc.nodes().values().any(|node| {
-                    nodes::kind(node) == "return" && node.get("value").is_some_and(|v| !v.is_null())
+                    node.kind() == "return" && node.get("value").is_some_and(|v| !v.is_null())
                 });
                 widgets::kv_text(ui, "returns", if returns { "a value" } else { "nothing" });
                 widgets::kv_text(ui, "nodes", nodes_line(doc));
@@ -294,20 +253,17 @@ fn shared_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     widgets::section(ui, "Events");
     let mut go: Option<String> = None;
     let mut any = false;
     for (name, node) in doc.nodes() {
-        if nodes::kind(node) != "on" {
+        if !nodes::is_event(node) {
             continue;
         }
         any = true;
         let event = nodes::event_of(node).unwrap_or("?").to_owned();
-        let pieces = nodes::pieces(
-            node,
-            editor.views.script.catalogue.as_ref().expect("catalogue"),
-        );
+        let pieces = nodes::pieces(node, &editor.views.script.catalogue);
         let detail = pieces
             .first()
             .map(|line| line.iter().map(|p| p.text.clone()).collect::<String>())
@@ -342,13 +298,8 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let ScriptOwner::Inline {
-        table,
-        key,
-        pointer,
-    } = &doc.owner
-    else {
+fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+    let ScriptOwner::Inline { table, key, module } = &doc.owner else {
         return;
     };
     let Some(row) = editor.row_value(table, key) else {
@@ -366,44 +317,47 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         format!("{display}'s")
     };
     widgets::section(ui, &format!("{possessive} other scripts"));
-    let (holder, scripts_field) = match object_index_of(pointer) {
+    let (holder, scripts_field) = match module.object() {
         Some(index) => (row["modules"][index].clone(), "scripts"),
         None => (row.clone(), "modules"),
     };
     let mut open: Option<ScriptOwner> = None;
     let mut any = false;
-    for (index, module) in holder[scripts_field]
+    for (index, sibling) in holder[scripts_field]
         .as_array()
         .into_iter()
         .flatten()
         .enumerate()
     {
-        let tag = module.kind();
+        let tag = sibling.kind();
         if !tag.ends_with("_script") {
             continue;
         }
-        let module_pointer = match object_index_of(pointer) {
-            Some(object) => format!("/modules/{object}/scripts/{index}"),
-            None => format!("/modules/{index}"),
+        let sibling_module = match module.object() {
+            Some(object) => ScriptPath::ObjectScript {
+                object,
+                script: index,
+            },
+            None => ScriptPath::Module(index),
         };
-        if module_pointer == *pointer {
+        if sibling_module == *module {
             continue;
         }
         any = true;
         let (word, name, detail) = if tag == "shared_script" {
-            let script = module.text_or("script", "?").to_owned();
-            let values = module["values"]
+            let script = sibling.text_or("script", "?").to_owned();
+            let values = sibling["values"]
                 .as_object()
                 .map(|v| {
                     v.iter()
-                        .map(|(k, v)| format!("{k} {}", crate::condition::summary(v)))
+                        .map(|(k, v)| format!("{k} {}", condition::summary(v)))
                         .collect::<Vec<_>>()
                         .join(" · ")
                 })
                 .unwrap_or_default();
             ("shared", script, values)
         } else {
-            let count = module["nodes"].as_object().map_or(0, |n| n.len());
+            let count = sibling["nodes"].as_object().map_or(0, |n| n.len());
             ("inline", format!("{count} nodes"), String::new())
         };
         let response = ui
@@ -423,10 +377,14 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         {
             open = Some(if tag == "shared_script" {
                 ScriptOwner::Shared {
-                    key: module.text("script").to_owned(),
+                    key: sibling.text("script").to_owned(),
                 }
             } else {
-                ScriptOwner::inline(table, key, &module_pointer)
+                ScriptOwner::Inline {
+                    table: table.clone(),
+                    key: key.clone(),
+                    module: sibling_module,
+                }
             });
         }
     }
@@ -443,29 +401,16 @@ fn other_scripts_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         });
     }
     if let Some(owner) = open {
-        editor.open_tab(Tab::Script(owner));
+        editor.open_tab(EditorTab::Script(owner));
     }
 }
 
-fn object_index_of(pointer: &str) -> Option<usize> {
-    let rest = pointer.strip_prefix("/modules/")?;
-    let (module, tail) = rest.split_once('/')?;
-    tail.starts_with("scripts/")
-        .then(|| module.parse().ok())
-        .flatten()
-}
-
-fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let ScriptOwner::Inline {
-        table,
-        key,
-        pointer,
-    } = &doc.owner
-    else {
+fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+    let ScriptOwner::Inline { table, key, module } = &doc.owner else {
         return;
     };
     let mut open = false;
-    match object_index_of(pointer) {
+    match module.object() {
         Some(index) => {
             let row = editor.row_value(table, key).unwrap_or(Value::Null);
             let module = &row["modules"][index];
@@ -503,11 +448,11 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 return;
             };
             let placed: Vec<String> = content
-                .ids::<game::systems::area::AreaDef>()
+                .ids::<AreaDef>()
                 .filter(|area| {
-                    game::systems::area::placed(&content, *area)
+                    area::placed(&content, *area)
                         .iter()
-                        .any(|place| matches!(&place.module, game::systems::area::AreaModule::Resident(resident) if resident.npc.key(&content) == key))
+                        .any(|place| matches!(&place.module, AreaModule::Resident(resident) if resident.npc.key(&content) == key))
                 })
                 .map(|area| area.key(&content).to_owned())
                 .collect();
@@ -552,12 +497,12 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         None => {}
     }
     if open {
-        editor.select(Selection::row(table, key));
-        editor.open_tab(Tab::for_row(table, key));
+        editor.select(RowSelection::row(table, key));
+        editor.open_tab(EditorTab::for_row(table, key));
     }
 }
 
-fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let key = doc.owner.key().to_owned();
     let variables: Vec<(String, Value)> = doc.script["variables"]
         .as_object()
@@ -583,22 +528,23 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 .usages
                 .of_row("script", &key)
                 .iter()
-                .filter(|u| !u.pointer.contains("/nodes/"))
+                .filter(|u| ScriptRef::parse(&u.pointer).node.is_none())
                 .count()
         })
         .unwrap_or(0);
     let mut script = doc.script.clone();
     let mut actions = Vec::new();
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     {
-        let mut cx = form_cx(editor, root, &mut actions, doc);
+        let mut cx = doc.form_cx(editor, root, &mut actions);
         for (name, variable) in &variables {
-            let holes: Vec<String> = doc
+            let filled: Vec<String> = doc
                 .nodes()
                 .iter()
                 .filter(|(_, node)| {
-                    node.to_string()
-                        .contains(&format!("{{\"var\":\"{name}\"}}"))
+                    let mut names = Vec::new();
+                    holes(node, &mut names);
+                    names.contains(name)
                 })
                 .map(|(node_name, _)| node_name.clone())
                 .collect();
@@ -606,14 +552,14 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 ui.set_width(ui.available_width());
                 widgets::card_header(ui, "script", name, "", |ui| {
                     if ui.button("Remove the variable").clicked() {
-                        script["variables"].as_object_mut().map(|m| m.remove(name));
-                        changed = Changed::at("/variables");
+                        script["variables"].remove_field(name);
+                        changed = FormChange::at("/variables");
                         ui.close();
                     }
                 });
                 let path = format!("/variables/{name}");
                 let mut draft = variable.clone();
-                if crate::forms::object_without(
+                if forms::object_without(
                     ui,
                     &mut cx,
                     &variable_schema,
@@ -624,7 +570,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 .is_some()
                 {
                     script["variables"][name] = draft.clone();
-                    changed = Changed::at(&path);
+                    changed = FormChange::at(&path);
                 }
                 widgets::kv(ui, "default", |ui| match draft.get("default") {
                     Some(default) if !default.is_null() => {
@@ -633,7 +579,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                             .pointer("/properties/default")
                             .cloned()
                             .unwrap_or(Value::Null);
-                        if crate::forms::value(
+                        if forms::value(
                             ui,
                             &mut cx,
                             &schema,
@@ -643,7 +589,7 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                         .is_some()
                         {
                             script["variables"][name]["default"] = value;
-                            changed = Changed::at(&path);
+                            changed = FormChange::at(&path);
                         }
                         if ui
                             .add(
@@ -656,21 +602,21 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                             script["variables"][name]
                                 .as_object_mut()
                                 .map(|m| m.remove("default"));
-                            changed = Changed::at(&path);
+                            changed = FormChange::at(&path);
                         }
                     }
                     _ => {
                         ui.label(theme::muted("none").size(13.0));
                         if ui.button("+ Add default").clicked() {
                             script["variables"][name]["default"] = Value::Null;
-                            changed = Changed::at(&path);
+                            changed = FormChange::at(&path);
                         }
                     }
                 });
                 widgets::kv_text(
                     ui,
                     "holes",
-                    match holes.as_slice() {
+                    match filled.as_slice() {
                         [] => "none yet".to_owned(),
                         [one] => format!("1 · in {one}"),
                         many => format!("{} · in {}", many.len(), many.join(", ")),
@@ -701,42 +647,50 @@ fn variables_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+struct Caller {
+    owner: String,
+    kind: &'static str,
+    node: String,
+}
+
+fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let key = doc.owner.key().to_owned();
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let mut callers: Vec<(String, String, String)> = Vec::new();
-    for usage in project.usages.of_row("script", &key) {
-        let Some((table, row_key)) = row_of(&usage.file) else {
-            continue;
-        };
-        if let Some(at) = usage.pointer.find("/nodes/") {
-            let node = usage.pointer[at + 7..]
-                .split('/')
-                .next()
-                .unwrap_or("")
-                .to_owned();
-            let kind = if usage.pointer.contains("/scripts/") || usage.pointer.contains("/modules/")
-            {
-                "inline"
-            } else {
-                "shared"
-            };
-            callers.push((format!("{table}/{row_key}"), kind.to_owned(), node));
-        }
-    }
+    let callers: Vec<Caller> = project
+        .usages
+        .of_row("script", &key)
+        .iter()
+        .filter_map(|usage| {
+            let (table, row_key) = row_of(&usage.file)?;
+            let at = ScriptRef::parse(&usage.pointer);
+            Some(Caller {
+                owner: format!("{table}/{row_key}"),
+                kind: if at.module.is_some() {
+                    "inline"
+                } else {
+                    "shared"
+                },
+                node: at.node?,
+            })
+        })
+        .collect();
     if !callers.is_empty() {
         widgets::section_count(ui, "Run by", callers.len());
-        let mut open: Option<(String, String)> = None;
-        for (owner, kind, node) in &callers {
+        let mut open: Option<String> = None;
+        for caller in &callers {
             let response = ui
                 .horizontal(|ui| {
                     widgets::badge(ui, "script");
-                    ui.label(theme::strong(owner).monospace().size(13.0));
-                    ui.label(theme::muted(format!("· {kind}")).monospace().size(12.5));
+                    ui.label(theme::strong(&caller.owner).monospace().size(13.0));
                     ui.label(
-                        theme::muted(format!("from run · {node}"))
+                        theme::muted(format!("· {}", caller.kind))
+                            .monospace()
+                            .size(12.5),
+                    );
+                    ui.label(
+                        theme::muted(format!("from run · {}", caller.node))
                             .monospace()
                             .size(12.5),
                     );
@@ -746,23 +700,21 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
             if response
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .clicked()
-                && let Some((table, row_key)) = owner.split_once('/')
             {
-                open = Some((table.to_owned(), row_key.to_owned()));
+                open = Some(caller.owner.clone());
             }
         }
-        if let Some((table, row_key)) = open {
-            editor.select(Selection::row(&table, &row_key));
-            editor.open_tab(Tab::for_row(&table, &row_key));
+        if let Some((table, row_key)) = open.as_deref().and_then(|owner| owner.split_once('/')) {
+            editor.select(RowSelection::row(table, row_key));
+            editor.open_tab(EditorTab::for_row(table, row_key));
         }
     }
-    let speakers: Vec<String> = doc
+    let speakers: BTreeSet<String> = doc
         .nodes()
         .values()
         .flat_map(|node| node["lines"].as_array().cloned().unwrap_or_default())
-        .filter_map(|line| line["by"]["npc"].as_str().map(str::to_owned))
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
+        .filter_map(|line| LineSpeaker::of(&line["by"]))
+        .filter_map(|speaker| speaker.npc().map(str::to_owned))
         .collect();
     if !speakers.is_empty() {
         widgets::section(ui, "Speaks for");
@@ -772,8 +724,8 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 ui.label(theme::strong(format!("npc/{npc}")).monospace().size(13.0));
                 let through = callers
                     .iter()
-                    .find(|(owner, _, _)| owner == &format!("npc/{npc}"))
-                    .map(|(_, kind, _)| format!("through its {kind} script"));
+                    .find(|caller| caller.owner == format!("npc/{npc}"))
+                    .map(|caller| format!("through its {} script", caller.kind));
                 ui.label(
                     theme::muted(through.unwrap_or_else(|| "in its lines".to_owned()))
                         .monospace()
@@ -784,13 +736,12 @@ fn run_by_section(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     ui.add_space(8.0);
     let outline = editor
         .views
         .script
-        .views
-        .get(&doc.owner)
+        .view(&doc.owner)
         .is_some_and(|view| view.layout.outline);
     let mut fire = false;
     let mut toggle_outline = false;
@@ -816,12 +767,11 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         }
     });
     if fire {
-        editor.panels.bottom = crate::app::BottomTab::Run;
+        editor.panels.bottom = BottomTab::Run;
         editor.views.script.fire = Some(doc.owner.clone());
     }
-    if toggle_outline && let Some(view) = editor.views.script.views.get_mut(&doc.owner) {
-        view.layout.outline = !view.layout.outline;
-        view.layout_dirty = true;
+    if toggle_outline {
+        editor.views.script.view_mut(&doc.owner).toggle_outline();
     }
     if make {
         if doc.is_shared() {
@@ -832,17 +782,17 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     }
 }
 
-fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
+fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str) {
     let Some(node) = doc.nodes().get(name).cloned() else {
         return;
     };
-    let kind = nodes::kind(&node).to_owned();
+    let kind = node.kind().to_owned();
     breadcrumb(ui, &format!("{} › {name}", owner_short(editor, doc)));
     let shapes = editor.shapes.clone();
     let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
-    let (outs, ins, system, blurb) = {
-        let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
+    let (outs, ins, badge_kind, blurb) = {
+        let catalogue = &editor.views.script.catalogue;
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
             .into_iter()
             .map(|(from, field)| {
@@ -854,8 +804,8 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
         (
             nodes::ports(&node, catalogue),
             ins,
-            entry.map(|e| e.system).unwrap_or(""),
-            entry.map(|e| e.blurb).unwrap_or(""),
+            entry.map_or("script", nodes::NodeEntry::badge),
+            entry.map_or("", |e| e.blurb),
         )
     };
     let mut draft = node.clone();
@@ -864,14 +814,13 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     let mut rename = false;
     let mut delete = false;
     let mut duplicate = false;
-    let badge_kind = badge_of(&kind, system);
     let title = super::graph::card_title(name, &node);
     let changed = {
-        let mut cx = form_cx(editor, root, &mut actions, doc);
+        let mut cx = doc.form_cx(editor, root, &mut actions);
         widgets::card_frame(true)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                widgets::card_header(ui, &badge_kind, &title, "", |ui| {
+                widgets::card_header(ui, badge_kind, &title, "", |ui| {
                     if ui.button("Rename…  F2").clicked() {
                         rename = true;
                         ui.close();
@@ -885,20 +834,22 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
                         ui.close();
                     }
                 });
-                let mut changed = Changed::default();
-                match kind.as_str() {
-                    "on" => changed = on_form(ui, &mut cx, root, &mut draft, &path),
-                    "dialogue" => {}
+                let mut changed = FormChange::default();
+                match nodes::FlowKind::of(&draft) {
+                    Some(nodes::FlowKind::On) => {
+                        changed = on_form(ui, &mut cx, root, &mut draft, &path);
+                    }
+                    Some(nodes::FlowKind::Dialogue) => {}
                     _ => {
                         if let Some((schema, hidden)) = nodes::form_fields(root, &draft) {
                             let hidden: Vec<&str> = hidden.iter().map(String::as_str).collect();
-                            changed = crate::forms::object_without(
+                            changed = forms::object_without(
                                 ui, &mut cx, schema, &mut draft, &path, &hidden,
                             );
                         }
                     }
                 }
-                if kind != "dialogue" {
+                if !nodes::is_dialogue(&node) {
                     arrows_rows(ui, &mut cx, &outs, &kind);
                 }
                 changed
@@ -915,11 +866,11 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
         }
         act(editor, action, doc);
     }
-    if kind == "dialogue" {
+    if nodes::is_dialogue(&node) {
         let mut draft_dialogue = draft.clone();
         let mut dialogue_actions = Vec::new();
         let dialogue_changed = {
-            let mut cx = form_cx(editor, root, &mut dialogue_actions, doc);
+            let mut cx = doc.form_cx(editor, root, &mut dialogue_actions);
             dialogue_form(
                 ui,
                 &mut cx,
@@ -973,14 +924,20 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
         select_nodes(editor, doc, &[target]);
         return;
     }
-    if rename && let Some(view) = editor.views.script.views.get_mut(&doc.owner) {
-        view.rename = Some((name.to_owned(), name.to_owned()));
+    if rename {
+        editor
+            .dialogs
+            .push(ModalDialog::RenameNode(RenameNodeDialog {
+                owner: doc.owner.clone(),
+                old: name.to_owned(),
+                draft: name.to_owned(),
+            }));
     }
     if duplicate {
-        super::act_now(
+        super::act(
             editor,
             doc,
-            super::graph::GraphAction::Duplicate(name.to_owned()),
+            super::graph::ScriptGraphAction::Duplicate(name.to_owned()),
         );
     }
     if delete {
@@ -994,27 +951,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str) {
     }
 }
 
-fn badge_of(kind: &str, system: &str) -> String {
-    match kind {
-        "on" | "if" | "random" | "repeat" | "wait" | "set" | "run" | "return" | "dialogue" => {
-            "script".to_owned()
-        }
-        _ => match system {
-            "item" => "item".to_owned(),
-            "memory" => "quest".to_owned(),
-            "area" => "object".to_owned(),
-            "npc body" | "npc" => "npc".to_owned(),
-            "quest" => "quest".to_owned(),
-            "shop" => "shop".to_owned(),
-            "audio" => "sfx".to_owned(),
-            "notification" | "chat" => "npc".to_owned(),
-            "stat" | "job" => "respawn".to_owned(),
-            other => other.to_owned(),
-        },
-    }
-}
-
-fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::Port], kind: &str) {
+fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::NodePort], kind: &str) {
     let mut go: Option<String> = None;
     for port in outs {
         widgets::kv(ui, &port.label, |ui| match &port.target {
@@ -1032,7 +969,7 @@ fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::Port], kind: &str) {
                 }
             }
             None => {
-                let meaning = free_arrow_meaning(kind, &port.label);
+                let meaning = nodes::arrow_meaning(kind, &port.label);
                 ui.add(egui::Label::new(theme::muted(meaning).size(13.0)).wrap());
             }
         });
@@ -1045,20 +982,6 @@ fn arrows_rows(ui: &mut Ui, cx: &mut FormCx, outs: &[nodes::Port], kind: &str) {
     }
 }
 
-fn free_arrow_meaning(kind: &str, label: &str) -> String {
-    match (kind, label) {
-        ("items", "refused") => "no arrow: the flow ends and the player is told why".to_owned(),
-        ("walk_to", "arrived") => "there".to_owned(),
-        ("walk_to", "blocked") => "no way there".to_owned(),
-        (_, "interrupted") => "another flow took the body".to_owned(),
-        ("wait", "next") => "ends the pass".to_owned(),
-        ("turn_in", "refused") => "objectives unmet: the flow ends".to_owned(),
-        ("turn_in", "cancelled") => "the card was closed: the flow ends".to_owned(),
-        (_, "left") => "the subject walked away: the flow ends".to_owned(),
-        _ => "no arrow · ends the flow".to_owned(),
-    }
-}
-
 struct Shown<'a> {
     name: &'a str,
     node: &'a Value,
@@ -1067,7 +990,7 @@ struct Shown<'a> {
     blurb: &'a str,
 }
 
-fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &Doc, shown: Shown) {
+fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, shown: Shown) {
     let Shown {
         name,
         node,
@@ -1104,7 +1027,7 @@ fn node_extras(editor: &mut Editor, ui: &mut Ui, doc: &Doc, shown: Shown) {
     }
 }
 
-fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
+fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, memory: &str) {
     let Some(mut row) = editor.row_value("memory", memory) else {
         return;
     };
@@ -1112,7 +1035,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
     let schema = shapes.shape_of("memory");
     let mut actions = Vec::new();
     let changed = {
-        let mut cx = form_cx(editor, schema, &mut actions, doc);
+        let mut cx = doc.form_cx(editor, schema, &mut actions);
         widgets::card_frame(false)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -1125,7 +1048,7 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
                         ui.close();
                     }
                 });
-                crate::forms::object_without(ui, &mut cx, schema, &mut row, "", &["modules"])
+                forms::object_without(ui, &mut cx, schema, &mut row, "", &["modules"])
             })
             .inner
     };
@@ -1133,13 +1056,13 @@ fn memory_row_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, memory: &str) {
         act(editor, action, doc);
     }
     if changed.is_some() {
-        let mut edit = Edit::new(format!("Edit memory/{memory}"));
+        let mut edit = ContentEdit::new(format!("Edit memory/{memory}"));
         edit.write_json(row_file("memory", memory), &row);
         editor.apply(edit);
     }
 }
 
-fn keeps_cards(ui: &mut Ui, doc: &Doc) {
+fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
     let owner = doc.owner.key().to_owned();
     for (title, field, sentence) in [
         ("state", "state", format!("{owner}'s, shared by its flows")),
@@ -1147,14 +1070,14 @@ fn keeps_cards(ui: &mut Ui, doc: &Doc) {
     ] {
         widgets::card_frame(false).show(ui, |ui| {
             ui.set_width(ui.available_width());
-            widgets::card_header(ui, "script", title, "", |_| {});
+            widgets::card_title(ui, "script", title);
             let names = names_of(&doc.script[field]);
             ui.label(theme::muted(format!("{names} · {sentence}")).size(13.0));
         });
     }
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "script", "variables", "", |_| {});
+        widgets::card_title(ui, "script", "variables");
         let text = if doc.is_shared() {
             format!(
                 "{} · each owner's values",
@@ -1167,8 +1090,8 @@ fn keeps_cards(ui: &mut Ui, doc: &Doc) {
     });
 }
 
-fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &Value) {
-    let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
+fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, node: &Value) {
+    let catalogue = &editor.views.script.catalogue;
     let at_most = node["at_most"].as_f64().unwrap_or(1.0);
     let mut body: Vec<String> = Vec::new();
     let mut queue: Vec<String> = node["each"]
@@ -1191,7 +1114,7 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &V
     let waits: Vec<f64> = body
         .iter()
         .filter_map(|n| doc.nodes().get(n))
-        .filter(|n| nodes::kind(n) == "wait")
+        .filter(|n| n.kind() == "wait")
         .map(|n| {
             n["at_most"]
                 .as_f64()
@@ -1202,7 +1125,7 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &V
     let pauses = body
         .iter()
         .filter_map(|n| doc.nodes().get(n))
-        .any(|n| catalogue.entry(nodes::kind(n)).is_some_and(|e| e.pauses));
+        .any(|n| catalogue.entry(n.kind()).is_some_and(|e| e.pauses));
     let steps = if pauses {
         body.len() + 1
     } else {
@@ -1228,8 +1151,8 @@ fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, node: &V
     });
 }
 
-fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &str) -> Changed {
-    let mut changed = Changed::default();
+fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &str) -> FormChange {
+    let mut changed = FormChange::default();
     let events = nodes::event_variants(root);
     let current = nodes::event_of(node).unwrap_or("").to_owned();
     let mut picked = current.clone();
@@ -1250,17 +1173,10 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
         if let Some(next) = next {
             node["next"] = next;
         }
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if let Some(schema) = nodes::event_variant(root, nodes::event_of(node).unwrap_or("")) {
-        changed = changed.or(crate::forms::object_without(
-            ui,
-            cx,
-            schema,
-            node,
-            path,
-            &["event"],
-        ));
+        changed |= forms::object_without(ui, cx, schema, node, path, &["event"]);
     }
     changed
 }
@@ -1271,10 +1187,10 @@ fn dialogue_form(
     root: &Value,
     node: &mut Value,
     path: &str,
-    doc: &Doc,
+    doc: &ScriptDoc,
     label: &mut String,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     let Some(schema) = nodes::variant_schema(root, "dialogue") else {
         return changed;
     };
@@ -1313,20 +1229,15 @@ fn dialogue_form(
                     ui.close();
                 }
             });
-            changed = std::mem::take(&mut changed).or(speaker_rows(
+            changed |= speaker_rows(
                 ui,
                 cx,
                 &by_schema,
                 &mut line["by"],
                 &format!("{line_path}/by"),
                 doc,
-            ));
-            changed = std::mem::take(&mut changed).or(crate::spans::line_field(
-                ui,
-                cx,
-                &mut line["text"],
-                &format!("{line_path}/text"),
-            ));
+            );
+            changed |= spans::line_field(ui, cx, &mut line["text"], &format!("{line_path}/text"));
         });
     }
     if let Some(index) = remove_line
@@ -1334,25 +1245,25 @@ fn dialogue_form(
         && lines.len() > 1
     {
         lines.remove(index);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
         *label = format!("Remove a line in {}", doc.owner.title());
     }
     if let Some((a, b)) = swap_line
         && let Some(lines) = node["lines"].as_array_mut()
     {
         lines.swap(a, b);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if ui
         .button("+ line")
         .on_hover_text("Enter on the card")
         .clicked()
     {
-        let speaker = super::default_speaker(doc);
+        let speaker = doc.default_speaker().json();
         if let Some(lines) = node["lines"].as_array_mut() {
             lines.push(serde_json::json!({ "by": speaker, "text": [""] }));
         }
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
         *label = format!("Add a line in {}", doc.owner.title());
     }
     widgets::section(ui, "Choices");
@@ -1360,50 +1271,38 @@ fn dialogue_form(
     let count = node["choices"].as_array().map_or(0, Vec::len);
     let mut menu = ChoiceMenu::default();
     for index in 0..count {
-        let choice_path = format!("{path}/choices/{index}");
-        changed = std::mem::take(&mut changed).or(choice_card(
-            ui,
-            cx,
-            &choice_schema,
-            &mut node["choices"][index],
-            &choice_path,
+        let at = ChoiceAt {
+            schema: &choice_schema,
+            path,
             index,
             count,
             doc,
-            &mut menu,
-            &mut go,
-        ));
+        };
+        let outcome = choice_card(ui, cx, &mut node["choices"][index], &at);
+        changed |= outcome.changed;
+        menu = menu.or(outcome.menu);
+        go = go.or(outcome.go);
     }
-    let remove_choice = menu.remove;
-    let swap_choice = menu.swap;
-    if let Some(index) = remove_choice
+    if let Some(index) = menu.remove
         && let Some(choices) = node["choices"].as_array_mut()
     {
         choices.remove(index);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
         *label = format!("Remove a choice in {}", doc.owner.title());
     }
-    if let Some((a, b)) = swap_choice
+    if let Some((a, b)) = menu.swap
         && let Some(choices) = node["choices"].as_array_mut()
     {
         choices.swap(a, b);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if ui
         .button("+ choice")
         .on_hover_text("Ctrl Enter on the card")
         .clicked()
     {
-        if node.get("choices").is_none_or(Value::is_null) {
-            node["choices"] = Value::Array(Vec::new());
-        }
-        if let Some(map) = node.as_object_mut() {
-            map.remove("next");
-        }
-        if let Some(choices) = node["choices"].as_array_mut() {
-            choices.push(serde_json::json!({ "label": ["…"] }));
-        }
-        changed = Changed::at(path);
+        super::add_choice(node);
+        changed = FormChange::at(path);
         *label = format!("Add a choice in {}", doc.owner.title());
     }
     if let Some(target) = go {
@@ -1421,37 +1320,59 @@ struct ChoiceMenu {
     swap: Option<(usize, usize)>,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn choice_card(
-    ui: &mut Ui,
-    cx: &mut FormCx,
-    choice_schema: &Value,
-    choice: &mut Value,
-    choice_path: &str,
+impl ChoiceMenu {
+    fn or(self, other: ChoiceMenu) -> ChoiceMenu {
+        ChoiceMenu {
+            remove: self.remove.or(other.remove),
+            swap: self.swap.or(other.swap),
+        }
+    }
+}
+
+struct ChoiceAt<'a> {
+    schema: &'a Value,
+    path: &'a str,
     index: usize,
     count: usize,
-    doc: &Doc,
-    menu: &mut ChoiceMenu,
-    go: &mut Option<String>,
-) -> Changed {
-    let mut changed = Changed::default();
+    doc: &'a ScriptDoc,
+}
+
+#[derive(Default)]
+struct ChoiceOutcome {
+    changed: FormChange,
+    menu: ChoiceMenu,
+    go: Option<String>,
+}
+
+fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) -> ChoiceOutcome {
+    let ChoiceAt {
+        schema: choice_schema,
+        path,
+        index,
+        count,
+        doc,
+    } = *at;
+    let choice_path = &format!("{path}/choices/{index}");
+    let mut changed = FormChange::default();
+    let mut menu = ChoiceMenu::default();
+    let mut go: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(theme::faint("≡"));
             widgets::badge(ui, "script");
             let id = ui.id().with(choice_path).with("label");
-            let edit = crate::spans::line(
+            let edit = spans::line(
                 ui,
                 &mut cx.state.drafts,
                 &choice["label"],
                 id,
-                egui::FontId::new(13.5, egui::FontFamily::Name("medium".into())),
+                egui::FontId::new(13.5, theme::medium()),
                 "the choice",
             );
             if let Some(spans) = edit.spans {
                 choice["label"] = spans;
-                changed = Changed::at(choice_path);
+                changed = FormChange::at(choice_path);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.menu_button(theme::faint("…"), |ui| {
@@ -1478,7 +1399,7 @@ fn choice_card(
                     .unwrap_or(serde_json::json!({ "x-condition": true }));
                 let mut draft = requires.clone();
                 ui.vertical(|ui| {
-                    if crate::condition::edit(
+                    if condition::edit(
                         ui,
                         cx,
                         &schema,
@@ -1488,7 +1409,7 @@ fn choice_card(
                     .is_some()
                     {
                         choice["requires"] = draft;
-                        changed = Changed::at(choice_path);
+                        changed = FormChange::at(choice_path);
                     }
                     if ui
                         .add(
@@ -1497,8 +1418,8 @@ fn choice_card(
                         )
                         .clicked()
                     {
-                        choice.as_object_mut().map(|m| m.remove("requires"));
-                        changed = Changed::at(choice_path);
+                        choice.remove_field("requires");
+                        changed = FormChange::at(choice_path);
                     }
                 });
             }
@@ -1512,7 +1433,7 @@ fn choice_card(
                     .clicked()
                 {
                     choice["requires"] = Value::Bool(true);
-                    changed = Changed::at(choice_path);
+                    changed = FormChange::at(choice_path);
                 }
             }
         });
@@ -1545,12 +1466,12 @@ fn choice_card(
             });
             if touched {
                 if reveal.is_empty() {
-                    choice.as_object_mut().map(|m| m.remove("reveal"));
+                    choice.remove_field("reveal");
                 } else {
                     choice["reveal"] =
                         Value::Array(reveal.into_iter().map(Value::String).collect());
                 }
-                changed = Changed::at(choice_path);
+                changed = FormChange::at(choice_path);
             }
         });
         widgets::kv(ui, "warning", |ui| {
@@ -1565,17 +1486,15 @@ fn choice_card(
                     .clicked()
                 {
                     choice["warn"] = Value::String(String::new());
-                    changed = Changed::at(choice_path);
+                    changed = FormChange::at(choice_path);
                 }
-            } else if crate::forms::text(ui, cx, &mut warn, &format!("{choice_path}/warn"))
-                .is_some()
-            {
+            } else if forms::text(ui, cx, &mut warn, &format!("{choice_path}/warn")).is_some() {
                 if warn.as_str().is_some_and(str::is_empty) {
-                    choice.as_object_mut().map(|m| m.remove("warn"));
+                    choice.remove_field("warn");
                 } else {
                     choice["warn"] = warn;
                 }
-                changed = Changed::at(choice_path);
+                changed = FormChange::at(choice_path);
             }
         });
         widgets::kv(ui, "arrow", |ui| match choice["to"].as_str() {
@@ -1594,7 +1513,7 @@ fn choice_card(
                     .on_hover_cursor(egui::CursorIcon::PointingHand)
                     .clicked()
                 {
-                    *go = Some(target);
+                    go = Some(target);
                 }
             }
             None => {
@@ -1602,10 +1521,10 @@ fn choice_card(
             }
         });
     });
-    changed
+    ChoiceOutcome { changed, menu, go }
 }
 
-fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, index: usize) {
+fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, index: usize) {
     let Some(node) = doc.nodes().get(name).cloned() else {
         return;
     };
@@ -1614,13 +1533,13 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
         node_inspector(editor, ui, doc, name);
         return;
     }
-    let label_text = nodes::plain_text(&node["choices"][index]["label"]);
+    let label_text = spans::plain(&node["choices"][index]["label"]);
     breadcrumb(
         ui,
         &format!(
             "{} › {name} › {}",
             owner_short(editor, doc),
-            nodes::clip(&label_text, 40)
+            widgets::clip(&label_text, 40)
         ),
     );
     let shapes = editor.shapes.clone();
@@ -1631,23 +1550,22 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
         .unwrap_or(Value::Null);
     let mut draft = node.clone();
     let mut actions = Vec::new();
-    let mut menu = ChoiceMenu::default();
-    let mut go: Option<String> = None;
-    let mut changed = {
-        let mut cx = form_cx(editor, root, &mut actions, doc);
-        choice_card(
-            ui,
-            &mut cx,
-            &choice_schema,
-            &mut draft["choices"][index],
-            &format!("{path}/choices/{index}"),
+    let outcome = {
+        let mut cx = doc.form_cx(editor, root, &mut actions);
+        let at = ChoiceAt {
+            schema: &choice_schema,
+            path: &path,
             index,
             count,
             doc,
-            &mut menu,
-            &mut go,
-        )
+        };
+        choice_card(ui, &mut cx, &mut draft["choices"][index], &at)
     };
+    let ChoiceOutcome {
+        mut changed,
+        menu,
+        go,
+    } = outcome;
     for action in actions {
         act(editor, action, doc);
     }
@@ -1656,14 +1574,14 @@ fn choice_inspector(editor: &mut Editor, ui: &mut Ui, doc: &Doc, name: &str, ind
         && let Some(choices) = draft["choices"].as_array_mut()
     {
         choices.remove(removed);
-        changed = Changed::at(&path);
+        changed = FormChange::at(&path);
         label = format!("Remove a choice in {}", doc.owner.title());
     }
     if let Some((a, b)) = menu.swap
         && let Some(choices) = draft["choices"].as_array_mut()
     {
         choices.swap(a, b);
-        changed = Changed::at(&path);
+        changed = FormChange::at(&path);
     }
     if let Some(target) = go {
         select_nodes(editor, doc, &[target]);
@@ -1682,102 +1600,95 @@ fn speaker_rows(
     schema: &Value,
     by: &mut Value,
     path: &str,
-    doc: &Doc,
-) -> Changed {
-    let mut changed = Changed::default();
-    let current = by.kind_or("narrator").to_owned();
-    let mut picked = current.clone();
-    let options: Vec<&str> = if doc.kind == OwnerKind::Object {
-        vec!["npc", "object", "narrator"]
-    } else {
-        vec!["npc", "narrator"]
-    };
+    doc: &ScriptDoc,
+) -> FormChange {
+    let mut changed = FormChange::default();
+    let current = LineSpeaker::of(by).unwrap_or(LineSpeaker::Narrator);
+    let mut picked = current.kind();
     widgets::kv(ui, "by", |ui| {
         egui::ComboBox::from_id_salt(ui.id().with(path).with("speaker"))
-            .selected_text(theme::mono(&current).size(13.0))
+            .selected_text(theme::mono(current.kind()).size(13.0))
             .width(ui.available_width())
             .show_ui(ui, |ui| {
-                for option in &options {
-                    ui.selectable_value(&mut picked, (*option).to_owned(), *option);
+                for option in LineSpeaker::options(doc.kind) {
+                    ui.selectable_value(&mut picked, option, *option);
                 }
             });
     });
-    if picked != current {
-        *by = match picked.as_str() {
-            "npc" => {
-                serde_json::json!({ "type": "npc", "npc": cx.speaker.clone().unwrap_or_default() })
-            }
-            "object" => serde_json::json!({ "type": "object" }),
-            _ => serde_json::json!({ "type": "narrator" }),
-        };
-        changed = Changed::at(path);
+    if picked != current.kind() {
+        let npc = cx.speaker.clone().unwrap_or_default();
+        *by = LineSpeaker::named(picked, &npc).json();
+        changed = FormChange::at(path);
     }
-    if by["type"] == "npc" {
-        let mut npc = by["npc"].as_str().unwrap_or_default().to_owned();
-        widgets::kv(ui, "└ npc", |ui| {
-            if crate::picker::row(ui, cx, "npc", &mut npc, &format!("{path}/npc")) {
-                by["npc"] = Value::String(npc.clone());
-                changed = Changed::at(path);
-            }
-        });
-        cx.speaker = Some(npc.clone());
-        let face_schema = schema
-            .get("oneOf")
-            .and_then(Value::as_array)
-            .and_then(|alts| {
-                alts.iter().find(|alt| {
-                    alt.pointer("/properties/type/const")
-                        .and_then(Value::as_str)
-                        == Some("npc")
-                })
+    let LineSpeaker::Npc { mut npc, face } = LineSpeaker::of(by).unwrap_or(LineSpeaker::Narrator)
+    else {
+        return changed;
+    };
+    widgets::kv(ui, "└ npc", |ui| {
+        if picker::row(ui, cx, "npc", &mut npc, &format!("{path}/npc")) {
+            by["npc"] = Value::String(npc.clone());
+            changed = FormChange::at(path);
+        }
+    });
+    cx.speaker = Some(npc.clone());
+    let face_schema = schema
+        .get("oneOf")
+        .and_then(Value::as_array)
+        .and_then(|alts| {
+            alts.iter().find(|alt| {
+                alt.pointer("/properties/type/const")
+                    .and_then(Value::as_str)
+                    == Some("npc")
             })
-            .and_then(|alt| alt.pointer("/properties/face"))
-            .cloned()
-            .unwrap_or(serde_json::json!({ "x-face": true, "type": ["string", "null"] }));
-        let mut face = by.get("face").cloned().unwrap_or(Value::Null);
-        widgets::kv(ui, "└ face", |ui| {
-            let file = nodes::bust_file(cx.files, &npc, face.as_str());
-            let ctx = ui.ctx().clone();
-            if let Some(file) = file
-                && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &file)
-            {
-                let [w, h] = [thumb.size[0] as f32, thumb.size[1] as f32];
-                let uv = if h >= w {
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, w / h))
-                } else {
-                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(h / w, 1.0))
-                };
-                ui.add(
-                    egui::Image::from_texture((thumb.texture.id(), egui::vec2(26.0, 26.0)))
-                        .uv(uv)
-                        .corner_radius(4.0),
-                );
+        })
+        .and_then(|alt| alt.pointer("/properties/face"))
+        .cloned()
+        .unwrap_or(serde_json::json!({ "x-face": true, "type": ["string", "null"] }));
+    let mut face_value = face.clone().map_or(Value::Null, Value::String);
+    widgets::kv(ui, "└ face", |ui| {
+        let speaker = LineSpeaker::Npc {
+            npc: npc.clone(),
+            face,
+        };
+        let ctx = ui.ctx().clone();
+        if let Some(file) = nodes::bust_file(cx.content, &speaker)
+            && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &file)
+        {
+            ui.add(
+                egui::Image::from_texture((thumb.texture.id(), egui::vec2(26.0, 26.0)))
+                    .uv(thumbs::square_uv(thumb.size))
+                    .corner_radius(4.0),
+            );
+        }
+        if forms::value(
+            ui,
+            cx,
+            &face_schema,
+            &mut face_value,
+            &format!("{path}/face"),
+        )
+        .is_some()
+        {
+            match face_value.as_str().filter(|face| !face.is_empty()) {
+                Some(face) => by["face"] = Value::String(face.to_owned()),
+                None => by.remove_field("face"),
             }
-            if crate::forms::value(ui, cx, &face_schema, &mut face, &format!("{path}/face"))
-                .is_some()
-            {
-                if face.is_null() || face.as_str() == Some("") {
-                    by.as_object_mut().map(|map| map.remove("face"));
-                } else {
-                    by["face"] = face.clone();
-                }
-                changed = Changed::at(path);
-            }
-        });
-    }
+            changed = FormChange::at(path);
+        }
+    });
     changed
 }
 
-fn act(editor: &mut Editor, action: FormAction, doc: &Doc) {
-    crate::ui::inspector::act(editor, action, doc.owner.table(), doc.owner.key());
+fn act(editor: &mut Editor, action: FormAction, doc: &ScriptDoc) {
+    inspector::act(editor, action, doc.owner.table(), doc.owner.key());
 }
 
 #[derive(Clone, Debug)]
-pub struct Constant {
+pub struct ScriptConstant {
     pub node: String,
     pub field: String,
     pub value: Value,
-    pub ty: &'static str,
+    pub ty: VariableType,
     pub table: Option<String>,
     pub name: String,
     pub ticked: bool,
@@ -1787,17 +1698,23 @@ pub struct MakeSharedDialog {
     pub owner: ScriptOwner,
     pub key: String,
     pub kind: String,
-    pub constants: Vec<Constant>,
+    pub constants: Vec<ScriptConstant>,
     pub error: Option<String>,
+}
+
+pub struct InlineScriptTarget {
+    pub table: String,
+    pub key: String,
+    pub module: ScriptPath,
 }
 
 pub struct MakeInlineDialog {
     pub key: String,
-    pub users: Vec<(String, String, String)>,
+    pub users: Vec<InlineScriptTarget>,
     pub picked: usize,
 }
 
-pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
+pub fn make_shared_dialog(editor: &mut Editor, doc: &ScriptDoc) {
     if doc.is_shared() {
         return;
     }
@@ -1806,8 +1723,7 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
     let mut constants = Vec::new();
     let mut taken: BTreeMap<String, usize> = BTreeMap::new();
     for (name, node) in doc.nodes() {
-        let kind = nodes::kind(node);
-        let Some(schema) = nodes::variant_schema(root, kind) else {
+        let Some(schema) = nodes::variant_schema(root, node.kind()) else {
             continue;
         };
         for (field, field_schema) in schema::properties(schema) {
@@ -1818,15 +1734,16 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
                 continue;
             };
             let (ty, table) = match (schema::marker(field_schema), value) {
-                (Some("x-table"), Value::String(_)) => {
-                    ("row", schema::table_of(field_schema).map(str::to_owned))
-                }
-                (Some("x-place"), Value::Object(_)) => ("place", None),
-                (None, Value::Number(n)) if n.is_i64() => ("integer", None),
-                (None, Value::Number(_)) => ("number", None),
-                (None, Value::Bool(_)) => ("boolean", None),
+                (Some("x-table"), Value::String(_)) => (
+                    VariableType::Row,
+                    schema::table_of(field_schema).map(str::to_owned),
+                ),
+                (Some("x-place"), Value::Object(_)) => (VariableType::Place, None),
+                (None, Value::Number(n)) if n.is_i64() => (VariableType::Integer, None),
+                (None, Value::Number(_)) => (VariableType::Number, None),
+                (None, Value::Bool(_)) => (VariableType::Boolean, None),
                 (None, Value::String(_)) if schema::type_names(field_schema) == vec!["string"] => {
-                    ("text", None)
+                    (VariableType::Text, None)
                 }
                 _ => continue,
             };
@@ -1838,7 +1755,7 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
             } else {
                 format!("{name}_{field}")
             };
-            constants.push(Constant {
+            constants.push(ScriptConstant {
                 node: name.clone(),
                 field: field.clone(),
                 value: value.clone(),
@@ -1852,15 +1769,17 @@ pub fn make_shared_dialog(editor: &mut Editor, doc: &Doc) {
     let files = editor.project.as_ref().map(|p| &p.files);
     let key = files.map_or_else(
         || doc.owner.key().to_owned(),
-        |files| crate::rows::free_key(files, "script", doc.owner.key()),
+        |files| rows::free_key(files, "script", doc.owner.key()),
     );
-    editor.dialogs.push(Dialog::MakeShared(MakeSharedDialog {
-        owner: doc.owner.clone(),
-        key,
-        kind: doc.kind.name().to_owned(),
-        constants,
-        error: None,
-    }));
+    editor
+        .dialogs
+        .push(ModalDialog::MakeShared(MakeSharedDialog {
+            owner: doc.owner.clone(),
+            key,
+            kind: doc.kind.name().to_owned(),
+            constants,
+            error: None,
+        }));
 }
 
 pub fn make_shared_body(
@@ -1869,12 +1788,7 @@ pub fn make_shared_body(
     mut dialog: MakeSharedDialog,
 ) -> Option<MakeSharedDialog> {
     let mut outcome = None;
-    let (enter, escape) = ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
-    });
+    let (enter, escape) = dialogs::keys(ctx);
     let owner = dialog
         .owner
         .title()
@@ -1882,16 +1796,16 @@ pub fn make_shared_body(
         .next()
         .unwrap_or("")
         .to_owned();
-    let count = Doc::load(editor, &dialog.owner).map_or(0, |doc| doc.nodes().len());
+    let count = ScriptDoc::load(editor, &dialog.owner).map_or(0, |doc| doc.nodes().len());
     let problem = editor
         .project
         .as_ref()
-        .and_then(|project| crate::rows::key_problem(&project.files, "script", &dialog.key));
+        .and_then(|project| rows::key_problem(&project.files, "script", &dialog.key));
     let valid = problem
         .as_deref()
         .is_none_or(|problem| problem.contains("already exists"));
     let free = problem.is_none();
-    crate::ui::dialogs::card(ctx, "make-shared", 620.0, |ui| {
+    dialogs::card(ctx, "make-shared", 620.0, |ui| {
         ui.label(RichText::new("Make shared").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(
@@ -1904,7 +1818,7 @@ pub fn make_shared_body(
         widgets::kv(ui, "key", |ui| {
             ui.scope(|ui| {
                 ui.set_width(160.0);
-                let response = crate::forms::boxed_input(ui, None, |ui| {
+                let response = forms::boxed_input(ui, None, |ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut dialog.key)
                             .frame(egui::Frame::NONE)
@@ -1912,9 +1826,7 @@ pub fn make_shared_body(
                             .desired_width(f32::INFINITY),
                     )
                 });
-                if dialog.error.is_none() {
-                    response.request_focus();
-                }
+                widgets::default_focus(ui, &response);
             });
             let standing = if !valid {
                 "letters, digits, _ and - only".to_owned()
@@ -1930,17 +1842,8 @@ pub fn make_shared_body(
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&dialog.kind).size(13.0))
                 .show_ui(ui, |ui| {
-                    for kind in [
-                        "object",
-                        "npc",
-                        "item",
-                        "area",
-                        "quest",
-                        "shop",
-                        "blueprint",
-                        "any",
-                    ] {
-                        ui.selectable_value(&mut dialog.kind, kind.to_owned(), kind);
+                    for kind in OwnerKind::VARIANTS {
+                        ui.selectable_value(&mut dialog.kind, kind.name().to_owned(), kind.name());
                     }
                 });
         });
@@ -1961,18 +1864,18 @@ pub fn make_shared_body(
                                     ui.label(theme::mono(&constant.field).size(13.0));
                                     let shown = match &constant.value {
                                         Value::String(text) => text.clone(),
-                                        other => crate::condition::summary(other),
+                                        other => condition::summary(other),
                                     };
-                                    ui.label(theme::strong(nodes::clip(&shown, 32)).size(13.0));
+                                    ui.label(theme::strong(widgets::clip(&shown, 32)).size(13.0));
                                 },
                             );
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     if constant.ticked {
-                                        let what = match (&constant.table, constant.ty) {
-                                            (Some(table), _) => format!("variable {} · row", table),
-                                            (None, ty) => format!("variable {ty}"),
+                                        let what = match &constant.table {
+                                            Some(table) => format!("variable {table} · row"),
+                                            None => format!("variable {}", constant.ty.name()),
                                         };
                                         ui.add(
                                             egui::TextEdit::singleline(&mut constant.name)
@@ -1986,12 +1889,7 @@ pub fn make_shared_body(
                                 },
                             );
                         });
-                        let rect = ui.max_rect();
-                        let y = ui.cursor().min.y + 2.0;
-                        ui.painter().line_segment(
-                            [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-                            egui::Stroke::new(1.0, theme::BORDER),
-                        );
+                        widgets::rule(ui);
                         ui.add_space(4.0);
                     }
                 });
@@ -2004,31 +1902,16 @@ pub fn make_shared_body(
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(
-                    valid && free,
-                    egui::Button::new(
-                        RichText::new("Make shared · one step")
-                            .color(egui::Color32::WHITE)
-                            .size(13.5),
-                    )
-                    .fill(theme::ACCENT)
-                    .corner_radius(5.0)
-                    .min_size(egui::vec2(0.0, 28.0)),
-                )
+                .add_enabled_ui(valid && free, |ui| {
+                    widgets::primary(ui, "Make shared · one step")
+                })
+                .inner
                 .clicked()
                 || (enter && valid && free)
             {
                 outcome = Some(true);
             }
-            if ui
-                .add(
-                    egui::Button::new(RichText::new("Cancel").size(13.5))
-                        .min_size(egui::vec2(0.0, 28.0))
-                        .corner_radius(5.0),
-                )
-                .clicked()
-                || escape
-            {
+            if ui.button("Cancel").clicked() || escape {
                 outcome = Some(false);
             }
         });
@@ -2055,9 +1938,9 @@ pub fn make_shared_body(
 }
 
 fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), String> {
-    let doc = Doc::load(editor, &dialog.owner).ok_or("the script is gone")?;
+    let doc = ScriptDoc::load(editor, &dialog.owner).ok_or("the script is gone")?;
     let files = &editor.project.as_ref().ok_or("no project")?.files;
-    if let Some(problem) = crate::rows::key_problem(files, "script", &dialog.key) {
+    if let Some(problem) = rows::key_problem(files, "script", &dialog.key) {
         return Err(problem);
     }
     let mut nodes_map = doc.nodes().clone();
@@ -2071,7 +1954,7 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         if let Some(node) = nodes_map.get_mut(&constant.node) {
             node[&constant.field] = serde_json::json!({ "var": name });
         }
-        let mut declared = serde_json::json!({ "type": constant.ty });
+        let mut declared = serde_json::json!({ "type": constant.ty.name() });
         if let Some(table) = &constant.table {
             declared["table"] = Value::String(table.clone());
         }
@@ -2093,7 +1976,7 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
         module["values"] = Value::Object(values);
     }
     let row = doc.row_with(module);
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Make {} shared as script/{}",
         dialog.owner.title(),
         dialog.key
@@ -2108,20 +1991,20 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
             editor.views.script.views.insert(shared, view);
         }
         for (_, tab) in editor.dock.iter_all_tabs_mut() {
-            if *tab == Tab::Script(dialog.owner.clone()) {
-                *tab = Tab::Script(ScriptOwner::Shared {
+            if *tab == EditorTab::Script(dialog.owner.clone()) {
+                *tab = EditorTab::Script(ScriptOwner::Shared {
                     key: dialog.key.clone(),
                 });
             }
         }
-        editor.select(Selection::row("script", &dialog.key));
+        editor.select(RowSelection::row("script", &dialog.key));
         Ok(())
     } else {
         Err("refused; see the message".to_owned())
     }
 }
 
-pub fn make_inline_dialog(editor: &mut Editor, doc: &Doc) {
+pub fn make_inline_dialog(editor: &mut Editor, doc: &ScriptDoc) {
     let ScriptOwner::Shared { key } = &doc.owner else {
         return;
     };
@@ -2133,21 +2016,27 @@ pub fn make_inline_dialog(editor: &mut Editor, doc: &Doc) {
         let Some((table, row_key)) = row_of(&usage.file) else {
             continue;
         };
-        if table == "script" || usage.pointer.contains("/nodes/") {
+        let at = ScriptRef::parse(&usage.pointer);
+        let Some(module) = at.module.filter(|_| table != "script" && at.node.is_none()) else {
             continue;
-        }
-        let pointer = usage.pointer.trim_end_matches("/script").to_owned();
-        users.push((table.to_owned(), row_key.to_owned(), pointer));
+        };
+        users.push(InlineScriptTarget {
+            table: table.to_owned(),
+            key: row_key.to_owned(),
+            module,
+        });
     }
     if users.is_empty() {
         editor.toast("No owner names this script, so there is nowhere to copy it inline");
         return;
     }
-    editor.dialogs.push(Dialog::MakeInline(MakeInlineDialog {
-        key: key.clone(),
-        users,
-        picked: 0,
-    }));
+    editor
+        .dialogs
+        .push(ModalDialog::MakeInline(MakeInlineDialog {
+            key: key.clone(),
+            users,
+            picked: 0,
+        }));
 }
 
 pub fn make_inline_body(
@@ -2156,12 +2045,7 @@ pub fn make_inline_body(
     mut dialog: MakeInlineDialog,
 ) -> Option<MakeInlineDialog> {
     let mut outcome = None;
-    let (enter, escape) = ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
-    });
+    let (enter, escape) = dialogs::keys(ctx);
     let count = editor
         .row_value("script", &dialog.key)
         .map_or(0, |script| script["nodes"].as_object().map_or(0, Map::len));
@@ -2171,27 +2055,15 @@ pub fn make_inline_body(
     let names: Vec<String> = dialog
         .users
         .iter()
-        .map(|(table, key, pointer)| {
-            let module = pointer
-                .split("/scripts/")
-                .next()
-                .unwrap_or(pointer)
-                .to_owned();
+        .map(|target| {
+            let index = target.module.module();
             editor
-                .row_value(table, key)
-                .and_then(|row| {
-                    row.pointer(&module)
-                        .and_then(|m| m["name"].as_str().map(str::to_owned))
-                })
-                .unwrap_or_else(|| {
-                    module
-                        .strip_prefix("/modules/")
-                        .map(|m| format!("module {m}"))
-                        .unwrap_or(module)
-                })
+                .row_value(&target.table, &target.key)
+                .and_then(|row| row["modules"][index]["name"].as_str().map(str::to_owned))
+                .unwrap_or_else(|| format!("module {index}"))
         })
         .collect();
-    crate::ui::dialogs::card(ctx, "make-inline", 620.0, |ui| {
+    dialogs::card(ctx, "make-inline", 620.0, |ui| {
         ui.label(RichText::new("Make inline").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(theme::muted(format!("The {count} nodes of script/{} are copied into one owner's row, its values written in. The script row stays.", dialog.key)).size(13.5));
@@ -2200,9 +2072,9 @@ pub fn make_inline_body(
         egui::ScrollArea::vertical()
             .max_height(300.0)
             .show(ui, |ui| {
-                for (index, (table, key, pointer)) in dialog.users.iter().enumerate() {
+                for (index, target) in dialog.users.iter().enumerate() {
                     let picked = dialog.picked == index;
-                    let module = names.get(index).cloned().unwrap_or_else(|| pointer.clone());
+                    let module = names.get(index).cloned().unwrap_or_default();
                     let response = egui::Frame::new()
                         .fill(if picked {
                             theme::ACCENT_SOFT
@@ -2218,8 +2090,11 @@ pub fn make_inline_body(
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             ui.horizontal(|ui| {
-                                widgets::badge(ui, table);
-                                ui.label(theme::mono(format!("{table}/{key}")).size(13.0));
+                                widgets::badge(ui, &target.table);
+                                ui.label(
+                                    theme::mono(format!("{}/{}", target.table, target.key))
+                                        .size(13.0),
+                                );
                                 ui.label(theme::muted(module).size(12.5));
                             });
                         })
@@ -2248,31 +2123,10 @@ pub fn make_inline_body(
         );
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if ui
-                .add(
-                    egui::Button::new(
-                        RichText::new("Make inline · one step")
-                            .color(egui::Color32::WHITE)
-                            .size(13.5),
-                    )
-                    .fill(theme::ACCENT)
-                    .corner_radius(5.0)
-                    .min_size(egui::vec2(0.0, 28.0)),
-                )
-                .clicked()
-                || enter
-            {
+            if widgets::primary(ui, "Make inline · one step").clicked() || enter {
                 outcome = Some(true);
             }
-            if ui
-                .add(
-                    egui::Button::new(RichText::new("Cancel").size(13.5))
-                        .min_size(egui::vec2(0.0, 28.0))
-                        .corner_radius(5.0),
-                )
-                .clicked()
-                || escape
-            {
+            if ui.button("Cancel").clicked() || escape {
                 outcome = Some(false);
             }
         });
@@ -2296,13 +2150,14 @@ pub fn make_inline_body(
 }
 
 fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
-    let Some((table, key, pointer)) = dialog.users.get(dialog.picked).cloned() else {
+    let Some(target) = dialog.users.get(dialog.picked) else {
         return;
     };
+    let (table, key, pointer) = (&target.table, &target.key, target.module.pointer());
     let Some(script) = editor.row_value("script", &dialog.key) else {
         return;
     };
-    let Some(mut row) = editor.row_value(&table, &key) else {
+    let Some(mut row) = editor.row_value(table, key) else {
         return;
     };
     let Some(module) = row.pointer(&pointer).cloned() else {
@@ -2317,7 +2172,7 @@ fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
         }
     }
     let mut nodes_value = script["nodes"].clone();
-    substitute(&mut nodes_value, &values);
+    fill_holes(&mut nodes_value, &Value::Object(values), &BTreeMap::new());
     let mut inline = serde_json::json!({ "type": "inline_script", "nodes": nodes_value });
     for field in ["state", "locals"] {
         if let Some(value) = script.get(field)
@@ -2329,37 +2184,17 @@ fn make_inline(editor: &mut Editor, dialog: &MakeInlineDialog) {
     if let Some(slot) = row.pointer_mut(&pointer) {
         *slot = inline;
     }
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Make script/{} inline in {table}/{key}",
         dialog.key
     ));
-    edit.write_json(row_file(&table, &key), &row);
+    edit.write_json(row_file(table, key), &row);
     if editor.apply(edit) {
-        let owner = ScriptOwner::inline(&table, &key, &pointer);
-        editor.select(Selection::row(&table, &key));
-        editor.open_tab(Tab::Script(owner));
-    }
-}
-
-fn substitute(value: &mut Value, values: &Map<String, Value>) {
-    match value {
-        Value::Object(map) => {
-            if map.len() == 1
-                && let Some(name) = map.get("var").and_then(Value::as_str)
-                && let Some(filled) = values.get(name)
-            {
-                *value = filled.clone();
-                return;
-            }
-            for child in map.values_mut() {
-                substitute(child, values);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                substitute(item, values);
-            }
-        }
-        _ => {}
+        editor.select(RowSelection::row(table, key));
+        editor.open_tab(EditorTab::Script(ScriptOwner::Inline {
+            table: table.clone(),
+            key: key.clone(),
+            module: target.module,
+        }));
     }
 }

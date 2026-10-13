@@ -5,10 +5,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
-use crate::core::content::{ContentId, Fixture};
+use crate::core::content::{ContentId, ContentRow, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::area::AreaTag;
+use crate::systems::area::{self, AreaTag};
 use crate::systems::interact::{self, Interactive};
 use crate::systems::movement::Position;
 use crate::systems::player::Players;
@@ -33,7 +33,7 @@ pub struct AttentionDef {
     pub icon: AssetRef,
 }
 
-impl crate::core::content::ContentRow for AttentionDef {
+impl ContentRow for AttentionDef {
     const TABLE: &'static str = "attention";
 }
 
@@ -126,7 +126,7 @@ pub fn update(
     *turn = (*turn + 1) % REFRESH_ROUNDS;
     let marking = world.resource::<MarkSources>().0.clone();
     let badging = world.resource::<BadgeSources>().0.clone();
-    let players: Vec<(Entity, Option<crate::systems::area::Id>, Option<Pos<Tiles>>)> = world
+    let players: Vec<(Entity, Option<area::Id>, Option<Pos<Tiles>>)> = world
         .resource::<Players>()
         .0
         .values()

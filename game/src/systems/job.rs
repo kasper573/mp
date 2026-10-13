@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId};
+use crate::core::content::{Content, ContentId, ContentRow, serial};
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, Owner, OwnerKind, ValueType,
 };
@@ -11,6 +11,7 @@ use crate::systems::effect::{self, Effect};
 use crate::systems::player::Xp;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Condition, EventKind, Reach, RiftInstances, RiftScripting};
+use crate::systems::stat::StatMap;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -20,7 +21,7 @@ pub fn register(app: &mut App) {
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Job {
-    pub def: crate::systems::job::Id,
+    pub def: Id,
 }
 
 pub type Id = ContentId<JobDef>;
@@ -31,7 +32,7 @@ pub struct JobDef {
     pub levels: Vec<JobLevel>,
 }
 
-impl crate::core::content::ContentRow for JobDef {
+impl ContentRow for JobDef {
     const TABLE: &'static str = "job";
 }
 
@@ -39,11 +40,8 @@ impl crate::core::content::ContentRow for JobDef {
 pub struct JobLevel {
     pub xp: u32,
     #[schemars(transform = crate::systems::stat::schema_with_units)]
-    pub stats: crate::systems::stat::StatMap,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::core::content::serial::is_false"
-    )]
+    pub stats: StatMap,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
     pub chasing: bool,
 }
 
@@ -113,7 +111,7 @@ pub struct GrantXp {
 pub struct SetJob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub job: crate::systems::job::Id,
+    pub job: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }

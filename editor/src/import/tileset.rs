@@ -3,20 +3,22 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 
-use super::formats::{self, Export};
+use super::formats::{self, AnimationExport};
+use crate::ui::widgets;
+use game::systems::area::grid::{self, PaletteRow};
 
 pub const MAX_TILE_PX: u32 = 512;
 pub const MAX_COLOURS: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GridSettings {
+pub struct TileGridSettings {
     pub tile: u32,
     pub margin: u32,
     pub spacing: u32,
     pub extruded: u32,
 }
 
-pub struct GridCut {
+pub struct TileGridCut {
     pub columns: u32,
     pub rows: u32,
     pub drawn: usize,
@@ -24,8 +26,8 @@ pub struct GridCut {
     pub image: RgbaImage,
 }
 
-pub fn cut_grid(image: &RgbaImage, settings: GridSettings) -> Result<GridCut, String> {
-    let GridSettings {
+pub fn cut_grid(image: &RgbaImage, settings: TileGridSettings) -> Result<TileGridCut, String> {
+    let TileGridSettings {
         tile,
         margin,
         spacing,
@@ -68,7 +70,7 @@ pub fn cut_grid(image: &RgbaImage, settings: GridSettings) -> Result<GridCut, St
                 .map_err(|error| error.to_string())?;
         }
     }
-    Ok(GridCut {
+    Ok(TileGridCut {
         columns,
         rows,
         drawn,
@@ -107,7 +109,7 @@ pub struct PaletteUse {
 }
 
 #[derive(Clone, Debug)]
-pub struct Rewrite {
+pub struct PaletteRewrite {
     pub area: String,
     pub entries: usize,
     pub first: Option<(u32, u32)>,
@@ -127,7 +129,7 @@ pub struct TilePlan {
     pub gone: Vec<u32>,
     pub gone_used: BTreeMap<u32, Vec<PaletteUse>>,
     pub replacements: BTreeMap<u32, Option<u32>>,
-    pub rewrites: Vec<Rewrite>,
+    pub rewrites: Vec<PaletteRewrite>,
     pub example: Option<(u32, u32)>,
     pub blank_data: usize,
     pub walk: usize,
@@ -148,7 +150,7 @@ impl TilePlan {
         }
         Err(format!(
             "tile{} {} {} gone but still painted; pick what replaces {}",
-            crate::ui::widgets::plural(waiting.len()),
+            widgets::plural(waiting.len()),
             waiting.join(", "),
             if waiting.len() == 1 { "is" } else { "are" },
             if waiting.len() == 1 { "it" } else { "them" }
@@ -167,25 +169,12 @@ impl TilePlan {
     }
 }
 
-pub fn palette_rows(text: &str) -> Vec<(String, u32, String)> {
-    text.lines()
-        .skip(1)
-        .filter_map(|line| {
-            let mut parts = line.splitn(3, ',');
-            let tileset = parts.next()?.to_owned();
-            let tile = parts.next()?.trim().parse().ok()?;
-            let flip = parts.next().unwrap_or("").to_owned();
-            Some((tileset, tile, flip))
-        })
-        .collect()
-}
-
 pub fn tile_plan(
     old: &RgbaImage,
     row: &Value,
     new: &RgbaImage,
     key: &str,
-    palettes: &[(String, String)],
+    palettes: &[(String, Vec<PaletteRow>)],
 ) -> TilePlan {
     let tile = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
     let old_hashes = tile_hashes(old, tile);
@@ -269,23 +258,20 @@ pub fn tile_plan(
     }
     let mut gone_used: BTreeMap<u32, Vec<PaletteUse>> = BTreeMap::new();
     let mut rewrites = Vec::new();
-    for (area, text) in palettes {
+    for (area, rows) in palettes {
         let mut entries = 0;
         let mut first = None;
         let mut uses: BTreeMap<u32, usize> = BTreeMap::new();
-        for (tileset, old_tile, _) in palette_rows(text) {
-            if tileset != key {
-                continue;
-            }
-            match matches.get(&old_tile) {
-                Some(new_tile) if *new_tile != old_tile => {
+        for row in rows.iter().filter(|row| row.tileset == key) {
+            match matches.get(&row.tile) {
+                Some(new_tile) if *new_tile != row.tile => {
                     entries += 1;
-                    first.get_or_insert((old_tile, *new_tile));
+                    first.get_or_insert((row.tile, *new_tile));
                 }
                 Some(_) => {}
                 None => {
                     entries += 1;
-                    *uses.entry(old_tile).or_default() += 1;
+                    *uses.entry(row.tile).or_default() += 1;
                 }
             }
         }
@@ -296,7 +282,7 @@ pub fn tile_plan(
             });
         }
         if entries > 0 {
-            rewrites.push(Rewrite {
+            rewrites.push(PaletteRewrite {
                 area: area.clone(),
                 entries,
                 first,
@@ -338,7 +324,7 @@ pub fn apply_tile_plan(
     plan: &TilePlan,
     row: &Value,
     key: &str,
-    palettes: &[(String, String)],
+    palettes: &[(String, Vec<PaletteRow>)],
 ) -> Result<(Value, Vec<(String, String)>), String> {
     plan.ready()?;
     let mut row = row.clone();
@@ -386,37 +372,31 @@ pub fn apply_tile_plan(
     }
     row["tiles"] = Value::Object(tiles);
     let mut rewritten = Vec::new();
-    for (area, text) in palettes {
-        let mut lines = text.lines();
-        let header = lines.next().unwrap_or("tileset,tile,flip").to_owned();
-        let mut out = vec![header];
+    for (area, rows) in palettes {
         let mut changed = false;
-        for line in lines {
-            let mut parts = line.splitn(3, ',');
-            let tileset = parts.next().unwrap_or("");
-            let tile = parts.next().unwrap_or("");
-            let flip = parts.next().unwrap_or("");
-            if tileset == key
-                && let Ok(old_tile) = tile.trim().parse::<u32>()
-                && let Some(new_tile) = plan.target(old_tile)
-            {
-                if new_tile != old_tile {
-                    changed = true;
+        let moved: Vec<PaletteRow> = rows
+            .iter()
+            .map(|row| {
+                let target = (row.tileset == key)
+                    .then(|| plan.target(row.tile))
+                    .flatten()
+                    .unwrap_or(row.tile);
+                changed |= target != row.tile;
+                PaletteRow {
+                    tile: target,
+                    ..row.clone()
                 }
-                out.push(format!("{tileset},{new_tile},{flip}"));
-            } else {
-                out.push(line.to_owned());
-            }
-        }
+            })
+            .collect();
         if changed {
-            rewritten.push((area.clone(), out.join("\n") + "\n"));
+            rewritten.push((area.clone(), grid::write_palette(&moved)));
         }
     }
     Ok((row, rewritten))
 }
 
 #[derive(Clone, Debug)]
-pub enum FrameRef {
+pub enum AnimFrameRef {
     Block,
     Existing(u32),
     New(usize),
@@ -428,7 +408,7 @@ pub struct AnimCell {
     pub row: u32,
     pub tile: u32,
     pub redrawn: bool,
-    pub frames: Vec<FrameRef>,
+    pub frames: Vec<AnimFrameRef>,
 }
 
 #[derive(Clone, Debug)]
@@ -453,7 +433,7 @@ impl AnimPlan {
 pub fn anim_plan(
     tileset: &RgbaImage,
     row: &Value,
-    export: &Export,
+    export: &AnimationExport,
     kind_limits: bool,
     block: (u32, u32),
 ) -> Result<AnimPlan, String> {
@@ -510,20 +490,20 @@ pub fn anim_plan(
             let redrawn = hashes
                 .get(index as usize)
                 .is_some_and(|(hash, _)| *hash != first);
-            let mut frames = vec![FrameRef::Block];
+            let mut frames = vec![AnimFrameRef::Block];
             for cut in cuts.iter().skip(1) {
                 let hash = formats::pixel_hash(cut);
                 if hash == first {
-                    frames.push(FrameRef::Block);
+                    frames.push(AnimFrameRef::Block);
                 } else if let Some(existing) = by_hash.get(hash.as_str()) {
                     reused.insert(*existing);
-                    frames.push(FrameRef::Existing(*existing));
+                    frames.push(AnimFrameRef::Existing(*existing));
                 } else if let Some(position) = new_hashes.iter().position(|seen| *seen == hash) {
-                    frames.push(FrameRef::New(position));
+                    frames.push(AnimFrameRef::New(position));
                 } else {
                     new_hashes.push(hash);
                     new_images.push(cut.clone());
-                    frames.push(FrameRef::New(new_images.len() - 1));
+                    frames.push(AnimFrameRef::New(new_images.len() - 1));
                 }
             }
             cells.push(AnimCell {
@@ -596,7 +576,7 @@ pub fn apply_anim_plan(
     plan: &AnimPlan,
     tileset: &RgbaImage,
     row: &Value,
-    export: &Export,
+    export: &AnimationExport,
 ) -> Result<(Option<Vec<u8>>, Value), String> {
     let tile = row["tile"].as_u64().unwrap_or(16).max(1) as u32;
     let columns = (tileset.width() / tile).max(1);
@@ -638,9 +618,9 @@ pub fn apply_anim_plan(
             .zip(&plan.lengths)
             .map(|(frame, ms)| {
                 let tile = match frame {
-                    FrameRef::Block => cell.tile,
-                    FrameRef::Existing(index) => *index,
-                    FrameRef::New(offset) => old_count + *offset as u32,
+                    AnimFrameRef::Block => cell.tile,
+                    AnimFrameRef::Existing(index) => *index,
+                    AnimFrameRef::New(offset) => old_count + *offset as u32,
                 };
                 json!({ "tile": tile, "ms": ms })
             })

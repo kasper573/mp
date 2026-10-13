@@ -1,15 +1,16 @@
-use crate::core::content::Content;
-use crate::systems::equipment::{self, Equipment, EquipmentSlot};
-use crate::systems::interface::InterfaceIcon;
-use crate::systems::item::card;
-use crate::systems::player::session;
 use bevy::prelude::*;
 use ui::{Align, RichPiece, Side, TooltipText, tooltip, tooltip_content};
 
+use crate::core::content::Content;
+use crate::systems::equipment::{self, Equipment, EquipmentSlot};
 use crate::systems::hud::{
-    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, slot_node, tooltip_label,
+    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
+    tooltip_label,
 };
 use crate::systems::input::map::{ActionInput, InputAction, input};
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::item::{Id as ItemId, card};
+use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct EquipmentGrid;
@@ -33,7 +34,7 @@ impl Window for EquipmentWindow {
         1
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content()))
+        single_tab(self.title(), ui::scrolled(content()))
     }
     fn sync(&self, world: &mut World) {
         sync_equipment(world)
@@ -53,7 +54,7 @@ fn content() -> Box<dyn Scene> {
 
 struct CellData {
     slot: EquipmentSlot,
-    item: Option<crate::systems::item::Id>,
+    item: Option<ItemId>,
     icon: Option<Handle<Image>>,
 }
 
@@ -124,7 +125,7 @@ fn empty_slot(slot: EquipmentSlot) -> impl Scene {
 fn worn_slot(
     content: &Content,
     slot: EquipmentSlot,
-    item: crate::systems::item::Id,
+    item: ItemId,
     icon: Handle<Image>,
 ) -> impl Scene {
     let def = item.get(content);

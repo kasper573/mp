@@ -1,21 +1,72 @@
 use egui::Ui;
 use game::core::math::Pos;
 use game::core::tiling::{Cell, TilePos, TileRect, Tiles};
-use game::systems::area::{self, AreaModuleKind, Flip};
+use game::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
-use super::holes::suffixed;
+use super::inspect::Followups;
 use super::placement::warp_destinations;
 use super::stamp::object_names;
-use super::{Frame, shapes};
+use super::{AreaFrame, shapes};
 use super::{modules, placement};
-use crate::app::Editor;
 use crate::forms::FormCx;
-use crate::project::{Edit, row_file};
+use crate::project::{ContentEdit, row_file};
 use crate::ui::widgets;
 use crate::value::RowValue;
+use crate::{app::Editor, forms, rows, value};
 
-pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
+pub struct PlacedTile {
+    pub column: usize,
+    pub row: usize,
+    pub offset: (usize, usize),
+    pub tile: SceneryTile,
+}
+
+pub fn tiles_of(module: &Value) -> Vec<PlacedTile> {
+    let flip = Flip::parse(module.text("flip")).unwrap_or(Flip::None);
+    let rows: Vec<&Vec<Value>> = module["tiles"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_array)
+        .collect();
+    let height = rows.len();
+    rows.iter()
+        .enumerate()
+        .flat_map(|(row, cells)| {
+            let width = cells.len();
+            cells.iter().enumerate().filter_map(move |(column, json)| {
+                let tile: SceneryTile = serde_json::from_value(json.clone()).ok()?;
+                Some(PlacedTile {
+                    column,
+                    row,
+                    offset: (
+                        if flip.horizontal() {
+                            width - 1 - column
+                        } else {
+                            column
+                        },
+                        if flip.vertical() {
+                            height - 1 - row
+                        } else {
+                            row
+                        },
+                    ),
+                    tile: SceneryTile {
+                        tile: tile.tile,
+                        flip: tile.flip.compose(flip),
+                    },
+                })
+            })
+        })
+        .collect()
+}
+
+pub fn tile_count(module: &Value) -> usize {
+    tiles_of(module).len()
+}
+
+pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     let indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
         .iter()
         .filter_map(|p| p.strip_prefix("/modules/")?.parse().ok())
@@ -27,7 +78,6 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
         .collect();
     if sceneries.len() < 2 {
         editor.toast("Select two or more sceneries of one tileset to join (Ctrl G)");
-        let _ = view_key;
         return;
     }
     let tileset = sceneries[0].text("tileset").to_owned();
@@ -41,7 +91,7 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
     let bounds = sceneries
         .iter()
         .filter_map(|s| shapes::scenery_rect(s))
-        .reduce(shapes::rect_union)
+        .reduce(|a, b| a.union(&b))
         .expect("bounds");
     let width = bounds.size.width.ceil() as usize;
     let height = bounds.size.height.ceil() as usize;
@@ -52,35 +102,14 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
             continue;
         };
         let flip = Flip::parse(scenery.text("flip")).unwrap_or(Flip::None);
-        let rows = scenery["tiles"].as_array().cloned().unwrap_or_default();
-        let h = rows.len();
-        for (r, row) in rows.iter().enumerate() {
-            let w = row.as_array().map_or(0, Vec::len);
-            for (c, tile) in row.as_array().into_iter().flatten().enumerate() {
-                if tile.is_null() {
-                    continue;
-                }
-                let (cc, rr) = (
-                    if flip.horizontal() { w - 1 - c } else { c },
-                    if flip.vertical() { h - 1 - r } else { r },
-                );
-                let x = (rect.min().x - bounds.min().x).round() as usize + cc;
-                let y = (rect.min().y - bounds.min().y).round() as usize + rr;
-                if y < height && x < width {
-                    let mut placed = tile.clone();
-                    if !flip.is_none() {
-                        let own = Flip::parse(tile.text("flip"))
-                            .unwrap_or(Flip::None)
-                            .compose(flip);
-                        let number = tile.as_u64().or_else(|| tile["tile"].as_u64()).unwrap_or(0);
-                        placed = if own.is_none() {
-                            Value::from(number)
-                        } else {
-                            serde_json::json!({ "tile": number, "flip": own.csv() })
-                        };
-                    }
-                    tiles[y][x] = placed;
-                }
+        for placed in tiles_of(scenery) {
+            let x = (rect.min().x - bounds.min().x).round() as usize + placed.offset.0;
+            let y = (rect.min().y - bounds.min().y).round() as usize + placed.offset.1;
+            if y < height
+                && x < width
+                && let Ok(json) = value::json(&placed.tile)
+            {
+                tiles[y][x] = json;
             }
         }
         for block in scenery["blocks"].as_array().into_iter().flatten() {
@@ -127,13 +156,12 @@ pub fn join_scenery(editor: &mut Editor, view_key: &str, frame: &Frame) {
     }
 }
 
-pub fn split_scenery(editor: &mut Editor, frame: &Frame, index: usize) {
+pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = shapes::scenery_rect(module) else {
         return;
     };
     let tileset = module.text("tileset").to_owned();
-    let flip = Flip::parse(module.text("flip")).unwrap_or(Flip::None);
     let grids = frame.area().grids;
     let mut draft = super::grid::GridDraft::of(&frame.area_key, grids);
     let layer = editor
@@ -143,39 +171,24 @@ pub fn split_scenery(editor: &mut Editor, frame: &Frame, index: usize) {
         .get(&super::area_view_key(&frame.area_key))
         .map_or(0, |v| v.layer);
     let rows = module["tiles"].as_array().cloned().unwrap_or_default();
-    let h = rows.len();
-    let mut placed = 0;
     let mut kept: Vec<Vec<Value>> = rows
         .iter()
         .map(|r| r.as_array().cloned().unwrap_or_default())
         .collect();
-    for (r, row) in rows.iter().enumerate() {
-        let w = row.as_array().map_or(0, Vec::len);
-        for (c, tile) in row.as_array().into_iter().flatten().enumerate() {
-            if tile.is_null() {
-                continue;
-            }
-            let (cc, rr) = (
-                if flip.horizontal() { w - 1 - c } else { c },
-                if flip.vertical() { h - 1 - r } else { r },
-            );
-            let cell = Pos::<Tiles>::new(
-                rect.min().x + cc as f32 + 0.5,
-                rect.min().y + rr as f32 + 0.5,
-            )
-            .cell();
-            if draft.get(layer, cell).is_some() || cell.index(draft.size).is_none() {
-                continue;
-            }
-            let number = tile.as_u64().or_else(|| tile["tile"].as_u64()).unwrap_or(0) as u32;
-            let own = Flip::parse(tile.text("flip"))
-                .unwrap_or(Flip::None)
-                .compose(flip);
-            let entry = draft.intern(&tileset, number, own);
-            draft.set(layer, cell, Some(entry));
-            kept[r][c] = Value::Null;
-            placed += 1;
+    let mut placed = 0;
+    for tile in tiles_of(module) {
+        let cell = Pos::<Tiles>::new(
+            rect.min().x + tile.offset.0 as f32 + 0.5,
+            rect.min().y + tile.offset.1 as f32 + 0.5,
+        )
+        .cell();
+        if draft.get(layer, cell).is_some() || cell.index(draft.size).is_none() {
+            continue;
         }
+        let entry = draft.intern(&tileset, tile.tile.tile, tile.tile.flip);
+        draft.set(layer, cell, Some(entry));
+        kept[tile.row][tile.column] = Value::Null;
+        placed += 1;
     }
     if placed == 0 {
         editor.toast("No free cell under the scenery on the active layer");
@@ -192,7 +205,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &Frame, index: usize) {
         return;
     };
     row["modules"] = Value::Array(modules);
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Split scenery into {placed} tiles in {}",
         frame.area_key
     ));
@@ -203,21 +216,9 @@ pub fn split_scenery(editor: &mut Editor, frame: &Frame, index: usize) {
     }
 }
 
-pub fn return_door(editor: &mut Editor, frame: &Frame, index: usize) {
-    return_door_from(editor, &frame.area_key, &frame.modules, index);
-}
-
-pub fn return_door_from(editor: &mut Editor, area_key: &str, modules: &[Value], index: usize) {
-    let index = if index == usize::MAX {
-        editor
-            .selection
-            .parts
-            .first()
-            .and_then(|p| p.strip_prefix("/modules/")?.parse().ok())
-            .unwrap_or(0)
-    } else {
-        index
-    };
+pub fn return_door(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+    let area_key = &frame.area_key;
+    let modules = &frame.modules;
     let Some(module) = modules.get(index) else {
         return;
     };
@@ -254,12 +255,12 @@ pub fn return_door_from(editor: &mut Editor, area_key: &str, modules: &[Value], 
         editor.toast("No walkable cell outside the door to come back to");
         return;
     };
-    let Some(_) = there.grid.nearest_walkable(target_at) else {
+    if there.grid.nearest_walkable(target_at).is_none() {
         editor.toast("The destination has no walkable cell");
         return;
     };
     let mut names = object_names(content, there_id);
-    let name = suffixed(&format!("{}_back", module.text_or("name", "door")), &names);
+    let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
     let door = serde_json::json!({
@@ -274,7 +275,7 @@ pub fn return_door_from(editor: &mut Editor, area_key: &str, modules: &[Value], 
     if let Some(m) = there_row["modules"].as_array_mut() {
         m.push(door);
     }
-    let mut edit = Edit::new(format!("Return door from {target_area} to {area_key}"));
+    let mut edit = ContentEdit::new(format!("Return door from {target_area} to {area_key}"));
     edit.write_json(row_file("area", &target_area), &there_row);
     if editor.apply(edit) {
         editor.toast(format!(
@@ -292,49 +293,36 @@ pub(super) fn scenery_rows(ui: &mut Ui, module: &mut Value, path: &str) -> bool 
         .map(|r| r.as_array().map_or(0, Vec::len))
         .max()
         .unwrap_or(0);
-    let count: usize = rows
-        .iter()
-        .map(|r| {
-            r.as_array()
-                .map_or(0, |cells| cells.iter().filter(|c| !c.is_null()).count())
-        })
-        .sum();
+    let count = tile_count(module);
     widgets::kv_text(ui, "size", format!("{width} × {height} tiles · {count}"));
     let mut changed = false;
     widgets::kv(ui, "sort", |ui| {
         let current = module["sort"].as_f64();
         let id = ui.id().with((path, "sort"));
-        let mut draft = ui
-            .ctx()
-            .data(|d| d.get_temp::<String>(id))
-            .unwrap_or_else(|| {
-                current
-                    .map(crate::forms::trim_number)
-                    .unwrap_or_else(|| "flat".to_owned())
-            });
-        let response = crate::forms::boxed_input(
-            ui,
-            Some(&format!("tiles from the top · of {height}")),
-            |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut draft)
-                        .frame(egui::Frame::NONE)
-                        .font(egui::TextStyle::Monospace)
-                        .desired_width(48.0),
-                )
-            },
-        );
-        if response.changed() {
-            ui.ctx().data_mut(|d| d.insert_temp(id, draft.clone()));
-        }
-        if crate::forms::committed(ui, &response) {
-            ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
-            let parsed = draft.trim().parse::<f64>().ok();
+        let shown = current
+            .map(forms::trim_number)
+            .unwrap_or_else(|| "flat".to_owned());
+        let typed = forms::drafted(ui, id, &shown, |ui, draft| {
+            forms::boxed_input(
+                ui,
+                Some(&format!("tiles from the top · of {height}")),
+                |ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .frame(egui::Frame::NONE)
+                            .font(egui::TextStyle::Monospace)
+                            .desired_width(48.0),
+                    )
+                },
+            )
+        });
+        if let Some(typed) = typed {
+            let parsed = typed.trim().parse::<f64>().ok();
             if parsed != current {
                 match parsed {
                     Some(sort) => module["sort"] = Value::from(sort),
                     None => {
-                        module.as_object_mut().map(|m| m.remove("sort"));
+                        module.remove_field("sort");
                     }
                 }
                 changed = true;
@@ -358,8 +346,7 @@ pub(super) fn scenery_extras(
     ui: &mut Ui,
     cx: &mut FormCx,
     module: &Value,
-    extras: &mut Vec<placement::Extra>,
-    deferred: &mut Vec<super::Deferred>,
+    out: &mut Followups,
     index: usize,
 ) {
     let under = cx
@@ -374,17 +361,18 @@ pub(super) fn scenery_extras(
             .button(format!("⧉ Make the {under} blocked cells its own"))
             .clicked()
         {
-            deferred.push(super::Deferred::AdoptBlocks(index));
+            out.deferred
+                .push(super::DeferredAreaAction::AdoptBlocks(index));
         }
     } else {
         widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
         if ui.button("▣ Make blueprint…").clicked() {
-            extras.push(placement::Extra::MakeBlueprint);
+            out.extras.push(placement::PlacementAction::MakeBlueprint);
         }
         if ui.button("Split into tiles").clicked() {
-            deferred.push(super::Deferred::Split(index));
+            out.deferred.push(super::DeferredAreaAction::Split(index));
         }
     });
 }
@@ -393,21 +381,19 @@ pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Opti
     let content = cx.content?;
     let area_id = content.by_key::<area::AreaDef>(area_key)?;
     let grids = area::load(&content, area_id).grids;
-    let rect = super::shapes::scenery_rect(module)?;
+    let rect = shapes::scenery_rect(module)?;
     let size = grids.size;
-    let mut count = 0;
-    for cell in rect.tiles() {
-        if cell.x < 0 || cell.y < 0 || cell.x >= size.width as i32 || cell.y >= size.height as i32 {
-            continue;
-        }
-        if grids.walk[cell.y as usize * size.width as usize + cell.x as usize] == Some(false) {
-            count += 1;
-        }
-    }
-    Some(count)
+    Some(
+        rect.tiles()
+            .filter(|cell| {
+                cell.index(size)
+                    .is_some_and(|index| grids.walk[index] == Some(false))
+            })
+            .count(),
+    )
 }
 
-pub fn adopt_blocks(editor: &mut Editor, frame: &super::Frame, index: usize) {
+pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = super::shapes::scenery_rect(module) else {
         return;
@@ -439,7 +425,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::Frame, index: usize) {
         return;
     };
     row["modules"] = Value::Array(modules);
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Give {count} blocked cells to the scenery in {}",
         frame.area_key
     ));
@@ -448,7 +434,7 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::Frame, index: usize) {
     editor.apply(edit);
 }
 
-pub fn selected_scenery(editor: &Editor, frame: &super::Frame) -> Option<usize> {
+pub fn selected_scenery(editor: &Editor, frame: &super::AreaFrame) -> Option<usize> {
     let parts = super::selected_parts(editor, &frame.area_key);
     if parts.len() != 1 {
         return None;

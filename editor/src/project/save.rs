@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
-use super::files::{Bytes, Files};
+use super::files::{FileBytes, ProjectFiles};
 
 pub struct SaveOutcome {
     pub written: Vec<String>,
@@ -17,8 +18,8 @@ pub struct SaveError {
 
 pub fn save(
     root: &Path,
-    files: &Files,
-    disk: &mut std::collections::BTreeMap<String, String>,
+    files: &ProjectFiles,
+    disk: &mut BTreeMap<String, String>,
 ) -> Result<SaveOutcome, SaveError> {
     let mut done = SaveOutcome {
         written: Vec::new(),
@@ -92,7 +93,7 @@ pub fn clean_leftovers(root: &Path) {
     walk(root);
 }
 
-fn write_atomic(root: &Path, file: &str, bytes: &Bytes) -> Result<(), String> {
+fn write_atomic(root: &Path, file: &str, bytes: &FileBytes) -> Result<(), String> {
     let path = root.join(file);
     let parent = path.parent().ok_or("no parent folder")?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;

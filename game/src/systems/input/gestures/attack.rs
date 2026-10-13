@@ -1,11 +1,11 @@
-use crate::systems::combat;
-use crate::systems::player::session;
 use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
 use crate::core::render;
+use crate::systems::combat;
 use crate::systems::input::gestures::{Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
+use crate::systems::player::session;
 
 pub struct AttackGesture;
 

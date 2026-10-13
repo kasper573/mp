@@ -17,7 +17,7 @@ One-time setup:
   deps on first run and drives Chrome on a virtual display through a real sign-in, so it's
   zero-config and never touches your desktop. CI fans out across Chrome, Firefox and Safari.
 - To record demo videos: [ffmpeg](https://ffmpeg.org/) and a GPU (demos fall back to slow software
-  rendering without one). The ui gallery recordings also need `xvfb` and `xdotool`.
+  rendering without one). The ui gallery and editor recordings also need `xvfb` and `xdotool`.
 
 Then:
 

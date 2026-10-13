@@ -1,13 +1,20 @@
-use egui::{Align, Layout as EguiLayout, RichText, Ui, Vec2};
+use egui::{Align, Layout, RichText, Ui, Vec2};
+use game::core::content::ContentRow;
+use game::systems::item::ItemDef;
+use game::systems::npc::NpcDef;
+use game::systems::quest::QuestDef;
+use game::systems::shop::ShopDef;
 
-use super::atlas::Atlas;
-use super::{ColourBy, ColourOf, ColourShow, Layout, Lens};
+use super::filters::{ColourBy, ColourField, MapLens};
+use super::{MapPart, OpenWorldMap, select};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
 
 const SEARCH_WIDTH: f32 = 300.0;
+const RESULTS_PER_KIND: usize = 6;
+const RESULTS_SHOWN: usize = 24;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
     let mut pick: Option<Pick> = None;
     let mut remove: Option<Chip> = None;
     egui::Frame::new()
@@ -17,11 +24,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
                 ui.spacing_mut().item_spacing.x = 8.0;
                 let search = search_box(editor, ui, &mut remove);
                 if !editor.views.world.search.trim().is_empty() {
-                    pick = results(editor, ui, atlas, &search);
+                    pick = results(editor, ui, map, &search);
                 }
                 ui.menu_button(RichText::new("Layers ▾").size(12.5), |ui| {
                     ui.set_width(220.0);
-                    layers_menu(editor, ui, atlas, layout);
+                    layer_rows(editor, ui, map);
                 });
                 ui.menu_button(RichText::new("Colour by ▾").size(12.5), |ui| {
                     ui.set_width(260.0);
@@ -43,19 +50,56 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
                 );
             });
         });
-    if let Some(chip) = remove {
-        let view = &mut editor.views.world;
-        match chip {
-            Chip::Lens(index) => {
-                view.lenses.remove(index);
-            }
-            Chip::Colour => view.colour = None,
-            Chip::Line => view.quest_line = None,
-            Chip::Route => view.route = None,
+    let view = &mut editor.views.world;
+    match remove {
+        Some(Chip::Lens(index)) => {
+            view.lenses.remove(index);
         }
+        Some(Chip::Colour) => view.colour = None,
+        Some(Chip::Line) => view.quest_line = None,
+        Some(Chip::Route) => view.route = None,
+        None => {}
     }
     if let Some(pick) = pick {
-        apply(editor, atlas, layout, pick);
+        apply(editor, map, pick);
+    }
+}
+
+pub fn layer_rows(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
+    let atlas = &map.atlas;
+    let count = |of: fn(&super::atlas::AtlasArea) -> usize| atlas.areas.values().map(of).sum();
+    let givers: usize = atlas
+        .areas
+        .keys()
+        .map(|area| atlas.givers(*area).count())
+        .sum();
+    let layers = &mut editor.views.world.layers;
+    for (on, label, count) in [
+        (&mut layers.warps, "warps", atlas.warps.len()),
+        (
+            &mut layers.residents,
+            "residents",
+            count(|info| info.residents.len()),
+        ),
+        (
+            &mut layers.populations,
+            "populations",
+            count(|info| info.populations.len()),
+        ),
+        (&mut layers.givers, "quest givers", givers),
+        (
+            &mut layers.regions,
+            "regions and notes",
+            map.layout.regions.len() + map.layout.notes.len(),
+        ),
+    ] {
+        ui.horizontal(|ui| {
+            widgets::toggle(ui, on);
+            ui.label(RichText::new(label).size(13.0));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.label(theme::faint(count.to_string()).monospace().size(12.0));
+            });
+        });
     }
 }
 
@@ -67,15 +111,20 @@ enum Chip {
 }
 
 #[derive(Clone)]
-pub enum Pick {
+enum Pick {
     Area(String),
-    Lens(Lens),
+    Lens(MapLens),
     Line(String),
     Colour(ColourBy),
 }
 
+struct SearchResult {
+    kind: &'static str,
+    label: String,
+    pick: Pick,
+}
+
 fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> egui::Response {
-    let mut inner = None;
     egui::Frame::new()
         .fill(theme::INPUT)
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
@@ -87,29 +136,26 @@ fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> eg
                 ui.spacing_mut().item_spacing.x = 6.0;
                 ui.label(theme::muted("🔍"));
                 let view = &mut editor.views.world;
-                for (index, lens) in view.lenses.iter().enumerate() {
-                    let (_, closed) = widgets::chip_closable(ui, &lens.chip());
-                    if closed {
-                        *remove = Some(Chip::Lens(index));
+                let mut chip = |ui: &mut Ui, text: &str, which: Chip| {
+                    if widgets::chip_closable(ui, text).1 {
+                        *remove = Some(which);
                     }
+                };
+                for (index, lens) in view.lenses.iter().enumerate() {
+                    chip(ui, &lens.chip(), Chip::Lens(index));
                 }
                 if let Some(colour) = &view.colour {
-                    let (_, closed) = widgets::chip_closable(ui, &colour.chip());
-                    if closed {
-                        *remove = Some(Chip::Colour);
-                    }
+                    chip(ui, &colour.chip(), Chip::Colour);
                 }
                 if let Some(line) = &view.quest_line {
-                    let (_, closed) = widgets::chip_closable(ui, &format!("quest line: {line}"));
-                    if closed {
-                        *remove = Some(Chip::Line);
-                    }
+                    chip(ui, &format!("quest line: {line}"), Chip::Line);
                 }
-                if let Some((from, to)) = &view.route {
-                    let (_, closed) = widgets::chip_closable(ui, &format!("route: {from} → {to}"));
-                    if closed {
-                        *remove = Some(Chip::Route);
-                    }
+                if let Some(route) = &view.route {
+                    chip(
+                        ui,
+                        &format!("route: {} → {}", route.from, route.to),
+                        Chip::Route,
+                    );
                 }
                 let empty = view.lenses.is_empty()
                     && view.colour.is_none()
@@ -120,82 +166,94 @@ fn search_box(editor: &mut Editor, ui: &mut Ui, remove: &mut Option<Chip>) -> eg
                 } else {
                     ""
                 };
-                let response = ui.add(
+                ui.add(
                     egui::TextEdit::singleline(&mut view.search)
                         .frame(egui::Frame::NONE)
                         .hint_text(hint)
                         .desired_width(if empty { SEARCH_WIDTH - 30.0 } else { 120.0 })
                         .font(egui::TextStyle::Body),
-                );
-                inner = Some(response);
-            });
-        });
-    inner.expect("search box")
+                )
+            })
+            .inner
+        })
+        .inner
 }
 
 fn results(
     editor: &mut Editor,
     ui: &mut Ui,
-    atlas: &Atlas,
+    map: &OpenWorldMap,
     search: &egui::Response,
 ) -> Option<Pick> {
     let text = editor.views.world.search.trim().to_lowercase();
-    let files = &editor.project.as_ref()?.files;
-    let mut rows: Vec<(&'static str, String, Pick)> = Vec::new();
-    for key in atlas.areas.keys().filter(|key| key.contains(&text)).take(6) {
-        rows.push(("area", key.clone(), Pick::Area(key.clone())));
-    }
-    for table in ["npc", "item", "quest", "shop"] {
-        for file in files.paths_under(&format!("tables/{table}/")) {
-            let Some((_, key)) = crate::project::row_of(file) else {
-                continue;
-            };
-            if key.contains(&text) {
-                rows.push((
-                    table,
-                    key.to_owned(),
-                    Pick::Lens(Lens::Row {
+    let atlas = &map.atlas;
+    let mut rows: Vec<SearchResult> = atlas
+        .areas
+        .values()
+        .filter(|info| info.key.contains(&text))
+        .take(RESULTS_PER_KIND)
+        .map(|info| SearchResult {
+            kind: "area",
+            label: info.key.clone(),
+            pick: Pick::Area(info.key.clone()),
+        })
+        .collect();
+    for table in [
+        NpcDef::TABLE,
+        ItemDef::TABLE,
+        QuestDef::TABLE,
+        ShopDef::TABLE,
+    ] {
+        let Some(keys) = map.content.table_named(table).map(|rows| rows.keys()) else {
+            continue;
+        };
+        rows.extend(
+            keys.iter()
+                .filter(|key| key.contains(&text))
+                .map(|key| SearchResult {
+                    kind: table,
+                    label: key.clone(),
+                    pick: Pick::Lens(MapLens::Row {
                         table: table.to_owned(),
-                        key: key.to_owned(),
+                        key: key.clone(),
                     }),
-                ));
-            }
-        }
+                }),
+        );
     }
-    for line in &atlas.lines {
-        if line.category.to_lowercase().contains(&text) {
-            rows.push((
-                "quest line",
-                format!("{} · {} quests", line.category, line.quests.len()),
-                Pick::Line(line.category.clone()),
-            ));
-        }
-    }
-    for module in atlas
-        .module_types
-        .iter()
-        .filter(|module| module.contains(&text))
-        .take(6)
-    {
-        rows.push((
-            "module",
-            module.clone(),
-            Pick::Lens(Lens::Module(module.clone())),
-        ));
-    }
-    rows.push((
-        "text",
-        format!("“{text}” anywhere in an area",),
-        Pick::Lens(Lens::Text(text.clone())),
-    ));
+    rows.extend(
+        atlas
+            .lines
+            .iter()
+            .filter(|line| line.category.to_lowercase().contains(&text))
+            .map(|line| SearchResult {
+                kind: "quest line",
+                label: format!("{} · {} quests", line.category, line.quests.len()),
+                pick: Pick::Line(line.category.clone()),
+            }),
+    );
+    rows.extend(
+        atlas
+            .module_kinds
+            .iter()
+            .filter(|kind| kind.tag().contains(&text))
+            .take(RESULTS_PER_KIND)
+            .map(|kind| SearchResult {
+                kind: "module",
+                label: kind.tag().to_owned(),
+                pick: Pick::Lens(MapLens::Module(*kind)),
+            }),
+    );
+    rows.push(SearchResult {
+        kind: "text",
+        label: format!("“{text}” anywhere in an area"),
+        pick: Pick::Lens(MapLens::Text(text.clone())),
+    });
     let mut picked: Option<Pick> = None;
-    let enter = search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-    if enter {
-        picked = rows.first().map(|(_, _, pick)| pick.clone());
+    if search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+        picked = rows.first().map(|row| row.pick.clone());
     }
-    let anchor = search.rect.left_bottom() + Vec2::new(-8.0, 8.0);
     egui::Area::new(ui.id().with("world-search-results"))
-        .fixed_pos(anchor)
+        .fixed_pos(search.rect.left_bottom() + Vec2::new(-8.0, 8.0))
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style())
@@ -203,18 +261,18 @@ fn results(
                 .show(ui, |ui| {
                     ui.set_width(SEARCH_WIDTH + 40.0);
                     let mut last_kind = "";
-                    for (kind, label, pick) in rows.iter().take(24) {
-                        if *kind != last_kind {
-                            widgets::section(ui, kind);
-                            last_kind = kind;
+                    for row in rows.iter().take(RESULTS_SHOWN) {
+                        if row.kind != last_kind {
+                            widgets::section(ui, row.kind);
+                            last_kind = row.kind;
                         }
                         let response = ui.add(
-                            egui::Button::new(theme::mono(label).size(12.5))
+                            egui::Button::new(theme::mono(&row.label).size(12.5))
                                 .frame(false)
                                 .min_size(Vec2::new(ui.available_width(), 20.0)),
                         );
                         if response.clicked() {
-                            picked = Some(pick.clone());
+                            picked = Some(row.pick.clone());
                         }
                     }
                     ui.add_space(4.0);
@@ -227,136 +285,29 @@ fn results(
     picked
 }
 
-fn apply(editor: &mut Editor, atlas: &Atlas, layout: &Layout, pick: Pick) {
-    editor.views.world.search.clear();
+fn apply(editor: &mut Editor, map: &OpenWorldMap, pick: Pick) {
+    let view = &mut editor.views.world;
+    view.search.clear();
     match pick {
         Pick::Area(key) => {
-            super::select(editor, vec![super::Part::Card(key.clone())]);
-            let zoom = editor.views.world.zoom;
-            editor.views.world.look_at(atlas, layout, &key, zoom);
+            if let Some(area) = map.atlas.id(&key) {
+                let zoom = view.zoom;
+                view.look_at(map, area, zoom);
+            }
+            select(editor, vec![MapPart::Card(key)]);
         }
         Pick::Lens(lens) => {
-            if !editor.views.world.lenses.contains(&lens) {
-                editor.views.world.lenses.push(lens);
+            if !view.lenses.contains(&lens) {
+                view.lenses.push(lens);
             }
         }
-        Pick::Line(category) => editor.views.world.quest_line = Some(category),
-        Pick::Colour(colour) => editor.views.world.colour = Some(colour),
-    }
-}
-
-fn layers_menu(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
-    let counts = LayerCounts::of(atlas, layout);
-    let layers = &mut editor.views.world.layers;
-    for (on, label, count) in [
-        (&mut layers.warps, "warps", counts.warps),
-        (&mut layers.residents, "residents", counts.residents),
-        (&mut layers.populations, "populations", counts.populations),
-        (&mut layers.givers, "quest givers", counts.givers),
-        (&mut layers.regions, "regions and notes", counts.regions),
-    ] {
-        ui.horizontal(|ui| {
-            widgets::toggle(ui, on);
-            ui.label(RichText::new(label).size(13.0));
-            ui.with_layout(EguiLayout::right_to_left(Align::Center), |ui| {
-                ui.label(theme::faint(count.to_string()).monospace().size(12.0));
-            });
-        });
-    }
-}
-
-pub struct LayerCounts {
-    pub warps: usize,
-    pub residents: usize,
-    pub populations: usize,
-    pub givers: usize,
-    pub regions: usize,
-}
-
-impl LayerCounts {
-    pub fn of(atlas: &Atlas, layout: &Layout) -> LayerCounts {
-        LayerCounts {
-            warps: atlas.warps.len(),
-            residents: atlas.areas.values().map(|info| info.residents.len()).sum(),
-            populations: atlas
-                .areas
-                .values()
-                .map(|info| info.populations.len())
-                .sum(),
-            givers: atlas
-                .areas
-                .keys()
-                .map(|area| atlas.givers(area).len())
-                .sum(),
-            regions: layout.regions.len() + layout.notes.len(),
-        }
-    }
-}
-
-pub fn number_fields(editor: &Editor) -> Vec<String> {
-    let mut out = Vec::new();
-    for table in ["npc", "item", "quest", "shop", "area"] {
-        let Some(shape) = editor.shapes.table(table) else {
-            continue;
-        };
-        let root = &shape.shape;
-        walk(root, root, &mut vec![table.to_owned()], &mut out, 0);
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
-fn walk(
-    root: &serde_json::Value,
-    schema: &serde_json::Value,
-    path: &mut Vec<String>,
-    out: &mut Vec<String>,
-    depth: usize,
-) {
-    if depth > 5 {
-        return;
-    }
-    let schema = crate::schema::resolve(root, schema);
-    let types = crate::schema::type_names(schema);
-    if types.iter().any(|t| *t == "number" || *t == "integer") {
-        out.push(path.join("."));
-        return;
-    }
-    if let Some(items) = schema.get("items") {
-        walk(root, items, path, out, depth + 1);
-    }
-    for (name, field) in crate::schema::properties(schema) {
-        if name == "modules" || name == "type" {
-            continue;
-        }
-        path.push(name.clone());
-        walk(root, field, path, out, depth + 1);
-        path.pop();
-    }
-    for variant in ["oneOf", "anyOf"]
-        .iter()
-        .filter_map(|key| schema.get(*key))
-        .filter_map(|v| v.as_array())
-        .flatten()
-    {
-        let variant = crate::schema::resolve(root, variant);
-        match crate::schema::tag_of(variant) {
-            Some((_, tag)) => {
-                path.push(tag);
-                walk(root, variant, path, out, depth + 1);
-                path.pop();
-            }
-            None => walk(root, variant, path, out, depth + 1),
-        }
-    }
-    if let Some(modules) = schema.get("properties").and_then(|p| p.get("modules")) {
-        walk(root, modules, path, out, depth + 1);
+        Pick::Line(category) => view.quest_line = Some(category),
+        Pick::Colour(colour) => view.colour = Some(colour),
     }
 }
 
 fn colour_menu(editor: &mut Editor, ui: &mut Ui) -> Option<ColourBy> {
-    let fields = number_fields(editor);
+    let fields = ColourField::all(editor);
     let mut picked = None;
     if ui
         .add(egui::Button::new(RichText::new("none").size(13.0)).frame(false))
@@ -365,39 +316,26 @@ fn colour_menu(editor: &mut Editor, ui: &mut Ui) -> Option<ColourBy> {
         editor.views.world.colour = None;
         ui.close();
     }
+    let current = editor
+        .views
+        .world
+        .colour
+        .as_ref()
+        .map(|colour| &colour.field);
     egui::ScrollArea::vertical()
         .max_height(360.0)
         .show(ui, |ui| {
-            let mut last_table = "";
-            for field in &fields {
-                let (table, rest) = field.split_once('.').unwrap_or((field, ""));
-                if table != last_table {
-                    widgets::section(ui, table);
-                    last_table = table;
+            let mut last_table = None;
+            for field in fields {
+                if last_table != Some(field.table) {
+                    widgets::section(ui, field.table.table());
+                    last_table = Some(field.table);
                 }
-                let on = editor
-                    .views
-                    .world
-                    .colour
-                    .as_ref()
-                    .is_some_and(|c| &c.value == field);
-                if ui
-                    .add(
-                        egui::Button::new(theme::mono(rest).size(12.5))
-                            .frame(false)
-                            .selected(on),
-                    )
-                    .clicked()
-                {
-                    picked = Some(ColourBy {
-                        value: field.clone(),
-                        of: if table == "npc" {
-                            ColourOf::Hostile
-                        } else {
-                            ColourOf::Placed
-                        },
-                        show: ColourShow::Highest,
-                    });
+                let button = egui::Button::new(theme::mono(field.path_text()).size(12.5))
+                    .frame(false)
+                    .selected(current == Some(&field));
+                if ui.add(button).clicked() {
+                    picked = Some(ColourBy::new(field));
                 }
             }
         });

@@ -1,12 +1,14 @@
 use egui::{RichText, Vec2};
 use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::TileSize;
+use game::core::tiling::{GridSize, TileSize};
 use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
-use super::shapes;
-use crate::app::Editor;
-use crate::project::{Edit, row_file};
+use super::{pins, shapes};
+use crate::app::{Editor, REFUSED};
+use crate::forms;
+use crate::project::{ContentEdit, row_file};
+use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
 
 pub struct ResizeDialog {
@@ -22,14 +24,8 @@ pub fn resize_dialog(
     ctx: &egui::Context,
     mut dialog: ResizeDialog,
 ) -> Option<ResizeDialog> {
-    use crate::ui::{theme, widgets};
     let mut outcome = None;
-    let (enter, escape) = ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
-    });
+    let (enter, escape) = dialogs::keys(ctx);
     let old = editor
         .project
         .as_ref()
@@ -59,15 +55,14 @@ pub fn resize_dialog(
                         .ctx()
                         .data(|d| d.get_temp::<String>(id))
                         .unwrap_or_else(|| value.to_string());
-                    let response =
-                        crate::forms::boxed_input(ui, Some(&format!("was {was}")), |ui| {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut draft)
-                                    .frame(egui::Frame::NONE)
-                                    .font(egui::TextStyle::Monospace)
-                                    .desired_width(f32::INFINITY),
-                            )
-                        });
+                    let response = forms::boxed_input(ui, Some(&format!("was {was}")), |ui| {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut draft)
+                                .frame(egui::Frame::NONE)
+                                .font(egui::TextStyle::Monospace)
+                                .desired_width(f32::INFINITY),
+                        )
+                    });
                     if response.changed() {
                         ui.ctx().data_mut(|d| d.insert_temp(id, draft.clone()));
                         if let Ok(parsed) = draft.trim().parse::<u32>() {
@@ -159,12 +154,9 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
             _ => "on both sides".to_owned(),
         };
         Some(if delta > 0 {
-            format!(
-                "Adds {n} empty {unit}{} {where_}",
-                crate::ui::widgets::plural(n)
-            )
+            format!("Adds {n} empty {unit}{} {where_}", widgets::plural(n))
         } else {
-            format!("Clips {n} {unit}{} {where_}", crate::ui::widgets::plural(n))
+            format!("Clips {n} {unit}{} {where_}", widgets::plural(n))
         })
     };
     if let Some(text) = side(
@@ -186,16 +178,9 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
     if parts.is_empty() {
         return "The size stays as it is.".to_owned();
     }
-    let shift = |axis_anchor: i8, delta: i32| -> i32 {
-        match axis_anchor {
-            -1 => 0,
-            0 => delta / 2,
-            _ => delta,
-        }
-    };
     let (dx, dy) = (
-        shift(anchor.0, new.0 as i32 - old.0 as i32),
-        shift(anchor.1, new.1 as i32 - old.1 as i32),
+        anchor_shift(anchor.0, old.0, new.0),
+        anchor_shift(anchor.1, old.1, new.1),
     );
     let shifting = if dx == 0 && dy == 0 {
         "With this anchor nothing shifts.".to_owned()
@@ -210,6 +195,15 @@ pub(super) fn resize_description(old: (u32, u32), new: (u32, u32), anchor: (i8, 
     )
 }
 
+fn anchor_shift(anchor: i8, old: u32, new: u32) -> i32 {
+    let delta = new as i32 - old as i32;
+    match anchor {
+        -1 => 0,
+        0 => delta / 2,
+        _ => delta,
+    }
+}
+
 pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), String> {
     let content = editor
         .project
@@ -221,17 +215,10 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         .ok_or("the area is gone")?;
     let area = area::load(&content, id);
     let old = area.size.grid();
-    let new = game::core::tiling::GridSize::new(dialog.width, dialog.height);
-    let shift_for = |anchor: i8, old: u32, new: u32| -> i32 {
-        match anchor {
-            -1 => 0,
-            0 => (new as i32 - old as i32) / 2,
-            _ => new as i32 - old as i32,
-        }
-    };
+    let new = GridSize::new(dialog.width, dialog.height);
     let shift = (
-        shift_for(dialog.anchor.0, old.width, new.width),
-        shift_for(dialog.anchor.1, old.height, new.height),
+        anchor_shift(dialog.anchor.0, old.width, new.width),
+        anchor_shift(dialog.anchor.1, old.height, new.height),
     );
     let draft = super::grid::GridDraft::of(&dialog.area, area.grids);
     let (resized, clipped) = draft.resized(new, shift);
@@ -271,45 +258,38 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
             outside.join(", ")
         ));
     }
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Resize {} to {} × {} ({clipped} cells clipped)",
         dialog.area, dialog.width, dialog.height
     ));
     edit.write_json(row_file("area", &dialog.area), &row);
     resized.write_all_into(&mut edit);
     if dx != 0.0 || dy != 0.0 {
-        let project = editor.project.as_ref().ok_or("no folder")?;
-        for usage in project.usages.of_row("area", &dialog.area) {
-            let Some(parent) = usage.pointer.strip_suffix("/area") else {
-                continue;
-            };
-            let mut json = if usage.file == row_file("area", &dialog.area) {
+        let area_file = row_file("area", &dialog.area);
+        for arrival in pins::arrivals(editor, &dialog.area) {
+            let project = editor.project.as_ref().ok_or("no folder")?;
+            let mut json = if arrival.file == area_file {
                 row.clone()
             } else {
                 project
                     .files
-                    .json_owned(&usage.file)
+                    .json_owned(&arrival.file)
                     .ok_or("a file is gone")?
             };
-            let Some(place) = json.pointer_mut(parent) else {
+            let Some(place) = json.pointer_mut(&arrival.pointer) else {
                 continue;
             };
-            let (Some(x), Some(y)) = (place["x"].as_f64(), place["y"].as_f64()) else {
-                continue;
-            };
-            place["x"] = serde_json::json!(x as f32 + dx);
-            place["y"] = serde_json::json!(y as f32 + dy);
-            if usage.file == row_file("area", &dialog.area) {
+            place["x"] = serde_json::json!(arrival.at.x + dx);
+            place["y"] = serde_json::json!(arrival.at.y + dy);
+            if arrival.file == area_file {
                 row = json.clone();
-                edit.write_json(usage.file.clone(), &row);
-            } else {
-                edit.write_json(usage.file.clone(), &json);
             }
+            edit.write_json(arrival.file.clone(), &json);
         }
     }
     if editor.apply(edit) {
         Ok(())
     } else {
-        Err("refused; see the output".to_owned())
+        Err(REFUSED.to_owned())
     }
 }

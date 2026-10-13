@@ -1,10 +1,12 @@
+pub use crate::core::script::{Arrow, Link};
+
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
-use crate::core::content::Fixture;
+use crate::core::content::Content;
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, Name, OwnerKind, ValueType,
 };
@@ -25,8 +27,6 @@ use crate::systems::shop::OpenShop;
 use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
 use crate::systems::text::LineText;
 
-pub type Arrow = crate::core::script::Arrow;
-pub type Link = crate::core::script::Link;
 pub type Aim = Option<Condition>;
 
 macro_rules! effects {
@@ -148,7 +148,7 @@ pub fn refuse(world: &mut World, cx: &FlowCx, wired: Link, reason: impl Into<Str
         world,
         subject,
         Notification::new(
-            NotificationKind::error(world.resource::<crate::core::content::Content>()),
+            NotificationKind::error(world.resource::<Content>()),
             LineText::plain(reason.into()),
         ),
     );
@@ -198,13 +198,6 @@ impl EffectDef<RiftScripting> for PlaySound {
 pub enum Audience {
     Everyone,
     Subject,
-}
-
-pub fn interface_sound(
-    content: &crate::core::content::Content,
-    sound: crate::systems::interface::InterfaceSound,
-) -> SfxId {
-    sound.id(content)
 }
 
 pub fn integer(

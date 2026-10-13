@@ -1,12 +1,19 @@
 use egui::{Ui, Vec2};
 use game::core::content::Content;
+use game::core::math::{Direction, Pos, Rng};
+use game::core::tiling::Tiles;
+use game::core::time::{PlaybackRate, Seconds};
+use game::systems::actor::{Action, ActorModel, model};
 use game::systems::area;
+use game::systems::npc::NpcDef;
+use game::systems::player::PlayerDef;
 use serde_json::Value;
 
 use crate::app::Editor;
-use crate::forms::FormCx;
+use crate::forms::{FormAction, FormCx};
 use crate::project::row_file;
 use crate::ui::{theme, widgets};
+use crate::{forms, thumbs};
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
@@ -25,7 +32,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
         ui,
         "respawn",
         respawn.map_or("never".to_owned(), |after| {
-            format!("{} s", crate::forms::trim_number(after))
+            format!("{} s", forms::trim_number(after))
         }),
     );
     let scripts: Vec<String> = modules
@@ -40,12 +47,10 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
                     .map(|(k, v)| {
                         format!(
                             "{k} {}",
-                            v.as_f64()
-                                .map(crate::forms::trim_number)
-                                .unwrap_or_else(|| v
-                                    .as_str()
-                                    .map(str::to_owned)
-                                    .unwrap_or_else(|| v.to_string()))
+                            v.as_f64().map(forms::trim_number).unwrap_or_else(|| v
+                                .as_str()
+                                .map(str::to_owned)
+                                .unwrap_or_else(|| v.to_string()))
                         )
                     })
                     .collect();
@@ -67,42 +72,34 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
             scripts.join(", ")
         },
     );
-    if let Some(health) = row["stats"]["health"]
-        .as_f64()
-        .or(row["stats"]["Health"].as_f64())
-    {
-        widgets::kv_text(ui, "health", crate::forms::trim_number(health));
+    if let Some(health) = row["stats"]["health"].as_f64() {
+        widgets::kv_text(ui, "health", forms::trim_number(health));
     }
     ui.add_space(4.0);
     if widgets::chip_coloured(ui, &format!("npc/ {npc} →"), theme::INPUT, theme::CODE).clicked() {
-        cx.actions.push(crate::forms::FormAction::OpenRow {
+        cx.actions.push(FormAction::OpenRow {
             table: "npc".to_owned(),
             key: npc.clone(),
         });
     }
 }
 
-pub fn population_places(
-    area: &area::Area,
-    module: &Value,
-    seed: u64,
-) -> Vec<game::core::math::Pos<game::core::tiling::Tiles>> {
+pub fn population_places(area: &area::Area, module: &Value, seed: u64) -> Vec<Pos<Tiles>> {
     let count = module["count"].as_u64().unwrap_or(0) as usize;
-    let nodes: Vec<game::core::math::Pos<game::core::tiling::Tiles>> =
-        match super::shapes::rect_of(&module["roams"]) {
-            Some(bounds) => area
-                .wild_grid
-                .nodes()
-                .iter()
-                .copied()
-                .filter(|p| bounds.contains(*p))
-                .collect(),
-            None => area.wild_grid.nodes().to_vec(),
-        };
+    let nodes: Vec<Pos<Tiles>> = match super::shapes::rect_of(&module["roams"]) {
+        Some(bounds) => area
+            .wild_grid
+            .nodes()
+            .iter()
+            .copied()
+            .filter(|p| bounds.contains(*p))
+            .collect(),
+        None => area.wild_grid.nodes().to_vec(),
+    };
     if nodes.is_empty() {
         return Vec::new();
     }
-    let mut rng = game::core::math::Rng::new(
+    let mut rng = Rng::new(
         seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)
             .wrapping_add(module["count"].as_u64().unwrap_or(0)),
     );
@@ -111,15 +108,19 @@ pub fn population_places(
         .collect()
 }
 
+pub struct NpcSprite {
+    pub texture: egui::TextureId,
+    pub uv: egui::Rect,
+    pub drawn: Vec2,
+}
+
 pub fn npc_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
     content: Content,
     npc: &str,
-) -> Option<(egui::TextureId, egui::Rect, Vec2)> {
-    let def = content
-        .by_key::<game::systems::npc::NpcDef>(npc)?
-        .get(&content);
+) -> Option<NpcSprite> {
+    let def = content.by_key::<NpcDef>(npc)?.get(&content);
     model_sprite(editor, ctx, content, def.model)
 }
 
@@ -127,15 +128,9 @@ pub fn player_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
     content: Content,
-) -> Option<(egui::TextureId, egui::Rect, Vec2)> {
-    let player = content
-        .table::<game::systems::player::PlayerDef>()
-        .keys()
-        .first()
-        .cloned()?;
-    let def = content
-        .by_key::<game::systems::player::PlayerDef>(&player)?
-        .get(&content);
+) -> Option<NpcSprite> {
+    let player = content.table::<PlayerDef>().keys().first().cloned()?;
+    let def = content.by_key::<PlayerDef>(&player)?.get(&content);
     model_sprite(editor, ctx, content, def.model)
 }
 
@@ -143,27 +138,26 @@ pub fn model_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
     content: Content,
-    model: game::systems::actor::bust::Id,
-) -> Option<(egui::TextureId, egui::Rect, Vec2)> {
-    let model = game::systems::actor::model(&content, model);
+    model: model::Id,
+) -> Option<NpcSprite> {
+    let model = ActorModel::get(&content, model);
     let project = editor.project.as_ref()?;
     let thumb = editor
         .form
         .thumbnails
         .image(ctx, &project.files, model.sheet().as_str())?;
-    let region = model.frame(
-        game::systems::actor::Action::Idle,
-        game::core::math::Direction::S,
-        game::core::time::Seconds(0.0),
-        game::core::time::PlaybackRate(1.0),
-    );
+    let region = model.frame(Action::Idle, Direction::S, Seconds(0.0), PlaybackRate(1.0));
     let drawn = model.drawn_size(region);
-    let uv = crate::thumbs::uv(
+    let uv = thumbs::uv(
         thumb.size,
         region.min().x,
         region.min().y,
         region.size.width,
         region.size.height,
     );
-    Some((thumb.texture.id(), uv, Vec2::new(drawn.width, drawn.height)))
+    Some(NpcSprite {
+        texture: thumb.texture.id(),
+        uv,
+        drawn: Vec2::new(drawn.width, drawn.height),
+    })
 }

@@ -2,8 +2,8 @@ use egui::{Align, Layout, Sense, Ui};
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::{Selection, row_of};
-use crate::tabs::Tab;
+use crate::project::{RowSelection, row_of};
+use crate::tabs::EditorTab;
 
 pub fn show_used_by(editor: &mut Editor, ui: &mut Ui) {
     let selection = editor.selection.clone();
@@ -80,8 +80,8 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &
     if let Some(file) = open
         && let Some((table, key)) = file.split_once('/')
     {
-        editor.select(Selection::row(table, key));
-        editor.open_tab(Tab::for_row(table, key));
+        editor.select(RowSelection::row(table, key));
+        editor.open_tab(EditorTab::for_row(table, key));
     }
 }
 
@@ -150,7 +150,7 @@ pub(super) fn show_asset_usages(editor: &mut Editor, ui: &mut Ui, path: &str) {
     if let Some(file) = open
         && let Some((table, key)) = row_of(&file)
     {
-        editor.select(Selection::row(table, key));
-        editor.open_tab(Tab::for_row(table, key));
+        editor.select(RowSelection::row(table, key));
+        editor.open_tab(EditorTab::for_row(table, key));
     }
 }

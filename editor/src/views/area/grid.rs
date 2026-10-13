@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 
+use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::{Cell, CellPos, GridSize, Tiles};
+use game::core::tiling::{self, Cell, CellPos, GridSize, NEIGHBORS_4, Tiles};
 use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteEntry, PaletteRow};
 
-use crate::project::Edit;
+use crate::project::{ContentEdit, ProjectFiles, text_bytes};
 
 #[derive(Clone)]
 pub struct GridDraft {
@@ -40,8 +41,7 @@ impl GridDraft {
     }
 
     pub fn cells(&self) -> impl Iterator<Item = CellPos> {
-        let (w, h) = (self.size.width as i32, self.size.height as i32);
-        (0..h).flat_map(move |y| (0..w).map(move |x| CellPos::new(x, y)))
+        tiling::cells(self.size)
     }
 
     pub fn entry(&self, index: u32) -> Option<&PaletteRow> {
@@ -119,7 +119,7 @@ impl GridDraft {
         seen[start_index] = true;
         while let Some(cell) = stack.pop() {
             out.push(cell);
-            for (dx, dy) in game::core::tiling::NEIGHBORS_4 {
+            for (dx, dy) in NEIGHBORS_4 {
                 let next = cell.step((dx, dy));
                 if let Some(index) = self.index(next)
                     && !seen[index]
@@ -188,46 +188,35 @@ impl GridDraft {
         self.touched.insert(GridPart::Palette);
     }
 
-    pub fn write_into(&self, edit: &mut Edit) {
+    pub fn write_into(&self, edit: &mut ContentEdit) {
         self.write_parts(edit, |part| self.touched.contains(part));
     }
 
-    pub fn write_all_into(&self, edit: &mut Edit) {
+    pub fn write_all_into(&self, edit: &mut ContentEdit) {
         self.write_parts(edit, |_| true);
     }
 
-    fn write_parts(&self, edit: &mut Edit, wanted: impl Fn(&GridPart) -> bool) {
+    fn write_parts(&self, edit: &mut ContentEdit, wanted: impl Fn(&GridPart) -> bool) {
         let folder = grid::folder(&self.area);
-        let grids = self.as_grids();
         if wanted(&GridPart::Palette) {
             edit.write(
-                format!("{folder}/{}", grid::PALETTE_FILE),
-                bytes(grids.write_palette()),
+                grid::palette_file(&self.area),
+                text_bytes(grid::write_palette(&self.palette)),
             );
         }
         if wanted(&GridPart::Walk) {
             edit.write(
                 format!("{folder}/{}", grid::WALK_FILE),
-                bytes(grids.write_walk()),
+                text_bytes(grid::write_walk(self.size, &self.walk)),
             );
         }
-        for layer in &grids.ground {
+        for layer in &self.ground {
             if wanted(&GridPart::Layer(layer.name.clone())) {
                 edit.write(
                     format!("{folder}/{}", grid::layer_file(&layer.name)),
-                    bytes(grids.write_layer(layer)),
+                    text_bytes(grid::write_layer(self.size, layer)),
                 );
             }
-        }
-    }
-
-    fn as_grids(&self) -> AreaGrids {
-        AreaGrids {
-            size: self.size,
-            palette: Vec::new(),
-            palette_keys: self.palette.clone(),
-            ground: self.ground.clone(),
-            walk: self.walk.clone(),
         }
     }
 
@@ -268,27 +257,25 @@ impl GridDraft {
         (out, clipped)
     }
 
-    pub fn palette_entries(
-        &self,
-        content: &game::core::content::Content,
-    ) -> Vec<Option<PaletteEntry>> {
+    pub fn palette_entries(&self, content: &Content) -> Vec<Option<PaletteEntry>> {
         self.palette
             .iter()
-            .map(|row| {
-                let id =
-                    content.by_key::<game::systems::area::tileset::TilesetDef>(&row.tileset)?;
-                Some(PaletteEntry {
-                    tileset: id,
-                    tile: row.tile,
-                    flip: row.flip,
-                })
-            })
+            .map(|row| row.resolve(content))
             .collect()
     }
 }
 
-fn bytes(text: String) -> crate::project::Bytes {
-    crate::project::Bytes::from(text.into_bytes())
+pub fn palettes(files: &ProjectFiles) -> Vec<(String, Vec<PaletteRow>)> {
+    files
+        .paths_under("tables/")
+        .filter_map(|path| {
+            let area = grid::area_of_palette_file(path)?;
+            let text = files.text(path)?;
+            let file = grid::GridFile { path, text: &text };
+            let rows = grid::read_palette(file, &mut Vec::new())?;
+            Some((area.to_owned(), rows))
+        })
+        .collect()
 }
 
 pub fn brush_cells(center: CellPos, size: u32) -> Vec<CellPos> {

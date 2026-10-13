@@ -1,4 +1,4 @@
-mod loader;
+pub mod loader;
 pub mod mix;
 pub mod playback;
 pub mod soundscape;

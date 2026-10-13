@@ -1,11 +1,14 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
-use game::core::content::Content;
+use game::core::content::{Content, load};
 use game::systems::area;
 use serde_json::Value;
 
 use super::grid;
-use crate::app::{ConfirmAction, ConfirmDialog, Dialog, Editor};
-use crate::project::{Edit, row_file};
+use crate::app::{
+    ConfirmAction, ConfirmDialog, Editor, ModalDialog, REFUSED, RenameDialog, RenameTarget,
+};
+use crate::project::{ContentEdit, row_file};
+use crate::rows;
 use crate::ui::{theme, widgets};
 
 const WIDTH: f32 = 190.0;
@@ -65,13 +68,16 @@ pub fn popover(
                 RichText::new("LAYERS")
                     .size(11.0)
                     .color(theme::MUTED)
-                    .family(egui::FontFamily::Name("medium".into())),
+                    .family(theme::medium()),
             );
             widgets::section(ui, "Ground · under everyone");
-            let active = editor.views.area.views[view_key]
+            let active = editor
+                .views
+                .area
+                .view(view_key)
                 .layer
                 .min(layers.len().saturating_sub(1));
-            let view = editor.views.area.views.get_mut(view_key).expect("view");
+            let view = editor.views.area.view_mut(view_key);
             for (index, name) in layers.iter().enumerate() {
                 let hidden = view.hidden_ground.contains(name);
                 let response = eye_row(ui, name, !hidden, index == active, None);
@@ -143,76 +149,49 @@ pub fn popover(
     };
     match action {
         LayerAction::Pick(index) => {
-            editor
-                .views
-                .area
-                .views
-                .get_mut(view_key)
-                .expect("view")
-                .layer = index;
+            editor.views.area.view_mut(view_key).layer = index;
         }
         LayerAction::Add => {
-            let name = unique_layer(&layers, "layer");
+            let name = rows::free_name("layer", &layers.iter().cloned().collect());
             let mut row = row.clone();
-            row["map"]["ground"]
-                .as_array_mut()
-                .expect("layers")
-                .push(Value::String(name.clone()));
+            let mut layers = layers.clone();
+            layers.push(name.clone());
+            row["map"]["ground"] = serde_json::json!(layers);
             let grids = area::load(&content, area_id).grids;
             let mut draft = grid::GridDraft::of(&area_key, grids);
             draft.add_layer(&name);
-            let mut edit = Edit::new(format!("Add layer {name} to {area_key}"));
+            let mut edit = ContentEdit::new(format!("Add layer {name} to {area_key}"));
             edit.write_json(row_file("area", &area_key), &row);
             draft.write_into(&mut edit);
             if editor.apply(edit) {
-                editor
-                    .views
-                    .area
-                    .views
-                    .get_mut(view_key)
-                    .expect("view")
-                    .layer = layers.len();
+                editor.views.area.view_mut(view_key).layer = layers.len();
             }
         }
         LayerAction::Rename(index) => {
             let name = layers[index].clone();
-            let draft_key = format!("rename-layer:{area_key}:{name}");
-            editor
-                .form
-                .drafts
-                .insert(egui::Id::new(&draft_key), name.clone());
-            editor
-                .dialogs
-                .push(Dialog::Rename(crate::app::RenameDialog {
-                    target: crate::app::RenameTarget::Layer {
-                        area: area_key.to_owned(),
-                        layer: name.clone(),
-                    },
-                    draft: name,
-                    error: None,
-                }));
+            editor.dialogs.push(ModalDialog::Rename(RenameDialog {
+                target: RenameTarget::Layer {
+                    area: area_key.to_owned(),
+                    layer: name.clone(),
+                },
+                draft: name,
+                error: None,
+            }));
         }
         LayerAction::Swap(a, b) => {
             let mut row = row.clone();
-            row["map"]["ground"]
-                .as_array_mut()
-                .expect("layers")
-                .swap(a, b);
-            let mut edit = Edit::new(format!("Reorder layers of {area_key}"));
+            let mut layers = layers.clone();
+            layers.swap(a, b);
+            row["map"]["ground"] = serde_json::json!(layers);
+            let mut edit = ContentEdit::new(format!("Reorder layers of {area_key}"));
             edit.write_json(row_file("area", &area_key), &row);
             if editor.apply(edit) {
-                editor
-                    .views
-                    .area
-                    .views
-                    .get_mut(view_key)
-                    .expect("view")
-                    .layer = b;
+                editor.views.area.view_mut(view_key).layer = b;
             }
         }
         LayerAction::Delete(index) => {
             let name = layers[index].clone();
-            editor.dialogs.push(Dialog::Confirm(ConfirmDialog {
+            editor.dialogs.push(ModalDialog::Confirm(ConfirmDialog {
                 title: format!("Delete layer {name}?"),
                 body: format!("Every tile of {name} in {area_key} goes with it. One undo step."),
                 label: "Delete layer".to_owned(),
@@ -289,20 +268,53 @@ fn draw_eye(painter: &egui::Painter, c: Pos2, open: bool, ink: Color32) {
     }
 }
 
+pub fn rename_layer(
+    editor: &mut Editor,
+    area_key: &str,
+    from: &str,
+    to: &str,
+) -> Result<(), String> {
+    let Some(mut row) = editor.row_value("area", area_key) else {
+        return Err("the area is gone".to_owned());
+    };
+    let layers = row["map"]["ground"].as_array_mut().ok_or("no layers")?;
+    if layers
+        .iter()
+        .any(|l| l.as_str().is_some_and(|l| l.eq_ignore_ascii_case(to)))
+    {
+        return Err(format!("{to} is already a layer"));
+    }
+    if to == "palette" || to == "walk" || !load::valid_key(to) {
+        return Err("a layer name is a key that isn't palette or walk".to_owned());
+    }
+    for layer in layers.iter_mut() {
+        if layer.as_str() == Some(from) {
+            *layer = Value::String(to.to_owned());
+        }
+    }
+    let project = editor.project.as_ref().ok_or("no folder")?;
+    let folder = area::grid::folder(area_key);
+    let old = format!("{folder}/{}", area::grid::layer_file(from));
+    let bytes = project
+        .files
+        .get(&old)
+        .cloned()
+        .ok_or("the layer file is gone")?;
+    let mut edit = ContentEdit::new(format!("Rename layer {from} of {area_key} to {to}"));
+    edit.write_json(row_file("area", area_key), &row);
+    edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
+    edit.remove(old);
+    if editor.apply(edit) {
+        Ok(())
+    } else {
+        Err(REFUSED.to_owned())
+    }
+}
+
 enum LayerAction {
     Pick(usize),
     Add,
     Rename(usize),
     Swap(usize, usize),
     Delete(usize),
-}
-
-fn unique_layer(layers: &[String], base: &str) -> String {
-    if !layers.iter().any(|l| l.eq_ignore_ascii_case(base)) {
-        return base.to_owned();
-    }
-    (2..)
-        .map(|n| format!("{base}_{n}"))
-        .find(|candidate| !layers.iter().any(|l| l.eq_ignore_ascii_case(candidate)))
-        .expect("a free layer name")
 }

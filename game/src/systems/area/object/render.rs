@@ -8,6 +8,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Hitbox;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::Position;
+use crate::systems::scene::Scene as GameScene;
 
 pub struct ObjectPlugin;
 
@@ -16,7 +17,7 @@ impl Plugin for ObjectPlugin {
         app.add_observer(attach_look).add_systems(
             Update,
             place_objects
-                .run_if(in_state(crate::systems::scene::Scene::Area))
+                .run_if(in_state(GameScene::Area))
                 .in_set(WorldViewSystems),
         );
     }
@@ -49,11 +50,11 @@ fn attach_look(
 }
 
 fn place_objects(
-    service: Res<Content>,
+    content: Res<Content>,
     mut objects: Query<(&Position, &Hitbox, &AreaTag, &mut Transform), With<AreaObject>>,
 ) {
     for (position, hitbox, tag, mut transform) in &mut objects {
-        let area = area::load(&service, tag.area);
+        let area = area::load(&content, tag.area);
         let z = dynamic_z(area.size.height, area.sort_base(), Tiles(position.pos.y));
         let center = position.pos.hitbox(hitbox.size).center();
         *transform = sprite_transform(center, z);

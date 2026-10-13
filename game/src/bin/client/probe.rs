@@ -15,9 +15,9 @@ use game::core::render::tile_to_window;
 use game::core::render::transition::ScreenTransitionPhase;
 use game::core::script::{OwnerKind, OwnerRow};
 use game::core::tiling::{TilePos, Tiles};
-use game::systems::actor::{self, Actor, Hitbox};
+use game::systems::actor::{self, Actor, ActorModel, Hitbox, model};
 use game::systems::area::{self, AreaModule, AreaObject, AreaTag};
-use game::systems::attention::{Attention, StatusBadges};
+use game::systems::attention::{Attention, Id as AttentionId, StatusBadges};
 use game::systems::combat::{self, Attitude};
 use game::systems::dialogue::stage;
 use game::systems::history::widget::{self as history, HistoryBook};
@@ -25,16 +25,17 @@ use game::systems::history::{HistoryMark, HistoryRecord, HistoryTopic, RecordTal
 use game::systems::input::map::InputMap;
 use game::systems::interact;
 use game::systems::item::card::ItemCardWindow;
-use game::systems::item::{self, DroppedItem, Inventory};
+use game::systems::item::{self, DroppedItem, Id as ItemId, Inventory};
 use game::systems::movement::Position;
 use game::systems::notification::{
     NotificationRows, alert, bubble, caption, error, feed, intro, milestone,
 };
-use game::systems::npc::Npc;
+use game::systems::npc::{Id as NpcId, Npc};
 use game::systems::player::{Owner, commands_locked, session};
-use game::systems::quest::{Parties, QuestLog, QuestResult};
+use game::systems::quest::{Id as QuestId, Parties, QuestLog, QuestResult};
 use game::systems::script::{Reach, RiftScripts};
 use game::systems::shop;
+use game::systems::shop::Id as ShopId;
 use game::systems::stat::{StatKind, Stats};
 use serde::Serialize;
 
@@ -109,12 +110,12 @@ struct Voice {
 struct Quests {
     active: Vec<QuestEntry>,
     finished: Vec<FinishedEntry>,
-    tracked: Vec<game::systems::quest::Id>,
+    tracked: Vec<QuestId>,
 }
 
 #[derive(Serialize)]
 struct QuestEntry {
-    quest: game::systems::quest::Id,
+    quest: QuestId,
     ready: bool,
     left: Option<f32>,
     progress: Vec<[u32; 2]>,
@@ -122,7 +123,7 @@ struct QuestEntry {
 
 #[derive(Serialize)]
 struct FinishedEntry {
-    quest: game::systems::quest::Id,
+    quest: QuestId,
     result: QuestResult,
 }
 
@@ -136,20 +137,20 @@ struct Cover {
 
 #[derive(Serialize)]
 struct ItemCard {
-    item: game::systems::item::Id,
+    item: ItemId,
     rect: Cover,
 }
 
 #[derive(Serialize)]
 struct Shop {
-    shop: game::systems::shop::Id,
+    shop: ShopId,
     offers: Vec<Offer>,
     buyback: Vec<Stack>,
 }
 
 #[derive(Serialize)]
 struct Offer {
-    item: game::systems::item::Id,
+    item: ItemId,
     count: u32,
     left: Option<u32>,
     refusal: Option<String>,
@@ -157,7 +158,7 @@ struct Offer {
 
 #[derive(Serialize)]
 struct Stack {
-    item: game::systems::item::Id,
+    item: ItemId,
     count: u32,
 }
 
@@ -187,7 +188,7 @@ struct Notifications {
 #[derive(Serialize)]
 struct BubbleView {
     speaker: String,
-    npc: game::systems::npc::Id,
+    npc: NpcId,
     body: Option<String>,
     replaced: u32,
     lines: Vec<String>,
@@ -280,7 +281,7 @@ struct View {
 struct Body {
     id: String,
     name: String,
-    model: game::systems::actor::bust::Id,
+    model: model::Id,
     flies: bool,
     player: bool,
     at: Pos<Tiles>,
@@ -288,12 +289,12 @@ struct Body {
     hitbox: Rect<Tiles>,
     health: f32,
     max_health: f32,
-    npc: Option<game::systems::npc::Id>,
+    npc: Option<NpcId>,
     role: Option<&'static str>,
     friendly: bool,
     locked: bool,
-    marks: Vec<game::systems::attention::Id>,
-    badges: Vec<game::systems::attention::Id>,
+    marks: Vec<AttentionId>,
+    badges: Vec<AttentionId>,
 }
 
 #[derive(Serialize)]
@@ -304,12 +305,12 @@ struct Fixture {
     at: Pos<Tiles>,
     aim: Pos<Tiles>,
     hitbox: Rect<Tiles>,
-    marks: Vec<game::systems::attention::Id>,
+    marks: Vec<AttentionId>,
 }
 
 #[derive(Serialize)]
 struct GroundItem {
-    item: game::systems::item::Id,
+    item: ItemId,
     count: u32,
     at: Pos<Tiles>,
 }
@@ -575,7 +576,7 @@ fn body(world: &World, entity: Entity) -> Option<Body> {
     let at = entity.get::<Position>()?.pos;
     let hitbox = at.hitbox(entity.get::<Hitbox>()?.size);
     let model = entity.get::<Actor>()?.model;
-    let flies = actor::model(world.resource::<Content>(), model).airborne();
+    let flies = ActorModel::get(world.resource::<Content>(), model).airborne();
     let stat = |kind| entity.get::<Stats>().map_or(0.0, |stats| stats.get(kind));
     Some(Body {
         id: entity.id().to_string(),

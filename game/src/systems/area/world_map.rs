@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::content::{ContentId, ContentRow, Fixture, Loading, RowCheck, serial};
+use crate::core::math::Pos;
 
 pub type Id = ContentId<WorldMapDef>;
 
@@ -57,16 +58,17 @@ impl ContentRow for WorldMapDef {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WorldMapTiles {}
+
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Card {
-    pub x: f32,
-    pub y: f32,
+    #[schemars(with = "serial::PosRow")]
+    #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
+    pub at: Pos<WorldMapTiles>,
     pub size: u32,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::core::content::serial::is_false"
-    )]
+    #[serde(default, skip_serializing_if = "serial::is_false")]
     pub pinned: bool,
 }
 
@@ -76,7 +78,29 @@ pub struct Region {
     pub name: String,
     pub cards: Vec<super::Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub colour: Option<String>,
+    pub colour: Option<RegionColour>,
+}
+
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::IntoStaticStr,
+    strum::VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum RegionColour {
+    Amber,
+    Green,
+    Blue,
+    Red,
+    Violet,
 }
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]

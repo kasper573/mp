@@ -121,7 +121,7 @@ impl WsTransport {
             };
             if let Ok(packets) = server.get_packets_to_send(client) {
                 for packet in packets {
-                    if out.send(packet).is_err() {
+                    if out.send(packet.clone()).is_err() {
                         break; // writer task gone; the reader will report the disconnect
                     }
                 }

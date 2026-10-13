@@ -43,6 +43,19 @@ pub enum Direction {
     W = 7,
 }
 
+impl Direction {
+    pub const ALL: [Direction; 8] = [
+        Direction::S,
+        Direction::SW,
+        Direction::W,
+        Direction::NW,
+        Direction::N,
+        Direction::NE,
+        Direction::E,
+        Direction::SE,
+    ];
+}
+
 impl<U> From<Offset<U>> for Direction {
     fn from(v: Offset<U>) -> Direction {
         if v.x == 0.0 && v.y == 0.0 {
@@ -88,6 +101,10 @@ impl Rng {
 
     pub fn rand_float(&mut self) -> f32 {
         self.0.rand_float()
+    }
+
+    pub fn choose<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
+        (!items.is_empty()).then(|| &items[self.rand_range(0..items.len() as u32) as usize])
     }
 
     pub fn rand_range(&mut self, range: std::ops::Range<u32>) -> u32 {

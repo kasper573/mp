@@ -1,8 +1,8 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::{Objective, QuestId};
 use crate::core::content::{Content, Fixture};
@@ -10,6 +10,7 @@ use crate::core::script::{
     Answer, Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, Reveal,
 };
 use crate::systems::dialogue::{self, CardOffer, ChoiceChip, ChoiceTag, ConversationPanel};
+use crate::systems::item::{Inventory, ItemStack};
 use crate::systems::script::condition;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
 use crate::systems::script::{Reach, RiftScripting};
@@ -383,10 +384,10 @@ fn offer_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer> {
 fn turn_in_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer> {
     let content = world.resource::<Content>();
     let def = quest.get(content);
-    let inventory = world.get::<crate::systems::item::Inventory>(player);
+    let inventory = world.get::<Inventory>(player);
     let have = |item| inventory.map_or(0, |inventory| inventory.count(item));
     let chips =
-        |pick: Option<crate::systems::item::ItemStack>| {
+        |pick: Option<ItemStack>| {
             let mut chips = Vec::new();
             if def.reveals(Reveal::Costs) {
                 chips.extend(def.hand_in().iter().map(|stack| ChoiceChip::Pays {

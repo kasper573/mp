@@ -3,6 +3,13 @@ pub mod effect;
 pub mod event;
 pub mod query;
 
+pub use effect::RiftEffect;
+pub use event::{EventKind, RiftEvent, Who};
+pub use query::RiftQuery;
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -10,30 +17,23 @@ use serde::{Deserialize, Serialize};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, row_file};
 use crate::core::math::Pos;
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use crate::core::script::{
     self, BoxEnding, DialogueView, Expr, FlowKey, Instances, LineDef, Owner, OwnerKind, OwnerRow,
     ScriptError, Scripts, Vocabulary, compile::compile_owner,
 };
 use crate::core::tiling::Tiles;
-use crate::systems::actor::bust::Face;
+use crate::systems::actor::model::Face;
 use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaObject};
-use crate::systems::dialogue;
-use crate::systems::item::ItemDef;
-use crate::systems::job::JobDef;
-use crate::systems::memory::MemoryDef;
-use crate::systems::notification::NotificationDef;
-use crate::systems::npc::{Npc, NpcDef};
-use crate::systems::quest::QuestDef;
-use crate::systems::shop::ShopDef;
+use crate::systems::item::{Id as ItemId, ItemDef, ItemKind};
+use crate::systems::job::{Id as JobId, JobDef};
+use crate::systems::memory::{Id as MemoryId, MemoryDef};
+use crate::systems::notification::{Id as NotificationId, NotificationDef};
+use crate::systems::npc::{Id as NpcId, Npc, NpcDef};
+use crate::systems::quest::{Id as QuestId, Parties, QuestDef};
+use crate::systems::shop::{Id as ShopId, ShopDef};
 use crate::systems::text::Span;
-
-pub use effect::RiftEffect;
-pub use event::{EventKind, RiftEvent, Who};
-pub use query::RiftQuery;
+use crate::systems::{WorldArea, dialogue};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RiftScripting;
@@ -104,13 +104,13 @@ impl From<Place> for PlaceRow {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowRef {
     Area(area::Id),
-    Item(crate::systems::item::Id),
-    Npc(crate::systems::npc::Id),
-    Quest(crate::systems::quest::Id),
-    Shop(crate::systems::shop::Id),
-    Memory(crate::systems::memory::Id),
-    Notification(crate::systems::notification::Id),
-    Job(crate::systems::job::Id),
+    Item(ItemId),
+    Npc(NpcId),
+    Quest(QuestId),
+    Shop(ShopId),
+    Memory(MemoryId),
+    Notification(NotificationId),
+    Job(JobId),
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -132,7 +132,7 @@ struct LineRow {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum SpeakerRow {
     Npc {
-        npc: crate::systems::npc::Id,
+        npc: NpcId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         face: Option<Face>,
     },
@@ -176,7 +176,7 @@ impl From<Line> for LineRow {
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Speaker {
-    Npc(crate::systems::npc::Id),
+    Npc(NpcId),
     Object,
     Narrator,
     Player,
@@ -197,17 +197,17 @@ impl LineDef<RiftScripting> for Line {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Reach {
     Warp(Place),
-    Takes(crate::systems::item::Id),
-    Gives(crate::systems::item::Id),
-    Drops(crate::systems::item::Id),
-    Offers(crate::systems::quest::Id),
-    Accepts(crate::systems::quest::Id),
-    TurnsIn(crate::systems::quest::Id),
-    Fails(crate::systems::quest::Id),
-    Completes(crate::systems::quest::Id),
-    Remembers(crate::systems::memory::Id),
-    OpensShop(crate::systems::shop::Id),
-    Spawns(crate::systems::npc::Id),
+    Takes(ItemId),
+    Gives(ItemId),
+    Drops(ItemId),
+    Offers(QuestId),
+    Accepts(QuestId),
+    TurnsIn(QuestId),
+    Fails(QuestId),
+    Completes(QuestId),
+    Remembers(MemoryId),
+    OpensShop(ShopId),
+    Spawns(NpcId),
     Hostile,
     Friendly,
     Despawns,
@@ -217,11 +217,11 @@ pub enum Reach {
     Heals,
     Buffs,
     GrantsXp,
-    SetsJob(crate::systems::job::Id),
-    Notifies(crate::systems::notification::Id),
+    SetsJob(JobId),
+    Notifies(NotificationId),
     Says,
     Plays(SfxId),
-    Speaks(crate::systems::npc::Id),
+    Speaks(NpcId),
 }
 
 impl Vocabulary for RiftScripting {
@@ -539,7 +539,7 @@ pub fn run_tick(world: &mut World) {
 
 pub fn spawn_stateless(world: &mut World) {
     let scripts = world.resource::<RiftScripts>().clone();
-    let area = world.resource::<crate::systems::WorldArea>().0;
+    let area = world.resource::<WorldArea>().0;
     let mut instances = world.resource_mut::<RiftInstances>();
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
@@ -663,7 +663,7 @@ pub fn check_all(loading: &mut Loading) {
         }
     }
     for (id, def) in loading.rows::<ItemDef>() {
-        let usable = matches!(def.kind, crate::systems::item::ItemKind::Usable);
+        let usable = matches!(def.kind, ItemKind::Usable);
         let answers = scripts
             .may_do(OwnerRow {
                 kind: OwnerKind::Item,
@@ -701,7 +701,7 @@ pub fn check_all(loading: &mut Loading) {
             );
         }
     }
-    let parties = crate::systems::quest::Parties::of(&content, scripts);
+    let parties = Parties::of(&content, scripts);
     crate::systems::quest::check_parties(loading, scripts, &parties);
     loading.built(parties);
 }

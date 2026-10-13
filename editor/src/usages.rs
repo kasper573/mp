@@ -4,38 +4,39 @@ use game::core::content::id::LeafKind;
 use game::core::content::{Content, Reference};
 use rayon::prelude::*;
 
-use crate::project::Files;
+use crate::app::registry;
+use crate::project::{GAME_FILE, ProjectFiles};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Usage {
+pub struct ContentUsage {
     pub file: String,
     pub pointer: String,
     pub known: bool,
 }
 
 #[derive(Default)]
-pub struct Usages {
-    rows: HashMap<(String, String), Vec<Usage>>,
-    assets: HashMap<String, Vec<Usage>>,
+pub struct ContentUsages {
+    rows: HashMap<(String, String), Vec<ContentUsage>>,
+    assets: HashMap<String, Vec<ContentUsage>>,
     by_file: HashMap<String, Vec<Reference>>,
 }
 
-impl Usages {
-    pub fn build(content: &Content, files: &Files) -> Usages {
-        let registry = game::systems::registry();
+impl ContentUsages {
+    pub fn build(content: &Content, files: &ProjectFiles) -> ContentUsages {
+        let registry = registry();
         let texts: Vec<(&String, String)> = files
             .iter()
-            .filter(|(path, _)| path.as_str() == "game.json" || path.ends_with(".json"))
+            .filter(|(path, _)| path.as_str() == GAME_FILE || path.ends_with(".json"))
             .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes.to_vec()).ok()?)))
             .collect();
         let parsed: Vec<(String, Vec<Reference>)> = texts
             .par_iter()
             .map(|(path, text)| ((*path).clone(), registry.references(content, path, text)))
             .collect();
-        let mut usages = Usages::default();
+        let mut usages = ContentUsages::default();
         for (file, references) in parsed {
             for reference in &references {
-                let usage = Usage {
+                let usage = ContentUsage {
                     file: file.clone(),
                     pointer: reference.pointer.clone(),
                     known: reference.known,
@@ -58,13 +59,13 @@ impl Usages {
         usages
     }
 
-    pub fn of_row(&self, table: &str, key: &str) -> &[Usage] {
+    pub fn of_row(&self, table: &str, key: &str) -> &[ContentUsage] {
         self.rows
             .get(&(table.to_owned(), key.to_owned()))
             .map_or(&[], Vec::as_slice)
     }
 
-    pub fn of_asset(&self, path: &str) -> &[Usage] {
+    pub fn of_asset(&self, path: &str) -> &[ContentUsage] {
         self.assets.get(path).map_or(&[], Vec::as_slice)
     }
 

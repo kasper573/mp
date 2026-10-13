@@ -58,6 +58,27 @@ impl ContentRow for CharacterSnapshot {
     const TABLE: &'static str = "test_character";
 }
 
+impl CharacterSnapshot {
+    pub fn fresh(name: &str, job: job::Id) -> CharacterSnapshot {
+        CharacterSnapshot {
+            name: name.to_owned(),
+            job,
+            xp: 0,
+            stats: StatMap::default(),
+            effects: Vec::new(),
+            bag: Vec::new(),
+            equipment: BTreeMap::new(),
+            known_areas: Vec::new(),
+            quests: Vec::new(),
+            memories: Vec::new(),
+            lines_heard: Vec::new(),
+            shops: Vec::new(),
+            history: Vec::new(),
+            start: CharacterStart::InitialSpawn(AtInitialSpawn::InitialSpawn),
+        }
+    }
+}
+
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CharacterStart {
@@ -304,16 +325,14 @@ fn quest_log(content: &Content, snapshot: &CharacterSnapshot, clock: WallClock) 
                 log.active.push(active);
                 log.tracked.push(entry.quest);
             }
-            QuestState::Completed | QuestState::Failed => log.finished.push(FinishedQuest {
-                quest: entry.quest,
-                result: match entry.state {
+            QuestState::Completed | QuestState::Failed => {
+                let result = match entry.state {
                     QuestState::Failed => QuestResult::Failed,
                     _ => QuestResult::Completed,
-                },
-                day: clock.day(),
-                resets_in: None,
-                offered_again: false,
-            }),
+                };
+                log.finished
+                    .push(FinishedQuest::new(entry.quest, result, clock.day()));
+            }
         }
     }
     log

@@ -1,41 +1,44 @@
 use egui::{Pos2, RichText, Ui, Vec2};
 use game::core::math::Pos;
-use game::core::tiling::{TilePos, Tiles};
+use game::core::tiling::{CellPos, TilePos, Tiles};
 use game::systems::area::AreaModuleKind;
+use game::systems::script::Place;
 use serde_json::Value;
 
 use super::select::{copy_selection, delete_selection, duplicate_selection, start_paste};
-use super::{Frame, Tool, ViewState, blueprint, pins, shapes};
-use super::{pick, placement, scenery};
+use super::{AreaFrame, AreaTool, AreaViewState, DeferredAreaAction, blueprint, pins, shapes};
+use super::{pick, placement};
 use crate::app::Editor;
-use crate::project::{Edit, Selection, row_file};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use crate::{play, schema};
 
 #[derive(Clone, Copy)]
-pub struct MenuAnchor {
+pub struct AreaMenuAnchor {
     pub at: Pos2,
     pub tile: Pos<Tiles>,
 }
 
-pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &Frame) {
+pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaFrame) {
     let Some(tile) = frame.pointer_tile else {
         return;
     };
-    let view = editor.views.area.views.get_mut(view_key).expect("view");
+    let view = editor.views.area.view_mut(view_key);
     view.cursor_cell = Some(tile.cell());
     view.drag = None;
-    let selecting = view.tool == Tool::Select;
+    let selecting = view.tool == AreaTool::Select;
     if selecting && let Some(hit) = frame.hit(tile) {
         let part = format!("/modules/{hit}");
         if !super::selected_parts(editor, &frame.area_key).contains(&part) {
-            editor.selection = Selection {
+            editor.selection = RowSelection {
                 table: "area".to_owned(),
                 keys: vec![frame.area_key.clone()],
                 parts: vec![part],
             };
         }
     }
-    let view = editor.views.area.views.get_mut(view_key).expect("view");
+    let view = editor.views.area.view_mut(view_key);
     open_menu(
         &frame.response.ctx,
         view,
@@ -49,7 +52,7 @@ pub(super) fn open_add_menu(
     ui: &mut Ui,
     editor: &mut Editor,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
     tile: Pos<Tiles>,
 ) {
     if let Some(view) = editor.views.area.views.get_mut(view_key) {
@@ -60,13 +63,13 @@ pub(super) fn open_add_menu(
 
 pub(super) fn open_menu(
     ctx: &egui::Context,
-    view: &mut ViewState,
+    view: &mut AreaViewState,
     view_key: &str,
     at: Pos2,
     tile: Pos<Tiles>,
 ) {
     egui::Popup::open_id(ctx, menu_id(view_key));
-    view.menu = Some(MenuAnchor { at, tile });
+    view.menu = Some(AreaMenuAnchor { at, tile });
 }
 
 fn menu_id(view_key: &str) -> egui::Id {
@@ -74,7 +77,6 @@ fn menu_id(view_key: &str) -> egui::Id {
 }
 
 pub fn module_menu_row(ui: &mut Ui, kind: &str, description: &str) -> bool {
-    use crate::ui::{theme, widgets};
     let (rect, response) = ui.allocate_exact_size(
         Vec2::new(ui.available_width().min(260.0), 34.0),
         egui::Sense::click(),
@@ -96,12 +98,12 @@ pub fn module_menu_row(ui: &mut Ui, kind: &str, description: &str) -> bool {
     response.clicked()
 }
 
-pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, frame: &Frame) {
+pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, frame: &AreaFrame) {
     let id = menu_id(view_key);
     if !egui::Popup::is_id_open(ui.ctx(), id) {
         return;
     }
-    let Some(MenuAnchor { at, tile }) = editor
+    let Some(AreaMenuAnchor { at, tile }) = editor
         .views
         .area
         .views
@@ -125,7 +127,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         let cell = tile.cell();
         ui.label(RichText::new(format!("{}, {}", cell.x, cell.y)).weak());
         let character =
-            crate::play::current_character(editor).unwrap_or_else(|| "a test character".to_owned());
+            play::current_character(editor).unwrap_or_else(|| "a test character".to_owned());
         if ui
             .add(egui::Button::new(format!("▸ Play here as {character}")).shortcut_text("F6"))
             .clicked()
@@ -134,7 +136,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             ui.close();
         }
         ui.menu_button("Play here as…", |ui| {
-            for other in crate::play::test_characters(editor) {
+            for other in play::test_characters(editor) {
                 if ui
                     .button(format!(
                         "{} · level {} · {}",
@@ -170,46 +172,16 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             RichText::new("ADD MODULE")
                 .size(11.0)
                 .color(crate::ui::theme::MUTED)
-                .family(egui::FontFamily::Name("medium".into())),
+                .family(theme::medium()),
         );
-        for (group, kinds) in [
-            (
-                "Shapes",
-                vec![
-                    (AreaModuleKind::Object, "a point or rect with scripts"),
-                    (AreaModuleKind::SafeZone, "a rect where no one fights"),
-                    (AreaModuleKind::Soundscape, "a sound zone"),
-                ],
-            ),
-            (
-                "People",
-                vec![
-                    (AreaModuleKind::Population, "npcs that roam a rect"),
-                    (AreaModuleKind::Resident, "one npc at one spot"),
-                ],
-            ),
-            (
-                "Copies",
-                vec![
-                    (AreaModuleKind::Blueprint, "a blueprint, placed"),
-                    (AreaModuleKind::Scenery, "tiles drawn as one"),
-                ],
-            ),
-            (
-                "Area-wide",
-                vec![
-                    (AreaModuleKind::InlineScript, "its nodes in this area"),
-                    (AreaModuleKind::SharedScript, "names a script row"),
-                ],
-            ),
-        ] {
+        for (group, kinds) in ADD_MENU {
             ui.add_space(2.0);
             ui.label(
-                RichText::new(group)
+                RichText::new(*group)
                     .size(11.0)
                     .color(crate::ui::theme::FAINT),
             );
-            for (kind, description) in kinds {
+            for &(kind, description) in *kinds {
                 if !variants.iter().any(|(tag, _)| tag == kind.tag()) {
                     continue;
                 }
@@ -247,24 +219,24 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                             ui.close();
                         }
                         if ui.button("Unpack").clicked() {
-                            action = Some(MenuAction::Unpack(index));
+                            action = Some(MenuAction::Defer(DeferredAreaAction::Unpack(index)));
                             ui.close();
                         }
                         if ui.button("Replace with…").clicked() {
-                            action = Some(MenuAction::Replace(index));
+                            action = Some(MenuAction::Defer(DeferredAreaAction::Replace(index)));
                             ui.close();
                         }
                     }
                     if module.is_module(AreaModuleKind::Scenery)
                         && ui.button("Split into tiles").clicked()
                     {
-                        action = Some(MenuAction::Split(index));
+                        action = Some(MenuAction::Defer(DeferredAreaAction::Split(index)));
                         ui.close();
                     }
                     if module.is_module(AreaModuleKind::Object)
                         && ui.button("Return door…").clicked()
                     {
-                        action = Some(MenuAction::ReturnDoor(index));
+                        action = Some(MenuAction::Defer(DeferredAreaAction::ReturnDoor(index)));
                         ui.close();
                     }
                 }
@@ -274,12 +246,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                 ui.close();
             }
         }
-        if editor
-            .clipboard
-            .as_ref()
-            .is_some_and(|c| c["rift"] == "modules")
-            && ui.button("Paste here (Ctrl V)").clicked()
-        {
+        if editor.clipboard.is_some() && ui.button("Paste here (Ctrl V)").clicked() {
             action = Some(MenuAction::Paste);
             ui.close();
         }
@@ -289,22 +256,16 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
     };
     match action {
         MenuAction::PlayHere => {
-            let place = game::systems::script::Place {
+            let place = Place {
                 area: frame.area_id,
                 at: tile.snap(),
             };
-            crate::play::start(editor, Some(place));
+            play::start(editor, Some(place));
         }
-        MenuAction::PlayFromStart => crate::play::start(editor, None),
-        MenuAction::SetSpawn => pins::set_spawn(editor, frame, tile.snap()),
+        MenuAction::PlayFromStart => play::start(editor, None),
+        MenuAction::SetSpawn => pins::set_spawn(editor, &frame.area_key, tile.snap()),
         MenuAction::Listen => {
-            editor
-                .views
-                .area
-                .views
-                .get_mut(view_key)
-                .expect("view")
-                .listener = Some(tile);
+            editor.views.area.view_mut(view_key).listener = Some(tile);
             pick::listen(editor, frame, tile);
         }
         MenuAction::Add(kind) => add_module(editor, view_key, frame, kind, tile),
@@ -314,10 +275,7 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
         MenuAction::Paste => start_paste(editor, view_key),
         MenuAction::MakeBlueprint => blueprint::make_blueprint_from_selection(editor, frame),
         MenuAction::EditInPlace(index) => placement::edit_in_place(editor, view_key, frame, index),
-        MenuAction::Unpack(index) => placement::unpack(editor, frame, index),
-        MenuAction::Replace(index) => placement::replace_dialog(editor, frame, index),
-        MenuAction::Split(index) => scenery::split_scenery(editor, frame, index),
-        MenuAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
+        MenuAction::Defer(deferred) => super::run_deferred(editor, frame, deferred),
     }
 }
 
@@ -333,10 +291,7 @@ pub(super) enum MenuAction {
     Paste,
     MakeBlueprint,
     EditInPlace(usize),
-    Unpack(usize),
-    Replace(usize),
-    Split(usize),
-    ReturnDoor(usize),
+    Defer(DeferredAreaAction),
 }
 
 pub fn variant_template(editor: &Editor, kind: &str) -> Option<Value> {
@@ -346,39 +301,49 @@ pub fn variant_template(editor: &Editor, kind: &str) -> Option<Value> {
 }
 
 pub fn module_variants(editor: &Editor) -> Vec<(String, Value)> {
-    let Some(items) = editor.shapes.modules_of("area") else {
-        return Vec::new();
-    };
-    let root = editor
+    let root = editor.shapes.shape_of("area");
+    editor
         .shapes
-        .table("area")
-        .map(|t| &t.shape)
-        .expect("area shape");
-    match crate::schema::kind(root, items) {
-        crate::schema::Kind::Union(variants) => variants
-            .iter()
-            .map(|variant| {
-                (
-                    variant.tag.clone(),
-                    crate::schema::variant_template(root, variant),
-                )
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
+        .module_variants("area")
+        .iter()
+        .map(|variant| (variant.tag.clone(), schema::variant_template(root, variant)))
+        .collect()
 }
 
-pub fn add_module(
-    editor: &mut Editor,
-    view_key: &str,
-    frame: &Frame,
-    kind: AreaModuleKind,
-    tile: Pos<Tiles>,
-) {
-    let Some(mut module) = variant_template(editor, kind.tag()) else {
-        return;
-    };
-    let cell = tile.cell();
+pub const ADD_MENU: &[(&str, &[(AreaModuleKind, &str)])] = &[
+    (
+        "Shapes",
+        &[
+            (AreaModuleKind::Object, "a point or rect with scripts"),
+            (AreaModuleKind::SafeZone, "a rect where no one fights"),
+            (AreaModuleKind::Soundscape, "a sound zone"),
+        ],
+    ),
+    (
+        "People",
+        &[
+            (AreaModuleKind::Population, "npcs that roam a rect"),
+            (AreaModuleKind::Resident, "one npc at one spot"),
+        ],
+    ),
+    (
+        "Copies",
+        &[
+            (AreaModuleKind::Blueprint, "a blueprint, placed"),
+            (AreaModuleKind::Scenery, "tiles drawn as one"),
+        ],
+    ),
+    (
+        "Area-wide",
+        &[
+            (AreaModuleKind::InlineScript, "its nodes in this area"),
+            (AreaModuleKind::SharedScript, "names a script row"),
+        ],
+    ),
+];
+
+pub fn module_template(editor: &Editor, kind: AreaModuleKind, cell: CellPos) -> Option<Value> {
+    let mut module = variant_template(editor, kind.tag())?;
     let (x, y) = (cell.x as f32, cell.y as f32);
     match kind {
         AreaModuleKind::Object => {
@@ -396,23 +361,34 @@ pub fn add_module(
             module["roams"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5, "w": 2.0, "h": 2.0 });
             module["count"] = serde_json::json!(1);
         }
-        AreaModuleKind::Resident => {
+        AreaModuleKind::Resident | AreaModuleKind::Blueprint => {
             module["at"] = serde_json::json!({ "x": x, "y": y });
         }
         AreaModuleKind::Scenery => {
             module["at"] = serde_json::json!({ "x": x - 0.5, "y": y - 0.5 });
         }
-        AreaModuleKind::Blueprint => {
-            module["at"] = serde_json::json!({ "x": x, "y": y });
-            let stamp = editor.views.area.views[view_key].stamp.clone();
-            if let Some(stamp) = stamp {
-                module["blueprint"] = Value::String(stamp);
-            }
-        }
         AreaModuleKind::InlineScript => {
             module["nodes"] = serde_json::json!({});
         }
         _ => {}
+    }
+    Some(module)
+}
+
+pub fn add_module(
+    editor: &mut Editor,
+    view_key: &str,
+    frame: &AreaFrame,
+    kind: AreaModuleKind,
+    tile: Pos<Tiles>,
+) {
+    let Some(mut module) = module_template(editor, kind, tile.cell()) else {
+        return;
+    };
+    if kind == AreaModuleKind::Blueprint
+        && let Some(stamp) = editor.views.area.view(view_key).stamp.clone()
+    {
+        module["blueprint"] = Value::String(stamp);
     }
     let reference = match kind {
         AreaModuleKind::Population | AreaModuleKind::Resident => Some("npc"),
@@ -424,13 +400,13 @@ pub fn add_module(
     if let Some(table) = reference
         && module[table].as_str().unwrap_or_default().is_empty()
     {
-        pick::pick_then_add(editor, view_key, frame, module, table, table);
+        pick::pick_then_add(editor, frame, module, table, table);
         return;
     }
     let label = shapes::label(&module);
     append_modules(
         editor,
-        frame,
+        &frame.area_key,
         vec![module],
         &format!("Add {label} to {}", frame.area_key),
     );
@@ -438,36 +414,31 @@ pub fn add_module(
 
 pub fn append_modules(
     editor: &mut Editor,
-    frame: &Frame,
+    area_key: &str,
     modules: Vec<Value>,
     label: &str,
 ) -> bool {
-    let Some(mut row) = editor.row_value("area", &frame.area_key) else {
+    let Some(mut row) = editor.row_value("area", area_key) else {
         return false;
     };
-    let start = row["modules"].as_array().map_or(0, Vec::len);
+    let mut list = row["modules"].as_array().cloned().unwrap_or_default();
+    let start = list.len();
     let count = modules.len();
-    if !row["modules"].is_array() {
-        row["modules"] = Value::Array(Vec::new());
+    list.extend(modules);
+    row["modules"] = Value::Array(list);
+    let mut edit = ContentEdit::new(label);
+    edit.write_json(row_file("area", area_key), &row);
+    if !editor.apply(edit) {
+        return false;
     }
-    row["modules"]
-        .as_array_mut()
-        .expect("modules")
-        .extend(modules);
-    let mut edit = Edit::new(label);
-    edit.write_json(row_file("area", &frame.area_key), &row);
-    if editor.apply(edit) {
-        editor.selection = Selection {
-            table: "area".to_owned(),
-            keys: vec![frame.area_key.clone()],
-            parts: (start..start + count)
-                .map(|i| format!("/modules/{i}"))
-                .collect(),
-        };
-        true
-    } else {
-        false
-    }
+    editor.selection = RowSelection::parts(
+        "area",
+        area_key,
+        (start..start + count)
+            .map(|i| format!("/modules/{i}"))
+            .collect(),
+    );
+    true
 }
 
 pub fn write_modules(
@@ -480,7 +451,7 @@ pub fn write_modules(
         return false;
     };
     row["modules"] = Value::Array(modules);
-    let mut edit = Edit::new(label);
+    let mut edit = ContentEdit::new(label);
     edit.write_json(row_file("area", area_key), &row);
     editor.apply(edit)
 }

@@ -4,11 +4,16 @@ use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
 use serde_json::Value;
 
 use super::{
-    ACTIONS, CueKind, DIRECTIONS, FrameData, MAX_FRAME_MS, MAX_FRAMES, Page, action_timing,
+    FrameCueKind, MAX_FRAME_MS, MAX_FRAMES, ModelPage, ModelStrip, StripFrame, action_timing,
     play_rule, strip_of, total_ms,
 };
 use crate::app::Editor;
+use crate::import;
+use crate::project::ContentEdit;
+use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
+use game::systems::actor::model::DirectionName;
+use strum::VariantArray;
 
 pub const PREVIEW: Vec2 = Vec2::new(170.0, 200.0);
 const CARD_H: f32 = 128.0;
@@ -17,7 +22,7 @@ const LANE_H: f32 = 22.0;
 const NUDGE: u32 = 10;
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub enum SetBy {
+pub enum TimingSetBy {
     #[default]
     Ms,
     Fps,
@@ -26,55 +31,46 @@ pub enum SetBy {
 
 #[derive(Default)]
 pub struct TimingDraft {
-    pub set_by: SetBy,
+    pub set_by: TimingSetBy,
     pub text: String,
 }
 
-pub struct EdgeDrag {
+pub struct FrameEdgeDrag {
     pub frame: usize,
     pub start_ms: u32,
     pub origin_x: f32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Confirm {
+pub enum StripConfirm {
     Timing,
     Cues,
 }
 
-pub struct SheetFrame(pub u32);
+pub struct DraggedFrame(pub u32);
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let (action, direction) = {
-        let view = &editor.views.model.views[key];
-        (view.action, view.direction)
-    };
-    let frames = strip_of(row, ACTIONS[action], DIRECTIONS[direction]);
-    header(editor, ui, key, row, action, direction);
+    let strip = editor.views.model.view(key).strip;
+    let frames = strip_of(row, strip);
+    header(editor, ui, key, row, strip);
     keys(editor, ui, key, &frames, &sheet);
     let frames = strip_of(
         &editor.row_value(super::TABLE, key).unwrap_or(row.clone()),
-        ACTIONS[action],
-        DIRECTIONS[direction],
+        strip,
     );
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let tick = {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         super::preview::keys(ui, &mut view.preview, &frames);
-        super::preview::tick(&mut view.preview, dt, &frames, ACTIONS[action])
+        super::preview::tick(&mut view.preview, dt, &frames, strip.action)
     };
     super::preview::fire(editor, key, &frames, &tick.passed);
     ui.ctx().request_repaint();
-    let timing = action_timing(row, ACTIONS[action]);
+    let timing = action_timing(row, strip.action);
     let total = total_ms(&frames);
-    let was = was_ms(editor, key, action, direction, &timing);
+    let was = was_ms(editor, key, strip, &timing);
     ui.add_space(6.0);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
@@ -87,17 +83,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 &sheet,
                 row,
                 frame,
-                super::preview::Fit {
+                super::preview::PreviewFit {
                     size: PREVIEW,
                     zoom: 2.0,
                 },
             );
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+            let view = editor.views.model.view_mut(key);
             super::preview::controls(ui, &mut view.preview, tick.index, frames.len(), true);
         });
         ui.add_space(16.0);
@@ -108,27 +99,17 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .size(20.0)
                     .strong(),
             );
-            ui.label(theme::muted(sentence(was, total, &timing, direction)));
+            ui.label(theme::muted(sentence(was, total, &timing, strip.direction)));
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 if ui
                     .button("Apply timing to the other 7 directions…")
                     .clicked()
                 {
-                    let view = editor
-                        .views
-                        .model
-                        .views
-                        .get_mut(key)
-                        .expect("the view exists");
-                    view.confirm = Some(Confirm::Timing);
+                    let view = editor.views.model.view_mut(key);
+                    view.confirm = Some(StripConfirm::Timing);
                 }
-                let recorded = crate::import::recorded_lengths(
-                    editor,
-                    key,
-                    ACTIONS[action],
-                    DIRECTIONS[direction],
-                );
+                let recorded = import::recorded_lengths(editor, key, strip);
                 let can_revert = recorded
                     .as_ref()
                     .is_some_and(|lengths| *lengths != super::lengths(&frames));
@@ -142,10 +123,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     .clicked()
                     && let Some(lengths) = recorded
                 {
-                    let reverted: Vec<FrameData> = frames
+                    let reverted: Vec<StripFrame> = frames
                         .iter()
                         .zip(lengths)
-                        .map(|(frame, ms)| FrameData {
+                        .map(|(frame, ms)| StripFrame {
                             ms,
                             ..frame.clone()
                         })
@@ -153,14 +134,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                     super::write_strip(
                         editor,
                         key,
-                        ACTIONS[action],
-                        DIRECTIONS[direction],
+                        strip,
                         &reverted,
-                        format!(
-                            "Revert {} · {} of {key} to the import's lengths",
-                            ACTIONS[action], DIRECTIONS[direction]
-                        ),
-                        false,
+                        ContentEdit::new(format!(
+                            "Revert {} of {key} to the import's lengths",
+                            strip.name()
+                        )),
                     );
                 }
             });
@@ -168,14 +147,12 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         });
     });
     ui.add_space(10.0);
-    let layout = timeline(
-        editor, ui, key, &sheet, &frames, action, direction, was, true,
-    );
-    lanes(editor, ui, key, &frames, &layout, action, direction, false);
+    let layout = timeline(editor, ui, key, &sheet, &frames, strip, was);
+    lanes(editor, ui, key, &frames, &layout, strip, false);
     rides(ui, &frames);
-    confirm(editor, &ctx, key, row, action, direction);
-    let selected = editor.views.model.views[key].frames.clone();
-    let mut status = format!("{} · {}", ACTIONS[action], DIRECTIONS[direction]);
+    confirm(editor, &ctx, key, row, strip);
+    let selected = editor.views.model.view(key).frames.clone();
+    let mut status = strip.name();
     if !selected.is_empty() {
         status.push_str(&format!(
             " · frames {}",
@@ -197,80 +174,59 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .push("stored as ms per frame".to_owned());
 }
 
-pub fn header(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    key: &str,
-    row: &Value,
-    action: usize,
-    direction: usize,
-) {
-    let timing = action_timing(row, ACTIONS[action]);
+pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: ModelStrip) {
+    let timing = action_timing(row, strip.action);
     let mut pick = None;
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(ACTIONS[action])
+            RichText::new(strip.action.key())
                 .size(16.0)
                 .strong()
                 .monospace(),
         );
         ui.add_space(6.0);
-        for (d, dir) in DIRECTIONS.iter().enumerate() {
-            let on = d == direction;
-            let marked = timing.differing.contains(&d) && timing.differing.len() < DIRECTIONS.len();
+        for &direction in DirectionName::VARIANTS {
+            let on = direction == strip.direction;
+            let marked = timing.out_of_step(direction);
             let text = if marked {
-                format!("{dir} ●")
+                format!("{} ●", direction.key())
             } else {
-                dir.to_string()
+                direction.key().to_owned()
             };
-            let (fill, ink) = if on {
-                (theme::ACCENT, Color32::WHITE)
-            } else {
-                (theme::RAISED, theme::TEXT)
-            };
-            let response = widgets::chip_coloured(ui, &text, fill, ink);
+            let response = widgets::mode_chip(ui, &text, on);
             if marked {
                 response
                     .clone()
                     .on_hover_text("edited alone: its lengths differ from the action's");
             }
             if response.clicked() {
-                pick = Some(d);
+                pick = Some(direction);
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let page = editor.views.model.views[key].page;
-            if page == Page::Cues {
+            let page = editor.views.model.view(key).page;
+            if page == ModelPage::Cues {
                 if widgets::primary(ui, "▶ Play with sound").clicked() {
-                    let view = editor
-                        .views
-                        .model
-                        .views
-                        .get_mut(key)
-                        .expect("the view exists");
+                    let view = editor.views.model.view_mut(key);
                     view.preview.muted = false;
                     super::preview::restart(&mut view.preview);
                 }
             } else {
                 ui.label(theme::muted(format!(
                     "{} · from the action",
-                    play_rule(ACTIONS[action])
+                    play_rule(strip.action)
                 )));
             }
         });
     });
-    if let Some(d) = pick {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
-        view.direction = d;
+    if let Some(direction) = pick {
+        let picked = ModelStrip { direction, ..strip };
+        let view = editor.views.model.view_mut(key);
+        view.strip = picked;
         view.frames.clear();
         view.cue = None;
         super::preview::restart(&mut view.preview);
-        super::select_strip(editor, key, action, d);
+        super::select_strip(editor, key, picked);
     }
 }
 
@@ -294,17 +250,14 @@ impl TimelineLayout {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn timeline(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    sheet: &super::SheetInfo,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    sheet: &super::ModelSheet,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     was: Option<u32>,
-    interactive: bool,
 ) -> TimelineLayout {
     let total = total_ms(frames).max(1);
     let width = ui.available_width() - LANE_LABEL - 24.0;
@@ -329,63 +282,26 @@ pub fn timeline(
     );
     let (_, response) = ui.allocate_exact_size(rect.size(), Sense::click_and_drag());
     let painter = ui.painter_at(rect.expand2(Vec2::new(0.0, 40.0)));
-    let selected = editor.views.model.views[key].frames.clone();
-    let hover = response.hover_pos();
-    let mut edge_hover = None;
+    let selected = editor.views.model.view(key).frames.clone();
     for (index, frame_rect) in rects.iter().enumerate() {
-        let is_selected = selected.contains(&index);
-        painter.rect(
+        frame_card(
+            &painter,
             *frame_rect,
-            3.0,
-            if is_selected {
-                theme::ACCENT_SOFT
-            } else {
-                theme::INPUT
-            },
-            egui::Stroke::new(
-                1.0,
-                if is_selected {
-                    theme::ACCENT
-                } else {
-                    theme::BORDER
-                },
-            ),
-            egui::StrokeKind::Inside,
+            sheet,
+            &frames[index],
+            index,
+            selected.contains(&index),
         );
-        let art = ERect::from_min_max(
-            frame_rect.min + Vec2::new(2.0, 6.0),
-            frame_rect.right_top() + Vec2::new(-2.0, 78.0),
-        );
-        sheet.draw(&painter, art, frames[index].frame, Color32::WHITE);
-        painter.text(
-            egui::pos2(frame_rect.center().x, frame_rect.max.y - 28.0),
-            egui::Align2::CENTER_CENTER,
-            format!("{} ms", frames[index].ms),
-            egui::FontId::monospace(12.0),
-            theme::TEXT,
-        );
-        painter.text(
-            egui::pos2(frame_rect.center().x, frame_rect.max.y - 12.0),
-            egui::Align2::CENTER_CENTER,
-            format!("frame {}", index + 1),
-            egui::FontId::monospace(10.5),
-            theme::MUTED,
-        );
-        if interactive
-            && let Some(pos) = hover
-            && (pos.x - frame_rect.max.x).abs() <= 6.0
-            && pos.y >= frame_rect.min.y
-            && pos.y <= frame_rect.max.y
-        {
-            edge_hover = Some(index);
-        }
     }
-    let edge_dragging = editor.views.model.views[key].edge_drag.is_some();
-    if let Some(index) = edge_hover.or(editor.views.model.views[key]
+    let edge_hover = response.hover_pos().and_then(|pos| edge_at(&rects, pos));
+    let edge_dragged = editor
+        .views
+        .model
+        .view(key)
         .edge_drag
         .as_ref()
-        .map(|d| d.frame))
-    {
+        .map(|drag| drag.frame);
+    if let Some(index) = edge_hover.or(edge_dragged) {
         if let Some(frame_rect) = rects.get(index) {
             let handle = ERect::from_center_size(
                 egui::pos2(frame_rect.max.x + 2.0, frame_rect.center().y),
@@ -441,67 +357,44 @@ pub fn timeline(
         frames: rects,
         origin_x,
     };
-    if interactive {
-        interact(
-            editor,
-            ui,
-            key,
-            &response,
-            &layout,
-            frames,
-            action,
-            direction,
-            edge_hover,
-            edge_dragging,
-        );
-    }
+    interact(editor, ui, key, &response, &layout, frames, strip);
     layout
 }
 
-#[allow(clippy::too_many_arguments)]
+fn edge_at(frames: &[ERect], pos: egui::Pos2) -> Option<usize> {
+    frames.iter().position(|rect| {
+        (pos.x - rect.max.x).abs() <= 6.0 && pos.y >= rect.min.y && pos.y <= rect.max.y
+    })
+}
+
 fn interact(
     editor: &mut Editor,
     ui: &Ui,
     key: &str,
     response: &egui::Response,
     layout: &TimelineLayout,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
-    edge_hover: Option<usize>,
-    edge_dragging: bool,
+    frames: &[StripFrame],
+    strip: ModelStrip,
 ) {
-    let (shift, ctrl, pressed, down, released, pointer) = ui.input(|i| {
-        (
-            i.modifiers.shift,
-            i.modifiers.command,
-            i.pointer.primary_pressed(),
-            i.pointer.primary_down(),
-            i.pointer.primary_released(),
-            i.pointer.latest_pos(),
-        )
-    });
-    if pressed
-        && response.hovered()
+    let (shift, ctrl) = ui.input(|i| (i.modifiers.shift, i.modifiers.command));
+    let edge_hover = response
+        .hover_pos()
+        .and_then(|pos| edge_at(&layout.frames, pos));
+    let edge_dragging = editor.views.model.view(key).edge_drag.is_some();
+    if response.drag_started()
         && let Some(index) = edge_hover
-        && let Some(pos) = pointer
+        && let Some(pos) = response.interact_pointer_pos()
     {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
-        view.edge_drag = Some(EdgeDrag {
+        let view = editor.views.model.view_mut(key);
+        view.edge_drag = Some(FrameEdgeDrag {
             frame: index,
             start_ms: frames[index].ms,
             origin_x: pos.x,
         });
     }
-    if edge_dragging
-        && down
-        && let Some(pos) = pointer
-        && let Some(drag) = editor.views.model.views[key].edge_drag.as_ref()
+    if response.dragged()
+        && let Some(pos) = response.interact_pointer_pos()
+        && let Some(drag) = editor.views.model.view(key).edge_drag.as_ref()
     {
         let ms = (drag.start_ms as f32 + (pos.x - drag.origin_x) / layout.px_per_ms)
             .round()
@@ -513,24 +406,14 @@ fn interact(
             super::write_strip(
                 editor,
                 key,
-                ACTIONS[action],
-                DIRECTIONS[direction],
+                strip,
                 &retimed,
-                format!(
-                    "Retime {} · {} of {key}",
-                    ACTIONS[action], DIRECTIONS[direction]
-                ),
-                true,
+                ContentEdit::new(format!("Retime {} of {key}", strip.name())).merging(),
             );
         }
     }
-    if released {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+    if response.drag_stopped() {
+        let view = editor.views.model.view_mut(key);
         view.edge_drag = None;
     }
     if response.clicked()
@@ -539,12 +422,7 @@ fn interact(
         && !edge_dragging
     {
         let hit = layout.frame_at(pos.x);
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         match hit {
             Some(index) if shift && !view.frames.is_empty() => {
                 let anchor = view.frames[0];
@@ -563,22 +441,17 @@ fn interact(
         }
         view.cue = None;
         view.timing.text.clear();
-        super::select_frames(editor, key, action, direction);
+        super::select_frames(editor, key, strip);
     }
     if response.double_clicked()
         && let Some(pos) = response.interact_pointer_pos()
         && let Some(index) = layout.frame_at(pos.x)
     {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.preview.playing = false;
         view.preview.position = super::starts_at(frames, index) as f32;
     }
-    if let Some(payload) = response.dnd_release_payload::<SheetFrame>()
+    if let Some(payload) = response.dnd_release_payload::<DraggedFrame>()
         && let Some(pos) = response.interact_pointer_pos()
     {
         let at = layout
@@ -586,9 +459,9 @@ fn interact(
             .iter()
             .position(|rect| pos.x < rect.center().x)
             .unwrap_or(frames.len());
-        insert_frame(editor, key, frames, action, direction, at, payload.0);
+        insert_frame(editor, key, frames, strip, at, payload.0);
     }
-    if response.dnd_hover_payload::<SheetFrame>().is_some()
+    if response.dnd_hover_payload::<DraggedFrame>().is_some()
         && let Some(pos) = response.hover_pos()
     {
         let at = layout
@@ -615,9 +488,8 @@ fn interact(
 pub fn insert_frame(
     editor: &mut Editor,
     key: &str,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     at: usize,
     sheet_frame: u32,
 ) {
@@ -631,7 +503,7 @@ pub fn insert_frame(
         .map_or(100, |frame| frame.ms);
     added.insert(
         at.min(frames.len()),
-        FrameData {
+        StripFrame {
             frame: sheet_frame,
             ms,
             apex: false,
@@ -642,52 +514,43 @@ pub fn insert_frame(
     if super::write_strip(
         editor,
         key,
-        ACTIONS[action],
-        DIRECTIONS[direction],
+        strip,
         &added,
-        format!(
-            "Add sheet frame {sheet_frame} to {} · {} of {key}",
-            ACTIONS[action], DIRECTIONS[direction]
-        ),
-        false,
+        ContentEdit::new(format!(
+            "Add sheet frame {sheet_frame} to {} of {key}",
+            strip.name()
+        )),
     ) {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.frames = vec![at.min(frames.len())];
-        super::select_frames(editor, key, action, direction);
+        super::select_frames(editor, key, strip);
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn lanes(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[FrameData],
+    frames: &[StripFrame],
     layout: &TimelineLayout,
-    action: usize,
-    direction: usize,
+    strip: ModelStrip,
     with_waves: bool,
 ) {
     let has_steps = frames.iter().any(|frame| frame.step);
-    let page = editor.views.model.views[key].page;
-    let kinds: Vec<CueKind> = if page == Page::Cues || has_steps {
-        vec![CueKind::Apex, CueKind::Sound, CueKind::Step]
+    let page = editor.views.model.view(key).page;
+    let kinds: Vec<FrameCueKind> = if page == ModelPage::Cues || has_steps {
+        vec![FrameCueKind::Apex, FrameCueKind::Sound, FrameCueKind::Step]
     } else {
-        vec![CueKind::Apex, CueKind::Sound]
+        vec![FrameCueKind::Apex, FrameCueKind::Sound]
     };
-    let selected_cue = editor.views.model.views[key].cue;
+    let selected_cue = editor.views.model.view(key).cue;
     let lane_w = layout.width;
     let mut set = None;
     let mut select = None;
     let strip_end = layout.x_at(total_ms(frames));
     for kind in kinds {
         ui.add_space(4.0);
-        let lane_h = if with_waves && kind == CueKind::Sound {
+        let lane_h = if with_waves && kind == FrameCueKind::Sound {
             LANE_H * 1.8
         } else {
             LANE_H
@@ -730,21 +593,16 @@ pub fn lanes(
             let x = frame_rect.min.x + 4.0;
             let is_selected = selected_cue == Some((index, kind));
             match kind {
-                CueKind::Apex if frame.apex => {
+                FrameCueKind::Apex if frame.apex => {
                     any = true;
-                    let c = egui::pos2(x + 6.0, lane.center().y);
-                    painter.add(egui::Shape::convex_polygon(
-                        vec![
-                            c + Vec2::new(0.0, -7.0),
-                            c + Vec2::new(7.0, 0.0),
-                            c + Vec2::new(0.0, 7.0),
-                            c + Vec2::new(-7.0, 0.0),
-                        ],
-                        theme::WARN,
-                        egui::Stroke::new(if is_selected { 2.0 } else { 0.0 }, Color32::WHITE),
-                    ));
+                    draw_cue(
+                        &painter,
+                        kind,
+                        egui::pos2(x + 6.0, lane.center().y),
+                        is_selected,
+                    );
                 }
-                CueKind::Sound => {
+                FrameCueKind::Sound => {
                     if let Some(sound) = &frame.sound {
                         any = true;
                         if with_waves {
@@ -789,14 +647,14 @@ pub fn lanes(
                         painter.galley(chip.min + Vec2::new(5.0, 1.0), galley, theme::TEXT);
                     }
                 }
-                CueKind::Step if frame.step => {
+                FrameCueKind::Step if frame.step => {
                     any = true;
-                    let c = egui::pos2(x + 6.0, lane.center().y);
-                    painter.circle_filled(c + Vec2::new(-3.0, 2.0), 4.0, theme::WARN);
-                    painter.circle_filled(c + Vec2::new(3.0, -3.0), 4.0, theme::WARN);
-                    if is_selected {
-                        painter.circle_stroke(c, 9.0, egui::Stroke::new(1.5, Color32::WHITE));
-                    }
+                    draw_cue(
+                        &painter,
+                        kind,
+                        egui::pos2(x + 6.0, lane.center().y),
+                        is_selected,
+                    );
                 }
                 _ => {}
             }
@@ -815,64 +673,51 @@ pub fn lanes(
             && let Some(index) = layout.frame_at(pos.x)
         {
             let frame = &frames[index];
-            let present = match kind {
-                CueKind::Apex => frame.apex,
-                CueKind::Sound => frame.sound.is_some(),
-                CueKind::Step => frame.step,
-            };
-            if present {
+            if frame.has(kind) {
                 select = Some((index, kind));
             } else {
                 set = Some((index, kind));
             }
         }
         response.on_hover_text(match kind {
-            CueKind::Apex => "Click a frame to put the apex there · A",
-            CueKind::Sound => "Click a frame to give it a sound · S",
-            CueKind::Step => "Click a frame to make it a step · T",
+            FrameCueKind::Apex => "Click a frame to put the apex there · A",
+            FrameCueKind::Sound => "Click a frame to give it a sound · S",
+            FrameCueKind::Step => "Click a frame to make it a step · T",
         });
     }
     if let Some((index, kind)) = set {
-        set_cue(editor, key, frames, action, direction, index, kind);
+        set_cue(editor, key, frames, strip, index, kind);
     }
     if let Some((index, kind)) = select {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.cue = Some((index, kind));
         view.frames = vec![index];
-        super::select_cue(editor, key, action, direction, index, kind);
+        super::select_cue(editor, key, strip, index, kind);
     }
 }
 
 pub fn set_cue(
     editor: &mut Editor,
     key: &str,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     index: usize,
-    kind: CueKind,
+    kind: FrameCueKind,
 ) {
     let mut cued = frames.to_vec();
     let label = match kind {
-        CueKind::Apex => {
+        FrameCueKind::Apex => {
             for frame in &mut cued {
                 frame.apex = false;
             }
             cued[index].apex = true;
-            format!(
-                "Apex on frame {} of {} · {} of {key}",
-                index + 1,
-                ACTIONS[action],
-                DIRECTIONS[direction]
-            )
+            format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
         }
-        CueKind::Sound => {
-            let sound = editor.views.model.views[key]
+        FrameCueKind::Sound => {
+            let sound = editor
+                .views
+                .model
+                .view(key)
                 .last_sound
                 .clone()
                 .or_else(|| super::sounds::first_sfx(editor));
@@ -882,62 +727,110 @@ pub fn set_cue(
             };
             cued[index].sound = Some(sound.clone());
             format!(
-                "Sound {sound} on frame {} of {} · {} of {key}",
+                "Sound {sound} on frame {} of {} of {key}",
                 index + 1,
-                ACTIONS[action],
-                DIRECTIONS[direction]
+                strip.name()
             )
         }
-        CueKind::Step => {
+        FrameCueKind::Step => {
             cued[index].step = !cued[index].step;
             if cued[index].step {
-                format!(
-                    "Step on frame {} of {} · {} of {key}",
-                    index + 1,
-                    ACTIONS[action],
-                    DIRECTIONS[direction]
-                )
+                format!("Step on frame {} of {} of {key}", index + 1, strip.name())
             } else {
                 format!(
-                    "No step on frame {} of {} · {} of {key}",
+                    "No step on frame {} of {} of {key}",
                     index + 1,
-                    ACTIONS[action],
-                    DIRECTIONS[direction]
+                    strip.name()
                 )
             }
         }
     };
-    if super::write_strip(
-        editor,
-        key,
-        ACTIONS[action],
-        DIRECTIONS[direction],
-        &cued,
-        label,
-        false,
-    ) {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
-        let present = match kind {
-            CueKind::Apex => true,
-            CueKind::Sound => true,
-            CueKind::Step => cued[index].step,
-        };
+    if super::write_strip(editor, key, strip, &cued, ContentEdit::new(label)) {
+        let view = editor.views.model.view_mut(key);
+        let present = cued[index].has(kind);
         view.cue = present.then_some((index, kind));
         view.frames = vec![index];
         if present {
-            super::select_cue(editor, key, action, direction, index, kind);
+            super::select_cue(editor, key, strip, index, kind);
         } else {
-            super::select_frames(editor, key, action, direction);
+            super::select_frames(editor, key, strip);
         }
     }
 }
 
-fn rides(ui: &mut Ui, frames: &[FrameData]) {
+pub fn draw_cue(painter: &egui::Painter, kind: FrameCueKind, at: egui::Pos2, selected: bool) {
+    match kind {
+        FrameCueKind::Apex => {
+            painter.add(egui::Shape::convex_polygon(
+                vec![
+                    at + Vec2::new(0.0, -7.0),
+                    at + Vec2::new(7.0, 0.0),
+                    at + Vec2::new(0.0, 7.0),
+                    at + Vec2::new(-7.0, 0.0),
+                ],
+                theme::WARN,
+                egui::Stroke::new(if selected { 2.0 } else { 0.0 }, Color32::WHITE),
+            ));
+        }
+        FrameCueKind::Step => {
+            painter.circle_filled(at + Vec2::new(-3.0, 2.0), 4.0, theme::WARN);
+            painter.circle_filled(at + Vec2::new(3.0, -3.0), 4.0, theme::WARN);
+            if selected {
+                painter.circle_stroke(at, 9.0, egui::Stroke::new(1.5, Color32::WHITE));
+            }
+        }
+        FrameCueKind::Sound => {}
+    }
+}
+
+pub fn frame_card(
+    painter: &egui::Painter,
+    rect: ERect,
+    sheet: &super::ModelSheet,
+    frame: &StripFrame,
+    index: usize,
+    selected: bool,
+) {
+    painter.rect(
+        rect,
+        3.0,
+        if selected {
+            theme::ACCENT_SOFT
+        } else {
+            theme::INPUT
+        },
+        egui::Stroke::new(
+            1.0,
+            if selected {
+                theme::ACCENT
+            } else {
+                theme::BORDER
+            },
+        ),
+        egui::StrokeKind::Inside,
+    );
+    let art = ERect::from_min_max(
+        rect.min + Vec2::new(2.0, 4.0),
+        rect.right_bottom() - Vec2::new(2.0, 44.0),
+    );
+    sheet.draw(painter, art, frame.frame, Color32::WHITE);
+    painter.text(
+        egui::pos2(rect.center().x, rect.max.y - 26.0),
+        egui::Align2::CENTER_CENTER,
+        format!("{} ms", frame.ms),
+        egui::FontId::monospace(12.0),
+        theme::TEXT,
+    );
+    painter.text(
+        egui::pos2(rect.center().x, rect.max.y - 11.0),
+        egui::Align2::CENTER_CENTER,
+        format!("frame {}", index + 1),
+        egui::FontId::monospace(10.5),
+        theme::MUTED,
+    );
+}
+
+fn rides(ui: &mut Ui, frames: &[StripFrame]) {
     let cued: Vec<(usize, u32)> = frames
         .iter()
         .enumerate()
@@ -963,10 +856,10 @@ fn sentence(
     was: Option<u32>,
     total: u32,
     timing: &super::ActionTiming,
-    direction: usize,
+    direction: DirectionName,
 ) -> String {
     let common: u32 = timing.common.iter().sum();
-    let others = DIRECTIONS.len() - 1;
+    let others = DirectionName::VARIANTS.len() - 1;
     let mut parts = Vec::new();
     if let Some(was) = was
         && was != total
@@ -979,7 +872,7 @@ fn sentence(
             format!("{:.0}% shorter", -change)
         });
     }
-    if timing.differing.contains(&direction) && timing.differing.len() < DIRECTIONS.len() {
+    if timing.out_of_step(direction) {
         parts.push(format!(
             "the other {} directions still last {common} ms",
             others - timing.differing.len() + 1
@@ -998,14 +891,14 @@ fn sentence(
 fn was_ms(
     editor: &Editor,
     key: &str,
-    action: usize,
-    direction: usize,
+    strip: ModelStrip,
     timing: &super::ActionTiming,
 ) -> Option<u32> {
-    crate::import::recorded_lengths(editor, key, ACTIONS[action], DIRECTIONS[direction])
+    import::recorded_lengths(editor, key, strip)
         .map(|lengths| lengths.iter().sum())
         .or_else(|| {
-            (timing.differing.contains(&direction) && timing.differing.len() < DIRECTIONS.len())
+            timing
+                .out_of_step(strip.direction)
                 .then(|| timing.common.iter().sum())
         })
 }
@@ -1014,59 +907,48 @@ pub fn keys(
     editor: &mut Editor,
     ui: &Ui,
     key: &str,
-    frames: &[FrameData],
-    sheet: &super::SheetInfo,
+    frames: &[StripFrame],
+    sheet: &super::ModelSheet,
 ) {
     if !super::keyboard_free(ui) {
         return;
     }
-    let (left, right, alt, shift, ctrl, dup, del, insert, escape, apex, sound, step) =
-        ui.input(|i| {
-            (
-                i.key_pressed(egui::Key::ArrowLeft),
-                i.key_pressed(egui::Key::ArrowRight),
-                i.modifiers.alt,
-                i.modifiers.shift,
-                i.modifiers.command,
-                i.modifiers.command && i.key_pressed(egui::Key::D),
-                i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace),
-                i.key_pressed(egui::Key::Insert),
-                i.key_pressed(egui::Key::Escape),
-                i.key_pressed(egui::Key::A) && !i.modifiers.command,
-                i.key_pressed(egui::Key::S) && !i.modifiers.command,
-                i.key_pressed(egui::Key::T) && !i.modifiers.command,
-            )
-        });
-    let (action, direction, selected, sheet_pick, confirm_open) = {
-        let view = &editor.views.model.views[key];
-        (
-            view.action,
-            view.direction,
-            view.frames.clone(),
-            view.sheet_pick,
-            view.confirm.is_some(),
-        )
-    };
+    let StripKeys {
+        left,
+        right,
+        alt,
+        shift,
+        ctrl,
+        dup,
+        del,
+        insert,
+        escape,
+        apex,
+        sound,
+        step,
+    } = ui.input(StripKeys::read);
+    let view = editor.views.model.view(key);
+    let (strip, selected, sheet_pick, confirm_open) = (
+        view.strip,
+        view.frames.clone(),
+        view.sheet_pick,
+        view.confirm.is_some(),
+    );
     if confirm_open {
         return;
     }
     if escape {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         if view.cue.is_some() {
             view.cue = None;
-            super::select_frames(editor, key, action, direction);
+            super::select_frames(editor, key, strip);
         } else {
-            view.page = Page::Matrix;
-            super::select_strip(editor, key, action, direction);
+            view.page = ModelPage::Matrix;
+            super::select_strip(editor, key, strip);
         }
         return;
     }
-    let name = format!("{} · {}", ACTIONS[action], DIRECTIONS[direction]);
+    let name = strip.name();
     if alt && (left || right) && !selected.is_empty() {
         let delta = if shift { 1 } else { NUDGE };
         let mut nudged = frames.to_vec();
@@ -1079,24 +961,18 @@ pub fn keys(
                 };
             }
         }
-        let merge = editor.views.model.views[key]
+        let mut edit = ContentEdit::new(format!("Retime {name} of {key}"));
+        if editor
+            .views
+            .model
+            .view(key)
             .last_nudge
-            .is_some_and(|at| at.elapsed().as_secs_f32() < 1.0);
-        if super::write_strip(
-            editor,
-            key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
-            &nudged,
-            format!("Retime {name} of {key}"),
-            merge,
-        ) {
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+            .is_some_and(|at| at.elapsed().as_secs_f32() < 1.0)
+        {
+            edit = edit.merging();
+        }
+        if super::write_strip(editor, key, strip, &nudged, edit) {
+            let view = editor.views.model.view_mut(key);
             view.last_nudge = Some(Instant::now());
         }
         return;
@@ -1114,31 +990,19 @@ pub fn keys(
             if super::write_strip(
                 editor,
                 key,
-                ACTIONS[action],
-                DIRECTIONS[direction],
+                strip,
                 &moved,
-                format!("Move frame {} of {name} of {key}", index + 1),
-                false,
+                ContentEdit::new(format!("Move frame {} of {name} of {key}", index + 1)),
             ) {
-                let view = editor
-                    .views
-                    .model
-                    .views
-                    .get_mut(key)
-                    .expect("the view exists");
+                let view = editor.views.model.view_mut(key);
                 view.frames = vec![target];
-                super::select_frames(editor, key, action, direction);
+                super::select_frames(editor, key, strip);
             }
         }
         return;
     }
     if !ctrl && !alt && (left || right) {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         let current = view.frames.first().copied();
         let next = match (current, right) {
             (None, _) => 0,
@@ -1152,7 +1016,7 @@ pub fn keys(
             view.frames = vec![next];
         }
         view.cue = None;
-        super::select_frames(editor, key, action, direction);
+        super::select_frames(editor, key, strip);
         return;
     }
     if dup && !selected.is_empty() {
@@ -1174,20 +1038,16 @@ pub fn keys(
         if super::write_strip(
             editor,
             key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
+            strip,
             &duplicated,
-            format!("Duplicate {} of {name} of {key}", frames_text(&sorted)),
-            false,
+            ContentEdit::new(format!(
+                "Duplicate {} of {name} of {key}",
+                frames_text(&sorted)
+            )),
         ) {
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+            let view = editor.views.model.view_mut(key);
             view.frames = new_selection;
-            super::select_frames(editor, key, action, direction);
+            super::select_frames(editor, key, strip);
         }
         return;
     }
@@ -1203,12 +1063,12 @@ pub fn keys(
             .filter_map(|index| frames.get(*index))
             .flat_map(|frame| {
                 frame.cues().into_iter().map(move |cue| match cue {
-                    CueKind::Sound => frame.sound.clone().unwrap_or_default(),
+                    FrameCueKind::Sound => frame.sound.clone().unwrap_or_default(),
                     other => other.key().to_owned(),
                 })
             })
             .collect();
-        let kept: Vec<FrameData> = frames
+        let kept: Vec<StripFrame> = frames
             .iter()
             .enumerate()
             .filter(|(index, _)| !sorted.contains(index))
@@ -1218,24 +1078,11 @@ pub fn keys(
         if !cues.is_empty() {
             label.push_str(&format!(" with {}", cues.join(", ")));
         }
-        if super::write_strip(
-            editor,
-            key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
-            &kept,
-            label,
-            false,
-        ) {
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+        if super::write_strip(editor, key, strip, &kept, ContentEdit::new(label)) {
+            let view = editor.views.model.view_mut(key);
             view.frames = vec![sorted[0].min(kept.len().saturating_sub(1))];
             view.cue = None;
-            super::select_frames(editor, key, action, direction);
+            super::select_frames(editor, key, strip);
         }
         return;
     }
@@ -1244,20 +1091,55 @@ pub fn keys(
         && pick < sheet.frames()
     {
         let at = selected.iter().max().map_or(frames.len(), |last| last + 1);
-        insert_frame(editor, key, frames, action, direction, at, pick);
+        insert_frame(editor, key, frames, strip, at, pick);
         return;
     }
     if (apex || sound || step)
         && let Some(index) = selected.first().copied()
     {
         let kind = if apex {
-            CueKind::Apex
+            FrameCueKind::Apex
         } else if sound {
-            CueKind::Sound
+            FrameCueKind::Sound
         } else {
-            CueKind::Step
+            FrameCueKind::Step
         };
-        set_cue(editor, key, frames, action, direction, index, kind);
+        set_cue(editor, key, frames, strip, index, kind);
+    }
+}
+
+struct StripKeys {
+    left: bool,
+    right: bool,
+    alt: bool,
+    shift: bool,
+    ctrl: bool,
+    dup: bool,
+    del: bool,
+    insert: bool,
+    escape: bool,
+    apex: bool,
+    sound: bool,
+    step: bool,
+}
+
+impl StripKeys {
+    fn read(input: &egui::InputState) -> StripKeys {
+        let command = input.modifiers.command;
+        StripKeys {
+            left: input.key_pressed(egui::Key::ArrowLeft),
+            right: input.key_pressed(egui::Key::ArrowRight),
+            alt: input.modifiers.alt,
+            shift: input.modifiers.shift,
+            ctrl: command,
+            dup: command && input.key_pressed(egui::Key::D),
+            del: input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace),
+            insert: input.key_pressed(egui::Key::Insert),
+            escape: input.key_pressed(egui::Key::Escape),
+            apex: input.key_pressed(egui::Key::A) && !command,
+            sound: input.key_pressed(egui::Key::S) && !command,
+            step: input.key_pressed(egui::Key::T) && !command,
+        }
     }
 }
 
@@ -1281,34 +1163,33 @@ pub fn confirm(
     ctx: &egui::Context,
     key: &str,
     row: &Value,
-    action: usize,
-    direction: usize,
+    strip: ModelStrip,
 ) {
-    let Some(what) = editor.views.model.views[key].confirm else {
+    let Some(what) = editor.views.model.view(key).confirm else {
         return;
     };
-    let source = strip_of(row, ACTIONS[action], DIRECTIONS[direction]);
-    let mismatched: Vec<String> = DIRECTIONS
+    let source = strip_of(row, strip);
+    let others_of = |direction: DirectionName| ModelStrip { direction, ..strip };
+    let mismatched: Vec<String> = DirectionName::VARIANTS
         .iter()
-        .enumerate()
-        .filter(|(d, _)| *d != direction)
-        .filter_map(|(_, dir)| {
-            let other = strip_of(row, ACTIONS[action], dir);
-            (other.len() != source.len()).then(|| format!("{dir} ({})", other.len()))
+        .filter(|&&direction| direction != strip.direction)
+        .filter_map(|&direction| {
+            let other = strip_of(row, others_of(direction));
+            (other.len() != source.len()).then(|| format!("{} ({})", direction.key(), other.len()))
         })
         .collect();
-    let others = DIRECTIONS.len() - 1 - mismatched.len();
+    let others = DirectionName::VARIANTS.len() - 1 - mismatched.len();
     let (title, noun) = match what {
-        Confirm::Timing => ("⑂ Apply timing to the other directions", "lengths"),
-        Confirm::Cues => ("⑂ Copy cues to the other directions", "cues"),
+        StripConfirm::Timing => ("⑂ Apply timing to the other directions", "lengths"),
+        StripConfirm::Cues => ("⑂ Copy cues to the other directions", "cues"),
     };
-    let mut decision = None;
-    crate::ui::dialogs::card(ctx, "model-confirm", 420.0, |ui| {
+    let mut answer = None;
+    dialogs::card(ctx, "model-confirm", 420.0, |ui| {
         ui.label(RichText::new(title).size(16.0).strong());
         ui.add_space(6.0);
         ui.label(format!(
-            "{} · {}'s {noun} go to the other {others} directions, frame by frame.",
-            ACTIONS[action], DIRECTIONS[direction]
+            "{}'s {noun} go to the other {others} directions, frame by frame.",
+            strip.name()
         ));
         if !mismatched.is_empty() {
             ui.add_space(4.0);
@@ -1319,58 +1200,33 @@ pub fn confirm(
             )));
         }
         ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            if widgets::primary(ui, &format!("Apply to {others} directions")).clicked() {
-                decision = Some(true);
-            }
-            if ui.button("Cancel").clicked() {
-                decision = Some(false);
-            }
-        });
-        let (enter, escape) = ui.input(|i| {
-            (
-                i.key_pressed(egui::Key::Enter),
-                i.key_pressed(egui::Key::Escape),
-            )
-        });
-        if enter {
-            decision = Some(true);
-        }
-        if escape {
-            decision = Some(false);
-        }
+        answer = dialogs::answer_row(ui, &format!("Apply to {others} directions"));
     });
-    let Some(apply) = decision else {
+    let Some(answer) = answer else {
         return;
     };
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.confirm = None;
-    if !apply {
+    editor.views.model.view_mut(key).confirm = None;
+    if answer == DialogAnswer::Cancel {
         return;
     }
     let mut changed = row.clone();
-    for (d, dir) in DIRECTIONS.iter().enumerate() {
-        if d == direction {
+    for &direction in DirectionName::VARIANTS {
+        if direction == strip.direction {
             continue;
         }
-        let other = strip_of(row, ACTIONS[action], dir);
+        let other = strip_of(row, others_of(direction));
         if other.len() != source.len() {
             continue;
         }
-        let merged: Vec<FrameData> = other
+        let merged: Vec<StripFrame> = other
             .iter()
             .zip(&source)
             .map(|(frame, from)| match what {
-                Confirm::Timing => FrameData {
+                StripConfirm::Timing => StripFrame {
                     ms: from.ms,
                     ..frame.clone()
                 },
-                Confirm::Cues => FrameData {
+                StripConfirm::Cues => StripFrame {
                     apex: from.apex,
                     step: from.step,
                     sound: from.sound.clone(),
@@ -1378,18 +1234,18 @@ pub fn confirm(
                 },
             })
             .collect();
-        changed["sprites"]["actions"][ACTIONS[action]][*dir] =
-            Value::Array(merged.iter().map(FrameData::to_value).collect());
+        changed["sprites"]["actions"][strip.action.key()][direction.key()] =
+            super::frames_json(&merged);
     }
     let label = match what {
-        Confirm::Timing => format!(
-            "Apply {} · {}'s timing to {others} directions of {key}",
-            ACTIONS[action], DIRECTIONS[direction]
+        StripConfirm::Timing => format!(
+            "Apply {}'s timing to {others} directions of {key}",
+            strip.name()
         ),
-        Confirm::Cues => format!(
-            "Copy {} · {}'s cues to {others} directions of {key}",
-            ACTIONS[action], DIRECTIONS[direction]
+        StripConfirm::Cues => format!(
+            "Copy {}'s cues to {others} directions of {key}",
+            strip.name()
         ),
     };
-    super::write_row(editor, key, &changed, label, false);
+    super::write_row(editor, key, &changed, ContentEdit::new(label));
 }

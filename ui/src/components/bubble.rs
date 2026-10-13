@@ -17,6 +17,7 @@ use crate::motion::transition::STANDARD_EXIT;
 use crate::motion::{Easing, Timing, Transform2d};
 use crate::opacity::Opacity;
 use crate::presence::{Leaving, Presence, PresenceMove};
+use crate::state::descendants;
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::{radius, spacing, typography};
@@ -117,19 +118,11 @@ pub fn bubble_tail_reach(body_extent: f32) -> f32 {
 }
 
 pub fn speech_line(world: &World, bubble: Entity, key: u64) -> Option<Entity> {
-    let mut stack = vec![bubble];
-    while let Some(entity) = stack.pop() {
-        if world
+    descendants(world, bubble).find(|&entity| {
+        world
             .get::<SpeechLine>(entity)
             .is_some_and(|line| line.key == key)
-        {
-            return Some(entity);
-        }
-        if let Some(kids) = world.get::<Children>(entity) {
-            stack.extend(kids.iter());
-        }
-    }
-    None
+    })
 }
 
 #[derive(Component, Default, Clone)]

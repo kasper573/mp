@@ -7,17 +7,19 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet};
+use crate::core::content::{
+    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, serial,
+};
 use crate::core::script::{
     Answer, Compiler, EffectCall, EffectDef, EffectStep, FlowKey, Name, Owner as ScriptOwner,
     OwnerKind, Value,
 };
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::systems::attention;
 use crate::systems::attention::Id as AttentionId;
 use crate::systems::dialogue;
-use crate::systems::item::Id as ItemId;
-use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemStack};
+use crate::systems::item::{
+    ExchangeRefusal, Id as ItemId, Inventory, ItemCategory, ItemFlag, ItemStack,
+};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::sender_player;
 use crate::systems::script::condition;
@@ -26,6 +28,7 @@ use crate::systems::script::{
     self, Condition, EventKind, Line, Reach, RiftEvent, RiftInstances, RiftScripting,
 };
 use crate::systems::text::LineText;
+use crate::systems::{attention, drain_requests};
 
 pub type Id = ContentId<ShopDef>;
 
@@ -115,10 +118,7 @@ impl ShopDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ShopOffer {
     pub item: ItemId,
-    #[serde(
-        default = "crate::core::content::serial::one",
-        skip_serializing_if = "crate::core::content::serial::is_one"
-    )]
+    #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub count: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub price: Vec<ItemStack>,
@@ -355,7 +355,7 @@ pub fn ledger(world: &World, player: Entity) -> ShopLedger {
 }
 
 pub fn requests(world: &mut World) {
-    for request in crate::systems::requests::<ShopRequest>(world) {
+    for request in drain_requests::<ShopRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -452,25 +452,6 @@ fn stacks_text(content: &Content, stacks: &[ItemStack], times: u32) -> String {
     } else {
         parts.join(" + ")
     }
-}
-
-pub fn reaction_lines(content: &Content) -> Vec<(Id, &'static Line)> {
-    content
-        .table::<ShopDef>()
-        .iter()
-        .flat_map(|(id, shop)| {
-            shop.reactions()
-                .into_iter()
-                .flat_map(|reactions| {
-                    reactions
-                        .bought
-                        .iter()
-                        .chain(&reactions.sold)
-                        .chain(&reactions.cant_afford)
-                })
-                .map(move |line| (id, line))
-        })
-        .collect()
 }
 
 fn profits(offer: &ShopOffer, pays: &[ItemStack]) -> bool {

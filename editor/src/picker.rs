@@ -1,10 +1,14 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::core::script::OwnerRow;
-use game::systems::script::{Reach, RiftScripts};
+use game::core::script::OwnerKind;
+use game::systems::area;
+use game::systems::area::{AreaDef, AreaModule};
+use game::systems::npc::{self, NpcDef};
+use game::systems::script::RiftScripts;
 
 use crate::forms::{FormAction, FormCx};
 use crate::project::{row_file, row_of};
-use crate::ui::theme;
+use crate::thumbs;
+use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 
 const PICTURE_TABLES: [&str; 6] = [
@@ -107,7 +111,9 @@ fn picker_body(
         .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
         .map(|row_key| {
             let name = display_name(cx, table, &row_key);
-            let reason = blocked.as_ref().and_then(|(block, _)| block(cx, &row_key));
+            let reason = blocked
+                .as_ref()
+                .and_then(|block| (block.reason)(cx, &row_key));
             (row_key, name, reason)
         })
         .filter(|(row_key, name, _)| {
@@ -139,24 +145,17 @@ fn picker_body(
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut search)
                         .frame(egui::Frame::NONE)
-                        .hint_text(filter_hint(cx, table, &blocked))
+                        .hint_text(filter_hint(cx, table))
                         .desired_width(ui.available_width() - 120.0),
                 );
-                if ui
-                    .ctx()
-                    .data(|d| d.get_temp::<bool>(id.with("fresh")))
-                    .is_none()
-                {
-                    response.request_focus();
-                    ui.ctx().data_mut(|d| d.insert_temp(id.with("fresh"), true));
-                }
+                widgets::default_focus(ui, &response);
                 if response.changed() {
                     cx.state.drafts.insert(search_id, search.clone());
                     highlight = 0;
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let counted = match &blocked {
-                        Some((_, verb)) => format!("{table} · {pickable} {verb}"),
+                        Some(block) => format!("{table} · {pickable} {}", block.rule),
                         None => format!("{table} · {} of {total}", keys.len()),
                     };
                     ui.label(theme::muted(counted).monospace().size(11.5));
@@ -358,62 +357,52 @@ fn picker_body(
 
 fn close_picker(ui: &mut Ui, cx: &mut FormCx, id: egui::Id, search_id: egui::Id) {
     cx.state.drafts.remove(&search_id);
-    ui.ctx().data_mut(|d| {
-        d.remove_temp::<bool>(id.with("fresh"));
-        d.remove_temp::<usize>(id.with("highlight"));
-    });
+    ui.ctx()
+        .data_mut(|d| d.remove_temp::<usize>(id.with("highlight")));
     ui.close();
 }
 
-fn filter_hint(cx: &FormCx, table: &str, blocked: &Option<Block>) -> String {
-    if table == "script"
-        && let Some(owner) = &cx.owner_table
-    {
-        return format!("filter · owner {owner}");
+fn filter_hint(cx: &FormCx, table: &str) -> String {
+    match (table, &cx.owner_table) {
+        ("script", Some(owner)) => format!("filter · owner {owner}"),
+        _ => "filter".to_owned(),
     }
-    if blocked.is_some() {
-        return "filter".to_owned();
-    }
-    "filter".to_owned()
 }
 
-type Block = (Box<dyn Fn(&FormCx, &str) -> Option<String>>, &'static str);
+type BlockReason = Box<dyn Fn(&FormCx, &str) -> Option<String>>;
+
+struct Block {
+    reason: BlockReason,
+    rule: &'static str,
+}
 
 fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
     if table == "script" {
         let owner = cx.owner_table.clone()?;
-        let kind = crate::views::script::nodes::owner_kind_named(&owner);
-        return Some((
-            Box::new(move |cx, key| {
+        let kind = owner.parse::<OwnerKind>().unwrap_or(OwnerKind::Any);
+        return Some(Block {
+            reason: Box::new(move |cx, key| {
                 let row = cx.files.json(&row_file("script", key))?;
                 let script_owner = row.text("owner");
-                (crate::views::script::nodes::owner_kind_named(script_owner) != kind)
+                (script_owner.parse::<OwnerKind>().unwrap_or(OwnerKind::Any) != kind)
                     .then(|| format!("owner {script_owner}"))
             }),
-            "fit the owner",
-        ));
+            rule: "fit the owner",
+        });
     }
     if table == "npc" && cx.owner_table.as_deref() == Some("quest") && path.ends_with("/npc") {
         let content = cx.content?;
         if !content.has_built::<RiftScripts>() {
             return None;
         }
-        return Some((
-            Box::new(move |_, key| {
-                let id = content.by_key::<game::systems::npc::NpcDef>(key)?;
-                let may = content.built::<RiftScripts>().may_do(OwnerRow {
-                    kind: game::core::script::OwnerKind::Npc,
-                    row: id.raw(),
-                    object: None,
-                });
-                (!may
-                    .reaches
-                    .iter()
-                    .any(|reach| matches!(reach, Reach::Hostile)))
-                .then(|| "no script sets it hostile".to_owned())
+        return Some(Block {
+            reason: Box::new(move |_, key| {
+                let id = content.by_key::<NpcDef>(key)?;
+                (!npc::can_be_fought(content.built::<RiftScripts>(), id))
+                    .then(|| "no script sets it hostile".to_owned())
             }),
-            "can be defeated",
-        ));
+            rule: "can be defeated",
+        });
     }
     None
 }
@@ -424,22 +413,16 @@ fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
             let Some(content) = cx.content else {
                 return String::new();
             };
-            let Some(id) = content.by_key::<game::systems::npc::NpcDef>(key) else {
+            let Some(id) = content.by_key::<NpcDef>(key) else {
                 return String::new();
             };
             let mut places: Vec<String> = Vec::new();
-            for area in content.ids::<game::systems::area::AreaDef>() {
-                let count: u32 = game::systems::area::placed(&content, area)
+            for area in content.ids::<AreaDef>() {
+                let count: u32 = area::placed(&content, area)
                     .iter()
                     .map(|placed| match &placed.module {
-                        game::systems::area::AreaModule::Resident(resident)
-                            if resident.npc == id =>
-                        {
-                            1
-                        }
-                        game::systems::area::AreaModule::Population(population)
-                            if population.npc == id =>
-                        {
+                        AreaModule::Resident(resident) if resident.npc == id => 1,
+                        AreaModule::Population(population) if population.npc == id => {
                             population.count
                         }
                         _ => 0,
@@ -486,8 +469,9 @@ fn picture_file(cx: &FormCx, table: &str, key: &str) -> Option<String> {
     match table {
         "model" => row["sprites"]["image"].as_str().map(str::to_owned),
         "item" => row["icon"].as_str().map(str::to_owned),
-        "tileset" => row["image"].as_str().map(str::to_owned),
-        "attention" | "interface_icon" | "cursor" => row["image"].as_str().map(str::to_owned),
+        "tileset" | "attention" | "interface_icon" | "cursor" => {
+            row["image"].as_str().map(str::to_owned)
+        }
         "npc" | "player" => {
             let model = row["model"].as_str()?;
             cx.files.json(&row_file("model", model))?["sprites"]["image"]
@@ -527,22 +511,11 @@ pub fn thumbnail(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str, size: f32
                 && let Some(path) = model["sprites"]["image"].as_str()
                 && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, path)
             {
-                let w = model["sprites"]["frame_size"]["width"]
-                    .as_f64()
-                    .unwrap_or(16.0) as f32;
-                let h = model["sprites"]["frame_size"]["height"]
-                    .as_f64()
-                    .unwrap_or(16.0) as f32;
-                let frame = model["sprites"]["actions"]["idle"]["s"][0]["frame"]
-                    .as_u64()
-                    .unwrap_or(0) as f32;
-                let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
-                let x = (frame % columns) * w;
-                let y = (frame / columns).floor() * h;
-                let uv = crate::thumbs::uv(thumb.size, x, y, w, h);
+                let frame = thumbs::model_frame(&model, &thumb);
+                let scale = size / frame.size.y.max(1.0);
                 ui.add(
-                    egui::Image::from_texture((thumb.texture.id(), egui::vec2(size * w / h, size)))
-                        .uv(uv),
+                    egui::Image::from_texture((thumb.texture.id(), frame.size * scale))
+                        .uv(frame.uv),
                 );
             }
         }
@@ -551,7 +524,7 @@ pub fn thumbnail(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str, size: f32
                 && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, path)
             {
                 let tile = row["tile"].as_f64().unwrap_or(16.0) as f32;
-                let uv = crate::thumbs::uv(thumb.size, 0.0, 0.0, tile * 2.0, tile * 2.0);
+                let uv = thumbs::uv(thumb.size, 0.0, 0.0, tile * 2.0, tile * 2.0);
                 ui.add(
                     egui::Image::from_texture((thumb.texture.id(), egui::vec2(size, size))).uv(uv),
                 );

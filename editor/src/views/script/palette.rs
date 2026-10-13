@@ -1,33 +1,31 @@
+use std::collections::HashSet;
+
 use egui::{Align2, Key, Pos2, Ui};
 
-use super::graph::GraphAction;
-use super::nodes::Catalogue;
-use super::{Doc, add_node, nodes};
+use super::graph::NodePaletteOpen;
+use super::nodes::{NodeCatalogue, NodeEntry};
+use super::{ScriptDoc, add_node, nodes};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
 
-pub struct Palette {
-    pub at: Option<Pos2>,
-    pub place: Option<Pos2>,
-    pub link: Option<(String, String)>,
-    pub search: String,
-    pub fresh: bool,
-    pub age: u32,
+pub struct NodePalette {
+    open: NodePaletteOpen,
+    search: String,
+    fresh: bool,
+    age: u32,
     cursor: usize,
-    open: Vec<&'static str>,
+    unfolded: HashSet<&'static str>,
 }
 
-impl Palette {
-    pub fn new(at: Option<Pos2>, place: Option<Pos2>, link: Option<(String, String)>) -> Palette {
-        Palette {
-            at,
-            place,
-            link,
+impl NodePalette {
+    pub fn new(open: NodePaletteOpen) -> NodePalette {
+        NodePalette {
+            open,
             search: String::new(),
             fresh: true,
             age: 0,
             cursor: 0,
-            open: vec!["flow"],
+            unfolded: HashSet::from(["flow"]),
         }
     }
 }
@@ -47,53 +45,43 @@ enum Row {
     },
 }
 
-pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction]) {
+struct Refused {
+    system: &'static str,
+    count: usize,
+    reason: String,
+}
+
+pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let owner = doc.owner.clone();
-    let Some(mut palette) = editor
-        .views
-        .script
-        .views
-        .get_mut(&owner)
-        .and_then(|view| view.palette.take())
-    else {
+    let Some(mut palette) = editor.views.script.view_mut(&owner).palette.take() else {
         return;
     };
-    let catalogue = editor.views.script.catalogue.as_ref().expect("catalogue");
+    let catalogue = &editor.views.script.catalogue;
     let needle = palette.search.trim().to_lowercase();
-    let linking = palette.link.is_some();
-    let fits: Vec<&nodes::Entry> = catalogue
-        .entries
-        .iter()
-        .filter(|entry| (entry.kind == "on") != linking)
-        .filter(|entry| catalogue.refusal(&entry.kind, doc.kind).is_none())
-        .collect();
+    let linking = palette.open.link.is_some();
+    let (fits, refused) = sorted(catalogue, doc, linking);
     let total = catalogue.entries.len();
     let rows = if needle.is_empty() {
-        grouped(&fits, &palette.open)
+        grouped(&fits, &palette.unfolded)
     } else {
         searched(&fits, &needle)
     };
-    let refused = refused_groups(catalogue, doc, linking);
+    let refused_groups = refused_groups(&refused);
     let refused_matches: Vec<String> = if needle.is_empty() {
         Vec::new()
     } else {
-        catalogue
-            .entries
+        refused
             .iter()
-            .filter(|entry| linking != (entry.kind == "on"))
-            .filter(|entry| {
+            .filter(|(entry, _)| {
                 entry.kind.replace('_', " ").contains(&needle)
                     || entry.blurb.to_lowercase().contains(&needle)
             })
-            .filter_map(|entry| {
-                catalogue.refusal(&entry.kind, doc.kind).map(|reason| {
-                    format!(
-                        "{} · {} · {}",
-                        entry.kind.replace('_', " "),
-                        entry.system.replace('_', " "),
-                        only_for(&reason)
-                    )
-                })
+            .map(|(entry, reason)| {
+                format!(
+                    "{} · {} · {reason}",
+                    entry.kind.replace('_', " "),
+                    entry.system.replace('_', " ")
+                )
             })
             .take(4)
             .collect()
@@ -102,11 +90,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
         .iter()
         .filter(|row| matches!(row, Row::Entry { .. }))
         .count();
-    if rows.is_empty() {
-        palette.cursor = 0;
-    } else {
-        palette.cursor = palette.cursor.min(rows.len() - 1);
-    }
+    palette.cursor = palette.cursor.min(rows.len().saturating_sub(1));
     let mut picked: Option<String> = None;
     let mut close = false;
     let (up, down, right, left, enter) = ui.input(|i| {
@@ -125,38 +109,61 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
         palette.cursor = palette.cursor.saturating_sub(1);
     }
     let mut toggle: Option<(&'static str, bool)> = None;
-    if let Some(Row::Group { system, .. }) = rows.get(palette.cursor) {
-        if right {
-            toggle = Some((system, true));
+    match rows.get(palette.cursor) {
+        Some(Row::Group { system, .. }) => {
+            if right {
+                toggle = Some((system, true));
+            }
+            if left {
+                toggle = Some((system, false));
+            }
+            if enter {
+                toggle = Some((system, !palette.unfolded.contains(system)));
+            }
         }
-        if left {
-            toggle = Some((system, false));
-        }
-        if enter {
-            toggle = Some((system, !palette.open.contains(system)));
-        }
-    } else if let Some(Row::Entry { kind, .. }) = rows.get(palette.cursor)
-        && enter
-    {
-        picked = Some(kind.clone());
+        Some(Row::Entry { kind, .. }) if enter => picked = Some(kind.clone()),
+        _ => {}
     }
-    let pos = palette
-        .at
-        .unwrap_or_else(|| ui.max_rect().center() - egui::vec2(WIDTH / 2.0, 200.0));
     let pos = Pos2::new(
-        pos.x
+        palette
+            .open
+            .at
+            .x
             .min(ui.max_rect().right() - WIDTH - 12.0)
             .max(ui.max_rect().left() + 4.0),
-        pos.y.max(ui.max_rect().top() + 4.0),
+        palette.open.at.y.max(ui.max_rect().top() + 4.0),
     );
     let owner_word = doc.kind.name();
-    let article = if owner_word.starts_with(['a', 'e', 'i', 'o', 'u']) {
-        "an"
-    } else {
-        "a"
-    };
+    let article = widgets::article(owner_word);
     let mut clicked_row: Option<usize> = None;
     let list_height = ui.max_rect().height() * 0.55;
+    let hint = match &palette.open.link {
+        Some((from, field)) => format!(
+            "add after {from} {}",
+            nodes::port_label(doc.nodes(), catalogue, from, field)
+        ),
+        None => "type to search".to_owned(),
+    };
+    let count = if !linking {
+        "ON STARTS A NEW FLOW · SELECT A NODE TO ADD AFTER IT".to_owned()
+    } else if needle.is_empty() {
+        format!(
+            "{} OF {total} NODES FIT {} {}",
+            fits.len(),
+            article.to_uppercase(),
+            owner_word.to_uppercase()
+        )
+    } else {
+        format!("{entries} OF {total} NODES THAT FIT HERE")
+    };
+    let by_system = (needle.is_empty() && linking).then(|| {
+        let flow = fits.iter().filter(|e| e.system == "flow").count();
+        let dialogue = fits.iter().filter(|e| e.system == "dialogue").count();
+        format!(
+            "FLOW {flow} · DIALOGUE {dialogue} · BY SYSTEM {}",
+            fits.len() - flow - dialogue
+        )
+    });
     let area = egui::Area::new(ui.id().with("palette"))
         .order(egui::Order::Foreground)
         .fixed_pos(pos)
@@ -167,14 +174,10 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
                 .stroke(egui::Stroke::new(1.0, theme::BORDER))
                 .corner_radius(6.0)
                 .inner_margin(egui::Margin::same(8))
-                .shadow(egui::epaint::Shadow { offset: [0, 6], blur: 18, spread: 0, color: egui::Color32::from_black_alpha(140) })
+                .shadow(theme::SHADOW)
                 .show(ui, |ui| {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
-                    let hint = match &palette.link {
-                        Some((from, field)) => format!("add after {from} {}", nodes::port_label(doc.nodes(), catalogue, from, field)),
-                        None => "type to search".to_owned(),
-                    };
                     let response = widgets::search_box(ui, &mut palette.search, &hint, None);
                     if palette.fresh {
                         response.request_focus();
@@ -184,53 +187,78 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
                         palette.cursor = 0;
                     }
                     ui.add_space(2.0);
-                    let count = if !linking {
-                        "ON STARTS A NEW FLOW · SELECT A NODE TO ADD AFTER IT".to_owned()
-                    } else if needle.is_empty() {
-                        format!("{} OF {total} NODES FIT {} {}", fits.len(), article.to_uppercase(), owner_word.to_uppercase())
-                    } else {
-                        format!("{entries} OF {total} NODES THAT FIT HERE")
-                    };
                     ui.label(theme::faint(count).size(11.0).monospace());
-                    if needle.is_empty() && linking {
-                        let flow = fits.iter().filter(|e| e.system == "flow").count();
-                        let dialogue = fits.iter().filter(|e| e.system == "dialogue").count();
-                        let by_system = fits.len() - flow - dialogue;
-                        ui.label(theme::faint(format!("FLOW {flow} · DIALOGUE {dialogue} · BY SYSTEM {by_system}")).size(11.0).monospace());
+                    if let Some(by_system) = by_system {
+                        ui.label(theme::faint(by_system).size(11.0).monospace());
                     }
                     ui.add_space(2.0);
-                    egui::ScrollArea::vertical().max_height(list_height).show(ui, |ui| {
-                        for (index, row) in rows.iter().enumerate() {
-                            let selected = index == palette.cursor;
-                            let response = match row {
-                                Row::Group { system, count, kinds } => group_row(ui, system, *count, kinds, palette.open.contains(system), selected),
-                                Row::Entry { kind, system, detail } => entry_row(ui, kind, system, detail, selected),
-                            };
-                            if selected && (up || down || right || left) {
-                                response.scroll_to_me(None);
+                    egui::ScrollArea::vertical()
+                        .max_height(list_height)
+                        .show(ui, |ui| {
+                            for (index, row) in rows.iter().enumerate() {
+                                let selected = index == palette.cursor;
+                                let response = match row {
+                                    Row::Group {
+                                        system,
+                                        count,
+                                        kinds,
+                                    } => group_row(
+                                        ui,
+                                        system,
+                                        *count,
+                                        kinds,
+                                        palette.unfolded.contains(system),
+                                        selected,
+                                    ),
+                                    Row::Entry {
+                                        kind,
+                                        system,
+                                        detail,
+                                    } => entry_row(ui, kind, system, detail, selected),
+                                };
+                                if selected && (up || down || right || left) {
+                                    response.scroll_to_me(None);
+                                }
+                                if response.clicked() {
+                                    clicked_row = Some(index);
+                                }
                             }
-                            if response.clicked() {
-                                clicked_row = Some(index);
+                            if rows.is_empty() {
+                                ui.label(
+                                    theme::muted(
+                                        "nothing matches · words, names and systems all count",
+                                    )
+                                    .size(12.0),
+                                );
                             }
-                        }
-                        if rows.is_empty() {
-                            ui.label(theme::muted("nothing matches · words, names and systems all count").size(12.0));
-                        }
-                    });
+                        });
                     ui.add_space(2.0);
                     ui.separator();
                     if needle.is_empty() {
-                        for (system, count, reason) in &refused {
-                            ui.label(theme::faint(format!("{} · {count} · {reason}", system.replace('_', " "))).size(11.5));
+                        for group in &refused_groups {
+                            ui.label(
+                                theme::faint(format!(
+                                    "{} · {} · {}",
+                                    group.system.replace('_', " "),
+                                    group.count,
+                                    group.reason
+                                ))
+                                .size(11.5),
+                            );
                         }
-                        if refused.is_empty() {
+                        if refused_groups.is_empty() {
                             ui.label(theme::faint("every node fits this owner").size(11.5));
                         }
                     } else {
                         for line in &refused_matches {
                             ui.label(theme::faint(line).size(11.5));
                         }
-                        ui.label(theme::faint("↑↓ choose · Enter places it at the arrow · words, names and systems all match").size(11.5));
+                        ui.label(
+                            theme::faint(
+                                "↑↓ choose · Enter places it at the arrow · words, names and systems all match",
+                            )
+                            .size(11.5),
+                        );
                     }
                     if ui.input(|i| i.key_pressed(Key::Escape)) {
                         close = true;
@@ -239,15 +267,18 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
         });
     if let Some(index) = clicked_row {
         match &rows[index] {
-            Row::Group { system, .. } => toggle = Some((system, !palette.open.contains(system))),
+            Row::Group { system, .. } => {
+                toggle = Some((system, !palette.unfolded.contains(system)));
+            }
             Row::Entry { kind, .. } => picked = Some(kind.clone()),
         }
         palette.cursor = index;
     }
     if let Some((system, open)) = toggle {
-        palette.open.retain(|s| *s != system);
         if open {
-            palette.open.push(system);
+            palette.unfolded.insert(system);
+        } else {
+            palette.unfolded.remove(system);
         }
     }
     if palette.age > 0 && area.response.clicked_elsewhere() {
@@ -255,17 +286,32 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &Doc, _actions: &mut [GraphAction
     }
     palette.age += 1;
     if let Some(kind) = picked {
-        let place = palette.place;
-        let link = palette.link.clone();
-        add_node(editor, doc, &kind, place, link);
+        let at = palette.open.placed.then_some(palette.open.at);
+        add_node(editor, doc, &kind, at, palette.open.link.clone());
         return;
     }
-    if !close && let Some(view) = editor.views.script.views.get_mut(&owner) {
-        view.palette = Some(palette);
+    if !close {
+        editor.views.script.view_mut(&owner).palette = Some(palette);
     }
 }
 
-fn grouped(fits: &[&nodes::Entry], open: &[&'static str]) -> Vec<Row> {
+fn sorted<'a>(
+    catalogue: &'a NodeCatalogue,
+    doc: &ScriptDoc,
+    linking: bool,
+) -> (Vec<&'a NodeEntry>, Vec<(&'a NodeEntry, String)>) {
+    let mut fits = Vec::new();
+    let mut refused = Vec::new();
+    for entry in catalogue.entries.iter().filter(|entry| entry.fits(linking)) {
+        match catalogue.refusal(&entry.kind, doc.kind) {
+            Some(refusal) => refused.push((entry, refusal.only_for())),
+            None => fits.push(entry),
+        }
+    }
+    (fits, refused)
+}
+
+fn grouped(fits: &[&NodeEntry], unfolded: &HashSet<&'static str>) -> Vec<Row> {
     let mut systems: Vec<&'static str> = Vec::new();
     for entry in fits {
         if !systems.contains(&entry.system) {
@@ -274,22 +320,22 @@ fn grouped(fits: &[&nodes::Entry], open: &[&'static str]) -> Vec<Row> {
     }
     let mut rows = Vec::new();
     for system in systems {
-        let members: Vec<&&nodes::Entry> =
+        let members: Vec<&&NodeEntry> =
             fits.iter().filter(|entry| entry.system == system).collect();
         rows.push(Row::Group {
             system,
             count: members.len(),
             kinds: members.iter().map(|entry| entry.kind.clone()).collect(),
         });
-        if open.contains(&system) {
+        if unfolded.contains(system) {
             rows.extend(members.iter().map(|entry| entry_of(entry)));
         }
     }
     rows
 }
 
-fn searched(fits: &[&nodes::Entry], needle: &str) -> Vec<Row> {
-    let mut scored: Vec<(u8, &&nodes::Entry)> = fits
+fn searched(fits: &[&NodeEntry], needle: &str) -> Vec<Row> {
+    let mut scored: Vec<(u8, &&NodeEntry)> = fits
         .iter()
         .filter_map(|entry| {
             let name = entry.kind.replace('_', " ");
@@ -316,7 +362,7 @@ fn searched(fits: &[&nodes::Entry], needle: &str) -> Vec<Row> {
         .collect()
 }
 
-fn entry_of(entry: &nodes::Entry) -> Row {
+fn entry_of(entry: &NodeEntry) -> Row {
     let fields: Vec<&str> = entry
         .fields
         .iter()
@@ -340,50 +386,19 @@ fn entry_of(entry: &nodes::Entry) -> Row {
     }
 }
 
-fn refused_groups(
-    catalogue: &Catalogue,
-    doc: &Doc,
-    linking: bool,
-) -> Vec<(&'static str, usize, String)> {
-    let mut groups: Vec<(&'static str, usize, String)> = Vec::new();
-    for entry in catalogue
-        .entries
-        .iter()
-        .filter(|entry| linking != (entry.kind == "on"))
-    {
-        let Some(reason) = catalogue.refusal(&entry.kind, doc.kind) else {
-            continue;
-        };
-        let reason = only_for(&reason);
-        match groups
-            .iter_mut()
-            .find(|(system, _, _)| *system == entry.system)
-        {
-            Some((_, count, _)) => *count += 1,
-            None => groups.push((entry.system, 1, reason)),
+fn refused_groups(refused: &[(&NodeEntry, String)]) -> Vec<Refused> {
+    let mut groups: Vec<Refused> = Vec::new();
+    for (entry, reason) in refused {
+        match groups.iter_mut().find(|group| group.system == entry.system) {
+            Some(group) => group.count += 1,
+            None => groups.push(Refused {
+                system: entry.system,
+                count: 1,
+                reason: reason.clone(),
+            }),
         }
     }
     groups
-}
-
-fn only_for(reason: &str) -> String {
-    reason
-        .split_once("only ")
-        .map(|(_, only)| {
-            format!(
-                "only for {} owner",
-                article_of(only.split(',').next().unwrap_or(only).trim())
-            )
-        })
-        .unwrap_or_else(|| reason.to_owned())
-}
-
-fn article_of(word: &str) -> String {
-    if word.starts_with(['a', 'e', 'i', 'o', 'u']) {
-        format!("an {word}")
-    } else {
-        format!("a {word}")
-    }
 }
 
 fn group_row(
@@ -425,26 +440,14 @@ fn group_row(
         theme::FAINT,
     );
     if !open {
-        let room = count_text.min.x - name.max.x - 16.0;
-        let mut preview = kinds.join(" · ");
-        let glyph = 7.2;
-        if preview.len() as f32 * glyph > room {
-            let keep = ((room / glyph) as usize).saturating_sub(2);
-            preview = format!(
-                "{} …",
-                preview
-                    .chars()
-                    .take(keep)
-                    .collect::<String>()
-                    .trim_end_matches([' ', '·'])
-            );
-        }
-        ui.painter().text(
+        widgets::text_within(
+            ui.painter(),
             egui::pos2(name.max.x + 12.0, rect.center().y),
             Align2::LEFT_CENTER,
-            preview,
+            &kinds.join(" · "),
             egui::FontId::proportional(12.0),
             ink.gamma_multiply(0.8),
+            count_text.min.x - name.max.x - 16.0,
         );
     }
     response

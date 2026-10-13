@@ -1,22 +1,20 @@
 use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::path::Path;
+use std::sync::{Arc, LazyLock};
 
 use bevy_app::App;
 use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ClientId as Sender, FromClient, SendTargets, ServerState, ToClients};
+use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use bevy_replicon::server::ServerSystems;
-use bevy_state::prelude::NextState;
 use bevy_time::TimeUpdateStrategy;
-use game::core::content::{Content, ContentId, ContentRow, key_of};
+use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
 use game::core::math::{Pos, Rng};
 use game::core::script::Value;
 use game::core::tiling::{TilePos, Tiles};
-use game::core::time::Seconds;
-use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::GameSettings;
+use game::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use game::systems::TICK_HZ;
-use game::systems::area::{self, Area, AreaObject};
+use game::systems::area::{self, Area, AreaObject, Id as AreaId};
 use game::systems::combat::Died;
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
@@ -24,12 +22,14 @@ use game::systems::interact::InteractRequest;
 use game::systems::item::Id as ItemId;
 use game::systems::item::{self, Inventory, ItemStack};
 use game::systems::memory;
+use game::systems::memory::Id as MemoryId;
 use game::systems::movement::position;
 use game::systems::notification::Id as NotificationId;
 use game::systems::notification::{Notification, NotificationKind, NotificationSent};
 use game::systems::npc::Id as NpcId;
 use game::systems::npc::{self, Npc, Pack};
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
+use game::systems::{GameSettings, WorldArea, from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
@@ -38,9 +38,9 @@ pub const CLOCK: WallClock = WallClock {
 
 pub fn content() -> &'static Content {
     static CONTENT: LazyLock<Content> = LazyLock::new(|| {
-        game::systems::load_content(
-            std::sync::Arc::new(game::core::content::FilesystemFolder(
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
+        load_content(
+            Arc::new(FilesystemFolder(
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
             )),
             "cargo test failed",
         )
@@ -65,18 +65,18 @@ pub fn row<Id: Named>(name: &str) -> Id {
     Id::named(name)
 }
 
-pub fn spawn_area() -> game::systems::area::Id {
+pub fn spawn_area() -> AreaId {
     content().built::<GameSettings>().initial_spawn.area
 }
 
 pub struct Sim {
     pub app: App,
-    area: game::systems::area::Id,
+    area: AreaId,
     conns: HashMap<u32, Entity>,
 }
 
 impl Sim {
-    pub fn area(area: game::systems::area::Id) -> Sim {
+    pub fn area(area: AreaId) -> Sim {
         let mut app = game::systems::server_app(area, 0, CLOCK, content());
         app.insert_resource(Rng::new(1));
         app.insert_resource(SpawnRules {
@@ -88,12 +88,7 @@ impl Sim {
             bevy_app::PostUpdate,
             collect_notified.before(ServerSystems::Send),
         );
-        app.finish();
-        app.cleanup();
-        app.world_mut()
-            .resource_mut::<NextState<ServerState>>()
-            .set(ServerState::Running);
-        app.update();
+        start_server(&mut app);
         Sim {
             app,
             area,
@@ -106,8 +101,8 @@ impl Sim {
     }
 
     pub fn map(&self) -> &'static Area {
-        let assets = *self.app.world().resource::<Content>();
-        area::load(&assets, self.area)
+        let content = *self.app.world().resource::<Content>();
+        area::load(&content, self.area)
     }
 
     pub fn tick(&mut self) {
@@ -163,10 +158,7 @@ impl Sim {
 
     pub fn send<M: Message>(&mut self, client: u32, message: M) {
         let conn = self.conns[&client];
-        self.world().write_message(FromClient {
-            client_id: Sender::Client(conn),
-            message,
-        });
+        from_client(self.world(), conn, message);
     }
 
     pub fn read_all<M: Message + Clone>(&self) -> Vec<M> {
@@ -211,15 +203,15 @@ pub fn object(sim: &mut Sim, name: &str) -> Entity {
         .expect("an object on the map")
 }
 
-pub fn remember(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) {
+pub fn remember(sim: &mut Sim, player: Entity, key: MemoryId) {
     memory::set(sim.world(), player, key, Value::Bool(true));
 }
 
-pub fn remembered(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) -> bool {
+pub fn remembered(sim: &mut Sim, player: Entity, key: MemoryId) -> bool {
     memory::get(sim.world(), player, key).truthy()
 }
 
-pub fn counted(sim: &mut Sim, player: Entity, key: game::systems::memory::Id) -> i64 {
+pub fn counted(sim: &mut Sim, player: Entity, key: MemoryId) -> i64 {
     match memory::get(sim.world(), player, key) {
         Value::Int(count) => count,
         other => panic!("{key:?} holds {other:?}, not a count"),
@@ -357,7 +349,7 @@ pub fn later(sim: &mut Sim, seconds: f32) {
 pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
     let world = sim.world();
     let at = position(world, player).expect("player position");
-    let area = world.resource::<game::systems::WorldArea>().0;
+    let area = world.resource::<WorldArea>().0;
     let victim = npc::spawn(world, what, at, area, Pack(u32::MAX));
     item::reserve(world, victim, player, Seconds(0.0));
     world.write_message(Died {

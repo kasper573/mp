@@ -11,7 +11,7 @@ use ui::{
     RichPiece,
 };
 
-use crate::core::content::{Content, Fixture};
+use crate::core::content::{Content, ContentRow, Fixture};
 
 #[derive(
     JsonSchema,
@@ -73,7 +73,7 @@ pub struct InputDef {
     pub bindings: Vec<InputBinding>,
 }
 
-impl crate::core::content::ContentRow for InputDef {
+impl ContentRow for InputDef {
     const TABLE: &'static str = "input";
 }
 
@@ -111,14 +111,6 @@ impl InputBinding {
         InputBinding::Click(ClickGesture {
             button,
             times: 1,
-            modifiers: KeyModifiers::NONE,
-        })
-    }
-
-    pub const fn double_click(button: MouseButton) -> InputBinding {
-        InputBinding::Click(ClickGesture {
-            button,
-            times: 2,
             modifiers: KeyModifiers::NONE,
         })
     }

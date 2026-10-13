@@ -9,6 +9,8 @@ pub mod usages;
 use std::collections::BTreeMap;
 
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use game::core::content::{ContentRow, ModuleRule};
+use game::systems::area::world_map::WorldMapDef;
 use serde_json::Value;
 
 use self::bindings::bindings_section;
@@ -19,19 +21,29 @@ use self::scripts::{
 };
 use self::usages::show_asset;
 use super::{theme, widgets};
-use crate::app::{Compare, ConfirmAction, ConfirmDialog, Dialog, Editor, RightTab};
-use crate::forms::{Changed, FormAction, FormCx};
-use crate::project::{Edit, Selection, row_file};
-use crate::schema::{self, Kind};
-use crate::tabs::Tab;
+use crate::app::{
+    BottomTab, Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, RightTab,
+    TextComparison, registry,
+};
+use crate::forms::{FormAction, FormChange, FormCx};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::rows::new_row_into;
+use crate::schema;
+use crate::tabs::EditorTab;
+use crate::ui::browser;
+use crate::ui::browser::BrowserAction;
 use crate::value::RowValue;
+use crate::views::area::{inspect, parts};
+use crate::views::script::{PendingScriptAction, ScriptOwner};
+use crate::views::{job, model, script, tileset, world};
+use crate::{forms, views};
 
 const WIDE: f32 = 760.0;
 pub(super) const LEFT_COLUMN: f32 = 390.0;
 const SINGLE_COLUMN: f32 = 560.0;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
-    if editor.panels.bottom == crate::app::BottomTab::History && editor.history_focus.is_some() {
+    if editor.panels.bottom == BottomTab::History && editor.history_focus.is_some() {
         super::history::step_card(editor, ui);
         ui.add_space(8.0);
     }
@@ -45,9 +57,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             .show(ui, |ui| settings::show_game(editor, ui));
         return;
     }
-    if selection.keys.is_empty() || selection.table == crate::views::world::TABLE {
-        if matches!(super::active_tab(editor), Some(Tab::World)) {
-            crate::views::world::inspect_world(editor, ui);
+    if selection.keys.is_empty() || selection.table == WorldMapDef::TABLE {
+        if matches!(super::active_tab(editor), Some(EditorTab::World)) {
+            world::inspect_parts(editor, ui, &selection);
             return;
         }
         ui.label(theme::muted(
@@ -65,32 +77,32 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
             .is_some_and(|rest| rest.parse::<usize>().is_ok())
         && !matches!(selection.table.as_str(), "area" | "blueprint");
     if !selection.parts.is_empty() && !module_part {
-        crate::views::inspect_parts(editor, ui, &selection);
+        views::inspect_parts(editor, ui, &selection);
         return;
     }
     if selection.keys.len() == 1 {
         let (table, key) = (selection.table.clone(), selection.keys[0].clone());
         if table == "script" {
-            crate::views::script::inspect_row(editor, ui, &key);
+            script::inspect_row(editor, ui, &key);
             return;
         }
-        if let Some(Tab::Script(owner)) = super::active_tab(editor)
+        if let Some(EditorTab::Script(owner)) = super::active_tab(editor)
             && owner.is_row(&table, &key)
         {
-            crate::views::script::inspect_parts(editor, ui, &selection);
+            script::inspect_parts(editor, ui, &selection);
             return;
         }
         if table == "area"
-            && matches!(super::active_tab(editor), Some(Tab::Area { key: open }) if open == key)
+            && matches!(super::active_tab(editor), Some(EditorTab::Area { key: open }) if open == key)
         {
-            crate::views::area::inspect::show(editor, ui, &key);
+            inspect::show(editor, ui, &key);
             return;
         }
         if table == "blueprint" {
             egui::ScrollArea::vertical()
                 .id_salt(("inspector-blueprint", &key))
                 .show(ui, |ui| {
-                    crate::views::area::parts::show_blueprint(editor, ui, &key, &[]);
+                    parts::show_blueprint(editor, ui, &key, &[]);
                 });
             return;
         }
@@ -113,10 +125,12 @@ pub fn right_tabs(editor: &Editor) -> Vec<(RightTab, String)> {
     let mut tabs = Vec::new();
     let shown_in_centre = selection.parts.is_empty()
         && match super::active_tab(editor) {
-            Some(Tab::Row { table, key }) => {
+            Some(EditorTab::Row { table, key }) => {
                 selection.keys.len() == 1 && table == selection.table && key == selection.keys[0]
             }
-            Some(Tab::Rows { table, keys }) => table == selection.table && keys == selection.keys,
+            Some(EditorTab::Rows { table, keys }) => {
+                table == selection.table && keys == selection.keys
+            }
             _ => false,
         };
     if selection.table == "input" && selection.parts.is_empty() && !selection.keys.is_empty() {
@@ -175,7 +189,7 @@ pub fn show_rows_tab(editor: &mut Editor, ui: &mut Ui, table: &str, keys: &[Stri
             egui::Frame::new()
                 .inner_margin(egui::Margin::symmetric(16, 10))
                 .show(ui, |ui| {
-                    let selection = Selection::rows(table, keys.to_vec());
+                    let selection = RowSelection::rows(table, keys.to_vec());
                     show_rows(editor, ui, &selection, ui.available_width() >= WIDE);
                 });
         });
@@ -207,14 +221,14 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         if fixture {
             ui.label(theme::faint("fixture").size(12.0));
         }
-        if !wide && !matches!(table, "world_map") {
+        if !wide && table != WorldMapDef::TABLE {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
                     .small_button("open")
                     .on_hover_text("Open in a tab")
                     .clicked()
                 {
-                    editor.open_tab(Tab::for_row(table, key));
+                    editor.open_tab(EditorTab::for_row(table, key));
                 }
             });
         }
@@ -235,7 +249,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
             .push("fixture · required by the engine".to_owned());
     }
     let mut actions = Vec::new();
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let mut module_ops: Vec<ModuleOp> = Vec::new();
     let mut status: Option<String> = None;
     {
@@ -246,27 +260,24 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
+        let mut cx =
+            FormCx::new(project, root, shapes, form, &mut actions).owned_by(table, Some(key));
         cx.speaker = speaker_of(table, key);
-        cx.owner_table = Some(table.to_owned());
-        cx.owner_key = Some(key.to_owned());
         ui.push_id(("row", table, key), |ui| {
             if wide && second_column {
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.set_width(LEFT_COLUMN);
-                        changed = std::mem::take(&mut changed).or(first_class_card(
-                            ui, &mut cx, table, key, fixture, root, &mut value,
-                        ));
+                        changed |=
+                            first_class_card(ui, &mut cx, table, key, fixture, root, &mut value);
                     });
                     ui.add_space(16.0);
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
                         if table == "input" {
-                            changed = std::mem::take(&mut changed)
-                                .or(bindings_section(ui, &mut cx, &mut value));
+                            changed |= bindings_section(ui, &mut value);
                         } else {
-                            changed = std::mem::take(&mut changed).or(modules_column(
+                            changed |= modules_column(
                                 ui,
                                 &mut cx,
                                 table,
@@ -274,7 +285,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                                 &mut module_ops,
                                 selected_module,
                                 &mut status,
-                            ));
+                            );
                         }
                     });
                 });
@@ -282,17 +293,14 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 if wide {
                     ui.set_max_width(SINGLE_COLUMN);
                 }
-                changed = std::mem::take(&mut changed).or(first_class_card(
-                    ui, &mut cx, table, key, fixture, root, &mut value,
-                ));
+                changed |= first_class_card(ui, &mut cx, table, key, fixture, root, &mut value);
                 if table == "input" {
                     ui.add_space(10.0);
-                    changed =
-                        std::mem::take(&mut changed).or(bindings_section(ui, &mut cx, &mut value));
+                    changed |= bindings_section(ui, &mut value);
                 }
                 if has_modules {
                     ui.add_space(10.0);
-                    changed = std::mem::take(&mut changed).or(modules_column(
+                    changed |= modules_column(
                         ui,
                         &mut cx,
                         table,
@@ -300,7 +308,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                         &mut module_ops,
                         selected_module,
                         &mut status,
-                    ));
+                    );
                 }
             }
         });
@@ -320,9 +328,12 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
         match op {
             ModuleOp::Copy(index) => {
                 let module = value["modules"][index].clone();
-                editor.clipboard = Some(
-                    serde_json::json!({ "rift": "modules", "table": table, "from": key, "modules": [module] }),
-                );
+                editor.clipboard = Some(Clipboard {
+                    table: table.to_owned(),
+                    from: key.to_owned(),
+                    modules: vec![module],
+                    origin: None,
+                });
                 editor.toast("Module copied");
             }
             ModuleOp::Paste => paste_modules(editor, table, key, &mut value, &mut changed),
@@ -338,7 +349,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 format!(" {}", what.trim_start_matches('/'))
             }
         );
-        let mut edit = Edit::new(label);
+        let mut edit = ContentEdit::new(label);
         edit.write_json(&file, &value);
         editor.apply(edit);
     }
@@ -355,8 +366,8 @@ fn first_class_card(
     fixture: bool,
     schema: &Value,
     value: &mut Value,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     let title = ["name", "title", "label"]
         .iter()
         .find_map(|field| value[*field].as_str().map(str::to_owned))
@@ -381,7 +392,7 @@ fn first_class_card(
                 }
                 if ui.button("Duplicate").clicked() {
                     cx.actions
-                        .push(FormAction::RowAction(crate::ui::browser::Action::Duplicate));
+                        .push(FormAction::RowAction(BrowserAction::Duplicate));
                     ui.close();
                 }
                 if !fixture
@@ -390,12 +401,12 @@ fn first_class_card(
                         .clicked()
                 {
                     cx.actions
-                        .push(FormAction::RowAction(crate::ui::browser::Action::Rename));
+                        .push(FormAction::RowAction(BrowserAction::Rename));
                     ui.close();
                 }
                 if ui.button("Show usages").clicked() {
                     cx.actions
-                        .push(FormAction::RowAction(crate::ui::browser::Action::Usages));
+                        .push(FormAction::RowAction(BrowserAction::Usages));
                     ui.close();
                 }
                 if !fixture {
@@ -405,7 +416,7 @@ fn first_class_card(
                         .clicked()
                     {
                         cx.actions
-                            .push(FormAction::RowAction(crate::ui::browser::Action::Delete));
+                            .push(FormAction::RowAction(BrowserAction::Delete));
                         ui.close();
                     }
                 }
@@ -415,7 +426,7 @@ fn first_class_card(
         if fixture {
             ui.horizontal(|ui| {
                 ui.allocate_ui_with_layout(
-                    Vec2::new(crate::forms::LABEL_WIDTH, ui.spacing().interact_size.y),
+                    Vec2::new(forms::LABEL_WIDTH, ui.spacing().interact_size.y),
                     Layout::left_to_right(Align::Center),
                     |ui| {
                         ui.label(theme::muted("key"));
@@ -446,28 +457,26 @@ fn first_class_card(
                     });
             });
         }
-        if table == crate::views::model::TABLE {
-            changed = crate::views::model::inspect::first_class_body(ui, cx, value);
+        if table == model::TABLE {
+            changed = model::inspect::first_class_body(ui, cx, value);
             return;
         }
-        if table == crate::views::tileset::TABLE {
-            changed = crate::views::tileset::inspect::first_class_body(ui, cx, value);
+        if table == tileset::TABLE {
+            changed = tileset::inspect::first_class_body(ui, cx, value);
             return;
         }
         let hidden: &[&str] = match table {
             "input" => &["modules", "bindings"],
-            crate::views::job::TABLE => &["modules", "levels"],
+            job::TABLE => &["modules", "levels"],
             _ => &["modules"],
         };
-        changed = crate::forms::object_without(ui, cx, schema, value, "", hidden);
-        if table == crate::views::job::TABLE {
-            changed = std::mem::take(&mut changed).or(crate::views::job::levels(ui, cx, value));
+        changed = forms::object_without(ui, cx, schema, value, "", hidden);
+        if table == job::TABLE {
+            changed |= job::levels(ui, cx, value);
         }
     });
     changed
 }
-
-pub(super) type Party = (String, String, String, String);
 
 fn code_name(table: &str, key: &str) -> String {
     fn pascal(text: &str) -> String {
@@ -501,19 +510,12 @@ fn modules_column(
     ops: &mut Vec<ModuleOp>,
     selected: Option<usize>,
     status: &mut Option<String>,
-) -> Changed {
-    let shapes: &crate::schema::Shapes = cx.shapes;
-    let Some(items) = shapes.modules_of(table) else {
-        return Changed::default();
-    };
-    let variants = match schema::kind(cx.root, items) {
-        Kind::Union(variants) => variants,
-        _ => Vec::new(),
-    };
+) -> FormChange {
+    let variants = cx.shapes.module_variants(table);
     if !value["modules"].is_array() {
         value["modules"] = Value::Array(Vec::new());
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let scripts_only = table == "area";
     let count = value["modules"].as_array().map_or(0, Vec::len);
     let shown = if scripts_only {
@@ -558,7 +560,7 @@ fn modules_column(
                     list.push(template);
                     let path = format!("{table}/modules/{}", list.len() - 1);
                     cx.state.folded.remove(&path);
-                    changed = Changed::at("/modules");
+                    changed = FormChange::at("/modules");
                     ui.close();
                 }
             });
@@ -685,8 +687,7 @@ fn modules_column(
                 }
             }
             if !folded {
-                changed = std::mem::take(&mut changed)
-                    .or(card_body(ui, cx, table, &variants, module, &path));
+                changed |= card_body(ui, cx, table, &variants, module, &path);
             }
         });
         if !folded && tag == "inline_script" {
@@ -697,16 +698,16 @@ fn modules_column(
     let list = value["modules"].as_array_mut().expect("modules");
     if let Some(index) = remove {
         list.remove(index);
-        changed = Changed::at("/modules");
+        changed = FormChange::at("/modules");
     }
     if let Some((a, b)) = swap {
         list.swap(a, b);
-        changed = Changed::at("/modules");
+        changed = FormChange::at("/modules");
     }
     if let Some(index) = duplicate {
         let copy = list[index].clone();
         list.insert(index + 1, copy);
-        changed = Changed::at("/modules");
+        changed = FormChange::at("/modules");
     }
     changed
 }
@@ -715,12 +716,12 @@ pub(super) fn card_body(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    variants: &[schema::Variant],
+    variants: &[schema::SchemaVariant],
     module: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     ui.add_space(4.0);
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     if let Some(variant) = schema::variant_of(variants, module) {
         let hidden: &[&str] = match variant.tag.as_str() {
             "inline_script" => &["nodes"],
@@ -737,20 +738,13 @@ pub(super) fn card_body(
         if fieldless {
             widgets::hint(ui, fieldless_note(table, &variant.tag));
         } else {
-            changed = changed.or(crate::forms::object_without(
-                ui,
-                cx,
-                variant.schema,
-                module,
-                path,
-                hidden,
-            ));
+            changed |= forms::object_without(ui, cx, variant.schema, module, path, hidden);
         }
         if variant.tag == "shared_script" {
-            changed = changed.or(script_values(ui, cx, module, path));
+            changed |= script_values(ui, cx, module, path);
         }
     } else {
-        changed = changed.or(crate::forms::raw_json(ui, cx, module, path));
+        changed |= forms::raw_json(ui, cx, module, path);
     }
     script_extras(ui, cx, table, module, path);
     changed
@@ -786,26 +780,19 @@ pub(super) fn add_module_popup(
     ui: &mut Ui,
     cx: &mut FormCx,
     table: &str,
-    variants: &[schema::Variant],
+    variants: &[schema::SchemaVariant],
     list: &[Value],
     scripts_only: bool,
     status: &mut Option<String>,
 ) -> Option<Value> {
-    let registry = game::systems::registry();
+    let registry = registry();
     let id = ui.id().with("add-module-filter");
     let mut filter = cx.state.drafts.get(&id).cloned().unwrap_or_default();
     let response = widgets::search_box(ui, &mut filter, "filter", None);
     if response.changed() {
         cx.state.drafts.insert(id, filter.clone());
     }
-    if ui
-        .ctx()
-        .data(|d| d.get_temp::<bool>(id.with("fresh")))
-        .is_none()
-    {
-        response.request_focus();
-        ui.ctx().data_mut(|d| d.insert_temp(id.with("fresh"), true));
-    }
+    widgets::default_focus(ui, &response);
     let needle = filter.to_lowercase();
     let mut picked = None;
     let mut blocked_count = 0;
@@ -823,7 +810,7 @@ pub(super) fn add_module_popup(
                 let present = list
                     .iter()
                     .any(|module| module.kind() == variant.tag.as_str());
-                let at_most_one = rule == Some(game::core::content::ModuleRule::AtMostOne);
+                let at_most_one = rule == Some(ModuleRule::AtMostOne);
                 let blocked = present && at_most_one;
                 if blocked {
                     blocked_count += 1;
@@ -897,8 +884,6 @@ pub(super) fn add_module_popup(
     ));
     if picked.is_some() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
         cx.state.drafts.remove(&id);
-        ui.ctx()
-            .data_mut(|d| d.remove_temp::<bool>(id.with("fresh")));
         if picked.is_none() {
             ui.close();
         }
@@ -906,25 +891,60 @@ pub(super) fn add_module_popup(
     picked
 }
 
-pub(super) fn path_owner_key<'a>(cx: &'a FormCx, _table: &str) -> Option<&'a str> {
-    cx.owner_key.as_deref()
+pub fn with_row_form(
+    editor: &mut Editor,
+    table: &str,
+    key: &str,
+    show: impl FnOnce(&mut FormCx) -> bool,
+) -> bool {
+    let Some(root) = editor.row_value(table, key) else {
+        return false;
+    };
+    let mut actions = Vec::new();
+    let changed = {
+        let Editor {
+            project,
+            form,
+            shapes,
+            ..
+        } = editor;
+        let Some(project) = project.as_ref() else {
+            return false;
+        };
+        let mut cx =
+            FormCx::new(project, &root, shapes, form, &mut actions).owned_by(table, Some(key));
+        show(&mut cx)
+    };
+    for action in actions {
+        act(editor, action, table, key);
+    }
+    changed
 }
 
 pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
     match action {
         FormAction::OpenRow { table, key } => {
-            editor.select(Selection::row(&table, &key));
-            editor.open_tab(Tab::for_row(&table, &key));
+            editor.select(RowSelection::row(&table, &key));
+            editor.open_tab(EditorTab::for_row(&table, &key));
         }
         FormAction::OpenScript { pointer } => {
-            crate::views::script::open_inline(editor, table, key, &pointer);
+            script::open_inline(editor, table, key, &pointer);
+        }
+        FormAction::MakeShared { pointer } => {
+            script::open_inline(editor, table, key, &pointer);
+            if let Some(owner) = ScriptOwner::inline(table, key, &pointer) {
+                editor.views.script.pending = Some((owner, PendingScriptAction::MakeShared));
+            }
+        }
+        FormAction::MakeInline { script } => {
+            let owner = ScriptOwner::Shared { key: script };
+            editor.open_tab(EditorTab::Script(owner.clone()));
+            editor.views.script.pending = Some((owner, PendingScriptAction::MakeInline));
         }
         FormAction::PickPlace { path } => {
-            editor.pick = Some(crate::app::PickRequest {
-                what: crate::app::PickWhat::Place {
-                    file: row_file(table, key),
-                    pointer: path,
-                },
+            editor.pick = Some(PlacePick {
+                file: row_file(table, key),
+                pointer: path,
                 area: None,
             });
             editor.toast(
@@ -935,9 +955,9 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
             table: into_table,
             path,
         } => {
-            crate::rows::new_row_into(editor, &into_table, Some((row_file(table, key), path)));
+            new_row_into(editor, &into_table, Some((row_file(table, key), path)));
         }
-        FormAction::RowAction(action) => crate::ui::browser::act(editor, table, key, action),
+        FormAction::RowAction(action) => browser::act(editor, table, key, action),
     }
 }
 
@@ -946,19 +966,15 @@ fn paste_modules(
     table: &str,
     key: &str,
     value: &mut Value,
-    changed: &mut Changed,
+    changed: &mut FormChange,
 ) {
     let Some(clip) = editor.clipboard.clone() else {
         editor.toast("Nothing copied");
         return;
     };
-    if clip["rift"] != "modules" {
-        editor.toast("The clipboard holds no modules");
-        return;
-    }
-    let from = clip.text_or("from", "the clipboard").to_owned();
-    let registry = game::systems::registry();
-    for module in clip["modules"].as_array().into_iter().flatten() {
+    let from = clip.from;
+    let registry = registry();
+    for module in &clip.modules {
         let tag = module.kind_or("module").to_owned();
         let Some(rule) = registry.module_rule(table, module) else {
             editor.toast(format!("a {table} row takes no {tag} module"));
@@ -969,14 +985,14 @@ fn paste_modules(
             .iter()
             .position(|known| known["type"] == module["type"]);
         match (rule, existing) {
-            (game::core::content::ModuleRule::AtMostOne, Some(index)) => {
-                editor.dialogs.push(Dialog::Confirm(ConfirmDialog {
+            (ModuleRule::AtMostOne, Some(index)) => {
+                editor.dialogs.push(ModalDialog::Confirm(ConfirmDialog {
                     title: format!("{table}/{key} already has {tag}"),
                     body: format!(
                         "A {table} has at most one {tag} module. Replace it with {from}'s?"
                     ),
                     label: format!("Replace {tag}"),
-                    compare: Some(Compare {
+                    compare: Some(TextComparison {
                         left_title: format!("{key} now"),
                         left: module_lines(&list[index]),
                         right_title: format!("copied from {from}"),
@@ -992,7 +1008,7 @@ fn paste_modules(
             }
             _ => {
                 list.push(module.clone());
-                *changed = Changed::at("/modules");
+                *changed = FormChange::at("/modules");
             }
         }
     }

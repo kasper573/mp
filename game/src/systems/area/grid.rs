@@ -3,11 +3,12 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{ContentRow, ErrorPlace, LoadError};
+use super::tileset::TilesetDef;
+use super::{AreaDef, tileset};
+use crate::core::content::{Content, ContentRow, ErrorPlace, LoadError, row_folder};
 use crate::core::math::Pos;
 use crate::core::tiling::{GridSize, Tiles};
-
-use super::tileset;
+use std::collections::BTreeSet;
 
 #[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,7 +80,29 @@ pub const PALETTE_FILE: &str = "palette.csv";
 pub const WALK_FILE: &str = "walk.csv";
 
 pub fn folder(area_key: &str) -> String {
-    crate::core::content::row_folder(<super::AreaDef as ContentRow>::TABLE, area_key)
+    row_folder(AreaDef::TABLE, area_key)
+}
+
+pub fn palette_file(area_key: &str) -> String {
+    format!("{}/{PALETTE_FILE}", folder(area_key))
+}
+
+pub fn area_of_palette_file(path: &str) -> Option<&str> {
+    path.strip_prefix(&format!("{}/", row_folder(AreaDef::TABLE, "")))?
+        .strip_suffix(&format!("/{PALETTE_FILE}"))
+}
+
+pub fn write_palette(rows: &[PaletteRow]) -> String {
+    let mut text = String::from("tileset,tile,flip\n");
+    for row in rows {
+        text.push_str(&format!(
+            "{},{},{}\n",
+            row.tileset,
+            row.tile,
+            row.flip.csv()
+        ));
+    }
+    text
 }
 
 pub fn layer_file(layer: &str) -> String {
@@ -109,37 +132,47 @@ pub struct AreaGrids {
 }
 
 impl AreaGrids {
+    pub fn layer_names(&self) -> Vec<String> {
+        self.ground.iter().map(|layer| layer.name.clone()).collect()
+    }
+
+    pub fn tilesets(&self) -> BTreeSet<String> {
+        self.palette_keys
+            .iter()
+            .map(|row| row.tileset.clone())
+            .collect()
+    }
+
     pub fn entry(&self, cell: Option<u32>) -> Option<PaletteEntry> {
         self.palette.get(cell? as usize).copied()
     }
 
     pub fn write_palette(&self) -> String {
-        let mut text = String::from("tileset,tile,flip\n");
-        for row in &self.palette_keys {
-            text.push_str(&format!(
-                "{},{},{}\n",
-                row.tileset,
-                row.tile,
-                row.flip.csv()
-            ));
-        }
-        text
+        write_palette(&self.palette_keys)
     }
 
     pub fn write_layer(&self, layer: &GroundLayer) -> String {
-        write_grid(self.size, &layer.cells, |cell| match cell {
-            Some(index) => index.to_string(),
-            None => String::new(),
-        })
+        write_layer(self.size, layer)
     }
 
     pub fn write_walk(&self) -> String {
-        write_grid(self.size, &self.walk, |cell| match cell {
-            Some(true) => "1".to_owned(),
-            Some(false) => "0".to_owned(),
-            None => String::new(),
-        })
+        write_walk(self.size, &self.walk)
     }
+}
+
+pub fn write_layer(size: GridSize, layer: &GroundLayer) -> String {
+    write_grid(size, &layer.cells, |cell| match cell {
+        Some(index) => index.to_string(),
+        None => String::new(),
+    })
+}
+
+pub fn write_walk(size: GridSize, walk: &[Option<bool>]) -> String {
+    write_grid(size, walk, |cell| match cell {
+        Some(true) => "1".to_owned(),
+        Some(false) => "0".to_owned(),
+        None => String::new(),
+    })
 }
 
 fn write_grid<T>(size: GridSize, cells: &[T], show: impl Fn(&T) -> String) -> String {
@@ -223,6 +256,16 @@ pub struct PaletteRow {
     pub tileset: String,
     pub tile: u32,
     pub flip: Flip,
+}
+
+impl PaletteRow {
+    pub fn resolve(&self, content: &Content) -> Option<PaletteEntry> {
+        Some(PaletteEntry {
+            tileset: content.by_key::<TilesetDef>(&self.tileset)?,
+            tile: self.tile,
+            flip: self.flip,
+        })
+    }
 }
 
 pub fn read_palette(file: GridFile, errors: &mut Vec<LoadError>) -> Option<Vec<PaletteRow>> {

@@ -1,17 +1,21 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use egui::emath::TSTransform;
 use egui::text::{LayoutJob, TextFormat};
-use egui::{Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
+use egui::{Align2, Color32, CornerRadius, FontId, Pos2, Rect, Stroke, Ui, Vec2};
 use egui_snarl::ui::{
-    AnyPins, NodeLayout, PinInfo, SnarlStyle, SnarlViewer, SnarlWidget, WireStyle,
+    AnyPins, NodeLayout, PinInfo, SnarlPin, SnarlStyle, SnarlViewer, SnarlWidget, WireStyle,
 };
 use egui_snarl::{InPin, InPinId, NodeId, OutPin, OutPinId, Snarl};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::Doc;
-use super::nodes::{self, Catalogue, Piece, Port, Tone};
-use crate::ui::theme;
+use super::ScriptDoc;
+use super::nodes::{
+    self, FlowKind, LineSpeaker, NodeCatalogue, NodePort, SummaryPiece, SummaryTone,
+};
+use crate::spans;
+use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 
 const COLUMN: f32 = 240.0;
@@ -20,23 +24,30 @@ const FACE: f32 = 20.0;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
-pub struct Layout {
+pub struct ScriptGraphLayout {
     pub nodes: BTreeMap<String, [f32; 2]>,
     pub outline: bool,
 }
 
 #[derive(Clone, Debug)]
-pub struct GraphNode {
+pub struct ScriptGraphNode {
     pub name: String,
 }
 
-pub struct Graph {
-    pub snarl: Snarl<GraphNode>,
+pub struct ScriptGraph {
+    pub snarl: Snarl<ScriptGraphNode>,
     pub ids: HashMap<String, NodeId>,
     pub built: u64,
 }
 
-pub enum GraphAction {
+#[derive(Clone, Debug)]
+pub struct NodePaletteOpen {
+    pub at: Pos2,
+    pub placed: bool,
+    pub link: Option<(String, String)>,
+}
+
+pub enum ScriptGraphAction {
     Connect {
         from: String,
         field: String,
@@ -50,11 +61,7 @@ pub enum GraphAction {
     Delete(String),
     Rename(String),
     Duplicate(String),
-    Palette {
-        at: Pos2,
-        place: Option<Pos2>,
-        link: Option<(String, String)>,
-    },
+    Palette(NodePaletteOpen),
     Select {
         name: String,
         extend: bool,
@@ -68,7 +75,7 @@ pub enum GraphAction {
     },
 }
 
-pub fn place_missing(doc: &Doc, catalogue: &Catalogue, layout: &mut Layout) {
+pub fn place_missing(doc: &ScriptDoc, catalogue: &NodeCatalogue, layout: &mut ScriptGraphLayout) {
     let nodes = doc.nodes();
     let depths = nodes::depths(nodes, catalogue);
     let mut next_y: BTreeMap<usize, f32> = BTreeMap::new();
@@ -93,9 +100,9 @@ pub fn place_missing(doc: &Doc, catalogue: &Catalogue, layout: &mut Layout) {
     layout.nodes.retain(|name, _| nodes.contains_key(name));
 }
 
-fn estimated_height(node: &Value, catalogue: &Catalogue) -> f32 {
+fn estimated_height(node: &Value, catalogue: &NodeCatalogue) -> f32 {
     let outputs = nodes::ports(node, catalogue).len() as f32;
-    if nodes::kind(node) == "dialogue" {
+    if nodes::is_dialogue(node) {
         let lines = node["lines"].as_array().map_or(0, Vec::len).min(3) as f32;
         44.0 + lines * 30.0 + outputs * 17.0
     } else {
@@ -104,12 +111,20 @@ fn estimated_height(node: &Value, catalogue: &Catalogue) -> f32 {
     }
 }
 
-pub fn build(doc: &Doc, catalogue: &Catalogue, layout: &Layout, generation: u64) -> Graph {
+pub fn build(
+    doc: &ScriptDoc,
+    catalogue: &NodeCatalogue,
+    layout: &ScriptGraphLayout,
+    generation: u64,
+) -> ScriptGraph {
     let mut snarl = Snarl::new();
     let mut ids = HashMap::new();
     for (name, _) in doc.nodes() {
         let at = layout.nodes.get(name).copied().unwrap_or([40.0, 40.0]);
-        let id = snarl.insert_node(Pos2::new(at[0], at[1]), GraphNode { name: name.clone() });
+        let id = snarl.insert_node(
+            Pos2::new(at[0], at[1]),
+            ScriptGraphNode { name: name.clone() },
+        );
         ids.insert(name.clone(), id);
     }
     for (name, node) in doc.nodes() {
@@ -128,14 +143,14 @@ pub fn build(doc: &Doc, catalogue: &Catalogue, layout: &Layout, generation: u64)
             }
         }
     }
-    Graph {
+    ScriptGraph {
         snarl,
         ids,
         built: generation,
     }
 }
 
-pub fn positions(graph: &Graph) -> BTreeMap<String, [f32; 2]> {
+pub fn positions(graph: &ScriptGraph) -> BTreeMap<String, [f32; 2]> {
     graph
         .snarl
         .nodes_pos_ids()
@@ -143,66 +158,57 @@ pub fn positions(graph: &Graph) -> BTreeMap<String, [f32; 2]> {
         .collect()
 }
 
-pub type Faces = HashMap<(String, Option<String>), (egui::TextureId, Rect)>;
+pub struct FaceImage {
+    pub texture: egui::TextureId,
+    pub uv: Rect,
+}
 
-pub struct Viewer<'a> {
-    pub doc: &'a Doc,
-    pub catalogue: &'a Catalogue,
-    pub ports: HashMap<String, Vec<Port>>,
+pub type SpeakerFaces = HashMap<LineSpeaker, FaceImage>;
+
+pub struct ScriptGraphViewer<'a> {
+    pub doc: &'a ScriptDoc,
+    pub catalogue: &'a NodeCatalogue,
+    pub ports: HashMap<String, Vec<NodePort>>,
     pub lit: &'a HashSet<String>,
     pub current: Option<&'a str>,
     pub selected: &'a HashSet<String>,
-    pub faces: &'a Faces,
+    pub faces: &'a SpeakerFaces,
     pub drafts: &'a mut HashMap<egui::Id, String>,
-    pub actions: Vec<GraphAction>,
-    pub to_global: egui::emath::TSTransform,
+    pub actions: Vec<ScriptGraphAction>,
+    pub to_global: TSTransform,
     pub rects: HashMap<String, Rect>,
     pub fit: Option<(Rect, Rect)>,
 }
 
-impl<'a> Viewer<'a> {
-    pub fn new(
-        doc: &'a Doc,
-        catalogue: &'a Catalogue,
-        lit: &'a HashSet<String>,
-        current: Option<&'a str>,
-        selected: &'a HashSet<String>,
-        faces: &'a Faces,
-        drafts: &'a mut HashMap<egui::Id, String>,
-    ) -> Viewer<'a> {
-        let ports = doc
-            .nodes()
-            .iter()
-            .map(|(name, node)| (name.clone(), nodes::ports(node, catalogue)))
-            .collect();
-        Viewer {
-            doc,
-            catalogue,
-            ports,
-            lit,
-            current,
-            selected,
-            faces,
-            drafts,
-            actions: Vec::new(),
-            to_global: egui::emath::TSTransform::IDENTITY,
-            rects: HashMap::new(),
-            fit: None,
-        }
-    }
+pub fn ports_of(doc: &ScriptDoc, catalogue: &NodeCatalogue) -> HashMap<String, Vec<NodePort>> {
+    doc.nodes()
+        .iter()
+        .map(|(name, node)| (name.clone(), nodes::ports(node, catalogue)))
+        .collect()
+}
 
+impl ScriptGraphViewer<'_> {
     fn node(&self, name: &str) -> Option<&Value> {
         self.doc.nodes().get(name)
     }
 
-    fn port(&self, name: &str, index: usize) -> Option<&Port> {
+    fn port(&self, name: &str, index: usize) -> Option<&NodePort> {
         self.ports.get(name).and_then(|ports| ports.get(index))
+    }
+
+    fn open_palette(&mut self, at: Pos2, link: Option<(String, String)>) {
+        self.actions
+            .push(ScriptGraphAction::Palette(NodePaletteOpen {
+                at: self.to_global * at,
+                placed: true,
+                link,
+            }));
     }
 
     fn click_to_select(&mut self, ui: &mut Ui, name: &str) {
         let response = ui.interact(ui.max_rect(), ui.id().with("select"), egui::Sense::click());
         if response.clicked() {
-            self.actions.push(GraphAction::Select {
+            self.actions.push(ScriptGraphAction::Select {
                 name: name.to_owned(),
                 extend: ui.input(|i| i.modifiers.shift || i.modifiers.command),
             });
@@ -229,7 +235,7 @@ impl<'a> Viewer<'a> {
                         ui.set_width(width);
                         if editing {
                             let id = ui.id().with(("line", name, index));
-                            let edit = crate::spans::line(
+                            let edit = spans::line(
                                 ui,
                                 self.drafts,
                                 &line["text"],
@@ -238,18 +244,19 @@ impl<'a> Viewer<'a> {
                                 "…",
                             );
                             if let Some(text) = edit.spans {
-                                self.actions.push(GraphAction::EditLine {
+                                self.actions.push(ScriptGraphAction::EditLine {
                                     name: name.to_owned(),
                                     index,
                                     text,
                                 });
                             }
                             if edit.entered {
-                                self.actions.push(GraphAction::AddLine(name.to_owned()));
+                                self.actions
+                                    .push(ScriptGraphAction::AddLine(name.to_owned()));
                             }
                         } else {
-                            let text = nodes::clip(&crate::spans::plain(&line["text"]), 64);
-                            let job = crate::spans::layout_job(
+                            let text = widgets::clip(&spans::plain(&line["text"]), 64);
+                            let job = spans::layout_job(
                                 &Value::Array(vec![Value::String(text)]),
                                 FontId::proportional(12.5),
                                 theme::TEXT,
@@ -277,61 +284,48 @@ impl<'a> Viewer<'a> {
     fn face(&self, ui: &mut Ui, by: &Value) {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(FACE), egui::Sense::hover());
         let rect = rect.translate(Vec2::new(0.0, 1.0));
-        match by["type"].as_str() {
-            Some("npc") => {
-                let key = (
-                    by.text("npc").to_owned(),
-                    by["face"].as_str().map(str::to_owned),
-                );
-                match self
-                    .faces
-                    .get(&key)
-                    .or_else(|| self.faces.get(&(key.0.clone(), None)))
-                {
-                    Some((texture, uv)) => {
-                        ui.painter()
-                            .add(egui::Shape::image(*texture, rect, *uv, Color32::WHITE));
-                        ui.painter().rect_stroke(
-                            rect,
-                            4.0,
-                            Stroke::new(1.0, theme::BORDER),
-                            egui::StrokeKind::Inside,
-                        );
-                    }
-                    None => {
-                        ui.painter().rect_filled(rect, 4.0, theme::RAISED);
-                        ui.painter().text(
-                            rect.center(),
-                            egui::Align2::CENTER_CENTER,
-                            "N",
-                            FontId::monospace(11.0),
-                            theme::MUTED,
-                        );
-                    }
-                }
-            }
-            Some("object") => {
-                ui.painter().rect_filled(rect, 4.0, theme::RAISED);
-                ui.painter().text(
-                    rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    "I",
-                    FontId::monospace(11.0),
-                    theme::MUTED,
+        let speaker = LineSpeaker::of(by);
+        let image = speaker.as_ref().and_then(|speaker| {
+            self.faces
+                .get(speaker)
+                .or_else(|| self.faces.get(&speaker.faceless()))
+        });
+        match image {
+            Some(image) => {
+                ui.painter().add(egui::Shape::image(
+                    image.texture,
+                    rect,
+                    image.uv,
+                    Color32::WHITE,
+                ));
+                ui.painter().rect_stroke(
+                    rect,
+                    4.0,
+                    Stroke::new(1.0, theme::BORDER),
+                    egui::StrokeKind::Inside,
                 );
             }
-            _ => {
-                ui.painter().rect_filled(rect, 4.0, theme::RAISED);
-                ui.painter().text(
-                    rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    "–",
-                    FontId::monospace(11.0),
-                    theme::MUTED,
-                );
+            None => {
+                let glyph = match speaker {
+                    Some(LineSpeaker::Npc { .. }) => "N",
+                    Some(LineSpeaker::Object) => "I",
+                    _ => "–",
+                };
+                face_placeholder(ui.painter(), rect, glyph);
             }
         }
     }
+}
+
+pub fn face_placeholder(painter: &egui::Painter, rect: Rect, glyph: &str) {
+    painter.rect_filled(rect, 4.0, theme::RAISED);
+    painter.text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        glyph,
+        FontId::monospace(11.0),
+        theme::MUTED,
+    );
 }
 
 pub fn style() -> SnarlStyle {
@@ -344,7 +338,7 @@ pub fn style() -> SnarlStyle {
     style.header_drag_space = Some(Vec2::new(0.0, 0.0));
     style.bg_pattern = Some(egui_snarl::ui::BackgroundPattern::NoPattern);
     style.select_stoke = Some(Stroke::new(1.0, theme::ACCENT));
-    style.select_fill = Some(Color32::from_rgba_unmultiplied(46, 110, 235, 20));
+    style.select_fill = Some(theme::alpha(theme::ACCENT, 20));
     style.min_scale = Some(0.3);
     style.max_scale = Some(2.5);
     style
@@ -354,8 +348,8 @@ pub fn widget(id: egui::Id) -> SnarlWidget {
     SnarlWidget::new().id(id).style(style())
 }
 
-impl SnarlViewer<GraphNode> for Viewer<'_> {
-    fn title(&mut self, node: &GraphNode) -> String {
+impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
+    fn title(&mut self, node: &ScriptGraphNode) -> String {
         node.name.clone()
     }
 
@@ -365,28 +359,23 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         _inputs: &[InPin],
         _outputs: &[OutPin],
         ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
+        snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         let name = snarl[id].name.clone();
         let Some(node) = self.node(&name).cloned() else {
             return;
         };
-        let kind = nodes::kind(&node).to_owned();
         ui.set_width(CARD);
-        ui.style_mut().interaction.selectable_labels = false;
         self.click_to_select(ui, &name);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            let (glyph, colour) = kind_glyph(&kind);
+            let (glyph, colour) = kind_glyph(&node);
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), egui::Sense::hover());
-            ui.painter().rect_filled(
-                rect,
-                3.0,
-                Color32::from_rgba_unmultiplied(colour.r(), colour.g(), colour.b(), 70),
-            );
+            ui.painter()
+                .rect_filled(rect, 3.0, theme::alpha(colour, 70));
             ui.painter().text(
                 rect.center(),
-                egui::Align2::CENTER_CENTER,
+                Align2::CENTER_CENTER,
                 glyph,
                 FontId::proportional(10.0),
                 colour,
@@ -396,11 +385,11 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         });
     }
 
-    fn inputs(&mut self, node: &GraphNode) -> usize {
+    fn inputs(&mut self, node: &ScriptGraphNode) -> usize {
         usize::from(self.node(&node.name).is_some_and(nodes::has_input))
     }
 
-    fn outputs(&mut self, node: &GraphNode) -> usize {
+    fn outputs(&mut self, node: &ScriptGraphNode) -> usize {
         self.ports.get(&node.name).map_or(0, Vec::len)
     }
 
@@ -408,8 +397,8 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         &mut self,
         pin: &InPin,
         ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
-    ) -> impl egui_snarl::ui::SnarlPin + 'static {
+        snarl: &mut Snarl<ScriptGraphNode>,
+    ) -> impl SnarlPin + 'static {
         let name = &snarl[pin.id.node].name;
         let lit = self.lit.contains(name);
         ui.allocate_exact_size(Vec2::new(1.0, 1.0), egui::Sense::hover());
@@ -427,50 +416,24 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         &mut self,
         pin: &OutPin,
         ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
-    ) -> impl egui_snarl::ui::SnarlPin + 'static {
+        snarl: &mut Snarl<ScriptGraphNode>,
+    ) -> impl SnarlPin + 'static {
         let name = snarl[pin.id.node].name.clone();
-        let kind = self.node(&name).map(nodes::kind).unwrap_or("").to_owned();
+        let flow = self.node(&name).and_then(FlowKind::of);
         let port = self.port(&name, pin.id.output).cloned();
         let label = port
             .as_ref()
             .map(|port| port.label.clone())
             .unwrap_or_default();
         let connected = port.as_ref().is_some_and(|port| port.target.is_some());
-        let dialogue_choice = kind == "dialogue"
+        let dialogue_choice = flow == Some(FlowKind::Dialogue)
             && port
                 .as_ref()
                 .is_some_and(|port| port.field.starts_with("/choices/"));
-        let mut job = LayoutJob::default();
         if dialogue_choice {
-            ui.allocate_ui_with_layout(
-                Vec2::new(CARD - 14.0, 16.0),
-                egui::Layout::left_to_right(egui::Align::Center),
-                |ui| {
-                    ui.set_width(CARD - 14.0);
-                    let y = ui.max_rect().min.y - 1.5;
-                    ui.painter().line_segment(
-                        [
-                            egui::pos2(ui.max_rect().min.x, y),
-                            egui::pos2(ui.max_rect().max.x + 10.0, y),
-                        ],
-                        Stroke::new(1.0, theme::BORDER),
-                    );
-                    let mut job = LayoutJob::default();
-                    job.append(
-                        &label,
-                        0.0,
-                        TextFormat::simple(FontId::proportional(12.0), theme::TEXT),
-                    );
-                    ui.add(egui::Label::new(job).truncate());
-                    if !connected {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(RichTextFaint::end());
-                        });
-                    }
-                },
-            );
+            choice_output(ui, &label, connected);
         } else {
+            let mut job = LayoutJob::default();
             job.append(
                 &label,
                 0.0,
@@ -488,24 +451,28 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         let fill = if !connected {
             theme::FAINT
         } else {
-            match kind.as_str() {
-                "on" => theme::WARN,
-                "dialogue" => DIALOGUE,
-                "if" | "random" | "repeat" | "wait" | "set" | "run" | "return" => WIRE,
-                _ => match label.as_str() {
+            match flow {
+                Some(FlowKind::On) => theme::WARN,
+                Some(FlowKind::Dialogue) => DIALOGUE,
+                Some(_) => WIRE,
+                None => match label.as_str() {
                     "refused" | "blocked" | "lost" | "declined" | "cancelled" | "left"
                     | "interrupted" => REFUSED,
                     _ => theme::OK,
                 },
             }
         };
-        let wire = if kind == "on" { theme::WARN } else { WIRE };
+        let wire = if flow == Some(FlowKind::On) {
+            theme::WARN
+        } else {
+            WIRE
+        };
         PinInfo::circle().with_fill(fill).with_wire_color(wire)
     }
 
-    fn has_body(&mut self, node: &GraphNode) -> bool {
+    fn has_body(&mut self, node: &ScriptGraphNode) -> bool {
         self.node(&node.name).is_some_and(|node| {
-            nodes::kind(node) == "dialogue" || !nodes::pieces(node, self.catalogue).is_empty()
+            nodes::is_dialogue(node) || !nodes::pieces(node, self.catalogue).is_empty()
         })
     }
 
@@ -515,11 +482,10 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         _inputs: &[InPin],
         _outputs: &[OutPin],
         ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
+        snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         let name = snarl[id].name.clone();
         ui.set_width(CARD);
-        ui.style_mut().interaction.selectable_labels = false;
         self.click_to_select(ui, &name);
         let Some(node) = self.node(&name).cloned() else {
             return;
@@ -527,7 +493,7 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         ui.vertical(|ui| {
             ui.set_width(CARD);
             ui.spacing_mut().item_spacing.y = 3.0;
-            if nodes::kind(&node) == "dialogue" {
+            if nodes::is_dialogue(&node) {
                 self.dialogue_body(ui, &name, &node);
                 return;
             }
@@ -543,7 +509,7 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         id: NodeId,
         _inputs: &[InPin],
         _outputs: &[OutPin],
-        snarl: &Snarl<GraphNode>,
+        snarl: &Snarl<ScriptGraphNode>,
     ) -> egui::Frame {
         let name = &snarl[id].name;
         let mut frame = default;
@@ -568,12 +534,11 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         id: NodeId,
         _inputs: &[InPin],
         _outputs: &[OutPin],
-        snarl: &Snarl<GraphNode>,
+        snarl: &Snarl<ScriptGraphNode>,
     ) -> egui::Frame {
         let name = &snarl[id].name;
-        let kind = self.node(name).map(nodes::kind).unwrap_or("");
         let mut frame = default;
-        frame.fill = kind_fill(kind);
+        frame.fill = self.node(name).map_or(EFFECT_FILL, kind_fill);
         frame.stroke = Stroke::NONE;
         frame.corner_radius = CornerRadius {
             nw: 6,
@@ -590,7 +555,7 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         node: NodeId,
         rect: Rect,
         _ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
+        snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         if let Some(graph_node) = snarl.get_node(node) {
             self.rects.insert(graph_node.name.clone(), rect);
@@ -604,7 +569,7 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         _snarl_style: &SnarlStyle,
         _style: &egui::Style,
         painter: &egui::Painter,
-        _snarl: &Snarl<GraphNode>,
+        _snarl: &Snarl<ScriptGraphNode>,
     ) {
         let step = 24.0;
         let x0 = (viewport.min.x / step).floor() * step;
@@ -620,11 +585,11 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         }
     }
 
-    fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<GraphNode>) {
+    fn connect(&mut self, from: &OutPin, to: &InPin, snarl: &mut Snarl<ScriptGraphNode>) {
         let from_name = snarl[from.id.node].name.clone();
         let to_name = snarl[to.id.node].name.clone();
         if let Some(port) = self.port(&from_name, from.id.output) {
-            self.actions.push(GraphAction::Connect {
+            self.actions.push(ScriptGraphAction::Connect {
                 from: from_name,
                 field: port.field.clone(),
                 to: to_name,
@@ -632,47 +597,41 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         }
     }
 
-    fn disconnect(&mut self, from: &OutPin, _to: &InPin, snarl: &mut Snarl<GraphNode>) {
-        let from_name = snarl[from.id.node].name.clone();
-        if let Some(port) = self.port(&from_name, from.id.output) {
-            self.actions.push(GraphAction::Disconnect {
-                from: from_name,
-                field: port.field.clone(),
-            });
-        }
+    fn disconnect(&mut self, from: &OutPin, _to: &InPin, snarl: &mut Snarl<ScriptGraphNode>) {
+        self.drop_outputs(from, snarl);
     }
 
-    fn drop_outputs(&mut self, pin: &OutPin, snarl: &mut Snarl<GraphNode>) {
+    fn drop_outputs(&mut self, pin: &OutPin, snarl: &mut Snarl<ScriptGraphNode>) {
         let from_name = snarl[pin.id.node].name.clone();
         if let Some(port) = self.port(&from_name, pin.id.output) {
-            self.actions.push(GraphAction::Disconnect {
+            self.actions.push(ScriptGraphAction::Disconnect {
                 from: from_name,
                 field: port.field.clone(),
             });
         }
     }
 
-    fn drop_inputs(&mut self, pin: &InPin, snarl: &mut Snarl<GraphNode>) {
+    fn drop_inputs(&mut self, pin: &InPin, snarl: &mut Snarl<ScriptGraphNode>) {
         let name = snarl[pin.id.node].name.clone();
-        self.actions.push(GraphAction::DropInputs(name));
+        self.actions.push(ScriptGraphAction::DropInputs(name));
     }
 
-    fn has_graph_menu(&mut self, _pos: Pos2, _snarl: &mut Snarl<GraphNode>) -> bool {
+    fn has_graph_menu(&mut self, _pos: Pos2, _snarl: &mut Snarl<ScriptGraphNode>) -> bool {
         true
     }
 
-    fn show_graph_menu(&mut self, pos: Pos2, ui: &mut Ui, _snarl: &mut Snarl<GraphNode>) {
+    fn show_graph_menu(&mut self, pos: Pos2, ui: &mut Ui, _snarl: &mut Snarl<ScriptGraphNode>) {
         if ui.button("Add node…  (Tab)").clicked() {
-            self.actions.push(GraphAction::Palette {
-                at: pos,
-                place: Some(pos),
-                link: None,
-            });
+            self.open_palette(pos, None);
             ui.close();
         }
     }
 
-    fn has_dropped_wire_menu(&mut self, _src_pins: AnyPins, _snarl: &mut Snarl<GraphNode>) -> bool {
+    fn has_dropped_wire_menu(
+        &mut self,
+        _src_pins: AnyPins,
+        _snarl: &mut Snarl<ScriptGraphNode>,
+    ) -> bool {
         true
     }
 
@@ -681,24 +640,20 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         pos: Pos2,
         ui: &mut Ui,
         src_pins: AnyPins,
-        snarl: &mut Snarl<GraphNode>,
+        snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         if let AnyPins::Out(pins) = src_pins
             && let Some(pin) = pins.first()
         {
             let name = snarl[pin.node].name.clone();
-            if let Some(port) = self.port(&name, pin.output) {
-                self.actions.push(GraphAction::Palette {
-                    at: pos,
-                    place: Some(pos),
-                    link: Some((name, port.field.clone())),
-                });
+            if let Some(port) = self.port(&name, pin.output).cloned() {
+                self.open_palette(pos, Some((name, port.field)));
             }
         }
         ui.close();
     }
 
-    fn has_node_menu(&mut self, _node: &GraphNode) -> bool {
+    fn has_node_menu(&mut self, _node: &ScriptGraphNode) -> bool {
         true
     }
 
@@ -708,39 +663,40 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
         _inputs: &[InPin],
         _outputs: &[OutPin],
         ui: &mut Ui,
-        snarl: &mut Snarl<GraphNode>,
+        snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         let name = snarl[id].name.clone();
-        let kind = self.node(&name).map(nodes::kind).unwrap_or("").to_owned();
-        if kind == "dialogue" {
+        if self.node(&name).is_some_and(nodes::is_dialogue) {
             if ui.button("Add line  (Enter)").clicked() {
-                self.actions.push(GraphAction::AddLine(name.clone()));
+                self.actions.push(ScriptGraphAction::AddLine(name.clone()));
                 ui.close();
             }
             if ui.button("Add choice  (Ctrl Enter)").clicked() {
-                self.actions.push(GraphAction::AddChoice(name.clone()));
+                self.actions
+                    .push(ScriptGraphAction::AddChoice(name.clone()));
                 ui.close();
             }
             ui.separator();
         }
         if ui.button("Rename…  (F2)").clicked() {
-            self.actions.push(GraphAction::Rename(name.clone()));
+            self.actions.push(ScriptGraphAction::Rename(name.clone()));
             ui.close();
         }
         if ui.button("Duplicate  (Ctrl D)").clicked() {
-            self.actions.push(GraphAction::Duplicate(name.clone()));
+            self.actions
+                .push(ScriptGraphAction::Duplicate(name.clone()));
             ui.close();
         }
         if ui.button("Delete  (Del)").clicked() {
-            self.actions.push(GraphAction::Delete(name));
+            self.actions.push(ScriptGraphAction::Delete(name));
             ui.close();
         }
     }
 
     fn current_transform(
         &mut self,
-        to_global: &mut egui::emath::TSTransform,
-        _snarl: &mut Snarl<GraphNode>,
+        to_global: &mut TSTransform,
+        _snarl: &mut Snarl<ScriptGraphNode>,
     ) {
         if let Some((graph, canvas)) = self.fit.take() {
             let scale = ((canvas.width() - 48.0) / graph.width())
@@ -748,21 +704,40 @@ impl SnarlViewer<GraphNode> for Viewer<'_> {
                 .clamp(0.3, 1.0);
             let translation =
                 canvas.min.to_vec2() + Vec2::new(24.0, 40.0) - graph.min.to_vec2() * scale;
-            *to_global = egui::emath::TSTransform::new(translation, scale);
+            *to_global = TSTransform::new(translation, scale);
         }
         self.to_global = *to_global;
     }
 }
 
-struct RichTextFaint;
-
-impl RichTextFaint {
-    fn end() -> egui::RichText {
-        egui::RichText::new("end")
-            .monospace()
-            .size(10.5)
-            .color(theme::FAINT)
-    }
+fn choice_output(ui: &mut Ui, label: &str, connected: bool) {
+    ui.allocate_ui_with_layout(
+        Vec2::new(CARD - 14.0, 16.0),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| {
+            ui.set_width(CARD - 14.0);
+            let y = ui.max_rect().min.y - 1.5;
+            ui.painter().line_segment(
+                [
+                    egui::pos2(ui.max_rect().min.x, y),
+                    egui::pos2(ui.max_rect().max.x + 10.0, y),
+                ],
+                Stroke::new(1.0, theme::BORDER),
+            );
+            let mut job = LayoutJob::default();
+            job.append(
+                label,
+                0.0,
+                TextFormat::simple(FontId::proportional(12.0), theme::TEXT),
+            );
+            ui.add(egui::Label::new(job).truncate());
+            if !connected {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(theme::faint("end").monospace().size(10.5));
+                });
+            }
+        },
+    );
 }
 
 const CARD_FILL: Color32 = Color32::from_rgb(30, 31, 38);
@@ -772,48 +747,49 @@ const DIALOGUE: Color32 = Color32::from_rgb(176, 140, 230);
 const REFUSED: Color32 = Color32::from_rgb(150, 150, 164);
 const LIT: Color32 = Color32::from_rgb(250, 200, 80);
 const CURRENT: Color32 = Color32::from_rgb(255, 240, 140);
+const RUN: Color32 = Color32::from_rgb(240, 150, 70);
+const EFFECT_FILL: Color32 = Color32::from_rgb(30, 54, 42);
 
-fn kind_fill(kind: &str) -> Color32 {
-    match kind {
-        "on" => Color32::from_rgb(58, 50, 26),
-        "if" | "random" | "repeat" | "wait" | "set" | "return" => Color32::from_rgb(38, 44, 62),
-        "run" => Color32::from_rgb(64, 44, 30),
-        "dialogue" => Color32::from_rgb(54, 42, 74),
-        _ => Color32::from_rgb(30, 54, 42),
+fn kind_fill(node: &Value) -> Color32 {
+    match FlowKind::of(node) {
+        Some(FlowKind::On) => Color32::from_rgb(58, 50, 26),
+        Some(FlowKind::Run) => Color32::from_rgb(64, 44, 30),
+        Some(FlowKind::Dialogue) => Color32::from_rgb(54, 42, 74),
+        Some(_) => Color32::from_rgb(38, 44, 62),
+        None => EFFECT_FILL,
     }
 }
 
-pub fn kind_glyph(kind: &str) -> (&'static str, Color32) {
-    match kind {
-        "on" => ("▶", theme::WARN),
-        "if" | "random" | "repeat" | "wait" | "set" | "return" => ("◆", WIRE),
-        "run" => ("▸", Color32::from_rgb(240, 150, 70)),
-        "dialogue" => ("●", DIALOGUE),
-        _ => ("!", theme::OK),
+pub fn kind_glyph(node: &Value) -> (&'static str, Color32) {
+    match FlowKind::of(node) {
+        Some(FlowKind::On) => ("▶", theme::WARN),
+        Some(FlowKind::Run) => ("▸", RUN),
+        Some(FlowKind::Dialogue) => ("●", DIALOGUE),
+        Some(_) => ("◆", WIRE),
+        None => ("!", theme::OK),
     }
 }
 
 pub fn card_title(name: &str, node: &Value) -> String {
-    match nodes::kind(node) {
-        "on" => format!("on {}", nodes::event_of(node).unwrap_or("?")),
-        "dialogue" => name.to_owned(),
-        other => other.to_owned(),
+    match FlowKind::of(node) {
+        Some(FlowKind::On) => format!("on {}", nodes::event_of(node).unwrap_or("?")),
+        Some(FlowKind::Dialogue) => name.to_owned(),
+        _ => node.kind().to_owned(),
     }
 }
 
-pub fn pieces_job(pieces: &[Piece], width: f32) -> LayoutJob {
+pub fn pieces_job(pieces: &[SummaryPiece], width: f32) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = width;
     for piece in pieces {
         let format = match piece.tone {
-            Tone::Muted => TextFormat::simple(FontId::proportional(12.0), theme::MUTED),
-            Tone::Strong => TextFormat::simple(
-                FontId::new(12.0, egui::FontFamily::Name("medium".into())),
-                theme::TEXT,
-            ),
-            Tone::Var => {
+            SummaryTone::Muted => TextFormat::simple(FontId::proportional(12.0), theme::MUTED),
+            SummaryTone::Strong => {
+                TextFormat::simple(FontId::new(12.0, theme::medium()), theme::TEXT)
+            }
+            SummaryTone::Var => {
                 let mut format = TextFormat::simple(FontId::monospace(11.0), DIALOGUE);
-                format.background = Color32::from_rgba_unmultiplied(176, 140, 230, 30);
+                format.background = theme::alpha(DIALOGUE, 30);
                 format
             }
         };

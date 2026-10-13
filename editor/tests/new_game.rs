@@ -42,6 +42,23 @@ fn new_game_writes_the_built_in_template_under_the_given_name() {
 }
 
 #[test]
+fn every_built_in_template_carries_the_content_version_of_this_build() {
+    let version = game::systems::registry().version().0;
+    for template in templates::list() {
+        let folder = temp(&format!("version-{}", template.key));
+        templates::new_game(&template.key, "Saltmarsh", &folder).expect("writes");
+        let text = std::fs::read_to_string(folder.join("game.json")).expect("game.json");
+        let game: serde_json::Value = serde_json::from_str(&text).expect("json");
+        assert_eq!(
+            game["content_version"].as_str(),
+            Some(version.as_str()),
+            "the {} template",
+            template.key
+        );
+    }
+}
+
+#[test]
 fn a_folder_that_is_not_empty_is_refused_and_left_alone() {
     let folder = temp("taken");
     std::fs::create_dir_all(&folder).unwrap();

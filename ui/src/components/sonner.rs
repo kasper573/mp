@@ -8,7 +8,7 @@ use bevy_picking::prelude::{Pickable, PointerClick, PointerOut, PointerOver};
 use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::{
-    AlignItems, BorderRadius, FlexDirection, Node, PositionType, UiRect, UiTransform, Val,
+    AlignItems, BorderRadius, Display, FlexDirection, Node, PositionType, UiRect, UiTransform, Val,
 };
 
 use crate::components::rich_text::MotionPreference;
@@ -306,7 +306,7 @@ pub(crate) fn layout_toasts(
             continue;
         }
         let mut depth = 0usize;
-        for &entity in children.iter().rev().collect::<Vec<_>>().iter() {
+        for entity in children.iter().rev() {
             let Ok((toast, mut node, mut motion)) = cards.get_mut(entity) else {
                 continue;
             };
@@ -318,9 +318,9 @@ pub(crate) fn layout_toasts(
             }
             let visible = here < MAX_VISIBLE || toast.leaving || toaster.expanded;
             node.display = if visible {
-                bevy_ui::Display::Flex
+                Display::Flex
             } else {
-                bevy_ui::Display::None
+                Display::None
             };
 
             let grow = toaster.position.grow();
@@ -387,7 +387,7 @@ fn layout_compact(
         false => COMPACT_SHOWN,
     };
     let mut live = 0usize;
-    for &entity in children.iter().rev().collect::<Vec<_>>().iter() {
+    for entity in children.iter().rev() {
         let Ok((mut toast, mut node, mut motion)) = cards.get_mut(entity) else {
             continue;
         };
@@ -396,8 +396,8 @@ fn layout_compact(
             live += 1;
         }
         let display = match here < limit || toast.leaving {
-            true => bevy_ui::Display::Flex,
-            false => bevy_ui::Display::None,
+            true => Display::Flex,
+            false => Display::None,
         };
         if node.display != display {
             node.display = display;

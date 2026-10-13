@@ -1,6 +1,5 @@
-use std::time::Duration;
-
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path};
 use bevy::image::ImageSampler;
@@ -31,6 +30,44 @@ pub struct TileSheet {
     pub size: Vec2,
     pub tile: Vec2,
     pub animations: Vec<TileAnimation>,
+}
+
+impl TileSheet {
+    fn columns(&self) -> u32 {
+        ((self.size.x / self.tile.x.max(1.0)) as u32).max(1)
+    }
+
+    fn tile_count(&self) -> u32 {
+        let rows = ((self.size.y / self.tile.y.max(1.0)) as u32).max(1);
+        self.columns() * rows
+    }
+
+    fn region(&self, tile: u32) -> Rect {
+        let x = (tile % self.columns()) as f32 * self.tile.x;
+        let y = (tile / self.columns()) as f32 * self.tile.y;
+        Rect::new(x, y, x + self.tile.x, y + self.tile.y)
+    }
+
+    fn frames(&self, tile: u32) -> Vec<Frame<Rect>> {
+        match self
+            .animations
+            .iter()
+            .find(|animation| animation.tile == tile)
+        {
+            Some(animation) if !animation.frames.is_empty() => animation
+                .frames
+                .iter()
+                .map(|frame| Frame {
+                    shows: self.region(frame.tile),
+                    lasts: frame.lasts,
+                })
+                .collect(),
+            _ => vec![Frame {
+                shows: self.region(tile),
+                lasts: Duration::ZERO,
+            }],
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -68,22 +105,27 @@ pub struct TileSprite {
     pub z: f32,
 }
 
+#[derive(Clone, Copy)]
 pub struct LayerPlacement {
     pub origin: Vec2,
     pub tile_px: f32,
     pub z: f32,
 }
 
+pub struct TilemapAssets<'a> {
+    pub images: &'a mut Assets<Image>,
+    pub meshes: &'a mut Assets<Mesh>,
+    pub materials: &'a mut Assets<TilemapMaterial>,
+}
+
 pub fn spawn_grid_layer(
     commands: &mut Commands,
-    images: &mut Assets<Image>,
-    meshes: &mut Assets<Mesh>,
-    materials: &mut Assets<TilemapMaterial>,
+    assets: &mut TilemapAssets,
     sheets: &[TileSheet],
     layer: &GridLayer,
     placement: LayerPlacement,
+    extra: impl Bundle + Clone,
 ) {
-    let LayerPlacement { origin, tile_px, z } = placement;
     let mut builders: HashMap<usize, IndexBuilder> = HashMap::new();
     for (index, cell) in layer.cells.iter().enumerate() {
         let Some(cell) = cell else {
@@ -98,11 +140,9 @@ pub fn spawn_grid_layer(
             .or_insert_with(|| IndexBuilder::new(layer.width, layer.height, sheet))
             .set(x, y, cell.tile, cell.flip_x, cell.flip_y);
     }
-    let quad = meshes.add(Rectangle::new(1.0, 1.0));
+    let quad = assets.meshes.add(Rectangle::new(1.0, 1.0));
     for builder in builders.into_values() {
-        spawn_tilemap(
-            commands, images, &quad, materials, builder, origin, tile_px, z,
-        );
+        spawn_tilemap(commands, assets, &quad, builder, placement, extra.clone());
     }
 }
 
@@ -111,17 +151,18 @@ pub fn spawn_tile_sprite(
     sheets: &[TileSheet],
     sprite: TileSprite,
     tile_px: f32,
+    extra: impl Bundle,
 ) {
     let Some(sheet) = sheets.get(sprite.sheet) else {
         return;
     };
-    let frames = frames(sheet, sprite.tile);
-    let total: f32 = frames.iter().map(|(_, seconds)| seconds).sum();
+    let frames = sheet.frames(sprite.tile);
+    let total: Duration = frames.iter().map(|frame| frame.lasts).sum();
     let mut tile = commands.spawn((
         MapTile,
         Sprite {
             image: sheet.image.clone(),
-            rect: Some(frames[0].0),
+            rect: Some(frames[0].shows),
             custom_size: Some(Vec2::splat(tile_px)),
             flip_x: sprite.flip_x,
             flip_y: sprite.flip_y,
@@ -129,8 +170,9 @@ pub fn spawn_tile_sprite(
         },
         Anchor::BOTTOM_LEFT,
         Transform::from_xyz(sprite.bottom_left.x, sprite.bottom_left.y, sprite.z),
+        extra,
     ));
-    if total > 0.0 {
+    if !total.is_zero() {
         tile.insert(AnimatedSprite { frames, total });
     }
 }
@@ -174,9 +216,14 @@ struct TilemapAnim {
 
 struct Anim {
     tile: u32,
-    frames: Vec<(u32, f32)>,
-    total: f32,
+    frames: Vec<Frame<u32>>,
+    total: Duration,
     current: usize,
+}
+
+struct Frame<T> {
+    shows: T,
+    lasts: Duration,
 }
 
 struct IndexBuilder {
@@ -204,21 +251,12 @@ impl IndexBuilder {
         self.data[i + 3] = 255;
     }
 
-    fn columns(&self) -> u32 {
-        ((self.sheet.size.x / self.sheet.tile.x.max(1.0)) as u32).max(1)
-    }
-
-    fn tile_count(&self) -> u32 {
-        let rows = ((self.sheet.size.y / self.sheet.tile.y.max(1.0)) as u32).max(1);
-        self.columns() * rows
-    }
-
     fn uniform(&self) -> TilemapUniform {
         TilemapUniform {
             grid: Vec4::new(
                 self.width as f32,
                 self.height as f32,
-                self.columns() as f32,
+                self.sheet.columns() as f32,
                 0.0,
             ),
             sheet: Vec4::new(
@@ -231,7 +269,7 @@ impl IndexBuilder {
     }
 
     fn frame_map_data(&self) -> Vec<u8> {
-        let count = self.tile_count();
+        let count = self.sheet.tile_count();
         let mut data = vec![0u8; (count * 4) as usize];
         for tile in 0..count {
             let i = (tile * 4) as usize;
@@ -242,20 +280,23 @@ impl IndexBuilder {
     }
 
     fn anims(&self) -> Vec<Anim> {
-        let count = self.tile_count();
+        let count = self.sheet.tile_count();
         self.sheet
             .animations
             .iter()
             .filter(|animation| animation.tile < count && animation.frames.len() > 1)
             .map(|animation| {
-                let frames: Vec<(u32, f32)> = animation
+                let frames: Vec<Frame<u32>> = animation
                     .frames
                     .iter()
-                    .map(|frame| (frame.tile.min(count - 1), frame.lasts.as_secs_f32()))
+                    .map(|frame| Frame {
+                        shows: frame.tile.min(count - 1),
+                        lasts: frame.lasts,
+                    })
                     .collect();
                 Anim {
                     tile: animation.tile,
-                    total: frames.iter().map(|(_, seconds)| seconds).sum(),
+                    total: frames.iter().map(|frame| frame.lasts).sum(),
                     frames,
                     current: 0,
                 }
@@ -264,33 +305,31 @@ impl IndexBuilder {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn spawn_tilemap(
     commands: &mut Commands,
-    images: &mut Assets<Image>,
+    assets: &mut TilemapAssets,
     quad: &Handle<Mesh>,
-    materials: &mut Assets<TilemapMaterial>,
     builder: IndexBuilder,
-    origin: Vec2,
-    tile_px: f32,
-    z: f32,
+    placement: LayerPlacement,
+    extra: impl Bundle,
 ) {
+    let LayerPlacement { origin, tile_px, z } = placement;
     let width_px = builder.width as f32 * tile_px;
     let height_px = builder.height as f32 * tile_px;
-    let frame_map = images.add(uint_image(
-        builder.tile_count(),
+    let frame_map = assets.images.add(uint_image(
+        builder.sheet.tile_count(),
         1,
         builder.frame_map_data(),
         RenderAssetUsages::default(),
     ));
     let anims = builder.anims();
-    let index = images.add(uint_image(
+    let index = assets.images.add(uint_image(
         builder.width,
         builder.height,
         builder.data.clone(),
         RenderAssetUsages::RENDER_WORLD,
     ));
-    let material = materials.add(TilemapMaterial {
+    let material = assets.materials.add(TilemapMaterial {
         index,
         atlas: builder.sheet.image.clone(),
         frame_map: frame_map.clone(),
@@ -306,19 +345,20 @@ fn spawn_tilemap(
             ..default()
         },
         TilemapAnim { frame_map, anims },
+        extra,
     ));
 }
 
 #[derive(Component)]
 struct AnimatedSprite {
-    frames: Vec<(Rect, f32)>,
-    total: f32,
+    frames: Vec<Frame<Rect>>,
+    total: Duration,
 }
 
 fn animate_sprites(time: Res<Time>, mut sprites: Query<(&AnimatedSprite, &mut Sprite)>) {
-    let now = time.elapsed_secs();
+    let now = time.elapsed();
     for (anim, mut sprite) in &mut sprites {
-        sprite.rect = Some(anim.frames[frame_at(&anim.frames, anim.total, now)].0);
+        sprite.rect = Some(anim.frames[frame_at(&anim.frames, anim.total, now)].shows);
     }
 }
 
@@ -328,11 +368,11 @@ fn animate_tilemaps(
     mut materials: ResMut<Assets<TilemapMaterial>>,
     mut maps: Query<(&mut TilemapAnim, &MeshMaterial2d<TilemapMaterial>)>,
 ) {
-    let now = time.elapsed_secs();
+    let now = time.elapsed();
     for (mut map, material) in &mut maps {
         let mut dirty = false;
         for anim in &mut map.anims {
-            if anim.total <= 0.0 {
+            if anim.total.is_zero() {
                 continue;
             }
             let frame = frame_at(&anim.frames, anim.total, now);
@@ -348,7 +388,7 @@ fn animate_tilemaps(
             && let Some(data) = image.data.as_mut()
         {
             for anim in &map.anims {
-                let shown = anim.frames[anim.current].0;
+                let shown = anim.frames[anim.current].shows;
                 let i = anim.tile as usize * 4;
                 data[i] = (shown & 0xff) as u8;
                 data[i + 1] = (shown >> 8) as u8;
@@ -360,37 +400,15 @@ fn animate_tilemaps(
     }
 }
 
-fn frame_at<T>(frames: &[(T, f32)], total: f32, now: f32) -> usize {
-    let mut remaining = now % total;
-    for (index, (_, duration)) in frames.iter().enumerate() {
-        if remaining < *duration {
+fn frame_at<T>(frames: &[Frame<T>], total: Duration, now: Duration) -> usize {
+    let mut remaining = Duration::from_nanos((now.as_nanos() % total.as_nanos()) as u64);
+    for (index, frame) in frames.iter().enumerate() {
+        if remaining < frame.lasts {
             return index;
         }
-        remaining -= *duration;
+        remaining -= frame.lasts;
     }
     frames.len() - 1
-}
-
-fn region(sheet: &TileSheet, tile: u32) -> Rect {
-    let columns = ((sheet.size.x / sheet.tile.x.max(1.0)) as u32).max(1);
-    let x = (tile % columns) as f32 * sheet.tile.x;
-    let y = (tile / columns) as f32 * sheet.tile.y;
-    Rect::new(x, y, x + sheet.tile.x, y + sheet.tile.y)
-}
-
-fn frames(sheet: &TileSheet, tile: u32) -> Vec<(Rect, f32)> {
-    match sheet
-        .animations
-        .iter()
-        .find(|animation| animation.tile == tile)
-    {
-        Some(animation) if !animation.frames.is_empty() => animation
-            .frames
-            .iter()
-            .map(|frame| (region(sheet, frame.tile), frame.lasts.as_secs_f32()))
-            .collect(),
-        _ => vec![(region(sheet, tile), 0.0)],
-    }
 }
 
 fn uint_image(width: u32, height: u32, data: Vec<u8>, usage: RenderAssetUsages) -> Image {

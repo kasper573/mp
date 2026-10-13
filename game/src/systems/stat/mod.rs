@@ -1,7 +1,6 @@
 pub mod effects;
-pub mod widget;
-
 mod health;
+pub mod widget;
 
 pub use health::{apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill};
 
@@ -112,10 +111,6 @@ pub fn value(stats: &[Stat], kind: StatKind) -> f32 {
 impl Stats {
     pub fn get(&self, kind: StatKind) -> f32 {
         value(&self.0, kind)
-    }
-
-    pub fn apply(&self, world: &mut World, entity: Entity) {
-        world.entity_mut(entity).insert(self.clone());
     }
 }
 

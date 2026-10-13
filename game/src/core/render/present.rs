@@ -11,6 +11,7 @@ use bevy::window::PrimaryWindow;
 use super::TILE;
 use super::camera::WorldCamera;
 use super::transition::{ActiveTransition, CutUniform, ScreenTransitionPhase};
+use crate::core::platform::ClientPlatform;
 use crate::core::time::Seconds;
 
 const TILE_SCREEN: f32 = 96.0;
@@ -79,13 +80,7 @@ pub(super) fn setup(
             ..default()
         },
         RenderTarget::Image(target.clone().into()),
-        Projection::Orthographic(OrthographicProjection {
-            scaling_mode: ScalingMode::Fixed {
-                width: target_w as f32 / SCALE,
-                height: target_h as f32 / SCALE,
-            },
-            ..OrthographicProjection::default_2d()
-        }),
+        world_projection(target_w, target_h),
         Msaa::Off,
         WorldCamera,
     ));
@@ -120,7 +115,7 @@ pub(super) fn setup(
 
 pub(super) fn match_display(
     mut window: Single<&mut Window, With<PrimaryWindow>>,
-    platform: Res<crate::core::platform::ClientPlatform>,
+    platform: Res<ClientPlatform>,
 ) {
     platform.0.sync_window(&mut window);
 }
@@ -145,12 +140,7 @@ pub(super) fn fit(
         targets.held = images.add(world_target(target_w, target_h));
         if let Ok((mut target, mut projection)) = camera.single_mut() {
             *target = RenderTarget::Image(targets.live.clone().into());
-            if let Projection::Orthographic(ortho) = projection.as_mut() {
-                ortho.scaling_mode = ScalingMode::Fixed {
-                    width: target_w as f32 / SCALE,
-                    height: target_h as f32 / SCALE,
-                };
-            }
+            *projection = world_projection(target_w, target_h);
         }
         if let Ok((_, material)) = quad.single()
             && let Some(mut material) = materials.get_mut(&material.0)
@@ -213,6 +203,16 @@ pub(super) fn hold_frame(world: &mut World) {
             material.snapshot = held.clone();
         }
     }
+}
+
+fn world_projection(width: u32, height: u32) -> Projection {
+    Projection::Orthographic(OrthographicProjection {
+        scaling_mode: ScalingMode::Fixed {
+            width: width as f32 / SCALE,
+            height: height as f32 / SCALE,
+        },
+        ..OrthographicProjection::default_2d()
+    })
 }
 
 fn world_target(width: u32, height: u32) -> Image {

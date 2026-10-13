@@ -1,17 +1,20 @@
 use std::collections::{BTreeMap, HashSet};
-use std::str::FromStr;
 
+use game::core::content::locate;
 use game::core::script::VariableType;
-use game::systems::area::AreaModuleKind;
 use game::systems::area::blueprint::{self, hole_name};
+use game::systems::script::Variable;
 use serde_json::Value;
 
-use crate::value::RowValue;
+use super::placement;
+use crate::forms::HoleRequest;
+use crate::schema::{self, SchemaKind, SchemaShapes};
+use crate::{rows, value};
 
 pub fn fill_holes(
     value: &mut Value,
     values: &Value,
-    variables: &BTreeMap<String, game::systems::script::Variable>,
+    variables: &BTreeMap<String, Variable>,
 ) -> usize {
     let mut filled = 0;
     if let Some(name) = hole_name(value) {
@@ -19,7 +22,7 @@ pub fn fill_holes(
             variables
                 .get(name)
                 .and_then(|v| v.default.as_ref())
-                .and_then(|d| crate::value::json(d).ok())
+                .and_then(|d| value::json(d).ok())
         });
         if let Some(replacement) = replacement {
             *value = replacement;
@@ -49,60 +52,41 @@ pub struct MadeVariable {
     pub kept: Value,
 }
 
-pub enum HoleOp {
-    Make {
-        part: usize,
-        field: String,
-        kind: VariableType,
-    },
-    Use {
-        part: usize,
-        field: String,
-        name: String,
-    },
-    Fix {
-        part: usize,
-        field: String,
-        name: String,
-    },
+pub struct HoleOp {
+    pub part: usize,
+    pub request: HoleRequest,
 }
 
-pub fn hole_op(part: usize, base: &str, request: crate::forms::HoleRequest) -> HoleOp {
-    use crate::forms::HoleRequest as R;
-    let relative = |field: String| field.strip_prefix(base).map(str::to_owned).unwrap_or(field);
-    match request {
-        R::Make { field, kind } => HoleOp::Make {
-            part,
-            field: relative(field),
-            kind,
-        },
-        R::Use { field, name } => HoleOp::Use {
-            part,
-            field: relative(field),
-            name,
-        },
-        R::Fix { field, name } => HoleOp::Fix {
-            part,
-            field: relative(field),
-            name,
-        },
+pub fn hole_op(part: usize, base: &str, mut request: HoleRequest) -> HoleOp {
+    let field = match &mut request {
+        HoleRequest::Make { field, .. }
+        | HoleRequest::Use { field, .. }
+        | HoleRequest::Fix { field, .. } => field,
+    };
+    if let Some(relative) = field.strip_prefix(base) {
+        *field = relative.to_owned();
     }
+    HoleOp { part, request }
 }
 
-pub fn apply_hole_op(row: &mut Value, op: HoleOp) -> Option<MadeVariable> {
-    match op {
-        HoleOp::Make { part, field, kind } => {
+pub fn apply_hole_op(shapes: &SchemaShapes, row: &mut Value, op: HoleOp) -> Option<MadeVariable> {
+    let HoleOp { part, request } = op;
+    match request {
+        HoleRequest::Make { field, kind } => {
             let taken: HashSet<String> = row["variables"]
                 .as_object()
                 .map(|v| v.keys().cloned().collect())
                 .unwrap_or_default();
             let base = field.rsplit('/').next().unwrap_or("value").to_owned();
-            let name = suffixed(&base, &taken);
+            let name = rows::free_name(&base, &taken);
             let table = match kind {
-                VariableType::Row => row_table_of(&row["parts"][part], &field),
+                VariableType::Row => holeable_fields(shapes, &row["parts"][part])
+                    .into_iter()
+                    .find(|holeable| holeable.pointer == field)
+                    .and_then(|holeable| holeable.table),
                 _ => None,
             };
-            let variable = game::systems::script::Variable {
+            let variable = Variable {
                 ty: kind,
                 table,
                 default: None,
@@ -121,13 +105,13 @@ pub fn apply_hole_op(row: &mut Value, op: HoleOp) -> Option<MadeVariable> {
                 kept: kept.unwrap_or(Value::Null),
             })
         }
-        HoleOp::Use { part, field, name } => {
+        HoleRequest::Use { field, name } => {
             if let Some(slot) = row["parts"][part].pointer_mut(&field) {
                 *slot = hole(&name);
             }
             None
         }
-        HoleOp::Fix { part, field, name } => {
+        HoleRequest::Fix { field, name } => {
             let default = row["variables"][&name]["default"].clone();
             let fixed = if default.is_null() {
                 fixed_template(&row["variables"][&name])
@@ -158,43 +142,10 @@ fn hole(name: &str) -> Value {
     serde_json::json!({ "var": name })
 }
 
-pub(super) fn fixed_template(variable: &Value) -> Value {
-    match VariableType::from_str(variable.kind()) {
-        Ok(VariableType::Integer) => Value::from(0),
-        Ok(VariableType::Number) => Value::from(0.0),
-        Ok(VariableType::Boolean) => Value::Bool(false),
-        Ok(VariableType::Place) => serde_json::json!({ "area": "", "x": 0.0, "y": 0.0 }),
-        Ok(VariableType::Condition) => crate::condition::empty_object(),
-        _ => Value::String(String::new()),
-    }
-}
-
-pub(super) fn row_table_of(part: &Value, field: &str) -> Option<String> {
-    let last = field.rsplit('/').next()?;
-    match (part.module_kind()?, last) {
-        (AreaModuleKind::Population | AreaModuleKind::Resident, "npc") => Some("npc".to_owned()),
-        (_, "script") => Some("script".to_owned()),
-        (_, "item") => Some("item".to_owned()),
-        (_, "quest") => Some("quest".to_owned()),
-        (_, "shop") => Some("shop".to_owned()),
-        (_, "memory") => Some("memory".to_owned()),
-        (_, "notification") => Some("notification".to_owned()),
-        _ => None,
-    }
-}
-
-pub fn suffixed(name: &str, taken: &HashSet<String>) -> String {
-    if !taken.iter().any(|t| t.eq_ignore_ascii_case(name)) {
-        return name.to_owned();
-    }
-    let base = match name.rfind('_') {
-        Some(cut) if name[cut + 1..].chars().all(|c| c.is_ascii_digit()) && cut > 0 => &name[..cut],
-        _ => name,
-    };
-    (2..)
-        .map(|n| format!("{base}_{n}"))
-        .find(|candidate| !taken.iter().any(|t| t.eq_ignore_ascii_case(candidate)))
-        .expect("a free name")
+fn fixed_template(variable: &Value) -> Value {
+    serde_json::from_value::<Variable>(variable.clone())
+        .map(|variable| placement::variable_template(&variable))
+        .unwrap_or_else(|_| Value::String(String::new()))
 }
 
 pub struct HoleSite {
@@ -214,10 +165,7 @@ pub fn holes_in(value: &Value, pointer: &str) -> Vec<HoleSite> {
     match value {
         Value::Object(map) => {
             for (key, v) in map {
-                out.extend(holes_in(
-                    v,
-                    &format!("{pointer}/{}", game::core::content::locate::escape(key)),
-                ));
+                out.extend(holes_in(v, &format!("{pointer}/{}", locate::escape(key))));
             }
         }
         Value::Array(items) => {
@@ -290,52 +238,77 @@ pub fn merge_keeping_holes(part: &mut Value, plain: &Value) {
 pub struct HoleableField {
     pub pointer: String,
     pub kind: VariableType,
+    pub table: Option<String>,
 }
 
-pub fn holeable_fields(part: &Value) -> Vec<HoleableField> {
+pub fn holeable_fields(shapes: &SchemaShapes, part: &Value) -> Vec<HoleableField> {
+    let root = shapes.shape_of("area");
+    let variants = shapes.module_variants("area");
+    let Some(variant) = schema::variant_of(&variants, part) else {
+        return Vec::new();
+    };
     let mut out = Vec::new();
-    let mut push = |pointer: String, kind: VariableType| out.push(HoleableField { pointer, kind });
-    match part.module_kind() {
-        Some(AreaModuleKind::Object) => {
-            push("/name".to_owned(), VariableType::Name);
-            push("/label".to_owned(), VariableType::Text);
-            push("/shown".to_owned(), VariableType::Condition);
-            for (index, script) in part["scripts"].as_array().into_iter().flatten().enumerate() {
-                for (name, value) in script["values"].as_object().into_iter().flatten() {
-                    push(format!("/scripts/{index}/values/{name}"), value_kind(value));
-                }
-            }
-        }
-        Some(AreaModuleKind::Soundscape) => {
-            push("/emit".to_owned(), VariableType::Number);
-            let channels = part["channels"].as_array().map_or(0, Vec::len);
-            for index in 0..channels {
-                push(format!("/channels/{index}/channel"), VariableType::Integer);
-                push(format!("/channels/{index}/file"), VariableType::Audio);
-                push(format!("/channels/{index}/volume"), VariableType::Number);
-                push(format!("/channels/{index}/pan"), VariableType::Number);
-            }
-        }
-        Some(AreaModuleKind::Population) => {
-            push("/npc".to_owned(), VariableType::Row);
-            push("/count".to_owned(), VariableType::Integer);
-        }
-        Some(AreaModuleKind::Resident) => {
-            push("/npc".to_owned(), VariableType::Row);
-            push("/shown".to_owned(), VariableType::Condition);
-        }
-        Some(AreaModuleKind::Blueprint) => {
-            for (name, value) in part["values"].as_object().into_iter().flatten() {
-                push(format!("/values/{name}"), value_kind(value));
-            }
-        }
-        _ => {}
-    }
+    collect_holeable(root, variant.schema, part, "", &mut out);
     out.retain(|field| {
         part.pointer(&field.pointer)
             .is_some_and(|v| hole_name(v).is_none())
     });
     out
+}
+
+fn collect_holeable(
+    root: &Value,
+    schema: &Value,
+    value: &Value,
+    pointer: &str,
+    out: &mut Vec<HoleableField>,
+) {
+    let schema = schema::resolve(root, schema);
+    let kind = match schema::marker(schema) {
+        Some("x-name") => Some(VariableType::Name),
+        Some("x-condition") => Some(VariableType::Condition),
+        Some("x-place") => Some(VariableType::Place),
+        Some("x-table") => Some(VariableType::Row),
+        Some("x-asset") => (schema["x-asset"] == "audio").then_some(VariableType::Audio),
+        Some(_) => return,
+        None => match schema::kind(root, schema) {
+            SchemaKind::Text => Some(VariableType::Text),
+            SchemaKind::Integer => Some(VariableType::Integer),
+            SchemaKind::Number => Some(VariableType::Number),
+            SchemaKind::Boolean => Some(VariableType::Boolean),
+            SchemaKind::Choice(_) | SchemaKind::Any => Some(value_kind(value)),
+            SchemaKind::Object => {
+                for (name, field) in schema::properties(schema) {
+                    if let Some(child) = value.get(name) {
+                        collect_holeable(root, field, child, &format!("{pointer}/{name}"), out);
+                    }
+                }
+                return;
+            }
+            SchemaKind::Array(items) => {
+                for (index, child) in value.as_array().into_iter().flatten().enumerate() {
+                    collect_holeable(root, items, child, &format!("{pointer}/{index}"), out);
+                }
+                return;
+            }
+            SchemaKind::Map(values) => {
+                for (name, child) in value.as_object().into_iter().flatten() {
+                    collect_holeable(root, values, child, &format!("{pointer}/{name}"), out);
+                }
+                return;
+            }
+            _ => None,
+        },
+    };
+    if let Some(kind) = kind
+        && !pointer.is_empty()
+    {
+        out.push(HoleableField {
+            pointer: pointer.to_owned(),
+            kind,
+            table: schema::table_of(schema).map(str::to_owned),
+        });
+    }
 }
 
 pub(super) fn value_kind(value: &Value) -> VariableType {

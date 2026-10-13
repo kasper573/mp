@@ -11,6 +11,8 @@ use std::time::Instant;
 
 use bevy_app::App;
 use game::core::content::{Content, FilesystemFolder};
+use game::systems::load_content;
+use serde::Deserialize;
 
 // The server's own allocator setup, so the measured ticks allocate exactly as production does.
 service::heap_profiling!(Counting, Counting);
@@ -47,7 +49,7 @@ const BUDGET_MS: f64 = 40.0;
 const MAX_AREAS: usize = 5000;
 const MEASURE: usize = 200;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Config {
     content_dir: PathBuf,
     a: Option<Vec<usize>>,
@@ -72,7 +74,7 @@ fn main() {
             .find(|arg| arg != "profile" && arg != "dist")
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().expect("cwd"));
-        profiling::run(&out, layout, service(&config.content_dir));
+        profiling::run(&out, layout, load(&config.content_dir));
         return;
     }
 
@@ -122,7 +124,7 @@ fn main() {
     }
 
     let (areas, r) = best.unwrap_or_else(|| (1, point(1, layout, &config.content_dir)));
-    let npcs = sim::npcs_per_area(&service(&config.content_dir)) * areas;
+    let npcs = sim::npcs_per_area(&load(&config.content_dir)) * areas;
     let players = sim::PLAYERS_PER_AREA * areas;
     println!("\n[bench] areas,npcs,players,clients,mean_ms,p50_ms,p99_ms,max_ms,sim_ms,repl_ms");
     println!(
@@ -144,8 +146,8 @@ fn main() {
     );
 }
 
-fn service(content_dir: &Path) -> Content {
-    game::systems::load_content(
+fn load(content_dir: &Path) -> Content {
+    load_content(
         Arc::new(FilesystemFolder(content_dir.to_path_buf())),
         "the program stopped",
     )
@@ -168,8 +170,8 @@ struct Point {
 }
 
 fn point(areas: usize, layout: sim::Layout, content_dir: &Path) -> Point {
-    let assets = service(content_dir);
-    let (mut worlds, rosters) = sim::worlds(areas, layout, &assets);
+    let content = load(content_dir);
+    let (mut worlds, rosters) = sim::worlds(areas, layout, &content);
 
     let baseline = measure(&mut worlds);
     sim::connect(&mut worlds, &rosters);

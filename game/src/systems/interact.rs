@@ -6,11 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
-use crate::core::script::Owner;
 use crate::core::tiling::Tiles;
-use crate::systems::actor;
-use crate::systems::attention::Id as AttentionId;
-use crate::systems::attention::{self, AttentionMark};
+use crate::systems::attention::{self, AttentionMark, Id as AttentionId};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
@@ -19,6 +16,7 @@ use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::{self, EventKind, RiftEvent, RiftInstances};
 use crate::systems::stat;
 use crate::systems::visibility;
+use crate::systems::{actor, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -73,19 +71,6 @@ pub fn interaction_of(world: &World, target: Entity) -> Option<Interactive> {
     (world.get::<Attitude>(target) != Some(&Attitude::Hostile)).then_some(interactive)
 }
 
-pub fn interactive_entry(world: &World, owner: Owner) -> Option<Interactive> {
-    world
-        .resource::<RiftInstances>()
-        .entries(owner, EventKind::Interacted)
-        .find_map(|event| match event {
-            RiftEvent::Interacted { verb, reach, .. } => Some(Interactive {
-                verb: *verb,
-                reach: *reach,
-            }),
-            _ => None,
-        })
-}
-
 pub fn interactable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
     let me = session::my_character(world).map(|entity| entity.id());
     actor::frontmost_at(world, point, me, |world, entity| {
@@ -94,7 +79,7 @@ pub fn interactable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
 }
 
 pub fn interact_request(world: &mut World) {
-    for request in crate::systems::requests::<InteractRequest>(world) {
+    for request in drain_requests::<InteractRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };

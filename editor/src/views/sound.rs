@@ -1,30 +1,30 @@
 use egui::Ui;
-
-use crate::ui::theme;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems::area;
 
 use crate::app::Editor;
+use crate::ui::theme;
+use game::core::audio::loader;
 
 #[derive(Clone, Debug, Default)]
-pub struct Listening {
+pub struct ListeningPoint {
     pub area: String,
     pub at: (f32, f32),
-    pub heard: Vec<Heard>,
+    pub heard: Vec<HeardModule>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Heard {
+pub struct HeardModule {
     pub module: usize,
     pub gain: f32,
     pub outside: f32,
-    pub channels: Vec<(u32, String, f32, Option<Loudness>)>,
+    pub channels: Vec<(u32, String, f32, Option<IntegratedLoudness>)>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Loudness {
+pub struct IntegratedLoudness {
     pub integrated: f64,
     pub peak_dbfs: f64,
 }
@@ -45,12 +45,10 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<
                 let loudness = editor
                     .project
                     .as_ref()
-                    .and_then(|p| {
-                        p.files
-                            .get(&format!("assets/{}", layer.src.as_str()))
-                            .cloned()
+                    .and_then(|project| {
+                        project.files.get(&format!("assets/{}", layer.src.as_str()))
                     })
-                    .and_then(|bytes| measure(&bytes));
+                    .and_then(|bytes| measure(bytes));
                 (
                     channel.0,
                     layer.src.as_str().to_owned(),
@@ -59,97 +57,46 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<
                 )
             })
             .collect();
-        heard.push(Heard {
+        heard.push(HeardModule {
             module: index,
             gain: positional.proximity,
             outside,
             channels,
         });
     }
-    editor.views.sound.listening = Some(Listening {
+    editor.views.sound.listening = Some(ListeningPoint {
         area: key,
         at: (at.x, at.y),
         heard,
     });
 }
 
-pub fn measure(bytes: &[u8]) -> Option<Loudness> {
-    let decoded = decode(bytes)?;
+pub fn measure(bytes: &[u8]) -> Option<IntegratedLoudness> {
+    let decoded = loader::decode(bytes.to_vec()).ok()?;
+    let channels = decoded.channels as u32;
     let mut meter = ebur128::EbuR128::new(
-        decoded.channels,
-        decoded.rate,
+        channels,
+        decoded.sample_rate,
         ebur128::Mode::I | ebur128::Mode::TRUE_PEAK,
     )
     .ok()?;
     meter.add_frames_f32(&decoded.samples).ok()?;
     let integrated = meter.loudness_global().ok()?;
     let mut peak: f64 = f64::NEG_INFINITY;
-    for channel in 0..decoded.channels {
+    for channel in 0..channels {
         if let Ok(p) = meter.true_peak(channel) {
             peak = peak.max(p);
         }
     }
-    Some(Loudness {
+    Some(IntegratedLoudness {
         integrated,
         peak_dbfs: 20.0 * peak.max(1e-9).log10(),
     })
 }
 
-pub struct Decoded {
-    pub channels: u32,
-    pub rate: u32,
-    pub samples: Vec<f32>,
-}
-
-pub fn decode(bytes: &[u8]) -> Option<Decoded> {
-    use symphonia::core::codecs::CodecParameters;
-    use symphonia::core::formats::TrackType;
-    use symphonia::core::io::MediaSourceStream;
-    let stream = MediaSourceStream::new(
-        Box::new(std::io::Cursor::new(bytes.to_vec())),
-        Default::default(),
-    );
-    let mut format = symphonia::default::get_probe()
-        .probe(
-            &Default::default(),
-            stream,
-            Default::default(),
-            Default::default(),
-        )
-        .ok()?;
-    let track = format.default_track(TrackType::Audio)?;
-    let track_id = track.id;
-    let Some(CodecParameters::Audio(params)) = track.codec_params.clone() else {
-        return None;
-    };
-    let codec = symphonia::default::get_codecs().get_audio_decoder(params.codec)?;
-    let mut decoder = (codec.factory)(&params, &Default::default()).ok()?;
-    let mut samples = Vec::new();
-    let mut channels = 0;
-    let mut rate = 0;
-    while let Ok(Some(packet)) = format.next_packet() {
-        if packet.track_id != track_id {
-            continue;
-        }
-        let Ok(audio) = decoder.decode(&packet) else {
-            continue;
-        };
-        channels = audio.spec().channels().count() as u32;
-        rate = audio.spec().rate();
-        let mut buffer = Vec::with_capacity(audio.frames() * channels as usize);
-        audio.copy_to_vec_interleaved(&mut buffer);
-        samples.extend_from_slice(&buffer);
-    }
-    (channels > 0 && !samples.is_empty()).then_some(Decoded {
-        channels,
-        rate,
-        samples,
-    })
-}
-
 #[derive(Default)]
 pub struct SoundViews {
-    pub listening: Option<Listening>,
+    pub listening: Option<ListeningPoint>,
 }
 
 pub fn panel(editor: &Editor, ui: &mut Ui) {

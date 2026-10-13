@@ -11,13 +11,13 @@ use strum::{IntoStaticStr, VariantArray};
 use crate::core::content::Content;
 use crate::core::script::{Owner, OwnerKind};
 use crate::systems::effect::{self, Effect};
-use crate::systems::item::ItemKind;
+use crate::systems::item::{Id as ItemId, ItemKind};
 use crate::systems::item::{Inventory, ItemStack};
 use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::player::sender_player;
 use crate::systems::script::condition;
 use crate::systems::script::{EventKind, RiftInstances};
 use crate::systems::text::LineText;
+use crate::systems::{drain_requests, player::sender_player};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -28,7 +28,7 @@ pub fn register(app: &mut App) {
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Equipment {
-    pub slots: BTreeMap<EquipmentSlot, crate::systems::item::Id>,
+    pub slots: BTreeMap<EquipmentSlot, ItemId>,
 }
 
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -70,11 +70,7 @@ impl EquipmentSlot {
     }
 }
 
-pub fn equip_held(
-    world: &mut World,
-    player: Entity,
-    item: crate::systems::item::Id,
-) -> Result<(), String> {
+pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(), String> {
     let slot = world
         .get::<Inventory>(player)
         .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
@@ -152,7 +148,7 @@ pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> R
 }
 
 pub fn unequip(world: &mut World) {
-    for request in crate::systems::requests::<UnequipRequest>(world) {
+    for request in drain_requests::<UnequipRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -169,7 +165,7 @@ pub fn unequip(world: &mut World) {
     }
 }
 
-fn raise(world: &mut World, item: crate::systems::item::Id, kind: EventKind, player: Entity) {
+fn raise(world: &mut World, item: ItemId, kind: EventKind, player: Entity) {
     world.resource_mut::<RiftInstances>().raise(
         Owner::Row(OwnerKind::Item, item.raw()),
         kind,

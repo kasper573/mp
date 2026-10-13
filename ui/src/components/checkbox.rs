@@ -22,7 +22,7 @@ pub fn checkbox(checked: Check) -> impl Scene {
         Checkable
         on(checkbox_self_update)
         StartChecked({checked != Check::Off})
-        box_style()
+        toggle_box_style(radius::S)
     }
 }
 
@@ -42,16 +42,15 @@ pub fn checkbox_indicator() -> impl Scene {
     }
 }
 
-// Filled box drops its border: a bordered rounded box leaks surface at the corners (bevy quirk).
-fn box_style() -> Style {
+pub(crate) fn toggle_box_style(corner: f32) -> Style {
     Style::new()
-        .node(|node| {
+        .node(move |node| {
             node.width = Val::Px(size::STEP_600);
             node.height = Val::Px(size::STEP_600);
             node.min_width = Val::Px(size::STEP_600);
             node.min_height = Val::Px(size::STEP_600);
             node.border = UiRect::all(Val::Px(2.0));
-            node.border_radius = BorderRadius::all(Val::Px(radius::S));
+            node.border_radius = BorderRadius::all(Val::Px(corner));
             node.align_items = AlignItems::Center;
             node.justify_content = JustifyContent::Center;
         })
@@ -67,5 +66,6 @@ fn box_style() -> Style {
             StatefulPaint::new(theme().surface_canvas.border).checked(theme().primary.base),
         )
         .transition(STANDARD_ENTER)
+        // The filled box drops its border: a bordered rounded box leaks surface at the corners.
         .checked(Style::new().node(|node| node.border = UiRect::all(Val::Px(0.0))))
 }

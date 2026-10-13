@@ -16,6 +16,8 @@ use game::core::time::{LocalClock, Seconds, UnixMillis};
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
 
+use crate::store::FileStore;
+
 const SETTINGS: &str = "settings.json";
 const CACHE: &str = "cache";
 
@@ -109,7 +111,7 @@ impl Platform for DesktopPlatform {
     }
 
     fn content_store(&self) -> Box<dyn ContentStore> {
-        Box::new(crate::store::FileStore::new(self.profile.join(CACHE)))
+        Box::new(FileStore::new(self.profile.join(CACHE)))
     }
 
     fn connect(&self, url: &str) -> Box<dyn ServerSocket> {

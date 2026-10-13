@@ -10,7 +10,7 @@ use crate::systems::actor::Name;
 use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::player::session::{self, SpectateStatus, Viewpoint};
-use crate::systems::scene::mode::Mode;
+use crate::systems::scene::{Scene as GameScene, despawn_all, mode::Mode};
 
 const BLANK_BG: Color = Color::srgb(0.07, 0.07, 0.07);
 const HINT: Color = Color::srgb(0.6, 0.6, 0.6);
@@ -22,13 +22,10 @@ impl Plugin for SpectatorPlugin {
         app.add_systems(
             Update,
             (step_keys.run_if(not(ui::typing)), show_nobody_playing)
-                .run_if(in_state(crate::systems::scene::Scene::Area))
+                .run_if(in_state(GameScene::Area))
                 .run_if(resource_equals(Mode::Spectate)),
         )
-        .add_systems(
-            OnExit(crate::systems::scene::Scene::Area),
-            crate::systems::scene::despawn_all::<NobodyPlaying>,
-        );
+        .add_systems(OnExit(GameScene::Area), despawn_all::<NobodyPlaying>);
     }
 }
 

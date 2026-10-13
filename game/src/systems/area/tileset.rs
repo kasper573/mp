@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{ContentId, ContentRow, RowCheck};
+use crate::core::math::{Pos, Rect, WorldPx};
 
 pub type Id = ContentId<TilesetDef>;
 pub type SurfaceId = ContentId<SurfaceDef>;
@@ -120,8 +121,11 @@ pub struct TileData {
     pub animation: Vec<TileFrame>,
 }
 
-#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, strum::IntoStaticStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Walk {
     Walkable,
     Blocks,
@@ -150,6 +154,14 @@ impl ContentRow for SurfaceDef {
 }
 
 impl TilesetDef {
+    pub fn tiles_with_corners(&self, set: &str, corners: &[String; 4]) -> Vec<u32> {
+        self.tiles
+            .iter()
+            .filter(|(_, data)| data.corners.get(set) == Some(corners))
+            .map(|(tile, _)| *tile)
+            .collect()
+    }
+
     pub fn data(&self, tile: u32) -> Option<&TileData> {
         self.tiles.get(&tile)
     }
@@ -166,6 +178,14 @@ impl TilesetDef {
         self.tiles
             .get(&tile)
             .map_or(&[], |data| data.animation.as_slice())
+    }
+
+    pub fn animations(&self, width: u32, height: u32) -> impl Iterator<Item = (u32, &[TileFrame])> {
+        let count = self.grid(width, height).count();
+        self.tiles
+            .iter()
+            .filter(move |(tile, data)| **tile < count && !data.animation.is_empty())
+            .map(|(tile, data)| (*tile, data.animation.as_slice()))
     }
 
     pub fn grid(&self, width: u32, height: u32) -> TilesetGrid {
@@ -193,10 +213,10 @@ impl TilesetGrid {
         self.columns * self.rows
     }
 
-    pub fn region(&self, tile: u32) -> crate::core::math::Rect<crate::core::math::WorldPx> {
+    pub fn region(&self, tile: u32) -> Rect<WorldPx> {
         let tile_px = self.tile as f32;
-        crate::core::math::Rect::new(
-            crate::core::math::Pos::new(
+        Rect::new(
+            Pos::new(
                 (tile % self.columns) as f32 * tile_px,
                 (tile / self.columns) as f32 * tile_px,
             ),

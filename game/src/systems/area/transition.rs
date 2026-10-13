@@ -15,7 +15,8 @@ use crate::systems::history::{self, History, HistoryEntry, HistoryMark, HistoryT
 use crate::systems::item::Inventory;
 use crate::systems::job::Job;
 use crate::systems::memory::Memory;
-use crate::systems::player::{CharacterState, ClientId, Owner, Xp};
+use crate::systems::npc::Npc;
+use crate::systems::player::{CharacterState, ClientId, Owner, Players, Xp};
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, RiftEvent, RiftInstances};
 use crate::systems::shop;
@@ -100,10 +101,7 @@ pub fn departing(world: &mut World) -> Vec<Traveler> {
         .collect();
     for (entity, traveler) in &leaving {
         raise_area(world, EventKind::Left, *entity);
-        world
-            .resource_mut::<crate::systems::player::Players>()
-            .0
-            .remove(&traveler.client);
+        world.resource_mut::<Players>().0.remove(&traveler.client);
         world.despawn(*entity);
     }
     leaving.into_iter().map(|(_, traveler)| traveler).collect()
@@ -133,7 +131,7 @@ pub fn arrive(world: &mut World, mut traveler: Traveler) -> Entity {
 }
 
 pub fn raise_area(world: &mut World, kind: EventKind, subject: Entity) {
-    let is_npc = world.get::<crate::systems::npc::Npc>(subject).is_some();
+    let is_npc = world.get::<Npc>(subject).is_some();
     world.resource_mut::<RiftInstances>().raise(
         ScriptOwner::Area,
         kind,

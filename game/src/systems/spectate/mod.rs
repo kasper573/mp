@@ -7,13 +7,12 @@ use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::message::Message;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{SendTargets, ToClients};
 use serde::{Deserialize, Serialize};
 
-use crate::systems::account::identity::Identity;
 use crate::systems::account::role::Role;
 use crate::systems::player::{ClientId, Players};
-use crate::systems::visibility::PrivateSight;
+use crate::systems::visibility::{self, PrivateSight};
+use crate::systems::{account::identity::Identity, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -68,7 +67,7 @@ pub struct SpectatorTransfer {
 }
 
 pub fn requests(world: &mut World) {
-    for request in crate::systems::requests::<SpectateRequest>(world) {
+    for request in drain_requests::<SpectateRequest>(world) {
         let Some(conn) = request.client_id.entity() else {
             continue;
         };
@@ -265,10 +264,7 @@ fn tell(world: &mut World, client: ClientId, status: Spectating) {
             own: client,
             watching,
         });
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
-            message: status,
-        });
+        visibility::send_to(world, conn, status);
     }
 }
 

@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId};
+use crate::core::content::{Content, ContentId, ContentRow};
 use crate::core::script::{
     Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, Value, ValueType,
 };
@@ -22,7 +22,7 @@ pub struct MemoryDef {
     pub resets: Resets,
 }
 
-impl crate::core::content::ContentRow for MemoryDef {
+impl ContentRow for MemoryDef {
     const TABLE: &'static str = "memory";
 }
 
@@ -86,6 +86,10 @@ impl Memory {
 
     pub fn forget(&mut self, key: Id) {
         self.0.remove(&key);
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = Id> + '_ {
+        self.0.keys().copied()
     }
 
     pub fn leave_area(&mut self, content: &Content) {

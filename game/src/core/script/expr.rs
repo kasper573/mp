@@ -284,16 +284,6 @@ impl<V: Vocabulary> Expr<V> {
         }
     }
 
-    pub fn queries(&self) -> Vec<&V::Query> {
-        let mut found = Vec::new();
-        self.visit(&mut |expr| {
-            if let Expr::Query(query) = expr {
-                found.push(query);
-            }
-        });
-        found
-    }
-
     pub fn vars(&self) -> Vec<&str> {
         let mut found = Vec::new();
         self.visit(&mut |expr| {

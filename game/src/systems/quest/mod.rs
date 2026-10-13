@@ -21,15 +21,12 @@ use crate::core::math::{Percent, Rng};
 use crate::core::script::{Name, Owner as ScriptOwner, OwnerKind, OwnerRow};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::AreaDef;
-use crate::systems::attention;
-use crate::systems::attention::AttentionMark;
-use crate::systems::attention::Id as AttentionId;
-use crate::systems::dialogue::ChoiceReveal;
+use crate::systems::attention::{AttentionMark, Id as AttentionId};
+use crate::systems::dialogue::{ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
-use crate::systems::item::Id as ItemId;
 use crate::systems::item::{
-    INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, ReservedBy, scatter_drop,
+    INVENTORY_MAX, Id as ItemId, Inventory, ItemDef, ItemFlag, ItemStack, ReservedBy, scatter_drop,
 };
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
@@ -43,6 +40,7 @@ use crate::systems::script::{
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
+use crate::systems::{attention, drain_requests};
 
 pub type QuestId = ContentId<QuestDef>;
 pub type Id = QuestId;
@@ -306,6 +304,7 @@ pub struct QuestParties {
 pub struct Party {
     pub name: String,
     pub item: Option<ItemId>,
+    pub npc: Option<NpcId>,
 }
 
 impl Parties {
@@ -365,6 +364,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             Party {
                 name: npc.get(content).name.to_owned(),
                 item: None,
+                npc: Some(npc),
             }
         }
         OwnerKind::Object => {
@@ -375,6 +375,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             Party {
                 name: object.label.clone().or_else(|| object.name.clone())?,
                 item: None,
+                npc: None,
             }
         }
         OwnerKind::Item => {
@@ -382,6 +383,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             Party {
                 name: item.get(content).name.to_owned(),
                 item: Some(item),
+                npc: None,
             }
         }
         _ => return None,
@@ -625,13 +627,19 @@ impl QuestLog {
     fn finish(&mut self, quest: QuestId, result: QuestResult, day: GameDay) {
         self.active.retain(|active| active.quest != quest);
         self.finished.retain(|finished| finished.quest != quest);
-        self.finished.push(FinishedQuest {
+        self.finished.push(FinishedQuest::new(quest, result, day));
+    }
+}
+
+impl FinishedQuest {
+    pub fn new(quest: QuestId, result: QuestResult, day: GameDay) -> FinishedQuest {
+        FinishedQuest {
             quest,
             result,
             day,
             resets_in: None,
             offered_again: false,
-        });
+        }
     }
 }
 
@@ -868,7 +876,7 @@ fn tell(world: &mut World, player: Entity, text: String, icon: &AssetRef, sfx: O
 }
 
 pub fn requests(world: &mut World) {
-    for request in crate::systems::requests::<QuestRequest>(world) {
+    for request in drain_requests::<QuestRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -983,7 +991,7 @@ pub fn check_all(loading: &mut Loading) {
         }
         if let Err((rule, found)) = crate::systems::dialogue::check_reveal(
             &quest.reveal,
-            crate::systems::dialogue::Revealable {
+            Revealable {
                 needs: quest.requires().is_some(),
                 costs: !quest.hand_in().is_empty(),
                 gains: !quest.rewards().is_empty() || !quest.pick_one().is_empty() || quest.xp > 0,

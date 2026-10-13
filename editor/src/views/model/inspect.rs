@@ -1,13 +1,21 @@
-use egui::{Color32, RichText, Sense, Ui, Vec2};
+use std::collections::HashMap;
+
+use egui::{RichText, Sense, Ui, Vec2};
+use forms::FormCx;
 use serde_json::Value;
 
-use super::{ACTIONS, CueKind, DIRECTIONS, FrameData, MAX_FRAME_MS, Page, strip::SetBy, strip_of};
+use super::{
+    FrameCueKind, MAX_FRAME_MS, ModelPage, ModelStrip, StripFrame, strip::TimingSetBy, strip_of,
+};
 use crate::app::Editor;
-use crate::forms::{FormAction, FormCx};
-use crate::project::Selection;
-use crate::ui::{theme, widgets};
+use crate::forms::FormChange;
+use crate::project::{ContentEdit, RowSelection, row_of};
+use crate::tabs::EditorTab;
+use crate::ui::{dialogs, inspector, theme, widgets};
+use crate::{forms, picker};
+use game::systems::actor::model::ActionName;
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {
         return;
     };
@@ -18,27 +26,21 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         return;
     };
     super::ensure_view(editor, &key);
-    let page = editor.views.model.views[&key].page;
+    let page = editor.views.model.view(&key).page;
     if let Some(rest) = part.strip_prefix("/sprites/actions/") {
         let bits: Vec<&str> = rest.split('/').collect();
-        let (Some(action), Some(direction)) = (
-            bits.first()
-                .and_then(|a| ACTIONS.iter().position(|n| n == a)),
-            bits.get(1)
-                .and_then(|d| DIRECTIONS.iter().position(|n| n == d)),
-        ) else {
+        let Some(strip) =
+            ModelStrip::parse(bits.first().unwrap_or(&""), bits.get(1).unwrap_or(&""))
+        else {
             return;
         };
-        let frames = strip_of(&row, ACTIONS[action], DIRECTIONS[direction]);
-        let crumb = format!(
-            "model/{key} › {} · {}",
-            ACTIONS[action], DIRECTIONS[direction]
-        );
+        let frames = strip_of(&row, strip);
+        let crumb = format!("model/{key} › {}", strip.name());
         egui::ScrollArea::vertical()
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
-                if page == Page::Matrix {
-                    crate::ui::inspector::show_row(editor, ui, super::TABLE, &key);
+                if page == ModelPage::Matrix {
+                    inspector::show_row(editor, ui, super::TABLE, &key);
                     ui.add_space(8.0);
                 }
                 match (
@@ -46,26 +48,18 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                     bits.get(3),
                 ) {
                     (Some(index), Some(cue)) => {
-                        if let Some(kind) = CueKind::of(cue) {
+                        if let Ok(kind) = cue.parse::<FrameCueKind>() {
                             ui.label(
                                 theme::mono(format!("{crumb} › frame {}", index + 1))
                                     .color(theme::CODE)
                                     .size(12.0),
                             );
-                            cue_card(editor, ui, &key, &frames, action, direction, index, kind);
+                            cue_card(editor, ui, &key, &frames, strip, index, kind);
                         }
                     }
                     (Some(index), None) if selection.parts.len() == 1 => {
-                        widgets::section(
-                            ui,
-                            &format!(
-                                "{} · {} · frame {}",
-                                ACTIONS[action],
-                                DIRECTIONS[direction],
-                                index + 1
-                            ),
-                        );
-                        frame_card(editor, ui, &key, &frames, action, direction, index);
+                        widgets::section(ui, &format!("{} · frame {}", strip.name(), index + 1));
+                        frame_card(editor, ui, &key, &frames, strip, index);
                     }
                     (Some(_), None) => {
                         let indices: Vec<usize> = selection
@@ -85,10 +79,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
                             .color(theme::CODE)
                             .size(12.0),
                         );
-                        frames_card(editor, ui, &key, &frames, action, direction, &indices);
+                        frames_card(editor, ui, &key, &frames, strip, &indices);
                     }
                     _ => {
-                        strip_card(editor, ui, &key, &row, &frames, action, direction);
+                        strip_card(editor, ui, &key, &row, &frames, strip);
                     }
                 }
             });
@@ -98,7 +92,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
         egui::ScrollArea::vertical()
             .id_salt(("model-inspect", &key))
             .show(ui, |ui| {
-                crate::ui::inspector::show_row(editor, ui, super::TABLE, &key);
+                inspector::show_row(editor, ui, super::TABLE, &key);
             });
         return;
     }
@@ -119,26 +113,22 @@ fn strip_card(
     ui: &mut Ui,
     key: &str,
     row: &Value,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
 ) {
-    let timing = super::action_timing(row, ACTIONS[action]);
-    widgets::section(
-        ui,
-        &format!("{} · {}", ACTIONS[action], DIRECTIONS[direction]),
-    );
+    let timing = super::action_timing(row, strip.action);
+    widgets::section(ui, &strip.name());
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
         widgets::kv_text(ui, "frames", frames.len().to_string());
         widgets::kv_text(ui, "lasts", format!("{} ms", super::total_ms(frames)));
-        widgets::kv_text(ui, "plays", super::play_rule_long(ACTIONS[action]));
+        widgets::kv_text(ui, "plays", super::play_rule_long(strip.action));
         let cues: Vec<String> = frames
             .iter()
             .enumerate()
             .flat_map(|(index, frame)| {
                 frame.cues().into_iter().map(move |cue| match cue {
-                    CueKind::Sound => format!(
+                    FrameCueKind::Sound => format!(
                         "{} on frame {}",
                         frame.sound.clone().unwrap_or_default(),
                         index + 1
@@ -156,7 +146,7 @@ fn strip_card(
                 cues.join(" · ")
             },
         );
-        if timing.differing.contains(&direction) && timing.differing.len() < DIRECTIONS.len() {
+        if timing.out_of_step(strip.direction) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new("!").color(theme::WARN).strong());
                 ui.label(theme::muted(format!(
@@ -168,7 +158,7 @@ fn strip_card(
         }
         ui.add_space(4.0);
         if widgets::keyed_button(ui, "Open in the animation editor", "Enter", true).clicked() {
-            super::matrix::open_strip(editor, key, action, direction);
+            super::matrix::open_strip(editor, key, strip);
         }
     });
 }
@@ -177,9 +167,8 @@ fn frame_card(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     index: usize,
 ) {
     let Some(frame) = frames.get(index).cloned() else {
@@ -189,28 +178,27 @@ fn frame_card(
     let mut label = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "frame", "frame", "", |_| {});
+        widgets::card_title(ui, "frame", "frame");
         ui.add_space(4.0);
         widgets::kv(ui, "lasts", |ui| {
             let mut text = frame.ms.to_string();
-            let response = crate::forms::boxed_input(ui, Some("ms"), |ui| {
+            let response = forms::boxed_input(ui, Some("ms"), |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut text)
                         .desired_width(60.0)
                         .font(egui::TextStyle::Monospace),
                 )
             });
-            if crate::forms::committed(ui, &response)
+            if forms::committed(ui, &response)
                 && let Ok(ms) = text.trim().parse::<u32>()
                 && (1..=MAX_FRAME_MS).contains(&ms)
                 && ms != frame.ms
             {
                 changed.ms = ms;
                 label = Some(format!(
-                    "Retime frame {} of {} · {} of {key}",
+                    "Retime frame {} of {} of {key}",
                     index + 1,
-                    ACTIONS[action],
-                    DIRECTIONS[direction]
+                    strip.name()
                 ));
             }
         });
@@ -219,22 +207,16 @@ fn frame_card(
             if widgets::toggle(ui, &mut on).changed() {
                 changed.apex = on;
                 label = Some(if on {
-                    format!(
-                        "Apex on frame {} of {} · {} of {key}",
-                        index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
-                    )
+                    format!("Apex on frame {} of {} of {key}", index + 1, strip.name())
                 } else {
                     format!(
-                        "No apex on frame {} of {} · {} of {key}",
+                        "No apex on frame {} of {} of {key}",
                         index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
+                        strip.name()
                     )
                 });
             }
-            ui.label(theme::muted(if ACTIONS[action] == "attack" {
+            ui.label(theme::muted(if strip.action == ActionName::Attack {
                 "the hit lands here"
             } else {
                 "only attack strips land a hit"
@@ -247,25 +229,20 @@ fn frame_card(
                 ui,
                 key,
                 &mut sound,
-                &format!(
-                    "/sprites/actions/{}/{}/{index}/sound",
-                    ACTIONS[action], DIRECTIONS[direction]
-                ),
+                &format!("{}/{index}/sound", strip.pointer()),
             ) {
                 changed.sound = (!sound.is_empty()).then_some(sound.clone());
                 label = Some(if sound.is_empty() {
                     format!(
-                        "No sound on frame {} of {} · {} of {key}",
+                        "No sound on frame {} of {} of {key}",
                         index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
+                        strip.name()
                     )
                 } else {
                     format!(
-                        "Sound {sound} on frame {} of {} · {} of {key}",
+                        "Sound {sound} on frame {} of {} of {key}",
                         index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
+                        strip.name()
                     )
                 });
             }
@@ -275,18 +252,12 @@ fn frame_card(
             if widgets::toggle(ui, &mut on).changed() {
                 changed.step = on;
                 label = Some(if on {
-                    format!(
-                        "Step on frame {} of {} · {} of {key}",
-                        index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
-                    )
+                    format!("Step on frame {} of {} of {key}", index + 1, strip.name())
                 } else {
                     format!(
-                        "No step on frame {} of {} · {} of {key}",
+                        "No step on frame {} of {} of {key}",
                         index + 1,
-                        ACTIONS[action],
-                        DIRECTIONS[direction]
+                        strip.name()
                     )
                 });
             }
@@ -300,15 +271,7 @@ fn frame_card(
             }
         }
         written[index] = changed;
-        super::write_strip(
-            editor,
-            key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
-            &written,
-            label,
-            false,
-        );
+        super::write_strip(editor, key, strip, &written, ContentEdit::new(label));
     }
 }
 
@@ -316,13 +279,12 @@ fn frames_card(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     indices: &[usize],
 ) {
     let (set_by, text) = {
-        let view = &editor.views.model.views[key];
+        let view = &editor.views.model.view(key);
         (view.timing.set_by, view.timing.text.clone())
     };
     let mut new_set_by = set_by;
@@ -341,41 +303,36 @@ fn frames_card(
         ui.add_space(4.0);
         widgets::kv(ui, "set by", |ui| {
             for (option, label) in [
-                (SetBy::Ms, "ms each"),
-                (SetBy::Fps, "fps"),
-                (SetBy::Scale, "scale"),
+                (TimingSetBy::Ms, "ms each"),
+                (TimingSetBy::Fps, "fps"),
+                (TimingSetBy::Scale, "scale"),
             ] {
                 let on = set_by == option;
-                let (fill, ink) = if on {
-                    (theme::ACCENT, Color32::WHITE)
-                } else {
-                    (theme::RAISED, theme::TEXT)
-                };
-                if widgets::chip_coloured(ui, label, fill, ink).clicked() {
+                if widgets::mode_chip(ui, label, on).clicked() {
                     new_set_by = option;
                     new_text.clear();
                 }
             }
         });
         let (name, unit) = match set_by {
-            SetBy::Ms => ("ms each", "ms"),
-            SetBy::Fps => ("fps", "fps"),
-            SetBy::Scale => ("scale", "×"),
+            TimingSetBy::Ms => ("ms each", "ms"),
+            TimingSetBy::Fps => ("fps", "fps"),
+            TimingSetBy::Scale => ("scale", "×"),
         };
         widgets::kv(ui, name, |ui| {
-            let response = crate::forms::boxed_input(ui, Some(unit), |ui| {
+            let response = forms::boxed_input(ui, Some(unit), |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut new_text)
                         .desired_width(80.0)
                         .font(egui::TextStyle::Monospace)
                         .hint_text(match set_by {
-                            SetBy::Ms => "100",
-                            SetBy::Fps => "10",
-                            SetBy::Scale => "1.25",
+                            TimingSetBy::Ms => "100",
+                            TimingSetBy::Fps => "10",
+                            TimingSetBy::Scale => "1.25",
                         }),
                 )
             });
-            if crate::forms::committed(ui, &response) {
+            if forms::committed(ui, &response) {
                 apply = true;
             }
         });
@@ -419,67 +376,57 @@ fn frames_card(
         if super::write_strip(
             editor,
             key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
+            strip,
             &written,
-            format!(
-                "Retime frames {} of {} · {} of {key}",
+            ContentEdit::new(format!(
+                "Retime frames {} of {} of {key}",
                 indices
                     .iter()
                     .map(|i| (i + 1).to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                ACTIONS[action],
-                DIRECTIONS[direction]
-            ),
-            false,
+                strip.name()
+            )),
         ) {
             new_text.clear();
         }
     }
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
+    let view = editor.views.model.view_mut(key);
     view.timing.set_by = new_set_by;
     view.timing.text = new_text;
 }
 
 fn plan(
-    frames: &[FrameData],
+    frames: &[StripFrame],
     indices: &[usize],
-    set_by: SetBy,
+    set_by: TimingSetBy,
     text: &str,
-) -> Option<std::collections::HashMap<usize, u32>> {
+) -> Option<HashMap<usize, u32>> {
     let value: f64 = text.trim().trim_start_matches('×').trim().parse().ok()?;
     if value <= 0.0 {
         return None;
     }
-    let mut out = std::collections::HashMap::new();
+    let mut out = HashMap::new();
     for index in indices {
         let frame = frames.get(*index)?;
         let ms = match set_by {
-            SetBy::Ms => value.round(),
-            SetBy::Fps => (1000.0 / value + 0.5).floor(),
-            SetBy::Scale => (frame.ms as f64 * value).round(),
+            TimingSetBy::Ms => value.round(),
+            TimingSetBy::Fps => (1000.0 / value + 0.5).floor(),
+            TimingSetBy::Scale => (frame.ms as f64 * value).round(),
         };
         out.insert(*index, (ms.max(1.0) as u32).min(MAX_FRAME_MS));
     }
     Some(out)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cue_card(
     editor: &mut Editor,
     ui: &mut Ui,
     key: &str,
-    frames: &[FrameData],
-    action: usize,
-    direction: usize,
+    frames: &[StripFrame],
+    strip: ModelStrip,
     index: usize,
-    kind: CueKind,
+    kind: FrameCueKind,
 ) {
     let Some(frame) = frames.get(index).cloned() else {
         return;
@@ -499,35 +446,45 @@ fn cue_card(
         });
         ui.add_space(4.0);
         match kind {
-            CueKind::Sound => {
+            FrameCueKind::Sound => {
                 let sound = frame.sound.clone().unwrap_or_default();
                 widgets::kv(ui, "sound", |ui| {
-                    if widgets::chip(ui, "▶").on_hover_text("Play the sound at its row's volume").clicked() {
+                    let play_chip = widgets::chip(ui, "▶");
+                    if play_chip.on_hover_text("Play the sound at its row's volume").clicked() {
                         play = Some(sound.clone());
                     }
                     let mut picked = sound.clone();
-                    if sound_picker(editor, ui, key, &mut picked, &format!("/sprites/actions/{}/{}/{index}/sound", ACTIONS[action], DIRECTIONS[direction])) && !picked.is_empty() {
+                    let path = format!("{}/{index}/sound", strip.pointer());
+                    if sound_picker(editor, ui, key, &mut picked, &path) && !picked.is_empty() {
                         new_sound = Some(picked);
                     }
                 });
-                widgets::kv_text(ui, "on frame", format!("{} · starts at {starts} ms", index + 1));
+                let on_frame = format!("{} · starts at {starts} ms", index + 1);
+                widgets::kv_text(ui, "on frame", on_frame);
                 let (volume_text, gain) = super::sounds::volume_of(editor, &sound);
                 widgets::kv_text(ui, "volume", volume_text);
                 widgets::kv_text(ui, "pitch", super::sounds::pitch_of(editor, &sound));
                 let wave = super::sounds::wave_of_sfx(editor, &sound);
                 ui.add_space(4.0);
-                let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width() - 8.0, 44.0), Sense::hover());
+                let size = Vec2::new(ui.available_width() - 8.0, 44.0);
+                let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
                 match &wave {
                     Some(wave) => {
                         super::sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::ACCENT);
                     }
                     None => {
-                        ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "no file to measure", egui::FontId::proportional(12.0), theme::MUTED);
+                        ui.painter().text(
+                            rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            "no file to measure",
+                            egui::FontId::proportional(12.0),
+                            theme::MUTED,
+                        );
                     }
                 }
                 widgets::section(ui, "Against the mix, at its loudest");
                 let file = super::sounds::sfx_file(editor, &sound).unwrap_or_default();
-                let role = super::sounds::Role::of_path(&file);
+                let role = super::sounds::SoundRole::of_path(&file);
                 match wave.as_ref().and_then(|wave| wave.loudness) {
                     Some(loudness) => {
                         let verdict = super::sounds::verdict(loudness, gain, role);
@@ -546,36 +503,39 @@ fn cue_card(
                     kv_wrapped(ui, "heard for", &heard);
                 }
             }
-            CueKind::Apex => {
-                widgets::kv_text(ui, "on frame", format!("{} · {starts} ms into the swing", index + 1));
-                widgets::kv_text(ui, "lands", "the hit, on server and client, when the swing reaches this frame");
-                if ACTIONS[action] != "attack" {
+            FrameCueKind::Apex => {
+                let on_frame = format!("{} · {starts} ms into the swing", index + 1);
+                widgets::kv_text(ui, "on frame", on_frame);
+                let lands = "the hit, on server and client, when the swing reaches this frame";
+                widgets::kv_text(ui, "lands", lands);
+                if strip.action != ActionName::Attack {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("!").color(theme::WARN).strong());
-                        ui.label(theme::muted("an apex belongs in attack strips only; the folder will not load with it here"));
+                        let why = "an apex belongs in attack strips only; the folder will not load with it here";
+                        ui.label(theme::muted(why));
                     });
                 }
             }
-            CueKind::Step => {
+            FrameCueKind::Step => {
                 widgets::kv_text(ui, "on frame", format!("{} · {starts} ms in", index + 1));
-                widgets::kv_text(ui, "plays", "the footstep of the surface underfoot; one per update however many steps pass");
+                let plays = "the footstep of the surface underfoot; one per update however many steps pass";
+                widgets::kv_text(ui, "plays", plays);
                 ui.add_space(4.0);
                 ui.label(theme::muted("hear it on").size(12.0));
-                let chosen = editor.views.model.views[key].surface.clone();
+                let chosen = editor.views.model.view(key).surface.clone();
                 let surfaces = super::sounds::surfaces(editor);
                 let mut pick_surface = None;
-                for (surface, name, footstep) in &surfaces {
+                for surface in &surfaces {
                     ui.horizontal(|ui| {
-                        let on = chosen.as_deref() == Some(surface);
-                        let (fill, ink) = if on { (theme::ACCENT, Color32::WHITE) } else { (theme::RAISED, theme::TEXT) };
-                        if widgets::chip_coloured(ui, "▶", fill, ink).clicked() {
-                            pick_surface = Some((surface.clone(), footstep.clone()));
+                        let on = chosen.as_deref() == Some(surface.key.as_str());
+                        if widgets::mode_chip(ui, "▶", on).clicked() {
+                            pick_surface = Some((surface.key.clone(), surface.footstep.clone()));
                         }
-                        ui.label(theme::mono(name.to_lowercase()).size(12.5));
+                        ui.label(theme::mono(surface.name.to_lowercase()).size(12.5));
                     });
                 }
                 if let Some((surface, footstep)) = pick_surface {
-                    let view = editor.views.model.views.get_mut(key).expect("the view exists");
+                    let view = editor.views.model.view_mut(key);
                     view.surface = Some(surface);
                     play = Some(footstep);
                 }
@@ -584,20 +544,11 @@ fn cue_card(
     });
     ui.add_space(8.0);
     if ui.button("Copy cues to the other 7 directions…").clicked() {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
-        view.confirm = Some(super::strip::Confirm::Cues);
+        let view = editor.views.model.view_mut(key);
+        view.confirm = Some(super::strip::StripConfirm::Cues);
     }
     if let Some(sound) = play {
-        editor
-            .views
-            .model
-            .play
-            .push(super::sounds::PlayRequest::Sfx(sound));
+        editor.views.model.sfx_to_play.push(sound);
     }
     if let Some(sound) = new_sound {
         let mut written = frames.to_vec();
@@ -605,57 +556,65 @@ fn cue_card(
         if super::write_strip(
             editor,
             key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
+            strip,
             &written,
-            format!(
-                "Sound {sound} on frame {} of {} · {} of {key}",
+            ContentEdit::new(format!(
+                "Sound {sound} on frame {} of {} of {key}",
                 index + 1,
-                ACTIONS[action],
-                DIRECTIONS[direction]
-            ),
-            false,
+                strip.name()
+            )),
         ) {
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+            let view = editor.views.model.view_mut(key);
             view.last_sound = Some(sound);
         }
     }
     if remove {
         let mut written = frames.to_vec();
         match kind {
-            CueKind::Apex => written[index].apex = false,
-            CueKind::Sound => written[index].sound = None,
-            CueKind::Step => written[index].step = false,
+            FrameCueKind::Apex => written[index].apex = false,
+            FrameCueKind::Sound => written[index].sound = None,
+            FrameCueKind::Step => written[index].step = false,
         }
         if super::write_strip(
             editor,
             key,
-            ACTIONS[action],
-            DIRECTIONS[direction],
+            strip,
             &written,
-            format!(
-                "No {} on frame {} of {} · {} of {key}",
+            ContentEdit::new(format!(
+                "No {} on frame {} of {} of {key}",
                 kind.key(),
                 index + 1,
-                ACTIONS[action],
-                DIRECTIONS[direction]
-            ),
-            false,
+                strip.name()
+            )),
         ) {
-            let view = editor
-                .views
-                .model
-                .views
-                .get_mut(key)
-                .expect("the view exists");
+            let view = editor.views.model.view_mut(key);
             view.cue = None;
-            super::select_frames(editor, key, action, direction);
+            super::select_frames(editor, key, strip);
         }
+    }
+}
+
+fn size_text(
+    face: &str,
+    own: Option<[usize; 2]>,
+    sizes: &[(String, Option<[usize; 2]>)],
+) -> String {
+    let Some(size) = own else {
+        return "missing file".to_owned();
+    };
+    let others: Vec<(&str, [usize; 2])> = sizes
+        .iter()
+        .filter(|(name, _)| name != face)
+        .filter_map(|(name, other)| Some((name.as_str(), (*other)?)))
+        .collect();
+    let differing = others.iter().find(|(_, other)| *other != size);
+    match differing {
+        _ if others.is_empty() => format!("{} × {}", size[0], size[1]),
+        None => format!("{} × {} · same as the others", size[0], size[1]),
+        Some((name, other)) => format!(
+            "{} × {} · differs from {name} ({} × {}); every bust of one model is one size",
+            size[0], size[1], other[0], other[1]
+        ),
     }
 }
 
@@ -699,36 +658,21 @@ fn sound_picker(
     sound: &mut String,
     path: &str,
 ) -> bool {
-    let Some(root) = editor.row_value(super::TABLE, key) else {
-        return false;
-    };
-    let mut actions = Vec::new();
-    let changed = {
-        let Editor {
-            project,
-            form,
-            shapes,
-            ..
-        } = editor;
-        let Some(project) = project.as_ref() else {
-            return false;
-        };
-        let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
-        cx.owner_table = Some(super::TABLE.to_owned());
-        cx.owner_key = Some(key.to_owned());
-        crate::picker::row(ui, &mut cx, "sfx", sound, path)
-    };
-    for action in actions {
-        if let FormAction::OpenRow {
-            table,
-            key: row_key,
-        } = action
-        {
-            editor.select(Selection::row(&table, &row_key));
-            editor.open_tab(crate::tabs::Tab::for_row(&table, &row_key));
-        }
-    }
-    changed
+    inspector::with_row_form(editor, super::TABLE, key, |cx| {
+        picker::row(ui, cx, "sfx", sound, path)
+    })
+}
+
+fn asset_picker(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    key: &str,
+    file: &mut String,
+    path: &str,
+) -> bool {
+    inspector::with_row_form(editor, super::TABLE, key, |cx| {
+        picker::asset(ui, cx, file, path)
+    })
 }
 
 fn face_card(
@@ -736,8 +680,8 @@ fn face_card(
     ui: &mut Ui,
     key: &str,
     row: &Value,
-    face: &super::busts::Face,
-    faces: &[super::busts::Face],
+    face: &super::busts::BustFace,
+    faces: &[super::busts::BustFace],
 ) {
     ui.label(
         theme::mono(format!("model/{key} › bust › {}", face.name))
@@ -749,11 +693,7 @@ fn face_card(
     let sizes: Vec<(String, Option<[usize; 2]>)> = faces
         .iter()
         .map(|other| {
-            let Editor { project, form, .. } = editor;
-            let size = project
-                .as_ref()
-                .and_then(|project| form.thumbnails.image(&ctx, &project.files, &other.file))
-                .map(|thumb| thumb.size);
+            let size = editor.thumb(&ctx, &other.file).map(|thumb| thumb.size);
             (other.name.clone(), size)
         })
         .collect();
@@ -768,7 +708,8 @@ fn face_card(
     let uses_of_face = lines.iter().filter(|line| line.face == face.name).count();
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "bust", &face.name, if face.own.is_some() { "" } else { "generic" }, |ui| {
+        let kind = if face.own.is_some() { "" } else { "generic" };
+        widgets::card_header(ui, "bust", &face.name, kind, |ui| {
             if face.own.is_some() && ui.button("Remove this face…").clicked() {
                 remove_with = Some(String::new());
                 ui.close();
@@ -778,20 +719,21 @@ fn face_card(
         widgets::kv(ui, "name", |ui| {
             if face.own.is_some() {
                 let id = ui.id().with(("face-name", &face.pointer));
-                let mut draft = ui.memory(|m| m.data.get_temp::<String>(id)).unwrap_or_else(|| face.name.clone());
-                let response = crate::forms::boxed_input(ui, None, |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut draft).desired_width(140.0).font(egui::TextStyle::Monospace))
+                let typed = forms::drafted(ui, id, &face.name, |ui, draft| {
+                    forms::boxed_input(ui, None, |ui| {
+                        ui.add(
+                            egui::TextEdit::singleline(draft)
+                                .desired_width(140.0)
+                                .font(egui::TextStyle::Monospace),
+                        )
+                    })
                 });
-                if crate::forms::committed(ui, &response) {
-                    let wanted = draft.trim().to_owned();
-                    if !wanted.is_empty() && wanted != face.name {
-                        rename_to = Some(wanted);
-                    }
-                    ui.memory_mut(|m| m.data.remove::<String>(id));
-                } else if response.has_focus() {
-                    ui.memory_mut(|m| m.data.insert_temp(id, draft));
-                } else {
-                    ui.memory_mut(|m| m.data.remove::<String>(id));
+                let wanted = typed.map(|typed| typed.trim().to_owned());
+                if let Some(wanted) = wanted
+                    && !wanted.is_empty()
+                    && wanted != face.name
+                {
+                    rename_to = Some(wanted);
                 }
             } else {
                 ui.label(theme::mono(&face.name));
@@ -800,33 +742,12 @@ fn face_card(
         });
         widgets::kv(ui, "file", |ui| {
             let mut file = face.file.clone();
-            if asset_picker(editor, ui, key, &mut file, &format!("{}/file", face.pointer)) && file != face.file {
+            let path = format!("{}/file", face.pointer);
+            if asset_picker(editor, ui, key, &mut file, &path) && file != face.file {
                 new_file = Some(file);
             }
         });
-        widgets::kv_text(
-            ui,
-            "size",
-            match own_size {
-                Some(size) => {
-                    let others: Vec<&(String, Option<[usize; 2]>)> = sizes
-                        .iter()
-                        .filter(|(name, other)| *name != face.name && other.is_some())
-                        .collect();
-                    let same = others.iter().all(|(_, other)| *other == Some(size));
-                    if others.is_empty() {
-                        format!("{} × {}", size[0], size[1])
-                    } else if same {
-                        format!("{} × {} · same as the others", size[0], size[1])
-                    } else {
-                        let (name, other) = others.iter().find(|(_, other)| *other != Some(size)).expect("one differs");
-                        let other = other.expect("a size");
-                        format!("{} × {} · differs from {name} ({} × {}); every bust of one model is one size", size[0], size[1], other[0], other[1])
-                    }
-                }
-                None => "missing file".to_owned(),
-            },
-        );
+        widgets::kv_text(ui, "size", size_text(&face.name, own_size, &sizes));
     });
     let own_lines: Vec<&super::busts::FaceLine> = lines
         .iter()
@@ -849,7 +770,7 @@ fn face_card(
     let mut open = None;
     for line in own_lines.iter().take(shown) {
         ui.horizontal(|ui| {
-            let (table, row_key) = crate::project::row_of(&line.file).unwrap_or(("", ""));
+            let (table, row_key) = row_of(&line.file).unwrap_or(("", ""));
             widgets::badge(ui, table);
             if ui
                 .link(theme::mono(format!("{table}/{row_key}")).size(12.5))
@@ -871,18 +792,13 @@ fn face_card(
         widgets::hint(ui, "no line asks for an own face yet");
     }
     if let Some((table, row_key)) = open {
-        editor.select(Selection::row(&table, &row_key));
-        editor.open_tab(crate::tabs::Tab::for_row(&table, &row_key));
+        editor.select(RowSelection::row(&table, &row_key));
+        editor.open_tab(EditorTab::for_row(&table, &row_key));
     }
     if let Some(wanted) = rename_to
         && super::busts::rename(editor, key, face, &wanted)
     {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.face = Some(wanted);
     }
     if let Some(file) = new_file {
@@ -899,30 +815,23 @@ fn face_card(
             editor,
             key,
             &changed,
-            format!("File {file} for face {} of {key}", face.name),
-            false,
+            ContentEdit::new(format!("File {file} for face {} of {key}", face.name)),
         );
     }
     if remove_with.is_some() {
-        remove_dialog(editor, ui, key, face, faces, uses_of_face);
+        remove_dialog(editor, key, face, faces, uses_of_face);
     }
 }
 
 fn remove_dialog(
     editor: &mut Editor,
-    ui: &mut Ui,
     key: &str,
-    face: &super::busts::Face,
-    faces: &[super::busts::Face],
+    face: &super::busts::BustFace,
+    faces: &[super::busts::BustFace],
     uses: usize,
 ) {
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    view.removing = Some(super::RemoveFace {
+    let view = editor.views.model.view_mut(key);
+    view.removing = Some(super::FaceRemoval {
         face: face.clone(),
         replacement: faces
             .iter()
@@ -931,7 +840,6 @@ fn remove_dialog(
             .unwrap_or_default(),
         uses,
     });
-    let _ = ui;
 }
 
 pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
@@ -950,7 +858,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         .unwrap_or_default();
     let mut decision = None;
     let mut replacement = removing.replacement.clone();
-    crate::ui::dialogs::card(ctx, "remove-face", 400.0, |ui| {
+    dialogs::card(ctx, "remove-face", 400.0, |ui| {
         ui.label(
             RichText::new(format!("Remove face {}", removing.face.name))
                 .size(16.0)
@@ -986,12 +894,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
         }
     });
     {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         if let Some(removing) = view.removing.as_mut() {
             removing.replacement = replacement.clone();
         }
@@ -999,93 +902,52 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     let Some(apply) = decision else {
         return;
     };
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
+    let view = editor.views.model.view_mut(key);
     view.removing = None;
     if apply && super::busts::remove(editor, key, &removing.face, &replacement) {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.face = None;
-        editor.select(Selection::row(super::TABLE, key));
+        editor.select(RowSelection::row(super::TABLE, key));
     }
 }
 
-fn asset_picker(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    key: &str,
-    file: &mut String,
-    path: &str,
-) -> bool {
-    let Some(root) = editor.row_value(super::TABLE, key) else {
-        return false;
-    };
-    let mut actions = Vec::new();
-    let Editor {
-        project,
-        form,
-        shapes,
-        ..
-    } = editor;
-    let Some(project) = project.as_ref() else {
-        return false;
-    };
-    let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
-    cx.owner_table = Some(super::TABLE.to_owned());
-    cx.owner_key = Some(key.to_owned());
-    crate::picker::asset(ui, &mut cx, file, path)
-}
-
-pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> crate::forms::Changed {
-    let mut changed = crate::forms::Changed::default();
+pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     let width = value["hitbox"]["width"].as_f64().unwrap_or(1.0);
     let height = value["hitbox"]["height"].as_f64().unwrap_or(1.0);
     widgets::kv(ui, "hitbox", |ui| {
         let id = ui.id().with("hitbox-draft");
         let shown = format!(
             "{} × {}",
-            crate::forms::trim_number(width),
-            crate::forms::trim_number(height)
+            forms::trim_number(width),
+            forms::trim_number(height)
         );
-        let mut draft = ui
-            .memory(|m| m.data.get_temp::<String>(id))
-            .unwrap_or_else(|| shown.clone());
-        let response = crate::forms::boxed_input(ui, Some("tiles"), |ui| {
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                ui.add(
-                    egui::TextEdit::singleline(&mut draft)
-                        .desired_width(110.0)
-                        .font(egui::TextStyle::Monospace),
-                )
+        let typed = forms::drafted(ui, id, &shown, |ui, draft| {
+            forms::boxed_input(ui, Some("tiles"), |ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(draft)
+                            .desired_width(110.0)
+                            .font(egui::TextStyle::Monospace),
+                    )
+                })
+                .inner
             })
-            .inner
         });
-        if crate::forms::committed(ui, &response) {
-            let parsed: Vec<f64> = draft
-                .split(['×', 'x', 'X', ','])
-                .filter_map(|part| part.trim().parse::<f64>().ok())
-                .collect();
-            if parsed.len() == 2
-                && parsed.iter().all(|v| (0.1..=8.0).contains(v))
-                && (parsed[0] != width || parsed[1] != height)
-            {
-                value["hitbox"]["width"] = serde_json::json!(parsed[0]);
-                value["hitbox"]["height"] = serde_json::json!(parsed[1]);
-                changed = crate::forms::Changed::at("/hitbox");
-            }
-            ui.memory_mut(|m| m.data.remove::<String>(id));
-        } else if response.has_focus() {
-            ui.memory_mut(|m| m.data.insert_temp(id, draft));
-        } else {
-            ui.memory_mut(|m| m.data.remove::<String>(id));
+        let Some(typed) = typed else {
+            return;
+        };
+        let parsed: Vec<f64> = typed
+            .split(['×', 'x', 'X', ','])
+            .filter_map(|part| part.trim().parse::<f64>().ok())
+            .collect();
+        if parsed.len() == 2
+            && parsed.iter().all(|v| (0.1..=8.0).contains(v))
+            && (parsed[0] != width || parsed[1] != height)
+        {
+            value["hitbox"]["width"] = serde_json::json!(parsed[0]);
+            value["hitbox"]["height"] = serde_json::json!(parsed[1]);
+            changed = FormChange::at("/hitbox");
         }
     });
     widgets::kv(ui, "image", |ui| {
@@ -1093,9 +955,9 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> crat
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if crate::picker::asset(ui, cx, &mut file, "/sprites/image") {
+        if picker::asset(ui, cx, &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
-            changed = crate::forms::Changed::at("/sprites/image");
+            changed = FormChange::at("/sprites/image");
         }
     });
     widgets::kv_text(
@@ -1111,22 +973,17 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> crat
                 .unwrap_or(0)
         ),
     );
-    let strips: usize = ACTIONS
-        .iter()
-        .map(|action| {
-            value["sprites"]["actions"][action]
-                .as_object()
-                .map_or(0, |d| d.len())
-        })
-        .sum();
-    let frames: usize = ACTIONS
-        .iter()
-        .flat_map(|action| DIRECTIONS.iter().map(move |dir| (action, dir)))
-        .map(|(action, dir)| {
-            value["sprites"]["actions"][action][dir]
-                .as_array()
-                .map_or(0, Vec::len)
-        })
+    let strips: usize = value["sprites"]["actions"]
+        .as_object()
+        .map_or(0, |actions| {
+            actions
+                .values()
+                .filter_map(Value::as_object)
+                .map(|d| d.len())
+                .sum()
+        });
+    let frames: usize = ModelStrip::all()
+        .map(|strip| strip_of(value, strip).len())
         .sum();
     widgets::kv_text(ui, "strips", format!("{strips} · {frames} frames"));
     changed

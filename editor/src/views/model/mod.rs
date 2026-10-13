@@ -9,34 +9,37 @@ pub mod sounds;
 pub mod strip;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
 use serde_json::Value;
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{Edit, Selection, row_file};
-use crate::thumbs::Thumb;
-use crate::ui::theme;
+use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::thumbs::Thumbnail;
+use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use crate::{import, thumbs, value};
+use game::systems::actor::model::{ActionName, DirectionName};
+use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub const TABLE: &str = "model";
-pub const ACTIONS: [&str; 5] = ["idle", "walk", "run", "attack", "death"];
-pub const DIRECTIONS: [&str; 8] = ["s", "sw", "nw", "n", "ne", "se", "e", "w"];
 pub const MAX_FRAMES: usize = 256;
 pub const MAX_FRAME_MS: u32 = 60_000;
 
 #[derive(Default)]
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
-    pub bank: sounds::SoundBank,
-    pub play: Vec<sounds::PlayRequest>,
-    pub drops: Vec<std::path::PathBuf>,
-    pub reimports: HashMap<String, crate::import::ModelReimport>,
+    pub bank: sounds::WaveformCache,
+    pub sfx_to_play: Vec<String>,
+    pub drops: Vec<PathBuf>,
+    pub reimports: HashMap<String, import::ModelReimport>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub enum Page {
+pub enum ModelPage {
     #[default]
     Matrix,
     Timing,
@@ -45,121 +48,153 @@ pub enum Page {
     Busts,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CueKind {
+#[derive(Clone, Copy, PartialEq, Eq, Debug, EnumString, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "lowercase")]
+pub enum FrameCueKind {
     Apex,
     Sound,
     Step,
 }
 
-impl CueKind {
+impl FrameCueKind {
     pub fn key(self) -> &'static str {
-        match self {
-            CueKind::Apex => "apex",
-            CueKind::Sound => "sound",
-            CueKind::Step => "step",
-        }
+        self.into()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct ModelStrip {
+    pub action: ActionName,
+    pub direction: DirectionName,
+}
+
+impl ModelStrip {
+    pub fn parse(action: &str, direction: &str) -> Option<ModelStrip> {
+        Some(ModelStrip {
+            action: action.parse().ok()?,
+            direction: direction.parse().ok()?,
+        })
     }
 
-    pub fn of(key: &str) -> Option<CueKind> {
-        match key {
-            "apex" => Some(CueKind::Apex),
-            "sound" => Some(CueKind::Sound),
-            "step" => Some(CueKind::Step),
-            _ => None,
-        }
+    pub fn all() -> impl Iterator<Item = ModelStrip> {
+        ActionName::VARIANTS.iter().flat_map(|&action| {
+            DirectionName::VARIANTS
+                .iter()
+                .map(move |&direction| ModelStrip { action, direction })
+        })
+    }
+
+    pub fn name(self) -> String {
+        format!("{} · {}", self.action.key(), self.direction.key())
+    }
+
+    pub fn pointer(self) -> String {
+        format!(
+            "/sprites/actions/{}/{}",
+            self.action.key(),
+            self.direction.key()
+        )
+    }
+
+    pub fn record_key(self) -> String {
+        format!("{}_{}", self.action.key(), self.direction.key())
     }
 }
 
 #[derive(Default)]
 pub struct ModelView {
-    pub page: Page,
-    pub action: usize,
-    pub direction: usize,
+    pub page: ModelPage,
+    pub strip: ModelStrip,
     pub frames: Vec<usize>,
-    pub cue: Option<(usize, CueKind)>,
-    pub preview: preview::Preview,
+    pub cue: Option<(usize, FrameCueKind)>,
+    pub preview: preview::StripPreview,
     pub timing: strip::TimingDraft,
-    pub edge_drag: Option<strip::EdgeDrag>,
+    pub edge_drag: Option<strip::FrameEdgeDrag>,
     pub last_nudge: Option<Instant>,
     pub surface: Option<String>,
     pub sheet_pick: Option<u32>,
     pub face: Option<String>,
-    pub hitbox_drag: Option<hitbox::Handle>,
+    pub hitbox_drag: Option<hitbox::HitboxHandle>,
     pub sound_search: String,
-    pub sound_filter: sounds::Filter,
+    pub sound_filter: sounds::SoundFilter,
     pub last_sound: Option<String>,
-    pub confirm: Option<strip::Confirm>,
-    pub removing: Option<RemoveFace>,
+    pub confirm: Option<strip::StripConfirm>,
+    pub removing: Option<FaceRemoval>,
+}
+
+impl ModelViews {
+    pub fn view(&self, key: &str) -> &ModelView {
+        self.views
+            .get(key)
+            .expect("ensure_view ran before the model view was read")
+    }
+
+    pub fn view_mut(&mut self, key: &str) -> &mut ModelView {
+        self.views.entry(key.to_owned()).or_default()
+    }
 }
 
 #[derive(Clone)]
-pub struct RemoveFace {
-    pub face: busts::Face,
+pub struct FaceRemoval {
+    pub face: busts::BustFace,
     pub replacement: String,
     pub uses: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrameData {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct StripFrame {
     pub frame: u32,
     pub ms: u32,
-    pub apex: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub step: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub apex: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sound: Option<String>,
 }
 
-impl FrameData {
-    pub fn to_value(&self) -> Value {
-        let mut value = serde_json::json!({ "frame": self.frame, "ms": self.ms });
-        if self.apex {
-            value["apex"] = Value::Bool(true);
-        }
-        if self.step {
-            value["step"] = Value::Bool(true);
-        }
-        if let Some(sound) = &self.sound {
-            value["sound"] = Value::String(sound.clone());
-        }
-        value
-    }
-
-    pub fn of(value: &Value) -> FrameData {
-        FrameData {
-            frame: value["frame"].as_u64().unwrap_or(0) as u32,
-            ms: value["ms"].as_u64().unwrap_or(100) as u32,
-            apex: value["apex"].as_bool().unwrap_or(false),
-            step: value["step"].as_bool().unwrap_or(false),
-            sound: value["sound"].as_str().map(str::to_owned),
+impl Default for StripFrame {
+    fn default() -> StripFrame {
+        StripFrame {
+            frame: 0,
+            ms: 100,
+            step: false,
+            apex: false,
+            sound: None,
         }
     }
+}
 
-    pub fn cues(&self) -> Vec<CueKind> {
-        let mut cues = Vec::new();
-        if self.apex {
-            cues.push(CueKind::Apex);
+impl StripFrame {
+    pub fn cues(&self) -> Vec<FrameCueKind> {
+        FrameCueKind::VARIANTS
+            .iter()
+            .copied()
+            .filter(|kind| self.has(*kind))
+            .collect()
+    }
+
+    pub fn has(&self, kind: FrameCueKind) -> bool {
+        match kind {
+            FrameCueKind::Apex => self.apex,
+            FrameCueKind::Sound => self.sound.is_some(),
+            FrameCueKind::Step => self.step,
         }
-        if self.sound.is_some() {
-            cues.push(CueKind::Sound);
-        }
-        if self.step {
-            cues.push(CueKind::Step);
-        }
-        cues
     }
 }
 
 #[derive(Clone)]
-pub struct SheetInfo {
+pub struct ModelSheet {
     pub image: String,
     pub frame_width: u32,
     pub frame_height: u32,
     pub columns: u32,
     pub rows: u32,
-    pub thumb: Option<Thumb>,
+    pub thumb: Option<Thumbnail>,
 }
 
-impl SheetInfo {
+impl ModelSheet {
     pub fn frames(&self) -> u32 {
         self.columns * self.rows
     }
@@ -169,7 +204,7 @@ impl SheetInfo {
             return ERect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
         };
         let columns = self.columns.max(1);
-        crate::thumbs::uv(
+        thumbs::uv(
             thumb.size,
             (frame % columns * self.frame_width) as f32,
             (frame / columns * self.frame_height) as f32,
@@ -203,69 +238,54 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     ensure_view(editor, key);
     let ctx = ui.ctx().clone();
     inspect::remove_face_dialog(editor, &ctx, key);
-    let page = editor.views.model.views[key].page;
+    let page = editor.views.model.view(key).page;
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {
             ui.set_min_size(ui.available_size());
             if editor.views.model.reimports.contains_key(key) {
-                crate::import::show_model_reimport(editor, ui, key);
+                import::show_model_reimport(editor, ui, key);
                 return;
             }
             page_bar(editor, ui, key, page);
             ui.add_space(4.0);
             match page {
-                Page::Matrix => matrix::show(editor, ui, key, &row),
-                Page::Timing => strip::show(editor, ui, key, &row),
-                Page::Cues => cues::show(editor, ui, key, &row),
-                Page::Hitbox => hitbox::show(editor, ui, key, &row),
-                Page::Busts => busts::show(editor, ui, key, &row),
+                ModelPage::Matrix => matrix::show(editor, ui, key, &row),
+                ModelPage::Timing => strip::show(editor, ui, key, &row),
+                ModelPage::Cues => cues::show(editor, ui, key, &row),
+                ModelPage::Hitbox => hitbox::show(editor, ui, key, &row),
+                ModelPage::Busts => busts::show(editor, ui, key, &row),
             }
         });
 }
 
-fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: Page) {
-    let view = editor
-        .views
-        .model
-        .views
-        .get_mut(key)
-        .expect("the view exists");
-    let in_strip = matches!(page, Page::Timing | Page::Cues);
+fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
+    let view = editor.views.model.view_mut(key);
+    let in_strip = matches!(page, ModelPage::Timing | ModelPage::Cues);
     ui.horizontal(|ui| {
         ui.label(theme::mono(format!("model/{key}")).color(theme::CODE));
         ui.add_space(8.0);
         for (target, label) in [
-            (Page::Matrix, "strips"),
-            (Page::Hitbox, "hitbox"),
-            (Page::Busts, "busts"),
+            (ModelPage::Matrix, "strips"),
+            (ModelPage::Hitbox, "hitbox"),
+            (ModelPage::Busts, "busts"),
         ] {
-            let on = page == target || (target == Page::Matrix && in_strip);
-            let (fill, ink) = if on {
-                (theme::ACCENT, Color32::WHITE)
-            } else {
-                (theme::RAISED, theme::TEXT)
-            };
-            if crate::ui::widgets::chip_coloured(ui, label, fill, ink).clicked() {
+            let on = page == target || (target == ModelPage::Matrix && in_strip);
+            if widgets::mode_chip(ui, label, on).clicked() {
                 view.page = target;
             }
         }
         if in_strip {
             ui.add_space(8.0);
             ui.label(theme::faint("›"));
-            for (target, label) in [(Page::Timing, "timing"), (Page::Cues, "cues")] {
+            for (target, label) in [(ModelPage::Timing, "timing"), (ModelPage::Cues, "cues")] {
                 let on = page == target;
-                let (fill, ink) = if on {
-                    (theme::ACCENT_SOFT, theme::TEXT)
-                } else {
-                    (theme::RAISED, theme::MUTED)
-                };
-                if crate::ui::widgets::chip_coloured(ui, label, fill, ink).clicked() {
+                if widgets::toggle_chip(ui, label, on).clicked() {
                     view.page = target;
                 }
             }
-            if crate::ui::widgets::keyed_button(ui, "‹ all strips", "Esc", true).clicked() {
-                view.page = Page::Matrix;
+            if widgets::keyed_button(ui, "‹ all strips", "Esc", true).clicked() {
+                view.page = ModelPage::Matrix;
             }
         }
     });
@@ -275,11 +295,7 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
     if editor.views.model.views.contains_key(key) {
         return;
     }
-    editor
-        .views
-        .model
-        .views
-        .insert(key.to_owned(), ModelView::default());
+    editor.views.model.view_mut(key);
     if let Some(row) = editor.row_value(TABLE, key)
         && let Some(index) = busts::module_index(&row)
     {
@@ -290,19 +306,17 @@ pub fn ensure_view(editor: &mut Editor, key: &str) {
     }
 }
 
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
+pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     if selection
         .parts
         .first()
-        .is_some_and(|part| part == "/import")
+        .is_some_and(|part| part == import::IMPORT_PART)
         && let Some(key) = selection.keys.first()
     {
         let key = key.clone();
         egui::ScrollArea::vertical()
             .id_salt(("model-import", &key))
-            .show(ui, |ui| {
-                crate::import::inspect_model_reimport(editor, ui, &key)
-            });
+            .show(ui, |ui| import::inspect_model_reimport(editor, ui, &key));
         return;
     }
     inspect::show(editor, ui, selection);
@@ -310,9 +324,9 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
 
 pub fn bottom_tabs(editor: &Editor, key: &str) -> Vec<BottomTab> {
     match editor.views.model.views.get(key).map(|view| view.page) {
-        Some(Page::Timing) => vec![BottomTab::Sheet],
-        Some(Page::Cues) => vec![BottomTab::Sounds, BottomTab::Sheet],
-        Some(Page::Busts) => Vec::new(),
+        Some(ModelPage::Timing) => vec![BottomTab::Sheet],
+        Some(ModelPage::Cues) => vec![BottomTab::Sounds, BottomTab::Sheet],
+        Some(ModelPage::Busts) => Vec::new(),
         _ => vec![BottomTab::Timeline],
     }
 }
@@ -325,39 +339,72 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
     match tab {
         BottomTab::Timeline => matrix::timeline(editor, ui, key, &row),
         BottomTab::Sheet => sheet::show(editor, ui, key, &row),
-        BottomTab::Sounds => sounds::bottom(editor, ui, key, &row),
+        BottomTab::Sounds => sounds::bottom(editor, ui, key),
         _ => {}
     }
 }
 
-pub fn strip_of(row: &Value, action: &str, direction: &str) -> Vec<FrameData> {
-    row["sprites"]["actions"][action][direction]
+pub fn strip_of(row: &Value, strip: ModelStrip) -> Vec<StripFrame> {
+    row["sprites"]["actions"][strip.action.key()][strip.direction.key()]
         .as_array()
-        .map(|frames| frames.iter().map(FrameData::of).collect())
+        .map(|frames| {
+            frames
+                .iter()
+                .map(|frame| serde_json::from_value(frame.clone()).unwrap_or_default())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
-pub fn total_ms(frames: &[FrameData]) -> u32 {
+pub fn frames_json(frames: &[StripFrame]) -> Value {
+    Value::Array(
+        frames
+            .iter()
+            .filter_map(|frame| value::json(frame).ok())
+            .collect(),
+    )
+}
+
+pub fn shifted<T: Copy + PartialEq>(all: &[T], current: T, by: isize) -> T {
+    let at = all.iter().position(|item| *item == current).unwrap_or(0) as isize;
+    all[(at + by).clamp(0, all.len() as isize - 1) as usize]
+}
+
+pub fn total_ms(frames: &[StripFrame]) -> u32 {
     frames.iter().map(|frame| frame.ms).sum()
 }
 
-pub fn starts_at(frames: &[FrameData], index: usize) -> u32 {
+pub fn starts_at(frames: &[StripFrame], index: usize) -> u32 {
     frames.iter().take(index).map(|frame| frame.ms).sum()
 }
 
-pub fn lengths(frames: &[FrameData]) -> Vec<u32> {
+pub fn lengths(frames: &[StripFrame]) -> Vec<u32> {
     frames.iter().map(|frame| frame.ms).collect()
 }
 
 pub struct ActionTiming {
     pub common: Vec<u32>,
-    pub differing: Vec<usize>,
+    pub differing: Vec<DirectionName>,
 }
 
-pub fn action_timing(row: &Value, action: &str) -> ActionTiming {
-    let strips: Vec<Vec<u32>> = DIRECTIONS
+impl ActionTiming {
+    pub fn out_of_step(&self, direction: DirectionName) -> bool {
+        self.differing.contains(&direction) && self.differing.len() < DirectionName::VARIANTS.len()
+    }
+
+    pub fn stragglers(&self) -> usize {
+        if self.differing.len() < DirectionName::VARIANTS.len() {
+            self.differing.len()
+        } else {
+            0
+        }
+    }
+}
+
+pub fn action_timing(row: &Value, action: ActionName) -> ActionTiming {
+    let strips: Vec<Vec<u32>> = DirectionName::VARIANTS
         .iter()
-        .map(|direction| lengths(&strip_of(row, action, direction)))
+        .map(|&direction| lengths(&strip_of(row, ModelStrip { action, direction })))
         .collect();
     let mut tally: Vec<(Vec<u32>, usize)> = Vec::new();
     for strip in &strips {
@@ -371,32 +418,32 @@ pub fn action_timing(row: &Value, action: &str) -> ActionTiming {
         .max_by_key(|(_, count)| *count)
         .map(|(strip, _)| strip.clone())
         .unwrap_or_default();
-    let differing = strips
+    let differing = DirectionName::VARIANTS
         .iter()
-        .enumerate()
+        .zip(&strips)
         .filter(|(_, strip)| **strip != common)
-        .map(|(index, _)| index)
+        .map(|(direction, _)| *direction)
         .collect();
     ActionTiming { common, differing }
 }
 
-pub fn play_rule(action: &str) -> &'static str {
+pub fn play_rule(action: ActionName) -> &'static str {
     match action {
-        "attack" => "once per swing",
-        "death" => "once, then holds",
+        ActionName::Attack => "once per swing",
+        ActionName::Death => "once, then holds",
         _ => "loops",
     }
 }
 
-pub fn play_rule_long(action: &str) -> &'static str {
+pub fn play_rule_long(action: ActionName) -> &'static str {
     match action {
-        "attack" => "once per swing · at attack speed · the hit lands at the apex",
-        "death" => "once, then holds · cues fire once",
+        ActionName::Attack => "once per swing · at attack speed · the hit lands at the apex",
+        ActionName::Death => "once, then holds · cues fire once",
         _ => "loops",
     }
 }
 
-pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> SheetInfo {
+pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> ModelSheet {
     let image = row["sprites"].text("image").to_owned();
     let frame_width = row["sprites"]["frame_size"]["width"]
         .as_u64()
@@ -406,10 +453,7 @@ pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> Shee
         .as_u64()
         .unwrap_or(1)
         .max(1) as u32;
-    let Editor { project, form, .. } = editor;
-    let thumb = project
-        .as_ref()
-        .and_then(|project| form.thumbnails.image(ctx, &project.files, &image));
+    let thumb = editor.thumb(ctx, &image);
     let (columns, rows) = thumb
         .as_ref()
         .map(|thumb| {
@@ -419,7 +463,7 @@ pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> Shee
             )
         })
         .unwrap_or((1, 1));
-    SheetInfo {
+    ModelSheet {
         image,
         frame_width,
         frame_height,
@@ -432,47 +476,27 @@ pub fn sheet_info(editor: &mut Editor, ctx: &egui::Context, row: &Value) -> Shee
 pub fn write_strip(
     editor: &mut Editor,
     key: &str,
-    action: &str,
-    direction: &str,
-    frames: &[FrameData],
-    label: impl Into<String>,
-    merge: bool,
+    strip: ModelStrip,
+    frames: &[StripFrame],
+    edit: ContentEdit,
 ) -> bool {
     let Some(mut row) = editor.row_value(TABLE, key) else {
         return false;
     };
-    row["sprites"]["actions"][action][direction] =
-        Value::Array(frames.iter().map(FrameData::to_value).collect());
-    write_row(editor, key, &row, label, merge)
+    row["sprites"]["actions"][strip.action.key()][strip.direction.key()] = frames_json(frames);
+    write_row(editor, key, &row, edit)
 }
 
-pub fn write_row(
-    editor: &mut Editor,
-    key: &str,
-    row: &Value,
-    label: impl Into<String>,
-    merge: bool,
-) -> bool {
-    let mut edit = Edit::new(label);
-    if merge {
-        edit = edit.merging();
-    }
+pub fn write_row(editor: &mut Editor, key: &str, row: &Value, mut edit: ContentEdit) -> bool {
     edit.write_json(row_file(TABLE, key), row);
     editor.apply(edit)
 }
 
-pub fn select_strip(editor: &mut Editor, key: &str, action: usize, direction: usize) {
-    editor.select(Selection {
-        table: TABLE.to_owned(),
-        keys: vec![key.to_owned()],
-        parts: vec![format!(
-            "/sprites/actions/{}/{}",
-            ACTIONS[action], DIRECTIONS[direction]
-        )],
-    });
+pub fn select_strip(editor: &mut Editor, key: &str, strip: ModelStrip) {
+    editor.select(RowSelection::parts(TABLE, key, vec![strip.pointer()]));
 }
 
-pub fn select_frames(editor: &mut Editor, key: &str, action: usize, direction: usize) {
+pub fn select_frames(editor: &mut Editor, key: &str, strip: ModelStrip) {
     let frames = editor
         .views
         .model
@@ -481,42 +505,32 @@ pub fn select_frames(editor: &mut Editor, key: &str, action: usize, direction: u
         .map(|view| view.frames.clone())
         .unwrap_or_default();
     if frames.is_empty() {
-        select_strip(editor, key, action, direction);
+        select_strip(editor, key, strip);
         return;
     }
-    editor.select(Selection {
-        table: TABLE.to_owned(),
-        keys: vec![key.to_owned()],
-        parts: frames
+    let pointer = strip.pointer();
+    editor.select(RowSelection::parts(
+        TABLE,
+        key,
+        frames
             .iter()
-            .map(|index| {
-                format!(
-                    "/sprites/actions/{}/{}/{index}",
-                    ACTIONS[action], DIRECTIONS[direction]
-                )
-            })
+            .map(|index| format!("{pointer}/{index}"))
             .collect(),
-    });
+    ));
 }
 
 pub fn select_cue(
     editor: &mut Editor,
     key: &str,
-    action: usize,
-    direction: usize,
+    strip: ModelStrip,
     frame: usize,
-    cue: CueKind,
+    cue: FrameCueKind,
 ) {
-    editor.select(Selection {
-        table: TABLE.to_owned(),
-        keys: vec![key.to_owned()],
-        parts: vec![format!(
-            "/sprites/actions/{}/{}/{frame}/{}",
-            ACTIONS[action],
-            DIRECTIONS[direction],
-            cue.key()
-        )],
-    });
+    editor.select(RowSelection::parts(
+        TABLE,
+        key,
+        vec![format!("{}/{frame}/{}", strip.pointer(), cue.key())],
+    ));
 }
 
 pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
@@ -527,7 +541,7 @@ pub fn users(editor: &Editor, key: &str) -> Vec<(String, String)> {
         .usages
         .of_row(TABLE, key)
         .iter()
-        .filter_map(|usage| crate::project::row_of(&usage.file))
+        .filter_map(|usage| row_of(&usage.file))
         .filter(|(table, _)| matches!(*table, "npc" | "player"))
         .map(|(table, key)| (table.to_owned(), key.to_owned()))
         .collect()

@@ -10,10 +10,9 @@ use crate::core::content::{Content, Fixture};
 use crate::systems::hud;
 use crate::systems::input::map::{InputAction, input};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::Id as ItemId;
-use crate::systems::item::{ItemDef, ItemFlag, ItemKind};
+use crate::systems::item::{Id as ItemId, ItemDef, ItemFlag, ItemKind};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::scene::{Scene as GameScene, despawn_all};
 use crate::systems::script::condition;
 use crate::systems::stat::Stat;
 
@@ -31,7 +30,7 @@ impl Plugin for ItemCardPlugin {
             .add_systems(Update, show_card.run_if(in_state(GameScene::Area)))
             .add_systems(
                 OnExit(GameScene::Area),
-                (crate::systems::scene::despawn_all::<ItemCardWindow>, forget),
+                (despawn_all::<ItemCardWindow>, forget),
             );
     }
 }

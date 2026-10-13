@@ -1,18 +1,32 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
+use game::core::audio::soundscape::EDGE_FALLOFF;
 use game::core::math::{Pos, Rect};
-use game::core::tiling::{Cell, CellPos, TileRect, TileSize};
+use game::core::tiling::{Cell, CellPos, TileRect, TileSize, Tiles};
 use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
+use super::population::NpcSprite;
 use super::{
-    Frame, TILE_PX, Tool, modules, population, scenery, selected_parts, shapes, size_cells,
+    AreaCanvas, AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes,
 };
 use crate::app::Editor;
+use crate::forms;
+use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
+use game::core::tiling;
 
-pub(super) fn overlay_grid(painter: &egui::Painter, frame: &Frame, area: &area::Area, lines: bool) {
+const LABEL_GAP: f32 = 2.0;
+const LABEL_SHIFTS: u32 = 3;
+
+pub(super) fn overlay_grid(
+    painter: &egui::Painter,
+    frame: &AreaFrame,
+    area: &area::Area,
+    lines: bool,
+) {
     let canvas = frame.canvas;
     let bounds = Rect::new(Pos::new(-0.5, -0.5), area.size);
     painter.rect_stroke(
@@ -52,12 +66,12 @@ pub(super) fn overlay_grid(painter: &egui::Painter, frame: &Frame, area: &area::
     }
 }
 
-pub(super) fn overlay_walk(painter: &egui::Painter, frame: &Frame, area: &area::Area) {
+pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &area::Area) {
     let canvas = frame.canvas;
     let visible = canvas.visible();
     let size = area.size.grid();
     let grids = area.grids;
-    for cell in size_cells(size) {
+    for cell in tiling::cells(size) {
         let bounds = cell.bounds();
         if !visible.intersects(&bounds) {
             continue;
@@ -67,10 +81,10 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &Frame, area: &area::
         };
         let rect = canvas.rect(bounds);
         if !area.grid.walkable(cell.center()) {
-            hatch(
+            patterns::hatch(
                 painter,
                 rect,
-                Color32::from_rgba_unmultiplied(220, 60, 60, 110),
+                theme::alpha(theme::BLOCKED, 110),
                 canvas.scale(),
             );
         } else if !area.wild_grid.walkable(cell.center()) {
@@ -87,54 +101,6 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &Frame, area: &area::
             painter.rect_filled(mark, 0.0, color);
         }
     }
-}
-
-pub fn hatch(painter: &egui::Painter, rect: ERect, color: Color32, scale: f32) {
-    painter.rect_filled(
-        rect,
-        0.0,
-        Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), color.a() / 3),
-    );
-    let step = (scale / 2.0).clamp(3.0, 12.0);
-    let mut x = rect.min.x - rect.height();
-    while x < rect.max.x {
-        let a = Pos2::new(x, rect.max.y);
-        let b = Pos2::new(x + rect.height(), rect.min.y);
-        let clipped = clip_line(a, b, rect);
-        if let Some((a, b)) = clipped {
-            painter.line_segment([a, b], EStroke::new(1.0, color));
-        }
-        x += step;
-    }
-}
-
-pub(super) fn clip_line(a: Pos2, b: Pos2, rect: ERect) -> Option<(Pos2, Pos2)> {
-    let mut t0 = 0.0f32;
-    let mut t1 = 1.0f32;
-    let d = b - a;
-    for (p, q) in [
-        (-d.x, a.x - rect.min.x),
-        (d.x, rect.max.x - a.x),
-        (-d.y, a.y - rect.min.y),
-        (d.y, rect.max.y - a.y),
-    ] {
-        if p == 0.0 {
-            if q < 0.0 {
-                return None;
-            }
-            continue;
-        }
-        let r = q / p;
-        if p < 0.0 {
-            t0 = t0.max(r);
-        } else {
-            t1 = t1.min(r);
-        }
-        if t0 > t1 {
-            return None;
-        }
-    }
-    Some((a + d * t0, a + d * t1))
 }
 
 pub fn module_color(kind: Option<AreaModuleKind>) -> Color32 {
@@ -154,15 +120,15 @@ pub(super) fn overlay_modules(
     editor: &mut Editor,
     painter: &egui::Painter,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
 ) {
     let canvas = frame.canvas;
     let selected: HashSet<String> = selected_parts(editor, &frame.area_key);
-    let view = &editor.views.area.views[view_key];
+    let view = editor.views.area.view(view_key);
     let editing = view.in_place.last().map(|p| p.module);
     let visible = canvas.visible();
     let hovered = match view.tool {
-        Tool::Select | Tool::Module => frame.pointer_tile.and_then(|tile| frame.hit(tile)),
+        AreaTool::Select | AreaTool::Module => frame.pointer_tile.and_then(|tile| frame.hit(tile)),
         _ => None,
     };
     for (index, module) in frame.modules.iter().enumerate() {
@@ -197,19 +163,14 @@ pub(super) fn overlay_modules(
         } else {
             170
         };
-        let color = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha);
+        let color = theme::alpha(color, alpha);
         let width = if is_selected { 2.0 } else { 1.0 };
         match kind {
-            AreaModuleKind::Soundscape if module["shape"]["type"] == "ellipse" => {
-                let center = rect.center();
-                let radius = rect.size() / 2.0;
-                let points: Vec<Pos2> = (0..48)
-                    .map(|i| {
-                        let t = i as f32 / 48.0 * std::f32::consts::TAU;
-                        Pos2::new(center.x + radius.x * t.cos(), center.y + radius.y * t.sin())
-                    })
-                    .collect();
-                painter.add(egui::Shape::closed_line(points, EStroke::new(width, color)));
+            AreaModuleKind::Soundscape if shapes::is_ellipse(module) => {
+                painter.add(egui::Shape::closed_line(
+                    ellipse_points(rect, 48),
+                    EStroke::new(width, color),
+                ));
             }
             AreaModuleKind::Resident | AreaModuleKind::Object if shapes::is_point(module) => {
                 painter.circle_stroke(
@@ -231,10 +192,9 @@ pub(super) fn overlay_modules(
             || is_hovered
             || (kind == AreaModuleKind::Population && canvas.scale() >= 2.0)
         {
-            label_chip(
-                painter,
+            frame.labels.chip(
                 rect.min + Vec2::new(0.0, -4.0),
-                &shapes::label(module),
+                shapes::label(module),
                 color,
             );
         }
@@ -265,7 +225,9 @@ pub(super) fn overlay_modules(
             [at - Vec2::new(0.0, 10.0), at + Vec2::new(0.0, 10.0)],
             EStroke::new(1.0, color),
         );
-        label_chip(painter, at + Vec2::new(8.0, -8.0), "0, 0 · top-left", color);
+        frame
+            .labels
+            .chip(at + Vec2::new(8.0, -8.0), "0, 0 · top-left", color);
     }
 }
 
@@ -274,7 +236,7 @@ pub(super) fn overlay_selected_scenery(
     ui: &Ui,
     painter: &egui::Painter,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
     area: &area::Area,
 ) {
     let Some(index) = scenery::selected_scenery(editor, frame) else {
@@ -291,10 +253,10 @@ pub(super) fn overlay_selected_scenery(
         if let Some(cell_index) = cell.index(size)
             && grids.walk[cell_index] == Some(false)
         {
-            hatch(
+            patterns::hatch(
                 painter,
                 canvas.rect(cell.bounds()),
-                Color32::from_rgba_unmultiplied(220, 60, 60, 140),
+                theme::alpha(theme::BLOCKED, 140),
                 canvas.scale(),
             );
         }
@@ -306,7 +268,7 @@ pub(super) fn overlay_selected_scenery(
                 at.x.round() as i32 + dx as i32,
                 at.y.round() as i32 + dy as i32,
             );
-            hatch(
+            patterns::hatch(
                 painter,
                 canvas.rect(cell.bounds()),
                 Color32::from_rgba_unmultiplied(220, 120, 60, 140),
@@ -324,18 +286,15 @@ pub(super) fn overlay_selected_scenery(
     let b = canvas.to_screen(Pos::new(rect.max().x, line_y));
     painter.add(egui::Shape::dashed_line(
         &[a, b],
-        EStroke::new(2.0, Color32::from_rgb(120, 170, 255)),
+        EStroke::new(2.0, theme::SORT_LINE),
         8.0,
         5.0,
     ));
     let handle = ERect::from_center_size(b + Vec2::new(10.0, 0.0), Vec2::splat(10.0));
-    painter.rect_filled(handle, 2.0, Color32::from_rgb(120, 170, 255));
-    label_chip(
-        painter,
-        a + Vec2::new(4.0, -6.0),
-        "sort line",
-        Color32::from_rgb(120, 170, 255),
-    );
+    painter.rect_filled(handle, 2.0, theme::SORT_LINE);
+    frame
+        .labels
+        .chip(a + Vec2::new(4.0, -6.0), "sort line", theme::SORT_LINE);
     let grab = ui.interact(
         ERect::from_min_max(a, b).expand2(Vec2::new(16.0, 6.0)),
         ui.id().with((view_key, "sort-line")),
@@ -366,17 +325,10 @@ pub(super) fn overlay_selected_scenery(
             );
         }
     }
-    let tiles: usize = module["tiles"].as_array().map_or(0, |rows| {
-        rows.iter()
-            .map(|r| {
-                r.as_array()
-                    .map_or(0, |cells| cells.iter().filter(|c| !c.is_null()).count())
-            })
-            .sum()
-    });
     editor.status.left.push(format!(
-        "scenery · {} · {tiles} tiles",
-        module.text("tileset")
+        "scenery · {} · {} tiles",
+        module.text("tileset"),
+        scenery::tile_count(module)
     ));
     editor
         .status
@@ -384,7 +336,11 @@ pub(super) fn overlay_selected_scenery(
         .push("drag the sort line · ⇧ snaps to 1/16".to_owned());
 }
 
-pub(super) fn overlay_soundscape_reach(editor: &Editor, painter: &egui::Painter, frame: &Frame) {
+pub(super) fn overlay_soundscape_reach(
+    editor: &Editor,
+    painter: &egui::Painter,
+    frame: &AreaFrame,
+) {
     let canvas = frame.canvas;
     for part in selected_parts(editor, &frame.area_key) {
         let Some(index) = part
@@ -402,44 +358,23 @@ pub(super) fn overlay_soundscape_reach(editor: &Editor, painter: &egui::Painter,
         let Some(bounds) = shapes::bounds(module, None) else {
             continue;
         };
-        let reach = module["emit"].as_f64().unwrap_or(0.0) as f32
-            + game::core::audio::soundscape::EDGE_FALLOFF.0;
+        let reach = module["emit"].as_f64().unwrap_or(0.0) as f32 + EDGE_FALLOFF.0;
         let outer = bounds.inflate(reach, reach);
         let rect = canvas.rect(outer);
         let color = Color32::from_rgba_unmultiplied(170, 110, 255, 120);
-        if module["shape"]["type"] == "ellipse" {
-            let center = rect.center();
-            let radius = rect.size() / 2.0;
-            let points: Vec<Pos2> = (0..64)
-                .map(|i| {
-                    let t = i as f32 / 64.0 * std::f32::consts::TAU;
-                    Pos2::new(center.x + radius.x * t.cos(), center.y + radius.y * t.sin())
-                })
-                .collect();
+        if shapes::is_ellipse(module) {
             painter.add(egui::Shape::dashed_line(
-                &points,
+                &ellipse_points(rect, 64),
                 EStroke::new(1.0, color),
                 6.0,
                 6.0,
             ));
         } else {
-            painter.add(egui::Shape::dashed_line(
-                &[
-                    rect.left_top(),
-                    rect.right_top(),
-                    rect.right_bottom(),
-                    rect.left_bottom(),
-                    rect.left_top(),
-                ],
-                EStroke::new(1.0, color),
-                6.0,
-                6.0,
-            ));
+            widgets::dashed_rect(painter, rect, EStroke::new(1.0, color), 6.0, 6.0);
         }
-        label_chip(
-            painter,
+        frame.labels.chip(
             rect.left_bottom() + Vec2::new(0.0, 22.0),
-            &format!("♪ reach {} tiles", crate::forms::tiles(reach)),
+            format!("♪ reach {} tiles", forms::tiles(reach)),
             Color32::from_rgb(190, 150, 255),
         );
     }
@@ -450,80 +385,43 @@ pub(super) fn overlay_blueprint_ghost(
     ui: &Ui,
     painter: &egui::Painter,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
 ) {
     let canvas = frame.canvas;
-    let (origin, blueprint) = {
-        let view = &editor.views.area.views[view_key];
-        let Some(blueprint) = view.blueprint.clone() else {
+    let origin = {
+        let view = editor.views.area.view(view_key);
+        if view.blueprint.is_none() {
             return;
-        };
-        (view.origin().0, blueprint)
+        }
+        view.origin().0
     };
     let ctx = ui.ctx().clone();
-    let Some((texture, uv, drawn)) = population::player_sprite(editor, &ctx, frame.content) else {
+    let Some(sprite) = population::player_sprite(editor, &ctx, frame.content) else {
         return;
     };
-    let view = editor.views.area.views.get_mut(view_key).expect("view");
+    let view = editor.views.area.view_mut(view_key);
     let feet_tile = view
         .ghost
         .unwrap_or(Pos::new(origin.x + 4.0, origin.y + 2.0));
-    let scale = canvas.scale() / TILE_PX;
-    let shown = drawn * scale;
-    let feet = canvas.to_screen(feet_tile) + Vec2::new(0.0, canvas.scale() * 0.5);
-    let sprite = ERect::from_min_max(
-        feet - Vec2::new(shown.x / 2.0, shown.y),
-        feet + Vec2::new(shown.x / 2.0, 0.0),
-    );
-    painter.add(egui::Shape::ellipse_filled(
-        feet,
-        Vec2::new(shown.x * 0.35, shown.x * 0.12),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 70),
-    ));
-    painter.image(
-        texture,
-        sprite,
-        uv,
-        Color32::from_rgba_unmultiplied(255, 255, 255, 230),
-    );
+    let sprite = draw_sprite(painter, canvas, feet_tile, &sprite, 230);
     let heard: Vec<String> = frame
-        .modules
+        .area()
+        .soundscape
         .iter()
-        .filter(|m| m.is_module(AreaModuleKind::Soundscape))
-        .filter_map(|m| {
-            let bounds = shapes::bounds(m, None)?;
-            let emit = m["emit"].as_f64().unwrap_or(0.0) as f32;
-            let inside = bounds.inflate(emit, emit);
-            let outer = bounds.inflate(
-                emit + game::core::audio::soundscape::EDGE_FALLOFF.0,
-                emit + game::core::audio::soundscape::EDGE_FALLOFF.0,
-            );
-            if !outer.contains(feet_tile) {
-                return None;
-            }
-            let gain = if inside.contains(feet_tile) {
-                1.0
-            } else {
-                let dx = (inside.min().x - feet_tile.x)
-                    .max(feet_tile.x - inside.max().x)
-                    .max(0.0);
-                let dy = (inside.min().y - feet_tile.y)
-                    .max(feet_tile.y - inside.max().y)
-                    .max(0.0);
-                (1.0 - (dx.max(dy) / game::core::audio::soundscape::EDGE_FALLOFF.0)).clamp(0.0, 1.0)
-            };
-            let file = m["channels"]
-                .as_array()
-                .and_then(|c| c.first())
-                .and_then(|c| c["file"].as_str())
-                .and_then(|f| f.rsplit('/').next())
+        .filter_map(|zone| {
+            let heard = zone.heard_from(feet_tile)?;
+            let file = zone
+                .channels
+                .values()
+                .next()
+                .and_then(|layer| layer.src.as_str().rsplit('/').next())
                 .map(|f| {
                     f.trim_end_matches(".flac")
                         .trim_end_matches(".ogg")
                         .to_owned()
                 })
                 .unwrap_or_else(|| "soundscape".to_owned());
-            Some(format!("hears {file} {:.2}", gain))
+            Some(format!("hears {file} {:.2}", heard.proximity))
         })
         .collect();
     let text = if heard.is_empty() {
@@ -531,8 +429,7 @@ pub(super) fn overlay_blueprint_ghost(
     } else {
         format!("ghost · {}", heard.join(" · "))
     };
-    label_chip(
-        painter,
+    frame.labels.chip(
         sprite.right_bottom() + Vec2::new(8.0, 0.0),
         &text,
         Color32::WHITE,
@@ -544,7 +441,6 @@ pub(super) fn overlay_blueprint_ghost(
         let tile = canvas.to_tile(pointer);
         view.ghost = Some(Pos::new(tile.x, tile.y - 0.5));
     }
-    let _ = blueprint;
 }
 
 pub(super) fn overlay_populations(
@@ -552,13 +448,13 @@ pub(super) fn overlay_populations(
     ui: &Ui,
     painter: &egui::Painter,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
     area: &area::Area,
 ) {
     let canvas = frame.canvas;
     let ctx = ui.ctx().clone();
-    let hidden = editor.views.area.views[view_key].population_hidden.clone();
-    let seeds = editor.views.area.views[view_key].population_seed.clone();
+    let hidden = editor.views.area.view(view_key).population_hidden.clone();
+    let seeds = editor.views.area.view(view_key).population_seed.clone();
     for (index, module) in frame.modules.iter().enumerate() {
         if !module.is_module(AreaModuleKind::Population) || hidden.contains(&index) {
             continue;
@@ -566,51 +462,69 @@ pub(super) fn overlay_populations(
         let Some(npc) = module["npc"].as_str() else {
             continue;
         };
-        let Some((texture, uv, drawn)) = population::npc_sprite(editor, &ctx, frame.content, npc)
-        else {
+        let Some(sprite) = population::npc_sprite(editor, &ctx, frame.content, npc) else {
             continue;
         };
-        let scale = canvas.scale() / TILE_PX;
         for at in
             population::population_places(area, module, seeds.get(&index).copied().unwrap_or(0))
         {
-            let feet = canvas.to_screen(at) + Vec2::new(0.0, canvas.scale() * 0.5);
-            let shown = drawn * scale;
-            let sprite = ERect::from_min_max(
-                feet - Vec2::new(shown.x / 2.0, shown.y),
-                feet + Vec2::new(shown.x / 2.0, 0.0),
-            );
-            painter.add(egui::Shape::ellipse_filled(
-                feet,
-                Vec2::new(shown.x * 0.35, shown.x * 0.12),
-                Color32::from_rgba_unmultiplied(0, 0, 0, 70),
-            ));
-            painter.image(
-                texture,
-                sprite,
-                uv,
-                Color32::from_rgba_unmultiplied(255, 255, 255, 200),
-            );
+            draw_sprite(painter, canvas, at, &sprite, 200);
         }
     }
 }
 
-pub fn label_chip(painter: &egui::Painter, bottom_left: Pos2, text: &str, color: Color32) {
-    let galley = painter.layout_no_wrap(text.to_owned(), egui::FontId::monospace(11.5), color);
-    let size = galley.size() + Vec2::new(10.0, 6.0);
-    let back = ERect::from_min_size(bottom_left - Vec2::new(0.0, size.y), size);
-    painter.rect_filled(back, 4.0, Color32::from_rgba_unmultiplied(20, 22, 26, 225));
-    painter.galley(back.min + Vec2::new(5.0, 3.0), galley, color);
+#[derive(Default)]
+pub struct AreaLabels(RefCell<Vec<AreaLabel>>);
+
+struct AreaLabel {
+    bottom_left: Pos2,
+    text: String,
+    color: Color32,
 }
 
-pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &Frame, area: &area::Area) {
+impl AreaLabels {
+    pub fn chip(&self, bottom_left: Pos2, text: impl Into<String>, color: Color32) {
+        self.0.borrow_mut().push(AreaLabel {
+            bottom_left,
+            text: text.into(),
+            color,
+        });
+    }
+
+    pub fn draw(&self, painter: &egui::Painter) {
+        let mut placed: Vec<ERect> = Vec::new();
+        for label in self.0.take() {
+            let galley =
+                painter.layout_no_wrap(label.text, egui::FontId::monospace(11.5), label.color);
+            let size = galley.size() + Vec2::new(10.0, 6.0);
+            let preferred = ERect::from_min_size(label.bottom_left - Vec2::new(0.0, size.y), size);
+            let back = free_slot(preferred, &placed);
+            placed.push(back);
+            painter.rect_filled(back, 4.0, Color32::from_rgba_unmultiplied(20, 22, 26, 225));
+            painter.galley(back.min + Vec2::new(5.0, 3.0), galley, label.color);
+        }
+    }
+}
+
+fn free_slot(preferred: ERect, placed: &[ERect]) -> ERect {
+    let row = preferred.height() + LABEL_GAP;
+    let shifted = (1..=LABEL_SHIFTS)
+        .flat_map(|shift| [-(shift as f32), shift as f32])
+        .map(|rows| preferred.translate(Vec2::new(0.0, rows * row)));
+    std::iter::once(preferred)
+        .chain(shifted)
+        .find(|slot| !placed.iter().any(|other| other.intersects(*slot)))
+        .unwrap_or(preferred)
+}
+
+pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &AreaFrame, area: &area::Area) {
     let canvas = frame.canvas;
     if canvas.scale() < 3.0 {
         return;
     }
     let visible = canvas.visible();
     let mut palette: Vec<(String, Color32)> = Vec::new();
-    for cell in size_cells(area.size.grid()) {
+    for cell in tiling::cells(area.size.grid()) {
         let tile = cell.center();
         if !visible.contains(tile) {
             continue;
@@ -644,6 +558,44 @@ pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &Frame, area: &ar
     }
 }
 
+fn draw_sprite(
+    painter: &egui::Painter,
+    canvas: AreaCanvas,
+    at: Pos<Tiles>,
+    sprite: &NpcSprite,
+    alpha: u8,
+) -> ERect {
+    let shown = sprite.drawn * canvas.scale() / TILE_PX;
+    let feet = canvas.to_screen(at) + Vec2::new(0.0, canvas.scale() * 0.5);
+    let rect = ERect::from_min_max(
+        feet - Vec2::new(shown.x / 2.0, shown.y),
+        feet + Vec2::new(shown.x / 2.0, 0.0),
+    );
+    painter.add(egui::Shape::ellipse_filled(
+        feet,
+        Vec2::new(shown.x * 0.35, shown.x * 0.12),
+        Color32::from_rgba_unmultiplied(0, 0, 0, 70),
+    ));
+    painter.image(
+        sprite.texture,
+        rect,
+        sprite.uv,
+        Color32::from_rgba_unmultiplied(255, 255, 255, alpha),
+    );
+    rect
+}
+
+fn ellipse_points(rect: ERect, segments: usize) -> Vec<Pos2> {
+    let center = rect.center();
+    let radius = rect.size() / 2.0;
+    (0..segments)
+        .map(|i| {
+            let t = i as f32 / segments as f32 * std::f32::consts::TAU;
+            Pos2::new(center.x + radius.x * t.cos(), center.y + radius.y * t.sin())
+        })
+        .collect()
+}
+
 pub fn hsv(h: f32, s: f32, v: f32) -> Color32 {
     let i = (h * 6.0).floor();
     let f = h * 6.0 - i;
@@ -659,7 +611,7 @@ pub fn hsv(h: f32, s: f32, v: f32) -> Color32 {
     Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
 }
 
-pub(super) fn overlay_sort_lines(painter: &egui::Painter, frame: &Frame, area: &area::Area) {
+pub(super) fn overlay_sort_lines(painter: &egui::Painter, frame: &AreaFrame, area: &area::Area) {
     let canvas = frame.canvas;
     for scenery in &area.scenery {
         let Some(line) = scenery.sort_line() else {
@@ -670,7 +622,7 @@ pub(super) fn overlay_sort_lines(painter: &egui::Painter, frame: &Frame, area: &
         let b = canvas.to_screen(Pos::new(scenery.at.x + width, line.0));
         painter.add(egui::Shape::dashed_line(
             &[a, b],
-            EStroke::new(1.5, Color32::from_rgb(120, 170, 255)),
+            EStroke::new(1.5, theme::SORT_LINE),
             6.0,
             4.0,
         ));

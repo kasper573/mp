@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::Arc;
 
 use bevy::asset::{AssetPlugin, LoadState};
 use bevy::camera::{RenderTarget, ScalingMode};
@@ -13,13 +14,14 @@ use bevy::render::render_resource::TextureFormat;
 use bevy::render::settings::{Backends, RenderCreation, WgpuSettings};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use bevy::window::ExitCondition;
-
 use game::core::content::{Content, FilesystemFolder};
 use game::core::math::{Direction, Size, WorldPx};
 use game::core::time::{PlaybackRate, Seconds};
-use game::systems::actor::bust::{self as model, ModelDef};
+use game::systems::actor::model::{self, ModelDef};
 use game::systems::actor::render::{ACTOR_ANCHOR, draw_actor_frame};
-use game::systems::actor::{self, Action, ActorModel};
+use game::systems::actor::{Action, ActorModel};
+use game::systems::load_content;
+use serde::Deserialize;
 
 const FPS: f32 = 30.0;
 const DEATH_HOLD: Seconds = Seconds(0.75);
@@ -39,7 +41,7 @@ const COLUMNS: [(Direction, &str); 8] = [
     (Direction::SE, "SE"),
 ];
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Config {
     content_dir: PathBuf,
 }
@@ -100,15 +102,15 @@ fn main() {
     };
     let out = PathBuf::from(out);
 
-    let service = game::systems::load_content(
-        std::sync::Arc::new(FilesystemFolder(content_dir.clone())),
+    let content = load_content(
+        Arc::new(FilesystemFolder(content_dir.clone())),
         "the program stopped",
     )
     .unwrap_or_else(|report| {
         eprint!("{report}");
         std::process::exit(2);
     });
-    let models = select_models(&service, names);
+    let models = select_models(&content, names);
     let loops: usize = loops
         .parse()
         .ok()
@@ -118,8 +120,8 @@ fn main() {
                 "loops must be a positive whole number, not `{loops}`"
             ))
         });
-    let clips = plan(&service, &models, animations, loops);
-    let layout = layout(&service, &models);
+    let clips = plan(&content, &models, animations, loops);
+    let layout = layout(&content, &models);
     let total = clips.iter().map(Clip::frames).sum();
     let seconds = total as f32 / FPS;
     eprintln!(
@@ -158,7 +160,7 @@ fn main() {
             }),
     )
     .insert_resource(ClearColor(Color::srgb_u8(0x24, 0x27, 0x2e)))
-    .insert_resource(service)
+    .insert_resource(content)
     .insert_resource(Sink::spawn(&out, layout.width, layout.height))
     .add_systems(Update, advance);
 
@@ -205,7 +207,7 @@ fn select_models(content: &Content, names: &str) -> Vec<model::Id> {
         .collect()
 }
 
-fn plan(service: &Content, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
+fn plan(content: &Content, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
     let wanted: Vec<Action> = split(animations)
         .into_iter()
         .map(|name| {
@@ -220,7 +222,7 @@ fn plan(service: &Content, models: &[model::Id], animations: &str, loops: usize)
         .collect();
     let mut clips = Vec::new();
     for &id in models {
-        let model = resolve(service, id);
+        let model = ActorModel::get(content, id);
         for action in Action::ALL {
             if wanted.is_empty() || wanted.contains(&action) {
                 clips.push(Clip {
@@ -248,11 +250,11 @@ fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     ((length.0 * FPS).round() as usize).max(1)
 }
 
-fn layout(service: &Content, models: &[model::Id]) -> Layout {
+fn layout(content: &Content, models: &[model::Id]) -> Layout {
     let drawn = models
         .iter()
         .map(|&id| {
-            let model = resolve(service, id);
+            let model = ActorModel::get(content, id);
             model.drawn_size(model.frame(Action::Idle, Direction::S, Seconds(0.0), AUTHORED_RATE))
         })
         .fold(Size::new(0.0, 0.0), |a: Size<WorldPx>, b| {
@@ -273,12 +275,12 @@ fn layout(service: &Content, models: &[model::Id]) -> Layout {
 }
 
 fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
-    let service = *world.resource::<Content>();
+    let content = *world.resource::<Content>();
     let assets = world.resource::<AssetServer>().clone();
     let sheets: BTreeMap<model::Id, Handle<Image>> = clips
         .iter()
         .map(|clip| {
-            let sheet = resolve(&service, clip.model).sheet().path();
+            let sheet = ActorModel::get(&content, clip.model).sheet().path();
             (clip.model, assets.load(sheet))
         })
         .collect();
@@ -375,7 +377,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
 fn advance(
     mut commands: Commands,
     mut reel: ResMut<Reel>,
-    service: Res<Content>,
+    content: Res<Content>,
     assets: Res<AssetServer>,
     mut slots: Query<(&Slot, &mut Sprite, &mut Visibility)>,
     mut caption: Single<&mut Text, With<Caption>>,
@@ -391,7 +393,7 @@ fn advance(
         }
     }
     let (clip, frame) = locate(&reel.clips, reel.next);
-    let model = resolve(&service, clip.model);
+    let model = ActorModel::get(&content, clip.model);
     let elapsed = Seconds((frame % clip.frames_per_loop) as f32 / FPS);
     for (slot, mut sprite, mut visibility) in &mut slots {
         sprite.image = reel.sheets[&clip.model].clone();
@@ -440,10 +442,6 @@ fn locate(clips: &[Clip], mut index: usize) -> (&Clip, usize) {
     unreachable!("frame index past the last clip")
 }
 
-fn resolve(service: &Content, id: model::Id) -> &'static ActorModel {
-    actor::model(service, id)
-}
-
 fn split(list: &str) -> Vec<&str> {
     list.split(',')
         .map(str::trim)
@@ -457,7 +455,7 @@ fn fail(message: &str) -> ! {
 }
 
 impl Sink {
-    fn spawn(out: &std::path::Path, width: u32, height: u32) -> Sink {
+    fn spawn(out: &Path, width: u32, height: u32) -> Sink {
         if let Some(dir) = out.parent() {
             std::fs::create_dir_all(dir)
                 .unwrap_or_else(|error| fail(&format!("{}: {error}", dir.display())));

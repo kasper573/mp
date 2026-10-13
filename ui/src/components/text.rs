@@ -1,23 +1,18 @@
+use bevy_color::Color;
 use bevy_picking::prelude::Pickable;
 use bevy_scene::{Scene, bsn};
 use bevy_text::{FontSource, FontSourceTemplate, FontWeight, TextFont, TextFontTemplate};
 use bevy_ui::widget::Text;
-
-use bevy_color::Color;
 
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::typography::{self, Typography};
 
 pub fn text(content: impl Into<String>) -> impl Scene {
-    styled(content, theme().surface_canvas.on)
+    text_colored(content, theme().surface_canvas.on)
 }
 
 pub fn text_colored(content: impl Into<String>, color: Color) -> impl Scene {
-    styled(content, color)
-}
-
-fn styled(content: impl Into<String>, color: Color) -> impl Scene {
     styled_text(content, color, typography::BODY)
 }
 

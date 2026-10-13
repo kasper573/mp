@@ -6,8 +6,9 @@ use game::systems::text::{Ink, Motion, Voice};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
-use crate::forms::{Changed, FormCx, committed};
+use crate::forms::{FormChange, FormCx, committed};
 use crate::ui::{theme, widgets};
+use crate::{condition, forms, picker};
 
 fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
     T::VARIANTS
@@ -18,7 +19,7 @@ fn names<T: VariantArray + Copy + Into<&'static str>>() -> Vec<&'static str> {
 const VALUE_TOKEN: &str = "⟨value⟩";
 const INPUT_TOKEN: &str = "⟨input⟩";
 
-pub struct LineEdit {
+pub struct SpanLineEdit {
     pub spans: Option<Value>,
     pub entered: bool,
 }
@@ -30,7 +31,7 @@ pub fn line(
     id: egui::Id,
     font: FontId,
     hint: &str,
-) -> LineEdit {
+) -> SpanLineEdit {
     let stored = spans_of(spans);
     let draft_spans: Value = drafts
         .get(&id)
@@ -43,7 +44,7 @@ pub fn line(
     let mut spans_now = draft_spans.clone();
     let mut changed = false;
     if let Some((start, end)) = selection.filter(|(a, b)| a != b)
-        && let Some(styled) = toolbar(ui, &spans_now, (start, end), id)
+        && let Some(styled) = toolbar(ui, &spans_now, (start, end))
     {
         spans_now = styled;
         changed = true;
@@ -122,7 +123,7 @@ pub fn line(
     let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
     if escape && focused {
         drafts.remove(&id);
-        return LineEdit {
+        return SpanLineEdit {
             spans: None,
             entered: false,
         };
@@ -130,13 +131,13 @@ pub fn line(
     if entered || committed(ui, &response) {
         drafts.remove(&id);
         if spans_now != stored {
-            return LineEdit {
+            return SpanLineEdit {
                 spans: Some(spans_now),
                 entered,
             };
         }
     }
-    LineEdit {
+    SpanLineEdit {
         spans: None,
         entered,
     }
@@ -294,12 +295,7 @@ pub fn retype(spans: &Value, before: &str, after: &str) -> Option<Value> {
     Some(Value::Array(merged))
 }
 
-fn toolbar(
-    ui: &mut Ui,
-    spans: &Value,
-    (start, end): (usize, usize),
-    id: egui::Id,
-) -> Option<Value> {
+fn toolbar(ui: &mut Ui, spans: &Value, (start, end): (usize, usize)) -> Option<Value> {
     let mut outcome = None;
     egui::Frame::new()
         .fill(theme::RAISED)
@@ -389,7 +385,6 @@ fn toolbar(
                 ui.label(theme::faint(format!("{} chars", end - start)).size(11.0));
             });
         });
-    let _ = id;
     outcome
 }
 
@@ -432,20 +427,14 @@ pub fn restyle(
     Value::Array(out)
 }
 
-pub fn edit(
-    ui: &mut Ui,
-    cx: &mut FormCx,
-    _schema: &Value,
-    value: &mut Value,
-    path: &str,
-) -> Changed {
-    let mut changed = Changed::default();
+pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+    let mut changed = FormChange::default();
     ui.vertical(|ui| {
         if let Some(text) = value.as_str().map(str::to_owned) {
             let mut draft_value = Value::String(text);
-            if crate::forms::text(ui, cx, &mut draft_value, path).is_some() {
+            if forms::text(ui, cx, &mut draft_value, path).is_some() {
                 *value = draft_value;
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
             ui.horizontal(|ui| {
                 if ui
@@ -456,7 +445,7 @@ pub fn edit(
                     let mut styled = Map::new();
                     styled.insert("text".to_owned(), value.clone());
                     *value = Value::Object(styled);
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             });
             return;
@@ -470,9 +459,9 @@ pub fn edit(
             let mut input = object["input"].as_str().unwrap_or_default().to_owned();
             ui.horizontal(|ui| {
                 ui.label("key of");
-                if crate::picker::row(ui, cx, "input", &mut input, &format!("{path}/input")) {
+                if picker::row(ui, cx, "input", &mut input, &format!("{path}/input")) {
                     object.insert("input".to_owned(), Value::String(input));
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             });
             return;
@@ -481,11 +470,9 @@ pub fn edit(
             ui.label(RichText::new("value").weak());
             let mut inner = object["value"].clone();
             let schema = serde_json::json!({ "x-condition": true });
-            if crate::condition::edit(ui, cx, &schema, &mut inner, &format!("{path}/value"))
-                .is_some()
-            {
+            if condition::edit(ui, cx, &schema, &mut inner, &format!("{path}/value")).is_some() {
                 object.insert("value".to_owned(), inner);
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
             return;
         }
@@ -493,9 +480,9 @@ pub fn edit(
             .get("text")
             .cloned()
             .unwrap_or(Value::String(String::new()));
-        if crate::forms::text(ui, cx, &mut text, &format!("{path}/text")).is_some() {
+        if forms::text(ui, cx, &mut text, &format!("{path}/text")).is_some() {
             object.insert("text".to_owned(), text);
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         ui.horizontal_wrapped(|ui| {
             for (field, options) in [
@@ -528,7 +515,7 @@ pub fn edit(
                     } else {
                         object.insert(field.to_owned(), Value::String(picked));
                     }
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             }
             let mut slow = object.get("slow").and_then(Value::as_bool).unwrap_or(false);
@@ -538,7 +525,7 @@ pub fn edit(
                 } else {
                     object.remove("slow");
                 }
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
             let id = ui.id().with(path).with("pause");
             let current = object
@@ -569,7 +556,7 @@ pub fn edit(
                 } else {
                     object.insert("pause_after".to_owned(), Value::from(draft));
                 }
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
             if object.len() == 1
                 && ui
@@ -583,16 +570,16 @@ pub fn edit(
         if back_to_plain {
             let plain = object.get("text").cloned().unwrap_or_default();
             *value = plain;
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
     });
     changed
 }
 
-pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Changed {
+pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("line");
-    let mut changed = Changed::default();
-    let edit = crate::forms::boxed_input(ui, None, |ui| {
+    let mut changed = FormChange::default();
+    forms::boxed_input(ui, None, |ui| {
         let edit = line(
             ui,
             &mut cx.state.drafts,
@@ -603,34 +590,31 @@ pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -
         );
         if let Some(spans) = edit.spans {
             *value = spans;
-            changed = Changed::at(path);
+            changed = FormChange::at(path);
         }
         ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover())
     });
-    let _ = edit;
-    let mut index = 0;
     let count = value.as_array().map_or(0, Vec::len);
-    while index < count {
-        let is_value = value[index].get("value").is_some();
-        if is_value {
-            let mut inner = value[index]["value"].clone();
-            let schema = serde_json::json!({ "x-condition": true });
-            widgets::kv(ui, "value", |ui| {
-                if crate::condition::edit(
-                    ui,
-                    cx,
-                    &schema,
-                    &mut inner,
-                    &format!("{path}/{index}/value"),
-                )
-                .is_some()
-                {
-                    value[index]["value"] = inner.clone();
-                    changed = Changed::at(path);
-                }
-            });
+    for index in 0..count {
+        if value[index].get("value").is_none() {
+            continue;
         }
-        index += 1;
+        let mut inner = value[index]["value"].clone();
+        let schema = serde_json::json!({ "x-condition": true });
+        widgets::kv(ui, "value", |ui| {
+            if condition::edit(
+                ui,
+                cx,
+                &schema,
+                &mut inner,
+                &format!("{path}/{index}/value"),
+            )
+            .is_some()
+            {
+                value[index]["value"] = inner.clone();
+                changed = FormChange::at(path);
+            }
+        });
     }
     changed
 }

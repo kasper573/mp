@@ -1,8 +1,8 @@
 use bevy_ecs::prelude::*;
 use game::core::math::{Offset, Pos};
 use game::core::tiling::Tiles;
-use game::systems::area::AreaObject;
 use game::systems::area::transition::{self, Crossing};
+use game::systems::area::{AreaObject, Id as AreaId};
 use game::systems::dialogue::Conversation;
 use game::systems::history::{History, HistoryTopic};
 use game::systems::input::map::InputMap;
@@ -60,7 +60,7 @@ fn object_center(sim: &mut Sim, name: &str) -> Pos<Tiles> {
         .center()
 }
 
-fn travel(from: &mut Sim, player: Entity, to: game::systems::area::Id) -> (Sim, Entity) {
+fn travel(from: &mut Sim, player: Entity, to: AreaId) -> (Sim, Entity) {
     let mut there = Sim::area(to);
     there.connect(1);
     from.world().entity_mut(player).insert(Crossing {

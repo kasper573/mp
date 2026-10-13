@@ -118,7 +118,6 @@ pub struct Instances<V: Vocabulary> {
     queue: VecDeque<Queued>,
     flows: SlotMap<FlowSlot, Option<Flow<V>>>,
     by_id: HashMap<u64, FlowSlot>,
-    due: Vec<FlowKey>,
     next_flow: u64,
     tick: u64,
 }
@@ -136,7 +135,6 @@ impl<V: Vocabulary> Default for Instances<V> {
             queue: VecDeque::new(),
             flows: SlotMap::with_key(),
             by_id: HashMap::new(),
-            due: Vec::new(),
             next_flow: 1,
             tick: 0,
         }
@@ -220,10 +218,6 @@ impl<V: Vocabulary> Instances<V> {
         self.ops.push_back(Op::BoxClosed { key });
     }
 
-    pub fn has_owner(&self, owner: Owner) -> bool {
-        self.instances.contains_key(&owner)
-    }
-
     pub fn owners(&self) -> impl Iterator<Item = Owner> + '_ {
         self.instances.keys().copied()
     }
@@ -302,10 +296,6 @@ impl<V: Vocabulary> Instances<V> {
         self.flow(key).and_then(|flow| flow.pause)
     }
 
-    pub fn subject_of(&self, key: FlowKey) -> Option<Entity> {
-        self.flow(key).and_then(|flow| flow.subject)
-    }
-
     pub fn live_flows(&self, owner: Owner) -> usize {
         self.instances
             .get(&owner)
@@ -320,6 +310,30 @@ impl<V: Vocabulary> Instances<V> {
     fn flow_mut(&mut self, key: FlowKey) -> Option<&mut Flow<V>> {
         let slot = *self.by_id.get(&key.flow)?;
         self.flows.get_mut(slot)?.as_mut()
+    }
+
+    fn take_state(&mut self, owner: Owner, procedure: &Procedure<V>) -> Vec<Value> {
+        let zeroed = || procedure.state.iter().map(|(_, ty)| ty.zero()).collect();
+        if procedure.state.is_empty() {
+            return Vec::new();
+        }
+        let Some(instance) = self.instances.get_mut(&owner) else {
+            return zeroed();
+        };
+        let state = instance.state.entry(procedure.id).or_default();
+        if state.len() != procedure.state.len() {
+            *state = zeroed();
+        }
+        std::mem::take(state)
+    }
+
+    fn put_state(&mut self, owner: Owner, procedure: &Procedure<V>, state: Vec<Value>) {
+        if procedure.state.is_empty() {
+            return;
+        }
+        if let Some(instance) = self.instances.get_mut(&owner) {
+            instance.state.insert(procedure.id, state);
+        }
     }
 }
 
@@ -341,8 +355,7 @@ pub fn choice_state<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usiz
 fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usize) -> Option<bool> {
     let (procedure, node, cx) = {
         let mut instances = world.resource_mut::<Instances<V>>();
-        let state = flow_state(&mut instances, key);
-        let flow = flow_mut(&mut instances, key)?;
+        let flow = instances.flow_mut(key)?;
         if flow.pause != Some(Pause::Dialogue) {
             return None;
         }
@@ -354,12 +367,13 @@ fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey, choice: usize) ->
         if !matches!(procedure.steps[node], Step::Dialogue { .. }) {
             return None;
         }
+        let locals = std::mem::take(&mut frame.locals);
         let cx = FlowCx {
             key,
             owner: key.owner,
             subject,
-            locals: std::mem::take(&mut frame.locals),
-            state,
+            locals,
+            state: instances.take_state(key.owner, &procedure),
             event,
         };
         (procedure, node, cx)
@@ -385,29 +399,27 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
         let mut instances = world.resource_mut::<Instances<V>>();
         instances.tick += 1;
         let tick = instances.tick;
-        let mut due = std::mem::take(&mut instances.due);
-        due.clear();
-        for flow in instances.flows.values().flatten() {
-            let ready = match flow.pause {
+        let mut due: Vec<FlowKey> = instances
+            .flows
+            .values()
+            .flatten()
+            .filter(|flow| match flow.pause {
                 Some(Pause::Wait { until }) => until <= now,
                 Some(Pause::NextTick { tick: at }) | Some(Pause::Step { tick: at }) => at <= tick,
                 _ => false,
-            };
-            if ready {
-                due.push(FlowKey {
-                    owner: flow.owner,
-                    flow: flow.id,
-                });
-            }
-        }
+            })
+            .map(|flow| FlowKey {
+                owner: flow.owner,
+                flow: flow.id,
+            })
+            .collect();
         due.sort_by_key(|key| key.flow);
-        for key in due.drain(..) {
+        for key in due {
             instances.queue.push_back(Queued::Resume {
                 key,
                 answer: Answer::Output("next"),
             });
         }
-        instances.due = due;
         tick
     };
     let clock = TickClock { tick, now };
@@ -667,8 +679,7 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
                     .push_back(Queued::Resume { key, answer });
             }
             Op::BoxClosed { key } => {
-                let mut instances = world.resource_mut::<Instances<V>>();
-                if let Some(flow) = flow_mut(&mut instances, key) {
+                if let Some(flow) = world.resource_mut::<Instances<V>>().flow_mut(key) {
                     flow.box_open = false;
                 }
             }
@@ -681,10 +692,6 @@ fn queued_owner(queued: &Queued) -> Owner {
         Queued::Start { owner, .. } => *owner,
         Queued::Resume { key, .. } => key.owner,
     }
-}
-
-fn flow_mut<V: Vocabulary>(instances: &mut Instances<V>, key: FlowKey) -> Option<&mut Flow<V>> {
-    instances.flow_mut(key)
 }
 
 fn resume<V: Vocabulary>(
@@ -721,7 +728,9 @@ fn resume<V: Vocabulary>(
                         owner: key.owner,
                         subject: flow.subject,
                         locals: std::mem::take(&mut frame.locals),
-                        state: take_state(world, key.owner, &frame.procedure),
+                        state: world
+                            .resource_mut::<Instances<V>>()
+                            .take_state(key.owner, &frame.procedure),
                         event: std::mem::take(&mut flow.event),
                     };
                     let met = requires(world, &cx).truthy();
@@ -759,24 +768,6 @@ fn keep<V: Vocabulary>(world: &mut World, key: FlowKey, flow: Flow<V>) -> Option
     None
 }
 
-fn flow_state<V: Vocabulary>(instances: &mut Instances<V>, key: FlowKey) -> Vec<Value> {
-    let Some(flow) = instances.flow(key) else {
-        return Vec::new();
-    };
-    let procedure = flow.frames.last().expect("a frame").procedure.clone();
-    if procedure.state.is_empty() {
-        return Vec::new();
-    }
-    let Some(instance) = instances.instances.get_mut(&key.owner) else {
-        return Vec::new();
-    };
-    let state = instance.state.entry(procedure.id).or_default();
-    if state.len() != procedure.state.len() {
-        *state = procedure.state.iter().map(|(_, ty)| ty.zero()).collect();
-    }
-    std::mem::take(state)
-}
-
 fn put_flow<V: Vocabulary>(world: &mut World, key: FlowKey, flow: Flow<V>) {
     let mut instances = world.resource_mut::<Instances<V>>();
     let Some(slot) = instances.by_id.get(&key.flow).copied() else {
@@ -784,40 +775,6 @@ fn put_flow<V: Vocabulary>(world: &mut World, key: FlowKey, flow: Flow<V>) {
     };
     if let Some(kept) = instances.flows.get_mut(slot) {
         *kept = Some(flow);
-    }
-}
-
-fn take_state<V: Vocabulary>(
-    world: &mut World,
-    owner: Owner,
-    procedure: &Procedure<V>,
-) -> Vec<Value> {
-    if procedure.state.is_empty() {
-        return Vec::new();
-    }
-    let mut instances = world.resource_mut::<Instances<V>>();
-    let Some(instance) = instances.instances.get_mut(&owner) else {
-        return procedure.state.iter().map(|(_, ty)| ty.zero()).collect();
-    };
-    let state = instance.state.entry(procedure.id).or_default();
-    if state.len() != procedure.state.len() {
-        *state = procedure.state.iter().map(|(_, ty)| ty.zero()).collect();
-    }
-    std::mem::take(state)
-}
-
-fn put_state<V: Vocabulary>(
-    world: &mut World,
-    owner: Owner,
-    procedure: &Procedure<V>,
-    state: Vec<Value>,
-) {
-    if procedure.state.is_empty() {
-        return;
-    }
-    let mut instances = world.resource_mut::<Instances<V>>();
-    if let Some(instance) = instances.instances.get_mut(&owner) {
-        instance.state.insert(procedure.id, state);
     }
 }
 
@@ -879,7 +836,9 @@ fn run_flow_traced<V: Vocabulary>(
             owner: key.owner,
             subject: flow.subject,
             locals: std::mem::take(&mut frame.locals),
-            state: take_state(world, key.owner, &frame.procedure),
+            state: world
+                .resource_mut::<Instances<V>>()
+                .take_state(key.owner, &frame.procedure),
             event: std::mem::take(&mut flow.event),
         };
         if let Some(trace) = trace.as_mut() {
@@ -1152,7 +1111,9 @@ fn give_back<V: Vocabulary>(
 ) {
     frame.locals = cx.locals;
     flow.event = cx.event;
-    put_state(world, cx.owner, &frame.procedure, cx.state);
+    world
+        .resource_mut::<Instances<V>>()
+        .put_state(cx.owner, &frame.procedure, cx.state);
 }
 
 enum StepOutcome<V: Vocabulary> {
@@ -1168,19 +1129,13 @@ enum StepOutcome<V: Vocabulary> {
 }
 
 fn restore<V: Vocabulary>(instances: &mut Instances<V>, key: FlowKey, cx: FlowCx) {
-    let Some(slot) = instances.by_id.get(&key.flow).copied() else {
-        return;
-    };
-    let Some(flow) = instances.flows.get_mut(slot).and_then(Option::as_mut) else {
+    let Some(flow) = instances.flow_mut(key) else {
         return;
     };
     let frame = flow.frames.last_mut().expect("a frame");
     frame.locals = cx.locals;
-    if !frame.procedure.state.is_empty()
-        && let Some(instance) = instances.instances.get_mut(&key.owner)
-    {
-        instance.state.insert(frame.procedure.id, cx.state);
-    }
+    let procedure = frame.procedure.clone();
+    instances.put_state(key.owner, &procedure, cx.state);
 }
 
 fn end_flow<V: Vocabulary>(world: &mut World, key: FlowKey, flow: Flow<V>, ending: BoxEnding) {

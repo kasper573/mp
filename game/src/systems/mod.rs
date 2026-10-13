@@ -35,25 +35,27 @@ pub mod text;
 pub mod view;
 pub mod visibility;
 
-use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use bevy_app::App;
 use bevy_ecs::message::{Message, Messages};
-use bevy_ecs::prelude::{Bundle, Res, ResMut, Resource, World};
+use bevy_ecs::prelude::{Bundle, Entity, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
 use bevy_terminal::Terminal;
+use schemars::JsonSchema;
 
 use crate::core::assets::SyncedFiles;
 use crate::core::content::sync::SyncedContent;
-use crate::core::content::{Content, ContentFolder, ContentRegistry, LoadReport};
+use crate::core::content::{
+    Content, ContentFolder, ContentRegistry, ContentVersion, GAME_FILE, LoadReport, Loading,
+    Settings,
+};
 use crate::core::platform::{ClientPlatform, Platform, StartParams};
-use terminal::TerminalKind;
-
 use actor::{Actor, Hitbox};
 use area::AreaTag;
 use movement::Position;
+use terminal::TerminalKind;
 
 pub const TICK_HZ: crate::core::time::Hertz = crate::core::time::Hertz(30.0);
 
@@ -102,7 +104,7 @@ pub struct WorldArea(pub area::Id);
 #[serde(deny_unknown_fields)]
 pub struct GameSettings {
     pub name: String,
-    pub content_version: crate::core::content::ContentVersion,
+    pub content_version: ContentVersion,
     pub initial_spawn: script::Place,
     pub player: player::Id,
 }
@@ -252,6 +254,27 @@ pub fn server_app(
     app
 }
 
+pub fn start_server(app: &mut App) {
+    use bevy_replicon::prelude::ServerState;
+    use bevy_state::prelude::NextState;
+
+    app.finish();
+    app.cleanup();
+    app.world_mut()
+        .resource_mut::<NextState<ServerState>>()
+        .set(ServerState::Running);
+    app.update();
+}
+
+pub fn from_client<M: bevy_ecs::message::Message>(world: &mut World, conn: Entity, message: M) {
+    use bevy_replicon::prelude::{ClientId, FromClient};
+
+    world.write_message(FromClient {
+        client_id: ClientId::Client(conn),
+        message,
+    });
+}
+
 pub fn client_app(
     platform: std::sync::Arc<dyn Platform>,
     params: StartParams,
@@ -298,7 +321,7 @@ pub fn client_app(
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
             ui::UiPlugin,
-            crate::core::net::transport::RepliconRenetClientPlugin,
+            crate::core::net::transport::SocketClientPlugin,
             crate::core::interpolate::SnapshotPlugin {
                 period: REPLICATION_PERIOD,
             },
@@ -445,18 +468,18 @@ pub fn registry() -> ContentRegistry {
     registry
 }
 
-impl crate::core::content::Settings for GameSettings {
-    fn content_version(&self) -> &crate::core::content::ContentVersion {
+impl Settings for GameSettings {
+    fn content_version(&self) -> &ContentVersion {
         &self.content_version
     }
 }
 
-fn check_settings(loading: &mut crate::core::content::Loading) {
+fn check_settings(loading: &mut Loading) {
     let content = loading.content();
     let settings = content.built::<GameSettings>();
     if let Err(problem) = area::check_place(&content, settings.initial_spawn) {
         loading.json_error(
-            "game.json",
+            GAME_FILE,
             "/initial_spawn",
             problem.rule,
             problem.found,
@@ -466,7 +489,7 @@ fn check_settings(loading: &mut crate::core::content::Loading) {
     }
 }
 
-pub(crate) fn requests<M: Message>(world: &mut World) -> Vec<FromClient<M>> {
+pub(crate) fn drain_requests<M: Message>(world: &mut World) -> Vec<FromClient<M>> {
     world
         .resource_mut::<Messages<FromClient<M>>>()
         .drain()

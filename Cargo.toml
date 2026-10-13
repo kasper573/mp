@@ -48,7 +48,8 @@ syn = { version = "3", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
 bevy_replicon = { version = "0.45", default-features = false }
-renet2 = { version = "0.17", default-features = false }
+renet2 = { version = "0.19", default-features = false }
+bevy_replicon_renet2 = { version = "0.21", default-features = false, features = ["client"] }
 rayon = "1"
 bevy_state = { version = "0.20.0", default-features = false, features = ["bevy_app"] }
 axum = "0.8"

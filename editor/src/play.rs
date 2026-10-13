@@ -1,18 +1,15 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::{ChildStdin, Command, Stdio};
-use std::sync::Mutex;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
+use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 
-use crate::app::{Dialog, Editor};
-use crate::tabs::Tab;
-use crate::ui::{theme, widgets};
-use crate::value::RowValue;
 use egui::{RichText, Ui};
-use game::core::content::{Content, ContentScope, with_content};
+use game::core::content::{Content, ContentScope, version, with_content};
 use game::core::time::UtcHour;
+use game::systems::GameSettings;
+use game::systems::job::JobDef;
 use game::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
     SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest,
@@ -22,22 +19,29 @@ use game::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap, ProcessGroup};
 use serde_json::Value;
 
+use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
+use crate::project::{RowSelection, row_of};
+use crate::tabs::EditorTab;
+use crate::ui::{theme, widgets};
+use crate::value::RowValue;
+use crate::{forms, play, ui};
+
 const SERVER: &str = "game-server";
 const CLIENT: &str = "desktop-client";
 const READY_WITHIN: Duration = Duration::from_secs(30);
 const LOCALHOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
 #[derive(Default)]
-pub struct Play {
-    pub running: Option<Running>,
+pub struct PlayTest {
+    pub running: Option<RunningPlayTest>,
     pub character: Option<String>,
-    pub failure: Option<Failure>,
+    pub failure: Option<String>,
     pub last_start: Option<Place>,
-    pub binaries: Option<Binaries>,
-    pub checking: Option<Mutex<Receiver<Binaries>>>,
+    pub binaries: Option<GameBinaries>,
+    pub checking: Option<ChannelInbox<GameBinaries>>,
 }
 
-pub struct Running {
+pub struct RunningPlayTest {
     pub character: String,
     pub start: Option<Place>,
     pub history_at: usize,
@@ -45,14 +49,9 @@ pub struct Running {
     started: Instant,
     server: Process,
     client: Option<Process>,
-    lines: Mutex<Receiver<OutputLine>>,
+    lines: ChannelInbox<OutputLine>,
     sender: Sender<OutputLine>,
     ports: Option<ServerPorts>,
-}
-
-pub struct OutputLine {
-    pub tag: &'static str,
-    pub text: String,
 }
 
 #[derive(Clone, Copy)]
@@ -74,18 +73,14 @@ struct Process {
     exited: Option<i32>,
 }
 
-pub struct Failure {
-    pub reason: String,
-}
-
 #[derive(Clone)]
-pub struct Binaries {
+pub struct GameBinaries {
     pub folder: PathBuf,
     pub server: Result<BuildInfo, String>,
     pub client: Result<BuildInfo, String>,
 }
 
-impl Binaries {
+impl GameBinaries {
     fn of(&self, name: &str) -> &Result<BuildInfo, String> {
         if name == SERVER {
             &self.server
@@ -114,7 +109,7 @@ pub struct TestCharacter {
     pub area: String,
 }
 
-impl Running {
+impl RunningPlayTest {
     pub fn stop(&mut self) {
         self.phase = Phase::Stopping;
         if let Some(client) = &mut self.client {
@@ -132,7 +127,7 @@ pub fn poll(editor: &mut Editor) {
     let Some(running) = editor.play.running.as_mut() else {
         return;
     };
-    for line in drain(&running.lines) {
+    for line in running.lines.drain() {
         if line.tag == SERVER
             && running.ports.is_none()
             && let Some(ports) = ready_ports(&line.text)
@@ -227,11 +222,11 @@ pub fn poll(editor: &mut Editor) {
         if let Some(running) = editor.play.running.as_mut() {
             running.stop();
         }
-        editor.play.failure = Some(Failure { reason });
+        editor.play.failure = Some(reason);
         editor.toast("The play-test stopped; see Output");
     }
     if done && let Some(running) = editor.play.running.take() {
-        for line in drain(&running.lines) {
+        for line in running.lines.drain() {
             editor.output.say(line.tag, line.text);
         }
         editor.output.say(
@@ -250,13 +245,6 @@ pub fn poll(editor: &mut Editor) {
     }
 }
 
-fn drain(lines: &Mutex<Receiver<OutputLine>>) -> Vec<OutputLine> {
-    lines
-        .lock()
-        .map(|lines| lines.try_iter().collect())
-        .unwrap_or_default()
-}
-
 pub fn start(editor: &mut Editor, start: Option<Place>) {
     if editor.project.is_none() {
         return;
@@ -269,16 +257,15 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         editor.toast("No test character: add a test_character row first");
         return;
     };
-    let build = game::core::content::version::build();
+    let build = version::build();
     let Some(binaries) = check_binaries(editor).filter(|binaries| binaries.matches(build)) else {
-        editor.dialogs.push(Dialog::Binaries);
+        editor.dialogs.push(ModalDialog::Binaries);
         return;
     };
     editor.play.failure = None;
     if editor.has_unsaved() && !editor.save() {
-        editor.play.failure = Some(Failure {
-            reason: "saving failed, so the server would read stale rows.".to_owned(),
-        });
+        editor.play.failure =
+            Some("saving failed, so the server would read stale rows.".to_owned());
         return;
     }
     editor.play.binaries = Some(binaries.clone());
@@ -294,16 +281,14 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
             editor
                 .output
                 .say("editor", format!("{SERVER} did not start: {error}"));
-            editor.play.failure = Some(Failure {
-                reason: format!("{SERVER} did not start: {error}"),
-            });
+            editor.play.failure = Some(format!("{SERVER} did not start: {error}"));
             return;
         }
     };
     editor.play.character = Some(character.clone());
     editor.settings.last_play = Some(character.clone());
     editor.play.last_start = start;
-    editor.play.running = Some(Running {
+    editor.play.running = Some(RunningPlayTest {
         character,
         start,
         history_at: editor
@@ -314,11 +299,11 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
         started: Instant::now(),
         server,
         client: None,
-        lines: Mutex::new(lines),
+        lines: ChannelInbox::new(lines),
         sender,
         ports: None,
     });
-    editor.panels.bottom = crate::app::BottomTab::Output;
+    editor.panels.bottom = BottomTab::Output;
 }
 
 pub fn stop(editor: &mut Editor) {
@@ -336,12 +321,12 @@ pub fn restart(editor: &mut Editor) {
         if let Some(client) = running.client.as_mut() {
             let _ = client.child.wait();
         }
-        for line in drain(&running.lines) {
+        for line in running.lines.drain() {
             editor.output.say(line.tag, line.text);
         }
         editor.output.say("editor", "restarting the play-test");
     }
-    crate::play::start(editor, start);
+    play::start(editor, start);
 }
 
 pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
@@ -421,8 +406,8 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         start(editor, None);
     }
     if edit && let Some(key) = current_character(editor) {
-        editor.select(crate::project::Selection::row("test_character", &key));
-        editor.open_tab(Tab::for_row("test_character", &key));
+        editor.select(RowSelection::row("test_character", &key));
+        editor.open_tab(EditorTab::for_row("test_character", &key));
     }
     if stop_now {
         stop(editor);
@@ -478,7 +463,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
     let Some(failure) = editor.play.failure.as_ref() else {
         return;
     };
-    let reason = failure.reason.clone();
+    let reason = failure.clone();
     let mut copy = false;
     let mut save = false;
     let mut again = false;
@@ -530,7 +515,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
     if again {
         let start = editor.play.last_start;
         editor.play.failure = None;
-        crate::play::start(editor, start);
+        play::start(editor, start);
     }
     if dismiss {
         editor.play.failure = None;
@@ -557,7 +542,7 @@ pub fn status(editor: &mut Editor) {
     } else if let Some(failure) = editor.play.failure.as_ref() {
         editor.status.right.push(format!(
             "play-test stopped · {}",
-            failure.reason.split('.').next().unwrap_or("")
+            failure.split('.').next().unwrap_or("")
         ));
     }
 }
@@ -569,7 +554,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     let content = project.content;
     let spawn_area = content.map(|content| {
         content
-            .built::<game::systems::GameSettings>()
+            .built::<GameSettings>()
             .initial_spawn
             .area
             .key(&content)
@@ -579,14 +564,14 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
         .files
         .paths_under("tables/test_character/")
         .filter_map(|file| {
-            let (_, key) = crate::project::row_of(file)?;
+            let (_, key) = row_of(file)?;
             let row = project.files.json(file)?;
             let xp = row["xp"].as_u64().unwrap_or(0) as u32;
             let level = content
                 .and_then(|content| {
                     row["job"]
                         .as_str()
-                        .and_then(|job| content.by_key::<game::systems::job::JobDef>(job))
+                        .and_then(|job| content.by_key::<JobDef>(job))
                         .map(|job| {
                             job.get(&content)
                                 .levels
@@ -640,9 +625,9 @@ pub fn next_to_editor() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
-/// Starting a game binary for its build line takes long enough to feel as a freeze, so the check
-/// runs on a thread and answers `None` until it is done.
-pub fn check_binaries(editor: &mut Editor) -> Option<Binaries> {
+// Starting a game binary for its build line takes long enough to feel as a freeze, so the check
+// runs on a thread and answers `None` until it is done.
+pub fn check_binaries(editor: &mut Editor) -> Option<GameBinaries> {
     let folder = binaries_folder(editor);
     if let Some(known) = editor
         .play
@@ -653,11 +638,7 @@ pub fn check_binaries(editor: &mut Editor) -> Option<Binaries> {
         return Some(known.clone());
     }
     if let Some(receiver) = &editor.play.checking {
-        let received = receiver
-            .lock()
-            .map(|receiver| receiver.try_recv())
-            .unwrap_or(Err(TryRecvError::Disconnected));
-        match received {
+        match receiver.try_recv() {
             Ok(binaries) if binaries.folder == folder => {
                 editor.play.binaries = Some(binaries.clone());
                 editor.play.checking = None;
@@ -669,13 +650,13 @@ pub fn check_binaries(editor: &mut Editor) -> Option<Binaries> {
     }
     let (sender, receiver) = channel();
     std::thread::spawn(move || {
-        let _ = sender.send(Binaries {
+        let _ = sender.send(GameBinaries {
             server: build_info(&folder.join(SERVER)),
             client: build_info(&folder.join(CLIENT)),
             folder,
         });
     });
-    editor.play.checking = Some(Mutex::new(receiver));
+    editor.play.checking = Some(ChannelInbox::new(receiver));
     None
 }
 
@@ -694,14 +675,13 @@ fn build_info(binary: &Path) -> Result<BuildInfo, String> {
 pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let checked = check_binaries(editor);
     let folder = binaries_folder(editor);
-    let build = game::core::content::version::build();
-    let content_version = crate::app::content_version();
-    let folder_version = editor.project.as_ref().and_then(|p| p.content).map(|c| {
-        c.built::<game::systems::GameSettings>()
-            .content_version
-            .0
-            .clone()
-    });
+    let build = version::build();
+    let content_version = content_version();
+    let folder_version = editor
+        .project
+        .as_ref()
+        .and_then(|p| p.content)
+        .map(|c| c.built::<GameSettings>().content_version.0.clone());
     let ok = checked
         .as_ref()
         .is_some_and(|binaries| binaries.matches(build));
@@ -722,9 +702,9 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     );
     ui.add_space(8.0);
     widgets::kv(ui, "folder", |ui| {
-        let response = crate::forms::boxed_input(ui, Some("pick…"), |ui| {
+        let response = forms::boxed_input(ui, Some("pick…"), |ui| {
             ui.add(
-                egui::Label::new(theme::mono(crate::ui::pretty_path(&folder)).size(13.0))
+                egui::Label::new(theme::mono(ui::pretty_path(&folder)).size(13.0))
                     .sense(egui::Sense::click()),
             )
         });
@@ -854,11 +834,7 @@ fn editor_folder(editor: &Editor) -> PathBuf {
         .unwrap_or_default()
 }
 
-fn spawn_server(
-    binaries: &Path,
-    folder: &Path,
-    sender: Sender<OutputLine>,
-) -> std::io::Result<Process> {
+fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> io::Result<Process> {
     let config = ServerConfig {
         bind: LOCALHOST,
         port: 0,
@@ -885,7 +861,7 @@ fn spawn_client(
     ports: ServerPorts,
     character: &str,
     sender: Sender<OutputLine>,
-) -> std::io::Result<Process> {
+) -> io::Result<Process> {
     let binaries = binaries_folder(editor);
     let profile = editor.user.profiles_dir().join("play-test");
     std::fs::create_dir_all(&profile)?;
@@ -909,7 +885,7 @@ fn spawn(
     mut command: Command,
     tag: &'static str,
     sender: Sender<OutputLine>,
-) -> std::io::Result<Process> {
+) -> io::Result<Process> {
     command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

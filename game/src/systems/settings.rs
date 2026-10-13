@@ -5,7 +5,7 @@ use ui::{Activate, ButtonSize, ValueChange, button_styled};
 
 use crate::core::audio::mix::{AudioCategory, AudioFader, AudioVolume};
 use crate::core::render::transition::ScreenTransition;
-use crate::systems::hud::{HudAudience, LettersPerSecond, Settings, Window};
+use crate::systems::hud::{HudAudience, LettersPerSecond, Settings, Window, single_tab};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 
@@ -31,7 +31,7 @@ impl Window for SettingsWindow {
         5
     }
     fn contents(&self, world: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content(world)))
+        single_tab(self.title(), ui::scrolled(content(world)))
     }
     fn sync(&self, world: &mut World) {
         sync_labels(world)

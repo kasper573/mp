@@ -21,7 +21,7 @@ use crate::systems::player::ClientId;
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
 use crate::systems::scene::mode::Mode;
-use crate::systems::text::LineText;
+use crate::systems::text::{LineText, SpanText};
 
 pub const HISTORY_WINDOW: &str = "History";
 const SIZE: Vec2 = Vec2::new(780.0, 460.0);
@@ -522,8 +522,8 @@ fn words(text: &LineText) -> String {
     text.0
         .iter()
         .map(|span| match span {
-            crate::systems::text::SpanText::Text { text, .. } => text.as_str(),
-            crate::systems::text::SpanText::Input(_) => "",
+            SpanText::Text { text, .. } => text.as_str(),
+            SpanText::Input(_) => "",
         })
         .collect()
 }

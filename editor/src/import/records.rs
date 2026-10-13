@@ -5,8 +5,9 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use crate::app::Editor;
-use crate::project::watch::Watcher;
+use crate::project::watch::FolderWatcher;
 use crate::user::UserFolder;
+use crate::views::model::ModelStrip;
 
 pub const RETRIES: u32 = 3;
 
@@ -89,7 +90,7 @@ pub fn fingerprint(files: &[PathBuf]) -> (u64, String) {
 }
 
 #[derive(Clone, Debug)]
-pub struct Due {
+pub struct DueReimport {
     pub table: String,
     pub key: String,
     pub part: String,
@@ -99,16 +100,16 @@ pub struct Due {
 }
 
 #[derive(Default)]
-pub struct Imports {
+pub struct ImportRecords {
     pub records: Vec<ImportRecord>,
     file: Option<PathBuf>,
-    watchers: HashMap<PathBuf, Watcher>,
-    pub due: Vec<Due>,
+    watchers: HashMap<PathBuf, FolderWatcher>,
+    pub due: Vec<DueReimport>,
     pub unreadable: Option<String>,
 }
 
-impl Imports {
-    pub fn load(user: &UserFolder, folder: &Path) -> Imports {
+impl ImportRecords {
+    pub fn load(user: &UserFolder, folder: &Path) -> ImportRecords {
         let file = user
             .imports_dir()
             .join(format!("{}.json", UserFolder::folder_key(folder)));
@@ -123,7 +124,7 @@ impl Imports {
         let due = records
             .iter()
             .filter(|record| record.changed() == Some(true))
-            .map(|record| Due {
+            .map(|record| DueReimport {
                 table: record.table.clone(),
                 key: record.key.clone(),
                 part: record.part.clone(),
@@ -132,7 +133,7 @@ impl Imports {
                 while_closed: true,
             })
             .collect();
-        let mut imports = Imports {
+        let mut imports = ImportRecords {
             records,
             file: unreadable.is_none().then_some(file),
             watchers: HashMap::new(),
@@ -188,12 +189,12 @@ impl Imports {
             .collect();
         for dir in dirs {
             if !self.watchers.contains_key(&dir) && dir.is_dir() {
-                self.watchers.insert(dir.clone(), Watcher::on(&dir));
+                self.watchers.insert(dir.clone(), FolderWatcher::on(&dir));
             }
         }
     }
 
-    pub fn poll(&mut self) -> Vec<Due> {
+    pub fn poll(&mut self) -> Vec<DueReimport> {
         let mut touched: Vec<PathBuf> = Vec::new();
         for (dir, watcher) in &mut self.watchers {
             match watcher.poll() {
@@ -217,7 +218,7 @@ impl Imports {
                     due.table == record.table && due.key == record.key && due.part == record.part
                 })
             {
-                self.due.push(Due {
+                self.due.push(DueReimport {
                     table: record.table.clone(),
                     key: record.key.clone(),
                     part: record.part.clone(),
@@ -228,17 +229,17 @@ impl Imports {
             }
         }
         let now = Instant::now();
-        let (ready, waiting): (Vec<Due>, Vec<Due>) =
+        let (ready, waiting): (Vec<DueReimport>, Vec<DueReimport>) =
             self.due.drain(..).partition(|due| due.at <= now);
         self.due = waiting;
         ready
     }
 
-    pub fn retry(&mut self, due: Due) -> bool {
+    pub fn retry(&mut self, due: DueReimport) -> bool {
         if due.tries + 1 >= RETRIES {
             return false;
         }
-        self.due.push(Due {
+        self.due.push(DueReimport {
             at: Instant::now() + Duration::from_millis(500),
             tries: due.tries + 1,
             ..due
@@ -247,16 +248,11 @@ impl Imports {
     }
 }
 
-pub fn recorded_lengths(
-    editor: &Editor,
-    key: &str,
-    action: &str,
-    direction: &str,
-) -> Option<Vec<u32>> {
+pub fn recorded_lengths(editor: &Editor, key: &str, strip: ModelStrip) -> Option<Vec<u32>> {
     editor
         .imports
         .record_for("model", key)?
         .strips
-        .get(&format!("{action}_{direction}"))
+        .get(&strip.record_key())
         .cloned()
 }

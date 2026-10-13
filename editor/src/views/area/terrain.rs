@@ -1,25 +1,37 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use game::core::content::Content;
 use game::core::math::Rng;
 use game::core::tiling::{Cell, CellPos};
 use game::systems::area::grid::Flip;
 use game::systems::area::tileset::TilesetDef;
 
 use super::grid::GridDraft;
+use crate::views::tileset::terrain::MixCompleteness;
 
-#[allow(clippy::too_many_arguments)]
+pub struct TerrainBrush<'a> {
+    pub def: &'a TilesetDef,
+    pub tileset: &'a str,
+    pub set: &'a str,
+    pub terrain: usize,
+    pub size: u32,
+}
+
 pub fn paint(
     draft: &mut GridDraft,
     layer: usize,
-    def: &TilesetDef,
-    tileset: &str,
-    set: &str,
-    terrain: usize,
+    brush: &TerrainBrush,
     center: CellPos,
-    size: u32,
     rng: &mut Rng,
     painted: &mut HashSet<CellPos>,
 ) -> usize {
+    let TerrainBrush {
+        def,
+        tileset,
+        set,
+        terrain,
+        size,
+    } = *brush;
     let Some(terrains) = def.terrains.get(set) else {
         return 0;
     };
@@ -27,6 +39,7 @@ pub fn paint(
         return 0;
     };
     let base = &terrains[0];
+    let plain = || std::array::from_fn(|_| base.clone());
     let half = (size.max(1) as i32 - 1) / 2;
     let extra = i32::from(size.max(1).is_multiple_of(2));
     let mut vertices: Vec<(i32, i32)> = Vec::new();
@@ -45,12 +58,11 @@ pub fn paint(
                 .data(row.tile)
                 .and_then(|data| data.corners.get(set))
                 .cloned()
-                .unwrap_or_else(|| [base.clone(), base.clone(), base.clone(), base.clone()]),
-            _ => [base.clone(), base.clone(), base.clone(), base.clone()],
+                .unwrap_or_else(plain),
+            _ => plain(),
         }
     };
-    let mut wanted: std::collections::HashMap<CellPos, [String; 4]> =
-        std::collections::HashMap::new();
+    let mut wanted: HashMap<CellPos, [String; 4]> = HashMap::new();
     for (vx, vy) in vertices {
         let around = [
             (CellPos::new(vx - 1, vy - 1), 2),
@@ -76,17 +88,10 @@ pub fn paint(
             }
             continue;
         }
-        let matches: Vec<u32> = def
-            .tiles
-            .iter()
-            .filter(|(_, data)| data.corners.get(set).is_some_and(|c| c == corners))
-            .map(|(tile, _)| *tile)
-            .collect();
-        if matches.is_empty() {
+        let Some(tile) = rng.choose(&def.tiles_with_corners(set, corners)).copied() else {
             kept += 1;
             continue;
-        }
-        let tile = matches[rng.rand_range(0..matches.len() as u32) as usize];
+        };
         let index = draft.intern(tileset, tile, Flip::None);
         if draft.set(layer, cell, Some(index)) {
             painted.insert(cell);
@@ -122,17 +127,10 @@ pub fn repaint(
         else {
             continue;
         };
-        let matches: Vec<u32> = def
-            .tiles
-            .iter()
-            .filter(|(_, data)| data.corners.get(set).is_some_and(|c| *c == corners))
-            .map(|(tile, _)| *tile)
-            .collect();
-        if matches.is_empty() {
+        let Some(pick) = rng.choose(&def.tiles_with_corners(set, &corners)).copied() else {
             kept += 1;
             continue;
-        }
-        let pick = matches[rng.rand_range(0..matches.len() as u32) as usize];
+        };
         let index = draft.intern(tileset, pick, Flip::None);
         if draft.set(layer, cell, Some(index)) {
             changed += 1;
@@ -141,12 +139,31 @@ pub fn repaint(
     (changed, kept)
 }
 
-pub fn completeness(def: &TilesetDef, set: &str, terrains: &[String]) -> (usize, usize) {
-    let total = terrains.len().pow(4);
-    let seen: HashSet<&[String; 4]> = def
-        .tiles
-        .values()
-        .filter_map(|data| data.corners.get(set))
-        .collect();
-    (seen.len().min(total), total)
+pub struct TerrainSetCoverage {
+    pub tileset: String,
+    pub set: String,
+    pub terrains: Vec<String>,
+    pub have: usize,
+    pub total: usize,
+}
+
+pub fn sets_for(content: &Content, tile_px: u32) -> Vec<TerrainSetCoverage> {
+    content
+        .table::<TilesetDef>()
+        .iter()
+        .filter(|(_, def)| def.tile == tile_px)
+        .flat_map(|(id, def)| {
+            let tileset = id.key(content).to_owned();
+            def.terrains.iter().map(move |(set, terrains)| {
+                let mixes = MixCompleteness::of(def, set);
+                TerrainSetCoverage {
+                    tileset: tileset.clone(),
+                    set: set.clone(),
+                    terrains: terrains.clone(),
+                    have: mixes.have,
+                    total: mixes.total,
+                }
+            })
+        })
+        .collect()
 }

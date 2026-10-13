@@ -12,6 +12,7 @@ use schemars::generate::SchemaSettings;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use super::GAME_FILE;
 use super::check::RowCheck;
 use super::fixture::Fixture;
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
@@ -32,7 +33,7 @@ pub enum LoadStep {
 }
 
 type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
-type FixtureCheck = Box<dyn Fn(&Content) -> Vec<(&'static str, &'static str)> + Send + Sync>;
+type FixtureCheck = Box<dyn Fn(&Content) -> Vec<&'static str> + Send + Sync>;
 
 struct FixtureEntry {
     table: &'static str,
@@ -94,12 +95,7 @@ impl ContentRegistry {
         self.fixtures.push(FixtureEntry {
             table: F::Row::TABLE,
             keys: F::VARIANTS.iter().map(|fixture| fixture.key()).collect(),
-            check: Box::new(|content| {
-                F::missing(content)
-                    .into_iter()
-                    .map(|key| (F::Row::TABLE, key))
-                    .collect()
-            }),
+            check: Box::new(F::missing),
         });
         self
     }
@@ -160,19 +156,21 @@ impl ContentRegistry {
     }
 
     pub fn references(&self, content: &Content, file: &str, text: &str) -> Vec<Reference> {
-        let leaves = if file == "game.json" {
+        let parse: &dyn Fn(&str) -> ParseResult = if file == GAME_FILE {
             let Some(loader) = self.settings.as_deref() else {
                 return Vec::new();
             };
-            leaves_of(content, text, &|text| loader.parse(text))
+            &|text| loader.parse(text)
         } else {
             let loader =
                 table_of(file).and_then(|table| self.rows.iter().find(|row| row.name() == table));
             let Some(loader) = loader else {
                 return Vec::new();
             };
-            leaves_of(content, text, &|text| loader.parse(text))
+            &|text| loader.parse(text)
         };
+        let (_, scope) = with_content(ContentScope::of(content), || parse(text));
+        let leaves = scope.leaves().to_vec();
         let index = JsonIndex::of(text);
         let mut strings = index.strings();
         leaves
@@ -222,11 +220,6 @@ fn table_of(file: &str) -> Option<&str> {
     let rest = file.strip_prefix("tables/")?;
     let (table, name) = rest.split_once('/')?;
     name.ends_with(".json").then_some(table)
-}
-
-fn leaves_of(content: &Content, text: &str, parse: &dyn Fn(&str) -> ParseResult) -> Vec<Leaf> {
-    let (_, scope) = with_content(ContentScope::of(content), || parse(text));
-    scope.leaves().to_vec()
 }
 
 pub trait ContentFolder: Send + Sync {
@@ -513,13 +506,6 @@ impl Loading {
             .unwrap_or_default()
     }
 
-    pub fn row_folder_file<Row: ContentRow>(&mut self, id: ContentId<Row>, name: &str) -> String {
-        format!(
-            "{}/{name}",
-            super::row_folder(Row::TABLE, id.key(&self.content()))
-        )
-    }
-
     pub fn place(&mut self, file: &str, pointer: &str) -> ErrorPlace {
         match self.index(file).and_then(|index| index.position(pointer)) {
             Some((line, column)) => ErrorPlace::Json {
@@ -544,13 +530,11 @@ impl Loading {
     fn parse(&mut self, registry: &ContentRegistry) {
         let mut scope = ContentScope::new();
         for loader in registry.row_loaders() {
-            let keys = self
-                .listing
-                .tables
-                .get(loader.name())
-                .map(|table| table.keys.clone())
-                .unwrap_or_default();
-            scope.table_by_type(loader.row_type(), loader.name(), keys);
+            scope.table_by_type(
+                loader.row_type(),
+                loader.name(),
+                self.listing.keys_of(loader.name()),
+            );
         }
         scope.assets(self.listing.assets.clone());
 
@@ -560,10 +544,7 @@ impl Loading {
             .enumerate()
             .flat_map(|(index, loader)| {
                 self.listing
-                    .tables
-                    .get(loader.name())
-                    .map(|table| table.keys.clone())
-                    .unwrap_or_default()
+                    .keys_of(loader.name())
                     .into_iter()
                     .map(move |key| (index, key))
             })
@@ -595,17 +576,11 @@ impl Loading {
             }
         }
         for (loader, rows) in registry.row_loaders().iter().zip(rows) {
-            let keys = self
-                .listing
-                .tables
-                .get(loader.name())
-                .map(|table| table.keys.clone())
-                .unwrap_or_default();
-            loader.finish(keys, rows, &mut self.builder);
+            loader.finish(self.listing.keys_of(loader.name()), rows, &mut self.builder);
         }
         self.snapshot = None;
 
-        let settings = parse_file(root.as_ref(), "game.json", &scope, |text| {
+        let settings = parse_file(root.as_ref(), GAME_FILE, &scope, |text| {
             registry
                 .settings_loader()
                 .map(|loader| loader.parse(text))
@@ -613,7 +588,7 @@ impl Loading {
         });
         self.errors.extend(settings.errors);
         if let Some(index) = settings.index {
-            self.indexes.insert("game.json".to_owned(), Arc::new(index));
+            self.indexes.insert(GAME_FILE.to_owned(), Arc::new(index));
         }
         match settings.row {
             Some(settings) => {
@@ -622,7 +597,7 @@ impl Loading {
                 }
             }
             None if !self.listing.game_json => self.file_error(
-                "game.json",
+                GAME_FILE,
                 ErrorPlace::WholeFile,
                 "missing file",
                 "no such file",
@@ -659,16 +634,15 @@ impl Loading {
     fn hash_files(&mut self) {
         let mut files: Vec<String> = Vec::new();
         if self.listing.game_json {
-            files.push("game.json".to_owned());
+            files.push(GAME_FILE.to_owned());
         }
         for (table, listing) in &self.listing.tables {
             for key in &listing.keys {
                 files.push(super::row_file(table, key));
             }
             for (key, names) in &listing.folders {
-                for name in names {
-                    files.push(format!("tables/{table}/{key}/{name}"));
-                }
+                let folder = super::row_folder(table, key);
+                files.extend(names.iter().map(|name| format!("{folder}/{name}")));
             }
         }
         files.extend(
@@ -716,9 +690,10 @@ impl Loading {
     fn check_fixtures(&mut self, registry: &ContentRegistry) {
         let content = self.content();
         for fixture in &registry.fixtures {
-            for (table, key) in (fixture.check)(&content) {
+            let table = fixture.table;
+            for key in (fixture.check)(&content) {
                 self.file_error(
-                    format!("tables/{table}/{key}.json"),
+                    super::row_file(table, key),
                     ErrorPlace::WholeFile,
                     "missing fixture",
                     "no such file",
@@ -739,7 +714,7 @@ impl Loading {
         };
         if found != version {
             self.json_error(
-                "game.json",
+                GAME_FILE,
                 "/content_version",
                 VERSION_RULE,
                 format!("{:?}", found.0),
@@ -1168,8 +1143,7 @@ impl<Row: ContentRow> TableLoader for RowLoader<Row> {
 
     fn write_rows(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         for (id, row) in content.table::<Row>().iter() {
-            let file = format!("tables/{}/{}.json", Row::TABLE, id.key(content));
-            writer.json(&file, row)?;
+            writer.json(&super::row_file(Row::TABLE, id.key(content)), row)?;
         }
         Ok(())
     }
@@ -1219,7 +1193,7 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
 
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
         if content.has_built::<G>() {
-            writer.json("game.json", content.built::<G>())?;
+            writer.json(GAME_FILE, content.built::<G>())?;
         }
         Ok(())
     }
@@ -1281,6 +1255,15 @@ struct Listed {
 }
 
 impl Listing {
+    fn keys_of(&self, table: &str) -> Vec<String> {
+        self.tables
+            .get(table)
+            .map(|listing| listing.keys.clone())
+            .unwrap_or_default()
+    }
+}
+
+impl Listing {
     fn read(registry: &ContentRegistry, root: &dyn ContentFolder) -> Listed {
         let mut errors = Vec::new();
         let mut listing = Listing {
@@ -1296,7 +1279,7 @@ impl Listing {
         for entry in entries(root, "") {
             let name = entry.name.clone();
             match (name.as_str(), entry.dir) {
-                ("game.json", false) => listing.game_json = true,
+                (GAME_FILE, false) => listing.game_json = true,
                 ("credits.md" | "README.md", false) => {}
                 ("tables", true) => listing.read_tables(registry, root, &mut errors),
                 ("assets", true) => collect_assets(root, "assets", "", &mut listing.assets),

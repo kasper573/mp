@@ -2,6 +2,7 @@ use egui::{Align, Layout, RichText, Ui};
 
 use super::theme;
 use crate::app::Editor;
+use crate::play;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui) {
     ui.horizontal(|ui| {
@@ -11,7 +12,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
                 editor.output.lines.clear();
             }
             if ui.small_button("Save to file…").clicked() {
-                crate::play::save_output(editor);
+                play::save_output(editor);
             }
             if ui.small_button("Copy").clicked() {
                 let text = editor.output.text();

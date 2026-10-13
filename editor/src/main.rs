@@ -2,17 +2,16 @@ use std::path::PathBuf;
 
 use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
-
-use editor::app::{EditorPlugin, Launch};
+use editor::app::{EditorLaunch, EditorPlugin};
 
 const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
 
   --scene STEPS      opens the folder on a state, for recordings and tests; steps join with `;`:
                      area:<key>  blueprint:<key>  row:<table>/<key>  rows:<table>/<key>,<key>
                      script:<key> | script:<table>/<key>#<pointer>  node:<name>  model:<key>
-                     tileset:<key>  sheet:<table>  world  part:<area>/<indices>  resize:area/<key>
-                     fold:<table>/<key>/<indices>  unfold:…  delete:<table>/<key>  save
-                     clipboard:<table>/<key>/<index>  make-shared | make-inline | connect
+                     tileset:<key>  sheet:<table>  world  part:<table>/<key>/<indices>  resize:area/<key>
+                     fold:<table>/<key>/<indices>  unfold:…  delete:<table>/<key>  duplicate:<table>/<key>  save
+                     clipboard:<table>/<key>/<index>  make-shared | make-inline | connect  dialog:<keys|binaries>
                      bottom:<may-do|used-by|run|output|timeline|sheet|sounds|surfaces>
                      section:<stats|bag|equipment|start|areas|quests|memories|lines|shops|history>
                      mp:<strip|timing|cues|hitbox|busts|bottom|setby|surface|drop>:<arg>
@@ -25,7 +24,7 @@ const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH]
   --shapes           prints every row shape as JSON and exits";
 
 fn main() {
-    let mut launch = Launch::default();
+    let mut launch = EditorLaunch::default();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -34,9 +33,7 @@ fn main() {
                 return;
             }
             "--shapes" => {
-                let settings = schemars::generate::SchemaSettings::draft2020_12()
-                    .with(|settings| settings.inline_subschemas = true);
-                let shapes = game::systems::registry().shapes(&settings);
+                let shapes = editor::schema::shapes_json();
                 println!("{}", serde_json::to_string_pretty(&shapes).expect("json"));
                 return;
             }

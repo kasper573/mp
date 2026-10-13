@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 pub mod blueprint;
 pub mod grid;
 pub mod object;
@@ -12,6 +11,7 @@ pub use blueprint::{Flattened, PlacedBlueprint, Placement};
 pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io;
 
@@ -30,12 +30,14 @@ use crate::core::audio::soundscape::{
 };
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    Content, ContentId, ContentRegistry, ContentRow, ErrorPlace, LoadError, LoadStep, Loading,
-    ModuleRule, ModuleSet, RowCheck,
+    Content, ContentId, ContentRegistry, ContentRow, ErrorPlace, FileWriter, LoadError, LoadStep,
+    Loading, ModuleRule, ModuleSet, RowCheck, serial, valid_key,
 };
 use crate::core::math::{Pos, Rect, Size};
+use crate::core::script::{OwnerKind, OwnerRow};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
 use crate::systems::movement;
+use crate::systems::npc::Id as NpcId;
 use crate::systems::script::{self, Condition, Reach, RiftScripts, ScriptModule};
 
 pub type Id = ContentId<AreaDef>;
@@ -133,10 +135,7 @@ impl ContentRow for AreaDef {
         );
         for (index, layer) in map.ground.iter().enumerate() {
             let pointer = format!("/map/ground/{index}");
-            if layer == "palette"
-                || layer == "walk"
-                || !crate::core::content::load::valid_key(layer)
-            {
+            if layer == "palette" || layer == "walk" || !valid_key(layer) {
                 cx.error(
                     &pointer,
                     "out of range",
@@ -291,10 +290,10 @@ impl AreaModule {
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SafeZone {
-    #[schemars(with = "crate::core::content::serial::RectRow")]
+    #[schemars(with = "serial::RectRow")]
     #[serde(
-        serialize_with = "crate::core::content::serial::rect",
-        deserialize_with = "crate::core::content::serial::rect_from"
+        serialize_with = "serial::rect",
+        deserialize_with = "serial::rect_from"
     )]
     pub rect: Rect<Tiles>,
 }
@@ -357,16 +356,14 @@ impl From<ZoneShape> for ZoneShapeRow {
 #[serde(deny_unknown_fields)]
 pub struct SoundChannel {
     pub channel: u32,
+    #[schemars(extend("x-asset" = "audio"))]
     pub file: AssetRef,
     #[serde(
-        default = "crate::core::content::serial::one_f32",
-        skip_serializing_if = "crate::core::content::serial::is_one_f32"
+        default = "serial::one_f32",
+        skip_serializing_if = "serial::is_one_f32"
     )]
     pub volume: f32,
-    #[serde(
-        default,
-        skip_serializing_if = "crate::core::content::serial::is_zero_f32"
-    )]
+    #[serde(default, skip_serializing_if = "serial::is_zero_f32")]
     pub pan: f32,
 }
 
@@ -433,11 +430,8 @@ impl SoundscapeDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Scenery {
-    #[schemars(with = "crate::core::content::serial::PosRow")]
-    #[serde(
-        serialize_with = "crate::core::content::serial::pos",
-        deserialize_with = "crate::core::content::serial::pos_from"
-    )]
+    #[schemars(with = "serial::PosRow")]
+    #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<Tiles>,
     pub tileset: tileset::Id,
     pub tiles: Vec<Vec<Option<SceneryTile>>>,
@@ -487,6 +481,13 @@ impl Scenery {
 
     pub fn width(&self) -> usize {
         self.tiles.first().map_or(0, Vec::len)
+    }
+
+    pub fn bounds(&self) -> Rect<Tiles> {
+        Rect::new(
+            self.at,
+            Size::new(self.width() as f32, self.height() as f32),
+        )
     }
 
     pub fn sort_line(&self) -> Option<Tiles> {
@@ -558,13 +559,13 @@ impl JsonSchema for SceneryTile {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Population {
-    pub npc: crate::systems::npc::Id,
+    pub npc: NpcId,
     pub count: u32,
-    #[schemars(with = "Option<crate::core::content::serial::RectRow>")]
+    #[schemars(with = "Option<serial::RectRow>")]
     #[serde(
         default,
-        serialize_with = "crate::core::content::serial::opt_rect",
-        deserialize_with = "crate::core::content::serial::opt_rect_from",
+        serialize_with = "serial::opt_rect",
+        deserialize_with = "serial::opt_rect_from",
         skip_serializing_if = "Option::is_none"
     )]
     pub roams: Option<Rect<Tiles>>,
@@ -573,12 +574,9 @@ pub struct Population {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Resident {
-    pub npc: crate::systems::npc::Id,
-    #[schemars(with = "crate::core::content::serial::PosRow")]
-    #[serde(
-        serialize_with = "crate::core::content::serial::pos",
-        deserialize_with = "crate::core::content::serial::pos_from"
-    )]
+    pub npc: NpcId,
+    #[schemars(with = "serial::PosRow")]
+    #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<Tiles>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shown: Option<Condition>,
@@ -618,7 +616,7 @@ pub fn objects(modules: &[Flattened]) -> impl Iterator<Item = (u32, &ObjectDef)>
         })
 }
 
-pub fn npcs(modules: &[Flattened]) -> impl Iterator<Item = crate::systems::npc::Id> + '_ {
+pub fn npcs(modules: &[Flattened]) -> impl Iterator<Item = NpcId> + '_ {
     modules.iter().filter_map(|placed| match &placed.module {
         AreaModule::Resident(resident) => Some(resident.npc),
         AreaModule::Population(population) => Some(population.npc),
@@ -626,7 +624,7 @@ pub fn npcs(modules: &[Flattened]) -> impl Iterator<Item = crate::systems::npc::
     })
 }
 
-pub fn residents(modules: &[Flattened]) -> impl Iterator<Item = crate::systems::npc::Id> + '_ {
+pub fn residents(modules: &[Flattened]) -> impl Iterator<Item = NpcId> + '_ {
     modules.iter().filter_map(|placed| match &placed.module {
         AreaModule::Resident(resident) => Some(resident.npc),
         _ => None,
@@ -979,8 +977,8 @@ fn build_all(loading: &mut Loading) {
         };
         let modules = placed(&content, id);
         let map = def.map();
-        let mut errors = Vec::new();
-        check_bounds(&content, map, modules, sizes, &mut errors);
+        let mut check = RowCheck::default();
+        check_bounds(&content, map, modules, sizes, &mut check);
         let safe_zones: Vec<Rect<Tiles>> = modules
             .iter()
             .filter_map(|placed| match &placed.module {
@@ -1017,16 +1015,12 @@ fn build_all(loading: &mut Loading) {
                 })
                 .collect(),
         };
-        check_placed(&content, id, &area, modules, &mut errors);
-        for (pointer, rule, found, expected, nearest) in errors {
-            loading.row_error(id, &pointer, rule, found, expected, nearest);
-        }
+        check_placed(&content, id, &area, modules, &mut check);
+        loading.row_errors(id, check);
         areas[id.index()] = Some(area);
     }
     loading.built(Areas(areas));
 }
-
-type PlaceError = (String, &'static str, String, String, Option<String>);
 
 fn module_pointer(placed: &Flattened) -> String {
     format!("/modules/{}", placed.origin)
@@ -1037,15 +1031,15 @@ fn check_bounds(
     map: &Tilemap,
     modules: &[Flattened],
     sizes: &ImageSizes,
-    errors: &mut Vec<PlaceError>,
+    check: &mut RowCheck,
 ) {
     let bounds = map.size.tiles().bounds();
     let outside = |at: Pos<Tiles>| !bounds.contains(at);
     for placed in modules {
         let pointer = module_pointer(placed);
         let what = placed.describe(content);
-        let out = |at: Pos<Tiles>| -> PlaceError {
-            (
+        let out = |check: &mut RowCheck, at: Pos<Tiles>| {
+            check.error(
                 pointer.clone(),
                 "outside the map",
                 format!("{what} lands outside the map at {}, {}", at.x, at.y),
@@ -1053,8 +1047,7 @@ fn check_bounds(
                     "everything inside the {} × {} map",
                     map.size.width, map.size.height
                 ),
-                None,
-            )
+            );
         };
         match &placed.module {
             AreaModule::Object(object) => {
@@ -1062,19 +1055,18 @@ fn check_bounds(
                 if outside(b.min())
                     || outside(b.max() - crate::core::math::Offset::new(0.001, 0.001))
                 {
-                    errors.push(out(object.shape.origin()));
+                    out(check, object.shape.origin());
                 }
             }
             AreaModule::Scenery(scenery) => {
                 let tileset = scenery.tileset.get(content);
                 if tileset.tile != map.tile {
-                    errors.push((
+                    check.error(
                         format!("{pointer}/tileset"),
                         "tile size mismatch",
                         format!("{} against {}", map.tile, tileset.tile),
                         format!("tilesets of {} px tiles, the area's", map.tile),
-                        None,
-                    ));
+                    );
                 }
                 let count = sizes
                     .0
@@ -1087,30 +1079,29 @@ fn check_bounds(
                         };
                         let square = walk::tile_square(scenery, column, row);
                         if outside(square.origin) {
-                            errors.push(out(square.origin));
+                            out(check, square.origin);
                         }
                         if let Some(count) = count
                             && tile.tile >= count
                         {
-                            errors.push((
+                            check.error(
                                 format!("{pointer}/tiles/{row}/{column}"),
                                 "tile out of range",
                                 format!("tile {} of {count}", tile.tile),
                                 format!("0 to {}", count.saturating_sub(1)),
-                                None,
-                            ));
+                            );
                         }
                     }
                 }
             }
             AreaModule::Resident(resident) => {
                 if outside(resident.at) {
-                    errors.push(out(resident.at));
+                    out(check, resident.at);
                 }
             }
             AreaModule::Population(Population {
                 roams: Some(roams), ..
-            }) if outside(roams.min()) => errors.push(out(roams.min())),
+            }) if outside(roams.min()) => out(check, roams.min()),
             _ => {}
         }
     }
@@ -1121,7 +1112,7 @@ fn check_placed(
     id: Id,
     area: &Area,
     modules: &[Flattened],
-    errors: &mut Vec<PlaceError>,
+    check: &mut RowCheck,
 ) {
     let scripts = content
         .has_built::<RiftScripts>()
@@ -1130,8 +1121,8 @@ fn check_placed(
         .filter(|(index, _)| {
             scripts.is_some_and(|scripts| {
                 scripts
-                    .may_do(crate::core::script::OwnerRow {
-                        kind: crate::core::script::OwnerKind::Object,
+                    .may_do(OwnerRow {
+                        kind: OwnerKind::Object,
                         row: id.raw(),
                         object: Some(*index),
                     })
@@ -1164,7 +1155,7 @@ fn check_placed(
             .map(|cell| format!("{}, {}", cell.x, cell.y))
     };
     let mut names: Vec<(String, String)> = Vec::new();
-    let mut seen_residents: Vec<crate::systems::npc::Id> = Vec::new();
+    let mut seen_residents: Vec<NpcId> = Vec::new();
     for placed in modules {
         let pointer = module_pointer(placed);
         match &placed.module {
@@ -1173,13 +1164,12 @@ fn check_placed(
                     if let Some((_, first)) =
                         names.iter().find(|(n, _)| n.eq_ignore_ascii_case(name))
                     {
-                        errors.push((
+                        check.error(
                             pointer.clone(),
                             "duplicate name",
                             format!("{name}, from {} and {}", first, placed.describe(content)),
-                            "object names unique in the area ignoring case".to_owned(),
-                            None,
-                        ));
+                            "object names unique in the area ignoring case",
+                        );
                     } else {
                         names.push((name.clone(), placed.describe(content)));
                     }
@@ -1187,46 +1177,44 @@ fn check_placed(
                 if let ObjectShape::Point(at) = object.shape
                     && !area.grid.walkable(at)
                 {
-                    errors.push((
+                    check.nearest(
                         format!("{pointer}/shape"),
                         "not walkable",
                         format!("{}, {}", at.x, at.y),
-                        "a point object on a walkable cell".to_owned(),
+                        "a point object on a walkable cell",
                         nearest_cell(at),
-                    ));
+                    );
                 }
             }
             AreaModule::Resident(resident) => {
                 let key = resident.npc.key(content);
                 if seen_residents.contains(&resident.npc) {
-                    errors.push((
+                    check.error(
                         pointer.clone(),
                         "resident twice",
                         format!("{key} in {}", id.key(content)),
-                        "each npc resident once per area".to_owned(),
-                        None,
-                    ));
+                        "each npc resident once per area",
+                    );
                 }
                 seen_residents.push(resident.npc);
                 if !area.grid.walkable(resident.at) {
-                    errors.push((
+                    check.nearest(
                         format!("{pointer}/at"),
                         "not walkable",
                         format!("{} {}, {}", key, resident.at.x, resident.at.y),
-                        "a resident on a walkable cell".to_owned(),
+                        "a resident on a walkable cell",
                         nearest_cell(resident.at),
-                    ));
+                    );
                 } else if let Some(door) = in_warp(resident.at) {
-                    errors.push((
+                    check.error(
                         format!("{pointer}/at"),
                         "in a warp object",
                         format!(
                             "{key} {}, {} inside object {door}",
                             resident.at.x, resident.at.y
                         ),
-                        "a spot outside every warp object".to_owned(),
-                        None,
-                    ));
+                        "a spot outside every warp object",
+                    );
                 }
             }
             AreaModule::Population(population) => {
@@ -1236,13 +1224,12 @@ fn check_placed(
                     None => !ground.is_empty(),
                 };
                 if !has_ground {
-                    errors.push((
+                    check.error(
                         pointer.clone(),
                         "no wild ground",
                         format!("{} in {}", population.npc.key(content), id.key(content)),
-                        "a walkable cell outside every safe zone to spawn on".to_owned(),
-                        None,
-                    ));
+                        "a walkable cell outside every safe zone to spawn on",
+                    );
                 }
             }
             _ => {}
@@ -1256,23 +1243,21 @@ fn check_placed(
             .tiles()
             .any(|cell| object.shape.covers_cell(cell) && area.grid.walkable(cell.center()));
         if !covered {
-            errors.push((
+            check.error(
                 pointer.clone(),
                 "warp object has no ground",
                 name.clone(),
-                "a warp object covering at least one walkable cell".to_owned(),
-                None,
-            ));
+                "a warp object covering at least one walkable cell",
+            );
         }
         for (_, other, other_name) in &warps[index + 1..] {
             if object.shape.overlaps(&other.shape) {
-                errors.push((
+                check.error(
                     pointer.clone(),
                     "warp objects overlap",
                     format!("{name} and {other_name}"),
-                    "warp objects that never overlap".to_owned(),
-                    None,
-                ));
+                    "warp objects that never overlap",
+                );
             }
         }
     }
@@ -1300,8 +1285,8 @@ pub fn check_place(content: &Content, place: script::Place) -> Result<(), PlaceP
     let warp_objects: Vec<(u32, &ObjectDef)> = objects(modules)
         .filter(|(index, _)| {
             scripts
-                .may_do(crate::core::script::OwnerRow {
-                    kind: crate::core::script::OwnerKind::Object,
+                .may_do(OwnerRow {
+                    kind: OwnerKind::Object,
                     row: place.area.raw(),
                     object: Some(*index),
                 })
@@ -1351,7 +1336,7 @@ pub fn check_place(content: &Content, place: script::Place) -> Result<(), PlaceP
     Ok(())
 }
 
-fn write_grids(content: &Content, writer: &mut crate::core::content::FileWriter) -> io::Result<()> {
+fn write_grids(content: &Content, writer: &mut FileWriter) -> io::Result<()> {
     let grids = content.built::<AreaGridSet>();
     for (id, _) in content.table::<AreaDef>().iter() {
         let Some(grids) = grids.0[id.index()].as_ref() else {

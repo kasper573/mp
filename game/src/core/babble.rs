@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::AudioSource;
+use bevy_replicon::prelude::AppRuleExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ui::{RichPiece, RichText, TextVoice, Typewriter, TypewriterReveal};
@@ -7,12 +8,14 @@ use ui::{RichPiece, RichText, TextVoice, Typewriter, TypewriterReveal};
 use crate::core::assets::AssetRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{PlayClip, SfxPlace, SfxTune};
-use crate::core::content::Content;
+use crate::core::content::{
+    Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
+};
 use crate::core::math::Rng;
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
-pub type BabbleId = crate::core::content::ContentId<BabbleDef>;
-pub type BabbleBankId = crate::core::content::ContentId<BabbleBankDef>;
+pub type BabbleId = ContentId<BabbleDef>;
+pub type BabbleBankId = ContentId<BabbleBankDef>;
 
 const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
 const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
@@ -37,7 +40,7 @@ pub struct BabbleDef {
     pub pace: Hertz,
 }
 
-impl crate::core::content::ContentRow for BabbleDef {
+impl ContentRow for BabbleDef {
     const TABLE: &'static str = "babble";
 }
 
@@ -47,16 +50,20 @@ pub struct BabbleBankDef {
     pub volume: f32,
 }
 
-pub fn content(registry: &mut crate::core::content::ContentRegistry) {
+impl ContentRow for BabbleBankDef {
+    const TABLE: &'static str = "babble_bank";
+}
+
+pub fn content(registry: &mut ContentRegistry) {
     registry
         .row::<BabbleDef>()
         .row::<BabbleBankDef>()
-        .hook(crate::core::content::LoadStep::Files, check_banks);
+        .hook(LoadStep::Files, check_banks);
 }
 
-fn check_banks(loading: &mut crate::core::content::Loading) {
+fn check_banks(loading: &mut Loading) {
     for (id, bank) in loading.rows::<BabbleBankDef>() {
-        let mut check = crate::core::content::RowCheck::default();
+        let mut check = RowCheck::default();
         check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
         for letter in letter_files(bank) {
             if !loading.has_asset(letter.as_str()) {
@@ -74,10 +81,6 @@ fn check_banks(loading: &mut crate::core::content::Loading) {
             loading.fail(id);
         }
     }
-}
-
-impl crate::core::content::ContentRow for BabbleBankDef {
-    const TABLE: &'static str = "babble_bank";
 }
 
 #[derive(
@@ -102,8 +105,7 @@ impl BabbleRank {
     pub const DIALOGUE_BOX: BabbleRank = BabbleRank(u32::MAX);
 }
 
-pub fn register(app: &mut bevy_app::App) {
-    use bevy_replicon::prelude::*;
+pub fn register(app: &mut App) {
     app.replicate::<Babbler>();
 }
 

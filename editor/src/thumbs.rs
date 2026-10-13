@@ -2,23 +2,27 @@ use std::collections::HashMap;
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
 
-use crate::project::Files;
+use crate::project::ProjectFiles;
 
 #[derive(Default)]
 pub struct Thumbnails {
-    textures: HashMap<String, Option<Thumb>>,
-    generation: u64,
+    textures: HashMap<String, Option<Thumbnail>>,
 }
 
 #[derive(Clone)]
-pub struct Thumb {
+pub struct Thumbnail {
     pub texture: TextureHandle,
     pub size: [usize; 2],
     pub hash: String,
 }
 
 impl Thumbnails {
-    pub fn image(&mut self, ctx: &egui::Context, files: &Files, path: &str) -> Option<Thumb> {
+    pub fn image(
+        &mut self,
+        ctx: &egui::Context,
+        files: &ProjectFiles,
+        path: &str,
+    ) -> Option<Thumbnail> {
         let mut unlimited = u32::MAX;
         self.image_within(ctx, files, path, &mut unlimited)
     }
@@ -26,10 +30,10 @@ impl Thumbnails {
     pub fn image_within(
         &mut self,
         ctx: &egui::Context,
-        files: &Files,
+        files: &ProjectFiles,
         path: &str,
         budget: &mut u32,
-    ) -> Option<Thumb> {
+    ) -> Option<Thumbnail> {
         let file = format!("assets/{path}");
         let bytes = files.get(&file)?;
         let hash = files.hash_of(&file)?.to_owned();
@@ -45,7 +49,7 @@ impl Thumbnails {
         *budget -= 1;
         let decoded = decode(bytes).map(|image| {
             let size = image.size;
-            Thumb {
+            Thumbnail {
                 texture: ctx.load_texture(file.clone(), image, TextureOptions::NEAREST),
                 size,
                 hash,
@@ -58,10 +62,10 @@ impl Thumbnails {
     pub fn icon(
         &mut self,
         ctx: &egui::Context,
-        files: &Files,
+        files: &ProjectFiles,
         path: &str,
         budget: &mut u32,
-    ) -> Option<Thumb> {
+    ) -> Option<Thumbnail> {
         let file = format!("assets/{path}");
         let key = format!("icon:{file}");
         let hash = files.hash_of(&file)?.to_owned();
@@ -78,7 +82,7 @@ impl Thumbnails {
         let decoded = decode(files.get(&file)?).map(|image| {
             let image = shrink(image, ICON);
             let size = image.size;
-            Thumb {
+            Thumbnail {
                 texture: ctx.load_texture(key.clone(), image, TextureOptions::NEAREST),
                 size,
                 hash,
@@ -91,10 +95,6 @@ impl Thumbnails {
     pub fn forget(&mut self, path: &str) {
         self.textures.remove(&format!("assets/{path}"));
         self.textures.remove(&format!("icon:assets/{path}"));
-    }
-
-    pub fn bump(&mut self) {
-        self.generation += 1;
     }
 }
 
@@ -133,10 +133,52 @@ pub fn decode(bytes: &[u8]) -> Option<ColorImage> {
     Some(ColorImage::from_rgba_unmultiplied(size, image.as_raw()))
 }
 
+pub struct ModelFrame {
+    pub uv: egui::Rect,
+    pub size: egui::Vec2,
+}
+
+pub fn model_frame(model: &serde_json::Value, thumb: &Thumbnail) -> ModelFrame {
+    let sprites = &model["sprites"];
+    let w = sprites["frame_size"]["width"].as_f64().unwrap_or(16.0) as f32;
+    let h = sprites["frame_size"]["height"].as_f64().unwrap_or(16.0) as f32;
+    let frame = sprites["actions"]["idle"]["s"][0]["frame"]
+        .as_u64()
+        .unwrap_or(0) as f32;
+    let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
+    let x = (frame % columns) * w;
+    let y = (frame / columns).floor() * h;
+    ModelFrame {
+        uv: uv(thumb.size, x, y, w, h),
+        size: egui::vec2(w, h),
+    }
+}
+
 pub fn uv(size: [usize; 2], x: f32, y: f32, w: f32, h: f32) -> egui::Rect {
     let (sw, sh) = (size[0] as f32, size[1] as f32);
     egui::Rect::from_min_max(
         egui::pos2(x / sw, y / sh),
         egui::pos2((x + w) / sw, (y + h) / sh),
     )
+}
+
+pub fn square_uv(size: [usize; 2]) -> egui::Rect {
+    let (w, h) = (size[0] as f32, size[1] as f32);
+    if h >= w {
+        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, w / h))
+    } else {
+        let margin = (1.0 - h / w) / 2.0;
+        egui::Rect::from_min_max(egui::pos2(margin, 0.0), egui::pos2(1.0 - margin, 1.0))
+    }
+}
+
+pub fn flip_uv(uv: egui::Rect, horizontal: bool, vertical: bool) -> egui::Rect {
+    let (mut min, mut max) = (uv.min, uv.max);
+    if horizontal {
+        std::mem::swap(&mut min.x, &mut max.x);
+    }
+    if vertical {
+        std::mem::swap(&mut min.y, &mut max.y);
+    }
+    egui::Rect::from_min_max(min, max)
 }

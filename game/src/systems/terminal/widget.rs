@@ -1,10 +1,10 @@
-use crate::systems::interface::InterfaceIcon;
-use crate::systems::terminal::TerminalKind;
 use bevy::prelude::*;
 use bevy_terminal::TerminalInput;
 
-use crate::systems::hud::{HudAudience, Window, reconcile_children};
+use crate::systems::hud::{HudAudience, Window, reconcile_children, single_tab};
 use crate::systems::input::map::InputAction;
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::terminal::TerminalKind;
 use crate::systems::terminal::Terminals;
 
 pub struct TerminalWindow;
@@ -28,7 +28,7 @@ impl Window for TerminalWindow {
     fn contents(&self, world: &World) -> Vec<ui::WindowContent> {
         let terminals = world.resource::<Terminals>();
         if terminals.tabs.is_empty() {
-            return crate::systems::hud::single_tab("Terminal", ui::text("Waiting for server…"));
+            return single_tab("Terminal", ui::text("Waiting for server…"));
         }
         terminals
             .tabs

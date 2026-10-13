@@ -6,14 +6,16 @@ mod locked;
 mod pickup;
 mod walk;
 
+use bevy::prelude::*;
+use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
+use strum::VariantArray;
+
 use super::ActiveTileHighlight;
 use super::map::{self, InputAction};
 use crate::core::content::{Content, Fixture};
 use crate::core::render::transition::WorldViewSystems;
 use crate::systems::interface::CursorShape;
-use bevy::prelude::*;
-use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
-use strum::VariantArray;
+use crate::systems::scene::Scene as GameScene;
 
 pub trait Gesture: Send + Sync {
     fn priority(&self) -> i32;
@@ -45,7 +47,7 @@ pub fn plugin(app: &mut App) {
             Update,
             update
                 .in_set(WorldViewSystems)
-                .run_if(in_state(crate::systems::scene::Scene::Area)),
+                .run_if(in_state(GameScene::Area)),
         );
 }
 

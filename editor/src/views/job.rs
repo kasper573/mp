@@ -3,7 +3,8 @@ use game::systems::stat::StatKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
-use crate::forms::{Changed, FormCx};
+use crate::forms;
+use crate::forms::{FormChange, FormCx};
 use crate::ui::{theme, widgets};
 
 pub const TABLE: &str = "job";
@@ -11,8 +12,8 @@ pub const TABLE: &str = "job";
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
 
-pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
+pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     if !value["levels"].is_array() {
         value["levels"] = Value::Array(Vec::new());
     }
@@ -29,7 +30,7 @@ pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
     }
     if let Some(index) = remove {
         levels.remove(index);
-        changed = Changed::at("/levels");
+        changed = FormChange::at("/levels");
     }
     if ui.button("+ level").clicked() {
         let xp = levels
@@ -37,7 +38,7 @@ pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
             .and_then(|level| level["xp"].as_u64())
             .map_or(0, |xp| xp + 100);
         levels.push(serde_json::json!({ "xp": xp, "stats": {} }));
-        changed = Changed::at("/levels");
+        changed = FormChange::at("/levels");
     }
     changed
 }
@@ -47,7 +48,7 @@ fn level_card(
     cx: &mut FormCx,
     index: usize,
     level: &mut Value,
-    changed: &mut Changed,
+    changed: &mut FormChange,
 ) -> bool {
     let path = format!("/levels/{index}");
     let mut removed = false;
@@ -74,14 +75,14 @@ fn level_card(
         ui.add_space(4.0);
         field_row(ui, "xp", |ui| {
             let schema = serde_json::json!({ "type": "integer", "minimum": 0 });
-            *changed = std::mem::take(changed).or(crate::forms::number(
+            *changed |= forms::number(
                 ui,
                 cx,
                 &schema,
                 &mut level["xp"],
                 &format!("{path}/xp"),
                 true,
-            ));
+            );
         });
         field_row(ui, "chasing", |ui| {
             let mut on = level["chasing"].as_bool().unwrap_or(false);
@@ -95,7 +96,7 @@ fn level_card(
                 } else if let Some(fields) = level.as_object_mut() {
                     fields.remove("chasing");
                 }
-                *changed = Changed::at(&format!("{path}/chasing"));
+                *changed = FormChange::at(&format!("{path}/chasing"));
             }
         });
         widgets::section(ui, "stats");
@@ -116,14 +117,14 @@ fn level_card(
                     Some(unit) => serde_json::json!({ "type": "number", "x-unit": unit }),
                     None => serde_json::json!({ "type": "number" }),
                 };
-                *changed = std::mem::take(changed).or(crate::forms::number(
+                *changed |= forms::number(
                     ui,
                     cx,
                     &schema,
                     &mut level["stats"][&key],
                     &stat_path,
                     false,
-                ));
+                );
                 if ui
                     .add(egui::Label::new(theme::faint("✕").size(11.0)).sense(egui::Sense::click()))
                     .on_hover_text(format!("Unset {key}"))
@@ -138,7 +139,7 @@ fn level_card(
         }
         if let Some(key) = unset {
             level["stats"].as_object_mut().expect("object").remove(&key);
-            *changed = Changed::at(&format!("{path}/stats"));
+            *changed = FormChange::at(&format!("{path}/stats"));
         }
         let missing: Vec<StatKind> = StatKind::VARIANTS
             .iter()
@@ -157,7 +158,7 @@ fn level_card(
                 });
             if let Some(kind) = picked {
                 level["stats"][stat_key(kind)] = Value::from(0.0);
-                *changed = Changed::at(&format!("{path}/stats"));
+                *changed = FormChange::at(&format!("{path}/stats"));
             }
         }
     });

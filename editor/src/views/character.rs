@@ -3,20 +3,25 @@ use std::collections::BTreeMap;
 use egui::{Align, Layout, RichText, Ui, Vec2};
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
+use game::systems::GameSettings;
 use game::systems::area::{self, AreaDef, AreaModule};
-use game::systems::job::JobDef;
-use game::systems::quest::{Objective, Parties, QuestDef};
+use game::systems::job::{JobDef, JobLevel};
+use game::systems::npc;
+use game::systems::quest::{Objective, Parties, Party, QuestDef};
 use game::systems::script::RiftScripts;
+use game::systems::stat::StatKind;
 use serde_json::{Map, Value};
 
-use super::area::scene::{SceneRequest, SceneSpec, SceneryOf};
-use crate::app::{Editor, PickRequest, PickWhat};
-use crate::forms::{Changed, FormCx};
-use crate::project::{Edit, Selection, row_file, row_of};
-use crate::schema;
-use crate::tabs::Tab;
-use crate::ui::{theme, widgets};
+use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
+use crate::app::{Editor, PlacePick};
+use crate::forms::{FormAction, FormChange, FormCx};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::tabs::EditorTab;
+use crate::ui::browser::BrowserAction;
+use crate::ui::{inspector, theme, widgets};
 use crate::value::RowValue;
+use crate::views::area::AreaViews;
+use crate::{condition, forms, picker, play, schema};
 
 pub const TABLE: &str = "test_character";
 const NAV: f32 = 150.0;
@@ -25,13 +30,13 @@ const MAP: Vec2 = Vec2::new(272.0, 96.0);
 
 #[derive(Default)]
 pub struct CharacterView {
-    pub section: Section,
+    pub section: CharacterSection,
     pub more_quests: bool,
     pub more_memories: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum Section {
+pub enum CharacterSection {
     #[default]
     Identity,
     Stats,
@@ -46,48 +51,56 @@ pub enum Section {
     History,
 }
 
-impl Section {
-    const ALL: [Section; 11] = [
-        Section::Identity,
-        Section::Stats,
-        Section::Bag,
-        Section::Equipment,
-        Section::Start,
-        Section::AreasKnown,
-        Section::Quests,
-        Section::Memories,
-        Section::LinesHeard,
-        Section::Shops,
-        Section::History,
+impl CharacterSection {
+    const ALL: [CharacterSection; 11] = [
+        CharacterSection::Identity,
+        CharacterSection::Stats,
+        CharacterSection::Bag,
+        CharacterSection::Equipment,
+        CharacterSection::Start,
+        CharacterSection::AreasKnown,
+        CharacterSection::Quests,
+        CharacterSection::Memories,
+        CharacterSection::LinesHeard,
+        CharacterSection::Shops,
+        CharacterSection::History,
     ];
 
-    fn page(self) -> (&'static [Section], &'static [Section]) {
+    fn page(self) -> (&'static [CharacterSection], &'static [CharacterSection]) {
         match self {
-            Section::Identity | Section::Bag | Section::Equipment | Section::Start => (
-                &[Section::Bag, Section::Equipment],
-                &[Section::Identity, Section::Start],
+            CharacterSection::Identity
+            | CharacterSection::Bag
+            | CharacterSection::Equipment
+            | CharacterSection::Start => (
+                &[CharacterSection::Bag, CharacterSection::Equipment],
+                &[CharacterSection::Identity, CharacterSection::Start],
             ),
-            Section::Stats | Section::AreasKnown => (&[Section::Stats], &[Section::AreasKnown]),
-            Section::Quests | Section::Memories => (&[Section::Quests], &[Section::Memories]),
-            Section::LinesHeard | Section::Shops | Section::History => {
-                (&[Section::LinesHeard, Section::Shops], &[Section::History])
+            CharacterSection::Stats | CharacterSection::AreasKnown => {
+                (&[CharacterSection::Stats], &[CharacterSection::AreasKnown])
             }
+            CharacterSection::Quests | CharacterSection::Memories => {
+                (&[CharacterSection::Quests], &[CharacterSection::Memories])
+            }
+            CharacterSection::LinesHeard | CharacterSection::Shops | CharacterSection::History => (
+                &[CharacterSection::LinesHeard, CharacterSection::Shops],
+                &[CharacterSection::History],
+            ),
         }
     }
 
     fn label(self) -> &'static str {
         match self {
-            Section::Identity => "Identity",
-            Section::Stats => "Stats and effects",
-            Section::Bag => "Bag",
-            Section::Equipment => "Equipment",
-            Section::Start => "Start",
-            Section::AreasKnown => "Areas known",
-            Section::Quests => "Quests",
-            Section::Memories => "Memories",
-            Section::LinesHeard => "Lines heard",
-            Section::Shops => "Shops",
-            Section::History => "History",
+            CharacterSection::Identity => "Identity",
+            CharacterSection::Stats => "Stats and effects",
+            CharacterSection::Bag => "Bag",
+            CharacterSection::Equipment => "Equipment",
+            CharacterSection::Start => "Start",
+            CharacterSection::AreasKnown => "Areas known",
+            CharacterSection::Quests => "Quests",
+            CharacterSection::Memories => "Memories",
+            CharacterSection::LinesHeard => "Lines heard",
+            CharacterSection::Shops => "Shops",
+            CharacterSection::History => "History",
         }
     }
 }
@@ -107,17 +120,16 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .map(|project| {
             project
                 .files
-                .paths_under("tables/test_character/")
-                .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
+                .keys_of("test_character")
+                .map(str::to_owned)
                 .collect()
         })
         .unwrap_or_default();
     let mut switch: Option<String> = None;
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let mut label = format!("Edit {TABLE}/{key}");
     let mut actions = Vec::new();
-    let mut requests = Vec::new();
-    let mut pick: Option<PickRequest> = None;
+    let mut pick: Option<PlacePick> = None;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(NAV);
@@ -137,7 +149,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 });
             });
             ui.add_space(6.0);
-            for candidate in Section::ALL {
+            for candidate in CharacterSection::ALL {
                 let selected = candidate == section;
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(NAV, 26.0), egui::Sense::click());
@@ -169,9 +181,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
-            let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
-            cx.owner_table = Some(TABLE.to_owned());
-            cx.owner_key = Some(key.to_owned());
+            let mut cx =
+                FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
             ui.push_id(("character", key), |ui| {
                 let (left, right) = section.page();
                 ui.horizontal_top(|ui| {
@@ -179,61 +190,56 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                         ui.vertical(|ui| {
                             ui.set_width(COLUMN + 16.0);
                             for card in column {
-                                let scene_key = format!("character:{key}");
-                                let texture = views
-                                    .area
-                                    .scenes
-                                    .by_key
-                                    .get(&scene_key)
-                                    .map(|scene| (scene.texture, scene.alloc, scene.shown));
                                 let result = match card {
-                                    Section::Identity => identity(ui, &mut cx, &mut value),
-                                    Section::Stats => generic(
+                                    CharacterSection::Identity => identity(ui, &mut cx, &mut value),
+                                    CharacterSection::Stats => generic(
                                         ui,
                                         &mut cx,
                                         root,
                                         &mut value,
                                         &[("stats", "Stats"), ("effects", "Effects")],
                                     ),
-                                    Section::Bag => bag(ui, &mut cx, &mut value),
-                                    Section::Equipment => equipment(ui, &mut cx, &mut value),
-                                    Section::Start => start(
+                                    CharacterSection::Bag => bag(ui, &mut cx, &mut value),
+                                    CharacterSection::Equipment => {
+                                        equipment(ui, &mut cx, &mut value)
+                                    }
+                                    CharacterSection::Start => start(
                                         ui,
                                         &mut cx,
                                         &mut value,
-                                        scene_key,
-                                        &file,
-                                        texture,
-                                        &mut requests,
+                                        key,
+                                        &mut views.area,
                                         &mut pick,
                                         project.generation,
                                     ),
-                                    Section::AreasKnown => areas_known(ui, &mut cx, &mut value),
-                                    Section::Quests => quests(
+                                    CharacterSection::AreasKnown => {
+                                        areas_known(ui, &mut cx, &mut value)
+                                    }
+                                    CharacterSection::Quests => quests(
                                         ui,
                                         &mut cx,
                                         &mut value,
                                         &mut views.character,
                                         &mut label,
                                     ),
-                                    Section::Memories => {
+                                    CharacterSection::Memories => {
                                         memories(ui, &mut cx, &mut value, &mut views.character)
                                     }
-                                    Section::LinesHeard => generic(
+                                    CharacterSection::LinesHeard => generic(
                                         ui,
                                         &mut cx,
                                         root,
                                         &mut value,
                                         &[("lines_heard", "Lines heard")],
                                     ),
-                                    Section::Shops => generic(
+                                    CharacterSection::Shops => generic(
                                         ui,
                                         &mut cx,
                                         root,
                                         &mut value,
                                         &[("shops", "Shops")],
                                     ),
-                                    Section::History => generic(
+                                    CharacterSection::History => generic(
                                         ui,
                                         &mut cx,
                                         root,
@@ -241,7 +247,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
                                         &[("history", "History")],
                                     ),
                                 };
-                                changed = std::mem::take(&mut changed).or(result);
+                                changed |= result;
                                 ui.add_space(8.0);
                             }
                         });
@@ -251,58 +257,48 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
             });
         });
     });
-    editor.views.area.requests.extend(requests);
     editor.status.left.push(format!(
         "test character {key} › {}",
         section.label().to_lowercase()
     ));
     editor.status.left.push(match section {
-        Section::Quests => {
+        CharacterSection::Quests => {
             "Set up for… fills bag, counts, memories and start in one step".to_owned()
         }
-        Section::Start => {
+        CharacterSection::Start => {
             "the start is where Play puts the character; Play here overrides it once".to_owned()
         }
-        Section::Bag => "counts stop at each item's stack size".to_owned(),
+        CharacterSection::Bag => "counts stop at each item's stack size".to_owned(),
         _ => "every section is what the server keeps for a player".to_owned(),
     });
     if let Some(request) = pick {
         if let Some(area) = request.area.clone() {
-            editor.open_tab(Tab::Area { key: area });
+            editor.open_tab(EditorTab::Area { key: area });
         }
         editor.pick = Some(request);
     }
     if changed.is_some() {
-        let mut edit = Edit::new(label);
+        let mut edit = ContentEdit::new(label);
         edit.write_json(&file, &value);
         editor.apply(edit);
     }
     for action in actions {
-        crate::ui::inspector::act(editor, action, TABLE, key);
+        inspector::act(editor, action, TABLE, key);
     }
     if let Some(other) = switch {
-        editor.select(Selection::row(TABLE, &other));
-        editor.open_tab(Tab::for_row(TABLE, &other));
+        editor.select(RowSelection::row(TABLE, &other));
+        editor.open_tab(EditorTab::for_row(TABLE, &other));
     }
 }
 
-fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
-    let jobs: Vec<String> = cx
-        .files
-        .paths_under("tables/job/")
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .collect();
+fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
+    let jobs: Vec<String> = cx.files.keys_of("job").map(str::to_owned).collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
     let level = level_of(cx, value.text("job"), xp);
     card(ui, "player", "Identity", |ui| {
         widgets::kv(ui, "name", |ui| {
-            changed = std::mem::take(&mut changed).or(crate::forms::text(
-                ui,
-                cx,
-                &mut value["name"],
-                "/name",
-            ));
+            changed |= forms::text(ui, cx, &mut value["name"], "/name");
         });
         widgets::kv(ui, "job", |ui| {
             let current = value.text("job").to_owned();
@@ -317,17 +313,17 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
                 });
             if picked != current {
                 value["job"] = Value::String(picked);
-                changed = Changed::at("/job");
+                changed = FormChange::at("/job");
             }
         });
         widgets::kv(ui, "xp", |ui| {
             let mut draft = xp;
-            let response = crate::forms::boxed_input(ui, Some(&format!("level {level}")), |ui| {
+            let response = forms::boxed_input(ui, Some(&format!("level {level}")), |ui| {
                 ui.add(egui::DragValue::new(&mut draft).speed(1.0))
             });
             if response.changed() && draft != xp {
                 value["xp"] = Value::from(draft);
-                changed = Changed::at("/xp");
+                changed = FormChange::at("/xp");
             }
         });
     });
@@ -340,8 +336,8 @@ fn generic(
     root: &Value,
     value: &mut Value,
     fields: &[(&str, &str)],
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     for (field, title) in fields {
         let Some(schema) = schema::properties(root)
             .into_iter()
@@ -354,28 +350,18 @@ fn generic(
             if value.get(*field).is_none_or(Value::is_null) {
                 value[*field] = schema::template(cx.root, schema);
             }
-            changed = std::mem::take(&mut changed).or(crate::forms::value(
-                ui,
-                cx,
-                schema,
-                &mut value[*field],
-                &format!("/{field}"),
-            ));
+            changed |= forms::value(ui, cx, schema, &mut value[*field], &format!("/{field}"));
         });
     }
     changed
 }
 
-fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
+fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     if !value["bag"].is_array() {
         value["bag"] = Value::Array(Vec::new());
     }
-    let items: Vec<String> = cx
-        .files
-        .paths_under("tables/item/")
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .collect();
+    let items: Vec<String> = cx.files.keys_of("item").map(str::to_owned).collect();
     let count = value["bag"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     card(ui, "item", "Bag", |ui| {
@@ -395,27 +381,24 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
                 let mut key = item_key.clone();
                 ui.scope(|ui| {
                     ui.set_width(200.0);
-                    if crate::picker::row(ui, cx, "item", &mut key, &format!("{path}/item")) {
+                    if picker::row(ui, cx, "item", &mut key, &format!("{path}/item")) {
                         stack["item"] = Value::String(key);
-                        changed = Changed::at(&path);
+                        changed = FormChange::at(&path);
                     }
                 });
                 let held = stack["count"].as_u64().unwrap_or(1) as u32;
                 let mut draft = held;
-                let response = crate::forms::boxed_input(
-                    ui,
-                    cap.map(|cap| format!("/{cap}")).as_deref(),
-                    |ui| {
+                let response =
+                    forms::boxed_input(ui, cap.map(|cap| format!("/{cap}")).as_deref(), |ui| {
                         ui.add(
                             egui::DragValue::new(&mut draft)
                                 .speed(0.2)
                                 .range(1..=cap.unwrap_or(999)),
                         )
-                    },
-                );
+                    });
                 if response.changed() && draft != held {
                     stack["count"] = Value::from(draft);
-                    changed = Changed::at(&path);
+                    changed = FormChange::at(&path);
                 }
             });
         }
@@ -427,30 +410,29 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
             && let Some(list) = value["bag"].as_array_mut()
         {
             list.push(serde_json::json!({ "item": first, "count": 1 }));
-            changed = Changed::at("/bag");
+            changed = FormChange::at("/bag");
         }
     });
     if let Some(index) = remove
         && let Some(list) = value["bag"].as_array_mut()
     {
         list.remove(index);
-        changed = Changed::at("/bag");
+        changed = FormChange::at("/bag");
     }
     changed
 }
 
-fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
+fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     let slots = ["weapon", "offhand", "head"];
     let fitting: BTreeMap<&str, Vec<String>> = slots
         .iter()
         .map(|slot| {
             let items = cx
                 .files
-                .paths_under("tables/item/")
-                .filter_map(|file| {
-                    let (_, key) = row_of(file)?;
-                    let row = cx.files.json(file)?;
+                .keys_of("item")
+                .filter_map(|key| {
+                    let row = cx.files.json(&row_file("item", key))?;
                     (row["kind"]["type"] == "equipment"
                         && row["kind"]["slot"].as_str() == Some(slot))
                     .then(|| key.to_owned())
@@ -483,13 +465,13 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
                     match picked {
                         Some(item) => value["equipment"][slot] = Value::String(item),
                         None => {
-                            value["equipment"].as_object_mut().map(|m| m.remove(slot));
+                            value["equipment"].remove_field(slot);
                         }
                     }
                     if value["equipment"].as_object().is_some_and(Map::is_empty) {
-                        value.as_object_mut().map(|m| m.remove("equipment"));
+                        value.remove_field("equipment");
                     }
-                    changed = Changed::at("/equipment");
+                    changed = FormChange::at("/equipment");
                 }
             });
         }
@@ -498,21 +480,25 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
     changed
 }
 
-#[allow(clippy::too_many_arguments)]
 fn start(
     ui: &mut Ui,
     cx: &mut FormCx,
     value: &mut Value,
-    scene_key: String,
-    file: &str,
-    texture: Option<(egui::TextureId, [u32; 2], [u32; 2])>,
-    requests: &mut Vec<SceneRequest>,
-    pick: &mut Option<PickRequest>,
+    key: &str,
+    area: &mut AreaViews,
+    pick: &mut Option<PlacePick>,
     generation: u64,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
+    let scene_key = format!("character:{key}");
+    let file = row_file(TABLE, key);
+    let texture = area
+        .scenes
+        .by_key
+        .get(&scene_key)
+        .map(|scene| (scene.texture, scene.uv()));
     let spawn = cx.content.map(|content| {
-        let place = &content.built::<game::systems::GameSettings>().initial_spawn;
+        let place = &content.built::<GameSettings>().initial_spawn;
         (place.area.key(&content).to_owned(), place.at)
     });
     let at_spawn = value["start"].as_str() == Some("initial_spawn");
@@ -534,9 +520,9 @@ fn start(
                 ui.label(theme::faint("· the initial spawn").size(12.0));
             } else {
                 let mut draft = area_key.clone();
-                if crate::picker::row(ui, cx, "area", &mut draft, "/start/area") {
+                if picker::row(ui, cx, "area", &mut draft, "/start/area") {
                     value["start"]["area"] = Value::String(draft);
-                    changed = Changed::at("/start");
+                    changed = FormChange::at("/start");
                 }
             }
         });
@@ -545,15 +531,15 @@ fn start(
                 ui.label(
                     theme::mono(format!(
                         "{}, {}",
-                        crate::forms::trim_number(at.x as f64),
-                        crate::forms::trim_number(at.y as f64)
+                        forms::trim_number(at.x as f64),
+                        forms::trim_number(at.y as f64)
                     ))
                     .size(13.0),
                 );
                 ui.label(theme::faint("tiles").size(12.0));
             } else {
                 let (mut x, mut y) = (at.x, at.y);
-                let response = crate::forms::boxed_input(ui, Some("tiles"), |ui| {
+                let response = forms::boxed_input(ui, Some("tiles"), |ui| {
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                         let a = ui.add(egui::DragValue::new(&mut x).speed(0.5).fixed_decimals(1));
                         ui.label(theme::faint(","));
@@ -565,7 +551,7 @@ fn start(
                 if response.changed() && (x != at.x || y != at.y) {
                     value["start"]["x"] = Value::from(x as f64);
                     value["start"]["y"] = Value::from(y as f64);
-                    changed = Changed::at("/start");
+                    changed = FormChange::at("/start");
                 }
             }
         });
@@ -576,9 +562,19 @@ fn start(
             let (rect, _) = ui.allocate_exact_size(MAP, egui::Sense::hover());
             let ppp = ui.ctx().pixels_per_point();
             let px_per_tile = 8.0;
-            requests.push(SceneRequest {
+            let center = Pos::new(
+                at.x.clamp(
+                    MAP.x / px_per_tile / 2.0,
+                    size.width - MAP.x / px_per_tile / 2.0,
+                ),
+                at.y.clamp(
+                    MAP.y / px_per_tile / 2.0,
+                    size.height - MAP.y / px_per_tile / 2.0,
+                ),
+            );
+            area.requests.push(AreaSceneRequest {
                 key: scene_key.clone(),
-                spec: SceneSpec {
+                spec: AreaSceneSpec {
                     ground: area_key.clone(),
                     scenery: SceneryOf::Area,
                     hidden_ground: Vec::new(),
@@ -587,36 +583,19 @@ fn start(
                 },
                 width: (MAP.x * ppp) as u32,
                 height: (MAP.y * ppp) as u32,
-                center: Pos::new(
-                    at.x.clamp(
-                        MAP.x / px_per_tile / 2.0,
-                        size.width - MAP.x / px_per_tile / 2.0,
-                    ),
-                    at.y.clamp(
-                        MAP.y / px_per_tile / 2.0,
-                        size.height - MAP.y / px_per_tile / 2.0,
-                    ),
-                ),
+                center,
                 zoom: px_per_tile / super::area::TILE_PX * ppp,
                 generation,
                 live: true,
             });
             ui.painter().rect_filled(rect, 4.0, theme::INPUT);
-            if let Some((texture, alloc, shown)) = texture {
-                let uv = egui::Rect::from_min_max(
-                    egui::Pos2::ZERO,
-                    egui::pos2(
-                        shown[0] as f32 / alloc[0] as f32,
-                        shown[1] as f32 / alloc[1] as f32,
-                    ),
-                );
+            if let Some((texture, uv)) = texture {
                 ui.painter().image(texture, rect, uv, egui::Color32::WHITE);
             }
-            let centre = requests.last().map(|r| r.center).unwrap_or(at);
             let marker = rect.center()
                 + egui::vec2(
-                    (at.x - centre.x) * px_per_tile,
-                    (at.y - centre.y) * px_per_tile,
+                    (at.x - center.x) * px_per_tile,
+                    (at.y - center.y) * px_per_tile,
                 );
             ui.painter().circle(
                 marker,
@@ -635,13 +614,11 @@ fn start(
             if ui.button("📍 Pick on the map").clicked() {
                 if at_spawn {
                     value["start"] = serde_json::json!({ "area": area_key, "x": at.x, "y": at.y });
-                    changed = Changed::at("/start");
+                    changed = FormChange::at("/start");
                 }
-                *pick = Some(PickRequest {
-                    what: PickWhat::Place {
-                        file: file.to_owned(),
-                        pointer: "/start".to_owned(),
-                    },
+                *pick = Some(PlacePick {
+                    file: file.clone(),
+                    pointer: "/start".to_owned(),
                     area: Some(area_key.clone()),
                 });
             }
@@ -650,15 +627,15 @@ fn start(
                 .clicked()
             {
                 value["start"] = Value::String("initial_spawn".to_owned());
-                changed = Changed::at("/start");
+                changed = FormChange::at("/start");
             }
         });
     });
     changed
 }
 
-fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
-    let mut changed = Changed::default();
+fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+    let mut changed = FormChange::default();
     let known: Vec<String> = value["known_areas"]
         .as_array()
         .into_iter()
@@ -667,8 +644,8 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
         .collect();
     let all: Vec<String> = cx
         .files
-        .paths_under("tables/area/")
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
+        .keys_of("area")
+        .map(str::to_owned)
         .filter(|key| !known.contains(key))
         .collect();
     let mut remove: Option<String> = None;
@@ -713,11 +690,11 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Changed {
             list.push(Value::String(area));
         }
         if list.is_empty() {
-            value.as_object_mut().map(|m| m.remove("known_areas"));
+            value.remove_field("known_areas");
         } else {
             value["known_areas"] = Value::Array(list);
         }
-        changed = Changed::at("/known_areas");
+        changed = FormChange::at("/known_areas");
     }
     changed
 }
@@ -768,6 +745,8 @@ impl Standing {
 
 struct ObjectiveLine {
     label: String,
+    subject: String,
+    held: Option<String>,
     max: u32,
 }
 
@@ -781,26 +760,39 @@ fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
     id.get(&content)
         .objectives()
         .map(|objective| match objective {
-            Objective::Hold(stack) => ObjectiveLine {
-                label: format!("hold {}", stack.item.key(&content)),
-                max: stack.count,
-            },
-            Objective::Defeat { npc, count } => ObjectiveLine {
-                label: format!("defeat {}", npc.key(&content)),
-                max: *count,
-            },
-            Objective::Task { label, .. } => ObjectiveLine {
+            Objective::Hold(stack) => {
+                let item = stack.item.key(&content).to_owned();
+                ObjectiveLine {
+                    label: format!("hold {item}"),
+                    subject: item.clone(),
+                    held: Some(item),
+                    max: stack.count,
+                }
+            }
+            Objective::Defeat { npc, count } => {
+                let npc = npc.key(&content).to_owned();
+                ObjectiveLine {
+                    label: format!("defeat {npc}"),
+                    subject: npc,
+                    held: None,
+                    max: *count,
+                }
+            }
+            Objective::Task { label, .. } | Objective::Decide { label, .. } => ObjectiveLine {
                 label: label.clone(),
+                subject: label.clone(),
+                held: None,
                 max: 1,
             },
-            Objective::Deliver { item } => ObjectiveLine {
-                label: format!("deliver {}", item.key(&content)),
-                max: 1,
-            },
-            Objective::Decide { label, .. } => ObjectiveLine {
-                label: label.clone(),
-                max: 1,
-            },
+            Objective::Deliver { item } => {
+                let item = item.key(&content).to_owned();
+                ObjectiveLine {
+                    label: format!("deliver {item}"),
+                    subject: item,
+                    held: None,
+                    max: 1,
+                }
+            }
         })
         .collect()
 }
@@ -811,13 +803,9 @@ fn quests(
     value: &mut Value,
     view: &mut CharacterView,
     label: &mut String,
-) -> Changed {
-    let mut changed = Changed::default();
-    let all: Vec<String> = cx
-        .files
-        .paths_under("tables/quest/")
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .collect();
+) -> FormChange {
+    let mut changed = FormChange::default();
+    let all: Vec<String> = cx.files.keys_of("quest").map(str::to_owned).collect();
     let in_log: Vec<String> = value["quests"]
         .as_array()
         .into_iter()
@@ -864,7 +852,7 @@ fn quests(
                         modules
                             .iter()
                             .find(|m| m["type"] == "requires")
-                            .map(|m| crate::condition::summary(&m["condition"]))
+                            .map(|m| condition::summary(&m["condition"]))
                     })
                 });
                 let subtitle = match standing {
@@ -897,7 +885,7 @@ fn quests(
                                 });
                             if picked != standing {
                                 set_standing(value, quest, picked);
-                                changed = Changed::at("/quests");
+                                changed = FormChange::at("/quests");
                             }
                         });
                     });
@@ -911,7 +899,7 @@ fn quests(
                                     .as_u64()
                                     .unwrap_or(0) as u32;
                                 let mut draft = held;
-                                let response = crate::forms::boxed_input(
+                                let response = forms::boxed_input(
                                     ui,
                                     Some(&format!("/ {}", objective.max)),
                                     |ui| {
@@ -937,7 +925,7 @@ fn quests(
                                     value["quests"][index]["progress"] = Value::Array(
                                         progress.into_iter().map(Value::from).collect(),
                                     );
-                                    changed = Changed::at("/quests");
+                                    changed = FormChange::at("/quests");
                                 }
                             });
                         }
@@ -977,7 +965,11 @@ fn quests(
                                 widgets::section(ui, &format!("Set up for {quest}"));
                                 let giver = giver_of(cx, parties.as_ref(), quest);
                                 for moment in Moment::all(cx, quest) {
-                                    let hint = moment.hint(cx, quest, giver.as_deref());
+                                    let hint = moment.hint(
+                                        cx,
+                                        quest,
+                                        giver.map(|party| party.name.as_str()),
+                                    );
                                     let (rect, response) = ui.allocate_exact_size(
                                         egui::vec2(ui.available_width(), 36.0),
                                         egui::Sense::click(),
@@ -1016,15 +1008,15 @@ fn quests(
             moment.label()
         );
         apply_moment(cx, value, &quest, moment, parties.as_ref());
-        changed = Changed::at("/quests");
+        changed = FormChange::at("/quests");
     }
     changed
 }
 
-fn giver_of(cx: &FormCx, parties: Option<&Parties>, quest: &str) -> Option<String> {
+fn giver_of<'p>(cx: &FormCx, parties: Option<&'p Parties>, quest: &str) -> Option<&'p Party> {
     let content = cx.content?;
     let id = content.by_key::<QuestDef>(quest)?;
-    parties?.giver(id).map(|party| party.name.clone())
+    parties?.giver(id)
 }
 
 fn set_standing(value: &mut Value, quest: &str, standing: Standing) {
@@ -1037,7 +1029,7 @@ fn set_standing(value: &mut Value, quest: &str, standing: Standing) {
         list.push(serde_json::json!({ "quest": quest, "state": state }));
     }
     if list.is_empty() {
-        value.as_object_mut().map(|m| m.remove("quests"));
+        value.remove_field("quests");
     }
 }
 
@@ -1089,15 +1081,7 @@ impl Moment {
         let done: Vec<String> = objectives_of(cx, quest)
             .iter()
             .filter(|o| o.max > 0)
-            .map(|o| {
-                format!(
-                    "{} {}",
-                    o.max,
-                    o.label
-                        .trim_start_matches("hold ")
-                        .trim_start_matches("defeat ")
-                )
-            })
+            .map(|o| format!("{} {}", o.max, o.subject))
             .collect();
         match self {
             Moment::JustOffered => format!("{by}, quest not taken"),
@@ -1124,7 +1108,7 @@ fn apply_moment(
     parties: Option<&Parties>,
 ) {
     let objectives = objectives_of(cx, quest);
-    let giver_place = giver_of(cx, parties, quest).and_then(|name| npc_place(cx, &name));
+    let giver_place = giver_of(cx, parties, quest).and_then(|party| npc_place(cx, party.npc?));
     match &moment {
         Moment::JustOffered => set_standing(value, quest, Standing::NotTaken),
         Moment::ObjectivesMet | Moment::ReadyToHandIn | Moment::Decided(_) => {
@@ -1140,7 +1124,7 @@ fn apply_moment(
                 }
             }
             for objective in &objectives {
-                if let Some(item) = objective.label.strip_prefix("hold ") {
+                if let Some(item) = &objective.held {
                     give(value, item, objective.max);
                 }
             }
@@ -1174,11 +1158,8 @@ fn give(value: &mut Value, item: &str, count: u32) {
     }
 }
 
-fn npc_place(cx: &FormCx, name: &str) -> Option<(String, Pos<Tiles>)> {
+fn npc_place(cx: &FormCx, npc: npc::Id) -> Option<(String, Pos<Tiles>)> {
     let content = cx.content?;
-    let npc = content
-        .ids::<game::systems::npc::NpcDef>()
-        .find(|id| id.get(&content).name == name)?;
     content.ids::<AreaDef>().find_map(|area| {
         area::placed(&content, area)
             .iter()
@@ -1191,30 +1172,29 @@ fn npc_place(cx: &FormCx, name: &str) -> Option<(String, Pos<Tiles>)> {
     })
 }
 
-fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut CharacterView) -> Changed {
-    let mut changed = Changed::default();
-    let defs: Vec<(String, String, String)> = cx
+fn memories(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    value: &mut Value,
+    view: &mut CharacterView,
+) -> FormChange {
+    let mut changed = FormChange::default();
+    let defs: Vec<MemoryDef> = cx
         .files
-        .paths_under("tables/memory/")
-        .filter_map(|file| {
-            let (_, key) = row_of(file)?;
-            let row = cx.files.json(file)?;
-            Some((
-                key.to_owned(),
-                row.kind_or("boolean").to_owned(),
-                row.text("label").to_owned(),
-            ))
+        .keys_of("memory")
+        .filter_map(|key| {
+            let row = cx.files.json(&row_file("memory", key))?;
+            Some(MemoryDef {
+                key: key.to_owned(),
+                ty: row.kind_or("boolean").to_owned(),
+                label: row.text("label").to_owned(),
+            })
         })
         .collect();
     let set: Vec<Value> = value["memories"].as_array().cloned().unwrap_or_default();
-    let mut order: Vec<&(String, String, String)> = defs
-        .iter()
-        .filter(|(key, _, _)| set.iter().any(|m| m["memory"].as_str() == Some(key)))
-        .collect();
-    order.extend(
-        defs.iter()
-            .filter(|(key, _, _)| !set.iter().any(|m| m["memory"].as_str() == Some(key))),
-    );
+    let is_set = |def: &&MemoryDef| set.iter().any(|m| m["memory"].as_str() == Some(&def.key));
+    let mut order: Vec<&MemoryDef> = defs.iter().filter(is_set).collect();
+    order.extend(defs.iter().filter(|def| !is_set(def)));
     let mut updates: Vec<(String, Option<Value>)> = Vec::new();
     widgets::section_count(ui, "Memories", defs.len());
     let hidden = if view.more_memories {
@@ -1231,7 +1211,7 @@ fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut Characte
             ui.label("");
             ui.label(theme::faint("LAST SET").size(11.0).monospace());
             ui.end_row();
-            for (key, ty, label) in order.iter().take(order.len() - hidden) {
+            for MemoryDef { key, ty, label } in order.iter().take(order.len() - hidden) {
                 let entry = set.iter().find(|m| m["memory"].as_str() == Some(key));
                 ui.label(theme::mono(key).size(13.0)).on_hover_text(label);
                 match ty.as_str() {
@@ -1258,7 +1238,7 @@ fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut Characte
                     _ => {
                         let held = entry.and_then(|m| m["value"].as_f64()).unwrap_or(0.0);
                         let mut draft = held;
-                        let response = crate::forms::boxed_input(ui, Some("times"), |ui| {
+                        let response = forms::boxed_input(ui, Some("times"), |ui| {
                             ui.add(
                                 egui::DragValue::new(&mut draft)
                                     .speed(0.2)
@@ -1279,9 +1259,12 @@ fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut Characte
                 }
                 let ago = entry.and_then(|m| m["ago"].as_f64());
                 ui.label(
-                    theme::muted(ago.map(ago_text).unwrap_or_else(|| "never".to_owned()))
-                        .size(12.5)
-                        .monospace(),
+                    theme::muted(ago.map_or_else(
+                        || "never".to_owned(),
+                        |seconds| widgets::ago(seconds as u64),
+                    ))
+                    .size(12.5)
+                    .monospace(),
                 );
                 if entry.is_some()
                     && ui
@@ -1313,32 +1296,25 @@ fn memories(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, view: &mut Characte
             }
         }
         if list.is_empty() {
-            value.as_object_mut().map(|m| m.remove("memories"));
+            value.remove_field("memories");
         } else {
             value["memories"] = Value::Array(list);
         }
-        changed = Changed::at("/memories");
+        changed = FormChange::at("/memories");
     }
     changed
 }
 
-fn ago_text(seconds: f64) -> String {
-    if seconds < 60.0 {
-        "just now".to_owned()
-    } else if seconds < 3600.0 {
-        format!("{} min ago", (seconds / 60.0).round())
-    } else if seconds < 86_400.0 {
-        format!("{} h ago", (seconds / 3600.0).round())
-    } else {
-        let days = (seconds / 86_400.0).round();
-        format!("{days} day{} ago", crate::ui::widgets::plural(days))
-    }
+struct MemoryDef {
+    key: String,
+    ty: String,
+    label: String,
 }
 
 fn card(ui: &mut Ui, badge: &str, title: &str, body: impl FnOnce(&mut Ui)) {
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(COLUMN);
-        widgets::card_header(ui, badge, title, "", |_| {});
+        widgets::card_title(ui, badge, title);
         body(ui);
     });
 }
@@ -1359,14 +1335,12 @@ pub fn level_of(cx: &FormCx, job: &str, xp: u32) -> u32 {
     };
     content
         .by_key::<JobDef>(job)
-        .map(|job| {
-            job.get(&content)
-                .levels
-                .iter()
-                .filter(|tier| tier.xp <= xp)
-                .count() as u32
-        })
+        .map(|job| levels_reached(&job.get(&content).levels, xp))
         .unwrap_or(0)
+}
+
+fn levels_reached(tiers: &[JobLevel], xp: u32) -> u32 {
+    tiers.iter().filter(|tier| tier.xp <= xp).count() as u32
 }
 
 pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
@@ -1382,24 +1356,24 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .by_key::<JobDef>(job)
         .map(|id| id.get(&content).levels.clone())
         .unwrap_or_default();
-    let level = tiers.iter().filter(|tier| tier.xp <= xp).count() as u32;
+    let level = levels_reached(&tiers, xp);
     let next = tiers
         .iter()
         .find(|tier| tier.xp > xp)
         .map(|tier| format!(" · {xp} of {} xp to {}", tier.xp, level + 1))
         .unwrap_or_else(|| format!(" · {xp} xp · top tier"));
-    let settings = content.built::<game::systems::GameSettings>();
+    let settings = content.built::<GameSettings>();
     let base = settings
         .player
         .get(&content)
         .stats
-        .get(&game::systems::stat::StatKind::MaxHealth)
+        .get(&StatKind::MaxHealth)
         .copied()
         .unwrap_or(0.0);
     let from_tiers: f32 = tiers
         .iter()
         .filter(|tier| tier.xp <= xp)
-        .filter_map(|tier| tier.stats.get(&game::systems::stat::StatKind::MaxHealth))
+        .filter_map(|tier| tier.stats.get(&StatKind::MaxHealth))
         .sum();
     let own = row["stats"]["max_health"].as_f64().map(|v| v as f32);
     let health = own.unwrap_or(base + from_tiers);
@@ -1407,8 +1381,8 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         Value::Object(place) => format!(
             "{} · {}, {}",
             place.text_or("area", "?"),
-            crate::forms::trim_number(place["x"].as_f64().unwrap_or(0.0)),
-            crate::forms::trim_number(place["y"].as_f64().unwrap_or(0.0))
+            forms::trim_number(place["x"].as_f64().unwrap_or(0.0)),
+            forms::trim_number(place["y"].as_f64().unwrap_or(0.0))
         ),
         _ => format!(
             "{} · the initial spawn",
@@ -1421,8 +1395,8 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         "health",
         format!(
             "{} of {}",
-            crate::forms::trim_number(health as f64),
-            crate::forms::trim_number(health as f64)
+            forms::trim_number(health as f64),
+            forms::trim_number(health as f64)
         ),
     );
     widgets::kv_text(ui, "starts", starts);
@@ -1432,12 +1406,12 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         if widgets::primary(ui, &format!("▸ Play as {key}")).clicked() {
             editor.play.character = Some(key.to_owned());
             editor.settings.last_play = Some(key.to_owned());
-            crate::play::start(editor, None);
+            play::start(editor, None);
         }
         if ui.button("⑂ Duplicate").clicked() {
-            crate::ui::inspector::act(
+            inspector::act(
                 editor,
-                crate::forms::FormAction::RowAction(crate::ui::browser::Action::Duplicate),
+                FormAction::RowAction(BrowserAction::Duplicate),
                 TABLE,
                 key,
             );

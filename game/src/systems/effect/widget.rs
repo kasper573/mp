@@ -1,20 +1,23 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use crate::systems::effect::{EffectContext, active_effects};
-use crate::systems::player::session;
 use bevy::prelude::*;
 use ui::{Align, DragHandle, DragRoot, OnSettle, Side, tooltip, tooltip_content};
 
-use crate::systems::hud::{reconcile_children, slot_node, tooltip_label};
+use crate::systems::effect::{EffectContext, active_effects};
+use crate::systems::hud::{
+    HudAudience, PANEL_BG, WIDGET, Widget, persist_widget, reconcile_children, slot_node,
+    tooltip_label,
+};
+use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
 struct EffectsGrid;
 
 pub struct EffectsWidget;
 
-impl crate::systems::hud::Widget for EffectsWidget {
-    fn audience(&self) -> crate::systems::hud::HudAudience {
-        crate::systems::hud::HudAudience::Players
+impl Widget for EffectsWidget {
+    fn audience(&self) -> HudAudience {
+        HudAudience::Players
     }
     fn fallback(&self, _: f32) -> Vec2 {
         Vec2::new(8.0, 80.0)
@@ -32,18 +35,18 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
         position_type: PositionType::Absolute,
         left: Val::Px(pos.x),
         top: Val::Px(pos.y),
-        min_width: Val::Px(crate::systems::hud::WIDGET.0),
-        min_height: Val::Px(crate::systems::hud::WIDGET.0 / 2.0),
+        min_width: Val::Px(WIDGET.0),
+        min_height: Val::Px(WIDGET.0 / 2.0),
         padding: UiRect::all(Val::Px(2.0)),
         ..default()
     };
     Box::new(bsn! {
         node
-        BackgroundColor({crate::systems::hud::PANEL_BG})
+        BackgroundColor({PANEL_BG})
         DragRoot
         DragHandle
         EffectsGrid
-        ~{OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom))}
+        ~{OnSettle::new(move |world, geom| persist_widget(world, id, geom))}
     })
 }
 

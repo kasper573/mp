@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::Checked;
 use bevy_scene::{Scene, bsn, on};
 
 use crate::Activate;
@@ -8,7 +9,6 @@ use crate::drag::{DragHandle, DragRoot, OnSettle, OnTap, ResizeHandle};
 use crate::state::{SelectGroup, SelectItem, SelectionChanged, selected};
 use crate::style::Style;
 use crate::theme::theme;
-use bevy::ui::Checked;
 
 const MIN_WINDOW: Vec2 = Vec2::new(100.0, 100.0);
 
@@ -55,7 +55,7 @@ pub fn window(opts: WindowOptions) -> impl Scene {
         .map(|content| (content.title, content.scene))
         .unzip();
     let tab = opts.tab.min(titles.len().saturating_sub(1));
-    let initial: Vec<String> = titles.iter().take(1).map(|_| tab_value(tab)).collect();
+    let initial = Vec::from_iter((!titles.is_empty()).then(|| tab_value(tab)));
     bsn! {
         node
         BackgroundColor({family.base})

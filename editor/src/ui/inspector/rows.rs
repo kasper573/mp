@@ -1,17 +1,19 @@
 use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Ui, Vec2};
+use game::core::content::ModuleRule;
 use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup};
 use super::{theme, widgets};
-use crate::app::Editor;
+use crate::app::{Editor, registry};
+use crate::forms;
 use crate::forms::{FormAction, FormCx};
-use crate::project::{Edit, Selection, row_file};
-use crate::schema::{self, Kind};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::schema::{self, SchemaKind};
 use crate::value::RowValue;
 
-pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection, wide: bool) {
+pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection, wide: bool) {
     let table = selection.table.clone();
     let values: Vec<(String, Value)> = selection
         .keys
@@ -48,8 +50,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
             ..
         } = editor;
         let project = project.as_ref().expect("a project");
-        let mut cx = FormCx::new(project, root, shapes, form, &mut actions);
-        cx.owner_table = Some(table.clone());
+        let mut cx = FormCx::new(project, root, shapes, form, &mut actions).owned_by(&table, None);
         let shared_card = |ui: &mut Ui, cx: &mut FormCx, edits: &mut Vec<(String, Value)>| {
             widgets::card_frame(false).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -61,60 +62,26 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                     |_| {},
                 );
                 ui.add_space(4.0);
+                let mut rows = RowSet {
+                    values: &values,
+                    edits,
+                };
                 for (name, field) in schema::properties(root) {
                     if name == "modules" {
                         continue;
                     }
-                    let distinct: Vec<Value> = {
-                        let mut seen: Vec<Value> = Vec::new();
-                        for (_, value) in &values {
-                            let v = value.get(name).cloned().unwrap_or(Value::Null);
-                            if !seen.contains(&v) {
-                                seen.push(v);
-                            }
-                        }
-                        seen
-                    };
                     let resolved = schema::resolve(cx.root, field);
-                    if matches!(schema::kind(cx.root, resolved), Kind::Object)
+                    if matches!(schema::kind(cx.root, resolved), SchemaKind::Object)
                         && schema::marker(resolved).is_none()
                     {
                         widgets::section(ui, name);
                         for (sub_name, sub_field) in schema::properties(resolved) {
-                            let distinct: Vec<Value> = {
-                                let mut seen: Vec<Value> = Vec::new();
-                                for (_, value) in &values {
-                                    let v =
-                                        value[name].get(sub_name).cloned().unwrap_or(Value::Null);
-                                    if !seen.contains(&v) {
-                                        seen.push(v);
-                                    }
-                                }
-                                seen
-                            };
-                            shared_field(
-                                ui,
-                                cx,
-                                &values,
-                                &format!("/{name}/{sub_name}"),
-                                sub_name,
-                                sub_field,
-                                &distinct,
-                                edits,
-                            );
+                            let path = format!("/{name}/{sub_name}");
+                            shared_field(ui, cx, &mut rows, &path, sub_name, sub_field);
                         }
                         continue;
                     }
-                    shared_field(
-                        ui,
-                        cx,
-                        &values,
-                        &format!("/{name}"),
-                        name,
-                        field,
-                        &distinct,
-                        edits,
-                    );
+                    shared_field(ui, cx, &mut rows, &format!("/{name}"), name, field);
                 }
             });
         };
@@ -123,14 +90,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                             edits: &mut Vec<(String, Value)>,
                             add_to_all: &mut Option<Value>,
                             status: &mut Option<String>| {
-            let shapes: &crate::schema::Shapes = cx.shapes;
-            let Some(items) = shapes.modules_of(&table) else {
-                return;
-            };
-            let variants = match schema::kind(cx.root, items) {
-                Kind::Union(variants) => variants,
-                _ => Vec::new(),
-            };
+            let variants = cx.shapes.module_variants(&table);
             let tags = |value: &Value| -> Vec<String> {
                 value["modules"]
                     .as_array()
@@ -175,7 +135,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                         let mut shared = firsts[0].2.clone();
                         let path = format!("/modules/{tag}");
                         let changed = match schema::variant_of(&variants, &shared) {
-                            Some(variant) => crate::forms::object_without(
+                            Some(variant) => forms::object_without(
                                 ui,
                                 cx,
                                 variant.schema,
@@ -183,7 +143,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
                                 &path,
                                 &["nodes"],
                             ),
-                            None => crate::forms::raw_json(ui, cx, &mut shared, &path),
+                            None => forms::raw_json(ui, cx, &mut shared, &path),
                         };
                         if changed.is_some() {
                             for (key, index, _) in &firsts {
@@ -278,16 +238,15 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
         .left
         .push("an edit applies to every selected row".to_owned());
     if let Some(template) = add_to_all {
-        let registry = game::systems::registry();
+        let registry = registry();
         let tag = template.kind_or("module").to_owned();
         let mut skipped: Vec<String> = Vec::new();
         for (key, value) in &values {
             let present = value["modules"]
                 .as_array()
                 .is_some_and(|list| list.iter().any(|m| m["type"] == template["type"]));
-            let blocked = present
-                && registry.module_rule(&table, &template)
-                    == Some(game::core::content::ModuleRule::AtMostOne);
+            let blocked =
+                present && registry.module_rule(&table, &template) == Some(ModuleRule::AtMostOne);
             if blocked {
                 skipped.push(key.clone());
                 continue;
@@ -310,7 +269,7 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
         }
     }
     if !edits.is_empty() {
-        let mut edit = Edit::new(format!("Edit {} {table} rows", edits.len()));
+        let mut edit = ContentEdit::new(format!("Edit {} {table} rows", edits.len()));
         for (key, value) in &edits {
             edit.write_json(row_file(&table, key), value);
         }
@@ -321,90 +280,103 @@ pub(super) fn show_rows(editor: &mut Editor, ui: &mut Ui, selection: &Selection,
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct RowSet<'a> {
+    pub values: &'a [(String, Value)],
+    pub edits: &'a mut Vec<(String, Value)>,
+}
+
+impl RowSet<'_> {
+    fn distinct(&self, path: &str) -> Vec<Value> {
+        let mut seen: Vec<Value> = Vec::new();
+        for (_, value) in self.values {
+            let v = value.pointer(path).cloned().unwrap_or(Value::Null);
+            if !seen.contains(&v) {
+                seen.push(v);
+            }
+        }
+        seen
+    }
+
+    fn set_all(&mut self, path: &str, shared: &Value) {
+        for (key, value) in self.values {
+            let mut next = value.clone();
+            if let Some(target) = next.pointer_mut(path) {
+                *target = shared.clone();
+            }
+            self.edits.push((key.clone(), next));
+        }
+    }
+}
+
 pub(super) fn shared_field(
     ui: &mut Ui,
     cx: &mut FormCx,
-    values: &[(String, Value)],
+    rows: &mut RowSet,
     path: &str,
     name: &str,
     field: &Value,
-    distinct: &[Value],
-    edits: &mut Vec<(String, Value)>,
 ) {
+    let distinct = rows.distinct(path);
     ui.horizontal(|ui| {
         ui.allocate_ui_with_layout(
-            Vec2::new(crate::forms::LABEL_WIDTH, ui.spacing().interact_size.y),
+            Vec2::new(forms::LABEL_WIDTH, ui.spacing().interact_size.y),
             Layout::left_to_right(Align::Center),
             |ui| {
                 ui.label(theme::muted(name).monospace().size(13.0));
             },
         );
-        if distinct.len() == 1 {
-            let mut shared = distinct[0].clone();
+        if let [only] = distinct.as_slice() {
+            let mut shared = only.clone();
             ui.vertical(|ui| {
                 ui.set_min_width(ui.available_width());
-                if crate::forms::value(ui, cx, field, &mut shared, path).is_some() {
-                    for (key, value) in values {
-                        let mut next = value.clone();
-                        if let Some(target) = next.pointer_mut(path) {
-                            *target = shared.clone();
-                        }
-                        edits.push((key.clone(), next));
-                    }
+                if forms::value(ui, cx, field, &mut shared, path).is_some() {
+                    rows.set_all(path, &shared);
                 }
             });
-        } else {
-            let listing: Vec<String> = values
-                .iter()
-                .map(|(key, value)| {
-                    format!(
-                        "{key}: {}",
-                        value
-                            .pointer(path)
-                            .map(|v| v
-                                .as_str()
-                                .map(str::to_owned)
-                                .unwrap_or_else(|| v.to_string()))
-                            .unwrap_or_default()
-                    )
-                })
-                .collect();
-            let id = ui.id().with(path).with("set-all");
-            let mut draft = cx.state.drafts.get(&id).cloned().unwrap_or_default();
-            let response = egui::Frame::new()
-                .fill(theme::INPUT)
-                .stroke(egui::Stroke::new(1.0, theme::BORDER))
-                .corner_radius(4.0)
-                .inner_margin(egui::Margin::symmetric(6, 2))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width() - 12.0);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut draft)
-                            .frame(egui::Frame::NONE)
-                            .hint_text(
-                                RichText::new(format!("{} values", distinct.len())).italics(),
-                            )
-                            .desired_width(f32::INFINITY),
-                    )
-                });
-            let response = response.inner.on_hover_text(listing.join("\n"));
-            if response.changed() {
-                cx.state.drafts.insert(id, draft.clone());
-            }
-            if crate::forms::committed(ui, &response) {
-                cx.state.drafts.remove(&id);
-                if !draft.trim().is_empty() {
-                    let parsed: Value = serde_json::from_str(draft.trim())
-                        .unwrap_or(Value::String(draft.trim().to_owned()));
-                    for (key, value) in values {
-                        let mut next = value.clone();
-                        if let Some(target) = next.pointer_mut(path) {
-                            *target = parsed.clone();
-                        }
-                        edits.push((key.clone(), next));
-                    }
-                }
+            return;
+        }
+        let listing: Vec<String> = rows
+            .values
+            .iter()
+            .map(|(key, value)| {
+                format!(
+                    "{key}: {}",
+                    value
+                        .pointer(path)
+                        .map(|v| v
+                            .as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| v.to_string()))
+                        .unwrap_or_default()
+                )
+            })
+            .collect();
+        let id = ui.id().with(path).with("set-all");
+        let mut draft = cx.state.drafts.get(&id).cloned().unwrap_or_default();
+        let response = egui::Frame::new()
+            .fill(theme::INPUT)
+            .stroke(egui::Stroke::new(1.0, theme::BORDER))
+            .corner_radius(4.0)
+            .inner_margin(egui::Margin::symmetric(6, 2))
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width() - 12.0);
+                ui.add(
+                    egui::TextEdit::singleline(&mut draft)
+                        .frame(egui::Frame::NONE)
+                        .hint_text(RichText::new(format!("{} values", distinct.len())).italics())
+                        .desired_width(f32::INFINITY),
+                )
+            });
+        let response = response.inner.on_hover_text(listing.join("\n"));
+        if response.changed() {
+            cx.state.drafts.insert(id, draft.clone());
+        }
+        if forms::committed(ui, &response) {
+            cx.state.drafts.remove(&id);
+            if !draft.trim().is_empty() {
+                let parsed: Value = serde_json::from_str(draft.trim())
+                    .unwrap_or(Value::String(draft.trim().to_owned()));
+                rows.set_all(path, &parsed);
             }
         }
     });
@@ -422,17 +394,16 @@ pub(super) fn fieldless_note(table: &str, tag: &str) -> &'static str {
 pub(super) fn free_singles(
     cx: &FormCx,
     table: &str,
-    variants: &[schema::Variant],
+    variants: &[schema::SchemaVariant],
     value: &Value,
 ) -> Vec<String> {
-    let registry = game::systems::registry();
+    let registry = registry();
     let list = value["modules"].as_array().cloned().unwrap_or_default();
     variants
         .iter()
         .filter(|variant| {
             let template = schema::variant_template(cx.root, variant);
-            registry.module_rule(table, &template)
-                == Some(game::core::content::ModuleRule::AtMostOne)
+            registry.module_rule(table, &template) == Some(ModuleRule::AtMostOne)
                 && !list
                     .iter()
                     .any(|module| module.kind() == variant.tag.as_str())

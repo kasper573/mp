@@ -1,29 +1,11 @@
 use egui::{Color32, FontId, RichText, Stroke, Ui};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
-use crate::forms::{Changed, FormCx, fits};
-use crate::schema::{self, Kind, Variant};
+use crate::forms;
+use crate::forms::{FormChange, FormCx, fits};
+use crate::schema::{self, SchemaKind, SchemaVariant};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-
-const OPERATORS: [&str; 16] = [
-    "all",
-    "any",
-    "not",
-    "equal",
-    "not_equal",
-    "less",
-    "at_most",
-    "more",
-    "at_least",
-    "add",
-    "subtract",
-    "multiply",
-    "divide",
-    "min",
-    "max",
-    "round",
-];
 
 const COMPARE: [(&str, &str); 6] = [
     ("equal", "="),
@@ -41,6 +23,18 @@ const ARITHMETIC: [(&str, &str); 6] = [
     ("min", "min"),
     ("max", "max"),
 ];
+
+fn sign_of(tag: &str) -> Option<&'static str> {
+    COMPARE
+        .iter()
+        .chain(ARITHMETIC.iter())
+        .find(|(op, _)| *op == tag)
+        .map(|(_, sign)| *sign)
+}
+
+fn is_operator(tag: &str) -> bool {
+    matches!(tag, "all" | "any" | "not" | "round") || sign_of(tag).is_some()
+}
 
 const GROUPS: [(&str, &[&str]); 7] = [
     ("The character", &["level", "is_job", "stat", "buffed"]),
@@ -69,9 +63,9 @@ const GROUPS: [(&str, &[&str]); 7] = [
 
 fn type_word(tag: &str) -> &'static str {
     match tag {
-        "all" | "any" | "not" | "equal" | "not_equal" | "less" | "at_most" | "more"
-        | "at_least" => "yes or no",
-        "add" | "subtract" | "multiply" | "divide" | "min" | "max" | "round" => "number",
+        "all" | "any" | "not" => "yes or no",
+        _ if COMPARE.iter().any(|(op, _)| *op == tag) => "yes or no",
+        _ if ARITHMETIC.iter().any(|(op, _)| *op == tag) || tag == "round" => "number",
         "join" | "quest_resets_in" => "text",
         "level" | "holding" | "free_slots" | "count" | "ground_items" => "number",
         "stat" | "distance" | "health" => "number",
@@ -88,21 +82,21 @@ pub fn edit(
     schema: &Value,
     value: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     let schema = schema::resolve(cx.root, schema);
     let alternatives: Vec<&Value> = match schema::kind(cx.root, schema) {
-        Kind::Choice(list) => list,
-        Kind::Union(variants) => variants.iter().map(|variant| variant.schema).collect(),
+        SchemaKind::Choice(list) => list,
+        SchemaKind::Union(variants) => variants.iter().map(|variant| variant.schema).collect(),
         _ => Vec::new(),
     };
     if alternatives.is_empty() {
-        return crate::forms::raw_json(ui, cx, value, path);
+        return forms::raw_json(ui, cx, value, path);
     }
-    let mut variants: Vec<Variant> = Vec::new();
+    let mut variants: Vec<SchemaVariant> = Vec::new();
     let mut plain: Vec<&Value> = Vec::new();
     for alternative in &alternatives {
         match schema::tag_of(alternative) {
-            Some((field, tag)) => variants.push(Variant {
+            Some((field, tag)) => variants.push(SchemaVariant {
                 field,
                 tag,
                 schema: alternative,
@@ -119,7 +113,7 @@ pub fn edit(
                 .is_some()
         }),
     };
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     ui.vertical(|ui| {
         ui.set_width(ui.available_width());
         ui.spacing_mut().item_spacing = egui::vec2(4.0, 4.0);
@@ -134,19 +128,19 @@ pub fn edit(
                 .any(|alternative| fits(cx.root, alternative, value))
         {
             ui.colored_label(theme::DANGER, "unknown block");
-            changed = std::mem::take(&mut changed).or(crate::forms::raw_json(ui, cx, value, path));
+            changed |= forms::raw_json(ui, cx, value, path);
         }
     });
     changed
 }
 
 struct Palette<'a> {
-    variants: &'a [Variant<'a>],
+    variants: &'a [SchemaVariant<'a>],
     has_var: bool,
 }
 
 impl Palette<'_> {
-    fn variant(&self, tag: &str) -> Option<&Variant<'_>> {
+    fn variant(&self, tag: &str) -> Option<&SchemaVariant<'_>> {
         self.variants.iter().find(|variant| variant.tag == tag)
     }
 }
@@ -164,73 +158,67 @@ fn block(
     value: &mut Value,
     path: &str,
     slot: Slot,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     match value {
         Value::Bool(flag) => {
             let text = if *flag { "true" } else { "false" };
             let response = chip(ui, text, theme::INPUT, theme::TEXT);
             if response.clicked() {
                 *value = Value::Bool(!*flag);
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
-            if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
-                changed = picked;
-            }
+            changed |=
+                picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
         Value::Number(_) => {
             ui.scope(|ui| {
                 ui.set_width(56.0);
                 let schema = serde_json::json!({ "type": "number" });
                 let mut number = value.clone();
-                if crate::forms::value(ui, cx, &schema, &mut number, &format!("{path}~n")).is_some()
-                {
+                if forms::value(ui, cx, &schema, &mut number, &format!("{path}~n")).is_some() {
                     *value = number;
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             });
             let response = chip(ui, "▾", theme::INPUT, theme::FAINT);
-            if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
-                changed = picked;
-            }
+            changed |=
+                picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
         Value::String(_) => {
             ui.scope(|ui| {
                 ui.set_width(120.0);
                 let mut text = value.clone();
-                if crate::forms::text(ui, cx, &mut text, &format!("{path}~s")).is_some() {
+                if forms::text(ui, cx, &mut text, &format!("{path}~s")).is_some() {
                     *value = text;
-                    changed = Changed::at(path);
+                    changed = FormChange::at(path);
                 }
             });
             let response = chip(ui, "▾", theme::INPUT, theme::FAINT);
-            if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
-                changed = picked;
-            }
+            changed |=
+                picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
         Value::Null => {
             let response = chip(ui, "+ pick…", theme::INPUT, theme::MUTED);
-            if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
-                changed = picked;
-            }
+            changed |=
+                picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
         Value::Object(object) if object.len() == 1 && object.contains_key("var") => {
             let mut name = object["var"].clone();
             let mut renamed = false;
             ui.scope(|ui| {
                 ui.set_width(100.0);
-                if crate::forms::text(ui, cx, &mut name, &format!("{path}/var")).is_some() {
+                if forms::text(ui, cx, &mut name, &format!("{path}/var")).is_some() {
                     renamed = true;
                 }
             });
             if renamed {
                 value["var"] = name.clone();
-                changed = Changed::at(path);
+                changed = FormChange::at(path);
             }
             let response = chip(ui, "◇ variable", theme::INPUT, theme::VARIABLE);
-            if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
-                changed = picked;
-            }
+            changed |=
+                picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or_default();
         }
         Value::Object(_) => {
             let tag = value.kind().to_owned();
@@ -239,11 +227,8 @@ fn block(
                 "not" | "round" => {
                     ui.horizontal_wrapped(|ui| {
                         let response = tag_chip(ui, &tag);
-                        if let Some(picked) =
-                            picker_popup(ui, cx, &response, palette, slot, value, path)
-                        {
-                            changed = picked;
-                        }
+                        changed |= picker_popup(ui, cx, &response, palette, slot, value, path)
+                            .unwrap_or_default();
                         if changed.0.is_none() {
                             let mut inner = value.get("of").cloned().unwrap_or(Value::Null);
                             let inner_slot = if tag == "not" {
@@ -262,29 +247,20 @@ fn block(
                             .is_some()
                             {
                                 value["of"] = inner;
-                                changed = Changed::at(path);
+                                changed = FormChange::at(path);
                             }
                         }
                     });
                 }
-                _ if COMPARE
-                    .iter()
-                    .chain(ARITHMETIC.iter())
-                    .any(|(op, _)| *op == tag) =>
-                {
+                _ if sign_of(&tag).is_some() => {
                     ui.horizontal_wrapped(|ui| {
                         let mut a = value.get("a").cloned().unwrap_or(Value::Null);
                         if block(ui, cx, palette, &mut a, &format!("{path}/a"), Slot::Any).is_some()
                         {
                             value["a"] = a;
-                            changed = Changed::at(path);
+                            changed = FormChange::at(path);
                         }
-                        let sign = COMPARE
-                            .iter()
-                            .chain(ARITHMETIC.iter())
-                            .find(|(op, _)| *op == tag)
-                            .map(|(_, sign)| *sign)
-                            .unwrap_or("?");
+                        let sign = sign_of(&tag).unwrap_or("?");
                         let response = chip(ui, sign, theme::INPUT, theme::CODE);
                         egui::Popup::from_toggle_button_response(&response)
                             .id(ui.id().with(path).with("op"))
@@ -295,7 +271,7 @@ fn block(
                                         .clicked()
                                     {
                                         value["type"] = Value::String((*op).to_owned());
-                                        changed = Changed::at(path);
+                                        changed = FormChange::at(path);
                                         ui.close();
                                     }
                                 }
@@ -304,18 +280,15 @@ fn block(
                         if block(ui, cx, palette, &mut b, &format!("{path}/b"), Slot::Any).is_some()
                         {
                             value["b"] = b;
-                            changed = Changed::at(path);
+                            changed = FormChange::at(path);
                         }
                     });
                 }
                 "local" | "state" | "event" => {
                     ui.horizontal_wrapped(|ui| {
                         let response = tag_chip(ui, &tag);
-                        if let Some(picked) =
-                            picker_popup(ui, cx, &response, palette, slot, value, path)
-                        {
-                            changed = picked;
-                        }
+                        changed |= picker_popup(ui, cx, &response, palette, slot, value, path)
+                            .unwrap_or_default();
                         if changed.0.is_none() {
                             let mut name = value
                                 .get(&tag)
@@ -323,11 +296,11 @@ fn block(
                                 .unwrap_or(Value::String(String::new()));
                             ui.scope(|ui| {
                                 ui.set_width(120.0);
-                                if crate::forms::text(ui, cx, &mut name, &format!("{path}/{tag}"))
+                                if forms::text(ui, cx, &mut name, &format!("{path}/{tag}"))
                                     .is_some()
                                 {
                                     value[&tag] = name;
-                                    changed = Changed::at(path);
+                                    changed = FormChange::at(path);
                                 }
                             });
                         }
@@ -337,7 +310,7 @@ fn block(
             }
         }
         Value::Array(_) => {
-            changed = crate::forms::raw_json(ui, cx, value, path);
+            changed = forms::raw_json(ui, cx, value, path);
         }
     }
     changed
@@ -351,8 +324,8 @@ fn list_block(
     path: &str,
     tag: &str,
     slot: Slot,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     let response = tag_chip(ui, tag);
     if let Some(picked) = picker_popup(ui, cx, &response, palette, slot, value, path) {
         return picked;
@@ -383,7 +356,7 @@ fn list_block(
                         )
                         .is_some()
                         {
-                            changed = Changed::at(path);
+                            changed = FormChange::at(path);
                         }
                     });
                     let hovered =
@@ -435,11 +408,11 @@ fn list_block(
     });
     if let Some(index) = remove {
         items.remove(index);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if let Some(fresh) = added {
         items.push(fresh);
-        changed = Changed::at(path);
+        changed = FormChange::at(path);
     }
     if changed.is_some() {
         value["of"] = Value::Array(items);
@@ -455,8 +428,8 @@ fn query_block(
     path: &str,
     tag: &str,
     slot: Slot,
-) -> Changed {
-    let mut changed = Changed::default();
+) -> FormChange {
+    let mut changed = FormChange::default();
     let Some(variant) = palette.variant(tag) else {
         let response = chip(ui, tag, theme::INPUT, theme::DANGER);
         return picker_popup(ui, cx, &response, palette, slot, value, path).unwrap_or(changed);
@@ -489,9 +462,8 @@ fn query_block(
             let child = value.get_mut(name).expect("set above");
             if schema::marker(resolved) == Some("x-condition") {
                 ui.label(theme::muted(name).size(12.0));
-                let inner_palette = palette;
-                if block(ui, cx, inner_palette, child, &field_path, Slot::Any).is_some() {
-                    changed = Changed::at(path);
+                if block(ui, cx, palette, child, &field_path, Slot::Any).is_some() {
+                    changed = FormChange::at(path);
                 }
                 continue;
             }
@@ -500,8 +472,8 @@ fn query_block(
             }
             ui.scope(|ui| {
                 ui.set_max_width(170.0);
-                if crate::forms::value(ui, cx, field, child, &field_path).is_some() {
-                    changed = Changed::at(path);
+                if forms::value(ui, cx, field, child, &field_path).is_some() {
+                    changed = FormChange::at(path);
                 }
             });
         }
@@ -546,7 +518,7 @@ fn picker_popup(
     slot: Slot,
     value: &mut Value,
     path: &str,
-) -> Option<Changed> {
+) -> Option<FormChange> {
     let id = ui.id().with(path).with("picker");
     let mut changed = None;
     egui::Popup::from_toggle_button_response(response)
@@ -555,7 +527,7 @@ fn picker_popup(
         .show(|ui| {
             if let Some(fresh) = picker_body(ui, cx, palette, slot) {
                 *value = fresh;
-                changed = Some(Changed::at(path));
+                changed = Some(FormChange::at(path));
                 ui.close();
             }
         });
@@ -570,7 +542,7 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
         .show(ui, |ui| {
             let mut listed: Vec<&str> = Vec::new();
             for (group, tags) in GROUPS {
-                let members: Vec<&Variant> = tags
+                let members: Vec<&SchemaVariant> = tags
                     .iter()
                     .filter_map(|tag| palette.variant(tag))
                     .filter(|variant| {
@@ -591,12 +563,12 @@ fn picker_body(ui: &mut Ui, cx: &mut FormCx, palette: &Palette, slot: Slot) -> O
                     }
                 }
             }
-            let others: Vec<&Variant> = palette
+            let others: Vec<&SchemaVariant> = palette
                 .variants
                 .iter()
                 .filter(|variant| {
                     !listed.contains(&variant.tag.as_str())
-                        && !OPERATORS.contains(&variant.tag.as_str())
+                        && !is_operator(&variant.tag)
                         && !matches!(variant.tag.as_str(), "local" | "state" | "event" | "join")
                 })
                 .collect();
@@ -747,21 +719,8 @@ pub fn summary(value: &Value) -> String {
                         out.push_str("not ");
                         go(&object["of"], out, depth + 1);
                     }
-                    "equal" | "not_equal" | "less" | "at_most" | "more" | "at_least" | "add"
-                    | "subtract" | "multiply" | "divide" | "min" | "max" => {
-                        let sign = match tag {
-                            "equal" => "=",
-                            "not_equal" => "≠",
-                            "less" => "<",
-                            "at_most" => "≤",
-                            "more" => ">",
-                            "at_least" => "≥",
-                            "add" => "+",
-                            "subtract" => "−",
-                            "multiply" => "×",
-                            "divide" => "÷",
-                            other => other,
-                        };
+                    _ if sign_of(tag).is_some() => {
+                        let sign = sign_of(tag).unwrap_or(tag);
                         go(&object["a"], out, depth + 1);
                         out.push_str(&format!(" {sign} "));
                         go(&object["b"], out, depth + 1);
@@ -789,8 +748,4 @@ pub fn summary(value: &Value) -> String {
     let mut out = String::new();
     go(value, &mut out, 0);
     out
-}
-
-pub fn empty_object() -> Value {
-    Value::Object(Map::new())
 }

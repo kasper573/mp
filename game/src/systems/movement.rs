@@ -1,21 +1,22 @@
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
+use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use serde::{Deserialize, Serialize};
 
+use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::{Direction, Offset, Pos, Rect, Rng};
 use crate::core::tiling::{
     Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, Tiles, TilesPerSec,
 };
 use crate::core::time::Seconds;
-
-use crate::systems::actor::{Action, Actor, set_facing};
-use crate::systems::area;
+use crate::systems::actor::{Action, Actor, ActorModel, set_facing};
 use crate::systems::player::{commands_locked, sender_player};
 use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
+use crate::systems::{area, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -86,7 +87,7 @@ pub struct MoveTarget {
 }
 
 pub fn move_request(world: &mut World) {
-    for request in crate::systems::requests::<MoveRequest>(world) {
+    for request in drain_requests::<MoveRequest>(world) {
         retarget(world, request.client_id, request.message.pos);
     }
 }
@@ -124,11 +125,7 @@ pub fn on_tile(world: &World, entity: Entity) -> bool {
     position(world, entity).is_some_and(|p| p.on_center())
 }
 
-fn retarget(
-    world: &mut World,
-    sender: bevy_replicon::prelude::ClientId,
-    pos: Pos<Tiles>,
-) -> Option<Entity> {
+fn retarget(world: &mut World, sender: Sender, pos: Pos<Tiles>) -> Option<Entity> {
     let entity = sender_player(world, sender)?;
     if stat::is_dead(world, entity) || commands_locked(world, entity) {
         return None;
@@ -446,10 +443,10 @@ impl Navigator {
 }
 
 fn airborne(world: &World, entity: Entity) -> bool {
-    let content = world.resource::<crate::core::content::Content>();
+    let content = world.resource::<Content>();
     world
         .get::<Actor>(entity)
-        .is_some_and(|actor| crate::systems::actor::model(content, actor.model).airborne())
+        .is_some_and(|actor| ActorModel::get(content, actor.model).airborne())
 }
 
 fn within(nodes: &[Pos<Tiles>], bounds: Rect<Tiles>) -> Vec<Pos<Tiles>> {

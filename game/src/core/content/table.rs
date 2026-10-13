@@ -168,10 +168,6 @@ impl Content {
             .expect("a table is stored under its row type")
     }
 
-    pub fn has_table<Row: ContentRow>(&self) -> bool {
-        self.0.tables.contains_key(&TypeId::of::<Row>())
-    }
-
     pub fn ids<Row: ContentRow>(
         &self,
     ) -> impl ExactSizeIterator<Item = ContentId<Row>> + Clone + 'static {

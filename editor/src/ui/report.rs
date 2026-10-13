@@ -2,6 +2,7 @@ use egui::{Context, RichText, Ui};
 
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::project::GAME_FILE;
 
 pub enum ReportAction {
     None,
@@ -136,7 +137,7 @@ fn coloured(line: &str) -> RichText {
         text.color(theme::DANGER)
     } else if line.starts_with("tables/")
         || line.starts_with("assets/")
-        || line.starts_with("game.json")
+        || line.starts_with(GAME_FILE)
     {
         text.color(theme::CODE)
     } else if line.starts_with("  ") {

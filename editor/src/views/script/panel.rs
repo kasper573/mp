@@ -1,32 +1,42 @@
-use egui::{RichText, Stroke, Ui};
+use std::collections::BTreeSet;
+
+use egui::{RichText, Ui};
 use game::core::content::Content;
-use game::core::script::{OwnerKind, OwnerRow};
-use game::systems::script::{Reach, RiftScripts};
+use game::core::script::{MayDo, OwnerKind, OwnerRow};
+use game::systems::area;
+use game::systems::area::blueprint::BlueprintDef;
+use game::systems::area::{AreaDef, AreaModule};
+use game::systems::item::ItemDef;
+use game::systems::npc::NpcDef;
+use game::systems::quest::QuestDef;
+use game::systems::script::{Place, Reach, RiftScripting, RiftScripts};
+use game::systems::shop::ShopDef;
 use serde_json::Value;
 
-use super::{Doc, Panel, ScriptOwner, run};
+use super::nodes::{self, NodeReads};
+use super::{ScriptDoc, ScriptOwner, ScriptPanel, ScriptPath, ScriptRef, run};
 use crate::app::Editor;
-use crate::project::{Selection, row_of};
-use crate::tabs::Tab;
+use crate::project::{RowSelection, row_file, row_of};
+use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use crate::{condition, forms};
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &Doc, panel: Panel) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
     match panel {
-        Panel::MayDo => may_do(editor, ui, doc),
-        Panel::UsedBy => used_by(editor, ui, doc),
-        Panel::Run => run::panel(editor, ui, doc),
-        Panel::History => history(editor, ui, doc),
+        ScriptPanel::MayDo => may_do(editor, ui, doc),
+        ScriptPanel::UsedBy => used_by(editor, ui, doc),
+        ScriptPanel::Run => run::panel(editor, ui, doc),
     }
 }
 
-pub struct Bound {
+pub struct ScriptBinding {
     pub label: String,
     pub row: OwnerRow,
     pub file: String,
 }
 
-pub fn bindings(editor: &Editor, doc: &Doc) -> Vec<Bound> {
+pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
     let Some(project) = &editor.project else {
         return Vec::new();
     };
@@ -34,27 +44,25 @@ pub fn bindings(editor: &Editor, doc: &Doc) -> Vec<Bound> {
         return Vec::new();
     };
     match &doc.owner {
-        ScriptOwner::Inline {
-            table,
-            key,
-            pointer,
-        } => owner_row(&content, table, key, pointer)
-            .into_iter()
-            .collect(),
+        ScriptOwner::Inline { table, key, module } => {
+            owner_row(&content, table, key, &module.pointer())
+                .into_iter()
+                .collect()
+        }
         ScriptOwner::Shared { key } => {
-            let mut found = Vec::new();
+            let mut found: Vec<ScriptBinding> = Vec::new();
             for usage in project.usages.of_row("script", key) {
                 let Some((table, row_key)) = row_of(&usage.file) else {
+                    continue;
+                };
+                let Some(module) = ScriptRef::parse(&usage.pointer).module else {
                     continue;
                 };
                 if table == "script" {
                     continue;
                 }
-                let Some(pointer) = module_pointer(&usage.pointer) else {
-                    continue;
-                };
-                if let Some(bound) = owner_row(&content, table, row_key, &pointer)
-                    && !found.iter().any(|known: &Bound| known.row == bound.row)
+                if let Some(bound) = owner_row(&content, table, row_key, &module.pointer())
+                    && !found.iter().any(|known| known.row == bound.row)
                 {
                     found.push(bound);
                 }
@@ -64,79 +72,30 @@ pub fn bindings(editor: &Editor, doc: &Doc) -> Vec<Bound> {
     }
 }
 
-fn module_pointer(pointer: &str) -> Option<String> {
-    let rest = pointer.strip_prefix("/modules/")?;
-    let mut parts = rest.split('/');
-    let module = parts.next()?;
-    let mut out = format!("/modules/{module}");
-    if parts.next() == Some("scripts") {
-        let script = parts.next()?;
-        out.push_str(&format!("/scripts/{script}"));
-    }
-    Some(out)
-}
-
-pub fn owner_row(content: &Content, table: &str, key: &str, pointer: &str) -> Option<Bound> {
-    use game::systems::area::AreaDef;
-    use game::systems::area::blueprint::BlueprintDef;
-    use game::systems::item::ItemDef;
-    use game::systems::npc::NpcDef;
-    use game::systems::quest::QuestDef;
-    use game::systems::shop::ShopDef;
-    let file = crate::project::row_file(table, key);
-    let bound = |label: String, row: OwnerRow| Bound {
+pub fn owner_row(
+    content: &Content,
+    table: &str,
+    key: &str,
+    pointer: &str,
+) -> Option<ScriptBinding> {
+    let kind: OwnerKind = table.parse().ok()?;
+    let file = row_file(table, key);
+    let bound = |label: String, row: OwnerRow| ScriptBinding {
         label,
         row,
         file: file.clone(),
     };
-    Some(match table {
-        "npc" => bound(
-            format!("npc/{key}"),
-            OwnerRow {
-                kind: OwnerKind::Npc,
-                row: content.by_key::<NpcDef>(key)?.raw(),
-                object: None,
-            },
-        ),
-        "item" => bound(
-            format!("item/{key}"),
-            OwnerRow {
-                kind: OwnerKind::Item,
-                row: content.by_key::<ItemDef>(key)?.raw(),
-                object: None,
-            },
-        ),
-        "quest" => bound(
-            format!("quest/{key}"),
-            OwnerRow {
-                kind: OwnerKind::Quest,
-                row: content.by_key::<QuestDef>(key)?.raw(),
-                object: None,
-            },
-        ),
-        "shop" => bound(
-            format!("shop/{key}"),
-            OwnerRow {
-                kind: OwnerKind::Shop,
-                row: content.by_key::<ShopDef>(key)?.raw(),
-                object: None,
-            },
-        ),
-        "area" => {
+    Some(match kind {
+        OwnerKind::Area => {
             let area = content.by_key::<AreaDef>(key)?;
-            match pointer
-                .split('/')
-                .nth(2)
-                .and_then(|m| m.parse::<usize>().ok())
-                .filter(|_| pointer.contains("/scripts/"))
-            {
+            match ScriptPath::parse(pointer).and_then(ScriptPath::object) {
                 Some(module) => {
-                    let placed = game::systems::area::placed(content, area);
+                    let placed = area::placed(content, area);
                     let index = placed
                         .iter()
                         .position(|p| p.chain.is_empty() && p.origin == module)?;
                     let name = match &placed[index].module {
-                        game::systems::area::AreaModule::Object(object) => object
+                        AreaModule::Object(object) => object
                             .name
                             .clone()
                             .or_else(|| object.label.clone())
@@ -162,37 +121,49 @@ pub fn owner_row(content: &Content, table: &str, key: &str, pointer: &str) -> Op
                 ),
             }
         }
-        "blueprint" => {
+        OwnerKind::Blueprint => {
             let blueprint = content.by_key::<BlueprintDef>(key)?;
-            let mut found = None;
-            for area in content.ids::<AreaDef>() {
-                for (ordinal, placement) in game::systems::area::placements(content, area)
+            content.ids::<AreaDef>().find_map(|area| {
+                let ordinal = area::placements(content, area)
                     .iter()
-                    .enumerate()
-                {
-                    if placement.blueprint == blueprint && !placement.scripts.is_empty() {
-                        found = Some(bound(
-                            format!("blueprint/{key} in {} {ordinal}", area.key(content)),
-                            OwnerRow {
-                                kind: OwnerKind::Blueprint,
-                                row: area.raw(),
-                                object: Some(ordinal as u32),
-                            },
-                        ));
-                        break;
-                    }
-                }
-                if found.is_some() {
-                    break;
-                }
-            }
-            found?
+                    .position(|placement| {
+                        placement.blueprint == blueprint && !placement.scripts.is_empty()
+                    })?;
+                Some(bound(
+                    format!("blueprint/{key} in {} {ordinal}", area.key(content)),
+                    OwnerRow {
+                        kind: OwnerKind::Blueprint,
+                        row: area.raw(),
+                        object: Some(ordinal as u32),
+                    },
+                ))
+            })?
         }
-        _ => return None,
+        OwnerKind::Object | OwnerKind::Any => return None,
+        kind => bound(
+            format!("{table}/{key}"),
+            OwnerRow {
+                kind,
+                row: raw_of(content, kind, key)?,
+                object: None,
+            },
+        ),
     })
 }
 
-fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
+fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
+    Some(match kind {
+        OwnerKind::Npc => content.by_key::<NpcDef>(key)?.raw(),
+        OwnerKind::Item => content.by_key::<ItemDef>(key)?.raw(),
+        OwnerKind::Quest => content.by_key::<QuestDef>(key)?.raw(),
+        OwnerKind::Shop => content.by_key::<ShopDef>(key)?.raw(),
+        OwnerKind::Area | OwnerKind::Object => content.by_key::<AreaDef>(key)?.raw(),
+        OwnerKind::Blueprint => content.by_key::<BlueprintDef>(key)?.raw(),
+        OwnerKind::Any => return None,
+    })
+}
+
+fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
         ui.label(theme::muted("The folder does not load"));
         return;
@@ -236,10 +207,8 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
     let Some(owner) = bound.get(picked).or(bound.first()) else {
         return;
     };
-    let scripts = content.built::<RiftScripts>();
-    let may = scripts.may_do(owner.row);
-    let files = &editor.project.as_ref().expect("a project").files;
-    let rows = may_do_rows(&content, doc, &may, files);
+    let may = content.built::<RiftScripts>().may_do(owner.row);
+    let rows = may_do_rows(&content, doc, &may);
     let read_by = read_by_rows(&content, &may);
     let wide = ui.available_width() > 760.0 && !read_by.is_empty();
     egui::ScrollArea::vertical()
@@ -252,8 +221,8 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                     } else {
                         ui.available_width()
                     });
-                    for (label, text, present) in &rows {
-                        may_row(ui, label, text, *present);
+                    for row in &rows {
+                        may_row(ui, row);
                     }
                 });
                 if wide {
@@ -269,12 +238,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                                 );
                                 ui.add(egui::Label::new(theme::muted(what).size(13.0)).wrap());
                             });
-                            let rect = ui.max_rect();
-                            let y = ui.cursor().min.y;
-                            ui.painter().line_segment(
-                                [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-                                Stroke::new(1.0, theme::BORDER),
-                            );
+                            widgets::rule(ui);
                         }
                     });
                 }
@@ -285,59 +249,76 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
         });
 }
 
-fn may_row(ui: &mut Ui, label: &str, text: &str, present: bool) {
+struct MayRow {
+    label: &'static str,
+    text: String,
+    present: bool,
+}
+
+impl MayRow {
+    fn present(label: &'static str, text: String) -> MayRow {
+        MayRow {
+            label,
+            text,
+            present: true,
+        }
+    }
+
+    fn maybe(label: &'static str, parts: &[String], none: &str, join: &str) -> MayRow {
+        MayRow {
+            label,
+            text: if parts.is_empty() {
+                none.to_owned()
+            } else {
+                parts.join(join)
+            },
+            present: !parts.is_empty(),
+        }
+    }
+}
+
+fn may_row(ui: &mut Ui, row: &MayRow) {
     ui.horizontal_top(|ui| {
         ui.add_sized(
             egui::vec2(120.0, 20.0),
             egui::Label::new(
-                RichText::new(label.to_uppercase())
+                RichText::new(row.label.to_uppercase())
                     .size(11.5)
                     .color(theme::MUTED)
-                    .family(egui::FontFamily::Name("medium".into())),
+                    .family(theme::medium()),
             ),
         );
-        let rich = if present {
-            RichText::new(text).size(13.0).color(theme::TEXT)
+        let rich = if row.present {
+            RichText::new(&row.text).size(13.0).color(theme::TEXT)
         } else {
-            theme::muted(text).size(13.0)
+            theme::muted(&row.text).size(13.0)
         };
         ui.add(egui::Label::new(rich).wrap());
     });
     ui.add_space(2.0);
 }
 
-fn may_do_rows(
-    content: &Content,
-    doc: &Doc,
-    may: &game::core::script::MayDo<game::systems::script::RiftScripting>,
-    files: &crate::project::Files,
-) -> Vec<(String, String, bool)> {
-    let mut rows: Vec<(String, String, bool)> = Vec::new();
+fn unique(list: impl IntoIterator<Item = String>) -> Vec<String> {
+    list.into_iter()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -> Vec<MayRow> {
+    let mut rows: Vec<MayRow> = Vec::new();
     let nodes = doc.nodes();
     let dialogue_count = nodes
         .values()
-        .filter(|node| nodes_kind(node) == "dialogue")
+        .filter(|node| nodes::is_dialogue(node))
         .count();
-    let mut speakers: Vec<String> = nodes
-        .values()
-        .flat_map(|node| node["lines"].as_array().cloned().unwrap_or_default())
-        .map(|line| super::nodes::speaker_name(&line["by"]))
-        .collect();
-    speakers.sort();
-    speakers.dedup();
-    let called_dialogue: usize = may
-        .calls
-        .iter()
-        .filter_map(|script| files.json(&crate::project::row_file("script", script)))
-        .map(|row| {
-            row["nodes"]
-                .as_object()
-                .into_iter()
-                .flatten()
-                .filter(|(_, node)| nodes_kind(node) == "dialogue")
-                .count()
-        })
-        .sum();
+    let speakers = unique(
+        nodes
+            .values()
+            .flat_map(|node| node["lines"].as_array().cloned().unwrap_or_default())
+            .map(|line| nodes::speaker_name(&line["by"])),
+    );
+    let called_dialogue = may.dialogue.len().saturating_sub(dialogue_count);
     if dialogue_count > 0 || called_dialogue > 0 {
         let by = match speakers.as_slice() {
             [] => String::new(),
@@ -360,13 +341,12 @@ fn may_do_rows(
         } else {
             String::new()
         };
-        rows.push((
-            "says".to_owned(),
+        rows.push(MayRow::present(
+            "says",
             format!(
                 "{dialogue_count} dialogue node{} to the subject{by}{more}",
-                crate::ui::widgets::plural(dialogue_count)
+                widgets::plural(dialogue_count)
             ),
-            true,
         ));
     }
     let shops: Vec<String> = may
@@ -378,160 +358,90 @@ fn may_do_rows(
         })
         .collect();
     if !shops.is_empty() {
-        rows.push((
-            "opens".to_owned(),
+        rows.push(MayRow::present(
+            "opens",
             format!("{} for the subject", shops.join(", ")),
-            true,
         ));
     }
     if !may.calls.is_empty() {
-        let text = may
+        let calls: Vec<String> = may
             .calls
             .iter()
-            .map(|script| {
-                let inner: Vec<String> = files
-                    .json(&crate::project::row_file("script", script))
-                    .map(|row| {
-                        let mut quests: Vec<String> = Vec::new();
-                        for (_, node) in row["nodes"].as_object().into_iter().flatten() {
-                            for (kind, verb) in [
-                                ("offer_quest", "offers"),
-                                ("accept_quest", "accepts"),
-                                ("turn_in", "turns in"),
-                            ] {
-                                if nodes_kind(node) == kind && !quests.iter().any(|q| q == verb) {
-                                    quests.push(verb.to_owned());
-                                }
-                            }
-                        }
-                        quests
-                    })
-                    .unwrap_or_default();
-                let quest = may.reaches.iter().find_map(|r| match r {
-                    Reach::Offers(q) | Reach::Accepts(q) | Reach::TurnsIn(q) => {
-                        Some(format!("quest/{}", q.key(content)))
-                    }
-                    _ => None,
-                });
-                match (inner.is_empty(), quest) {
-                    (false, Some(quest)) => format!(
-                        "script/{script}: {} {quest}",
-                        inner.join(", ").replacen(", turns in", " and turns in", 1)
-                    ),
-                    _ => format!("script/{script}"),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" · ");
-        rows.push(("runs".to_owned(), text, true));
+            .map(|script| format!("script/{script}"))
+            .collect();
+        rows.push(MayRow::present("runs", calls.join(" · ")));
     }
-    let reads = reads_of(doc);
+    let reads = NodeReads::of(nodes).text();
     if !reads.is_empty() {
-        rows.push(("reads".to_owned(), reads, true));
+        rows.push(MayRow::present("reads", reads));
     }
     let warps: Vec<String> = may
         .reaches
         .iter()
         .filter_map(|r| match r {
             Reach::Warp(place) => Some(format!(
-                "the subject to area/{} · {}, {} · sets its spawn point there",
+                "the subject to area/{} · {} · sets its spawn point there",
                 place.area.key(content),
-                trim(place.at.x),
-                trim(place.at.y)
+                place_coords(place)
             )),
             _ => None,
         })
         .collect();
-    rows.push((
-        "warps".to_owned(),
-        if warps.is_empty() {
-            "nowhere".to_owned()
-        } else {
-            warps.join(" · ")
-        },
-        !warps.is_empty(),
-    ));
-    let takes: Vec<String> = dedup(
-        may.reaches
-            .iter()
-            .filter_map(|r| match r {
-                Reach::Takes(item) => Some(stack_text(doc, "take", item.key(content))),
-                _ => None,
-            })
-            .collect(),
-    );
-    let gives: Vec<String> = dedup(
-        may.reaches
-            .iter()
-            .filter_map(|r| match r {
-                Reach::Gives(item) => Some(stack_text(doc, "give", item.key(content))),
-                _ => None,
-            })
-            .collect(),
-    );
+    rows.push(MayRow::maybe("warps", &warps, "nowhere", " · "));
+    let takes = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Takes(item) => Some(stack_text(doc, "take", item.key(content))),
+        _ => None,
+    }));
+    let gives = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Gives(item) => Some(stack_text(doc, "give", item.key(content))),
+        _ => None,
+    }));
     if !takes.is_empty() || !gives.is_empty() {
-        rows.push((
-            "takes".to_owned(),
-            if takes.is_empty() {
+        rows.push(MayRow {
+            label: "takes",
+            text: if takes.is_empty() {
                 "nothing".to_owned()
             } else {
                 format!("from the subject: {}", takes.join(", "))
             },
-            !takes.is_empty(),
-        ));
-        rows.push((
-            "gives".to_owned(),
-            if gives.is_empty() {
+            present: !takes.is_empty(),
+        });
+        rows.push(MayRow {
+            label: "gives",
+            text: if gives.is_empty() {
                 "nothing".to_owned()
             } else {
                 format!("the subject {}", gives.join(", "))
             },
-            !gives.is_empty(),
-        ));
+            present: !gives.is_empty(),
+        });
     }
-    let drops: Vec<String> = dedup(
-        may.reaches
-            .iter()
-            .filter_map(|r| match r {
-                Reach::Drops(item) => Some(item.key(content).to_owned()),
-                _ => None,
-            })
-            .collect(),
-    );
+    let drops = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Drops(item) => Some(item.key(content).to_owned()),
+        _ => None,
+    }));
     if !drops.is_empty() {
-        rows.push((
-            "drops".to_owned(),
+        rows.push(MayRow::present(
+            "drops",
             format!("{} at the owner, reserved to the subject", drops.join(", ")),
-            true,
         ));
     }
-    let memories: Vec<String> = dedup(
-        may.reaches
-            .iter()
-            .filter_map(|r| match r {
-                Reach::Remembers(memory) => Some(memory.key(content).to_owned()),
-                _ => None,
-            })
-            .collect(),
-    );
+    let memories = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Remembers(memory) => Some(memory.key(content).to_owned()),
+        _ => None,
+    }));
     if !memories.is_empty() {
-        rows.push((
-            "remembers".to_owned(),
+        rows.push(MayRow::present(
+            "remembers",
             format!("the subject's {}", memories.join(", ")),
-            true,
         ));
     }
-    let notices: Vec<String> = dedup(
-        may.reaches
-            .iter()
-            .filter_map(|r| match r {
-                Reach::Notifies(n) => Some(format!("notification/{}", n.key(content))),
-                _ => None,
-            })
-            .collect(),
-    );
+    let notices = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Notifies(n) => Some(format!("notification/{}", n.key(content))),
+        _ => None,
+    }));
     if !notices.is_empty() {
-        rows.push(("notifies".to_owned(), notices.join(", "), true));
+        rows.push(MayRow::present("notifies", notices.join(", ")));
     }
     let mut quests: Vec<(String, Vec<&str>)> = Vec::new();
     for reach in &may.reaches {
@@ -566,38 +476,31 @@ fn may_do_rows(
             })
             .collect::<Vec<_>>()
             .join(" · ");
-        rows.push(("quests".to_owned(), text, true));
+        rows.push(MayRow::present("quests", text));
     }
-    let mut npcs: Vec<String> = Vec::new();
-    for reach in &may.reaches {
-        match reach {
-            Reach::Spawns(npc) => npcs.push(format!("spawns npc/{}", npc.key(content))),
-            Reach::Hostile => npcs.push("may turn hostile".to_owned()),
-            Reach::Friendly => npcs.push("may turn friendly".to_owned()),
-            Reach::Despawns => npcs.push("despawns".to_owned()),
-            Reach::Walks => npcs.push("walks".to_owned()),
-            Reach::Targets | Reach::Damages => npcs.push("attacks".to_owned()),
-            _ => {}
-        }
-    }
-    npcs.dedup();
+    let npcs = unique(may.reaches.iter().filter_map(|reach| match reach {
+        Reach::Spawns(npc) => Some(format!("spawns npc/{}", npc.key(content))),
+        Reach::Hostile => Some("may turn hostile".to_owned()),
+        Reach::Friendly => Some("may turn friendly".to_owned()),
+        Reach::Despawns => Some("despawns".to_owned()),
+        Reach::Walks => Some("walks".to_owned()),
+        Reach::Targets | Reach::Damages => Some("attacks".to_owned()),
+        _ => None,
+    }));
     if !npcs.is_empty() {
-        rows.push(("npcs".to_owned(), npcs.join(" · "), true));
+        rows.push(MayRow::present("npcs", npcs.join(" · ")));
     }
-    let mut stats: Vec<String> = Vec::new();
-    for reach in &may.reaches {
-        match reach {
-            Reach::Heals => stats.push("heals".to_owned()),
-            Reach::Buffs => stats.push("buffs".to_owned()),
-            Reach::GrantsXp => stats.push("grants xp".to_owned()),
-            Reach::SetsJob(job) => stats.push(format!("sets job {}", job.key(content))),
-            Reach::Plays(sfx) => stats.push(format!("plays {}", sfx.key(content))),
-            Reach::Says => stats.push("says a chat line".to_owned()),
-            _ => {}
-        }
-    }
+    let stats = unique(may.reaches.iter().filter_map(|reach| match reach {
+        Reach::Heals => Some("heals".to_owned()),
+        Reach::Buffs => Some("buffs".to_owned()),
+        Reach::GrantsXp => Some("grants xp".to_owned()),
+        Reach::SetsJob(job) => Some(format!("sets job {}", job.key(content))),
+        Reach::Plays(sfx) => Some(format!("plays {}", sfx.key(content))),
+        Reach::Says => Some("says a chat line".to_owned()),
+        _ => None,
+    }));
     if !stats.is_empty() {
-        rows.push(("also".to_owned(), stats.join(" · "), true));
+        rows.push(MayRow::present("also", stats.join(" · ")));
     }
     let mut waits: Vec<String> = Vec::new();
     if dialogue_count > 0 || called_dialogue > 0 {
@@ -615,50 +518,36 @@ fn may_do_rows(
     }
     let seconds: Vec<String> = nodes
         .values()
-        .filter(|node| nodes_kind(node) == "wait")
+        .filter(|node| node.kind() == "wait")
         .filter_map(|node| node["seconds"].as_f64())
-        .map(|s| format!("{} s", trim(s as f32)))
+        .map(|s| format!("{} s", forms::trim_number(s)))
         .collect();
     if !seconds.is_empty() {
         waits.push(seconds.join(", "));
     }
-    rows.push((
-        "waits".to_owned(),
-        if waits.is_empty() {
+    rows.push(MayRow {
+        label: "waits",
+        text: if waits.is_empty() {
             "never".to_owned()
         } else if seconds.len() == waits.len() {
             waits.join(" · ")
         } else {
             format!("for the subject: {}", waits.join(", "))
         },
-        !waits.is_empty(),
-    ));
+        present: !waits.is_empty(),
+    });
     rows
 }
 
-fn dedup(list: Vec<String>) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for item in list {
-        if !out.contains(&item) {
-            out.push(item);
-        }
-    }
-    out
+fn place_coords(place: &Place) -> String {
+    format!(
+        "{}, {}",
+        forms::trim_number(f64::from(place.at.x)),
+        forms::trim_number(f64::from(place.at.y))
+    )
 }
 
-fn nodes_kind(node: &Value) -> &str {
-    node.kind()
-}
-
-fn trim(number: f32) -> String {
-    if number.fract() == 0.0 {
-        format!("{}", number as i64)
-    } else {
-        format!("{number}")
-    }
-}
-
-fn stack_text(doc: &Doc, field: &str, item: &str) -> String {
+fn stack_text(doc: &ScriptDoc, field: &str, item: &str) -> String {
     for node in doc.nodes().values() {
         for stack in node[field].as_array().into_iter().flatten() {
             if stack["item"].as_str() == Some(item) {
@@ -670,154 +559,46 @@ fn stack_text(doc: &Doc, field: &str, item: &str) -> String {
     item.to_owned()
 }
 
-fn reads_of(doc: &Doc) -> String {
-    fn walk(
-        value: &Value,
-        memories: &mut Vec<String>,
-        items: &mut Vec<String>,
-        places: &mut Vec<String>,
-        other: &mut Vec<String>,
-    ) {
-        match value {
-            Value::Object(map) => {
-                match map.get("type").and_then(Value::as_str) {
-                    Some("memory") | Some("set_within") => {
-                        if let Some(name) = map.get("memory").and_then(Value::as_str) {
-                            memories.push(name.to_owned());
-                        }
-                    }
-                    Some("holding") | Some("wearing") => {
-                        if let Some(item) = map.get("item").and_then(Value::as_str) {
-                            items.push(format!("holding {item}"));
-                        }
-                    }
-                    Some("inside") | Some("in_area") | Some("knows_area") => {
-                        let area = map.get("area").and_then(Value::as_str).unwrap_or("?");
-                        let object = map
-                            .get("object")
-                            .and_then(Value::as_str)
-                            .map(|o| format!(" · {o}"))
-                            .unwrap_or_default();
-                        places.push(format!("inside area/{area}{object}"));
-                    }
-                    Some("on_quest") | Some("quest_done") | Some("task_done") => {
-                        if let Some(quest) = map.get("quest").and_then(Value::as_str) {
-                            other.push(format!("quest/{quest}"));
-                        }
-                    }
-                    Some("level") => other.push("the level".to_owned()),
-                    _ => {}
-                }
-                for child in map.values() {
-                    walk(child, memories, items, places, other);
-                }
-            }
-            Value::Array(list) => {
-                for child in list {
-                    walk(child, memories, items, places, other);
-                }
-            }
-            _ => {}
-        }
-    }
-    let (mut memories, mut items, mut places, mut other) =
-        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    for node in doc.nodes().values() {
-        if let Some(test) = node.get("test") {
-            walk(test, &mut memories, &mut items, &mut places, &mut other);
-        }
-        for choice in node["choices"].as_array().into_iter().flatten() {
-            if let Some(requires) = choice.get("requires") {
-                walk(requires, &mut memories, &mut items, &mut places, &mut other);
-            }
-        }
-    }
-    for list in [&mut memories, &mut items, &mut places, &mut other] {
-        list.sort();
-        list.dedup();
-    }
-    let mut parts: Vec<String> = Vec::new();
-    if !memories.is_empty() {
-        parts.push(format!("the subject's memory {}", memories.join(", ")));
-    }
-    parts.extend(items);
-    parts.extend(places);
-    parts.extend(other);
-    parts.join(" · ")
-}
-
-fn read_by_rows(
-    content: &Content,
-    may: &game::core::script::MayDo<game::systems::script::RiftScripting>,
-) -> Vec<(String, String)> {
+fn read_by_rows(content: &Content, may: &MayDo<RiftScripting>) -> Vec<(String, String)> {
     let mut rows = Vec::new();
-    let warps: Vec<&game::systems::script::Place> = may
-        .reaches
-        .iter()
-        .filter_map(|r| match r {
-            Reach::Warp(place) => Some(place),
-            _ => None,
-        })
-        .collect();
-    if let Some(place) = warps.first() {
-        rows.push((
-            "World map".to_owned(),
-            format!("a route to {} (P5)", place.area.key(content)),
-        ));
+    let warp = may.reaches.iter().find_map(|r| match r {
+        Reach::Warp(place) => Some(place),
+        _ => None,
+    });
+    if let Some(place) = warp {
+        let area = place.area.key(content);
+        rows.push(("World map".to_owned(), format!("a route to {area}")));
         rows.push((
             "Area view".to_owned(),
-            format!(
-                "{} · arrival pin at {}, {} (H10)",
-                place.area.key(content),
-                trim(place.at.x),
-                trim(place.at.y)
-            ),
+            format!("{area} · arrival pin at {}", place_coords(place)),
         ));
         rows.push((
             "Loader".to_owned(),
-            format!(
-                "{}'s {}, {} is a valid place (spec)",
-                place.area.key(content),
-                trim(place.at.x),
-                trim(place.at.y)
-            ),
+            format!("{area}'s {} is a valid place", place_coords(place)),
         ));
     }
-    let quests: Vec<String> = may
-        .reaches
-        .iter()
-        .filter_map(|r| match r {
-            Reach::Offers(q) | Reach::Accepts(q) | Reach::TurnsIn(q) => {
-                Some(q.key(content).to_owned())
-            }
-            _ => None,
-        })
-        .collect();
+    let quests = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Offers(q) | Reach::Accepts(q) | Reach::TurnsIn(q) => Some(q.key(content).to_owned()),
+        _ => None,
+    }));
     if !quests.is_empty() {
         rows.push((
             "Quest log".to_owned(),
-            format!("given by and turned in at, for {} (L13)", quests.join(", ")),
+            format!("given by and turned in at, for {}", quests.join(", ")),
         ));
         rows.push((
             "World map".to_owned(),
-            "quest marks on this owner (P5)".to_owned(),
+            "quest marks on this owner".to_owned(),
         ));
     }
-    let items: Vec<String> = may
-        .reaches
-        .iter()
-        .filter_map(|r| match r {
-            Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.key(content).to_owned()),
-            _ => None,
-        })
-        .collect();
+    let items = unique(may.reaches.iter().filter_map(|r| match r {
+        Reach::Takes(i) | Reach::Gives(i) | Reach::Drops(i) => Some(i.key(content).to_owned()),
+        _ => None,
+    }));
     if !items.is_empty() {
-        let mut items = items;
-        items.sort();
-        items.dedup();
         rows.push((
             "Item sources".to_owned(),
-            format!("{} change hands here (P2)", items.join(", ")),
+            format!("{} change hands here", items.join(", ")),
         ));
     }
     rows
@@ -826,10 +607,9 @@ fn read_by_rows(
 pub fn describe_reach(content: &Content, reach: &Reach) -> String {
     match reach {
         Reach::Warp(place) => format!(
-            "warps to {} {}, {}",
+            "warps to {} {}",
             place.area.key(content),
-            place.at.x,
-            place.at.y
+            place_coords(place)
         ),
         Reach::Takes(item) => format!("takes {}", item.key(content)),
         Reach::Gives(item) => format!("gives {}", item.key(content)),
@@ -859,14 +639,24 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
     }
 }
 
-fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let mut open: Option<(String, String, Option<String>)> = None;
+struct NamedBy {
+    table: String,
+    key: String,
+    name: String,
+    module: Option<ScriptPath>,
+    what: String,
+}
+
+struct Open {
+    table: String,
+    key: String,
+    module: Option<ScriptPath>,
+}
+
+fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
+    let mut open: Option<Open> = None;
     match &doc.owner {
-        ScriptOwner::Inline {
-            table,
-            key,
-            pointer,
-        } => {
+        ScriptOwner::Inline { table, key, module } => {
             let response = ui
                 .horizontal(|ui| {
                     ui.label(theme::code(format!("{table}/{key}")).size(13.0));
@@ -878,107 +668,103 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .clicked()
             {
-                open = Some((table.clone(), key.clone(), Some(pointer.clone())));
+                open = Some(Open {
+                    table: table.clone(),
+                    key: key.clone(),
+                    module: Some(*module),
+                });
             }
         }
         ScriptOwner::Shared { key } => {
             let Some(project) = &editor.project else {
                 return;
             };
-            let mut rows: Vec<(String, String, Option<String>, String, String)> = Vec::new();
+            let mut rows: Vec<NamedBy> = Vec::new();
             for (file, pointers) in project.usages.files_naming("script", key) {
                 let row = project.files.json(&file);
                 let Some((table, row_key)) = row_of(&file) else {
                     continue;
                 };
                 for pointer in pointers {
-                    let module_pointer = module_pointer(&pointer);
-                    let module = module_pointer
-                        .as_ref()
-                        .and_then(|p| row.as_ref().and_then(|row| row.pointer(p)).cloned());
-                    let (name, what) = if pointer.contains("/nodes/") {
-                        (
-                            pointer.rsplit('/').nth(1).unwrap_or("").to_owned(),
-                            "run node".to_owned(),
-                        )
-                    } else {
-                        let object = pointer
-                            .strip_prefix("/modules/")
-                            .and_then(|rest| rest.split('/').next())
-                            .and_then(|i| i.parse::<usize>().ok())
-                            .and_then(|i| {
-                                row.as_ref().and_then(|row| {
-                                    row["modules"][i]["name"].as_str().map(str::to_owned)
-                                })
-                            });
-                        let values = module
-                            .as_ref()
-                            .map(|m| summarise_values(&m["values"]))
-                            .unwrap_or_default();
-                        (object.unwrap_or_default(), values)
+                    let at = ScriptRef::parse(&pointer);
+                    let module_json = at
+                        .module
+                        .and_then(|module| row.as_ref()?.pointer(&module.pointer()).cloned());
+                    let (name, what) = match at.node {
+                        Some(node) => (node, "run node".to_owned()),
+                        None => (
+                            module_json
+                                .as_ref()
+                                .and_then(|module| module["name"].as_str())
+                                .unwrap_or_default()
+                                .to_owned(),
+                            module_json
+                                .as_ref()
+                                .map(|module| summarise_values(&module["values"]))
+                                .unwrap_or_default(),
+                        ),
                     };
-                    rows.push((
-                        format!("{table}/{row_key}"),
+                    rows.push(NamedBy {
+                        table: table.to_owned(),
+                        key: row_key.to_owned(),
                         name,
-                        module_pointer,
+                        module: at.module,
                         what,
-                        file.clone(),
-                    ));
+                    });
                 }
             }
             if rows.is_empty() {
                 widgets::hint(ui, "Nothing names this script yet.");
                 return;
             }
-            let areas: std::collections::BTreeSet<&str> = rows
+            let owners: BTreeSet<(&str, &str)> = rows
                 .iter()
-                .map(|(owner, _, _, _, _)| owner.as_str())
+                .map(|row| (row.table.as_str(), row.key.as_str()))
                 .collect();
             let shown = 8;
             egui::ScrollArea::vertical()
                 .id_salt(("used-by", key))
                 .show(ui, |ui| {
-                    for (owner, name, module_pointer, what, _) in rows.iter().take(shown) {
+                    for row in rows.iter().take(shown) {
                         let response = ui
                             .horizontal(|ui| {
                                 ui.add_sized(
                                     egui::vec2(150.0, 20.0),
-                                    egui::Label::new(theme::code(owner).size(13.0)).truncate(),
+                                    egui::Label::new(
+                                        theme::code(format!("{}/{}", row.table, row.key))
+                                            .size(13.0),
+                                    )
+                                    .truncate(),
                                 );
                                 ui.add_sized(
                                     egui::vec2(120.0, 20.0),
-                                    egui::Label::new(theme::mono(name).size(13.0)).truncate(),
+                                    egui::Label::new(theme::mono(&row.name).size(13.0)).truncate(),
                                 );
-                                ui.label(theme::muted(what).size(13.0));
+                                ui.label(theme::muted(&row.what).size(13.0));
                             })
                             .response
                             .interact(egui::Sense::click());
                         if response
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
                             .clicked()
-                            && let Some((table, row_key)) = owner.split_once('/')
                         {
-                            open = Some((
-                                table.to_owned(),
-                                row_key.to_owned(),
-                                module_pointer.clone(),
-                            ));
+                            open = Some(Open {
+                                table: row.table.clone(),
+                                key: row.key.clone(),
+                                module: row.module,
+                            });
                         }
-                        let rect = ui.max_rect();
-                        let y = ui.cursor().min.y;
-                        ui.painter().line_segment(
-                            [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-                            Stroke::new(1.0, theme::BORDER),
-                        );
+                        widgets::rule(ui);
                     }
                     if rows.len() > shown {
-                        let all_areas = areas.iter().all(|a| a.starts_with("area/"));
+                        let all_areas = owners.iter().all(|(table, _)| *table == "area");
                         ui.label(
                             theme::muted(format!(
-                                "… {} more in {} {} · click one to open its {}",
+                                "… {} more in {} {}{} · click one to open its {}",
                                 rows.len() - shown,
-                                areas.len(),
-                                counted(areas.len(), if all_areas { "area" } else { "owner" }),
+                                owners.len(),
+                                if all_areas { "area" } else { "owner" },
+                                widgets::plural(owners.len()),
                                 if all_areas {
                                     "area with it selected"
                                 } else {
@@ -998,38 +784,21 @@ fn used_by(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
                 });
         }
     }
-    if let Some((table, key, pointer)) = open {
-        match pointer {
-            Some(pointer) if table == "area" && !pointer.contains("/scripts/") => {
-                editor.select(Selection {
-                    table: table.clone(),
-                    keys: vec![key.clone()],
-                    parts: vec![
-                        pointer
-                            .rsplit_once("/scripts")
-                            .map(|(m, _)| m.to_owned())
-                            .unwrap_or(pointer),
-                    ],
-                });
-                editor.open_tab(Tab::Area { key });
-            }
-            Some(pointer) if !pointer.is_empty() => {
-                editor.select(Selection::row(&table, &key));
-                super::open_inline_or_row(editor, &table, &key, &pointer);
-            }
-            _ => {
-                editor.select(Selection::row(&table, &key));
-                editor.open_tab(Tab::for_row(&table, &key));
-            }
+    let Some(Open { table, key, module }) = open else {
+        return;
+    };
+    editor.select(RowSelection::row(&table, &key));
+    match module {
+        Some(ScriptPath::Module(index)) if table == "area" => {
+            editor.select(RowSelection::parts(
+                &table,
+                &key,
+                vec![format!("/modules/{index}")],
+            ));
+            editor.open_tab(EditorTab::Area { key });
         }
-    }
-}
-
-fn counted(count: usize, word: &str) -> String {
-    if count == 1 {
-        word.to_owned()
-    } else {
-        format!("{word}s")
+        Some(module) => super::open_inline_or_row(editor, &table, &key, &module.pointer()),
+        None => editor.open_tab(EditorTab::for_row(&table, &key)),
     }
 }
 
@@ -1048,68 +817,13 @@ fn summarise_values(values: &Value) -> String {
         .as_object()
         .map(|map| {
             map.iter()
-                .map(|(name, value)| match value {
-                    Value::Object(place)
-                        if place.contains_key("area") && place.contains_key("x") =>
-                    {
-                        format!(
-                            "{name} {} · {}, {}",
-                            place.text_or("area", "?"),
-                            trim(place["x"].as_f64().unwrap_or(0.0) as f32),
-                            trim(place["y"].as_f64().unwrap_or(0.0) as f32)
-                        )
-                    }
-                    other => format!("{name} {}", crate::condition::summary(other)),
+                .map(|(name, value)| {
+                    let shown =
+                        nodes::place_text(value).unwrap_or_else(|| condition::summary(value));
+                    format!("{name} {shown}")
                 })
                 .collect::<Vec<_>>()
                 .join(" · ")
         })
         .unwrap_or_default()
-}
-
-fn history(editor: &mut Editor, ui: &mut Ui, doc: &Doc) {
-    let Some(project) = &editor.project else {
-        return;
-    };
-    let applied = project.history.applied();
-    let steps: Vec<(usize, String, bool)> = project
-        .history
-        .steps()
-        .iter()
-        .enumerate()
-        .filter(|(_, step)| step.after.iter().any(|change| change.file == doc.file))
-        .map(|(index, step)| (index + 1, step.label.clone(), index < applied))
-        .collect();
-    if steps.is_empty() {
-        ui.label(RichText::new("No steps touched this script yet").weak());
-        return;
-    }
-    let mut jump = None;
-    egui::ScrollArea::vertical()
-        .id_salt(("script-history", doc.owner.slug()))
-        .show(ui, |ui| {
-            for (index, label, done) in steps.iter().rev() {
-                let text = if *done {
-                    RichText::new(label)
-                } else {
-                    RichText::new(label).weak()
-                };
-                if ui.selectable_label(*index == applied, text).clicked() {
-                    jump = Some(*index);
-                }
-            }
-        });
-    if let Some(index) = jump
-        && let Some(project) = &mut editor.project
-    {
-        match project.jump(index) {
-            Ok(Some(applied)) => {
-                editor.selection = applied.viewpoint.selection;
-                editor.views.restore_camera(applied.viewpoint.camera);
-                editor.views.content_changed();
-            }
-            Ok(None) => {}
-            Err(refusal) => editor.refused("History", &refusal),
-        }
-    }
 }

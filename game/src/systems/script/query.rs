@@ -14,13 +14,14 @@ use crate::systems::area::{self, Area, AreaTag, object};
 use crate::systems::combat::{Attackers, Attitude};
 use crate::systems::effect::{self, Effect};
 use crate::systems::equipment::Equipment;
-use crate::systems::item::{DroppedItem, Inventory};
-use crate::systems::job::{self, Job};
+use crate::systems::item::{DroppedItem, Id as ItemId, Inventory};
+use crate::systems::job::{self, Id as JobId, Job};
 use crate::systems::memory;
+use crate::systems::memory::Id as MemoryId;
 use crate::systems::movement::{self, Position};
-use crate::systems::npc::{Npc, Pack, body};
+use crate::systems::npc::{Id as NpcId, Npc, Pack, body};
 use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
-use crate::systems::quest::{self, Objective};
+use crate::systems::quest::{self, Id as QuestId, Objective};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility;
 use crate::systems::visibility::Presence;
@@ -69,7 +70,7 @@ pub struct Listed {
     pub entity: Entity,
     pub at: Pos<Tiles>,
     pub area: area::Id,
-    pub npc: Option<crate::systems::npc::Id>,
+    pub npc: Option<NpcId>,
     pub character: bool,
     pub dead: bool,
     pub held: bool,
@@ -178,7 +179,7 @@ pub enum RiftQuery {
     IsJob {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        job: crate::systems::job::Id,
+        job: JobId,
     },
     Stat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -193,7 +194,7 @@ pub enum RiftQuery {
     Holding {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        item: crate::systems::item::Id,
+        item: ItemId,
     },
     FreeSlots {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -202,44 +203,44 @@ pub enum RiftQuery {
     Wearing {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        item: crate::systems::item::Id,
+        item: ItemId,
     },
     Memory {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        memory: crate::systems::memory::Id,
+        memory: MemoryId,
     },
     SetWithin {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        memory: crate::systems::memory::Id,
+        memory: MemoryId,
         seconds: Actor,
     },
     OnQuest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: crate::systems::quest::Id,
+        quest: QuestId,
     },
     QuestDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: crate::systems::quest::Id,
+        quest: QuestId,
     },
     QuestCooling {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: crate::systems::quest::Id,
+        quest: QuestId,
     },
     TaskDone {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: crate::systems::quest::Id,
+        quest: QuestId,
         task: String,
     },
     QuestResetsIn {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        quest: crate::systems::quest::Id,
+        quest: QuestId,
     },
     Inside {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -259,13 +260,13 @@ pub enum RiftQuery {
     Nearest {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        npc: Option<crate::systems::npc::Id>,
+        npc: Option<NpcId>,
         within: Actor,
     },
     Count {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        npc: Option<crate::systems::npc::Id>,
+        npc: Option<NpcId>,
         within: Actor,
     },
     Present {
@@ -289,7 +290,7 @@ pub enum RiftQuery {
         actor: Actor,
     },
     GroundItems {
-        item: crate::systems::item::Id,
+        item: ItemId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         at: Option<Actor>,
         within: Actor,
@@ -676,7 +677,7 @@ pub fn nearest(
     world: &World,
     cx: &FlowCx,
     among: Among,
-    npc: Option<crate::systems::npc::Id>,
+    npc: Option<NpcId>,
     within: Tiles,
 ) -> Option<Entity> {
     around(world, cx, among, npc, within)
@@ -688,7 +689,7 @@ pub fn around<'w>(
     world: &'w World,
     cx: &FlowCx,
     among: Among,
-    npc: Option<crate::systems::npc::Id>,
+    npc: Option<NpcId>,
     within: Tiles,
 ) -> impl Iterator<Item = (Entity, Tiles)> + 'w {
     let scan = Scan::of(world, cx, among, within);

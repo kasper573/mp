@@ -5,16 +5,16 @@ pub mod screen;
 pub mod transition;
 
 pub use camera::{WorldToWindow, cursor_tile, tile_to_window};
+pub use screen::ToScreen;
 
 use std::collections::HashMap;
 
-use crate::core::math::{Pos, WorldPx};
-use crate::core::tiling::Tiles;
-use crate::core::time::Seconds;
 use bevy::prelude::*;
 use bevy::sprite_render::Material2dPlugin;
 
-pub use screen::ToScreen;
+use crate::core::math::{Pos, Rect as WorldRect, WorldPx};
+use crate::core::tiling::Tiles;
+use crate::core::time::Seconds;
 
 pub const TILE: WorldPx = WorldPx(16.0);
 
@@ -30,7 +30,7 @@ pub fn dynamic_z(area_height: f32, base: f32, y: Tiles) -> f32 {
     base + (y + Tiles(1.0)).ratio(Tiles(area_height + 2.0))
 }
 
-pub fn atlas_rect(region: crate::core::math::Rect<WorldPx>) -> Rect {
+pub fn atlas_rect(region: WorldRect<WorldPx>) -> Rect {
     Rect::new(
         region.min().x,
         region.min().y,

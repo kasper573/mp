@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
-use crate::project::Bytes;
-use crate::project::history::Step;
+use crate::project::history::EditStep;
+use crate::project::{FileBytes, row_of};
 
 const ROW: f32 = 28.0;
 
@@ -113,13 +113,13 @@ fn row(
         ui.painter().rect_filled(rect, 4.0, theme::RAISED);
     }
     let ink = if done { theme::TEXT } else { theme::FAINT };
-    let (glyph, colour) = glyph_of(label);
+    let glyph = glyph_of(label);
     ui.painter().text(
         rect.left_center() + egui::vec2(14.0, 0.0),
         Align2::LEFT_CENTER,
         glyph,
         FontId::proportional(13.0),
-        if done { colour } else { theme::FAINT },
+        if done { theme::MUTED } else { theme::FAINT },
     );
     ui.painter().text(
         rect.left_center() + egui::vec2(36.0, 0.0),
@@ -162,17 +162,17 @@ fn row(
     response
 }
 
-fn glyph_of(label: &str) -> (&'static str, egui::Color32) {
+fn glyph_of(label: &str) -> &'static str {
     let verb = label.split_whitespace().next().unwrap_or("").to_lowercase();
     match verb.as_str() {
-        "move" | "drag" | "place" | "stamp" | "resize" => ("➚", theme::MUTED),
-        "delete" | "remove" | "erase" | "clear" => ("✕", theme::MUTED),
-        "paint" | "fill" => ("✸", theme::MUTED),
-        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => ("✱", theme::MUTED),
-        "add" | "new" | "duplicate" | "paste" | "make" | "import" => ("+", theme::MUTED),
-        "rename" => ("▤", theme::MUTED),
-        "open" | "recover" => ("▭", theme::MUTED),
-        _ => ("•", theme::MUTED),
+        "move" | "drag" | "place" | "stamp" | "resize" => "➚",
+        "delete" | "remove" | "erase" | "clear" => "✕",
+        "paint" | "fill" => "✸",
+        "set" | "edit" | "change" | "toggle" | "link" | "unlink" => "✱",
+        "add" | "new" | "duplicate" | "paste" | "make" | "import" => "+",
+        "rename" => "▤",
+        "open" | "recover" => "▭",
+        _ => "•",
     }
 }
 
@@ -196,7 +196,7 @@ pub fn step_card(editor: &Editor, ui: &mut Ui) {
     for change in &step.after {
         let before = step.before.iter().find(|b| b.file == change.file);
         ui.horizontal(|ui| {
-            let name = crate::project::row_of(&change.file)
+            let name = row_of(&change.file)
                 .map(|(table, key)| format!("{table}/{key}"))
                 .unwrap_or_else(|| change.file.clone());
             ui.label(theme::mono(name).size(13.0));
@@ -213,9 +213,10 @@ pub fn step_card(editor: &Editor, ui: &mut Ui) {
     ui.label(theme::muted(restores(step)).size(13.0));
 }
 
-fn touched(before: Option<&Bytes>, after: Option<&Bytes>) -> String {
-    let parse =
-        |bytes: Option<&Bytes>| bytes.and_then(|b| serde_json::from_slice::<Value>(&b[..]).ok());
+fn touched(before: Option<&FileBytes>, after: Option<&FileBytes>) -> String {
+    let parse = |bytes: Option<&FileBytes>| {
+        bytes.and_then(|b| serde_json::from_slice::<Value>(&b[..]).ok())
+    };
     match (before, after) {
         (None, Some(_)) => return "new file".to_owned(),
         (Some(_), None) => return "removed".to_owned(),
@@ -250,13 +251,13 @@ fn touched(before: Option<&Bytes>, after: Option<&Bytes>) -> String {
     if changed_modules > 0 {
         parts.push(format!(
             "{changed_modules} module{}",
-            crate::ui::widgets::plural(changed_modules)
+            widgets::plural(changed_modules)
         ));
     }
     if changed_fields > 0 {
         parts.push(format!(
             "{changed_fields} field{}",
-            crate::ui::widgets::plural(changed_fields)
+            widgets::plural(changed_fields)
         ));
     }
     if parts.is_empty() {
@@ -266,7 +267,7 @@ fn touched(before: Option<&Bytes>, after: Option<&Bytes>) -> String {
     }
 }
 
-fn restores(step: &Step) -> String {
+fn restores(step: &EditStep) -> String {
     let mut parts = vec!["the files as they were".to_owned()];
     if !step.selection.keys.is_empty() {
         parts.push("the selection".to_owned());
@@ -282,15 +283,9 @@ fn restores(step: &Step) -> String {
 }
 
 fn clock(at: SystemTime) -> String {
-    let seconds = at
+    let unix = at
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs())
-        .unwrap_or(0)
-        % 86_400;
-    format!(
-        "{:02}:{:02}:{:02}",
-        seconds / 3600,
-        (seconds % 3600) / 60,
-        seconds % 60
-    )
+        .unwrap_or(0);
+    widgets::clock(unix, true)
 }

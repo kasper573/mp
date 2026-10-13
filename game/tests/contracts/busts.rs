@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use game::systems::actor::bust::ModelDef;
+use game::systems::actor::model::ModelDef;
 
 use crate::support::content;
 

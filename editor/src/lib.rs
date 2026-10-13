@@ -7,7 +7,7 @@ mod play;
 pub mod project;
 mod rows;
 mod scenes;
-mod schema;
+pub mod schema;
 mod spans;
 mod tabs;
 pub mod templates;

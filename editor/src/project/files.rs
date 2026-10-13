@@ -5,28 +5,28 @@ use std::sync::{Arc, OnceLock};
 
 use game::core::content::MemoryFolder;
 
-pub type Bytes = Arc<[u8]>;
+pub type FileBytes = Arc<[u8]>;
 
 #[derive(Clone, Default)]
-pub struct Files {
+pub struct ProjectFiles {
     map: BTreeMap<String, Stored>,
 }
 
 #[derive(Clone)]
 struct Stored {
-    bytes: Bytes,
+    bytes: FileBytes,
     hash: String,
     json: OnceLock<Option<Arc<serde_json::Value>>>,
 }
 
-impl Files {
-    pub fn read_dir(root: &Path) -> io::Result<Files> {
-        let mut files = Files::default();
+impl ProjectFiles {
+    pub fn read_dir(root: &Path) -> io::Result<ProjectFiles> {
+        let mut files = ProjectFiles::default();
         walk(root, root, &mut files)?;
         Ok(files)
     }
 
-    pub fn get(&self, path: &str) -> Option<&Bytes> {
+    pub fn get(&self, path: &str) -> Option<&FileBytes> {
         self.map.get(path).map(|stored| &stored.bytes)
     }
 
@@ -38,7 +38,7 @@ impl Files {
         self.map.contains_key(path)
     }
 
-    pub fn insert(&mut self, path: String, bytes: Bytes) {
+    pub fn insert(&mut self, path: String, bytes: FileBytes) {
         let hash = hash(&bytes);
         self.map.insert(
             path,
@@ -58,7 +58,7 @@ impl Files {
         self.map.keys()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Bytes)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &FileBytes)> {
         self.map.iter().map(|(path, stored)| (path, &stored.bytes))
     }
 
@@ -96,7 +96,7 @@ impl Files {
         }
     }
 
-    pub fn with(&self, changes: &[Change]) -> Files {
+    pub fn with(&self, changes: &[FileChange]) -> ProjectFiles {
         let mut files = self.clone();
         for change in changes {
             match &change.bytes {
@@ -105,6 +105,18 @@ impl Files {
             }
         }
         files
+    }
+
+    pub fn keys_of(&self, table: &str) -> impl Iterator<Item = &str> {
+        let prefix = format!("tables/{table}/");
+        self.map
+            .range::<str, _>((
+                std::ops::Bound::Included(prefix.as_str()),
+                std::ops::Bound::Unbounded,
+            ))
+            .map(|(path, _)| path.as_str())
+            .take_while(move |path| path.starts_with(&prefix))
+            .filter_map(|path| row_of(path).map(|(_, key)| key))
     }
 
     pub fn paths_under(&self, prefix: &str) -> impl Iterator<Item = &String> {
@@ -122,10 +134,14 @@ pub fn hash(bytes: &[u8]) -> String {
     blake3::hash(bytes).to_hex().to_string()
 }
 
-pub fn json_bytes(value: &serde_json::Value) -> Bytes {
+pub fn json_bytes(value: &serde_json::Value) -> FileBytes {
     let mut bytes = serde_json::to_vec_pretty(value).expect("json");
     bytes.push(b'\n');
-    Bytes::from(bytes)
+    FileBytes::from(bytes)
+}
+
+pub fn text_bytes(text: String) -> FileBytes {
+    FileBytes::from(text.into_bytes())
 }
 
 pub const GAME_FILE: &str = "game.json";
@@ -142,13 +158,13 @@ pub fn row_of(file: &str) -> Option<(&str, &str)> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Change {
+pub struct FileChange {
     pub file: String,
-    pub bytes: Option<Bytes>,
+    pub bytes: Option<FileBytes>,
 }
 
-impl PartialEq for Change {
-    fn eq(&self, other: &Change) -> bool {
+impl PartialEq for FileChange {
+    fn eq(&self, other: &FileChange) -> bool {
         self.file == other.file
             && match (&self.bytes, &other.bytes) {
                 (Some(a), Some(b)) => a[..] == b[..],
@@ -158,7 +174,7 @@ impl PartialEq for Change {
     }
 }
 
-fn walk(root: &Path, dir: &Path, into: &mut Files) -> io::Result<()> {
+fn walk(root: &Path, dir: &Path, into: &mut ProjectFiles) -> io::Result<()> {
     let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
@@ -181,7 +197,7 @@ fn walk(root: &Path, dir: &Path, into: &mut Files) -> io::Result<()> {
                 .map(|part| part.as_os_str().to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("/");
-            into.insert(relative, Bytes::from(std::fs::read(&path)?));
+            into.insert(relative, FileBytes::from(std::fs::read(&path)?));
         }
     }
     Ok(())

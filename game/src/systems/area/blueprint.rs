@@ -4,17 +4,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::grid::Flip;
+use super::{AreaDef, AreaModule, ObjectShape, ZoneShape};
 use crate::core::content::id::{LeafKind, LeafProblem, nearest};
 use crate::core::content::{
-    Content, ContentId, ContentRow, ContentScope, RowCheck, row_file, with_content,
+    Content, ContentId, ContentRow, ContentScope, RowCheck, pointer_of, row_file, serial,
+    valid_key, with_content,
 };
 use crate::core::math::{Pos, Rect};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
 use crate::core::tiling::Tiles;
 use crate::systems::script::{RiftScripting, ScriptModule};
-
-use super::grid::Flip;
-use super::{AreaDef, AreaModule, ObjectShape, ZoneShape};
 
 pub type Id = ContentId<BlueprintDef>;
 
@@ -45,7 +45,7 @@ impl ContentRow for BlueprintDef {
             "variables",
         );
         for name in self.variables.keys() {
-            if !(1..=40).contains(&name.len()) || !crate::core::content::load::valid_key(name) {
+            if !(1..=40).contains(&name.len()) || !valid_key(name) {
                 cx.error(
                     format!("/variables/{}", crate::core::content::locate::escape(name)),
                     "out of range",
@@ -75,11 +75,8 @@ impl ContentRow for BlueprintDef {
 #[serde(deny_unknown_fields)]
 pub struct Placement {
     pub blueprint: Id,
-    #[schemars(with = "crate::core::content::serial::PosRow")]
-    #[serde(
-        serialize_with = "crate::core::content::serial::pos",
-        deserialize_with = "crate::core::content::serial::pos_from"
-    )]
+    #[schemars(with = "serial::PosRow")]
+    #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<Tiles>,
     #[serde(default, skip_serializing_if = "Flip::is_none")]
     pub flip: Flip,
@@ -102,11 +99,7 @@ impl Flattened {
                 format!("/modules/{}", self.origin),
             ),
             Some((blueprint, part)) => (
-                format!(
-                    "tables/{}/{}.json",
-                    BlueprintDef::TABLE,
-                    blueprint.key(content)
-                ),
+                row_file(BlueprintDef::TABLE, blueprint.key(content)),
                 format!("/parts/{part}"),
             ),
         }
@@ -401,10 +394,7 @@ impl Expansion<'_> {
                 match result {
                     Ok(module) => module,
                     Err(error) => {
-                        let pointer = format!(
-                            "{part_pointer}{}",
-                            crate::core::content::load::pointer_of(error.path())
-                        );
+                        let pointer = format!("{part_pointer}{}", pointer_of(error.path()));
                         self.error(
                             FlattenAt::Blueprint(placement.blueprint, pointer),
                             "wrong type",

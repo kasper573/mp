@@ -2,9 +2,15 @@ pub mod session;
 pub mod snapshot;
 pub mod widget;
 
+use std::collections::HashMap;
+
 use bevy_app::App;
 use bevy_ecs::component::Component;
+use bevy_ecs::lifecycle::{Add, Remove};
 use bevy_ecs::message::Message;
+use bevy_ecs::observer::On;
+use bevy_ecs::prelude::*;
+use bevy_replicon::prelude::{ClientId as Sender, Replicated};
 use bevy_time::Time;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,11 +19,9 @@ use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, WallClock};
-use crate::systems::Character;
 use crate::systems::GameSettings;
 use crate::systems::account::identity::Identity;
-use crate::systems::actor;
-use crate::systems::actor::{Action, Actor, Hitbox, Name, Rgba, Tint};
+use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint, model};
 use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::belongings;
@@ -27,20 +31,17 @@ use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
 use crate::systems::item::Inventory;
-use crate::systems::job::Job;
+use crate::systems::job::{Id as JobId, Job};
 use crate::systems::memory::Memory;
 use crate::systems::movement::Position;
 use crate::systems::quest::QuestLog;
+use crate::systems::script::EventKind;
 use crate::systems::shop::ShopLedger;
 use crate::systems::spectate::Spectators;
-use crate::systems::stat::{self, StatKind, Stats};
-use crate::systems::visibility::OwnedBy;
-use bevy_ecs::lifecycle::{Add, Remove};
-use bevy_ecs::observer::On;
-use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{Replicated, SendTargets, ToClients};
+use crate::systems::stat::{self, StatKind, StatMap, Stats};
+use crate::systems::visibility::{self, OwnedBy};
+use crate::systems::{Character, WorldArea, drain_requests};
 use snapshot::JoinAs;
-use std::collections::HashMap;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -119,10 +120,10 @@ pub type Id = ContentId<PlayerDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
-    pub model: crate::systems::actor::bust::Id,
-    pub job: crate::systems::job::Id,
+    pub model: model::Id,
+    pub job: JobId,
     #[schemars(transform = crate::systems::stat::schema_with_units)]
-    pub stats: crate::systems::stat::StatMap,
+    pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<PlayerModule>,
 }
@@ -176,10 +177,7 @@ pub fn def(content: &Content) -> &'static PlayerDef {
 #[derive(Resource, Default)]
 pub struct Players(pub HashMap<ClientId, Entity>);
 
-pub(crate) fn sender_player(
-    world: &World,
-    sender: bevy_replicon::prelude::ClientId,
-) -> Option<Entity> {
+pub(crate) fn sender_player(world: &World, sender: Sender) -> Option<Entity> {
     conn_player(world, sender.entity()?)
 }
 
@@ -192,7 +190,7 @@ pub fn held(world: &World, entity: Entity) -> bool {
 }
 
 pub fn arrival_holds(world: &mut World) {
-    for request in crate::systems::requests::<AreaDrawn>(world) {
+    for request in drain_requests::<AreaDrawn>(world) {
         if let Some(player) = sender_player(world, request.client_id)
             && let Ok(mut player) = world.get_entity_mut(player)
         {
@@ -216,18 +214,12 @@ pub(crate) fn conn_player(world: &World, conn: Entity) -> Option<Entity> {
     world.resource::<Players>().0.get(client).copied()
 }
 
-pub fn greet(
-    add: On<Add<ClientId>>,
-    clients: Query<&ClientId>,
-    mut welcome: MessageWriter<ToClients<Welcome>>,
-) {
+pub fn greet(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Commands) {
     let Ok(&id) = clients.get(add.entity) else {
         return;
     };
-    welcome.write(ToClients {
-        targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(add.entity)),
-        message: Welcome { id },
-    });
+    let conn = add.entity;
+    commands.queue(move |world: &mut World| visibility::send_to(world, conn, Welcome { id }));
 }
 
 pub fn client_left(
@@ -264,11 +256,11 @@ pub struct SpawnRules {
 }
 
 pub fn join(world: &mut World) {
-    let zone = world.resource::<crate::systems::WorldArea>().0;
-    let assets = *world.resource::<Content>();
-    let area = area::load(&assets, zone);
+    let zone = world.resource::<WorldArea>().0;
+    let content = *world.resource::<Content>();
+    let area = area::load(&content, zone);
     let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
-    for request in crate::systems::requests::<JoinRequest>(world) {
+    for request in drain_requests::<JoinRequest>(world) {
         let Some(client_entity) = request.client_id.entity() else {
             continue;
         };
@@ -284,14 +276,14 @@ pub fn join(world: &mut World) {
         let (at, state) = match world.get::<JoinAs>(client_entity) {
             Some(JoinAs { snapshot, start }) if start.area == zone => (
                 start.at,
-                snapshot::materialize(&assets, snapshot, *start, clock, immortal),
+                snapshot::materialize(&content, snapshot, *start, clock, immortal),
             ),
             _ => {
                 let name = world
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let at = spawn_position(world, policy, zone, area);
-                (at, fresh_state(&assets, zone, at, name, immortal))
+                (at, fresh_state(&content, zone, at, name, immortal))
             }
         };
         let entity = place(world, client, zone, at, state);
@@ -300,11 +292,7 @@ pub fn join(world: &mut World) {
 }
 
 pub fn spawned(world: &mut World, player: Entity) {
-    crate::systems::area::transition::raise_area(
-        world,
-        crate::systems::script::EventKind::Entered,
-        player,
-    );
+    crate::systems::area::transition::raise_area(world, EventKind::Entered, player);
 }
 
 fn spawn_position(
@@ -392,7 +380,6 @@ pub(crate) fn place(
     let content = *world.resource::<Content>();
     let def = def(&content);
     let model = def.model;
-    let assets = *world.resource::<Content>();
     let entity = world
         .spawn((
             Character {
@@ -406,7 +393,7 @@ pub(crate) fn place(
                     attack_rate: PlaybackRate(stat::of_map(&def.stats, StatKind::AttackSpeed)),
                 },
                 hitbox: Hitbox {
-                    size: actor::model(&assets, model).hitbox(),
+                    size: ActorModel::get(&content, model).hitbox(),
                 },
                 area: AreaTag { area: zone },
             },
@@ -414,19 +401,21 @@ pub(crate) fn place(
             state.discovered,
             OwnedBy(client),
             Owner { client },
-            state.inventory,
-            state.xp,
-            state.equipment,
-            state.job,
-            state.timed,
-            state.memory,
-            state.heard,
-            state.ledger,
-            state.quests,
-            state.history,
+            (
+                state.inventory,
+                state.xp,
+                state.equipment,
+                state.job,
+                state.timed,
+                state.memory,
+                state.heard,
+                state.ledger,
+                state.quests,
+                state.history,
+                state.stats,
+            ),
         ))
         .id();
-    state.stats.apply(world, entity);
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     world.entity_mut(entity).insert((
         SpawnPoint(state.spawn),
@@ -442,7 +431,7 @@ pub(crate) fn place(
 
 pub fn respawn(world: &mut World) {
     let content = *world.resource::<Content>();
-    for request in crate::systems::requests::<RespawnRequest>(world) {
+    for request in drain_requests::<RespawnRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
         };

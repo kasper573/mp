@@ -42,13 +42,13 @@ pub struct TreeOutput {
     pub open_table: Option<String>,
 }
 
-pub type LeafMenu<'a> = dyn FnMut(&mut Ui, &TreeNode) + 'a;
-pub type Thumbs<'a> = dyn FnMut(&egui::Context, &str) -> Option<IconImage> + 'a;
+pub type TreeLeafMenu<'a> = dyn FnMut(&mut Ui, &TreeNode) + 'a;
+pub type TreeThumbs<'a> = dyn FnMut(&egui::Context, &str) -> Option<IconImage> + 'a;
 
 #[derive(Default)]
-pub struct Hooks<'a, 'b> {
-    pub menu: Option<&'a mut LeafMenu<'b>>,
-    pub thumbs: Option<&'a mut Thumbs<'b>>,
+pub struct TreeHooks<'a, 'b> {
+    pub menu: Option<&'a mut TreeLeafMenu<'b>>,
+    pub thumbs: Option<&'a mut TreeThumbs<'b>>,
 }
 
 impl TreeNode {
@@ -103,22 +103,19 @@ pub fn show(
     state: &mut TreeState,
     nodes: &[TreeNode],
     open_all: bool,
-    mut hooks: Hooks<'_, '_>,
+    mut hooks: TreeHooks<'_, '_>,
 ) -> TreeOutput {
-    let mut out = TreeOutput::default();
-    let mut toggle: Vec<String> = Vec::new();
+    let mut walk = Walk {
+        state,
+        open_all,
+        out: TreeOutput::default(),
+        toggle: Vec::new(),
+        hooks: &mut hooks,
+    };
     for node in nodes {
-        node_line(
-            ui,
-            state,
-            node,
-            0,
-            open_all,
-            &mut out,
-            &mut toggle,
-            &mut hooks,
-        );
+        node_line(ui, &mut walk, node, 0);
     }
+    let Walk { out, toggle, .. } = walk;
     for id in toggle {
         if !state.open.remove(&id) {
             state.open.insert(id);
@@ -131,17 +128,15 @@ const LINE: f32 = 22.0;
 const INDENT: f32 = 14.0;
 const BUTTON: f32 = 18.0;
 
-#[allow(clippy::too_many_arguments)]
-fn node_line(
-    ui: &mut Ui,
-    state: &TreeState,
-    node: &TreeNode,
-    depth: usize,
+struct Walk<'a, 'b, 'c> {
+    state: &'a TreeState,
     open_all: bool,
-    out: &mut TreeOutput,
-    toggle: &mut Vec<String>,
-    hooks: &mut Hooks<'_, '_>,
-) {
+    out: TreeOutput,
+    toggle: Vec<String>,
+    hooks: &'a mut TreeHooks<'b, 'c>,
+}
+
+fn node_line(ui: &mut Ui, walk: &mut Walk, node: &TreeNode, depth: usize) {
     let full = ui.available_rect_before_wrap();
     let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), Sense::click());
     let visible = ui.clip_rect().intersects(rect);
@@ -162,23 +157,23 @@ fn node_line(
     child.add_space(6.0 + INDENT * depth as f32);
     match &node.children {
         Some(children) => {
-            let open = open_all || state.open.contains(&node.id);
-            folder_line(&mut child, node, open, out);
+            let open = walk.open_all || walk.state.open.contains(&node.id);
+            folder_line(&mut child, node, open, &mut walk.out);
             if response.clicked() {
-                toggle.push(node.id.clone());
+                walk.toggle.push(node.id.clone());
             }
             if node.adds || node.table {
-                response.context_menu(|ui| folder_menu(ui, node, out));
+                response.context_menu(|ui| folder_menu(ui, node, &mut walk.out));
             }
             if open {
                 for child in children {
-                    node_line(ui, state, child, depth + 1, open_all, out, toggle, hooks);
+                    node_line(ui, walk, child, depth + 1);
                 }
             }
         }
         None => {
             if visible {
-                leaf_line(&mut child, node, &mut hooks.thumbs);
+                leaf_line(&mut child, node, &mut walk.hooks.thumbs);
             }
             if node.unsaved {
                 ui.painter().circle_filled(
@@ -188,12 +183,12 @@ fn node_line(
                 );
             }
             if response.clicked() {
-                out.clicked = Some((node.id.clone(), ui.input(|i| i.modifiers)));
+                walk.out.clicked = Some((node.id.clone(), ui.input(|i| i.modifiers)));
             }
             if response.double_clicked() {
-                out.double_clicked = Some(node.id.clone());
+                walk.out.double_clicked = Some(node.id.clone());
             }
-            if let Some(menu) = hooks.menu.as_deref_mut() {
+            if let Some(menu) = walk.hooks.menu.as_deref_mut() {
                 response.context_menu(|ui| menu(ui, node));
             }
         }
@@ -201,17 +196,12 @@ fn node_line(
 }
 
 fn folder_line(ui: &mut Ui, node: &TreeNode, open: bool, out: &mut TreeOutput) {
-    ui.add(
-        egui::Label::new(theme::muted(if open { "▾" } else { "▸" }).size(11.0)).selectable(false),
-    );
-    let label = ui.add(
-        egui::Label::new(theme::mono(&node.label).color(if node.locked {
-            theme::MUTED
-        } else {
-            theme::CODE
-        }))
-        .selectable(false),
-    );
+    ui.label(theme::muted(if open { "▾" } else { "▸" }).size(11.0));
+    let label = ui.label(theme::mono(&node.label).color(if node.locked {
+        theme::MUTED
+    } else {
+        theme::CODE
+    }));
     if node.locked {
         label.on_hover_text("Fixtures: the engine names these rows, so none can be added");
     }
@@ -250,7 +240,7 @@ fn line_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
     .on_hover_text(tip)
 }
 
-fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut Thumbs<'_>>) {
+fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
     let colour = if node.selected {
         theme::TEXT
     } else {
@@ -260,7 +250,7 @@ fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut Thumbs<'_>>)
     let image = match &node.icon {
         TreeIcon::None => None,
         TreeIcon::Glyph(glyph) => {
-            ui.add(egui::Label::new(theme::muted(*glyph)).selectable(false));
+            ui.label(theme::muted(*glyph));
             None
         }
         TreeIcon::Thumb(path) => thumbs
@@ -273,7 +263,7 @@ fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut Thumbs<'_>>)
     } else if matches!(node.icon, TreeIcon::Thumb(_)) {
         ui.add_space(18.0);
     }
-    ui.add(egui::Label::new(theme::mono(&node.label).size(13.0).color(colour)).selectable(false));
+    ui.label(theme::mono(&node.label).size(13.0).color(colour));
 }
 
 #[derive(Default)]

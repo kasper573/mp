@@ -233,11 +233,6 @@ pub fn backfill(
             .get::<History>(player)
             .map(|history| history.records().cloned().collect())
             .unwrap_or_default();
-        world.write_message(bevy_replicon::prelude::ToClients {
-            targets: bevy_replicon::prelude::SendTargets::Single(
-                bevy_replicon::prelude::ClientId::Client(conn),
-            ),
-            message: HistoryNews::Backfill { subject, records },
-        });
+        visibility::send_to(world, conn, HistoryNews::Backfill { subject, records });
     }
 }

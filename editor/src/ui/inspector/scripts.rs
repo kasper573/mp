@@ -1,12 +1,19 @@
-use egui::{Align, Color32, Layout, RichText, Ui};
+use std::str::FromStr;
+
+use egui::{Align, Layout, RichText, Ui};
+use game::core::script::VariableType;
+use game::systems::script::RiftScripts;
 use serde_json::Value;
 
-use super::{card_body, path_owner_key};
+use super::card_body;
 use super::{theme, widgets};
-use crate::forms::{Changed, FormAction, FormCx};
+use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::row_file;
-use crate::schema::{self, Kind};
+use crate::schema;
 use crate::value::RowValue;
+use crate::views::model::busts;
+use crate::views::script::{graph, nodes, panel};
+use crate::{condition, forms};
 
 pub fn script_cards(
     ui: &mut Ui,
@@ -15,22 +22,17 @@ pub fn script_cards(
     owner: &mut Value,
     field: &str,
     path: &str,
-) -> Changed {
-    let shapes: &crate::schema::Shapes = cx.shapes;
-    let Some(items) = shapes.modules_of(table) else {
-        return Changed::default();
-    };
-    let variants: Vec<schema::Variant> = match schema::kind(cx.root, items) {
-        Kind::Union(variants) => variants
-            .into_iter()
-            .filter(|v| v.tag.ends_with("_script"))
-            .collect(),
-        _ => Vec::new(),
-    };
+) -> FormChange {
+    let variants: Vec<schema::SchemaVariant> = cx
+        .shapes
+        .module_variants(table)
+        .into_iter()
+        .filter(|v| v.tag.ends_with("_script"))
+        .collect();
     if !owner[field].is_array() {
         owner[field] = Value::Array(Vec::new());
     }
-    let mut changed = Changed::default();
+    let mut changed = FormChange::default();
     let count = owner[field].as_array().map_or(0, Vec::len);
     let mut remove = None;
     let mut duplicate = None;
@@ -57,14 +59,7 @@ pub fn script_cards(
                     });
                 });
             });
-            changed = std::mem::take(&mut changed).or(card_body(
-                ui,
-                cx,
-                table,
-                &variants,
-                module,
-                &module_path,
-            ));
+            changed |= card_body(ui, cx, table, &variants, module, &module_path);
         });
         if tag == "inline_script" {
             outline_block(ui, cx, &owner[field][index]);
@@ -98,7 +93,7 @@ pub fn script_cards(
                     {
                         let template = schema::variant_template(cx.root, variant);
                         owner[field].as_array_mut().expect("scripts").push(template);
-                        changed = Changed::at(&format!("{path}/{field}"));
+                        changed = FormChange::at(&format!("{path}/{field}"));
                         ui.close();
                     }
                 }
@@ -107,12 +102,12 @@ pub fn script_cards(
     let list = owner[field].as_array_mut().expect("scripts");
     if let Some(index) = remove {
         list.remove(index);
-        changed = Changed::at(&format!("{path}/{field}"));
+        changed = FormChange::at(&format!("{path}/{field}"));
     }
     if let Some(index) = duplicate {
         let copy = list[index].clone();
         list.insert(index + 1, copy);
-        changed = Changed::at(&format!("{path}/{field}"));
+        changed = FormChange::at(&format!("{path}/{field}"));
     }
     changed
 }
@@ -159,14 +154,11 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
         );
     }
     if let (Some(content), Some(owner_key)) =
-        (cx.content, key.as_deref().or(path_owner_key(cx, table)))
-        && content.has_built::<game::systems::script::RiftScripts>()
-        && let Some(bound) =
-            crate::views::script::panel::owner_row(&content, table, owner_key, &pointer)
+        (cx.content, key.as_deref().or(cx.owner_key.as_deref()))
+        && content.has_built::<RiftScripts>()
+        && let Some(bound) = panel::owner_row(&content, table, owner_key, &pointer)
     {
-        let may = content
-            .built::<game::systems::script::RiftScripts>()
-            .may_do(bound.row);
+        let may = content.built::<RiftScripts>().may_do(bound.row);
         if !inline {
             let answers: Vec<&str> = may.answers.iter().map(|kind| kind.name()).collect();
             widgets::kv_text(
@@ -182,7 +174,7 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
         let mut lines: Vec<String> = may
             .reaches
             .iter()
-            .map(|reach| crate::views::script::panel::describe_reach(&content, reach))
+            .map(|reach| panel::describe_reach(&content, reach))
             .collect();
         lines.sort();
         lines.dedup();
@@ -216,7 +208,7 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
                 .on_hover_text("Move these nodes into a new script row")
                 .clicked()
             {
-                cx.actions.push(FormAction::OpenScript {
+                cx.actions.push(FormAction::MakeShared {
                     pointer: pointer.clone(),
                 });
             }
@@ -232,9 +224,8 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
                 .on_hover_text("Copy the script's nodes into this row")
                 .clicked()
             {
-                cx.actions.push(FormAction::OpenRow {
-                    table: "script".to_owned(),
-                    key: script.to_owned(),
+                cx.actions.push(FormAction::MakeInline {
+                    script: script.to_owned(),
                 });
             }
         }
@@ -250,8 +241,8 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     };
     ui.add_space(4.0);
     widgets::section(ui, "Outline · read-only");
-    let catalogue = crate::views::script::nodes::Catalogue::build(cx.root, cx.content);
-    let rows = crate::views::script::nodes::outline(nodes, &catalogue);
+    let catalogue = cx.state.catalogue(cx.generation, cx.root, cx.content);
+    let rows = nodes::outline(nodes, catalogue);
     egui::Frame::new()
         .fill(theme::INPUT)
         .stroke(egui::Stroke::new(1.0, theme::BORDER))
@@ -262,24 +253,19 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
             ui.spacing_mut().item_spacing.y = 2.0;
             for row in rows.iter().take(40) {
                 let node = &nodes[&row.name];
-                let kind = crate::views::script::nodes::kind(node);
-                let summary = crate::views::script::nodes::summary(node);
+                let summary = nodes::summary(node, catalogue);
                 ui.horizontal(|ui| {
                     ui.add_space(14.0 * row.depth as f32);
                     if let Some(via) = &row.via {
                         ui.label(theme::code(format!("{via} →")).size(12.0));
                     }
-                    let (glyph, colour) = node_glyph(kind);
+                    let (glyph, colour) = graph::kind_glyph(node);
                     ui.label(RichText::new(glyph).color(colour).size(12.0));
-                    ui.label(theme::mono(kind).size(12.5).strong());
+                    ui.label(theme::mono(node.kind()).size(12.5).strong());
                     ui.label(theme::mono(&row.name).size(12.5).color(theme::CODE));
                     if !summary.is_empty() {
                         ui.label(
-                            theme::muted(format!(
-                                "· {}",
-                                crate::views::script::nodes::clip(&summary, 60)
-                            ))
-                            .size(12.0),
+                            theme::muted(format!("· {}", widgets::clip(&summary, 60))).size(12.0),
                         );
                     }
                 });
@@ -288,16 +274,6 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
                 ui.label(theme::faint(format!("… {} more", rows.len() - 40)));
             }
         });
-}
-
-pub(super) fn node_glyph(kind: &str) -> (&'static str, Color32) {
-    match kind {
-        "on" => ("●", theme::WARN),
-        "if" | "random" | "repeat" => ("◆", theme::ACCENT),
-        "dialogue" => ("■", theme::CODE),
-        "wait" | "set" | "run" | "return" => ("■", theme::MUTED),
-        _ => ("■", theme::OK),
-    }
 }
 
 pub(super) fn script_summary(module: &Value) -> String {
@@ -313,7 +289,7 @@ pub(super) fn script_summary(module: &Value) -> String {
                     value
                         .as_str()
                         .map(str::to_owned)
-                        .or_else(|| value.as_f64().map(crate::forms::trim_number))
+                        .or_else(|| value.as_f64().map(forms::trim_number))
                         .unwrap_or_else(|| value.to_string())
                 ));
             }
@@ -342,36 +318,24 @@ pub(super) fn script_values(
     cx: &mut FormCx,
     module: &mut Value,
     path: &str,
-) -> Changed {
+) -> FormChange {
     let Some(script) = module["script"].as_str().map(str::to_owned) else {
-        return Changed::default();
+        return FormChange::default();
     };
     let Some(row) = cx.files.json(&row_file("script", &script)) else {
-        return Changed::default();
+        return FormChange::default();
     };
     let Some(variables) = row["variables"].as_object() else {
-        return Changed::default();
+        return FormChange::default();
     };
     if variables.is_empty() {
-        return Changed::default();
+        return FormChange::default();
     }
     let mut properties = serde_json::Map::new();
     let mut required = Vec::new();
     for (name, variable) in variables {
-        let kind = match variable.kind_or("text") {
-            "number" => serde_json::json!({ "type": "number" }),
-            "integer" => serde_json::json!({ "type": "integer" }),
-            "boolean" => serde_json::json!({ "type": "boolean" }),
-            "row" => {
-                serde_json::json!({ "type": "string", "x-table": variable["table"].as_str().unwrap_or_default() })
-            }
-            "audio" => serde_json::json!({ "type": "string", "x-asset": "audio" }),
-            "place" => {
-                serde_json::json!({ "type": "object", "x-place": true, "properties": { "area": { "type": "string", "x-table": "area" }, "x": { "type": "number" }, "y": { "type": "number" } }, "required": ["area", "x", "y"] })
-            }
-            "condition" => serde_json::json!({ "x-condition": true }),
-            _ => serde_json::json!({ "type": "string" }),
-        };
+        let ty = VariableType::from_str(variable.kind_or("text")).unwrap_or(VariableType::Text);
+        let kind = schema::variable_schema(ty, variable["table"].as_str());
         properties.insert(name.clone(), kind);
         if variable.get("default").is_none() {
             required.push(Value::String(name.clone()));
@@ -382,7 +346,7 @@ pub(super) fn script_values(
     if !module["values"].is_object() {
         module["values"] = Value::Object(serde_json::Map::new());
     }
-    crate::forms::object(
+    forms::object(
         ui,
         cx,
         &schema,
@@ -423,10 +387,7 @@ pub fn summary_of(module: &Value) -> String {
             .get("own")
             .and_then(Value::as_array)
             .map_or(0, Vec::len);
-        return format!(
-            "{} expressions",
-            crate::views::model::busts::generic().count() + own
-        );
+        return format!("{} expressions", busts::generic().count() + own);
     }
     for (name, field) in object {
         if name == "type" {
@@ -435,19 +396,18 @@ pub fn summary_of(module: &Value) -> String {
         match field {
             Value::String(text) => parts.push(text.clone()),
             Value::Number(number) => parts.push(match name.as_str() {
-                "count" | "amount" | "times" => format!(
-                    "× {}",
-                    crate::forms::trim_number(number.as_f64().unwrap_or(0.0))
-                ),
+                "count" | "amount" | "times" => {
+                    format!("× {}", forms::trim_number(number.as_f64().unwrap_or(0.0)))
+                }
                 _ => format!(
                     "{name} {}",
-                    crate::forms::trim_number(number.as_f64().unwrap_or(0.0))
+                    forms::trim_number(number.as_f64().unwrap_or(0.0))
                 ),
             }),
             Value::Array(items) => parts.push(format!("{} {name}", items.len())),
             Value::Object(nodes) if name == "nodes" => parts.push(format!("{} nodes", nodes.len())),
             Value::Object(fields) if fields.contains_key("type") => {
-                parts.push(crate::condition::summary(field))
+                parts.push(condition::summary(field))
             }
             _ => {}
         }
@@ -463,7 +423,7 @@ pub fn module_lines(module: &Value) -> String {
         match value {
             Value::String(text) => text.clone(),
             Value::Number(number) => {
-                let number = crate::forms::trim_number(number.as_f64().unwrap_or(0.0));
+                let number = forms::trim_number(number.as_f64().unwrap_or(0.0));
                 if name == "chance" {
                     format!("{number}%")
                 } else {

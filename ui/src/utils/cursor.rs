@@ -7,6 +7,7 @@ use bevy_picking::pointer::PointerId;
 use bevy_ui::{ComputedNode, InteractionDisabled};
 
 use crate::carry::Ghost;
+use crate::state::ancestry;
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CursorStyle {
@@ -60,15 +61,10 @@ pub(crate) fn track_interface_cursor(
     ghosts: Query<(), With<Ghost>>,
     mut cursor: ResMut<InterfaceCursor>,
 ) {
-    let ancestry = |hit: Entity| {
-        std::iter::successors(Some(hit), |&entity| {
-            parents.get(entity).ok().map(ChildOf::parent)
-        })
-    };
     let topmost = hover.get(&PointerId::Mouse).and_then(|hits| {
         hits.iter()
             .filter(|&(&hit, _)| {
-                !ancestry(hit)
+                !ancestry(hit, &parents)
                     .find_map(|entity| {
                         passes_at(nodes.get(entity).unwrap_or(false), styles.contains(entity))
                     })
@@ -76,7 +72,7 @@ pub(crate) fn track_interface_cursor(
             })
             .filter_map(|(&hit, data)| {
                 Some((
-                    ancestry(hit).find(|&entity| nodes.contains(entity))?,
+                    ancestry(hit, &parents).find(|&entity| nodes.contains(entity))?,
                     data.depth,
                 ))
             })
@@ -84,12 +80,10 @@ pub(crate) fn track_interface_cursor(
             .map(|(node, _)| node)
     });
     cursor.hovered = topmost.map(|node| {
-        std::iter::successors(Some(node), |&entity| {
-            parents.get(entity).ok().map(ChildOf::parent)
-        })
-        .find_map(|entity| styles.get(entity).ok())
-        .filter(|(_, disabled)| !disabled)
-        .map_or(CursorStyle::Default, |(style, _)| *style)
+        ancestry(node, &parents)
+            .find_map(|entity| styles.get(entity).ok())
+            .filter(|(_, disabled)| !disabled)
+            .map_or(CursorStyle::Default, |(style, _)| *style)
     });
     if mouse.get_pressed().next().is_none() {
         cursor.held = None;

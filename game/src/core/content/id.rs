@@ -301,10 +301,6 @@ thread_local! {
     static SCOPE: RefCell<Option<ContentScope>> = const { RefCell::new(None) };
 }
 
-pub fn scope_content() -> Option<Content> {
-    SCOPE.with(|scope| scope.borrow().as_ref().and_then(|scope| scope.content))
-}
-
 pub fn scope_asset(path: &str) {
     SCOPE.with(|scope| {
         if let Some(scope) = scope.borrow_mut().as_mut() {

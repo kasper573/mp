@@ -1,14 +1,15 @@
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 
-pub struct Watcher {
+use crate::app::ChannelInbox;
+
+pub struct FolderWatcher {
     root: PathBuf,
     _watcher: Option<RecommendedWatcher>,
-    events: Mutex<Receiver<notify::Result<notify::Event>>>,
+    events: ChannelInbox<notify::Result<notify::Event>>,
     pending: Vec<PathBuf>,
     quiet_since: Option<Instant>,
     lost: bool,
@@ -16,8 +17,8 @@ pub struct Watcher {
 
 pub const QUIET: Duration = Duration::from_millis(500);
 
-impl Watcher {
-    pub fn on(root: &Path) -> Watcher {
+impl FolderWatcher {
+    pub fn on(root: &Path) -> FolderWatcher {
         let (sender, events) = channel();
         let watcher = notify::recommended_watcher(move |event| {
             let _ = sender.send(event);
@@ -27,10 +28,10 @@ impl Watcher {
             watcher.watch(root, RecursiveMode::Recursive).ok()?;
             Some(watcher)
         });
-        Watcher {
+        FolderWatcher {
             root: root.to_path_buf(),
             _watcher: watcher,
-            events: Mutex::new(events),
+            events: ChannelInbox::new(events),
             pending: Vec::new(),
             quiet_since: None,
             lost: false,
@@ -43,11 +44,7 @@ impl Watcher {
     }
 
     pub fn poll(&mut self) -> Option<Option<Vec<String>>> {
-        let events = self
-            .events
-            .get_mut()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        while let Ok(event) = events.try_recv() {
+        for event in self.events.drain() {
             match event {
                 Ok(event) => {
                     if event.need_rescan() {

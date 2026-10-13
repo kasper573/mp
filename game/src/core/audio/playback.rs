@@ -6,7 +6,7 @@ use crate::core::assets::AssetRef;
 use crate::core::audio::decibels;
 use crate::core::audio::loader::AudioLoader;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
-use crate::core::content::Content;
+use crate::core::content::{Content, ContentId, ContentRow};
 use crate::core::math::{Pos, Rng, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds};
@@ -41,7 +41,7 @@ impl Plugin for SfxPlugin {
     }
 }
 
-pub type SfxId = crate::core::content::ContentId<SfxDef>;
+pub type SfxId = ContentId<SfxDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
@@ -50,7 +50,7 @@ pub struct SfxDef {
     pub pitch: SfxScalar,
 }
 
-impl crate::core::content::ContentRow for SfxDef {
+impl ContentRow for SfxDef {
     const TABLE: &'static str = "sfx";
 }
 

@@ -1,11 +1,18 @@
+use std::collections::{BTreeMap, HashSet};
+
 use egui::{RichText, Ui};
+use game::core::content::ModuleRule;
+use game::core::content::id::LeafKind;
 use serde_json::Value;
 
-use crate::app::{DeleteDialog, Dialog, Editor, NewRowDialog};
-use crate::project::{Edit, Selection, row_file, row_of};
-use crate::schema;
-use crate::tabs::Tab;
-use crate::usages::Usage;
+use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog, registry};
+use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection, row_file, row_of};
+use crate::tabs::EditorTab;
+use crate::ui::{theme, widgets};
+use crate::usages::ContentUsage;
+use crate::views::area::placement;
+use crate::views::world;
+use crate::{forms, schema, usages};
 
 pub const KEY_MAX: usize = 64;
 
@@ -13,21 +20,21 @@ pub const KEY_MAX: usize = 64;
 pub struct UsageGroup {
     pub table: String,
     pub kind: String,
-    pub usages: Vec<Usage>,
+    pub usages: Vec<ContentUsage>,
     pub removable: bool,
     pub whole_modules: bool,
-    pub decision: Decision,
+    pub decision: UsageDecision,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Decision {
+pub enum UsageDecision {
     Undecided,
     Remove,
     Repoint(String),
     Unpack,
 }
 
-pub fn key_problem(files: &crate::project::Files, table: &str, key: &str) -> Option<String> {
+pub fn key_problem(files: &ProjectFiles, table: &str, key: &str) -> Option<String> {
     if key.is_empty() || key.len() > KEY_MAX {
         return Some(format!("a key is 1 to {KEY_MAX} characters"));
     }
@@ -45,16 +52,28 @@ pub fn key_problem(files: &crate::project::Files, table: &str, key: &str) -> Opt
     clash.map(|other| format!("{table}/{other} already exists (keys ignore case)"))
 }
 
-pub fn free_key(files: &crate::project::Files, table: &str, wanted: &str) -> String {
-    let base = wanted.trim_end_matches(|c: char| c.is_ascii_digit() || c == '_');
-    let base = if base.is_empty() { "row" } else { base };
-    if key_problem(files, table, wanted).is_none() {
-        return wanted.to_owned();
+pub fn key_from_name(name: &str) -> String {
+    name.trim().to_lowercase().replace(' ', "_")
+}
+
+pub fn free_key(files: &ProjectFiles, table: &str, wanted: &str) -> String {
+    let taken: HashSet<String> = files.keys_of(table).map(str::to_owned).collect();
+    free_name(wanted, &taken)
+}
+
+pub fn free_name(name: &str, taken: &HashSet<String>) -> String {
+    let is_taken = |candidate: &str| taken.iter().any(|t| t.eq_ignore_ascii_case(candidate));
+    if !is_taken(name) {
+        return name.to_owned();
     }
+    let base = match name.rfind('_') {
+        Some(cut) if cut > 0 && name[cut + 1..].chars().all(|c| c.is_ascii_digit()) => &name[..cut],
+        _ => name,
+    };
     (2..)
         .map(|n| format!("{base}_{n}"))
-        .find(|candidate| key_problem(files, table, candidate).is_none())
-        .expect("some free key")
+        .find(|candidate| !is_taken(candidate))
+        .expect("a free name")
 }
 
 pub fn new_row_dialog(editor: &mut Editor, table: &str) {
@@ -70,7 +89,7 @@ pub fn new_row_into(editor: &mut Editor, table: &str, into: Option<(String, Stri
     };
     let value = schema::template(&shape.shape, &shape.shape);
     let key = free_key(&project.files, table, &format!("new_{table}"));
-    editor.dialogs.push(Dialog::NewRow(NewRowDialog {
+    editor.dialogs.push(ModalDialog::NewRow(NewRowDialog {
         table: table.to_owned(),
         key,
         value,
@@ -110,7 +129,7 @@ pub fn new_row_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut NewRowDialog)
         );
     }
     if let Some(error) = &dialog.error {
-        ui.colored_label(egui::Color32::from_rgb(220, 80, 80), error);
+        ui.colored_label(theme::DANGER, error);
     }
 }
 
@@ -120,7 +139,7 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
     if let Some(problem) = key_problem(&project.files, &dialog.table, &key) {
         return Err(problem);
     }
-    let mut edit = Edit::new(format!("New {} {key}", dialog.table));
+    let mut edit = ContentEdit::new(format!("New {} {key}", dialog.table));
     edit.write_json(row_file(&dialog.table, &key), &dialog.value);
     if let Some((file, pointer)) = &dialog.into
         && let Some(mut target) = project.files.json_owned(file)
@@ -130,11 +149,9 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
         }
         edit.write_json(file, &target);
     }
-    if !editor.apply(edit) {
-        return Err("the folder refused the new row; see the output".to_owned());
-    }
-    editor.select(Selection::row(&dialog.table, &key));
-    editor.open_tab(Tab::for_row(&dialog.table, &key));
+    editor.try_apply(edit)?;
+    editor.select(RowSelection::row(&dialog.table, &key));
+    editor.open_tab(EditorTab::for_row(&dialog.table, &key));
     Ok(())
 }
 
@@ -146,7 +163,7 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
         return;
     };
     let copy = free_key(&project.files, table, &format!("{key}_2"));
-    let mut edit = Edit::new(format!("Duplicate {table}/{key} as {copy}"));
+    let mut edit = ContentEdit::new(format!("Duplicate {table}/{key} as {copy}"));
     edit.write_json(row_file(table, &copy), &value);
     for file in folder_files(project, table, key) {
         if let Some(bytes) = project.files.get(&file) {
@@ -161,11 +178,11 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
         }
     }
     if table == "area" {
-        crate::views::world::card_beside(project, &mut edit, key, &copy);
+        world::card_beside(project, &mut edit, key, &copy);
     }
     if editor.apply(edit) {
-        editor.select(Selection::row(table, &copy));
-        editor.open_tab(Tab::for_row(table, &copy));
+        editor.select(RowSelection::row(table, &copy));
+        editor.open_tab(EditorTab::for_row(table, &copy));
     }
 }
 
@@ -182,9 +199,9 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
     {
         return Err(problem);
     }
-    let mut edit = Edit::new(format!("Rename {table}/{key} to {new_key}"));
+    let mut edit = ContentEdit::new(format!("Rename {table}/{key} to {new_key}"));
     let usages = project.usages.of_row(table, key).to_vec();
-    let mut by_file: std::collections::BTreeMap<String, Vec<Usage>> = Default::default();
+    let mut by_file: BTreeMap<String, Vec<ContentUsage>> = Default::default();
     for usage in usages {
         by_file.entry(usage.file.clone()).or_default().push(usage);
     }
@@ -245,7 +262,7 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
 fn rewrite(
     value: &mut Value,
     pointer: &str,
-    usages: &crate::usages::Usages,
+    usages: &usages::ContentUsages,
     file: &str,
     new_key: &str,
 ) {
@@ -273,24 +290,9 @@ fn split_pointer(pointer: &str) -> (&str, String) {
 
 fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
     for (_, tab) in editor.dock.iter_all_tabs_mut() {
-        let fresh = match tab {
-            Tab::Row { table: t, key: k } if t == table && k == key => Some(Tab::Row {
-                table: t.clone(),
-                key: new_key.to_owned(),
-            }),
-            Tab::Area { key: k } if table == "area" && k == key => Some(Tab::Area {
-                key: new_key.to_owned(),
-            }),
-            Tab::Blueprint { key: k } if table == "blueprint" && k == key => Some(Tab::Blueprint {
-                key: new_key.to_owned(),
-            }),
-            Tab::Model { key: k } if table == "model" && k == key => Some(Tab::Model {
-                key: new_key.to_owned(),
-            }),
-            Tab::Tileset { key: k } if table == "tileset" && k == key => Some(Tab::Tileset {
-                key: new_key.to_owned(),
-            }),
-            Tab::Script(owner) => owner.renamed(table, key, new_key).map(Tab::Script),
+        let fresh = match &*tab {
+            EditorTab::Script(owner) => owner.renamed(table, key, new_key).map(EditorTab::Script),
+            other if other.is_row(table, key) => Some(EditorTab::for_row(table, new_key)),
             _ => None,
         };
         if let Some(fresh) = fresh {
@@ -299,7 +301,7 @@ fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
     }
 }
 
-pub fn folder_files(project: &crate::project::Project, table: &str, key: &str) -> Vec<String> {
+pub fn folder_files(project: &Project, table: &str, key: &str) -> Vec<String> {
     project
         .files
         .paths_under(&format!("tables/{table}/{key}/"))
@@ -335,7 +337,11 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
             if own.contains(&usage.file) {
                 continue;
             }
-            let (other_table, kind, entry) = kind_of(project, &usage.file, &usage.pointer);
+            let UsageKind {
+                table: other_table,
+                kind,
+                entry,
+            } = kind_of(project, &usage.file, &usage.pointer);
             let removable = entry.is_some();
             let same_group = |group: &&mut UsageGroup| {
                 group.table == other_table
@@ -355,15 +361,15 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
                     removable,
                     whole_modules: entry == Some(Entry::Module),
                     decision: if removable {
-                        Decision::Remove
+                        UsageDecision::Remove
                     } else {
-                        Decision::Repoint(String::new())
+                        UsageDecision::Repoint(String::new())
                     },
                 }),
             }
         }
     }
-    editor.dialogs.push(Dialog::Delete(DeleteDialog {
+    editor.dialogs.push(ModalDialog::Delete(DeleteDialog {
         table: table.to_owned(),
         keys,
         groups,
@@ -371,12 +377,14 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
     }));
 }
 
-pub fn usage_groups(
-    project: &crate::project::Project,
-    table: &str,
-    key: &str,
-) -> Vec<(String, String, Vec<String>)> {
-    let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
+pub struct UsageSummary {
+    pub table: String,
+    pub field: String,
+    pub keys: Vec<String>,
+}
+
+pub fn usage_groups(project: &Project, table: &str, key: &str) -> Vec<UsageSummary> {
+    let mut groups: Vec<UsageSummary> = Vec::new();
     for usage in project.usages.of_row(table, key) {
         let Some((other_table, other_key)) = row_of(&usage.file) else {
             continue;
@@ -384,20 +392,24 @@ pub fn usage_groups(
         let field = field_of(project, &usage.file, &usage.pointer);
         match groups
             .iter_mut()
-            .find(|(t, f, _)| *t == other_table && *f == field)
+            .find(|group| group.table == other_table && group.field == field)
         {
-            Some((_, _, keys)) => {
-                if !keys.iter().any(|k| k == other_key) {
-                    keys.push(other_key.to_owned());
+            Some(group) => {
+                if !group.keys.iter().any(|k| k == other_key) {
+                    group.keys.push(other_key.to_owned());
                 }
             }
-            None => groups.push((other_table.to_owned(), field, vec![other_key.to_owned()])),
+            None => groups.push(UsageSummary {
+                table: other_table.to_owned(),
+                field,
+                keys: vec![other_key.to_owned()],
+            }),
         }
     }
     groups
 }
 
-pub fn field_of(project: &crate::project::Project, file: &str, pointer: &str) -> String {
+pub fn field_of(project: &Project, file: &str, pointer: &str) -> String {
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
     if segments.first() == Some(&"modules")
         && let Some(index) = segments.get(1)
@@ -419,46 +431,52 @@ enum Entry {
     Module,
 }
 
-fn kind_of(
-    project: &crate::project::Project,
-    file: &str,
-    pointer: &str,
-) -> (String, String, Option<Entry>) {
+struct UsageKind {
+    table: String,
+    kind: String,
+    entry: Option<Entry>,
+}
+
+fn kind_of(project: &Project, file: &str, pointer: &str) -> UsageKind {
     let table = row_of(file)
         .map(|(table, _)| table)
         .unwrap_or("game")
         .to_owned();
     let kind = field_of(project, file, pointer);
     let segments: Vec<&str> = pointer.split('/').skip(1).collect();
-    if segments.contains(&"nodes") {
-        return (table, kind, None);
-    }
-    let Some(at) = segments
-        .iter()
-        .rposition(|segment| segment.parse::<usize>().is_ok())
-    else {
-        return (table, kind, None);
+    let slot = (!segments.contains(&"nodes"))
+        .then(|| list_slot(pointer))
+        .flatten();
+    let entry = match slot {
+        None => None,
+        Some((parent, index)) if parent.ends_with("/modules") => {
+            let any_number = project
+                .files
+                .json(file)
+                .and_then(|row| row["modules"].get(index).cloned())
+                .and_then(|module| registry().module_rule(&table, &module))
+                == Some(ModuleRule::AnyNumber);
+            any_number.then_some(Entry::Module)
+        }
+        Some(_) => Some(Entry::List),
     };
-    if at == 0 {
-        return (table, kind, Some(Entry::List));
-    }
-    if segments[at - 1] != "modules" {
-        return (table, kind, Some(Entry::List));
-    }
-    let any_number = project
-        .files
-        .json(file)
-        .and_then(|row| {
-            row["modules"]
-                .get(segments[at].parse::<usize>().unwrap_or(usize::MAX))
-                .cloned()
-        })
-        .and_then(|module| game::systems::registry().module_rule(&table, &module))
-        == Some(game::core::content::ModuleRule::AnyNumber);
-    (table, kind, any_number.then_some(Entry::Module))
+    UsageKind { table, kind, entry }
 }
 
-fn usage_detail(project: &crate::project::Project, file: &str, pointer: &str) -> String {
+fn list_slot(pointer: &str) -> Option<(String, usize)> {
+    let segments: Vec<&str> = pointer.split('/').skip(1).collect();
+    let at = segments
+        .iter()
+        .rposition(|segment| segment.parse::<usize>().is_ok())?;
+    let parent = if at == 0 {
+        String::new()
+    } else {
+        format!("/{}", segments[..at].join("/"))
+    };
+    Some((parent, segments[at].parse().ok()?))
+}
+
+fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
     let Some(row) = project.files.json(file) else {
         return String::new();
     };
@@ -476,17 +494,13 @@ fn usage_detail(project: &crate::project::Project, file: &str, pointer: &str) ->
         }
         let text = match value {
             Value::Number(number) => match name.as_str() {
-                "chance" => format!(
-                    "{}%",
-                    crate::forms::trim_number(number.as_f64().unwrap_or(0.0))
-                ),
-                "amount" | "count" | "times" => format!(
-                    "× {}",
-                    crate::forms::trim_number(number.as_f64().unwrap_or(0.0))
-                ),
+                "chance" => format!("{}%", forms::trim_number(number.as_f64().unwrap_or(0.0))),
+                "amount" | "count" | "times" => {
+                    format!("× {}", forms::trim_number(number.as_f64().unwrap_or(0.0)))
+                }
                 _ => format!(
                     "{name} {}",
-                    crate::forms::trim_number(number.as_f64().unwrap_or(0.0))
+                    forms::trim_number(number.as_f64().unwrap_or(0.0))
                 ),
             },
             Value::String(text) => format!("{name} {text}"),
@@ -502,7 +516,6 @@ fn usage_detail(project: &crate::project::Project, file: &str, pointer: &str) ->
 }
 
 pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) {
-    use crate::ui::{theme, widgets};
     let Some(project) = &editor.project else {
         return;
     };
@@ -522,7 +535,12 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
             "Nothing names it. The file goes; its assets stay until nothing names them.",
         ));
     } else {
-        ui.label(theme::muted(format!("Used in {total} place{} in {rows} row{}. Nothing is deleted until every group has an answer.", crate::ui::widgets::plural(total), crate::ui::widgets::plural(rows))));
+        let used = format!(
+            "Used in {total} place{} in {rows} row{}. Nothing is deleted until every group has an answer.",
+            widgets::plural(total),
+            widgets::plural(rows)
+        );
+        ui.label(theme::muted(used));
     }
     let candidates: Vec<String> = project
         .files
@@ -579,119 +597,50 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
         })
         .collect();
     ui.add_space(6.0);
-    egui::ScrollArea::vertical().max_height(440.0).show(ui, |ui| {
-        for (index, group) in dialog.groups.iter_mut().enumerate() {
-            let mut files: Vec<&String> = group.usages.iter().map(|usage| &usage.file).collect();
-            files.sort();
-            files.dedup();
-            let kinds: Vec<String> = {
-                let mut kinds: Vec<String> = group.usages.iter().map(|usage| field_of(project, &usage.file, &usage.pointer)).collect();
-                kinds.sort();
-                kinds.dedup();
-                kinds
-            };
-            let title = if files.len() == 1 {
-                let row = row_of(files[0]).map(|(t, k)| format!("{t}/{k}")).unwrap_or_else(|| files[0].clone());
-                if kinds.len() == 1 && !kinds[0].is_empty() && kinds[0] != group.table { format!("{row} · {}", kinds[0].replace('_', " ")) } else { row }
-            } else {
-                format!("{} · {} {}s", group.kind.replace('_', " "), files.len(), group.table)
-            };
-            widgets::card_frame(false).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    widgets::badge(ui, if group.kind.is_empty() { &group.table } else { &group.kind });
-                    ui.label(theme::strong(&title));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let mut repoint = matches!(group.decision, Decision::Repoint(_)) || !group.removable;
-                        if group.removable {
-                            let remove_label = if group.whole_modules {
-                                format!("Remove the {} modules", group.kind.replace('_', " "))
-                            } else if entries_word(&group.kind) == "from the bag" {
-                                "Remove from the bag".to_owned()
-                            } else {
-                                format!("Remove the {}", entries_word(&group.kind))
-                            };
-                            let unpackable = dialog.table == "blueprint" && group.whole_modules;
-                            let label = match group.decision {
-                                Decision::Repoint(_) => "Replace with…".to_owned(),
-                                Decision::Unpack => "Unpack into scenery".to_owned(),
-                                _ => remove_label.clone(),
-                            };
-                            egui::ComboBox::from_id_salt(("decision", index)).selected_text(theme::mono(label).size(13.0)).show_ui(ui, |ui| {
-                                if unpackable && ui.selectable_label(group.decision == Decision::Unpack, "Unpack into scenery").on_hover_text("Each placement becomes its parts, placed, and looks exactly the same").clicked() {
-                                    group.decision = Decision::Unpack;
-                                    repoint = false;
-                                }
-                                if ui.selectable_label(matches!(group.decision, Decision::Remove), &remove_label).clicked() {
-                                    group.decision = Decision::Remove;
-                                    repoint = false;
-                                }
-                                if ui.selectable_label(repoint, "Replace with…").clicked() && !repoint {
-                                    group.decision = Decision::Repoint(String::new());
-                                    repoint = true;
-                                }
-                            });
-                        }
-                        if repoint {
-                            let mut picked = match &group.decision {
-                                Decision::Repoint(key) => key.clone(),
-                                _ => String::new(),
-                            };
-                            ui.allocate_ui_with_layout(egui::vec2(170.0, ui.spacing().interact_size.y), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                                egui::ComboBox::from_id_salt(("repoint", index))
-                                    .width(160.0)
-                                    .selected_text(if picked.is_empty() { theme::muted("pick a replacement…").size(13.0) } else { theme::code(format!("{}/ {picked}", dialog.table)).size(13.0) })
-                                    .show_ui(ui, |ui| {
-                                        for candidate in &candidates {
-                                            if ui.selectable_label(picked == *candidate, theme::mono(candidate)).clicked() {
-                                                picked = candidate.clone();
-                                            }
-                                        }
-                                    });
-                            });
-                            if !picked.is_empty() && group.decision != Decision::Repoint(picked.clone()) {
-                                group.decision = Decision::Repoint(picked);
-                            }
-                            ui.label(theme::muted("Replace with").size(12.5));
-                        }
-                    });
-                });
-                ui.add_space(2.0);
-                egui::Grid::new(("usages", index)).num_columns(2).spacing([14.0, 2.0]).show(ui, |ui| {
-                    for (row, detail) in &details[index] {
-                        if row.is_empty() {
-                            ui.label(theme::mono(detail).size(12.5).color(theme::TEXT));
-                            ui.label("");
+    egui::ScrollArea::vertical()
+        .max_height(440.0)
+        .show(ui, |ui| {
+            for (index, group) in dialog.groups.iter_mut().enumerate() {
+                let title = group_title(project, group);
+                widgets::card_frame(false).show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        let badge = if group.kind.is_empty() {
+                            &group.table
                         } else {
-                            ui.label(theme::mono(row).size(12.5).color(theme::TEXT));
-                            ui.label(theme::muted(detail).monospace().size(12.5));
-                        }
-                        ui.end_row();
-                    }
+                            &group.kind
+                        };
+                        widgets::badge(ui, badge);
+                        ui.label(theme::strong(&title));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            decision_picker(ui, &dialog.table, index, group, &candidates);
+                        });
+                    });
+                    ui.add_space(2.0);
+                    usage_lines(ui, index, &details[index]);
                 });
-            });
-            ui.add_space(4.0);
-        }
-    });
+                ui.add_space(4.0);
+            }
+        });
     let files_removed = dialog.keys.len();
     let assets_named = dialog.keys.iter().any(|key| {
         project
             .usages
             .in_file(&row_file(&dialog.table, key))
             .iter()
-            .any(|reference| reference.kind == game::core::content::id::LeafKind::Asset)
+            .any(|reference| reference.kind == LeafKind::Asset)
     });
     ui.add_space(4.0);
     let mut summary = format!(
         "{total} edit{} in {rows} row{} and {files_removed} deleted file{}, one undo step.",
-        crate::ui::widgets::plural(total),
-        crate::ui::widgets::plural(rows),
-        crate::ui::widgets::plural(files_removed)
+        widgets::plural(total),
+        widgets::plural(rows),
+        widgets::plural(files_removed)
     );
     if dialog.groups.is_empty() {
         summary = format!(
             "{files_removed} deleted file{}, one undo step.",
-            crate::ui::widgets::plural(files_removed)
+            widgets::plural(files_removed)
         );
     }
     if assets_named {
@@ -701,6 +650,146 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
     if let Some(error) = &dialog.error {
         ui.colored_label(theme::DANGER, error);
     }
+}
+
+fn group_title(project: &Project, group: &UsageGroup) -> String {
+    let mut files: Vec<&String> = group.usages.iter().map(|usage| &usage.file).collect();
+    files.sort();
+    files.dedup();
+    let mut kinds: Vec<String> = group
+        .usages
+        .iter()
+        .map(|usage| field_of(project, &usage.file, &usage.pointer))
+        .collect();
+    kinds.sort();
+    kinds.dedup();
+    if files.len() != 1 {
+        return format!(
+            "{} · {} {}s",
+            group.kind.replace('_', " "),
+            files.len(),
+            group.table
+        );
+    }
+    let row = row_of(files[0])
+        .map(|(t, k)| format!("{t}/{k}"))
+        .unwrap_or_else(|| files[0].clone());
+    match kinds.as_slice() {
+        [kind] if !kind.is_empty() && *kind != group.table => {
+            format!("{row} · {}", kind.replace('_', " "))
+        }
+        _ => row,
+    }
+}
+
+fn decision_picker(
+    ui: &mut Ui,
+    table: &str,
+    index: usize,
+    group: &mut UsageGroup,
+    candidates: &[String],
+) {
+    let mut repoint = matches!(group.decision, UsageDecision::Repoint(_)) || !group.removable;
+    if group.removable {
+        let remove_label = if group.whole_modules {
+            format!("Remove the {} modules", group.kind.replace('_', " "))
+        } else if entries_word(&group.kind) == "from the bag" {
+            "Remove from the bag".to_owned()
+        } else {
+            format!("Remove the {}", entries_word(&group.kind))
+        };
+        let unpackable = table == "blueprint" && group.whole_modules;
+        let label = match group.decision {
+            UsageDecision::Repoint(_) => "Replace with…".to_owned(),
+            UsageDecision::Unpack => "Unpack into scenery".to_owned(),
+            _ => remove_label.clone(),
+        };
+        egui::ComboBox::from_id_salt(("decision", index))
+            .selected_text(theme::mono(label).size(13.0))
+            .show_ui(ui, |ui| {
+                if unpackable
+                    && ui
+                        .selectable_label(
+                            group.decision == UsageDecision::Unpack,
+                            "Unpack into scenery",
+                        )
+                        .on_hover_text(
+                            "Each placement becomes its parts, placed, and looks exactly the same",
+                        )
+                        .clicked()
+                {
+                    group.decision = UsageDecision::Unpack;
+                    repoint = false;
+                }
+                if ui
+                    .selectable_label(
+                        matches!(group.decision, UsageDecision::Remove),
+                        &remove_label,
+                    )
+                    .clicked()
+                {
+                    group.decision = UsageDecision::Remove;
+                    repoint = false;
+                }
+                if ui.selectable_label(repoint, "Replace with…").clicked() && !repoint {
+                    group.decision = UsageDecision::Repoint(String::new());
+                    repoint = true;
+                }
+            });
+    }
+    if !repoint {
+        return;
+    }
+    let mut picked = match &group.decision {
+        UsageDecision::Repoint(key) => key.clone(),
+        _ => String::new(),
+    };
+    let selected = if picked.is_empty() {
+        theme::muted("pick a replacement…").size(13.0)
+    } else {
+        theme::code(format!("{table}/ {picked}")).size(13.0)
+    };
+    ui.allocate_ui_with_layout(
+        egui::vec2(170.0, ui.spacing().interact_size.y),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| {
+            egui::ComboBox::from_id_salt(("repoint", index))
+                .width(160.0)
+                .selected_text(selected)
+                .show_ui(ui, |ui| {
+                    for candidate in candidates {
+                        if ui
+                            .selectable_label(picked == *candidate, theme::mono(candidate))
+                            .clicked()
+                        {
+                            picked = candidate.clone();
+                        }
+                    }
+                });
+        },
+    );
+    if !picked.is_empty() && group.decision != UsageDecision::Repoint(picked.clone()) {
+        group.decision = UsageDecision::Repoint(picked);
+    }
+    ui.label(theme::muted("Replace with").size(12.5));
+}
+
+fn usage_lines(ui: &mut Ui, index: usize, lines: &[(String, String)]) {
+    egui::Grid::new(("usages", index))
+        .num_columns(2)
+        .spacing([14.0, 2.0])
+        .show(ui, |ui| {
+            for (row, detail) in lines {
+                if row.is_empty() {
+                    ui.label(theme::mono(detail).size(12.5).color(theme::TEXT));
+                    ui.label("");
+                } else {
+                    ui.label(theme::mono(row).size(12.5).color(theme::TEXT));
+                    ui.label(theme::muted(detail).monospace().size(12.5));
+                }
+                ui.end_row();
+            }
+        });
 }
 
 fn entries_word(kind: &str) -> &'static str {
@@ -716,17 +805,16 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     if let Some(group) = dialog
         .groups
         .iter()
-        .find(|group| group.decision == Decision::Undecided)
+        .find(|group| group.decision == UsageDecision::Undecided)
     {
         return Err(format!("decide what happens to {}", group.kind));
     }
-    let mut edit = Edit::new(format!(
+    let mut edit = ContentEdit::new(format!(
         "Delete {} {}",
         dialog.table,
         dialog.keys.join(", ")
     ));
-    let mut by_file: std::collections::BTreeMap<String, Vec<(&Usage, &Decision)>> =
-        Default::default();
+    let mut by_file: BTreeMap<String, Vec<(&ContentUsage, &UsageDecision)>> = Default::default();
     for group in &dialog.groups {
         for usage in &group.usages {
             by_file
@@ -742,12 +830,12 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
         entries.sort_by(|a, b| b.0.pointer.cmp(&a.0.pointer));
         for (usage, decision) in entries {
             match decision {
-                Decision::Repoint(key) => {
+                UsageDecision::Repoint(key) => {
                     rewrite(&mut value, &usage.pointer, &project.usages, &file, key)
                 }
-                Decision::Remove => remove_entry(&mut value, &usage.pointer),
-                Decision::Unpack => unpack_entry(project, &mut value, &usage.pointer),
-                Decision::Undecided => {}
+                UsageDecision::Remove => remove_entry(&mut value, &usage.pointer),
+                UsageDecision::Unpack => unpack_entry(project, &mut value, &usage.pointer),
+                UsageDecision::Undecided => {}
             }
         }
         edit.write_json(file, &value);
@@ -778,30 +866,20 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     Ok(())
 }
 
-fn unpack_entry(project: &crate::project::Project, value: &mut Value, pointer: &str) {
+fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
     let Some(content) = project.content else {
         return;
     };
-    let segments: Vec<&str> = pointer.split('/').skip(1).collect();
-    let Some(at) = segments
-        .iter()
-        .rposition(|segment| segment.parse::<usize>().is_ok())
-    else {
+    let Some((parent, index)) = list_slot(pointer) else {
         return;
     };
-    let parent = if at == 0 {
-        String::new()
-    } else {
-        format!("/{}", segments[..at].join("/"))
-    };
-    let index: usize = segments[at].parse().expect("an index");
     let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut) else {
         return;
     };
     if index >= list.len() {
         return;
     }
-    let parts = crate::views::area::placement::unpacked(content, &list[index]);
+    let parts = placement::unpacked(content, &list[index]);
     list.remove(index);
     for (offset, part) in parts.into_iter().enumerate() {
         list.insert(index + offset, part);
@@ -809,17 +887,8 @@ fn unpack_entry(project: &crate::project::Project, value: &mut Value, pointer: &
 }
 
 fn remove_entry(value: &mut Value, pointer: &str) {
-    let segments: Vec<&str> = pointer.split('/').skip(1).collect();
-    let Some(at) = segments
-        .iter()
-        .rposition(|segment| segment.parse::<usize>().is_ok())
-    else {
-        return;
-    };
-    let parent = format!("/{}", segments[..at].join("/"));
-    let parent = if at == 0 { String::new() } else { parent };
-    let index: usize = segments[at].parse().expect("an index");
-    if let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut)
+    if let Some((parent, index)) = list_slot(pointer)
+        && let Some(list) = value.pointer_mut(&parent).and_then(Value::as_array_mut)
         && index < list.len()
     {
         list.remove(index);
@@ -827,19 +896,11 @@ fn remove_entry(value: &mut Value, pointer: &str) {
 }
 
 pub fn close_tabs(editor: &mut Editor, table: &str, key: &str) {
-    let gone: Vec<Tab> = editor
+    let gone: Vec<EditorTab> = editor
         .dock
         .iter_all_tabs()
         .map(|(_, tab)| tab.clone())
-        .filter(|tab| match tab {
-            Tab::Row { table: t, key: k } => t == table && k == key,
-            Tab::Area { key: k } => table == "area" && k == key,
-            Tab::Blueprint { key: k } => table == "blueprint" && k == key,
-            Tab::Model { key: k } => table == "model" && k == key,
-            Tab::Tileset { key: k } => table == "tileset" && k == key,
-            Tab::Script(owner) => owner.is_row(table, key),
-            _ => false,
-        })
+        .filter(|tab| tab.is_row(table, key))
         .collect();
     for tab in gone {
         if let Some(path) = editor.dock.find_tab(&tab) {

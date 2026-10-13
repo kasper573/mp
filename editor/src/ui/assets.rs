@@ -3,7 +3,8 @@ use egui::Ui;
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Editor, RightTab};
-use crate::project::Selection;
+use crate::project::RowSelection;
+use crate::thumbs;
 
 #[derive(Default)]
 pub struct AssetsState {
@@ -86,7 +87,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
                 &mut views.assets.tree,
                 &nodes,
                 !needle.is_empty(),
-                tree::Hooks {
+                tree::TreeHooks {
                     menu: None,
                     thumbs: Some(&mut |ctx, path| {
                         let thumb = form.thumbnails.icon(ctx, files, path, &mut budget)?;
@@ -97,7 +98,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         })
         .inner;
     if let Some((path, _)) = out.clicked {
-        editor.select(Selection::row("asset", &path));
+        editor.select(RowSelection::row("asset", &path));
         editor.panels.right = RightTab::Inspector;
     }
     if !needle.is_empty() {
@@ -108,7 +109,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     }
 }
 
-pub fn icon_image(thumb: &crate::thumbs::Thumb) -> IconImage {
+pub fn icon_image(thumb: &thumbs::Thumbnail) -> IconImage {
     let [w, h] = thumb.size;
     let scale = (16.0 / h.max(1) as f32).min(16.0 / w.max(1) as f32);
     IconImage {

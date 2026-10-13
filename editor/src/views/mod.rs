@@ -3,24 +3,29 @@ pub mod character;
 pub mod job;
 pub mod model;
 pub mod script;
-pub mod sheet;
 pub mod sound;
+pub mod spreadsheet;
 pub mod tileset;
 pub mod world;
 
 use bevy::prelude::*;
 use egui::Ui;
+use game::core::tiling::TilePos;
+use game::systems::area::AreaDef;
+use game::systems::script::Place;
 
 use crate::app::{BottomTab, Editor};
-use crate::project::{CameraState, Selection};
-use crate::tabs::Tab;
+use crate::project::{AreaCameraState, RowSelection};
+use crate::tabs::EditorTab;
 use crate::ui::browser::BrowserState;
+use crate::ui::theme;
+use crate::{play, ui};
 
 #[derive(Component)]
 pub struct EditorCamera;
 
 #[derive(Default)]
-pub struct Views {
+pub struct EditorViews {
     pub browser: BrowserState,
     pub show_usages: bool,
     pub area: area::AreaViews,
@@ -28,25 +33,25 @@ pub struct Views {
     pub script: script::ScriptViews,
     pub model: model::ModelViews,
     pub tileset: tileset::TilesetViews,
-    pub sheet: sheet::SheetViews,
+    pub spreadsheet: spreadsheet::SpreadsheetViews,
     pub sound: sound::SoundViews,
     pub character: character::CharacterView,
     pub assets: crate::ui::assets::AssetsState,
-    pub preview: crate::ui::inspector::preview::PreviewState,
+    pub preview: crate::ui::inspector::preview::InspectorPreviewState,
     pub generation_seen: u64,
 }
 
-impl Views {
-    pub fn close(&mut self, _project: &mut Option<crate::project::Project>) {
+impl EditorViews {
+    pub fn close(&mut self) {
         self.area.close();
         self.script.close();
     }
 
-    pub fn camera_state(&self) -> Option<CameraState> {
+    pub fn camera_state(&self) -> Option<AreaCameraState> {
         self.area.camera_state()
     }
 
-    pub fn restore_camera(&mut self, camera: Option<CameraState>) {
+    pub fn restore_camera(&mut self, camera: Option<AreaCameraState>) {
         if let Some(camera) = camera {
             self.area.restore_camera(&camera);
         }
@@ -54,7 +59,6 @@ impl Views {
 
     pub fn content_changed(&mut self) {
         self.area.content_changed();
-        self.world.content_changed();
         self.script.content_changed();
     }
 }
@@ -65,25 +69,25 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
 }
 
 pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
-    let mut tabs: Vec<BottomTab> = match crate::ui::active_tab(editor) {
-        Some(Tab::Area { .. }) | Some(Tab::Blueprint { .. }) => {
+    let mut tabs: Vec<BottomTab> = match ui::active_tab(editor) {
+        Some(EditorTab::Area { .. }) | Some(EditorTab::Blueprint { .. }) => {
             let mut tabs = vec![BottomTab::Palette, BottomTab::Blueprints];
             if editor.views.sound.listening.is_some() {
                 tabs.push(BottomTab::Listen);
             }
             tabs
         }
-        Some(Tab::Script(_)) => vec![BottomTab::MayDo, BottomTab::UsedBy, BottomTab::Run],
-        Some(Tab::Model { key }) => model::bottom_tabs(editor, &key),
-        Some(Tab::Tileset { key }) => tileset::bottom_tabs(editor, &key),
+        Some(EditorTab::Script(_)) => vec![BottomTab::MayDo, BottomTab::UsedBy, BottomTab::Run],
+        Some(EditorTab::Model { key }) => model::bottom_tabs(editor, &key),
+        Some(EditorTab::Tileset { key }) => tileset::bottom_tabs(editor, &key),
         _ => Vec::new(),
     };
     tabs.push(BottomTab::History);
     tabs.push(BottomTab::Output);
     tabs.into_iter()
         .map(|tab| {
-            let title = match (tab, crate::ui::active_tab(editor)) {
-                (BottomTab::UsedBy, Some(Tab::Script(owner))) => format!(
+            let title = match (tab, ui::active_tab(editor)) {
+                (BottomTab::UsedBy, Some(EditorTab::Script(owner))) => format!(
                     "{}   {}",
                     tab.title(),
                     script::panel::used_by_count(editor, &owner)
@@ -96,31 +100,32 @@ pub fn bottom_tabs(editor: &Editor) -> Vec<(BottomTab, String)> {
 }
 
 pub fn bottom_show(editor: &mut Editor, ui: &mut Ui, tab: BottomTab) {
-    match (crate::ui::active_tab(editor), tab) {
-        (Some(Tab::Area { key }), BottomTab::Palette) => {
+    match (ui::active_tab(editor), tab) {
+        (Some(EditorTab::Area { key }), BottomTab::Palette) => {
             area::bottom(editor, ui, &area::area_view_key(&key), tab)
         }
-        (Some(Tab::Area { key }), BottomTab::Blueprints) => {
+        (Some(EditorTab::Area { key }), BottomTab::Blueprints) => {
             area::bottom(editor, ui, &area::area_view_key(&key), tab)
         }
-        (Some(Tab::Area { .. }) | Some(Tab::Blueprint { .. }), BottomTab::Listen) => {
+        (Some(EditorTab::Area { .. }) | Some(EditorTab::Blueprint { .. }), BottomTab::Listen) => {
             sound::panel(editor, ui)
         }
-        (Some(Tab::Blueprint { key }), BottomTab::Palette | BottomTab::Blueprints) => {
+        (Some(EditorTab::Blueprint { key }), BottomTab::Palette | BottomTab::Blueprints) => {
             area::bottom(editor, ui, &area::blueprint_view_key(&key), tab)
         }
-        (Some(Tab::Script(owner)), BottomTab::MayDo | BottomTab::UsedBy | BottomTab::Run) => {
+        (Some(EditorTab::Script(owner)), BottomTab::MayDo | BottomTab::UsedBy | BottomTab::Run) => {
             script::bottom(editor, ui, &owner, tab)
         }
-        (Some(Tab::Model { key }), BottomTab::Timeline | BottomTab::Sheet | BottomTab::Sounds) => {
-            model::bottom(editor, ui, &key, tab)
-        }
         (
-            Some(Tab::Tileset { key }),
+            Some(EditorTab::Model { key }),
+            BottomTab::Timeline | BottomTab::Sheet | BottomTab::Sounds,
+        ) => model::bottom(editor, ui, &key, tab),
+        (
+            Some(EditorTab::Tileset { key }),
             BottomTab::Surfaces | BottomTab::Mixes | BottomTab::Timeline,
         ) => tileset::bottom(editor, ui, &key, tab),
         _ => {
-            ui.label(crate::ui::theme::muted("nothing to show here"));
+            ui.label(theme::muted("nothing to show here"));
         }
     }
 }
@@ -133,20 +138,19 @@ pub fn play_here(editor: &mut Editor) {
     let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
         return;
     };
-    let Some(area) = content.by_key::<game::systems::area::AreaDef>(&hover.area) else {
+    let Some(area) = content.by_key::<AreaDef>(&hover.area) else {
         return;
     };
-    use game::core::tiling::TilePos;
-    crate::play::start(
+    play::start(
         editor,
-        Some(game::systems::script::Place {
+        Some(Place {
             area,
             at: hover.tile.snap(),
         }),
     );
 }
 
-pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
+pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     if script::is_node_selection(selection) {
         script::inspect_parts(editor, ui, selection);
         return;
@@ -158,12 +162,11 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &Selection) {
     {
         egui::ScrollArea::vertical()
             .id_salt(("sheet-inspect", &selection.table))
-            .show(ui, |ui| sheet::inspect(editor, ui, selection));
+            .show(ui, |ui| spreadsheet::inspect(editor, ui, selection));
         return;
     }
     match selection.table.as_str() {
         "area" | "blueprint" => area::inspect_parts(editor, ui, selection),
-        "world_map" => world::inspect_parts(editor, ui, selection),
         "model" => model::inspect_parts(editor, ui, selection),
         "tileset" => tileset::inspect_parts(editor, ui, selection),
         _ => {

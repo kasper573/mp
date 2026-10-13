@@ -1,21 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use game::systems::actor::bust::GenericExpression;
+use game::systems::actor::model::GenericExpression;
 use serde_json::Value;
 use strum::VariantArray;
 
 use crate::app::Editor;
-use crate::project::{Edit, Selection, row_file};
+use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::ui::{theme, widgets};
+use crate::{rows, thumbs};
+use std::collections::HashSet;
+
+const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
 pub fn generic() -> impl Iterator<Item = &'static str> {
     GenericExpression::VARIANTS.iter().map(|face| face.key())
 }
-const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Face {
+pub struct BustFace {
     pub name: String,
     pub file: String,
     pub own: Option<usize>,
@@ -29,13 +32,13 @@ pub fn module_index(row: &Value) -> Option<usize> {
         .position(|module| module["type"] == "bust")
 }
 
-pub fn faces(row: &Value) -> Vec<Face> {
+pub fn faces(row: &Value) -> Vec<BustFace> {
     let Some(index) = module_index(row) else {
         return Vec::new();
     };
     let module = &row["modules"][index];
-    let mut faces: Vec<Face> = generic()
-        .map(|name| Face {
+    let mut faces: Vec<BustFace> = generic()
+        .map(|name| BustFace {
             name: name.to_owned(),
             file: module[name].as_str().unwrap_or_default().to_owned(),
             own: None,
@@ -43,7 +46,7 @@ pub fn faces(row: &Value) -> Vec<Face> {
         })
         .collect();
     for (j, own) in module["own"].as_array().into_iter().flatten().enumerate() {
-        faces.push(Face {
+        faces.push(BustFace {
             name: own["name"].as_str().unwrap_or_default().to_owned(),
             file: own["file"].as_str().unwrap_or_default().to_owned(),
             own: Some(j),
@@ -73,9 +76,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     }
     let drops = std::mem::take(&mut editor.views.model.drops);
     let pointer = ui.input(|i| i.pointer.hover_pos());
-    let selected = editor.views.model.views[key].face.clone();
+    let selected = editor.views.model.view(key).face.clone();
     let mut pick = None;
-    let mut replace: Option<(Face, PathBuf)> = None;
+    let mut replace: Option<(BustFace, PathBuf)> = None;
     let mut add: Vec<PathBuf> = Vec::new();
     let mut browse = false;
     let per_row = ((ui.available_width() + 12.0) / (CARD.x + 12.0))
@@ -86,12 +89,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .spacing(Vec2::new(12.0, 12.0))
         .show(ui, |ui| {
             for (index, face) in faces.iter().enumerate() {
-                let thumb = {
-                    let Editor { project, form, .. } = editor;
-                    project
-                        .as_ref()
-                        .and_then(|project| form.thumbnails.image(&ctx, &project.files, &face.file))
-                };
+                let thumb = editor.thumb(&ctx, &face.file);
                 let is_selected = selected.as_deref() == Some(&face.name);
                 let response = card(ui, face, thumb.as_ref(), is_selected, key);
                 if response.clicked() {
@@ -111,18 +109,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             let (rect, response) = ui.allocate_exact_size(CARD, Sense::click());
             let painter = ui.painter_at(rect);
             painter.rect_filled(rect, 4.0, theme::SELECTION.gamma_multiply(0.5));
-            painter.extend(egui::Shape::dashed_line(
-                &[
-                    rect.left_top(),
-                    rect.right_top(),
-                    rect.right_bottom(),
-                    rect.left_bottom(),
-                    rect.left_top(),
-                ],
+            widgets::dashed_rect(
+                &painter,
+                rect,
                 egui::Stroke::new(1.0, theme::ACCENT),
                 4.0,
                 4.0,
-            ));
+            );
             painter.text(
                 rect.center() - Vec2::new(0.0, 10.0),
                 egui::Align2::CENTER_CENTER,
@@ -154,18 +147,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         add.push(path);
     }
     if let Some(face) = pick {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.face = Some(face.name.clone());
-        editor.select(Selection {
-            table: super::TABLE.to_owned(),
-            keys: vec![key.to_owned()],
-            parts: vec![face.pointer],
-        });
+        editor.select(RowSelection::parts(super::TABLE, key, vec![face.pointer]));
     }
     if let Some((face, path)) = replace {
         replace_file(editor, key, &face, &path);
@@ -185,8 +169,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
 
 fn card(
     ui: &mut Ui,
-    face: &Face,
-    thumb: Option<&crate::thumbs::Thumb>,
+    face: &BustFace,
+    thumb: Option<&thumbs::Thumbnail>,
     selected: bool,
     key: &str,
 ) -> egui::Response {
@@ -261,7 +245,7 @@ fn png_bytes(path: &Path) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn replace_file(editor: &mut Editor, key: &str, face: &Face, path: &Path) {
+fn replace_file(editor: &mut Editor, key: &str, face: &BustFace, path: &Path) {
     let bytes = match png_bytes(path) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -269,7 +253,7 @@ fn replace_file(editor: &mut Editor, key: &str, face: &Face, path: &Path) {
             return;
         }
     };
-    let mut edit = Edit::new(format!("Replace {} of {key}'s bust", face.name));
+    let mut edit = ContentEdit::new(format!("Replace {} of {key}'s bust", face.name));
     edit.write(format!("assets/{}", face.file), bytes.into());
     editor.apply(edit);
 }
@@ -293,13 +277,8 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
                 .replace([' ', '-'], "_")
         })
         .unwrap_or_else(|| "expression".to_owned());
-    let taken: Vec<String> = faces(row).into_iter().map(|face| face.name).collect();
-    let mut name = stem.clone();
-    let mut n = 2;
-    while taken.contains(&name) {
-        name = format!("{stem}_{n}");
-        n += 1;
-    }
+    let taken: HashSet<String> = faces(row).into_iter().map(|face| face.name).collect();
+    let name = rows::free_name(&stem, &taken);
     let file = format!("busts/{key}/{name}.png");
     let mut changed = row.clone();
     let own = &mut changed["modules"][index]["own"];
@@ -309,25 +288,20 @@ fn add_expression(editor: &mut Editor, key: &str, row: &Value, path: &Path) {
     own.as_array_mut()
         .expect("an array")
         .push(serde_json::json!({ "name": name, "file": file }));
-    let mut edit = Edit::new(format!("Add expression {name} to {key}'s bust"));
+    let mut edit = ContentEdit::new(format!("Add expression {name} to {key}'s bust"));
     edit.write(format!("assets/{file}"), bytes.into());
     edit.write_json(row_file(super::TABLE, key), &changed);
     if editor.apply(edit) {
-        let view = editor
-            .views
-            .model
-            .views
-            .get_mut(key)
-            .expect("the view exists");
+        let view = editor.views.model.view_mut(key);
         view.face = Some(name.clone());
         let j = changed["modules"][index]["own"]
             .as_array()
             .map_or(0, |own| own.len().saturating_sub(1));
-        editor.select(Selection {
-            table: super::TABLE.to_owned(),
-            keys: vec![key.to_owned()],
-            parts: vec![format!("/modules/{index}/own/{j}")],
-        });
+        editor.select(RowSelection::parts(
+            super::TABLE,
+            key,
+            vec![format!("/modules/{index}/own/{j}")],
+        ));
     }
 }
 
@@ -355,7 +329,7 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
         .cloned()
         .collect();
     for file in files {
-        let Some((table, row_key)) = crate::project::row_of(&file) else {
+        let Some((table, row_key)) = row_of(&file) else {
             continue;
         };
         let owners: Vec<String> = match table {
@@ -364,7 +338,7 @@ pub fn lines(editor: &Editor, key: &str) -> Vec<FaceLine> {
                 .usages
                 .of_row("script", row_key)
                 .iter()
-                .filter_map(|usage| crate::project::row_of(&usage.file))
+                .filter_map(|usage| row_of(&usage.file))
                 .filter(|(table, _)| *table == "npc")
                 .map(|(_, key)| key.to_owned())
                 .collect(),
@@ -418,14 +392,11 @@ fn find_nodes(row: &Value) -> Vec<(String, Value)> {
     out
 }
 
-pub fn rename(editor: &mut Editor, key: &str, face: &Face, new_name: &str) -> bool {
+pub fn rename(editor: &mut Editor, key: &str, face: &BustFace, new_name: &str) -> bool {
     let Some(mut row) = editor.row_value(super::TABLE, key) else {
         return false;
     };
-    let Some(j) = face.own else {
-        return false;
-    };
-    let Some(index) = module_index(&row) else {
+    let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
         return false;
     };
     if faces(&row).iter().any(|other| other.name == new_name) {
@@ -433,38 +404,22 @@ pub fn rename(editor: &mut Editor, key: &str, face: &Face, new_name: &str) -> bo
         return false;
     }
     row["modules"][index]["own"][j]["name"] = Value::String(new_name.to_owned());
-    let mut edit = Edit::new(format!("Rename face {} of {key} to {new_name}", face.name));
-    let uses = lines(editor, key);
-    let mut files: Vec<String> = uses
-        .iter()
-        .filter(|line| line.face == face.name)
-        .map(|line| line.file.clone())
-        .collect();
-    files.sort();
-    files.dedup();
-    for file in files {
-        let Some(mut value) = editor
-            .project
-            .as_ref()
-            .and_then(|p| p.files.json_owned(&file))
-        else {
-            continue;
-        };
-        rewrite_faces(&mut value, &face.name, Some(new_name));
-        edit.write_json(file, &value);
-    }
+    let mut edit = retarget_face(
+        editor,
+        key,
+        &face.name,
+        new_name,
+        format!("Rename face {} of {key} to {new_name}", face.name),
+    );
     edit.write_json(row_file(super::TABLE, key), &row);
     editor.apply(edit)
 }
 
-pub fn remove(editor: &mut Editor, key: &str, face: &Face, replacement: &str) -> bool {
+pub fn remove(editor: &mut Editor, key: &str, face: &BustFace, replacement: &str) -> bool {
     let Some(mut row) = editor.row_value(super::TABLE, key) else {
         return false;
     };
-    let Some(j) = face.own else {
-        return false;
-    };
-    let Some(index) = module_index(&row) else {
+    let (Some(j), Some(index)) = (face.own, module_index(&row)) else {
         return false;
     };
     if let Some(own) = row["modules"][index]["own"].as_array_mut()
@@ -472,11 +427,23 @@ pub fn remove(editor: &mut Editor, key: &str, face: &Face, replacement: &str) ->
     {
         own.remove(j);
     }
-    let mut edit = Edit::new(format!("Remove face {} of {key}", face.name));
-    let uses = lines(editor, key);
-    let mut files: Vec<String> = uses
+    let mut edit = retarget_face(
+        editor,
+        key,
+        &face.name,
+        replacement,
+        format!("Remove face {} of {key}", face.name),
+    );
+    edit.write_json(row_file(super::TABLE, key), &row);
+    edit.remove(format!("assets/{}", face.file));
+    editor.apply(edit)
+}
+
+fn retarget_face(editor: &Editor, key: &str, from: &str, to: &str, label: String) -> ContentEdit {
+    let mut edit = ContentEdit::new(label);
+    let mut files: Vec<String> = lines(editor, key)
         .iter()
-        .filter(|line| line.face == face.name)
+        .filter(|line| line.face == from)
         .map(|line| line.file.clone())
         .collect();
     files.sort();
@@ -489,26 +456,17 @@ pub fn remove(editor: &mut Editor, key: &str, face: &Face, replacement: &str) ->
         else {
             continue;
         };
-        rewrite_faces(&mut value, &face.name, Some(replacement));
+        rewrite_faces(&mut value, from, to);
         edit.write_json(file, &value);
     }
-    edit.write_json(row_file(super::TABLE, key), &row);
-    edit.remove(format!("assets/{}", face.file));
-    editor.apply(edit)
+    edit
 }
 
-fn rewrite_faces(value: &mut Value, from: &str, to: Option<&str>) {
+fn rewrite_faces(value: &mut Value, from: &str, to: &str) {
     match value {
         Value::Object(map) => {
             if map.get("face").and_then(Value::as_str) == Some(from) {
-                match to {
-                    Some(to) => {
-                        map.insert("face".to_owned(), Value::String(to.to_owned()));
-                    }
-                    None => {
-                        map.remove("face");
-                    }
-                }
+                map.insert("face".to_owned(), Value::String(to.to_owned()));
             }
             for child in map.values_mut() {
                 rewrite_faces(child, from, to);

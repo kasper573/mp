@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..");
-// The folder the local stack's game server reads: a copy of content/ that `just stack-content` makes.
+// The copy of content/ the local stack's game server reads.
 const STACK_CONTENT = join(ROOT, "target", "stack", "content");
 
 export interface Deploy {

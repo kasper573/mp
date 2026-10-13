@@ -1,23 +1,21 @@
 use egui::{Color32, Rect as ERect, Vec2};
-use game::core::tiling::TilePos;
+use game::core::tiling::{Cell, TilePos};
 use game::systems::area;
 
-use super::{Frame, Tool, placement};
+use super::{AreaFrame, AreaTool, placement};
 use crate::app::Editor;
+use crate::ui::{theme, widgets};
 
 pub(super) fn status_bar(
     editor: &mut Editor,
     painter: &egui::Painter,
     view_key: &str,
-    frame: &Frame,
+    frame: &AreaFrame,
 ) {
-    let view = &editor.views.area.views[view_key];
+    let view = editor.views.area.view(view_key);
     let mut left: Vec<String> = Vec::new();
     if let Some(place) = view.in_place.last() {
-        let parts = frame
-            .content
-            .by_key::<area::blueprint::BlueprintDef>(&place.blueprint)
-            .map_or(0, |id| id.get(&frame.content).parts.len());
+        let parts = part_count(frame, &place.blueprint);
         let picked = placement::selected_part_indices(editor, &place.blueprint);
         match picked.as_slice() {
             [one] => left.push(format!("{} · part {} of {parts}", place.blueprint, one + 1)),
@@ -25,13 +23,10 @@ pub(super) fn status_bar(
         }
         left.push("double-click a part to open it · Esc goes up one level".to_owned());
     } else if let Some(blueprint) = &view.blueprint {
-        let parts = frame
-            .content
-            .by_key::<area::blueprint::BlueprintDef>(blueprint)
-            .map_or(0, |id| id.get(&frame.content).parts.len());
+        let parts = part_count(frame, blueprint);
         left.push(format!(
             "blueprint/{blueprint} · {parts} part{}",
-            crate::ui::widgets::plural(parts)
+            widgets::plural(parts)
         ));
         left.push(
             placement::placement_count(frame.content, blueprint)
@@ -42,14 +37,13 @@ pub(super) fn status_bar(
     }
     if let Some(tile) = frame.pointer_tile {
         let cell = tile.cell();
-        if view.walk_overlay && view.tool == Tool::Paint {
+        if view.walk_overlay && view.tool == AreaTool::Paint {
             left.push(format!("cell {}, {}", cell.x, cell.y));
             if frame.in_map(tile) {
                 let area = frame.area();
-                let grid = area
-                    .grids
-                    .walk
-                    .get((cell.y as usize) * area.grids.size.width as usize + cell.x as usize)
+                let grid = cell
+                    .index(area.grids.size)
+                    .and_then(|index| area.grids.walk.get(index))
                     .copied()
                     .flatten();
                 left.push(format!(
@@ -66,7 +60,7 @@ pub(super) fn status_bar(
                     }
                 ));
             }
-        } else if view.tool == Tool::Terrain {
+        } else if view.tool == AreaTool::Terrain {
             left.push(format!("corner {}, {}", cell.x, cell.y));
             if let (Some(tileset), Some(set)) = (&view.terrain.tileset, &view.terrain.set) {
                 left.push(format!("{set} · {tileset}"));
@@ -75,7 +69,7 @@ pub(super) fn status_bar(
             left.push(format!("tile {}, {}", cell.x, cell.y));
             if matches!(
                 view.tool,
-                Tool::Paint | Tool::Fill | Tool::Erase | Tool::Eyedropper
+                AreaTool::Paint | AreaTool::Fill | AreaTool::Erase | AreaTool::Eyedropper
             ) && let Some(tileset) = &view.pick.tileset
             {
                 let layer = frame
@@ -111,7 +105,7 @@ pub(super) fn status_bar(
         left.push(format!(
             "stroke: {} {}",
             stroke.cells.len(),
-            if view.tool == Tool::Terrain {
+            if view.tool == AreaTool::Terrain {
                 "corners"
             } else {
                 "cells"
@@ -146,11 +140,17 @@ pub(super) fn status_bar(
             size.height,
             (zoom * 100.0).round()
         );
-        let galley =
-            painter.layout_no_wrap(text, egui::FontId::monospace(12.0), crate::ui::theme::TEXT);
+        let galley = painter.layout_no_wrap(text, egui::FontId::monospace(12.0), theme::TEXT);
         let at = frame.canvas.rect.min + Vec2::new(16.0, 12.0);
         let back = ERect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0));
         painter.rect_filled(back, 4.0, Color32::from_rgba_unmultiplied(20, 22, 26, 220));
-        painter.galley(at + Vec2::new(6.0, 3.0), galley, crate::ui::theme::TEXT);
+        painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT);
     }
+}
+
+fn part_count(frame: &AreaFrame, blueprint: &str) -> usize {
+    frame
+        .content
+        .by_key::<area::blueprint::BlueprintDef>(blueprint)
+        .map_or(0, |id| id.get(&frame.content).parts.len())
 }

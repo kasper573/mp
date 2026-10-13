@@ -1,22 +1,21 @@
-pub mod bust;
-mod model;
+pub mod model;
 pub mod plate;
 pub mod render;
+
+pub use model::{ActorModel, ModelDef, Timing};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::Content;
+use crate::core::content::{ContentRegistry, LoadStep};
 use crate::core::math::{Direction, Pos, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
 use crate::systems::combat::Swing;
 use crate::systems::movement::{Path, Position};
 use crate::systems::stat::{self, StatKind, Stats};
-
-pub use model::{ActorModel, Timing};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -26,15 +25,11 @@ pub fn register(app: &mut App) {
         .replicate::<Name>();
 }
 
-pub fn model(content: &Content, model: bust::Id) -> &'static ActorModel {
-    model::get(content, model)
-}
-
-pub fn content(registry: &mut crate::core::content::ContentRegistry) {
+pub fn content(registry: &mut ContentRegistry) {
     registry
-        .row::<bust::ModelDef>()
-        .modules::<bust::ModelDef>()
-        .hook(crate::core::content::LoadStep::Files, model::build_all);
+        .row::<ModelDef>()
+        .modules::<ModelDef>()
+        .hook(LoadStep::Files, model::build_all);
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -117,7 +112,7 @@ pub struct Actor {
     pub color: Rgba,
     pub dir: Direction,
     pub action: Action,
-    pub model: crate::systems::actor::bust::Id,
+    pub model: model::Id,
     pub attack_rate: PlaybackRate,
 }
 

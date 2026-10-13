@@ -16,8 +16,8 @@ use game::systems::memory;
 use game::systems::movement::Position;
 use game::systems::player::Xp;
 use game::systems::player::snapshot::{
-    CharacterSnapshot, CharacterStart, HeardLine, JoinAs, MemoryValue, QuestState, SnapshotEffect,
-    SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
+    AtInitialSpawn, CharacterSnapshot, CharacterStart, HeardLine, JoinAs, MemoryValue, QuestState,
+    SnapshotEffect, SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
 };
 use game::systems::quest::{QuestLog, QuestResult};
 use game::systems::script::Place;
@@ -123,9 +123,7 @@ fn a_start_of_its_own_moves_the_character_and_nothing_else() {
     let island = row("island");
     let spawn = content().built::<GameSettings>().initial_spawn;
     let snapshot = CharacterSnapshot {
-        start: CharacterStart::InitialSpawn(
-            game::systems::player::snapshot::AtInitialSpawn::InitialSpawn,
-        ),
+        start: CharacterStart::InitialSpawn(AtInitialSpawn::InitialSpawn),
         ..tess(spawn)
     };
     let here = Place {

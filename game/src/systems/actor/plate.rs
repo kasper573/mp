@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
 use bevy::ui::Val2;
 use ui::tokens::{palette, typography};
@@ -20,7 +21,6 @@ use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
-use bevy::ecs::query::QueryData;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;

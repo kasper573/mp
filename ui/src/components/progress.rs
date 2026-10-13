@@ -15,8 +15,11 @@ pub struct ProgressFraction(pub f32);
 pub struct ProgressIndicator;
 
 pub fn progress(value: f32, max: f32) -> impl Scene {
-    let max = if max > 0.0 { max } else { 100.0 };
-    let fraction = (value / max).clamp(0.0, 1.0);
+    let fraction = if max > 0.0 {
+        (value / max).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     bsn! {
         ProgressFraction({fraction})
         Style::new()

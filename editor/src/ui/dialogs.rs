@@ -1,10 +1,21 @@
-use egui::{Context, RichText};
+use std::path::{Path, PathBuf};
+
+use egui::{Context, RichText, Ui};
+use game::core::content::version;
 
 use super::{theme, widgets};
 use crate::app::{
-    CloseThen, ConfirmAction, Dialog, Editor, NewGameDialog, NewGameSource, RenameTarget,
+    CloseThen, ConfirmAction, Editor, ModalDialog, NewGameDialog, NewGameSource, RenameDialog,
+    RenameTarget,
 };
-use crate::project::{Edit, row_file};
+use crate::project::{ContentEdit, GAME_FILE, row_file, row_of};
+use crate::rows::{UsageDecision, UsageSummary};
+use crate::templates::GameTemplate;
+use crate::ui::start;
+use crate::views::area::{layers, pick, resize};
+use crate::views::script::inspect;
+use crate::views::{area, script, world};
+use crate::{import, play, rows, templates, ui};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     let mut dialogs = std::mem::take(&mut editor.dialogs);
@@ -31,6 +42,35 @@ fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
         .show(ctx, body);
 }
 
+pub fn keys(ctx: &Context) -> (bool, bool) {
+    ctx.input(|i| {
+        (
+            i.key_pressed(egui::Key::Enter),
+            i.key_pressed(egui::Key::Escape),
+        )
+    })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DialogAnswer {
+    Confirm,
+    Cancel,
+}
+
+pub fn answer_row(ui: &mut Ui, confirm: &str) -> Option<DialogAnswer> {
+    let (enter, escape) = keys(ui.ctx());
+    let mut answer = None;
+    ui.horizontal(|ui| {
+        if widgets::primary(ui, confirm).clicked() || enter {
+            answer = Some(DialogAnswer::Confirm);
+        }
+        if ui.button("Cancel").clicked() || escape {
+            answer = Some(DialogAnswer::Cancel);
+        }
+    });
+    answer
+}
+
 pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui)) {
     egui::Area::new(egui::Id::new(id))
         .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -48,21 +88,16 @@ pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui
         });
 }
 
-fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Option<Dialog> {
+fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Option<ModalDialog> {
     let mut outcome = None;
-    let templates = crate::templates::list();
-    let (enter, escape) = ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
-    });
+    let templates = templates::list();
+    let (enter, escape) = keys(ctx);
     let copy_source = match &dialog.source {
         NewGameSource::Copy(folder) => Some(folder.clone()),
         NewGameSource::Template(_) => None,
     };
     let title = match &copy_source {
-        Some(folder) => format!("+ New game from {}", crate::ui::start::game_name(folder)),
+        Some(folder) => format!("+ New game from {}", start::game_name(folder)),
         None => "+ New game".to_owned(),
     };
     card(
@@ -75,71 +110,15 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
             match &mut dialog.source {
                 NewGameSource::Template(picked) => {
                     ui.horizontal_top(|ui| {
-                    ui.vertical(|ui| {
-                        ui.set_width(460.0);
-                        widgets::section(ui, "Built into this editor");
-                        for template in &templates {
-                            let selected = *picked == template.key;
-                            let players = template.tables.iter().find(|(t, _)| t == "player").map_or(0, |(_, keys)| keys.len());
-                            let scripts = template.tables.iter().find(|(t, _)| t == "script").map_or(0, |(_, keys)| keys.len());
-                            let response = egui::Frame::new()
-                                .fill(if selected { theme::ACCENT_SOFT } else { theme::PANEL })
-                                .stroke(egui::Stroke::new(1.0, if selected { theme::ACCENT } else { theme::BORDER }))
-                                .corner_radius(6.0)
-                                .inner_margin(12.0)
-                                .show(ui, |ui| {
-                                    ui.set_width(ui.available_width());
-                                    ui.horizontal(|ui| {
-                                        ui.vertical(|ui| {
-                                            ui.horizontal(|ui| {
-                                                ui.label(theme::strong(&template.name));
-                                                ui.label(theme::muted(&template.key).monospace());
-                                            });
-                                            ui.label(theme::muted(format!(
-                                                "{} area{} · {players} player{} · {scripts} shared script{}",
-                                                template.areas.len(),
-                                                crate::ui::widgets::plural(template.areas.len()),
-                                                crate::ui::widgets::plural(players),
-                                                crate::ui::widgets::plural(scripts)
-                                            )));
-                                        });
-                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                            ui.label(theme::faint(format!("build {}", game::core::content::version::build())).monospace().size(12.0));
-                                        });
-                                    });
-                                })
-                                .response
-                                .interact(egui::Sense::click());
-                            if response.clicked() {
-                                *picked = template.key.clone();
-                            }
+                        template_cards(ui, picked, &templates);
+                        ui.add_space(20.0);
+                        if let Some(template) = templates.iter().find(|t| t.key == *picked) {
+                            template_summary(ui, editor, template);
                         }
                     });
-                    ui.add_space(20.0);
-                    if let Some(template) = templates.iter().find(|t| t.key == *picked) {
-                        ui.vertical(|ui| {
-                            ui.set_width(560.0);
-                            widgets::kv(ui, "name", |ui| {
-                                ui.label(theme::strong(&template.name));
-                                ui.label(theme::muted("from game.json"));
-                            });
-                            widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
-                            widgets::kv(ui, "holds", |ui| {
-                                let mut parts: Vec<String> = vec!["game.json".to_owned(), "every fixture".to_owned()];
-                                for (table, keys) in &template.tables {
-                                    if editor.shapes.has_fixtures(table) {
-                                        continue;
-                                    }
-                                    parts.push(format!("{}/{}", table, keys.join(", ")));
-                                }
-                                ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
-                            });
-                        });
-                    }
-                });
                 }
                 NewGameSource::Copy(source) => {
-                    widgets::kv_code(ui, "from", crate::ui::pretty_path(source));
+                    widgets::kv_code(ui, "from", ui::pretty_path(source));
                 }
             }
             ui.add_space(10.0);
@@ -148,16 +127,13 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                 let response =
                     ui.add(egui::TextEdit::singleline(&mut dialog.name).desired_width(360.0));
                 if response.changed() && !dialog.folder_touched {
-                    let base = std::path::Path::new(&dialog.folder)
+                    let base = Path::new(&dialog.folder)
                         .parent()
                         .map(|p| p.to_path_buf())
                         .unwrap_or_default();
-                    dialog.folder = base
-                        .join(crate::ui::start::slug(&dialog.name))
-                        .display()
-                        .to_string();
+                    dialog.folder = base.join(start::slug(&dialog.name)).display().to_string();
                 }
-                ui.label(theme::muted("written into the new game.json"));
+                ui.label(theme::muted(format!("written into the new {GAME_FILE}")));
             });
             widgets::kv(ui, "folder", |ui| {
                 if ui
@@ -197,7 +173,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                             })
                             .unwrap_or(0);
                         let assets = count_files_in(&source.join("assets"));
-                        ui.label(theme::mono(format!("game.json   name → {}", dialog.name)));
+                        ui.label(theme::mono(format!("{GAME_FILE}   name → {}", dialog.name)));
                         ui.label(theme::mono(format!("tables/     {rows} rows")));
                         ui.label(theme::mono(format!("assets/     {assets} files")));
                     });
@@ -209,17 +185,14 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                                     .flatten()
                                     .filter_map(|entry| {
                                         let name = entry.file_name().to_string_lossy().into_owned();
-                                        (!matches!(
-                                            name.as_str(),
-                                            "game.json" | "tables" | "assets"
-                                        ))
-                                        .then(|| {
-                                            if entry.path().is_dir() {
-                                                format!("{name}/")
-                                            } else {
-                                                name.clone()
-                                            }
-                                        })
+                                        (!matches!(name.as_str(), GAME_FILE | "tables" | "assets"))
+                                            .then(|| {
+                                                if entry.path().is_dir() {
+                                                    format!("{name}/")
+                                                } else {
+                                                    name.clone()
+                                                }
+                                            })
                                     })
                                     .collect()
                             })
@@ -236,7 +209,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                 ui.add_space(6.0);
                 ui.label(theme::muted(format!(
                     "{} isn't touched. Nothing links the two afterwards.",
-                    crate::ui::start::game_name(source)
+                    start::game_name(source)
                 )));
             } else {
                 ui.add_space(6.0);
@@ -245,7 +218,10 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                     .find(|t| matches!(&dialog.source, NewGameSource::Template(k) if *k == t.key))
                     .map(|t| t.name.clone())
                     .unwrap_or_default();
-                ui.label(theme::muted(format!("Create writes {name}'s files into {} and opens it. Nothing links the game to its template.", crate::ui::pretty_path(std::path::Path::new(&dialog.folder)))));
+                ui.label(theme::muted(format!(
+                    "Create writes {name}'s files into {} and opens it. Nothing links the game to its template.",
+                    ui::pretty_path(Path::new(&dialog.folder))
+                )));
             }
             if let Some(error) = &dialog.error {
                 ui.colored_label(theme::DANGER, error);
@@ -277,20 +253,20 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
     }
     match outcome {
         Some(true) => {
-            let folder = std::path::PathBuf::from(dialog.folder.trim());
+            let folder = PathBuf::from(dialog.folder.trim());
             let result = match &dialog.source {
                 NewGameSource::Template(template) => {
-                    crate::templates::new_game(template, dialog.name.trim(), &folder)
+                    templates::new_game(template, dialog.name.trim(), &folder)
                 }
                 NewGameSource::Copy(source) => {
-                    crate::templates::new_game_from(source, dialog.name.trim(), &folder)
+                    templates::new_game_from(source, dialog.name.trim(), &folder)
                 }
             };
             match result {
                 Ok(()) => {
                     editor.say(format!("Created {}", folder.display()));
                     if editor.has_unsaved() {
-                        crate::ui::request_close(editor, CloseThen::Open(folder));
+                        ui::request_close(editor, CloseThen::Open(folder));
                     } else {
                         editor.open_folder(&folder);
                     }
@@ -298,16 +274,106 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                 }
                 Err(error) => {
                     dialog.error = Some(error);
-                    Some(Dialog::NewGame(dialog))
+                    Some(ModalDialog::NewGame(dialog))
                 }
             }
         }
         Some(false) => None,
-        None => Some(Dialog::NewGame(dialog)),
+        None => Some(ModalDialog::NewGame(dialog)),
     }
 }
 
-fn count_files_in(folder: &std::path::Path) -> usize {
+fn template_cards(ui: &mut Ui, picked: &mut String, templates: &[GameTemplate]) {
+    ui.vertical(|ui| {
+        ui.set_width(460.0);
+        widgets::section(ui, "Built into this editor");
+        for template in templates {
+            let selected = *picked == template.key;
+            let response = egui::Frame::new()
+                .fill(if selected {
+                    theme::ACCENT_SOFT
+                } else {
+                    theme::PANEL
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if selected {
+                        theme::ACCENT
+                    } else {
+                        theme::BORDER
+                    },
+                ))
+                .corner_radius(6.0)
+                .inner_margin(12.0)
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(theme::strong(&template.name));
+                                ui.label(theme::muted(&template.key).monospace());
+                            });
+                            ui.label(theme::muted(template_counts(template)));
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(
+                                theme::faint(format!("build {}", version::build()))
+                                    .monospace()
+                                    .size(12.0),
+                            );
+                        });
+                    });
+                })
+                .response
+                .interact(egui::Sense::click());
+            if response.clicked() {
+                *picked = template.key.clone();
+            }
+        }
+    });
+}
+
+fn template_counts(template: &GameTemplate) -> String {
+    let rows_in = |table: &str| {
+        template
+            .tables
+            .iter()
+            .find(|(t, _)| t == table)
+            .map_or(0, |(_, keys)| keys.len())
+    };
+    let players = rows_in("player");
+    let scripts = rows_in("script");
+    format!(
+        "{} area{} · {players} player{} · {scripts} shared script{}",
+        template.areas.len(),
+        widgets::plural(template.areas.len()),
+        widgets::plural(players),
+        widgets::plural(scripts)
+    )
+}
+
+fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
+    ui.vertical(|ui| {
+        ui.set_width(560.0);
+        widgets::kv(ui, "name", |ui| {
+            ui.label(theme::strong(&template.name));
+            ui.label(theme::muted(format!("from {GAME_FILE}")));
+        });
+        widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
+        widgets::kv(ui, "holds", |ui| {
+            let mut parts: Vec<String> = vec![GAME_FILE.to_owned(), "every fixture".to_owned()];
+            for (table, keys) in &template.tables {
+                if editor.shapes.has_fixtures(table) {
+                    continue;
+                }
+                parts.push(format!("{}/{}", table, keys.join(", ")));
+            }
+            ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
+        });
+    });
+}
+
+fn count_files_in(folder: &Path) -> usize {
     std::fs::read_dir(folder)
         .map(|entries| {
             entries
@@ -324,25 +390,16 @@ fn count_files_in(folder: &std::path::Path) -> usize {
         .unwrap_or(0)
 }
 
-fn rename(
-    editor: &mut Editor,
-    ctx: &Context,
-    mut dialog: crate::app::RenameDialog,
-) -> Option<Dialog> {
+fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Option<ModalDialog> {
     let mut outcome = None;
-    let (enter, escape) = ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
-    });
-    let groups: Vec<(String, String, Vec<String>)> = match (&dialog.target, &editor.project) {
+    let (enter, escape) = keys(ctx);
+    let groups: Vec<UsageSummary> = match (&dialog.target, &editor.project) {
         (RenameTarget::Row { table, key }, Some(project)) => {
-            crate::rows::usage_groups(project, table, key)
+            rows::usage_groups(project, table, key)
         }
         _ => Vec::new(),
     };
-    let rows: usize = groups.iter().map(|(_, _, keys)| keys.len()).sum();
+    let rows: usize = groups.iter().map(|group| group.keys.len()).sum();
     let title = match &dialog.target {
         RenameTarget::Row { table, key } => format!("Rename {table}/{key}"),
         RenameTarget::Layer { area, layer } => format!("Rename layer {layer} of {area}"),
@@ -355,12 +412,7 @@ fn rename(
                 .desired_width(f32::INFINITY)
                 .font(egui::TextStyle::Monospace),
         );
-        if !ui.memory(|m| m.has_focus(response.id))
-            && dialog.error.is_none()
-            && dialog.draft == dialog.target.name()
-        {
-            response.request_focus();
-        }
+        widgets::default_focus(ui, &response);
         ui.add_space(6.0);
         if let RenameTarget::Layer { .. } = &dialog.target {
             ui.label(theme::muted(
@@ -372,7 +424,7 @@ fn rename(
             } else {
                 format!(
                     "{rows} row{} name it. The file and those rows change as one undo step.",
-                    crate::ui::widgets::plural(rows)
+                    widgets::plural(rows)
                 )
             }));
             if !groups.is_empty() {
@@ -387,21 +439,21 @@ fn rename(
                         ui.label(
                             theme::mono(format!(
                                 "{}  →  {}.json",
-                                crate::project::row_file(table, key),
+                                row_file(table, key),
                                 dialog.draft.trim()
                             ))
                             .color(theme::CODE),
                         );
-                        for (table, field, keys) in &groups {
+                        for group in &groups {
                             let shown: Vec<&str> =
-                                keys.iter().take(4).map(String::as_str).collect();
-                            let more = if keys.len() > 4 { ", …" } else { "" };
+                                group.keys.iter().take(4).map(String::as_str).collect();
+                            let more = if group.keys.len() > 4 { ", …" } else { "" };
                             ui.horizontal(|ui| {
-                                ui.label(theme::code(format!("{table} · {field}")));
+                                ui.label(theme::code(format!("{} · {}", group.table, group.field)));
                                 ui.label(
                                     theme::mono(format!(
                                         "{} · {}{more}",
-                                        keys.len(),
+                                        group.keys.len(),
                                         shown.join(", ")
                                     ))
                                     .color(theme::MUTED),
@@ -419,10 +471,7 @@ fn rename(
             let label = if matches!(dialog.target, RenameTarget::Layer { .. }) || rows == 0 {
                 "Rename".to_owned()
             } else {
-                format!(
-                    "Rename and update {rows} row{}",
-                    crate::ui::widgets::plural(rows)
-                )
+                format!("Rename and update {rows} row{}", widgets::plural(rows))
             };
             if widgets::primary(ui, &label).clicked() {
                 outcome = Some(true);
@@ -441,32 +490,29 @@ fn rename(
     match outcome {
         Some(true) => {
             let renamed = match &dialog.target {
-                RenameTarget::Layer { area, layer } => crate::views::area::tools::rename_layer(
-                    editor,
-                    area,
-                    layer,
-                    dialog.draft.trim(),
-                ),
+                RenameTarget::Layer { area, layer } => {
+                    layers::rename_layer(editor, area, layer, dialog.draft.trim())
+                }
                 RenameTarget::Row { table, key } => {
-                    crate::rows::rename(editor, table, key, dialog.draft.trim())
+                    rows::rename(editor, table, key, dialog.draft.trim())
                 }
             };
             match renamed {
                 Ok(()) => None,
                 Err(error) => {
                     dialog.error = Some(error);
-                    Some(Dialog::Rename(dialog))
+                    Some(ModalDialog::Rename(dialog))
                 }
             }
         }
         Some(false) => None,
-        None => Some(Dialog::Rename(dialog)),
+        None => Some(ModalDialog::Rename(dialog)),
     }
 }
 
-fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
+fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalDialog> {
     match dialog {
-        Dialog::Error(title, text) => {
+        ModalDialog::Error(title, text) => {
             let mut open = true;
             window(ctx, &title, |ui| {
                 ui.label(&text);
@@ -474,16 +520,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     open = false;
                 }
             });
-            open.then(|| Dialog::Error(title, text))
+            open.then(|| ModalDialog::Error(title, text))
         }
-        Dialog::Confirm(confirm) => {
+        ModalDialog::Confirm(confirm) => {
             let mut outcome = None;
-            let (enter, escape) = ctx.input(|i| {
-                (
-                    i.key_pressed(egui::Key::Enter),
-                    i.key_pressed(egui::Key::Escape),
-                )
-            });
+            let (enter, escape) = keys(ctx);
             card(
                 ctx,
                 "confirm",
@@ -535,10 +576,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     None
                 }
                 Some(false) => None,
-                None => Some(Dialog::Confirm(confirm)),
+                None => Some(ModalDialog::Confirm(confirm)),
             }
         }
-        Dialog::Close(close) => {
+        ModalDialog::Close(close) => {
             let mut outcome = None;
             window(ctx, "Unsaved changes", |ui| {
                 let count = editor.project.as_ref().map_or(0, |p| p.unsaved().len());
@@ -558,22 +599,22 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
             match outcome {
                 Some(Some(true)) => {
                     if editor.save() {
-                        crate::ui::finish_close(editor, close.then);
+                        ui::finish_close(editor, close.then);
                     }
                     None
                 }
                 Some(Some(false)) => {
-                    crate::ui::finish_close(editor, close.then);
+                    ui::finish_close(editor, close.then);
                     None
                 }
                 Some(None) => None,
-                None => Some(Dialog::Close(close)),
+                None => Some(ModalDialog::Close(close)),
             }
         }
-        Dialog::NewGame(dialog) => new_game(editor, ctx, dialog),
-        Dialog::Conflicts(mut conflicts) => {
+        ModalDialog::NewGame(dialog) => new_game(editor, ctx, dialog),
+        ModalDialog::Conflicts(mut conflicts) => {
             let conflict = conflicts.first().cloned()?;
-            let name = crate::project::row_of(&conflict.file)
+            let name = row_of(&conflict.file)
                 .map(|(table, key)| format!("{table}/{key}"))
                 .unwrap_or_else(|| conflict.file.clone());
             let disk_text = conflict
@@ -696,7 +737,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                 },
             );
             let Some(take) = decided else {
-                return Some(Dialog::Conflicts(conflicts));
+                return Some(ModalDialog::Conflicts(conflicts));
             };
             ctx.data_mut(|d| d.remove_temp::<bool>(compare_id));
             conflicts.remove(0);
@@ -706,10 +747,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                 }
                 editor.views.content_changed();
             }
-            (!conflicts.is_empty()).then_some(Dialog::Conflicts(conflicts))
+            (!conflicts.is_empty()).then_some(ModalDialog::Conflicts(conflicts))
         }
-        Dialog::Rename(dialog) => rename(editor, ctx, dialog),
-        Dialog::Delete(mut dialog) => {
+        ModalDialog::Rename(dialog) => rename(editor, ctx, dialog),
+        ModalDialog::Delete(mut dialog) => {
             let mut outcome = None;
             let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             card(ctx, "delete", 620.0, |ui| {
@@ -726,19 +767,19 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     );
                 });
                 ui.add_space(4.0);
-                crate::rows::delete_body(editor, ui, &mut dialog);
+                rows::delete_body(editor, ui, &mut dialog);
                 ui.add_space(8.0);
                 let edits: usize = dialog.groups.iter().map(|group| group.usages.len()).sum();
                 let ready = dialog.groups.iter().all(|group| match &group.decision {
-                    crate::rows::Decision::Undecided => false,
-                    crate::rows::Decision::Repoint(key) => !key.is_empty(),
-                    crate::rows::Decision::Remove | crate::rows::Decision::Unpack => true,
+                    UsageDecision::Undecided => false,
+                    UsageDecision::Repoint(key) => !key.is_empty(),
+                    UsageDecision::Remove | UsageDecision::Unpack => true,
                 });
                 ui.horizontal(|ui| {
                     let unpacked: usize = dialog
                         .groups
                         .iter()
-                        .filter(|group| group.decision == crate::rows::Decision::Unpack)
+                        .filter(|group| group.decision == UsageDecision::Unpack)
                         .map(|group| group.usages.len())
                         .sum();
                     let label = if edits == 0 {
@@ -746,13 +787,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     } else if unpacked == edits {
                         format!(
                             "Delete and unpack {edits} placement{}",
-                            crate::ui::widgets::plural(edits)
+                            widgets::plural(edits)
                         )
                     } else {
-                        format!(
-                            "Delete and apply {edits} edit{}",
-                            crate::ui::widgets::plural(edits)
-                        )
+                        format!("Delete and apply {edits} edit{}", widgets::plural(edits))
                     };
                     ui.add_enabled_ui(ready, |ui| {
                         if widgets::danger(ui, &label).clicked() {
@@ -768,21 +806,21 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                 outcome = Some(false);
             }
             match outcome {
-                Some(true) => match crate::rows::delete(editor, &dialog) {
+                Some(true) => match rows::delete(editor, &dialog) {
                     Ok(()) => None,
                     Err(error) => {
                         dialog.error = Some(error);
-                        Some(Dialog::Delete(dialog))
+                        Some(ModalDialog::Delete(dialog))
                     }
                 },
                 Some(false) => None,
-                None => Some(Dialog::Delete(dialog)),
+                None => Some(ModalDialog::Delete(dialog)),
             }
         }
-        Dialog::NewRow(mut dialog) => {
+        ModalDialog::NewRow(mut dialog) => {
             let mut outcome = None;
             window(ctx, &format!("New {}", dialog.table), |ui| {
-                crate::rows::new_row_body(editor, ui, &mut dialog);
+                rows::new_row_body(editor, ui, &mut dialog);
                 ui.horizontal(|ui| {
                     if ui.button("Create").clicked() {
                         outcome = Some(true);
@@ -793,28 +831,28 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                 });
             });
             match outcome {
-                Some(true) => match crate::rows::create(editor, &dialog) {
+                Some(true) => match rows::create(editor, &dialog) {
                     Ok(()) => None,
                     Err(error) => {
                         dialog.error = Some(error);
-                        Some(Dialog::NewRow(dialog))
+                        Some(ModalDialog::NewRow(dialog))
                     }
                 },
                 Some(false) => None,
-                None => Some(Dialog::NewRow(dialog)),
+                None => Some(ModalDialog::NewRow(dialog)),
             }
         }
-        Dialog::Binaries => {
+        ModalDialog::Binaries => {
             let mut open = true;
             let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             card(ctx, "binaries", 560.0, |ui| {
-                if crate::play::binaries_body(editor, ui) || escape {
+                if play::binaries_body(editor, ui) || escape {
                     open = false;
                 }
             });
-            open.then_some(Dialog::Binaries)
+            open.then_some(ModalDialog::Binaries)
         }
-        Dialog::Keys => {
+        ModalDialog::Keys => {
             let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             let mut open = true;
             card(ctx, "keys", 1500.0, |ui| {
@@ -847,34 +885,36 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                     }
                 });
             });
-            (open && !escape).then_some(Dialog::Keys)
+            (open && !escape).then_some(ModalDialog::Keys)
         }
-        Dialog::MakeBlueprint(dialog) => {
-            crate::views::area::make_blueprint_dialog(editor, ctx, dialog)
-                .map(Dialog::MakeBlueprint)
+        ModalDialog::MakeBlueprint(dialog) => {
+            area::make_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::MakeBlueprint)
         }
-        Dialog::Resize(dialog) => {
-            crate::views::area::resize::resize_dialog(editor, ctx, dialog).map(Dialog::Resize)
+        ModalDialog::Resize(dialog) => {
+            resize::resize_dialog(editor, ctx, dialog).map(ModalDialog::Resize)
         }
-        Dialog::DeleteBlueprint(dialog) => {
-            crate::views::area::delete_blueprint_dialog(editor, ctx, dialog)
-                .map(Dialog::DeleteBlueprint)
+        ModalDialog::DeleteBlueprint(dialog) => {
+            area::delete_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::DeleteBlueprint)
         }
-        Dialog::Arrange(dialog) => {
-            crate::views::world::arrange_dialog(editor, ctx, dialog).map(Dialog::Arrange)
+        ModalDialog::Arrange(dialog) => {
+            world::arrange_dialog(editor, ctx, dialog).map(ModalDialog::Arrange)
         }
-        Dialog::Import(dialog) => {
-            crate::import::dialog(editor, ctx, *dialog).map(|next| Dialog::Import(Box::new(next)))
+        ModalDialog::Import(dialog) => {
+            import::dialog(editor, ctx, *dialog).map(|next| ModalDialog::Import(Box::new(next)))
         }
-        Dialog::MakeShared(dialog) => {
-            crate::views::script::inspect::make_shared_body(editor, ctx, dialog)
-                .map(Dialog::MakeShared)
+        ModalDialog::MakeShared(dialog) => {
+            inspect::make_shared_body(editor, ctx, dialog).map(ModalDialog::MakeShared)
         }
-        Dialog::MakeInline(dialog) => {
-            crate::views::script::inspect::make_inline_body(editor, ctx, dialog)
-                .map(Dialog::MakeInline)
+        ModalDialog::MakeInline(dialog) => {
+            inspect::make_inline_body(editor, ctx, dialog).map(ModalDialog::MakeInline)
         }
-        Dialog::PickRow(mut dialog) => {
+        ModalDialog::RenameNode(dialog) => {
+            script::rename_node_dialog(editor, ctx, dialog).map(ModalDialog::RenameNode)
+        }
+        ModalDialog::LinkNode(dialog) => {
+            script::link_node_dialog(editor, ctx, dialog).map(ModalDialog::LinkNode)
+        }
+        ModalDialog::PickRow(mut dialog) => {
             let mut outcome = None;
             window(ctx, &dialog.title, |ui| {
                 let keys: Vec<String> = if dialog.options.is_empty() {
@@ -884,9 +924,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
                         .map(|p| {
                             p.files
                                 .paths_under(&format!("tables/{}/", dialog.table))
-                                .filter_map(|f| {
-                                    crate::project::row_of(f).map(|(_, k)| k.to_owned())
-                                })
+                                .filter_map(|f| row_of(f).map(|(_, k)| k.to_owned()))
                                 .collect()
                         })
                         .unwrap_or_default()
@@ -928,11 +966,11 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: Dialog) -> Option<Dialog> {
             match outcome {
                 Some(true) => {
                     let picked = dialog.picked.clone().unwrap_or_default();
-                    crate::views::area::pick::picked_row(editor, dialog.then, &picked);
+                    pick::picked_row(editor, dialog.then, &picked);
                     None
                 }
                 Some(false) => None,
-                None => Some(Dialog::PickRow(dialog)),
+                None => Some(ModalDialog::PickRow(dialog)),
             }
         }
     }
@@ -948,18 +986,16 @@ fn confirmed(editor: &mut Editor, action: ConfirmAction) {
         } => {
             if let Some(mut value) = editor.row_value(&table, &key) {
                 value["modules"][index] = module;
-                let mut edit = Edit::new(format!("Replace module {index} of {table}/{key}"));
+                let mut edit = ContentEdit::new(format!("Replace module {index} of {table}/{key}"));
                 edit.write_json(row_file(&table, &key), &value);
                 editor.apply(edit);
             }
         }
-        ConfirmAction::RemoveLayer { area, layer } => {
-            crate::views::area::remove_layer(editor, &area, &layer)
-        }
+        ConfirmAction::RemoveLayer { area, layer } => area::remove_layer(editor, &area, &layer),
         ConfirmAction::DeleteScriptNodes { owner, names } => {
-            crate::views::script::delete_nodes_now(editor, &owner, names)
+            script::delete_nodes_now(editor, &owner, names)
         }
-        ConfirmAction::RestartPlay { start } => crate::play::start(editor, start),
+        ConfirmAction::RestartPlay { start } => play::start(editor, start),
     }
 }
 

@@ -2,20 +2,217 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use game::core::content::{Content, ContentScope, with_content};
 use game::core::script::{EffectDef, EventDef, OwnerKind};
+use game::systems::actor::model::Face;
+use game::systems::area::blueprint::hole_name;
+use game::systems::npc::NpcDef;
+use game::systems::script::Node;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
-use crate::schema::{self, Variant};
+use crate::project::{ProjectFiles, row_of};
+use crate::schema::{self, SchemaVariant};
+use crate::ui::widgets;
 use crate::value::RowValue;
+use crate::{condition, forms, spans};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
+#[strum(serialize_all = "snake_case")]
+pub enum FlowKind {
+    On,
+    If,
+    Random,
+    Repeat,
+    Wait,
+    Set,
+    Run,
+    Return,
+    Dialogue,
+}
+
+impl FlowKind {
+    pub fn of(node: &Value) -> Option<FlowKind> {
+        node.kind().parse().ok()
+    }
+
+    pub fn name(self) -> &'static str {
+        self.into()
+    }
+
+    pub fn arrows(self) -> &'static [&'static str] {
+        match self {
+            FlowKind::On | FlowKind::Wait | FlowKind::Set | FlowKind::Run => &["next"],
+            FlowKind::If => &["yes", "no"],
+            FlowKind::Repeat => &["each", "then"],
+            FlowKind::Random => &["outputs"],
+            FlowKind::Dialogue => &["choices", "next", "left"],
+            FlowKind::Return => &[],
+        }
+    }
+
+    pub fn pauses(self) -> bool {
+        matches!(self, FlowKind::Wait | FlowKind::Dialogue)
+    }
+
+    pub fn system(self) -> &'static str {
+        match self {
+            FlowKind::Dialogue => "dialogue",
+            _ => "flow",
+        }
+    }
+
+    pub fn blurb(self) -> &'static str {
+        match self {
+            FlowKind::On => "Starts a flow at an event; its cause is the subject",
+            FlowKind::If => "Takes yes when the test holds, else no",
+            FlowKind::Random => "Picks an output by weight",
+            FlowKind::Repeat => "Runs each a number of times, then goes on",
+            FlowKind::Wait => "Pauses for seconds, or one tick at 0",
+            FlowKind::Set => "Writes locals and owner state in order",
+            FlowKind::Run => "Calls another script and goes on when it ends",
+            FlowKind::Return => "Ends a called script, handing back a value",
+            FlowKind::Dialogue => "Lines and choices spoken to the subject",
+        }
+    }
+}
+
+pub fn is_dialogue(node: &Value) -> bool {
+    FlowKind::of(node) == Some(FlowKind::Dialogue)
+}
+
+pub fn is_event(node: &Value) -> bool {
+    FlowKind::of(node) == Some(FlowKind::On)
+}
+
+pub fn hint(node: &Value) -> &'static str {
+    match FlowKind::of(node) {
+        Some(FlowKind::Dialogue) => {
+            "Enter adds a line · Ctrl Enter a choice · select text to style it"
+        }
+        Some(FlowKind::If) => "each slot takes one type · the same builder edits every condition",
+        Some(FlowKind::Repeat | FlowKind::Wait | FlowKind::Random) => {
+            "a loop may come back only through a node that pauses"
+        }
+        Some(FlowKind::Run) => "calls nest 8 deep and never loop back",
+        Some(FlowKind::On) => "a flow starts here; its cause is the subject",
+        Some(FlowKind::Set | FlowKind::Return) | None => match node.kind() {
+            "remember" | "forget" => "two arrows may lead into one node",
+            _ => "an output without an arrow ends the flow",
+        },
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum LineSpeaker {
+    Npc {
+        npc: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        face: Option<String>,
+    },
+    Object,
+    Narrator,
+    Player,
+}
+
+impl LineSpeaker {
+    pub fn of(by: &Value) -> Option<LineSpeaker> {
+        serde_json::from_value(by.clone()).ok()
+    }
+
+    pub fn named(kind: &str, npc: &str) -> LineSpeaker {
+        match kind {
+            "npc" => LineSpeaker::Npc {
+                npc: npc.to_owned(),
+                face: None,
+            },
+            "object" => LineSpeaker::Object,
+            "player" => LineSpeaker::Player,
+            _ => LineSpeaker::Narrator,
+        }
+    }
+
+    pub fn options(owner: OwnerKind) -> &'static [&'static str] {
+        match owner {
+            OwnerKind::Object => &["npc", "object", "narrator"],
+            _ => &["npc", "narrator"],
+        }
+    }
+
+    pub fn json(&self) -> Value {
+        serde_json::to_value(self).expect("a speaker serialises")
+    }
+
+    pub fn kind(&self) -> &'static str {
+        match self {
+            LineSpeaker::Npc { .. } => "npc",
+            LineSpeaker::Object => "object",
+            LineSpeaker::Narrator => "narrator",
+            LineSpeaker::Player => "player",
+        }
+    }
+
+    pub fn npc(&self) -> Option<&str> {
+        match self {
+            LineSpeaker::Npc { npc, .. } => Some(npc),
+            _ => None,
+        }
+    }
+
+    pub fn faceless(&self) -> LineSpeaker {
+        match self {
+            LineSpeaker::Npc { npc, .. } => LineSpeaker::Npc {
+                npc: npc.clone(),
+                face: None,
+            },
+            other => other.clone(),
+        }
+    }
+
+    pub fn name(&self) -> String {
+        match self {
+            LineSpeaker::Npc { npc, .. } => npc.clone(),
+            other => other.kind().to_owned(),
+        }
+    }
+}
+
+pub fn speaker_name(by: &Value) -> String {
+    LineSpeaker::of(by).map_or_else(|| "?".to_owned(), |speaker| speaker.name())
+}
+
+pub fn bust_file(content: Option<Content>, speaker: &LineSpeaker) -> Option<String> {
+    let content = content?;
+    let LineSpeaker::Npc { npc, face } = speaker else {
+        return None;
+    };
+    let busts = content
+        .by_key::<NpcDef>(npc)?
+        .get(&content)
+        .model
+        .get(&content)
+        .busts()?;
+    let face = face
+        .as_deref()
+        .map(|face| serde_json::from_value::<Face>(Value::String(face.to_owned())))
+        .transpose()
+        .ok()?;
+    let file = match face {
+        Some(face) => busts.face(&face)?,
+        None => &busts.generic.neutral,
+    };
+    Some(file.as_str().to_owned())
+}
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Port {
+pub struct NodePort {
     pub label: String,
     pub field: String,
     pub target: Option<String>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Entry {
+pub struct NodeEntry {
     pub kind: String,
     pub system: &'static str,
     pub blurb: &'static str,
@@ -25,35 +222,79 @@ pub struct Entry {
     pub pauses: bool,
 }
 
-pub struct Catalogue {
-    pub entries: Vec<Entry>,
+impl NodeEntry {
+    pub fn fits(&self, linking: bool) -> bool {
+        (self.kind == FlowKind::On.name()) != linking
+    }
+
+    pub fn badge(&self) -> &'static str {
+        match self.system {
+            "flow" | "dialogue" => "script",
+            "memory" => "quest",
+            "area" => "object",
+            "npc body" | "notification" | "chat" => "npc",
+            "audio" => "sfx",
+            "stat" | "job" => "respawn",
+            other => other,
+        }
+    }
+}
+
+pub struct OwnerRefusal {
+    pub owner: OwnerKind,
+    pub allowed: Vec<OwnerKind>,
+}
+
+impl OwnerRefusal {
+    pub fn text(&self) -> String {
+        let names: Vec<&str> = self.allowed.iter().map(|kind| kind.name()).collect();
+        format!(
+            "not for {} owners: only {}",
+            self.owner.name(),
+            names.join(", ")
+        )
+    }
+
+    pub fn only_for(&self) -> String {
+        match self.allowed.first() {
+            Some(first) => format!(
+                "only for {} {} owner",
+                widgets::article(first.name()),
+                first.name()
+            ),
+            None => self.text(),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct NodeCatalogue {
+    pub entries: Vec<NodeEntry>,
     pub events: Vec<(String, Vec<OwnerKind>)>,
 }
 
-impl Catalogue {
-    pub fn build(root: &Value, content: Option<Content>) -> Catalogue {
-        let mut entries = Vec::new();
-        for (kind, blurb) in FLOW_BLURBS {
-            entries.push(Entry {
-                kind: (*kind).to_owned(),
-                system: if kind == "dialogue" {
-                    "dialogue"
-                } else {
-                    "flow"
-                },
-                blurb,
+impl NodeCatalogue {
+    pub fn build(root: &Value, content: Option<Content>) -> NodeCatalogue {
+        let mut entries: Vec<NodeEntry> = FlowKind::VARIANTS
+            .iter()
+            .map(|&kind| NodeEntry {
+                kind: kind.name().to_owned(),
+                system: kind.system(),
+                blurb: kind.blurb(),
                 owners: Vec::new(),
-                outputs: flow_outputs(kind),
+                outputs: kind.arrows().iter().map(|&s| s.to_owned()).collect(),
                 fields: Vec::new(),
-                pauses: matches!(kind, "wait" | "dialogue"),
-            });
-        }
+                pauses: kind.pauses(),
+            })
+            .collect();
         let scope = content.map(|content| ContentScope::of(&content));
+        let parse = |template: Value| -> Option<Node> {
+            let scope = scope.clone()?;
+            let (parsed, _) = with_content(scope, || serde_json::from_value::<Node>(template));
+            parsed.ok()
+        };
         for variant in variants(root) {
-            if FLOW_BLURBS
-                .iter()
-                .any(|(kind, _)| *kind == variant.tag.as_str())
-            {
+            if variant.tag.parse::<FlowKind>().is_ok() {
                 continue;
             }
             let outputs: Vec<String> = schema::properties(variant.schema)
@@ -71,26 +312,15 @@ impl Catalogue {
                     )
                 })
                 .collect();
-            let template = schema::variant_template(root, &variant);
-            let (owners, pauses) = match &scope {
-                Some(scope) => {
-                    let (parsed, _) = with_content(scope.clone(), || {
-                        serde_json::from_value::<game::systems::script::Node>(template)
-                    });
-                    match parsed {
-                        Ok(game::core::script::Node::Effect(effect)) => {
-                            (effect.owners().to_vec(), effect.pauses())
-                        }
-                        _ => (Vec::new(), false),
-                    }
-                }
-                None => (Vec::new(), false),
+            let (owners, pauses) = match parse(schema::variant_template(root, &variant)) {
+                Some(Node::Effect(effect)) => (effect.owners().to_vec(), effect.pauses()),
+                _ => (Vec::new(), false),
             };
             let (system, blurb) = EFFECT_BLURBS
                 .iter()
                 .find(|(kind, _, _)| *kind == variant.tag)
                 .map_or(("other", ""), |(_, system, blurb)| (*system, *blurb));
-            entries.push(Entry {
+            entries.push(NodeEntry {
                 kind: variant.tag.clone(),
                 system,
                 blurb,
@@ -100,43 +330,36 @@ impl Catalogue {
                 pauses,
             });
         }
-        let mut events = Vec::new();
-        for variant in event_variants(root) {
-            let mut template = schema::variant_template(root, &variant);
-            template["type"] = Value::String("on".to_owned());
-            let owners = match &scope {
-                Some(scope) => {
-                    let (parsed, _) = with_content(scope.clone(), || {
-                        serde_json::from_value::<game::systems::script::Node>(template)
-                    });
-                    match parsed {
-                        Ok(game::core::script::Node::On { event, .. }) => event.owners().to_vec(),
-                        _ => Vec::new(),
-                    }
-                }
-                None => Vec::new(),
-            };
-            events.push((variant.tag.clone(), owners));
-        }
-        Catalogue { entries, events }
+        let events = event_variants(root)
+            .into_iter()
+            .map(|variant| {
+                let mut template = schema::variant_template(root, &variant);
+                template["type"] = Value::String(FlowKind::On.name().to_owned());
+                let owners = match parse(template) {
+                    Some(Node::On { event, .. }) => event.owners().to_vec(),
+                    _ => Vec::new(),
+                };
+                (variant.tag.clone(), owners)
+            })
+            .collect();
+        NodeCatalogue { entries, events }
     }
 
-    pub fn entry(&self, kind: &str) -> Option<&Entry> {
+    pub fn entry(&self, kind: &str) -> Option<&NodeEntry> {
         self.entries.iter().find(|entry| entry.kind == kind)
     }
 
-    pub fn refusal(&self, kind: &str, owner: OwnerKind) -> Option<String> {
-        let entry = self.entry(kind)?;
-        allowed(&entry.owners, owner)
+    pub fn refusal(&self, kind: &str, owner: OwnerKind) -> Option<OwnerRefusal> {
+        allowed(&self.entry(kind)?.owners, owner)
     }
 
-    pub fn event_refusal(&self, event: &str, owner: OwnerKind) -> Option<String> {
+    pub fn event_refusal(&self, event: &str, owner: OwnerKind) -> Option<OwnerRefusal> {
         let (_, owners) = self.events.iter().find(|(name, _)| name == event)?;
         allowed(owners, owner)
     }
 }
 
-fn allowed(owners: &[OwnerKind], owner: OwnerKind) -> Option<String> {
+fn allowed(owners: &[OwnerKind], owner: OwnerKind) -> Option<OwnerRefusal> {
     if owners.is_empty()
         || owner == OwnerKind::Any
         || owners.contains(&owner)
@@ -144,40 +367,30 @@ fn allowed(owners: &[OwnerKind], owner: OwnerKind) -> Option<String> {
     {
         return None;
     }
-    let names: Vec<&str> = owners.iter().map(|kind| kind.name()).collect();
-    Some(format!(
-        "not for {} owners: only {}",
-        owner.name(),
-        names.join(", ")
-    ))
-}
-
-pub fn kind(node: &Value) -> &str {
-    node.kind()
+    Some(OwnerRefusal {
+        owner,
+        allowed: owners.to_vec(),
+    })
 }
 
 pub fn has_input(node: &Value) -> bool {
-    kind(node) != "on"
+    !is_event(node)
 }
 
-pub fn ports(node: &Value, catalogue: &Catalogue) -> Vec<Port> {
-    let arrow = |field: &str| -> Port {
-        Port {
+pub fn ports(node: &Value, catalogue: &NodeCatalogue) -> Vec<NodePort> {
+    let arrow = |field: &str| -> NodePort {
+        NodePort {
             label: field.to_owned(),
             field: format!("/{field}"),
             target: node[field].as_str().map(str::to_owned),
         }
     };
-    match kind(node) {
-        "on" | "wait" | "set" | "run" => vec![arrow("next")],
-        "if" => vec![arrow("yes"), arrow("no")],
-        "repeat" => vec![arrow("each"), arrow("then")],
-        "return" => Vec::new(),
-        "random" => {
+    match FlowKind::of(node) {
+        Some(FlowKind::Random) => {
             let weights = node["weights"].as_array().cloned().unwrap_or_default();
             let outputs = node["outputs"].as_array().cloned().unwrap_or_default();
             (0..weights.len().max(outputs.len()))
-                .map(|index| Port {
+                .map(|index| NodePort {
                     label: weights
                         .get(index)
                         .and_then(Value::as_u64)
@@ -190,13 +403,13 @@ pub fn ports(node: &Value, catalogue: &Catalogue) -> Vec<Port> {
                 })
                 .collect()
         }
-        "dialogue" => {
+        Some(FlowKind::Dialogue) => {
             let choices = node["choices"].as_array().cloned().unwrap_or_default();
-            let mut ports: Vec<Port> = choices
+            let mut ports: Vec<NodePort> = choices
                 .iter()
                 .enumerate()
-                .map(|(index, choice)| Port {
-                    label: clip(&plain_text(&choice["label"]), 22),
+                .map(|(index, choice)| NodePort {
+                    label: widgets::clip(&spans::plain(&choice["label"]), 22),
                     field: format!("/choices/{index}/to"),
                     target: choice["to"].as_str().map(str::to_owned),
                 })
@@ -207,8 +420,9 @@ pub fn ports(node: &Value, catalogue: &Catalogue) -> Vec<Port> {
             ports.push(arrow("left"));
             ports
         }
-        other => catalogue
-            .entry(other)
+        Some(flow) => flow.arrows().iter().map(|field| arrow(field)).collect(),
+        None => catalogue
+            .entry(node.kind())
             .map(|entry| entry.outputs.iter().map(|name| arrow(name)).collect())
             .unwrap_or_default(),
     }
@@ -250,7 +464,7 @@ pub fn set_arrow(node: &mut Value, field: &str, target: Option<&str>) {
 pub fn arrows_into(
     nodes: &Map<String, Value>,
     target: &str,
-    catalogue: &Catalogue,
+    catalogue: &NodeCatalogue,
 ) -> Vec<(String, String)> {
     let mut found = Vec::new();
     for (name, node) in nodes {
@@ -263,9 +477,17 @@ pub fn arrows_into(
     found
 }
 
+pub fn unlink(nodes: &mut Map<String, Value>, target: &str, catalogue: &NodeCatalogue) {
+    for (from, field) in arrows_into(nodes, target, catalogue) {
+        if let Some(node) = nodes.get_mut(&from) {
+            set_arrow(node, &field, None);
+        }
+    }
+}
+
 pub fn port_label(
     nodes: &Map<String, Value>,
-    catalogue: &Catalogue,
+    catalogue: &NodeCatalogue,
     from: &str,
     field: &str,
 ) -> String {
@@ -280,44 +502,50 @@ pub fn port_label(
         .unwrap_or_else(|| field.rsplit('/').next().unwrap_or("").to_owned())
 }
 
-pub fn reachable(nodes: &Map<String, Value>, catalogue: &Catalogue) -> HashSet<String> {
-    let mut seen = HashSet::new();
-    let mut queue: VecDeque<String> = nodes
+pub fn reachable(nodes: &Map<String, Value>, catalogue: &NodeCatalogue) -> HashSet<String> {
+    depths(nodes, catalogue).into_keys().collect()
+}
+
+pub fn depths(nodes: &Map<String, Value>, catalogue: &NodeCatalogue) -> BTreeMap<String, usize> {
+    let mut depths: BTreeMap<String, usize> = BTreeMap::new();
+    let mut queue: VecDeque<(String, usize)> = nodes
         .iter()
-        .filter(|(_, node)| kind(node) == "on")
-        .map(|(name, _)| name.clone())
+        .filter(|(_, node)| is_event(node))
+        .map(|(name, _)| (name.clone(), 0))
         .collect();
-    while let Some(name) = queue.pop_front() {
-        if !seen.insert(name.clone()) {
+    while let Some((name, depth)) = queue.pop_front() {
+        if depths.contains_key(&name) {
             continue;
         }
+        depths.insert(name.clone(), depth);
         if let Some(node) = nodes.get(&name) {
             for port in ports(node, catalogue) {
                 if let Some(target) = port.target
-                    && !seen.contains(&target)
+                    && !depths.contains_key(&target)
                 {
-                    queue.push_back(target);
+                    queue.push_back((target, depth + 1));
                 }
             }
         }
     }
-    seen
+    depths
 }
 
-pub fn rename(nodes: &mut Map<String, Value>, old: &str, new: &str, catalogue: &Catalogue) {
+pub fn insert_sorted(nodes: &mut Map<String, Value>, name: &str, node: Value) {
+    nodes.insert(name.to_owned(), node);
+    nodes.sort_keys();
+}
+
+pub fn rename(nodes: &mut Map<String, Value>, old: &str, new: &str, catalogue: &NodeCatalogue) {
     let Some(node) = nodes.remove(old) else {
         return;
     };
-    nodes.insert(new.to_owned(), node);
-    let arrows: Vec<(String, String)> = arrows_into(nodes, old, catalogue);
-    for (from, field) in arrows {
+    insert_sorted(nodes, new, node);
+    for (from, field) in arrows_into(nodes, old, catalogue) {
         if let Some(node) = nodes.get_mut(&from) {
             set_arrow(node, &field, Some(new));
         }
     }
-    let mut sorted: Vec<(String, Value)> = std::mem::take(nodes).into_iter().collect();
-    sorted.sort_by(|(a, _), (b, _)| a.cmp(b));
-    nodes.extend(sorted);
 }
 
 pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
@@ -339,46 +567,43 @@ pub fn free_name(nodes: &Map<String, Value>, base: &str) -> String {
 }
 
 pub fn template(root: &Value, kind: &str) -> Option<Value> {
-    if kind == "on" {
-        return Some(serde_json::json!({ "type": "on", "event": "started" }));
+    let flow = kind.parse::<FlowKind>().ok();
+    if flow == Some(FlowKind::On) {
+        return template_event(root, "started");
     }
     let variants = variants(root);
     let variant = variants.iter().find(|variant| variant.tag == kind)?;
     let mut value = schema::variant_template(root, variant);
-    match kind {
-        "dialogue" => {
-            value["lines"] = serde_json::json!([{ "by": { "type": "narrator" }, "text": [""] }]);
+    match flow {
+        Some(FlowKind::Dialogue) => {
+            value["lines"] =
+                serde_json::json!([{ "by": LineSpeaker::Narrator.json(), "text": [""] }]);
         }
-        "random" => {
+        Some(FlowKind::Random) => {
             value["weights"] = serde_json::json!([1, 1]);
             value["outputs"] = serde_json::json!([null, null]);
         }
-        "repeat" => {
+        Some(FlowKind::Repeat) => {
             value["times"] = Value::from(2);
             value["at_most"] = Value::from(10);
         }
-        "wait" => {
+        Some(FlowKind::Wait) => {
             value["seconds"] = Value::from(1.0);
             value["at_most"] = Value::from(60.0);
         }
-        "if" => value["test"] = Value::Bool(true),
+        Some(FlowKind::If) => value["test"] = Value::Bool(true),
         _ => {}
     }
     Some(value)
 }
 
-pub fn fill_references(
-    root: &Value,
-    schema: &Value,
-    value: &mut Value,
-    files: &crate::project::Files,
-) {
+pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &ProjectFiles) {
     let schema = schema::resolve(root, schema);
     if let Some(table) = schema::table_of(schema) {
         if value.as_str().is_some_and(str::is_empty)
             && let Some(key) = files
                 .paths_under(&format!("tables/{table}/"))
-                .filter_map(|file| crate::project::row_of(file).map(|(_, key)| key.to_owned()))
+                .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
                 .min()
         {
             *value = Value::String(key);
@@ -386,22 +611,22 @@ pub fn fill_references(
         return;
     }
     match schema::kind(root, schema) {
-        schema::Kind::Object => {
+        schema::SchemaKind::Object => {
             for (name, field) in schema::properties(schema) {
                 if let Some(inner) = value.get_mut(name) {
                     fill_references(root, field, inner, files);
                 }
             }
         }
-        schema::Kind::Choice(alternatives) => {
+        schema::SchemaKind::Choice(alternatives) => {
             if let Some(alternative) = alternatives
                 .iter()
-                .find(|alternative| crate::forms::fits(root, alternative, value))
+                .find(|alternative| forms::fits(root, alternative, value))
             {
                 fill_references(root, alternative, value, files);
             }
         }
-        schema::Kind::Union(variants) => {
+        schema::SchemaKind::Union(variants) => {
             if let Some(variant) = schema::variant_of(&variants, value) {
                 fill_references(root, variant.schema, value, files);
             }
@@ -415,7 +640,7 @@ pub fn template_event(root: &Value, event: &str) -> Option<Value> {
         .into_iter()
         .find(|variant| variant.tag == event)?;
     let mut node = schema::variant_template(root, &variant);
-    node["type"] = Value::String("on".to_owned());
+    node["type"] = Value::String(FlowKind::On.name().to_owned());
     if event == "interacted" {
         node["verb"] = Value::String("talk".to_owned());
         node["reach"] = Value::from(1.5);
@@ -436,12 +661,12 @@ pub fn node_schema(root: &Value) -> Option<&Value> {
         .get("additionalProperties")
 }
 
-pub fn variants(root: &Value) -> Vec<Variant<'_>> {
+pub fn variants(root: &Value) -> Vec<SchemaVariant<'_>> {
     let Some(schema) = node_schema(root) else {
         return Vec::new();
     };
     match schema::kind(root, schema) {
-        schema::Kind::Union(variants) => variants,
+        schema::SchemaKind::Union(variants) => variants,
         _ => Vec::new(),
     }
 }
@@ -453,8 +678,8 @@ pub fn variant_schema<'a>(root: &'a Value, kind: &str) -> Option<&'a Value> {
         .map(|variant| variant.schema)
 }
 
-pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
-    let Some(on) = variant_schema(root, "on") else {
+pub fn event_variants(root: &Value) -> Vec<SchemaVariant<'_>> {
+    let Some(on) = variant_schema(root, FlowKind::On.name()) else {
         return Vec::new();
     };
     let mut found = Vec::new();
@@ -467,7 +692,7 @@ pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
         if let Some((field, tag)) = schema::tag_of(alternative)
             && field == "event"
         {
-            found.push(Variant {
+            found.push(SchemaVariant {
                 field,
                 tag,
                 schema: alternative,
@@ -477,36 +702,33 @@ pub fn event_variants(root: &Value) -> Vec<Variant<'_>> {
     found
 }
 
-pub fn form_fields<'a>(root: &'a Value, node: &Value) -> Option<(&'a Value, Vec<String>)> {
-    let kind = kind(node);
-    let schema = variant_schema(root, kind)?;
-    let mut hidden: Vec<String> = vec!["type".to_owned()];
-    if kind == "on" {
-        hidden.push("event".to_owned());
-    }
-    hidden.extend(match kind {
-        "on" => ["next"].iter().map(|s| (*s).to_owned()).collect(),
-        "if" => ["yes", "no"].iter().map(|s| (*s).to_owned()).collect(),
-        "repeat" => ["each", "then"].iter().map(|s| (*s).to_owned()).collect(),
-        "random" => ["outputs"].iter().map(|s| (*s).to_owned()).collect(),
-        "dialogue" => ["next", "left", "lines", "choices"]
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect(),
-        _ => schema::properties(schema)
-            .into_iter()
-            .filter(|(_, field)| is_arrow(field))
-            .map(|(name, _)| name.clone())
-            .collect::<Vec<String>>(),
-    });
-    Some((schema, hidden))
-}
-
 pub fn event_variant<'a>(root: &'a Value, event: &str) -> Option<&'a Value> {
     event_variants(root)
         .into_iter()
         .find(|variant| variant.tag == event)
         .map(|variant| variant.schema)
+}
+
+pub fn form_fields<'a>(root: &'a Value, node: &Value) -> Option<(&'a Value, Vec<String>)> {
+    let schema = variant_schema(root, node.kind())?;
+    let mut hidden: Vec<String> = vec!["type".to_owned()];
+    match FlowKind::of(node) {
+        Some(flow) => {
+            hidden.extend(flow.arrows().iter().map(|&s| s.to_owned()));
+            match flow {
+                FlowKind::On => hidden.push("event".to_owned()),
+                FlowKind::Dialogue => hidden.extend(["lines".to_owned()]),
+                _ => {}
+            }
+        }
+        None => hidden.extend(
+            schema::properties(schema)
+                .into_iter()
+                .filter(|(_, field)| is_arrow(field))
+                .map(|(name, _)| name.clone()),
+        ),
+    }
+    Some((schema, hidden))
 }
 
 fn is_arrow(field: &Value) -> bool {
@@ -517,390 +739,217 @@ fn is_arrow(field: &Value) -> bool {
         && schema::marker(field).is_none()
 }
 
-fn flow_outputs(kind: &str) -> Vec<String> {
-    match kind {
-        "on" | "wait" | "set" | "run" => vec!["next".to_owned()],
-        "if" => vec!["yes".to_owned(), "no".to_owned()],
-        "repeat" => vec!["each".to_owned(), "then".to_owned()],
-        "random" => vec!["outputs".to_owned()],
-        "dialogue" => vec!["choices".to_owned(), "next".to_owned(), "left".to_owned()],
-        _ => Vec::new(),
-    }
+pub fn summary(node: &Value, catalogue: &NodeCatalogue) -> String {
+    pieces(node, catalogue)
+        .into_iter()
+        .map(|line| line.into_iter().map(|piece| piece.text).collect::<String>())
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
-pub fn summary(node: &Value) -> String {
-    match kind(node) {
-        "on" => {
-            let mut text = format!("on {}", event_of(node).unwrap_or("?"));
-            if let Some(verb) = node["verb"].as_str() {
-                text.push_str(&format!(" · {verb}"));
-            }
-            if let Some(by) = node["by"].as_str() {
-                text.push_str(&format!(" by {by}"));
-            }
-            if let Some(within) = node["within"].as_f64() {
-                text.push_str(&format!(" within {within}"));
-            }
-            text
-        }
-        "if" => format!("if {}", crate::condition::summary(&node["test"])),
-        "random" => {
-            let weights: Vec<String> = node["weights"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|w| w.to_string())
-                .collect();
-            format!("random {}", weights.join(" : "))
-        }
-        "repeat" => format!("repeat {} ×", crate::condition::summary(&node["times"])),
-        "wait" => format!("wait {} s", crate::condition::summary(&node["seconds"])),
-        "set" => {
-            let names: Vec<String> = node["values"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .map(|value| {
-                    value["local"]
-                        .as_str()
-                        .map(|name| format!("local {name}"))
-                        .or_else(|| value["state"].as_str().map(|name| format!("state {name}")))
-                        .unwrap_or_default()
-                })
-                .collect();
-            format!("set {}", names.join(", "))
-        }
-        "run" => format!("run {}", node.text_or("script", "?")),
-        "return" => match node.get("value") {
-            Some(value) if !value.is_null() => {
-                format!("return {}", crate::condition::summary(value))
-            }
-            _ => "return".to_owned(),
-        },
-        "dialogue" => {
-            let lines = node["lines"].as_array().cloned().unwrap_or_default();
-            let first = lines.first();
-            let speaker = first
-                .map(|line| speaker_name(&line["by"]))
-                .unwrap_or_default();
-            let text = first
-                .map(|line| plain_text(&line["text"]))
-                .unwrap_or_default();
-            let choices = node["choices"].as_array().map_or(0, Vec::len);
-            let mut out = format!("{speaker}: {}", clip(&text, 48));
-            if lines.len() > 1 {
-                out.push_str(&format!(" (+{} lines)", lines.len() - 1));
-            }
-            if choices > 0 {
-                out.push_str(&format!(" · {choices} choices"));
-            }
-            out
-        }
-        other => {
-            let mut out = other.replace('_', " ");
-            for field in CONTENT_FIELDS {
-                if let Some(value) = node.get(*field)
-                    && !value.is_null()
-                {
-                    out.push(' ');
-                    out.push_str(&content_text(value));
-                }
-            }
-            if let Some(take) = node["take"].as_array()
-                && !take.is_empty()
-            {
-                out.push_str(&format!(" takes {}", stacks(take)));
-            }
-            if let Some(give) = node["give"].as_array()
-                && !give.is_empty()
-            {
-                out.push_str(&format!(" gives {}", stacks(give)));
-            }
-            if let Some(items) = node["items"].as_array()
-                && !items.is_empty()
-            {
-                out.push(' ');
-                out.push_str(&stacks(items));
-            }
-            if let Some(text) = node["text"].as_array() {
-                out.push_str(&format!(
-                    " {:?}",
-                    clip(&plain_text(&Value::Array(text.clone())), 40)
-                ));
-            }
-            out
-        }
+pub fn place_text(value: &Value) -> Option<String> {
+    let map = value.as_object()?;
+    if !map.contains_key("area") || !map.contains_key("x") {
+        return None;
     }
+    Some(format!(
+        "{} {}, {}",
+        map.text_or("area", "?"),
+        forms::trim_number(map["x"].as_f64().unwrap_or(0.0)),
+        forms::trim_number(map["y"].as_f64().unwrap_or(0.0))
+    ))
 }
 
-const CONTENT_FIELDS: &[&str] = &[
-    "to",
-    "item",
-    "quest",
-    "shop",
-    "memory",
-    "notification",
-    "npc",
-    "job",
-    "sfx",
-    "stat",
-    "attitude",
-    "slot",
-    "task",
-    "path",
-    "memories",
-    "count",
-    "by",
-    "xp",
-    "seconds",
-    "toward",
-    "target",
-    "priority",
-];
-
-fn content_text(value: &Value) -> String {
+fn value_text(value: &Value) -> String {
     match value {
         Value::String(text) => text.clone(),
         Value::Number(number) => number.to_string(),
         Value::Bool(flag) => flag.to_string(),
-        Value::Object(map) if map.len() == 1 && map.contains_key("var") => {
-            format!("◇{}", map.text("var"))
+        Value::Object(_) if hole_name(value).is_some() => {
+            format!("◇{}", hole_name(value).unwrap_or(""))
         }
-        Value::Object(map) if map.contains_key("area") && map.contains_key("x") => format!(
-            "{} {}, {}",
-            map.text_or("area", "?"),
-            map["x"].as_f64().unwrap_or(0.0),
-            map["y"].as_f64().unwrap_or(0.0)
-        ),
-        Value::Array(items) => items
-            .iter()
-            .map(content_text)
-            .collect::<Vec<_>>()
-            .join(", "),
-        other => crate::condition::summary(other),
+        Value::Array(items) => items.iter().map(value_text).collect::<Vec<_>>().join(", "),
+        other => place_text(other).unwrap_or_else(|| condition::summary(other)),
     }
-}
-
-fn stacks(list: &[Value]) -> String {
-    list.iter()
-        .map(|stack| {
-            let count = stack["count"].as_u64().unwrap_or(1);
-            let item = stack.text_or("item", "?");
-            if count == 1 {
-                item.to_owned()
-            } else {
-                format!("{count} {item}")
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-pub fn speaker_name(by: &Value) -> String {
-    match by.kind() {
-        "npc" => by.text_or("npc", "npc").to_owned(),
-        "object" => "object".to_owned(),
-        "narrator" => "narrator".to_owned(),
-        "player" => "player".to_owned(),
-        _ => "?".to_owned(),
-    }
-}
-
-pub fn plain_text(spans: &Value) -> String {
-    match spans {
-        Value::String(text) => text.clone(),
-        Value::Array(items) => items.iter().map(plain_text).collect::<String>(),
-        Value::Object(map) => {
-            if let Some(text) = map.get("text").and_then(Value::as_str) {
-                text.to_owned()
-            } else if let Some(value) = map.get("value") {
-                format!("[{}]", crate::condition::summary(value))
-            } else if let Some(input) = map.get("input").and_then(Value::as_str) {
-                format!("[{input}]")
-            } else {
-                String::new()
-            }
-        }
-        _ => String::new(),
-    }
-}
-
-pub fn clip(text: &str, max: usize) -> String {
-    let text = text.trim();
-    if text.chars().count() <= max {
-        return text.to_owned();
-    }
-    let mut out: String = text.chars().take(max.saturating_sub(1)).collect();
-    out.push('…');
-    out
 }
 
 pub struct OutlineRow {
     pub name: String,
     pub depth: usize,
     pub via: Option<String>,
+    pub reachable: bool,
     pub link: bool,
     pub choice: Option<usize>,
 }
 
-pub fn outline(nodes: &Map<String, Value>, catalogue: &Catalogue) -> Vec<OutlineRow> {
-    let mut rows = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-    fn walk(
-        nodes: &Map<String, Value>,
-        catalogue: &Catalogue,
-        name: &str,
-        depth: usize,
-        via: Option<String>,
-        seen: &mut HashSet<String>,
-        rows: &mut Vec<OutlineRow>,
-    ) {
+pub fn outline(nodes: &Map<String, Value>, catalogue: &NodeCatalogue) -> Vec<OutlineRow> {
+    let mut walker = Walker {
+        nodes,
+        catalogue,
+        seen: HashSet::new(),
+        rows: Vec::new(),
+        reachable: true,
+    };
+    for (name, node) in nodes {
+        if is_event(node) {
+            walker.walk(name, 0, None);
+        }
+    }
+    walker.reachable = false;
+    for name in nodes.keys() {
+        if !walker.seen.contains(name) {
+            walker.walk(name, 0, None);
+        }
+    }
+    walker.rows
+}
+
+struct Walker<'a> {
+    nodes: &'a Map<String, Value>,
+    catalogue: &'a NodeCatalogue,
+    seen: HashSet<String>,
+    rows: Vec<OutlineRow>,
+    reachable: bool,
+}
+
+impl Walker<'_> {
+    fn walk(&mut self, name: &str, depth: usize, via: Option<String>) {
         if depth > 64 {
             return;
         }
-        let link = !seen.insert(name.to_owned());
-        rows.push(OutlineRow {
+        let link = !self.seen.insert(name.to_owned());
+        self.rows.push(OutlineRow {
             name: name.to_owned(),
             depth,
             via,
+            reachable: self.reachable,
             link,
             choice: None,
         });
         if link {
             return;
         }
-        let Some(node) = nodes.get(name) else {
+        let Some(node) = self.nodes.get(name) else {
             return;
         };
-        if kind(node) == "dialogue" {
-            for (index, choice) in node["choices"].as_array().into_iter().flatten().enumerate() {
-                rows.push(OutlineRow {
-                    name: name.to_owned(),
-                    depth: depth + 1,
-                    via: None,
-                    link: false,
-                    choice: Some(index),
-                });
-                if let Some(target) = choice["to"].as_str() {
-                    walk(nodes, catalogue, target, depth + 2, None, seen, rows);
-                }
+        let choices = if is_dialogue(node) {
+            node["choices"].as_array().map_or(0, Vec::len)
+        } else {
+            0
+        };
+        for (index, choice) in node["choices"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(choices)
+            .enumerate()
+        {
+            self.rows.push(OutlineRow {
+                name: name.to_owned(),
+                depth: depth + 1,
+                via: None,
+                reachable: self.reachable,
+                link: false,
+                choice: Some(index),
+            });
+            if let Some(target) = choice["to"].as_str() {
+                self.walk(target, depth + 2, None);
             }
-            for port in ports(node, catalogue)
-                .into_iter()
-                .filter(|port| !port.field.starts_with("/choices/"))
-            {
-                if let Some(target) = port.target {
-                    walk(
-                        nodes,
-                        catalogue,
-                        &target,
-                        depth + 1,
-                        Some(port.label.clone()),
-                        seen,
-                        rows,
-                    );
-                }
-            }
-            return;
         }
-        for port in ports(node, catalogue) {
+        for port in ports(node, self.catalogue) {
+            if port.field.starts_with("/choices/") {
+                continue;
+            }
             if let Some(target) = port.target {
-                walk(
-                    nodes,
-                    catalogue,
-                    &target,
-                    depth + 1,
-                    Some(port.label.clone()),
-                    seen,
-                    rows,
-                );
+                self.walk(&target, depth + 1, Some(port.label));
             }
         }
     }
-    for (name, node) in nodes {
-        if kind(node) == "on" {
-            walk(nodes, catalogue, name, 0, None, &mut seen, &mut rows);
-        }
-    }
-    for name in nodes.keys() {
-        if !seen.contains(name) {
-            walk(
-                nodes,
-                catalogue,
-                name,
-                0,
-                Some("unreachable".to_owned()),
-                &mut seen,
-                &mut rows,
-            );
-        }
-    }
-    rows
 }
 
-pub fn depths(nodes: &Map<String, Value>, catalogue: &Catalogue) -> BTreeMap<String, usize> {
-    let mut depths: BTreeMap<String, usize> = BTreeMap::new();
-    let mut queue: VecDeque<(String, usize)> = nodes
-        .iter()
-        .filter(|(_, node)| kind(node) == "on")
-        .map(|(name, _)| (name.clone(), 0))
-        .collect();
-    while let Some((name, depth)) = queue.pop_front() {
-        if depths.contains_key(&name) {
-            continue;
-        }
-        depths.insert(name.clone(), depth);
-        if let Some(node) = nodes.get(&name) {
-            for port in ports(node, catalogue) {
-                if let Some(target) = port.target
-                    && !depths.contains_key(&target)
-                {
-                    queue.push_back((target, depth + 1));
+#[derive(Default)]
+pub struct NodeReads {
+    pub memories: Vec<String>,
+    pub items: Vec<String>,
+    pub places: Vec<String>,
+    pub other: Vec<String>,
+}
+
+impl NodeReads {
+    pub fn of(nodes: &Map<String, Value>) -> NodeReads {
+        let mut reads = NodeReads::default();
+        for node in nodes.values() {
+            if let Some(test) = node.get("test") {
+                reads.walk(test);
+            }
+            for choice in node["choices"].as_array().into_iter().flatten() {
+                if let Some(requires) = choice.get("requires") {
+                    reads.walk(requires);
                 }
             }
         }
+        for list in [
+            &mut reads.memories,
+            &mut reads.items,
+            &mut reads.places,
+            &mut reads.other,
+        ] {
+            list.sort();
+            list.dedup();
+        }
+        reads
     }
-    depths
-}
 
-pub fn owner_kind_of(table: &str, pointer: &str) -> OwnerKind {
-    match table {
-        "npc" => OwnerKind::Npc,
-        "item" => OwnerKind::Item,
-        "quest" => OwnerKind::Quest,
-        "shop" => OwnerKind::Shop,
-        "blueprint" => OwnerKind::Blueprint,
-        "area" if pointer.contains("/scripts/") => OwnerKind::Object,
-        "area" => OwnerKind::Area,
-        "script" => OwnerKind::Any,
-        _ => OwnerKind::Any,
+    pub fn text(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if !self.memories.is_empty() {
+            parts.push(format!("the subject's memory {}", self.memories.join(", ")));
+        }
+        parts.extend(self.items.iter().cloned());
+        parts.extend(self.places.iter().cloned());
+        parts.extend(self.other.iter().cloned());
+        parts.join(" · ")
+    }
+
+    fn walk(&mut self, value: &Value) {
+        match value {
+            Value::Object(map) => {
+                match map.kind() {
+                    "memory" | "set_within" => {
+                        if let Some(name) = map.get("memory").and_then(Value::as_str) {
+                            self.memories.push(name.to_owned());
+                        }
+                    }
+                    "holding" | "wearing" => {
+                        if let Some(item) = map.get("item").and_then(Value::as_str) {
+                            self.items.push(format!("holding {item}"));
+                        }
+                    }
+                    "inside" | "in_area" | "knows_area" => {
+                        let area = map.text_or("area", "?");
+                        let object = map
+                            .get("object")
+                            .and_then(Value::as_str)
+                            .map(|o| format!(" · {o}"))
+                            .unwrap_or_default();
+                        self.places.push(format!("inside area/{area}{object}"));
+                    }
+                    "on_quest" | "quest_done" | "task_done" => {
+                        if let Some(quest) = map.get("quest").and_then(Value::as_str) {
+                            self.other.push(format!("quest/{quest}"));
+                        }
+                    }
+                    "level" => self.other.push("the level".to_owned()),
+                    _ => {}
+                }
+                map.values().for_each(|child| self.walk(child));
+            }
+            Value::Array(list) => list.iter().for_each(|child| self.walk(child)),
+            _ => {}
+        }
     }
 }
-
-pub fn owner_kind_named(name: &str) -> OwnerKind {
-    match name {
-        "object" => OwnerKind::Object,
-        "npc" => OwnerKind::Npc,
-        "item" => OwnerKind::Item,
-        "area" => OwnerKind::Area,
-        "quest" => OwnerKind::Quest,
-        "shop" => OwnerKind::Shop,
-        "blueprint" => OwnerKind::Blueprint,
-        _ => OwnerKind::Any,
-    }
-}
-
-const FLOW_BLURBS: [(&str, &str); 9] = [
-    ("on", "Starts a flow at an event; its cause is the subject"),
-    ("if", "Takes yes when the test holds, else no"),
-    ("random", "Picks an output by weight"),
-    ("repeat", "Runs each a number of times, then goes on"),
-    ("wait", "Pauses for seconds, or one tick at 0"),
-    ("set", "Writes locals and owner state in order"),
-    ("run", "Calls another script and goes on when it ends"),
-    ("return", "Ends a called script, handing back a value"),
-    ("dialogue", "Lines and choices spoken to the subject"),
-];
 
 const EFFECT_BLURBS: [(&str, &str, &str); 35] = [
     (
@@ -976,45 +1025,60 @@ const EFFECT_BLURBS: [(&str, &str, &str); 35] = [
     ),
 ];
 
+pub fn arrow_meaning(kind: &str, label: &str) -> &'static str {
+    match (kind, label) {
+        ("items", "refused") => "no arrow: the flow ends and the player is told why",
+        ("walk_to", "arrived") => "there",
+        ("walk_to", "blocked") => "no way there",
+        (_, "interrupted") => "another flow took the body",
+        ("wait", "next") => "ends the pass",
+        ("turn_in", "refused") => "objectives unmet: the flow ends",
+        ("turn_in", "cancelled") => "the card was closed: the flow ends",
+        (_, "left") => "the subject walked away: the flow ends",
+        _ => "no arrow · ends the flow",
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
-pub struct Piece {
+pub struct SummaryPiece {
     pub text: String,
-    pub tone: Tone,
+    pub tone: SummaryTone,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Tone {
+pub enum SummaryTone {
     Muted,
     Strong,
     Var,
 }
 
-fn muted(text: impl Into<String>) -> Piece {
-    Piece {
+fn muted(text: impl Into<String>) -> SummaryPiece {
+    SummaryPiece {
         text: text.into(),
-        tone: Tone::Muted,
+        tone: SummaryTone::Muted,
     }
 }
 
-fn strong(text: impl Into<String>) -> Piece {
-    Piece {
+fn strong(text: impl Into<String>) -> SummaryPiece {
+    SummaryPiece {
         text: text.into(),
-        tone: Tone::Strong,
+        tone: SummaryTone::Strong,
     }
 }
 
-fn var(text: impl Into<String>) -> Piece {
-    Piece {
+fn var(text: impl Into<String>) -> SummaryPiece {
+    SummaryPiece {
         text: text.into(),
-        tone: Tone::Var,
+        tone: SummaryTone::Var,
     }
 }
 
-pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
-    match kind(node) {
-        "on" => vec![event_pieces(node)],
-        "if" => vec![expression_pieces(&node["test"])],
-        "random" => {
+pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
+    let trim = forms::trim_number;
+    match FlowKind::of(node) {
+        Some(FlowKind::On) => vec![event_pieces(node)],
+        Some(FlowKind::If) => vec![expression_pieces(&node["test"])],
+        Some(FlowKind::Random) => {
             let weights: Vec<String> = node["weights"]
                 .as_array()
                 .into_iter()
@@ -1023,7 +1087,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
                 .collect();
             vec![vec![muted("weights "), strong(weights.join(" : "))]]
         }
-        "repeat" => {
+        Some(FlowKind::Repeat) => {
             let mut line = expression_pieces(&node["times"]);
             line.push(muted(" times"));
             if let Some(at_most) = node["at_most"].as_f64() {
@@ -1032,7 +1096,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             }
             vec![line]
         }
-        "wait" => {
+        Some(FlowKind::Wait) => {
             let mut line = expression_pieces(&node["seconds"]);
             line.push(muted(" s"));
             if node["seconds"].as_f64() == Some(0.0) {
@@ -1043,7 +1107,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             }
             vec![line]
         }
-        "set" => node["values"]
+        Some(FlowKind::Set) => node["values"]
             .as_array()
             .into_iter()
             .flatten()
@@ -1057,7 +1121,7 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
                 line
             })
             .collect(),
-        "run" => {
+        Some(FlowKind::Run) => {
             let mut lines = vec![vec![muted("script/"), strong(node.text_or("script", "?"))]];
             if let Some(values) = node["values"].as_object().filter(|v| !v.is_empty()) {
                 let mut line = Vec::new();
@@ -1072,77 +1136,98 @@ pub fn pieces(node: &Value, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
             }
             lines
         }
-        "return" => match node.get("value") {
+        Some(FlowKind::Return) => match node.get("value") {
             Some(value) if !value.is_null() => vec![expression_pieces(value)],
             _ => vec![vec![muted("back to the caller")]],
         },
-        "remember" => {
-            let mut line = vec![strong(node.text_or("memory", "?")), muted(" = ")];
-            match node.get("to") {
-                Some(to) if !to.is_null() => line.extend(expression_pieces(to)),
-                _ => line.push(strong("true")),
+        Some(FlowKind::Dialogue) => vec![dialogue_pieces(node)],
+        None => match node.kind() {
+            "remember" => {
+                let mut line = vec![strong(node.text_or("memory", "?")), muted(" = ")];
+                match node.get("to") {
+                    Some(to) if !to.is_null() => line.extend(expression_pieces(to)),
+                    _ => line.push(strong("true")),
+                }
+                vec![line]
             }
-            vec![line]
-        }
-        "forget" => vec![vec![
-            strong(
-                node["memories"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(Value::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
-            muted(" back to zero"),
-        ]],
-        "items" => {
-            let mut lines = Vec::new();
-            for (field, word) in [("take", "take "), ("give", "give ")] {
-                if let Some(list) = node[field].as_array().filter(|l| !l.is_empty()) {
-                    let mut line = vec![muted(word)];
-                    for (index, stack) in list.iter().enumerate() {
-                        if index > 0 {
-                            line.push(muted(", "));
-                        }
-                        let count = stack["count"].as_u64().unwrap_or(1);
-                        line.push(strong(format!("{count} ")));
-                        line.push(strong(stack.text_or("item", "?")));
+            "forget" => vec![vec![
+                strong(
+                    node["memories"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+                muted(" back to zero"),
+            ]],
+            "items" => {
+                let mut lines = Vec::new();
+                for (field, word) in [("take", "take "), ("give", "give ")] {
+                    if let Some(list) = node[field].as_array().filter(|l| !l.is_empty()) {
+                        let mut line = vec![muted(word)];
+                        line.extend(stack_pieces(list));
+                        lines.push(line);
                     }
-                    lines.push(line);
                 }
-            }
-            if lines.is_empty() {
-                lines.push(vec![muted("nothing changes hands")]);
-            }
-            lines
-        }
-        "dialogue" => Vec::new(),
-        "warp" => {
-            let who = node["who"]
-                .as_str()
-                .map(actor_word)
-                .unwrap_or_else(|| "the subject".to_owned());
-            let mut line = vec![strong(who), muted(" to ")];
-            match &node["to"] {
-                Value::Object(map) if map.len() == 1 && map.contains_key("var") => {
-                    line.push(var(format!("◇ {}", map.text("var"))))
+                if lines.is_empty() {
+                    lines.push(vec![muted("nothing changes hands")]);
                 }
-                Value::Object(map) if map.contains_key("area") => line.push(strong(format!(
-                    "{} {}, {}",
-                    map.text_or("area", "?"),
-                    trim(map["x"].as_f64().unwrap_or(0.0)),
-                    trim(map["y"].as_f64().unwrap_or(0.0))
-                ))),
-                other => line.extend(expression_pieces(other)),
+                lines
             }
-            vec![line, vec![muted("sets its spawn point")]]
-        }
-        other => effect_pieces(node, other, catalogue),
+            "warp" => {
+                let who = node["who"]
+                    .as_str()
+                    .map(actor_word)
+                    .unwrap_or_else(|| "the subject".to_owned());
+                let mut line = vec![strong(who), muted(" to ")];
+                match (hole_name(&node["to"]), place_text(&node["to"])) {
+                    (Some(name), _) => line.push(var(format!("◇ {name}"))),
+                    (None, Some(place)) => line.push(strong(place)),
+                    (None, None) => line.extend(expression_pieces(&node["to"])),
+                }
+                vec![line, vec![muted("sets its spawn point")]]
+            }
+            other => effect_pieces(node, other, catalogue),
+        },
     }
 }
 
-fn event_pieces(node: &Value) -> Vec<Piece> {
+fn dialogue_pieces(node: &Value) -> Vec<SummaryPiece> {
+    let lines = node["lines"].as_array().cloned().unwrap_or_default();
+    let Some(first) = lines.first() else {
+        return vec![muted("no lines")];
+    };
+    let mut line = vec![
+        strong(speaker_name(&first["by"])),
+        muted(": "),
+        strong(widgets::clip(&spans::plain(&first["text"]), 48)),
+    ];
+    if lines.len() > 1 {
+        line.push(muted(format!(" (+{} lines)", lines.len() - 1)));
+    }
+    let choices = node["choices"].as_array().map_or(0, Vec::len);
+    if choices > 0 {
+        line.push(muted(format!(" · {choices} choices")));
+    }
+    line
+}
+
+fn stack_pieces(list: &[Value]) -> Vec<SummaryPiece> {
+    let mut line = Vec::new();
+    for (index, stack) in list.iter().enumerate() {
+        if index > 0 {
+            line.push(muted(", "));
+        }
+        let count = stack["count"].as_u64().unwrap_or(1);
+        line.push(strong(format!("{count} {}", stack.text_or("item", "?"))));
+    }
+    line
+}
+
+fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
+    let trim = forms::trim_number;
     let mut line = Vec::new();
     match event_of(node) {
         Some("interacted") => {
@@ -1155,11 +1240,7 @@ fn event_pieces(node: &Value) -> Vec<Piece> {
             }
         }
         Some("came_near") | Some("entered") | Some("left") => {
-            if let Some(by) = node["by"].as_str() {
-                line.push(strong(by));
-            } else {
-                line.push(strong("characters"));
-            }
+            line.push(strong(node.text_or("by", "characters")));
             if let Some(within) = node["within"].as_f64() {
                 line.push(muted(" within "));
                 line.push(strong(trim(within)));
@@ -1188,7 +1269,7 @@ fn event_pieces(node: &Value) -> Vec<Piece> {
     line
 }
 
-fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Piece>> {
+fn effect_pieces(node: &Value, kind: &str, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
     let fields: Vec<(String, Option<String>)> = catalogue
         .entry(kind)
         .map(|entry| entry.fields.clone())
@@ -1200,86 +1281,13 @@ fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Pie
                 .filter(|(name, _)| name != "type")
                 .collect()
         });
-    let mut named: Vec<Piece> = Vec::new();
-    let mut rest: Vec<Piece> = Vec::new();
+    let mut named: Vec<SummaryPiece> = Vec::new();
+    let mut rest: Vec<SummaryPiece> = Vec::new();
     for (field, table) in &fields {
         let Some(value) = node.get(field).filter(|v| !v.is_null()) else {
             continue;
         };
-        let mut piece: Vec<Piece> = Vec::new();
-        match (table, value) {
-            (Some(table), Value::String(key)) => {
-                piece.push(muted(format!("{table}/")));
-                piece.push(strong(key));
-            }
-            (_, Value::Object(map)) if map.len() == 1 && map.contains_key("var") => {
-                if field != "who" {
-                    piece.push(muted(format!("{field} ")));
-                }
-                piece.push(var(format!("◇ {}", map.text("var"))));
-            }
-            (_, Value::String(text))
-                if matches!(
-                    field.as_str(),
-                    "who" | "at" | "for" | "toward" | "target" | "from" | "to"
-                ) =>
-            {
-                if field != "who" {
-                    piece.push(muted(format!("{field} ")));
-                }
-                piece.push(strong(actor_word(text)));
-            }
-            (_, Value::Array(list)) if list.iter().all(|item| item.get("item").is_some()) => {
-                piece.push(muted(format!("{field} ")));
-                for (index, stack) in list.iter().enumerate() {
-                    if index > 0 {
-                        piece.push(muted(", "));
-                    }
-                    let count = stack["count"].as_u64().unwrap_or(1);
-                    piece.push(strong(format!("{count} {}", stack.text_or("item", "?"))));
-                }
-            }
-            (_, Value::Object(map)) if map.contains_key("area") && map.contains_key("x") => {
-                if field != "to" {
-                    piece.push(muted(format!("{field} ")));
-                }
-                piece.push(strong(format!(
-                    "{} {}, {}",
-                    map.text_or("area", "?"),
-                    trim(map["x"].as_f64().unwrap_or(0.0)),
-                    trim(map["y"].as_f64().unwrap_or(0.0))
-                )));
-            }
-            (_, Value::Object(map))
-                if map.get("type").is_some()
-                    && matches!(map.kind(), "object" | "actor" | "place") =>
-            {
-                let inner = map
-                    .iter()
-                    .find(|(k, _)| *k != "type")
-                    .map(|(_, v)| content_text(v))
-                    .unwrap_or_default();
-                piece.push(muted(format!("{} ", map.kind())));
-                piece.push(strong(inner));
-            }
-            (_, Value::Number(_)) | (_, Value::Bool(_)) => {
-                piece.push(muted(format!("{field} ")));
-                piece.push(strong(content_text(value)));
-            }
-            (_, Value::String(text)) => {
-                piece.push(strong(text));
-            }
-            (_, Value::Array(list)) => {
-                piece.push(muted(format!("{field} ")));
-                piece.push(strong(
-                    list.iter().map(content_text).collect::<Vec<_>>().join(", "),
-                ));
-            }
-            (_, other) => {
-                piece.push(muted(format!("{field} ")));
-                piece.extend(expression_pieces(other));
-            }
-        }
+        let piece = field_pieces(field, table.as_deref(), value);
         let main = table.is_some()
             || matches!(
                 field.as_str(),
@@ -1303,6 +1311,64 @@ fn effect_pieces(node: &Value, kind: &str, catalogue: &Catalogue) -> Vec<Vec<Pie
     lines
 }
 
+fn field_pieces(field: &str, table: Option<&str>, value: &Value) -> Vec<SummaryPiece> {
+    let is_actor_field = matches!(
+        field,
+        "who" | "at" | "for" | "toward" | "target" | "from" | "to"
+    );
+    let labelled = |pieces: Vec<SummaryPiece>| -> Vec<SummaryPiece> {
+        let mut out = vec![muted(format!("{field} "))];
+        out.extend(pieces);
+        out
+    };
+    match (table, value) {
+        (Some(table), Value::String(key)) => vec![muted(format!("{table}/")), strong(key)],
+        _ if hole_name(value).is_some() => {
+            let hole = var(format!("◇ {}", hole_name(value).unwrap_or("")));
+            if field == "who" {
+                vec![hole]
+            } else {
+                labelled(vec![hole])
+            }
+        }
+        (_, Value::String(text)) if is_actor_field => {
+            let actor = strong(actor_word(text));
+            if field == "who" {
+                vec![actor]
+            } else {
+                labelled(vec![actor])
+            }
+        }
+        (_, Value::Array(list)) if list.iter().all(|item| item.get("item").is_some()) => {
+            labelled(stack_pieces(list))
+        }
+        _ if place_text(value).is_some() => {
+            let place = strong(place_text(value).unwrap_or_default());
+            if field == "to" {
+                vec![place]
+            } else {
+                labelled(vec![place])
+            }
+        }
+        (_, Value::Object(map))
+            if map.get("type").is_some() && matches!(map.kind(), "object" | "actor" | "place") =>
+        {
+            let inner = map
+                .iter()
+                .find(|(k, _)| *k != "type")
+                .map(|(_, v)| value_text(v))
+                .unwrap_or_default();
+            vec![muted(format!("{} ", map.kind())), strong(inner)]
+        }
+        (_, Value::Number(_)) | (_, Value::Bool(_)) => labelled(vec![strong(value_text(value))]),
+        (_, Value::String(text)) => vec![strong(text)],
+        (_, Value::Array(list)) => labelled(vec![strong(
+            list.iter().map(value_text).collect::<Vec<_>>().join(", "),
+        )]),
+        (_, other) => labelled(expression_pieces(other)),
+    }
+}
+
 fn actor_word(text: &str) -> String {
     match text {
         "subject" => "the subject".to_owned(),
@@ -1311,15 +1377,12 @@ fn actor_word(text: &str) -> String {
     }
 }
 
-pub fn expression_pieces(value: &Value) -> Vec<Piece> {
-    if let Some(map) = value.as_object()
-        && map.len() == 1
-        && let Some(name) = map.get("var").and_then(Value::as_str)
-    {
+pub fn expression_pieces(value: &Value) -> Vec<SummaryPiece> {
+    if let Some(name) = hole_name(value) {
         return vec![var(format!("◇ {name}"))];
     }
-    let summary = crate::condition::summary(value);
-    let mut out: Vec<Piece> = Vec::new();
+    let summary = condition::summary(value);
+    let mut out: Vec<SummaryPiece> = Vec::new();
     for word in summary.split(' ') {
         let bare = word.trim_matches(|c: char| c == '(' || c == ')' || c == ',');
         let is_name = !bare.is_empty()
@@ -1342,35 +1405,4 @@ pub fn expression_pieces(value: &Value) -> Vec<Piece> {
         }
     }
     out
-}
-
-fn trim(number: f64) -> String {
-    if number.fract() == 0.0 {
-        format!("{}", number as i64)
-    } else {
-        format!("{number}")
-    }
-}
-
-pub fn bust_file(files: &crate::project::Files, npc: &str, face: Option<&str>) -> Option<String> {
-    let npc_row = files.json(&crate::project::row_file("npc", npc))?;
-    let model = files.json(&crate::project::row_file(
-        "model",
-        npc_row["model"].as_str()?,
-    ))?;
-    let bust = model["modules"]
-        .as_array()?
-        .iter()
-        .find(|module| module["type"] == "bust")?;
-    let face = face.unwrap_or("neutral");
-    if let Some(file) = bust[face].as_str() {
-        return Some(file.to_owned());
-    }
-    bust["own"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|own| own["name"].as_str() == Some(face))
-        .and_then(|own| own["file"].as_str().map(str::to_owned))
-        .or_else(|| bust["neutral"].as_str().map(str::to_owned))
 }

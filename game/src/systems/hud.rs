@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use ui::{Geom, OnSettle, OnTap, SnapGrid, text_colored, widget};
@@ -8,7 +10,7 @@ use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
 use crate::systems::input::map::{ActionInput, InputAction};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::scene::mode::Mode;
+use crate::systems::scene::{Scene as GameScene, despawn_all, mode::Mode};
 use crate::systems::{
     effect, equipment, history, item, player, quest, settings, spectate, stat, terminal,
 };
@@ -28,11 +30,8 @@ impl Plugin for HudPlugin {
             .init_resource::<Open>()
             .init_resource::<RefreshWindows>()
             .add_systems(Update, (persist_settings, sync_preferences))
-            .add_systems(OnEnter(crate::systems::scene::Scene::Area), spawn_hud)
-            .add_systems(
-                OnExit(crate::systems::scene::Scene::Area),
-                crate::systems::scene::despawn_all::<Hud>,
-            )
+            .add_systems(OnEnter(GameScene::Area), spawn_hud)
+            .add_systems(OnExit(GameScene::Area), despawn_all::<Hud>)
             .add_systems(
                 Update,
                 (
@@ -41,13 +40,13 @@ impl Plugin for HudPlugin {
                     sync_widgets,
                     sync_windows,
                 )
-                    .run_if(in_state(crate::systems::scene::Scene::Area)),
+                    .run_if(in_state(GameScene::Area)),
             );
     }
 }
 
 #[derive(Resource, Default)]
-pub(crate) struct RefreshWindows(pub std::collections::HashSet<&'static str>);
+pub(crate) struct RefreshWindows(pub HashSet<&'static str>);
 
 pub(crate) const TERMINAL_WINDOW: &str = "Terminal";
 
@@ -396,11 +395,11 @@ impl UserSettings {
         }
     }
 
-    pub(crate) fn snapping_enabled(&self) -> bool {
+    fn snapping_enabled(&self) -> bool {
         self.ui.snap.is_some()
     }
 
-    pub(crate) fn toggle_snapping(&mut self) {
+    fn toggle_snapping(&mut self) {
         self.ui.snap = match self.ui.snap {
             Some(_) => None,
             None => Some(DEFAULT_SNAP),
@@ -423,7 +422,7 @@ fn default_snap() -> Option<ScreenPx> {
 }
 
 #[derive(Resource, Default)]
-struct Open(std::collections::HashSet<&'static str>);
+struct Open(HashSet<&'static str>);
 
 #[derive(Component, Default, Clone)]
 struct Hud;
@@ -467,7 +466,7 @@ fn spawn_hud(
 
 fn rebuild_windows(world: &mut World) {
     let refresh = match world.resource::<RefreshWindows>().0.is_empty() {
-        true => std::collections::HashSet::new(),
+        true => HashSet::new(),
         false => std::mem::take(&mut world.resource_mut::<RefreshWindows>().0),
     };
     if !world.is_resource_changed::<Open>() && refresh.is_empty() {

@@ -12,9 +12,9 @@ pub const MAX_IMAGE_PX: u32 = 16384;
 pub const DEFAULT_MS: u32 = 100;
 
 #[derive(Clone, Debug)]
-pub struct Export {
+pub struct AnimationExport {
     pub files: Vec<PathBuf>,
-    pub kind: Kind,
+    pub kind: ExportFormat,
     pub frame: (u32, u32),
     pub trimmed: bool,
     pub strips: Vec<ExportStrip>,
@@ -23,7 +23,7 @@ pub struct Export {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
+pub enum ExportFormat {
     SheetJson,
     Grid,
     Sequence,
@@ -44,39 +44,57 @@ pub struct ExportFrame {
     pub hash: String,
 }
 
-impl Kind {
+impl ExportFormat {
     pub fn label(self) -> &'static str {
         match self {
-            Kind::SheetJson => "sheet + JSON",
-            Kind::Grid => "grid",
-            Kind::Sequence => "sequence",
-            Kind::Gif => "GIF",
-            Kind::Apng => "APNG",
+            ExportFormat::SheetJson => "sheet + JSON",
+            ExportFormat::Grid => "grid",
+            ExportFormat::Sequence => "sequence",
+            ExportFormat::Gif => "GIF",
+            ExportFormat::Apng => "APNG",
         }
     }
 
     pub fn sentence(self) -> &'static str {
         match self {
-            Kind::SheetJson => "a sheet and its JSON",
-            Kind::Grid => "a sheet on a grid",
-            Kind::Sequence => "an image sequence",
-            Kind::Gif => "an animated GIF",
-            Kind::Apng => "an APNG",
+            ExportFormat::SheetJson => "a sheet and its JSON",
+            ExportFormat::Grid => "a sheet on a grid",
+            ExportFormat::Sequence => "an image sequence",
+            ExportFormat::Gif => "an animated GIF",
+            ExportFormat::Apng => "an APNG",
         }
     }
 }
 
-impl Export {
+impl AnimationExport {
+    pub fn new(
+        files: Vec<PathBuf>,
+        kind: ExportFormat,
+        strips: Vec<ExportStrip>,
+    ) -> AnimationExport {
+        AnimationExport {
+            files,
+            kind,
+            frame: (0, 0),
+            trimmed: false,
+            strips,
+            warnings: Vec::new(),
+            sheet: None,
+        }
+    }
+
     pub fn frames(&self) -> usize {
         self.strips.iter().map(|strip| strip.frames.len()).sum()
     }
 
     pub fn timed(&self) -> bool {
-        matches!(self.kind, Kind::SheetJson | Kind::Gif | Kind::Apng)
-            && self
-                .strips
-                .iter()
-                .all(|strip| strip.frames.iter().all(|frame| frame.ms.is_some()))
+        matches!(
+            self.kind,
+            ExportFormat::SheetJson | ExportFormat::Gif | ExportFormat::Apng
+        ) && self
+            .strips
+            .iter()
+            .all(|strip| strip.frames.iter().all(|frame| frame.ms.is_some()))
     }
 
     pub fn strip(&self, tag: &str) -> Option<&ExportStrip> {
@@ -154,7 +172,7 @@ pub fn is_blank(image: &RgbaImage) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Dropped {
+pub enum DroppedFiles {
     Sheet { image: PathBuf, json: PathBuf },
     Png(PathBuf),
     Apng(PathBuf),
@@ -164,7 +182,7 @@ pub enum Dropped {
 
 pub const FORMATS: &str = "a sheet with its JSON (Aseprite or TexturePacker), a sheet on a grid, a numbered PNG sequence, an animated GIF or APNG; a tileset is a grid; a bust is one PNG";
 
-pub fn sort_out(files: &[PathBuf]) -> Result<Dropped, String> {
+pub fn sort_out(files: &[PathBuf]) -> Result<DroppedFiles, String> {
     if files.is_empty() {
         return Err(format!("nothing to import; the editor imports {FORMATS}"));
     }
@@ -190,23 +208,23 @@ pub fn sort_out(files: &[PathBuf]) -> Result<Dropped, String> {
         (1, 0, 0) => {
             let json = jsons.remove(0);
             let image = sheet_image_of(&json)?;
-            Ok(Dropped::Sheet { image, json })
+            Ok(DroppedFiles::Sheet { image, json })
         }
-        (1, 1, 0) => Ok(Dropped::Sheet {
+        (1, 1, 0) => Ok(DroppedFiles::Sheet {
             image: pngs.remove(0),
             json: jsons.remove(0),
         }),
-        (0, 0, 1) => Ok(Dropped::Gif(gifs.remove(0))),
+        (0, 0, 1) => Ok(DroppedFiles::Gif(gifs.remove(0))),
         (0, 1, 0) => {
             let png = pngs.remove(0);
             match is_apng(&png) {
-                true => Ok(Dropped::Apng(png)),
-                false => Ok(Dropped::Png(png)),
+                true => Ok(DroppedFiles::Apng(png)),
+                false => Ok(DroppedFiles::Png(png)),
             }
         }
         (0, n, 0) if n > 1 => {
             pngs.sort();
-            Ok(Dropped::Sequence(pngs))
+            Ok(DroppedFiles::Sequence(pngs))
         }
         _ => Err(format!(
             "{} mix formats; the editor imports {FORMATS}, one export at a time",
@@ -215,13 +233,13 @@ pub fn sort_out(files: &[PathBuf]) -> Result<Dropped, String> {
     }
 }
 
-pub fn decode(dropped: &Dropped) -> Result<Export, String> {
+pub fn decode(dropped: &DroppedFiles) -> Result<AnimationExport, String> {
     match dropped {
-        Dropped::Sheet { image, json } => decode_sheet(image, json),
-        Dropped::Png(file) => decode_grid(file),
-        Dropped::Apng(file) => decode_apng(file),
-        Dropped::Gif(file) => decode_gif(file),
-        Dropped::Sequence(files) => decode_sequence(files),
+        DroppedFiles::Sheet { image, json } => decode_sheet(image, json),
+        DroppedFiles::Png(file) => decode_grid(file),
+        DroppedFiles::Apng(file) => decode_apng(file),
+        DroppedFiles::Gif(file) => decode_gif(file),
+        DroppedFiles::Sequence(files) => decode_sequence(files),
     }
 }
 
@@ -381,7 +399,7 @@ struct TagJson {
     to: usize,
 }
 
-fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<Export, String> {
+fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, String> {
     let text = std::fs::read_to_string(json_file)
         .map_err(|error| format!("{}: {error}", name(json_file)))?;
     let sheet: SheetJson =
@@ -505,33 +523,24 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<Export, String> {
                 .collect(),
         })
         .collect();
-    let mut export = Export {
-        files: vec![image_file.to_path_buf(), json_file.to_path_buf()],
-        kind: Kind::SheetJson,
-        frame: (0, 0),
-        trimmed,
+    let mut export = AnimationExport::new(
+        vec![image_file.to_path_buf(), json_file.to_path_buf()],
+        ExportFormat::SheetJson,
         strips,
-        warnings: Vec::new(),
-        sheet: None,
-    };
+    );
+    export.trimmed = trimmed;
     unify(&mut export)?;
     Ok(export)
 }
 
-fn decode_grid(file: &Path) -> Result<Export, String> {
+fn decode_grid(file: &Path) -> Result<AnimationExport, String> {
     let image = decode_image(file)?;
-    Ok(Export {
-        files: vec![file.to_path_buf()],
-        kind: Kind::Grid,
-        frame: (0, 0),
-        trimmed: false,
-        strips: Vec::new(),
-        warnings: Vec::new(),
-        sheet: Some(image),
-    })
+    let mut export = AnimationExport::new(vec![file.to_path_buf()], ExportFormat::Grid, Vec::new());
+    export.sheet = Some(image);
+    Ok(export)
 }
 
-fn decode_sequence(files: &[PathBuf]) -> Result<Export, String> {
+fn decode_sequence(files: &[PathBuf]) -> Result<AnimationExport, String> {
     let mut groups: BTreeMap<String, Vec<(u64, PathBuf)>> = BTreeMap::new();
     let mut order = Vec::new();
     for file in files {
@@ -565,20 +574,12 @@ fn decode_sequence(files: &[PathBuf]) -> Result<Export, String> {
             .collect::<Result<Vec<_>, _>>()?;
         strips.push(ExportStrip { tag, frames });
     }
-    let mut export = Export {
-        files: files.to_vec(),
-        kind: Kind::Sequence,
-        frame: (0, 0),
-        trimmed: false,
-        strips,
-        warnings: Vec::new(),
-        sheet: None,
-    };
+    let mut export = AnimationExport::new(files.to_vec(), ExportFormat::Sequence, strips);
     unify(&mut export)?;
     Ok(export)
 }
 
-fn decode_gif(file: &Path) -> Result<Export, String> {
+fn decode_gif(file: &Path) -> Result<AnimationExport, String> {
     let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = GifDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
@@ -589,13 +590,13 @@ fn decode_gif(file: &Path) -> Result<Export, String> {
         .into_frames()
         .collect_frames()
         .map_err(|error| format!("{}: {error}", name(file)))?;
-    animated(file, Kind::Gif, frames, |numer, denom| {
+    animated(file, ExportFormat::Gif, frames, |numer, denom| {
         let ms = numer / denom.max(1);
         if ms == 0 { DEFAULT_MS } else { ms }
     })
 }
 
-fn decode_apng(file: &Path) -> Result<Export, String> {
+fn decode_apng(file: &Path) -> Result<AnimationExport, String> {
     let handle = std::fs::File::open(file).map_err(|error| format!("{}: {error}", name(file)))?;
     let mut decoder = PngDecoder::new(BufReader::new(handle))
         .map_err(|error| format!("{}: {error}", name(file)))?;
@@ -608,7 +609,7 @@ fn decode_apng(file: &Path) -> Result<Export, String> {
         .into_frames()
         .collect_frames()
         .map_err(|error| format!("{}: {error}", name(file)))?;
-    animated(file, Kind::Apng, frames, |numer, denom| {
+    animated(file, ExportFormat::Apng, frames, |numer, denom| {
         let denom = denom.max(1);
         let ms = (numer * 2 + denom) / (denom * 2);
         if ms == 0 { DEFAULT_MS } else { ms }
@@ -617,10 +618,10 @@ fn decode_apng(file: &Path) -> Result<Export, String> {
 
 fn animated(
     file: &Path,
-    kind: Kind,
+    kind: ExportFormat,
     frames: Vec<image::Frame>,
     ms_of: impl Fn(u32, u32) -> u32,
-) -> Result<Export, String> {
+) -> Result<AnimationExport, String> {
     if frames.is_empty() {
         return Err(format!("{} has no frames", name(file)));
     }
@@ -631,23 +632,16 @@ fn animated(
             ExportFrame::new(frame.into_buffer(), Some(ms_of(numer, denom)))
         })
         .collect();
-    let mut export = Export {
-        files: vec![file.to_path_buf()],
-        kind,
-        frame: (0, 0),
-        trimmed: false,
-        strips: vec![ExportStrip {
-            tag: stem(file),
-            frames,
-        }],
-        warnings: Vec::new(),
-        sheet: None,
+    let strip = ExportStrip {
+        tag: stem(file),
+        frames,
     };
+    let mut export = AnimationExport::new(vec![file.to_path_buf()], kind, vec![strip]);
     unify(&mut export)?;
     Ok(export)
 }
 
-fn unify(export: &mut Export) -> Result<(), String> {
+fn unify(export: &mut AnimationExport) -> Result<(), String> {
     let mut width = 0;
     let mut height = 0;
     let mut differ = false;

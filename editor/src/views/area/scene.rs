@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -10,28 +9,31 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
 use game::core::content::Content;
-use game::core::math::Pos;
+use game::core::math::{Pos, Rect};
+use game::core::render;
 use game::core::render::{TILE, ToScreen};
 use game::core::tiling::{TileSize, Tiles};
-use game::systems::area::{self, AreaModule, Scenery};
+use game::systems::area::{self, AreaModule, Flip, Scenery};
 
-use crate::project::Files;
+use super::stamp;
+use crate::project::{ProjectFiles, hash};
+use game::systems::scene::area::TileSheets;
 
-pub struct SceneRequest {
+pub struct AreaSceneRequest {
     pub key: String,
-    pub spec: SceneSpec,
+    pub spec: AreaSceneSpec,
     pub width: u32,
     pub height: u32,
     pub center: Pos<Tiles>,
     pub zoom: f32,
     pub generation: u64,
-    /// A still scene keeps its last frame until something about it changes, so the world map's
-    /// many cards cost no rendering while nothing moves.
+    // A still scene keeps its last frame until something about it changes, so the world map's
+    // many cards cost no rendering while nothing moves.
     pub live: bool,
 }
 
 #[derive(Clone, PartialEq)]
-pub struct SceneSpec {
+pub struct AreaSceneSpec {
     pub ground: String,
     pub scenery: SceneryOf,
     pub hidden_ground: Vec<String>,
@@ -49,14 +51,14 @@ pub enum SceneryOf {
     },
 }
 
-pub struct Scene {
+pub struct AreaScene {
     pub texture: egui::TextureId,
     pub image: Handle<Image>,
     pub alloc: [u32; 2],
     pub shown: [u32; 2],
     pub layer: usize,
     camera: Entity,
-    spec: SceneSpec,
+    spec: AreaSceneSpec,
     generation: u64,
     idle: u32,
     zoom: f32,
@@ -65,12 +67,24 @@ pub struct Scene {
     active: bool,
 }
 
-#[derive(Component)]
-pub struct SceneOf(pub usize);
+impl AreaScene {
+    pub fn uv(&self) -> egui::Rect {
+        egui::Rect::from_min_max(
+            egui::Pos2::ZERO,
+            egui::pos2(
+                self.shown[0] as f32 / self.alloc[0].max(1) as f32,
+                self.shown[1] as f32 / self.alloc[1].max(1) as f32,
+            ),
+        )
+    }
+}
+
+#[derive(Component, Clone)]
+pub struct AreaSceneOf(pub usize);
 
 #[derive(Default)]
-pub struct Scenes {
-    pub by_key: HashMap<String, Scene>,
+pub struct AreaScenes {
+    pub by_key: HashMap<String, AreaScene>,
     images: HashMap<String, (String, Handle<Image>)>,
     next_layer: usize,
     free_layers: Vec<usize>,
@@ -78,19 +92,19 @@ pub struct Scenes {
 
 pub const IDLE_FRAMES: u32 = 120;
 
-/// Spawning a scene builds its tile meshes, so a view asking for many at once (the world map's
-/// cards) gets them over a few frames instead of one long one.
+// Spawning a scene builds its tile meshes, so a view asking for many at once (the world map's
+// cards) gets them over a few frames instead of one long one.
 const SPAWNS_PER_FRAME: usize = 6;
 
-/// Frames a still scene keeps rendering after a change, so its spawned tiles and uploaded images
-/// are all on the target before the camera rests.
+// Frames a still scene keeps rendering after a change, so its spawned tiles and uploaded images
+// are all on the target before the camera rests.
 const SETTLE_FRAMES: u8 = 3;
 
 pub fn sync(
-    scenes: &mut Scenes,
-    requests: Vec<SceneRequest>,
+    scenes: &mut AreaScenes,
+    requests: Vec<AreaSceneRequest>,
     content: Option<Content>,
-    files: &Files,
+    files: &ProjectFiles,
     world: &mut World,
 ) {
     let mut seen: Vec<String> = Vec::new();
@@ -139,16 +153,15 @@ pub fn sync(
         let grows = wanted[0] > scene.alloc[0] || wanted[1] > scene.alloc[1];
         let shrinks = scene.alloc[0] >= fit[0] * 2 || scene.alloc[1] >= fit[1] * 2;
         if grows || shrinks {
-            let alloc = fit;
-            let image = target_image(alloc);
-            let handle = world.resource_mut::<Assets<Image>>().add(image);
-            let mut textures = world.resource_mut::<EguiUserTextures>();
-            textures.remove_image(&scene.image);
-            scene.texture = textures.add_image(EguiTextureHandle::Strong(handle.clone()));
-            scene.image = handle.clone();
-            scene.alloc = alloc;
+            let (image, texture) = render_target(world, fit);
+            world
+                .resource_mut::<EguiUserTextures>()
+                .remove_image(&scene.image);
+            scene.texture = texture;
+            scene.image = image.clone();
+            scene.alloc = fit;
             if let Ok(mut camera) = world.get_entity_mut(scene.camera) {
-                camera.insert(RenderTarget::Image(handle.into()));
+                camera.insert(RenderTarget::Image(image.into()));
             }
         }
         scene.shown = wanted;
@@ -189,7 +202,7 @@ pub fn sync(
     }
 }
 
-pub fn clear(scenes: &mut Scenes, world: &mut World) {
+pub fn clear(scenes: &mut AreaScenes, world: &mut World) {
     let keys: Vec<String> = scenes.by_key.keys().cloned().collect();
     for key in keys {
         despawn(scenes, &key, world);
@@ -201,6 +214,16 @@ fn round_up(n: u32) -> u32 {
     n.div_ceil(256) * 256
 }
 
+fn render_target(world: &mut World, alloc: [u32; 2]) -> (Handle<Image>, egui::TextureId) {
+    let image = world
+        .resource_mut::<Assets<Image>>()
+        .add(target_image(alloc));
+    let texture = world
+        .resource_mut::<EguiUserTextures>()
+        .add_image(EguiTextureHandle::Strong(image.clone()));
+    (image, texture)
+}
+
 fn target_image(alloc: [u32; 2]) -> Image {
     let mut image =
         Image::new_target_texture(alloc[0], alloc[1], TextureFormat::Rgba8UnormSrgb, None);
@@ -208,12 +231,12 @@ fn target_image(alloc: [u32; 2]) -> Image {
     image
 }
 
-fn despawn(scenes: &mut Scenes, key: &str, world: &mut World) {
+fn despawn(scenes: &mut AreaScenes, key: &str, world: &mut World) {
     let Some(scene) = scenes.by_key.remove(key) else {
         return;
     };
     let tiles: Vec<Entity> = world
-        .query::<(Entity, &SceneOf)>()
+        .query::<(Entity, &AreaSceneOf)>()
         .iter(world)
         .filter(|(_, of)| of.0 == scene.layer)
         .map(|(entity, _)| entity)
@@ -228,10 +251,10 @@ fn despawn(scenes: &mut Scenes, key: &str, world: &mut World) {
 }
 
 fn spawn(
-    scenes: &mut Scenes,
-    request: &SceneRequest,
+    scenes: &mut AreaScenes,
+    request: &AreaSceneRequest,
     content: Content,
-    files: &Files,
+    files: &ProjectFiles,
     world: &mut World,
 ) {
     let Some(area_id) = content.by_key::<area::AreaDef>(&request.spec.ground) else {
@@ -245,12 +268,7 @@ fn spawn(
         round_up(request.width.max(1)),
         round_up(request.height.max(1)),
     ];
-    let image = world
-        .resource_mut::<Assets<Image>>()
-        .add(target_image(alloc));
-    let texture = world
-        .resource_mut::<EguiUserTextures>()
-        .add_image(EguiTextureHandle::Strong(image.clone()));
+    let (image, texture) = render_target(world, alloc);
     let at = request.center.to_screen();
     let camera = world
         .spawn((
@@ -267,7 +285,7 @@ fn spawn(
             }),
             Transform::from_xyz(at.x, at.y, 0.0),
             RenderLayers::from_layers(&[layer]),
-            SceneOf(layer),
+            AreaSceneOf(layer),
         ))
         .id();
     let area = area::load(&content, area_id);
@@ -301,10 +319,12 @@ fn spawn(
         layer,
         hidden_ground: request.spec.hidden_ground.clone(),
     };
-    let _ = world.run_system_once_with(spawn_tiles, spec);
+    world
+        .run_system_once_with(spawn_tiles, spec)
+        .expect("spawn_tiles runs on the editor world");
     scenes.by_key.insert(
         request.key.clone(),
-        Scene {
+        AreaScene {
             texture,
             image,
             alloc,
@@ -322,30 +342,22 @@ fn spawn(
     );
 }
 
+pub fn scenery_extent(sceneries: &[Scenery]) -> Option<Rect<Tiles>> {
+    sceneries
+        .iter()
+        .map(Scenery::bounds)
+        .reduce(|a, b| a.union(&b))
+}
+
 pub fn parts_scenery(
     content: Content,
     blueprint: &str,
     at: Pos<Tiles>,
     values: &serde_json::Value,
 ) -> Vec<Scenery> {
-    let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(blueprint) else {
+    let Some(module) = stamp::placement_module(content, blueprint, at, Flip::None, values) else {
         return Vec::new();
     };
-    let placement = serde_json::json!({
-        "type": "blueprint",
-        "blueprint": blueprint,
-        "at": { "x": at.x, "y": at.y },
-        "values": values,
-    });
-    let Ok(module) =
-        game::core::content::with_content(game::core::content::ContentScope::of(&content), || {
-            serde_json::from_value::<AreaModule>(placement)
-        })
-        .0
-    else {
-        return Vec::new();
-    };
-    let _ = id;
     let mut errors = Vec::new();
     let flattening = area::blueprint::flatten(&content, &[module], &mut errors);
     flattening
@@ -358,61 +370,25 @@ pub fn parts_scenery(
         .collect()
 }
 
-struct SheetSet {
-    tilesets: Vec<area::tileset::Id>,
-    sheets: Vec<bevy_tilemap::TileSheet>,
-}
-
 fn sheets_for(
-    scenes: &mut Scenes,
+    scenes: &mut AreaScenes,
     content: Content,
-    files: &Files,
+    files: &ProjectFiles,
     grids: &area::AreaGrids,
     scenery: &[Scenery],
     world: &mut World,
-) -> SheetSet {
-    let sizes = content.built::<game::core::content::media::ImageSizes>();
-    let mut tilesets: Vec<area::tileset::Id> = grids
-        .palette
-        .iter()
-        .map(|entry| entry.tileset)
-        .chain(scenery.iter().map(|s| s.tileset))
-        .collect();
-    tilesets.sort_by_key(|id| id.index());
-    tilesets.dedup();
-    let mut sheets = Vec::new();
-    for &id in &tilesets {
-        let def = id.get(&content);
-        let image = image_handle(scenes, files, def.image.as_str(), world);
-        let (width, height) = sizes.0.get(def.image.as_str()).copied().unwrap_or((0, 0));
-        let grid = def.grid(width, height);
-        sheets.push(bevy_tilemap::TileSheet {
-            image,
-            size: Vec2::new(width as f32, height as f32),
-            tile: Vec2::splat(def.tile as f32),
-            animations: (0..grid.count())
-                .filter_map(|tile| {
-                    let frames = def.animation(tile);
-                    (!frames.is_empty()).then(|| bevy_tilemap::TileAnimation {
-                        tile,
-                        frames: frames
-                            .iter()
-                            .map(|frame| bevy_tilemap::TileAnimationFrame {
-                                tile: frame.tile,
-                                lasts: Duration::from_millis(u64::from(frame.ms)),
-                            })
-                            .collect(),
-                    })
-                })
-                .collect(),
-        });
-    }
-    SheetSet { tilesets, sheets }
+) -> TileSheets {
+    TileSheets::new(
+        &content,
+        grids,
+        scenery.iter().map(|scenery| scenery.tileset),
+        |def| image_handle(scenes, files, def.image.as_str(), world),
+    )
 }
 
 pub fn image_handle(
-    scenes: &mut Scenes,
-    files: &Files,
+    scenes: &mut AreaScenes,
+    files: &ProjectFiles,
     path: &str,
     world: &mut World,
 ) -> Handle<Image> {
@@ -420,7 +396,7 @@ pub fn image_handle(
     let Some(bytes) = files.get(&file) else {
         return Handle::default();
     };
-    let hash = crate::project::hash(bytes);
+    let hash = hash(bytes);
     if let Some((known, handle)) = scenes.images.get(&file)
         && *known == hash
     {
@@ -453,7 +429,7 @@ struct SpawnSpec {
     content: Content,
     area: area::Id,
     scenery: Vec<Scenery>,
-    sheets: SheetSet,
+    sheets: TileSheets,
     layer: usize,
     hidden_ground: Vec<String>,
 }
@@ -469,8 +445,10 @@ fn spawn_tiles(
     let grids = area.grids;
     let size = grids.size;
     let origin = area.size.bounds().min().to_screen();
-    let index_of =
-        |tileset: area::tileset::Id| spec.sheets.tilesets.iter().position(|&id| id == tileset);
+    let scene_tag = (
+        AreaSceneOf(spec.layer),
+        RenderLayers::from_layers(&[spec.layer]),
+    );
     for (index, layer) in grids.ground.iter().enumerate() {
         if spec.hidden_ground.contains(&layer.name) {
             continue;
@@ -481,7 +459,7 @@ fn spawn_tiles(
             .map(|cell| {
                 let entry = grids.entry(*cell)?;
                 Some(bevy_tilemap::GridCell {
-                    sheet: index_of(entry.tileset)?,
+                    sheet: spec.sheets.index(entry.tileset)?,
                     tile: entry.tile,
                     flip_x: entry.flip.horizontal(),
                     flip_y: entry.flip.vertical(),
@@ -490,9 +468,11 @@ fn spawn_tiles(
             .collect();
         bevy_tilemap::spawn_grid_layer(
             &mut commands,
-            &mut images,
-            &mut meshes,
-            &mut materials,
+            &mut bevy_tilemap::TilemapAssets {
+                images: &mut images,
+                meshes: &mut meshes,
+                materials: &mut materials,
+            },
             &spec.sheets.sheets,
             &bevy_tilemap::GridLayer {
                 width: size.width,
@@ -504,6 +484,7 @@ fn spawn_tiles(
                 tile_px: TILE.0,
                 z: index as f32,
             },
+            scene_tag.clone(),
         );
     }
     let flat_count = spec
@@ -513,11 +494,11 @@ fn spawn_tiles(
         .count();
     let mut flat_index = 0;
     for scenery in &spec.scenery {
-        let Some(sheet) = index_of(scenery.tileset) else {
+        let Some(sheet) = spec.sheets.index(scenery.tileset) else {
             continue;
         };
         let z = match scenery.sort_line() {
-            Some(line) => game::core::render::dynamic_z(area.size.height, area.sort_base(), line),
+            Some(line) => render::dynamic_z(area.size.height, area.sort_base(), line),
             None => {
                 flat_index += 1;
                 area.sort_base() - 1.0 + flat_index as f32 / (flat_count as f32 + 1.0)
@@ -542,20 +523,9 @@ fn spawn_tiles(
                         z,
                     },
                     TILE.0,
+                    scene_tag.clone(),
                 );
             }
         }
     }
-    let layer = spec.layer;
-    commands.queue(move |world: &mut World| {
-        let fresh: Vec<Entity> = world
-            .query_filtered::<Entity, (With<bevy_tilemap::MapTile>, Without<SceneOf>)>()
-            .iter(world)
-            .collect();
-        for entity in fresh {
-            world
-                .entity_mut(entity)
-                .insert((SceneOf(layer), RenderLayers::from_layers(&[layer])));
-        }
-    });
 }

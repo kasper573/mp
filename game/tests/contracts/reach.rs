@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::core::time::Seconds;
 use game::systems::area::AreaTag;
@@ -9,7 +10,7 @@ use game::systems::reach::{self, ReachAct, Tether};
 
 use crate::support::{Sim, row, spawn_area};
 
-fn drop_bone(sim: &mut Sim, at: game::core::math::Pos<Tiles>) -> Entity {
+fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
     sim.world()
         .spawn((
             Position { pos: at },

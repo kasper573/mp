@@ -1,6 +1,6 @@
 # The local and e2e stacks mount a copy of the content folder over the image's example, as
 # production mounts its own: a chapter can then change the files and restart the server to show a
-# content deploy. `just stack-content` makes the copy.
+# content deploy.
 services:
   rift-game-server:
     volumes:

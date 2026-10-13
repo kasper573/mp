@@ -11,13 +11,13 @@ use crate::core::content::Content;
 use crate::core::math::{Direction, Pos};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Millis, PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, set_facing};
+use crate::systems::actor::{self, Action, Actor, ActorModel, Timing, set_facing};
 use crate::systems::area::AreaTag;
 use crate::systems::movement::{MoveTarget, Path, halt, on_tile, position};
 use crate::systems::player::{self, Owner, commands_locked, sender_player, session};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::stat::{self, StatKind};
-use crate::systems::visibility;
+use crate::systems::{drain_requests, visibility};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -109,7 +109,7 @@ pub fn regen(world: &mut World) {
 }
 
 pub fn request(world: &mut World) {
-    for request in crate::systems::requests::<AttackRequest>(world) {
+    for request in drain_requests::<AttackRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
         };
@@ -249,11 +249,11 @@ fn strike(world: &mut World, attacker: Entity, target: Entity) {
     inflict(world, target, Some(attacker), damage);
 }
 
-fn attack_timing(world: &World, entity: Entity, dir: Direction) -> crate::systems::actor::Timing {
-    let content = world.resource::<crate::core::content::Content>();
+fn attack_timing(world: &World, entity: Entity, dir: Direction) -> Timing {
+    let content = world.resource::<Content>();
     world
         .get::<Actor>(entity)
-        .map(|a| actor::model(content, a.model).timing(Action::Attack, dir))
+        .map(|a| ActorModel::get(content, a.model).timing(Action::Attack, dir))
         .unwrap_or_default()
 }
 

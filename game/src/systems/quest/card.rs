@@ -11,6 +11,7 @@ use super::{
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::systems::dialogue::{ChoiceReveal, Conversation, ConversationPanel, stage};
+use crate::systems::hud::{SLOT_BG, SLOT_BORDER, reconcile_children, slot_node};
 use crate::systems::item::{self, Inventory, ItemStack};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::scene::Scene as GameScene;
@@ -97,7 +98,7 @@ fn show_card(world: &mut World) {
         .unwrap_or_else(Inventory::empty);
     let mut hasher = DefaultHasher::new();
     format!("{:?}", inventory.slots).hash(&mut hasher);
-    crate::systems::hud::reconcile_children(world, body, &[hasher.finish()], |world, _| {
+    reconcile_children(world, body, &[hasher.finish()], |world, _| {
         let content = world.resource::<Content>();
         let assets = world.resource::<AssetServer>();
         let parts = match moment {
@@ -354,9 +355,9 @@ pub(super) fn picks(content: &Content, assets: &AssetServer, def: &QuestDef) -> 
         .iter()
         .map(|stack| -> Box<dyn Scene> {
             let slot = bsn! {
-                crate::systems::hud::slot_node()
-                BackgroundColor({crate::systems::hud::SLOT_BG})
-                BorderColor::all(crate::systems::hud::SLOT_BORDER)
+                slot_node()
+                BackgroundColor({SLOT_BG})
+                BorderColor::all(SLOT_BORDER)
                 Children [ @{icon(assets, &stack.item.get(content).icon, PICK)} ]
             };
             Box::new(ui::inspectable(

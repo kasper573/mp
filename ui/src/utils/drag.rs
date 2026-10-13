@@ -5,9 +5,10 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::cursor::CursorStyle;
+use crate::state::ancestor_with;
 use crate::tokens::layer;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Geom {
     pub pos: Vec2,
     pub size: Vec2,
@@ -26,8 +27,8 @@ pub struct ResizeHandle {
     pub min: Vec2,
 }
 
-type Settle = Arc<dyn Fn(&mut World, Geom) -> Geom + Send + Sync>;
-type Tap = Arc<dyn Fn(&mut World) + Send + Sync>;
+pub type Settle = Arc<dyn Fn(&mut World, Geom) -> Geom + Send + Sync>;
+pub type Tap = Arc<dyn Fn(&mut World) + Send + Sync>;
 
 #[derive(Component, Clone)]
 pub struct OnSettle(pub Settle);
@@ -151,13 +152,10 @@ fn on_drag_start(
         return;
     }
     dragged.0 = true;
-    let Some(root) = nearest_root(entity, &parents, &is_root) else {
+    let Some(root) = ancestor_with::<DragRoot>(entity, &parents, &is_root) else {
         return;
     };
-    let raw = nodes.get(root).map(read_geom).unwrap_or(Geom {
-        pos: Vec2::ZERO,
-        size: Vec2::ZERO,
-    });
+    let raw = nodes.get(root).map(read_geom).unwrap_or_default();
     state.0 = Some(Active {
         entity,
         root,
@@ -204,7 +202,7 @@ fn on_drag_end(
     if !handles.contains(drag.entity) {
         return;
     }
-    let Some(root) = nearest_root(drag.entity, &parents, &is_root) else {
+    let Some(root) = ancestor_with::<DragRoot>(drag.entity, &parents, &is_root) else {
         return;
     };
     commands.queue(move |world: &mut World| settle(world, root));
@@ -221,7 +219,7 @@ fn on_click(
     if dragged.0 {
         return;
     }
-    let Some(root) = nearest_root(click.entity, &parents, &is_root) else {
+    let Some(root) = ancestor_with::<DragRoot>(click.entity, &parents, &is_root) else {
         return;
     };
     let Ok(tap) = taps.get(root) else {
@@ -259,27 +257,11 @@ fn anchor_panels(
     }
 }
 
-fn nearest_root(
-    mut entity: Entity,
-    parents: &Query<&ChildOf>,
-    is_root: &Query<(), With<DragRoot>>,
-) -> Option<Entity> {
-    loop {
-        if is_root.get(entity).is_ok() {
-            return Some(entity);
-        }
-        entity = parents.get(entity).ok()?.parent();
-    }
-}
-
 fn settle(world: &mut World, root: Entity) {
     let Some(settle) = world.get::<OnSettle>(root).cloned() else {
         return;
     };
-    let geom = world.get::<Node>(root).map(read_geom).unwrap_or(Geom {
-        pos: Vec2::ZERO,
-        size: Vec2::ZERO,
-    });
+    let geom = world.get::<Node>(root).map(read_geom).unwrap_or_default();
     let settled = (settle.0)(world, geom);
     write_geom(world, root, settled);
 }

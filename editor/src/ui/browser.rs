@@ -1,12 +1,16 @@
+use std::collections::BTreeSet;
+
 use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
+use game::core::content::ContentRow;
+use game::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
-use crate::app::{Dialog, Editor, RenameDialog, RenameTarget, RightTab};
-use crate::project::files::GAME_FILE;
-use crate::project::{Selection, row_of};
-use crate::tabs::Tab;
+use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
+use crate::project::{GAME_FILE, Project, RowSelection, row_file, row_of};
+use crate::tabs::EditorTab;
 use crate::value::RowValue;
+use crate::{forms, rows, thumbs};
 
 pub struct BrowserState {
     pub search: String,
@@ -48,7 +52,7 @@ enum Hit {
     },
 }
 
-pub enum Action {
+pub enum BrowserAction {
     Open,
     OpenTab,
     Duplicate,
@@ -84,38 +88,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let searching = !state.search.trim().is_empty();
     if searching || state.only_unsaved || state.only_fixtures {
         ui.horizontal(|ui| {
-            let unsaved = widgets::chip_coloured(
-                ui,
-                "● unsaved",
-                if state.only_unsaved {
-                    theme::ACCENT_SOFT
-                } else {
-                    theme::RAISED
-                },
-                if state.only_unsaved {
-                    theme::TEXT
-                } else {
-                    theme::MUTED
-                },
-            );
-            if unsaved.clicked() {
+            if widgets::toggle_chip(ui, "● unsaved", state.only_unsaved).clicked() {
                 state.only_unsaved = !state.only_unsaved;
             }
-            let fixtures = widgets::chip_coloured(
-                ui,
-                "fixtures",
-                if state.only_fixtures {
-                    theme::ACCENT_SOFT
-                } else {
-                    theme::RAISED
-                },
-                if state.only_fixtures {
-                    theme::TEXT
-                } else {
-                    theme::MUTED
-                },
-            );
-            if fixtures.clicked() {
+            if widgets::toggle_chip(ui, "fixtures", state.only_fixtures).clicked() {
                 state.only_fixtures = !state.only_fixtures;
             }
         });
@@ -184,7 +160,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
             nodes.insert(0, game);
         }
     }
-    let mut action: Option<(String, String, Action)> = None;
+    let mut action: Option<(String, String, BrowserAction)> = None;
     let mut budget = super::assets::ICON_DECODES_PER_FRAME;
     let out = egui::ScrollArea::vertical()
         .id_salt("browser")
@@ -201,7 +177,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 &mut views.browser.tree,
                 &nodes,
                 false,
-                tree::Hooks {
+                tree::TreeHooks {
                     menu: Some(&mut |ui, node| {
                         if let Some((table, key)) = row_of(&node.id) {
                             row_menu(ui, &mut action, table, key);
@@ -216,24 +192,24 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
         })
         .inner;
     if let Some(table) = out.add {
-        crate::rows::new_row_dialog(editor, &table);
+        rows::new_row_dialog(editor, &table);
     }
     if let Some(table) = out.open_table {
-        editor.open_tab(Tab::Sheet { table });
+        editor.open_tab(EditorTab::Spreadsheet { table });
     }
     if out
         .clicked
         .as_ref()
         .is_some_and(|(path, _)| path == GAME_FILE)
     {
-        editor.select(Selection::game());
+        editor.select(RowSelection::game());
         editor.panels.right = RightTab::Inspector;
     }
     if let Some((path, modifiers)) = out.clicked
         && let Some((table, key)) = row_of(&path)
     {
-        if table == crate::views::world::TABLE {
-            action = Some((table.to_owned(), key.to_owned(), Action::Open));
+        if table == WorldMapDef::TABLE {
+            action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         } else {
             select_row(editor, table, key, modifiers.ctrl, modifiers.shift);
         }
@@ -241,7 +217,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     if let Some(path) = out.double_clicked
         && let Some((table, key)) = row_of(&path)
     {
-        action = Some((table.to_owned(), key.to_owned(), Action::Open));
+        action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
     }
     if let Some((table, key, action)) = action {
         act(editor, &table, &key, action);
@@ -250,8 +226,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
 
 pub fn row_icon(
     ctx: &egui::Context,
-    form: &mut crate::forms::FormState,
-    project: &crate::project::Project,
+    form: &mut forms::FormState,
+    project: &Project,
     table: &str,
     key: &str,
     budget: &mut u32,
@@ -261,34 +237,25 @@ pub fn row_icon(
             let model_key = if table == "model" {
                 key.to_owned()
             } else {
-                project.files.json(&crate::project::row_file(table, key))?["model"]
+                project.files.json(&row_file(table, key))?["model"]
                     .as_str()?
                     .to_owned()
             };
-            let model = project
-                .files
-                .json(&crate::project::row_file("model", &model_key))?;
+            let model = project.files.json(&row_file("model", &model_key))?;
             let image = model["sprites"]["image"].as_str()?;
             let thumb = form
                 .thumbnails
                 .image_within(ctx, &project.files, image, budget)?;
-            let w = model["sprites"]["frame_size"]["width"].as_f64()? as f32;
-            let h = model["sprites"]["frame_size"]["height"].as_f64()? as f32;
-            let frame = model["sprites"]["actions"]["idle"]["s"][0]["frame"]
-                .as_u64()
-                .unwrap_or(0) as f32;
-            let columns = (thumb.size[0] as f32 / w).floor().max(1.0);
-            let x = (frame % columns) * w;
-            let y = (frame / columns).floor() * h;
-            let scale = 18.0 / h.max(1.0);
+            let frame = thumbs::model_frame(&model, &thumb);
+            let scale = 18.0 / frame.size.y.max(1.0);
             Some(IconImage {
                 texture: thumb.texture.id(),
-                uv: crate::thumbs::uv(thumb.size, x, y, w, h),
-                size: egui::vec2(w * scale, h * scale),
+                uv: frame.uv,
+                size: frame.size * scale,
             })
         }
         "item" | "interface_icon" | "cursor" | "attention" => {
-            let row = project.files.json(&crate::project::row_file(table, key))?;
+            let row = project.files.json(&row_file(table, key))?;
             let path = row["icon"].as_str().or_else(|| row["image"].as_str())?;
             let thumb = form.thumbnails.icon(ctx, &project.files, path, budget)?;
             Some(super::assets::icon_image(&thumb))
@@ -299,7 +266,7 @@ pub fn row_icon(
 
 fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     let over_browser = ui.ui_contains_pointer();
-    let on_row_form = matches!(super::active_tab(editor), Some(Tab::Row { .. }));
+    let on_row_form = matches!(super::active_tab(editor), Some(EditorTab::Row { .. }));
     if (!over_browser && !on_row_form) || ui.ctx().text_edit_focused() {
         return;
     }
@@ -313,12 +280,24 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     }
     let pressed = ui.input_mut(|i| {
         [
-            (Action::Rename, i.consume_key(Modifiers::NONE, Key::F2)),
-            (Action::Usages, i.consume_key(Modifiers::SHIFT, Key::F12)),
-            (Action::Duplicate, i.consume_key(Modifiers::COMMAND, Key::D)),
-            (Action::Delete, i.consume_key(Modifiers::NONE, Key::Delete)),
             (
-                Action::OpenTab,
+                BrowserAction::Rename,
+                i.consume_key(Modifiers::NONE, Key::F2),
+            ),
+            (
+                BrowserAction::Usages,
+                i.consume_key(Modifiers::SHIFT, Key::F12),
+            ),
+            (
+                BrowserAction::Duplicate,
+                i.consume_key(Modifiers::COMMAND, Key::D),
+            ),
+            (
+                BrowserAction::Delete,
+                i.consume_key(Modifiers::NONE, Key::Delete),
+            ),
+            (
+                BrowserAction::OpenTab,
                 i.consume_key(Modifiers::COMMAND, Key::Enter),
             ),
         ]
@@ -331,8 +310,13 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     }
 }
 
-fn row_menu(ui: &mut Ui, action: &mut Option<(String, String, Action)>, table: &str, key: &str) {
-    let mut pick = |what: Action, ui: &mut Ui| {
+fn row_menu(
+    ui: &mut Ui,
+    action: &mut Option<(String, String, BrowserAction)>,
+    table: &str,
+    key: &str,
+) {
+    let mut pick = |what: BrowserAction, ui: &mut Ui| {
         *action = Some((table.to_owned(), key.to_owned(), what));
         ui.close();
     };
@@ -340,39 +324,39 @@ fn row_menu(ui: &mut Ui, action: &mut Option<(String, String, Action)>, table: &
         .add(egui::Button::new("Open").shortcut_text("Enter"))
         .clicked()
     {
-        pick(Action::Open, ui);
+        pick(BrowserAction::Open, ui);
     }
     if ui
         .add(egui::Button::new("Open in new tab").shortcut_text("Ctrl Enter"))
         .clicked()
     {
-        pick(Action::OpenTab, ui);
+        pick(BrowserAction::OpenTab, ui);
     }
     ui.separator();
     if ui
         .add(egui::Button::new("Duplicate").shortcut_text("Ctrl D"))
         .clicked()
     {
-        pick(Action::Duplicate, ui);
+        pick(BrowserAction::Duplicate, ui);
     }
     if ui
         .add(egui::Button::new("Rename key…").shortcut_text("F2"))
         .clicked()
     {
-        pick(Action::Rename, ui);
+        pick(BrowserAction::Rename, ui);
     }
     if ui
         .add(egui::Button::new("Show usages").shortcut_text("Shift F12"))
         .clicked()
     {
-        pick(Action::Usages, ui);
+        pick(BrowserAction::Usages, ui);
     }
     ui.separator();
     if ui
         .add(egui::Button::new("Delete…").shortcut_text("Del"))
         .clicked()
     {
-        pick(Action::Delete, ui);
+        pick(BrowserAction::Delete, ui);
     }
 }
 
@@ -380,7 +364,7 @@ fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bo
     let mut selection = if editor.selection.table == table && (ctrl || shift) {
         editor.selection.clone()
     } else {
-        Selection::rows(table, Vec::new())
+        RowSelection::rows(table, Vec::new())
     };
     if ctrl && selection.keys.contains(&key.to_owned()) {
         selection.keys.retain(|k| k != key);
@@ -412,19 +396,19 @@ fn select_row(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bo
     editor.panels.right = RightTab::Inspector;
 }
 
-pub fn act(editor: &mut Editor, table: &str, key: &str, action: Action) {
+pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
     match action {
-        Action::Open | Action::OpenTab => {
-            editor.select(Selection::row(table, key));
-            editor.open_tab(Tab::for_row(table, key));
+        BrowserAction::Open | BrowserAction::OpenTab => {
+            editor.select(RowSelection::row(table, key));
+            editor.open_tab(EditorTab::for_row(table, key));
         }
-        Action::Rename => {
+        BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
                 editor.toast(format!(
                     "{table}/{key} is a fixture: the engine names it in code"
                 ));
             } else {
-                editor.dialogs.push(Dialog::Rename(RenameDialog {
+                editor.dialogs.push(ModalDialog::Rename(RenameDialog {
                     target: RenameTarget::Row {
                         table: table.to_owned(),
                         key: key.to_owned(),
@@ -434,12 +418,12 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: Action) {
                 }));
             }
         }
-        Action::Duplicate => crate::rows::duplicate(editor, table, key),
-        Action::Usages => {
-            editor.select(Selection::row(table, key));
+        BrowserAction::Duplicate => rows::duplicate(editor, table, key),
+        BrowserAction::Usages => {
+            editor.select(RowSelection::row(table, key));
             editor.panels.right = RightTab::UsedBy;
         }
-        Action::Delete => crate::rows::delete_dialog(editor, table, vec![key.to_owned()]),
+        BrowserAction::Delete => rows::delete_dialog(editor, table, vec![key.to_owned()]),
     }
 }
 
@@ -507,7 +491,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                 }
             }
         }
-        let mut folders: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        let mut folders: BTreeSet<String> = std::collections::BTreeSet::new();
         for path in project.files.paths_under("assets/") {
             let relative = path.trim_start_matches("assets/");
             if super::assets::kind(relative).is_none() {
@@ -539,7 +523,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         editor.views.browser.search.trim()
     ));
     let mut clicked: Option<(String, String, bool, bool)> = None;
-    let mut action: Option<(String, String, Action)> = None;
+    let mut action: Option<(String, String, BrowserAction)> = None;
     let mut open_module: Option<(String, String, usize)> = None;
     let mut open_file: Option<String> = None;
     let mut heading: Option<&str> = None;
@@ -575,7 +559,7 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                                 Some((table.clone(), key.clone(), modifiers.ctrl, modifiers.shift));
                         }
                         if response.double_clicked() {
-                            action = Some((table.clone(), key.clone(), Action::Open));
+                            action = Some((table.clone(), key.clone(), BrowserAction::Open));
                         }
                         response.context_menu(|ui| row_menu(ui, &mut action, table, key));
                     }
@@ -625,7 +609,9 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         });
     if enter && let Some(first) = hits.first() {
         match first {
-            Hit::Row { table, key } => action = Some((table.clone(), key.clone(), Action::Open)),
+            Hit::Row { table, key } => {
+                action = Some((table.clone(), key.clone(), BrowserAction::Open))
+            }
             Hit::Module {
                 table, key, index, ..
             } => open_module = Some((table.clone(), key.clone(), *index)),
@@ -639,19 +625,19 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
         act(editor, &table, &key, action);
     }
     if let Some((table, key, index)) = open_module {
-        editor.select(Selection {
+        editor.select(RowSelection {
             table: table.clone(),
             keys: vec![key.clone()],
             parts: vec![format!("/modules/{index}")],
         });
-        editor.open_tab(Tab::for_row(&table, &key));
+        editor.open_tab(EditorTab::for_row(&table, &key));
         editor.panels.right = RightTab::Inspector;
     }
     if let Some(path) = open_file {
-        editor.panels.left = crate::app::LeftTab::Assets;
+        editor.panels.left = LeftTab::Assets;
         editor.views.assets.search = path.trim_end_matches('/').to_owned();
         if !path.ends_with('/') {
-            editor.select(Selection::row("asset", &path));
+            editor.select(RowSelection::row("asset", &path));
             editor.panels.right = RightTab::Inspector;
         }
     }
@@ -682,7 +668,7 @@ fn result_line(
             .layout(Layout::left_to_right(Align::Center)),
     );
     child.add_space(6.0);
-    if let Some((kind, owner)) = module {
+    if let Some((kind, owner)) = &module {
         widgets::badge(&mut child, kind);
         child.label(theme::mono(label).size(13.0));
         child.label(theme::faint("·"));
@@ -702,12 +688,8 @@ fn result_line(
         if let Some(icon) = icon {
             child.add(egui::Image::from_texture((icon.texture, icon.size)).uv(icon.uv));
         }
-        child.label(theme::mono(label).size(13.0).color(if selected {
-            theme::TEXT
-        } else {
-            theme::CODE
-        }));
-    } else {
+    }
+    if module.is_none() {
         child.label(theme::mono(label).size(13.0).color(if selected {
             theme::TEXT
         } else {

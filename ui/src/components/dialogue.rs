@@ -21,7 +21,7 @@ use crate::components::rich_text::{RichPiece, RichText, Typewriter, rich_text};
 use crate::components::text::styled_text;
 use crate::cursor::CursorStyle;
 use crate::motion::transition::STANDARD_ENTER;
-use crate::state::ancestor_with;
+use crate::state::{ancestor_with, descendants};
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::{palette, radius, spacing, typography};
@@ -529,14 +529,5 @@ fn row_count(world: &World, list: Entity) -> usize {
 }
 
 fn descendant_with<C: Component>(world: &World, root: Entity) -> Option<Entity> {
-    let mut stack = vec![root];
-    while let Some(entity) = stack.pop() {
-        if world.get::<C>(entity).is_some() {
-            return Some(entity);
-        }
-        if let Some(kids) = world.get::<Children>(entity) {
-            stack.extend(kids.iter());
-        }
-    }
-    None
+    descendants(world, root).find(|&entity| world.get::<C>(entity).is_some())
 }

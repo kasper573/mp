@@ -3,13 +3,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use game::core::content::{Content, FilesystemFolder, LoadReport};
+use game::systems::load_content;
 
 pub fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
 pub fn load(folder: &Path) -> Result<Content, LoadReport> {
-    game::systems::load_content(
+    load_content(
         Arc::new(FilesystemFolder(folder.to_path_buf())),
         "cargo test failed",
     )

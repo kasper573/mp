@@ -11,26 +11,29 @@ use bevy_replicon::prelude::Replicated;
 use game::core::content::Content;
 use game::systems::movement::Position;
 use game::systems::visibility::seen_by;
+use serde::Deserialize;
+
+use crate::sim;
 
 const AREAS: usize = 250; // near the current budget crossover: the representative heavy workload
 const MEASURE: usize = 400;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Env {
     no_clients: Option<bool>,
 }
 
-pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: Content) {
+pub fn run(out_dir: &Path, layout: sim::Layout, content: Content) {
     let env: Env = envy::prefixed("RIFT_BENCH_")
         .from_env()
         .expect("RIFT_BENCH_* environment");
-    let (mut worlds, rosters) = crate::sim::worlds(AREAS, layout, &assets);
+    let (mut worlds, rosters) = sim::worlds(AREAS, layout, &content);
     if !env.no_clients.unwrap_or(false) {
-        crate::sim::connect(&mut worlds, &rosters);
+        sim::connect(&mut worlds, &rosters);
     }
 
-    for _ in 0..crate::sim::WARMUP {
-        crate::sim::step_single_threaded(&mut worlds);
+    for _ in 0..sim::WARMUP {
+        sim::step_single_threaded(&mut worlds);
     }
 
     report_aoi(&mut worlds);
@@ -45,7 +48,7 @@ pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: Content) {
     crate::BYTES.store(0, Relaxed);
     let started = Instant::now();
     for _ in 0..MEASURE {
-        crate::sim::step_single_threaded(&mut worlds);
+        sim::step_single_threaded(&mut worlds);
     }
     let elapsed = started.elapsed();
     let allocs = crate::ALLOCS.load(Relaxed);

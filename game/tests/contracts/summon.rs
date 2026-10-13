@@ -1,6 +1,6 @@
 use bevy_ecs::prelude::*;
 use game::systems::combat::{self, AttackRequest, Attitude};
-use game::systems::npc::Id as NpcId;
+use game::systems::npc::{Id as NpcId, Npc};
 use game::systems::npc::{Summoned, summon};
 use game::systems::player::ClientId;
 use game::systems::stat::{self, StatKind};
@@ -14,7 +14,7 @@ use crate::support::{
 fn summoned(sim: &mut Sim, what: NpcId) -> Vec<Entity> {
     let world = sim.world();
     world
-        .query::<(Entity, &game::systems::npc::Npc)>()
+        .query::<(Entity, &Npc)>()
         .iter(world)
         .filter(|(_, npc)| npc.def == what)
         .map(|(entity, _)| entity)

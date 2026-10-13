@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use game::core::content::FilesystemFolder;
+use game::systems::load_content;
 
 #[test]
 fn every_template_loads() {
@@ -14,7 +15,7 @@ fn every_template_loads() {
         }
         seen += 1;
         let folder = Arc::new(FilesystemFolder(folder.clone()));
-        if let Err(report) = game::systems::load_content(folder, "cargo test failed") {
+        if let Err(report) = load_content(folder, "cargo test failed") {
             panic!("{}: {report}", folder_name(&templates, &report.folder));
         }
     }

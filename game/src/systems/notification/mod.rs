@@ -8,19 +8,20 @@ pub mod intro;
 pub mod milestone;
 mod rows;
 
+pub use intro::IntroAppearance;
+pub use rows::{NotificationRow, NotificationRows};
+
 use std::borrow::Cow;
 
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
-use bevy_replicon::prelude::{SendTargets, ToClients};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::content::{Content, ContentId, Fixture, Loading, RowCheck};
+use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
+use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::math::Pos;
 use crate::core::platform::ClientPlatform;
 use crate::core::script::{
@@ -32,27 +33,23 @@ use crate::systems::actor::Rgba;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
-use crate::systems::npc::Id as NpcId;
-use crate::systems::npc::{Npc, NpcDef};
+use crate::systems::npc::{Id as NpcId, Npc, NpcDef};
 use crate::systems::player::Players;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::scene::{Scene as GameScene, despawn_all};
 use crate::systems::script::condition;
 use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Audience, Link};
 use crate::systems::script::{Reach, RiftScripting};
 use crate::systems::text::{self, LineText, Motion, Span, SpanText};
 use crate::systems::visibility;
 
-pub type NotificationId = ContentId<NotificationDef>;
-pub type Id = NotificationId;
-pub use intro::IntroAppearance;
-pub use rows::{NotificationRow, NotificationRows};
+pub type Id = ContentId<NotificationDef>;
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
 const LATE_AFTER: Seconds = Seconds(2.0);
 const LONGEST_ROW_WORDS: usize = 30;
 
-pub fn register(app: &mut bevy_app::App) {
+pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.add_mapped_server_message::<NotificationSent>(Channel::Ordered)
         .add_server_message::<SoundPlayed>(Channel::Ordered)
@@ -317,7 +314,7 @@ fn notification_kind_from<'de, D: serde::Deserializer<'de>>(
     })
 }
 
-impl crate::core::content::ContentRow for NotificationDef {
+impl ContentRow for NotificationDef {
     const TABLE: &'static str = "notification";
 }
 
@@ -342,7 +339,7 @@ impl NotificationDef {
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub notification: NotificationId,
+    pub notification: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
@@ -407,10 +404,7 @@ pub fn play_sound(
                 return;
             };
             for client in visibility::seen_by(world, source) {
-                world.write_message(ToClients {
-                    targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(client)),
-                    message: played,
-                });
+                visibility::send_to(world, client, played);
             }
         }
         Audience::Subject => {
@@ -509,10 +503,7 @@ impl Plugin for NotificationPlugin {
             feed::FeedPlugin,
         ))
         .add_systems(OnEnter(GameScene::Area), spawn_places)
-        .add_systems(
-            OnExit(GameScene::Area),
-            crate::systems::scene::despawn_all::<PlacesRoot>,
-        )
+        .add_systems(OnExit(GameScene::Area), despawn_all::<PlacesRoot>)
         .add_systems(
             Update,
             (deliver, deliver_sounds).run_if(in_state(GameScene::Area)),
