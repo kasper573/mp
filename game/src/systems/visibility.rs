@@ -2,7 +2,7 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
 use bevy_replicon::prelude::{
-    AppVisibilityExt, Replicated, SendTargets, ToClients, VisibilityFilter,
+    AppVisibilityExt, Replicated, ScopeLifetime, SendTargets, ToClients, VisibilityFilter,
 };
 use bevy_replicon::server::visibility::client_visibility::ClientVisibility;
 use bevy_replicon::server::visibility::filters_mask::FilterBit;
@@ -193,7 +193,7 @@ impl VisibilityFilter for OwnedBy {
     }
 }
 
-fn grant_own_sight(add: On<Add, ClientId>, clients: Query<&ClientId>, mut commands: Commands) {
+fn grant_own_sight(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Commands) {
     if let Ok(&own) = clients.get(add.entity) {
         commands.entity(add.entity).insert(PrivateSight {
             own,
@@ -203,7 +203,7 @@ fn grant_own_sight(add: On<Add, ClientId>, clients: Query<&ClientId>, mut comman
 }
 
 fn reveal_to_all(
-    remove: On<Remove, Presence>,
+    remove: On<Remove<Presence>>,
     bit: Res<PresenceBit>,
     mut clients: Query<&mut ClientVisibility>,
 ) {
@@ -242,7 +242,7 @@ impl FromWorld for PresenceBit {
 fn entity_scope_bit(world: &mut World) -> FilterBit {
     world.resource_scope(|world, mut filters: Mut<FilterRegistry>| {
         world.resource_scope(|world, mut registry: Mut<ReplicationRegistry>| {
-            filters.register_scope::<Entity>(world, &mut registry)
+            filters.register_scope::<Entity>(world, &mut registry, ScopeLifetime::WhileVisible)
         })
     })
 }

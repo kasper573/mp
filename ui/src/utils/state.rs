@@ -1,6 +1,6 @@
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
-use bevy_picking::prelude::{Out, Pointer, Press, Release};
+use bevy_picking::prelude::{PointerOut, PointerPress, PointerRelease};
 use bevy_ui::{Checkable, Checked, Display, Node, Pressed};
 use bevy_ui_widgets::Activate;
 
@@ -195,7 +195,7 @@ pub(crate) fn apply_gating(mut gated: Query<(&mut Node, Has<Checked>), With<Gate
 pub struct Pressable;
 
 pub(crate) fn on_pressable_press(
-    press: On<Pointer<Press>>,
+    press: On<PointerPress>,
     pressable: Query<(), With<Pressable>>,
     mut commands: Commands,
 ) {
@@ -205,7 +205,7 @@ pub(crate) fn on_pressable_press(
 }
 
 pub(crate) fn on_pressable_release(
-    release: On<Pointer<Release>>,
+    release: On<PointerRelease>,
     pressable: Query<(), With<Pressable>>,
     mut commands: Commands,
 ) {
@@ -215,7 +215,7 @@ pub(crate) fn on_pressable_release(
 }
 
 pub(crate) fn on_pressable_out(
-    out: On<Pointer<Out>>,
+    out: On<PointerOut>,
     pressable: Query<(), With<Pressable>>,
     mut commands: Commands,
 ) {

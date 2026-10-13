@@ -1,10 +1,9 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
+use ui::TooltipText;
 use ui::tokens::{palette, spacing, typography};
 use ui::{
     ChipOptions, Family, InspectableOptions, OnTap, RichPiece, RichSpan, RichText, TextVoice,
 };
-use ui::{TooltipText, component};
 
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
@@ -126,25 +125,24 @@ pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
             width: Val::Percent(100.0),
         }
         Children [
-            (
-                Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
+            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
+            Children [
+                Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
+                ImageNode { image: {assets.load(def.icon.path())} }
+                --
+                Node { flex_direction: FlexDirection::Column }
                 Children [
-                    (
-                        Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                        component(ImageNode::new(assets.load(def.icon.path())))
-                    ),
-                    (
-                        Node { flex_direction: FlexDirection::Column }
-                        Children [
-                            {EntityScene(ui::styled_text(def.name.as_str(), ink, typography::NAME))},
-                            {EntityScene(ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION))},
-                        ]
-                    ),
+                    @{ui::styled_text(def.name.as_str(), ink, typography::NAME)}
+                    --
+                    @{ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION)}
                 ]
-            ),
-            ( Node { column_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap } Children [ {tags} ] ),
-            {EntityScene(ui::rich_text(flavor, false))},
-            ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {facts} ] ),
+            ]
+            --
+            Node { column_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap } Children [ {tags} ]
+            --
+            @{ui::rich_text(flavor, false)}
+            --
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {facts} ]
         ]
     })
 }
@@ -206,7 +204,7 @@ fn show_card(world: &mut World) {
 fn padded(sheet: Box<dyn Scene>) -> impl Scene {
     bsn! {
         Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-        Children [ {EntityScene(sheet)} ]
+        Children [ @{sheet} ]
     }
 }
 

@@ -1,9 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{DragHandle, DragRoot, OnSettle, component};
+use ui::{DragHandle, DragRoot, OnSettle};
 
 use super::card::{Countdown, icon, live_text};
 use super::{Parties, QuestId, QuestLog, QuestResult};
@@ -52,13 +51,13 @@ impl Widget for QuestTrackerWidget {
             ..default()
         };
         Box::new(bsn! {
-            template_value(node)
+            node
             BackgroundColor({hud::PANEL_BG})
-            component(BorderColor::all(hud::BORDER))
+            BorderColor::all(hud::BORDER)
             DragRoot
             DragHandle
             QuestTracker
-            component(OnSettle::new(move |world, geom| hud::persist_widget(world, id, geom)))
+            ~{OnSettle::new(move |world, geom| hud::persist_widget(world, id, geom))}
         })
     }
     fn sync(&self, world: &mut World) {
@@ -244,16 +243,15 @@ fn header(count: usize, folded: bool) -> impl Scene {
         Node { justify_content: JustifyContent::SpaceBetween, align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Pickable::IGNORE
         Children [
-            {EntityScene(ui::styled_text(title, ink.with_alpha(0.7), typography::LABEL))},
-            (
-                {ui::button_styled(ui::button::intent::SECONDARY, ui::ButtonSize::Sm, toggle)}
-                on(|_: On<ui::Activate>, mut commands: Commands| {
-                    commands.queue(|world: &mut World| {
-                        let mut folded = world.resource_mut::<Folded>();
-                        folded.0 = !folded.0;
-                    });
-                })
-            ),
+            @{ui::styled_text(title, ink.with_alpha(0.7), typography::LABEL)}
+            --
+            @{ui::button_styled(ui::button::intent::SECONDARY, ui::ButtonSize::Sm, toggle)}
+            on(|_: On<ui::Activate>, mut commands: Commands| {
+                commands.queue(|world: &mut World| {
+                    let mut folded = world.resource_mut::<Folded>();
+                    folded.0 = !folded.0;
+                });
+            })
         ]
     }
 }
@@ -277,8 +275,9 @@ fn entry_scene(
             Box::new(bsn! {
                 Node { column_gap: Val::Px({spacing::S}), align_items: AlignItems::Center }
                 Children [
-                    {EntityScene(icon(assets, &InterfaceIcon::Timed.get(content).image, 12.0))},
-                    {EntityScene(live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION))},
+                    @{icon(assets, &InterfaceIcon::Timed.get(content).image, 12.0)}
+                    --
+                    @{live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION)}
                 ]
             })
         })
@@ -312,8 +311,9 @@ fn entry_scene(
                 }
                 Pickable::IGNORE
                 Children [
-                    {EntityScene(ui::styled_text(label.clone(), color, typography::CAPTION))},
-                    {count},
+                    @{ui::styled_text(label.clone(), color, typography::CAPTION)}
+                    --
+                    {count}
                 ]
             })
         })
@@ -323,16 +323,17 @@ fn entry_scene(
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(1.0), width: Val::Percent(100.0) }
         Pickable::IGNORE
         Children [
-            (
-                Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
-                Pickable::IGNORE
-                Children [
-                    {mark},
-                    ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(title, ink, typography::LABEL))} ] ),
-                    {timer},
-                ]
-            ),
-            {rows},
+            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
+            Pickable::IGNORE
+            Children [
+                {mark}
+                --
+                Node { flex_grow: 1.0 } Children [ @{ui::styled_text(title, ink, typography::LABEL)} ]
+                --
+                {timer}
+            ]
+            --
+            {rows}
         ]
     })
 }

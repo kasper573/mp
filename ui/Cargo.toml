@@ -22,6 +22,7 @@ bevy_color = { workspace = true }
 bevy_text = { workspace = true }
 bevy_window = { workspace = true }
 bevy_math = { workspace = true }
+bevy_curve = { workspace = true }
 bevy_time = { workspace = true }
 bevy_scene = { workspace = true }
 # The `gallery` binary (a standalone showcase window) needs the full Bevy app — windowing, rendering,

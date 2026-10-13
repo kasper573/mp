@@ -1,6 +1,6 @@
 use crate::Family;
 use bevy_ecs::hierarchy::Children;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{AlignItems, BorderRadius, JustifyContent, Node, UiRect, Val};
 use bevy_ui_widgets::Button;
 
@@ -71,8 +71,8 @@ pub fn button_styled(
     bsn! {
         Node
         Button
-        template_value(style)
-        Children [ {EntityScene(label)} ]
+        style
+        Children [ @{label} ]
     }
 }
 

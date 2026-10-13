@@ -23,7 +23,7 @@ impl Plugin for ObjectPlugin {
 }
 
 fn attach_look(
-    add: On<Add, AreaObject>,
+    add: On<Add<AreaObject>>,
     objects: Query<(&AreaObject, &Hitbox)>,
     assets: Res<AssetServer>,
     mut commands: Commands,

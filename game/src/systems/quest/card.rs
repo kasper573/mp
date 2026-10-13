@@ -1,9 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{ChipOptions, Family, component};
+use ui::{ChipOptions, Family};
 
 use super::{
     ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
@@ -208,9 +207,11 @@ fn turn_in(
     parts.push(Box::new(bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, flex_wrap: FlexWrap::Wrap }
         Children [
-            {EntityScene(caption("Rewards"))},
-            {EntityScene(reward_chips(content, assets, def))},
-            {pick_note},
+            @{caption("Rewards")}
+            --
+            @{reward_chips(content, assets, def)}
+            --
+            {pick_note}
         ]
     }));
     parts
@@ -234,8 +235,9 @@ fn decision(content: &Content, quest: QuestId) -> Vec<Box<dyn Scene>> {
             Box::new(bsn! {
                 Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}), flex_basis: Val::Px(0.0), flex_grow: 1.0 }
                 Children [
-                    {EntityScene(ui::styled_text(path.choice.as_str(), ink, typography::LABEL))},
-                    {means},
+                    @{ui::styled_text(path.choice.as_str(), ink, typography::LABEL)}
+                    --
+                    {means}
                 ]
             })
         })
@@ -254,8 +256,9 @@ fn head(content: &Content, assets: &AssetServer, def: &'static QuestDef) -> impl
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
         Children [
-            {EntityScene(icon(assets, def.icon(content), PICK))},
-            {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::NAME))},
+            @{icon(assets, def.icon(content), PICK)}
+            --
+            @{ui::styled_text(def.title.as_str(), ink, typography::NAME)}
         ]
     }
 }
@@ -275,10 +278,13 @@ fn hand_in_row(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(caption("Hand in"))},
-            {EntityScene(icon(assets, &stack.item.get(content).icon, ICON))},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(counted(content, stack), ink, typography::BODY))} ] ),
-            {EntityScene(ui::styled_text(format!("{held} in your bag"), held_color, typography::CAPTION))},
+            @{caption("Hand in")}
+            --
+            @{icon(assets, &stack.item.get(content).icon, ICON)}
+            --
+            Node { flex_grow: 1.0 } Children [ @{ui::styled_text(counted(content, stack), ink, typography::BODY)} ]
+            --
+            @{ui::styled_text(format!("{held} in your bag"), held_color, typography::CAPTION)}
         ]
     }
 }
@@ -298,9 +304,11 @@ pub(super) fn objective_row(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(icon(assets, objective.icon(content), ICON))},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(progress.label.clone(), color, typography::BODY))} ] ),
-            {EntityScene(ui::styled_text(count, color, typography::LABEL))},
+            @{icon(assets, objective.icon(content), ICON)}
+            --
+            Node { flex_grow: 1.0 } Children [ @{ui::styled_text(progress.label.clone(), color, typography::BODY)} ]
+            --
+            @{ui::styled_text(count, color, typography::LABEL)}
         ]
     }
 }
@@ -336,7 +344,7 @@ pub(super) fn reward_chips(
         .collect();
     bsn! {
         Node { column_gap: Val::Px({spacing::M}), row_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap }
-        Children [ {xp}, {items} ]
+        Children [ {xp} -- {items} ]
     }
 }
 
@@ -346,10 +354,10 @@ pub(super) fn picks(content: &Content, assets: &AssetServer, def: &QuestDef) -> 
         .iter()
         .map(|stack| -> Box<dyn Scene> {
             let slot = bsn! {
-                template_value(crate::systems::hud::slot_node())
+                crate::systems::hud::slot_node()
                 BackgroundColor({crate::systems::hud::SLOT_BG})
-                component(BorderColor::all(crate::systems::hud::SLOT_BORDER))
-                Children [ {EntityScene(icon(assets, &stack.item.get(content).icon, PICK))} ]
+                BorderColor::all(crate::systems::hud::SLOT_BORDER)
+                Children [ @{icon(assets, &stack.item.get(content).icon, PICK)} ]
             };
             Box::new(ui::inspectable(
                 item::card::inspectable(content, stack.item),
@@ -385,7 +393,7 @@ pub(super) fn caption(text: impl Into<String>) -> impl Scene {
 pub(super) fn icon(assets: &AssetServer, icon: &AssetRef, size: f32) -> impl Scene + use<> {
     bsn! {
         Node { width: Val::Px({size}), height: Val::Px({size}), flex_shrink: 0.0 }
-        component(ImageNode::new(assets.load(icon.path())))
+        ImageNode { image: {assets.load(icon.path())} }
         Pickable::IGNORE
     }
 }
@@ -444,7 +452,7 @@ pub(super) fn live_text(
 ) -> impl Scene + use<> {
     let now = shows.label(log, quest).unwrap_or_default();
     bsn! {
-        {ui::styled_text(now, color, typography)}
+        @{ui::styled_text(now, color, typography)}
         QuestClock { quest: {Some(quest)}, shows: {shows} }
     }
 }
@@ -452,9 +460,9 @@ pub(super) fn live_text(
 pub(super) fn live_bar(content: &Content, log: &QuestLog, quest: QuestId) -> impl Scene + use<> {
     let (left, limit) = remaining(content, log, quest);
     bsn! {
-        {ui::progress(left, limit)}
+        @{ui::progress(left, limit)}
         QuestClockBar { quest: {Some(quest)} }
-        Children [ {EntityScene(ui::progress_indicator())} ]
+        Children [ @{ui::progress_indicator()} ]
     }
 }
 

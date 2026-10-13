@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::widget::ImageNode;
 
 use crate::components::input::{InputRef, input_cap};
@@ -8,7 +8,7 @@ use crate::cursor::CursorStyle;
 use crate::drag::{DragHandle, DragRoot, OnSettle, OnTap};
 use crate::style::Style;
 use crate::theme::theme;
-use crate::{Align, Side, component};
+use crate::{Align, Side};
 
 const WIDGET: f32 = 48.0;
 const BADGE: f32 = 12.0;
@@ -34,30 +34,28 @@ pub fn widget(opts: WidgetOptions) -> impl Scene {
         ..default()
     };
     bsn! {
-        template_value(node)
+        node
         BackgroundColor({family.base})
-        component(BorderColor::all(family.border))
-        {tooltip(false)}
+        BorderColor::all(family.border)
+        @{tooltip(false)}
         DragRoot
         DragHandle
-        component(CursorStyle::Pointer)
-        component(opts.on_tap)
-        component(opts.on_settle)
+        CursorStyle::Pointer
+        opts.on_tap
+        opts.on_settle
         Children [
-            (
-                Node {
-                    width: Val::Px(32.0),
-                    height: Val::Px(32.0),
-                    margin: {UiRect::all(Val::Px(8.0))},
-                }
-                component(ImageNode::new(opts.icon))
-                Pickable { should_block_lower: false, is_hoverable: false }
-            ),
-            {opts.badge.map(|input| EntityScene(badge(input)))},
-            (
-                {tooltip_content(Side::Left, Align::Center, 0.0)}
-                Children [ {EntityScene(label(opts.tooltip))} ]
-            ),
+            Node {
+                width: Val::Px(32.0),
+                height: Val::Px(32.0),
+                margin: {UiRect::all(Val::Px(8.0))},
+            }
+            ImageNode { image: {opts.icon} }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            --
+            {Vec::from_iter(opts.badge.map(badge))}
+            --
+            @{tooltip_content(Side::Left, Align::Center, 0.0)}
+            Children [ @{label(opts.tooltip)} ]
         ]
     }
 }
@@ -66,17 +64,17 @@ fn badge(input: InputRef) -> impl Scene {
     bsn! {
         Node { position_type: PositionType::Absolute, right: Val::Px(2.0), bottom: Val::Px(2.0) }
         Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ {EntityScene(input_cap(input, BADGE, theme().surface_floating.on))} ]
+        Children [ @{input_cap(input, BADGE, theme().surface_floating.on)} ]
     }
 }
 
 fn label(text: String) -> impl Scene {
     let family = theme().surface_inset;
     bsn! {
-        template_value(Style::new().background(family.base).node(|node| {
+        Style::new().background(family.base).node(|node| {
             node.padding = UiRect::axes(Val::Px(6.0), Val::Px(3.0));
-        }))
+        })
         Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ {EntityScene(text_colored(text, family.on))} ]
+        Children [ @{text_colored(text, family.on)} ]
     }
 }

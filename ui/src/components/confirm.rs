@@ -3,11 +3,10 @@ use std::time::Duration;
 use bevy_ecs::prelude::*;
 use bevy_input::ButtonInput;
 use bevy_input::keyboard::KeyCode;
-use bevy_scene::{EntityScene, Scene, bsn, on};
+use bevy_scene::{Scene, bsn, on};
 use bevy_time::Time;
 use bevy_ui::{FlexDirection, JustifyContent, Node, Val};
 
-use crate::component;
 use crate::components::button::{ButtonSize, button_styled, intent};
 use crate::components::dialog::modal;
 use crate::components::input::{InputCatalog, InputRef};
@@ -66,41 +65,38 @@ pub fn confirm_dialog(options: ConfirmOptions) -> impl Scene {
     let cancel_tap = on_cancel.0.clone();
     let content = bsn! {
         Children [
-            {EntityScene(styled_text(title, ink, typography::NAME))},
-            ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {lines} ] ),
-            (
-                Node { justify_content: JustifyContent::End, column_gap: Val::Px({spacing::L}) }
-                Children [
-                    (
-                        {button_styled(intent::DANGER, ButtonSize::Md, confirm)}
-                        on(move |activate: On<Activate>, mut commands: Commands| {
-                            let tap = confirm_tap.clone();
-                            let button = activate.entity;
-                            commands.queue(move |world: &mut World| {
-                                overlay::set_overlay_open(world, button, false);
-                                tap(world);
-                            });
-                        })
-                    ),
-                    (
-                        {button_styled(intent::PRIMARY, ButtonSize::Md, cancel)}
-                        on(move |activate: On<Activate>, mut commands: Commands| {
-                            let tap = cancel_tap.clone();
-                            let button = activate.entity;
-                            commands.queue(move |world: &mut World| {
-                                overlay::set_overlay_open(world, button, false);
-                                tap(world);
-                            });
-                        })
-                    ),
-                ]
-            ),
+            @{styled_text(title, ink, typography::NAME)}
+            --
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {lines} ]
+            --
+            Node { justify_content: JustifyContent::End, column_gap: Val::Px({spacing::L}) }
+            Children [
+                @{button_styled(intent::DANGER, ButtonSize::Md, confirm)}
+                on(move |activate: On<Activate>, mut commands: Commands| {
+                    let tap = confirm_tap.clone();
+                    let button = activate.entity;
+                    commands.queue(move |world: &mut World| {
+                        overlay::set_overlay_open(world, button, false);
+                        tap(world);
+                    });
+                })
+                --
+                @{button_styled(intent::PRIMARY, ButtonSize::Md, cancel)}
+                on(move |activate: On<Activate>, mut commands: Commands| {
+                    let tap = cancel_tap.clone();
+                    let button = activate.entity;
+                    commands.queue(move |world: &mut World| {
+                        overlay::set_overlay_open(world, button, false);
+                        tap(world);
+                    });
+                })
+            ]
         ]
     };
     bsn! {
-        {modal(true, false, bsn! { Node }, content)}
-        component(OnDismiss(on_cancel))
-        component(KeepInput(keep))
+        @{modal(true, false, bsn! { Node }, content)}
+        ~{OnDismiss(on_cancel)}
+        ~{KeepInput(keep)}
         DespawnOnClose
     }
 }

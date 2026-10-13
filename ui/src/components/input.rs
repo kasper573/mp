@@ -8,18 +8,17 @@ use bevy_ecs::system::SystemParam;
 use bevy_input::ButtonInput;
 use bevy_input::keyboard::KeyCode;
 use bevy_input::mouse::MouseButton;
-use bevy_picking::events::{Click, Pointer};
+use bevy_picking::events::PointerClick;
 use bevy_picking::pointer::PointerButton;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{Scene, bsn, template_value};
-use bevy_text::{TextColor, TextFont};
+use bevy_scene::{Scene, bsn};
+use bevy_text::{TextColor, TextFontTemplate};
 use bevy_ui::widget::Text;
 use bevy_ui::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, JustifyContent, Node, UiRect, Val,
 };
 
-use crate::component;
-use crate::components::text::font;
+use crate::components::text::font_template;
 use crate::tokens::{radius, typography};
 
 const CAP_SCALE: f32 = 0.85;
@@ -58,7 +57,7 @@ impl InputCatalog {
     pub fn clicked(
         &self,
         input: InputRef,
-        click: &Pointer<Click>,
+        click: &PointerClick,
         keys: &ButtonInput<KeyCode>,
     ) -> bool {
         self.0.get(&input).is_some_and(|entry| {
@@ -95,7 +94,7 @@ impl CatalogInput<'_> {
         self.catalog.keyed(input, key, &self.keys)
     }
 
-    pub(crate) fn clicked(&self, input: InputRef, click: &Pointer<Click>) -> bool {
+    pub(crate) fn clicked(&self, input: InputRef, click: &PointerClick) -> bool {
         self.catalog.clicked(input, click, &self.keys)
     }
 
@@ -136,7 +135,7 @@ pub struct ClickGesture {
 }
 
 impl ClickGesture {
-    pub fn matches(&self, click: &Pointer<Click>, keys: &ButtonInput<KeyCode>) -> bool {
+    pub fn matches(&self, click: &PointerClick, keys: &ButtonInput<KeyCode>) -> bool {
         pointer_button(self.button) == Some(click.button)
             && click.count.is_multiple_of(self.times.max(1))
             && KeyModifiers::held(keys) == self.modifiers
@@ -239,22 +238,20 @@ pub fn input_cap(input: InputRef, size: f32, color: Color) -> impl Scene {
         min_width: Val::Px(size * 1.3),
         ..Default::default()
     };
-    let label = TextFont {
+    let label = TextFontTemplate {
         font_size: (size * CAP_SCALE).into(),
-        ..font(typography::KEY)
+        ..font_template(typography::KEY)
     };
     bsn! {
-        template_value(node)
+        node
         BackgroundColor({color.with_alpha(color.alpha() * 0.12)})
-        component(BorderColor::all(color.with_alpha(color.alpha() * 0.5)))
+        BorderColor::all(color.with_alpha(color.alpha() * 0.5))
         Pickable::IGNORE
         Children [
-            (
-                component(InputLabel(input))
-                component(label)
-                component(TextColor(color))
-                Pickable::IGNORE
-            ),
+            ~{InputLabel(input)}
+            label
+            TextColor(color)
+            Pickable::IGNORE
         ]
     }
 }

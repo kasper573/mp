@@ -4,13 +4,12 @@ use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
 use bevy_picking::hover::Hovered;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{CommandsSceneExt, EntityScene, Scene, bsn, template_value};
+use bevy_scene::{CommandsSceneExt, Scene, bsn};
 use bevy_ui::{
     AlignItems, BorderRadius, Display, FlexDirection, GridPlacement, Node, Overflow,
     RepeatedGridTrack, UiRect, Val,
 };
 
-use crate::component;
 use crate::components::rich_text::{RichText, rich_text};
 use crate::components::text::styled_text;
 use crate::cursor::ClickThrough;
@@ -91,17 +90,16 @@ pub fn captions() -> impl Scene {
             row_gap: Val::Px({spacing::M}),
             max_width: Val::Vw(94.0),
         }
-        component(Hovered::default())
+        Hovered
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            (
-                LineHost
-                template_value(scrim_style())
-                component(SCRIM_PRESENCE)
-                Pickable { should_block_lower: false, is_hoverable: true }
-            ),
-            ( CountHost Node Pickable { should_block_lower: false, is_hoverable: true } ),
+            LineHost
+            scrim_style()
+            SCRIM_PRESENCE
+            Pickable { should_block_lower: false, is_hoverable: true }
+            --
+            CountHost Node Pickable { should_block_lower: false, is_hoverable: true }
         ]
     }
 }
@@ -195,10 +193,11 @@ impl PlaceParts<'_, '_> {
             if kept.iter().any(|(_, shown)| shown.key == line.key) {
                 continue;
             }
+            let shown = ShownLine(line.clone());
             let row = commands
                 .spawn_scene(bsn! {
-                    component(presence)
-                    component(ShownLine(line.clone()))
+                    presence
+                    shown
                     Node { display: Display::Grid, grid_template_columns: {vec![RepeatedGridTrack::flex(1, 1.0)]} }
                     Pickable::IGNORE
                 })
@@ -242,9 +241,9 @@ fn cell(content: Box<dyn Scene>) -> impl Scene {
             grid_row: {GridPlacement::start(1)},
             grid_column: {GridPlacement::start(1)},
         }
-        component(SWAP_PRESENCE)
+        SWAP_PRESENCE
         Pickable::IGNORE
-        Children [ {EntityScene(content)} ]
+        Children [ @{content} ]
     }
 }
 
@@ -265,8 +264,8 @@ fn count_row() -> impl Scene {
         });
     bsn! {
         CountRow
-        template_value(frame)
-        component(COUNT_PRESENCE)
+        frame
+        COUNT_PRESENCE
         Pickable { should_block_lower: false, is_hoverable: true }
     }
 }
@@ -297,12 +296,11 @@ fn caption_row(row: LabelledLine) -> impl Scene {
         }
         Pickable::IGNORE
         Children [
-            {EntityScene(label_text(&row.label, row.replaced, ink.with_alpha(0.7)))},
-            (
-                Node { max_height: Val::Px({ROW_LINE_HEIGHT * SHOWN_TEXT_LINES}), overflow: {Overflow::clip()} }
-                Pickable::IGNORE
-                Children [ {EntityScene(rich_text(text, false))} ]
-            ),
+            @{label_text(&row.label, row.replaced, ink.with_alpha(0.7))}
+            --
+            Node { max_height: Val::Px({ROW_LINE_HEIGHT * SHOWN_TEXT_LINES}), overflow: {Overflow::clip()} }
+            Pickable::IGNORE
+            Children [ @{rich_text(text, false)} ]
         ]
     }
 }

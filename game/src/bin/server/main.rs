@@ -33,7 +33,7 @@ use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
 use game::systems::spectate::{self, SpectatorTransfer};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
-use rand::RngCore;
+use rand::Rng;
 use renet2::{ConnectionConfig, DisconnectReason, RenetServer, ServerEvent};
 use transport::WsTransport;
 

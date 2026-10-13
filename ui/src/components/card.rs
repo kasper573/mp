@@ -1,5 +1,5 @@
 use bevy_picking::hover::Hovered;
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{BorderRadius, BoxShadow, FlexDirection, Pressed, UiRect, Val};
 
 use crate::motion::transition::STANDARD_ENTER;
@@ -73,7 +73,7 @@ pub fn card(opts: CardOptions) -> impl Scene {
         }
     });
     bsn! {
-        template_value(style)
+        style
         Pressable
     }
 }

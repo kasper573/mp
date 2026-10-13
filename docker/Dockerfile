@@ -5,7 +5,7 @@
 # Shared runtime: ubuntu plus the system CA bundle that rustls' verifier reads. Every service runs
 # the pyroscope agent, whose reqwest client loads the CA store at startup and panics without one;
 # the game-server additionally reaches keycloak.
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:26.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

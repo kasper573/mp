@@ -3,7 +3,6 @@ use crate::systems::player::Xp;
 use crate::systems::player::session;
 use crate::systems::stat;
 use bevy::prelude::*;
-use ui::component;
 use ui::{DragHandle, DragRoot, OnSettle, text_colored};
 
 #[derive(Component, Default, Clone)]
@@ -38,13 +37,13 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
         ..default()
     };
     Box::new(bsn! {
-        template_value(node)
+        node
         BackgroundColor({crate::systems::hud::PANEL_BG})
-        component(BorderColor::all(crate::systems::hud::BORDER))
+        BorderColor::all(crate::systems::hud::BORDER)
         DragRoot
         DragHandle
-        component(OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom)))
-        Children [ ( {text_colored(String::new(), Color::WHITE)} CharacterText ) ]
+        ~{OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom))}
+        Children [ @{text_colored(String::new(), Color::WHITE)} CharacterText ]
     })
 }
 

@@ -1,4 +1,4 @@
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{
     AlignItems, BorderRadius, Checkable, FlexDirection, JustifyContent, Node, UiRect, Val,
 };
@@ -17,11 +17,11 @@ pub fn radio_group(value: Option<String>) -> impl Scene {
             toggleable: false,
             initial: {value.into_iter().collect::<Vec<_>>()},
         }
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.flex_direction = FlexDirection::Column;
             node.width = Val::Percent(100.0);
             node.row_gap = Val::Px(spacing::L);
-        }))
+        })
     }
 }
 
@@ -32,18 +32,18 @@ pub fn radio_item(value: impl Into<String>) -> impl Scene {
         Checkable
         SelectItem { value: {value_str} }
         SelectTrigger
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.flex_direction = FlexDirection::Row;
             node.align_items = AlignItems::Center;
             node.column_gap = Val::Px(spacing::M);
-        }))
+        })
     }
 }
 
 pub fn radio_circle() -> impl Scene {
     bsn! {
         InheritChecked
-        template_value(circle_style())
+        circle_style()
     }
 }
 
@@ -56,7 +56,7 @@ pub fn radio_indicator() -> impl Scene {
         }
         InheritChecked
         Gated
-        template_value(Style::new().background(theme().primary.on))
+        Style::new().background(theme().primary.on)
     }
 }
 

@@ -1,6 +1,6 @@
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{BorderRadius, Node, Overflow, Val};
 
 use crate::state::ancestor_with;
@@ -19,23 +19,23 @@ pub fn progress(value: f32, max: f32) -> impl Scene {
     let fraction = (value / max).clamp(0.0, 1.0);
     bsn! {
         ProgressFraction({fraction})
-        template_value(Style::new()
+        Style::new()
             .background(theme().surface_inset.base)
             .node(|node| {
                 node.height = Val::Px(size::STEP_200);
                 node.width = Val::Percent(100.0);
                 node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
                 node.overflow = Overflow::clip_x();
-            }))
+            })
     }
 }
 
 pub fn progress_indicator() -> impl Scene {
     bsn! {
         ProgressIndicator
-        template_value(Style::new().background(theme().primary.base).node(|node| {
+        Style::new().background(theme().primary.base).node(|node| {
             node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
-        }))
+        })
     }
 }
 

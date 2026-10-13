@@ -4,14 +4,13 @@ use bevy_color::Alpha;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
-use bevy_picking::prelude::{Click, Out, Over, Pickable, Pointer};
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_picking::prelude::{Pickable, PointerClick, PointerOut, PointerOver};
+use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::{
     AlignItems, BorderRadius, FlexDirection, Node, PositionType, UiRect, UiTransform, Val,
 };
 
-use crate::component;
 use crate::components::rich_text::MotionPreference;
 use crate::cursor::{ClickThrough, CursorStyle};
 use crate::motion::transition::{STANDARD_ENTER, STANDARD_EXIT};
@@ -130,19 +129,19 @@ pub fn toaster(position: SonnerPosition) -> impl Scene {
     };
     position.place_toaster(&mut node);
     bsn! {
-        template_value(node)
+        node
         Toaster { position: {position} }
     }
 }
 
 pub fn toast(lasts: Duration) -> impl Scene {
     bsn! {
-        component(card_node())
+        card_node()
         Toast { lasts: {Some(lasts)} }
         Motion
-        component(Opacity(0.0))
+        Opacity(0.0)
         UiTransform
-        template_value(card_style())
+        card_style()
     }
 }
 
@@ -158,7 +157,7 @@ pub fn compact_toaster(max_width: f32) -> impl Scene {
         ..Node::default()
     };
     bsn! {
-        template_value(node)
+        node
         Toaster { position: {SonnerPosition::BottomRight}, look: {SonnerLook::Compact} }
         Pickable::IGNORE
     }
@@ -166,12 +165,12 @@ pub fn compact_toaster(max_width: f32) -> impl Scene {
 
 pub fn compact_toast(lasts: Duration) -> impl Scene {
     bsn! {
-        component(compact_node())
+        compact_node()
         Toast { lasts: {Some(lasts)} }
         Motion
-        component(Opacity(0.0))
+        Opacity(0.0)
         UiTransform
-        template_value(compact_style())
+        compact_style()
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
     }
@@ -196,7 +195,7 @@ pub fn sonner_close() -> impl Scene {
 }
 
 pub(crate) fn on_close(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     is_close: Query<(), With<ToastClose>>,
     parents: Query<&ChildOf>,
     has_toast: Query<(), With<Toast>>,
@@ -268,7 +267,7 @@ pub(crate) fn size_toaster(
 }
 
 pub(crate) fn toaster_hover(
-    over: On<Pointer<Over>>,
+    over: On<PointerOver>,
     parents: Query<&ChildOf>,
     is_toaster: Query<(), With<Toaster>>,
     mut toasters: Query<&mut Toaster>,
@@ -281,7 +280,7 @@ pub(crate) fn toaster_hover(
 }
 
 pub(crate) fn toaster_leave(
-    out: On<Pointer<Out>>,
+    out: On<PointerOut>,
     parents: Query<&ChildOf>,
     is_toaster: Query<(), With<Toaster>>,
     mut toasters: Query<&mut Toaster>,

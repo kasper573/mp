@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, typography};
 
 use super::{Notification, NotificationKind, NotificationSent};
@@ -39,12 +38,14 @@ pub fn toast(world: &mut World, notification_sent: NotificationSent) {
         None => {}
     }
     let lasts = Duration::from(notification.stays());
-    let row = bsn! {
-        {ui::toast(lasts)}
-        ui::component(ErrorRow(notification.clone()))
-        Children [ {EntityScene(content(&notification))} ]
+    let body = content(&notification);
+    let row = ErrorRow(notification);
+    let toast = bsn! {
+        @{ui::toast(lasts)}
+        row
+        Children [ @{body} ]
     };
-    if let Ok(mut spawned) = world.spawn_scene(row) {
+    if let Ok(mut spawned) = world.spawn_scene(toast) {
         spawned.insert(ChildOf(toaster));
     }
 }
@@ -73,6 +74,6 @@ fn content(notification: &Notification) -> impl Scene + use<> {
     bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), align_items: AlignItems::Center }
         Pickable::IGNORE
-        Children [ {EntityScene(line)} ]
+        Children [ @{line} ]
     }
 }

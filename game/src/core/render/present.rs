@@ -1,10 +1,10 @@
-use bevy::asset::uuid_handle;
+use bevy::asset::{AssetPath, embedded_path};
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{RenderTarget, ScalingMode};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, TextureFormat};
-use bevy::shader::{Shader, ShaderRef};
+use bevy::shader::ShaderRef;
 use bevy::sprite_render::Material2d;
 use bevy::window::PrimaryWindow;
 
@@ -48,12 +48,11 @@ pub(super) struct Present {
     cut: CutUniform,
 }
 
-pub(super) const PRESENT_SHADER: Handle<Shader> =
-    uuid_handle!("3f1b7a2e-6c4d-4e8f-9a0b-2c5d7e9f1a3b");
-
 impl Material2d for Present {
     fn fragment_shader() -> ShaderRef {
-        ShaderRef::Handle(PRESENT_SHADER)
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("present.wesl")).with_source("embedded"),
+        )
     }
 }
 

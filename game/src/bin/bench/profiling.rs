@@ -9,6 +9,7 @@ use std::time::Instant;
 use bevy_app::App;
 use bevy_ecs::prelude::{Entity, With};
 use bevy_replicon::prelude::Replicated;
+use game::core::content::Content;
 use game::systems::movement::Position;
 use game::systems::visibility::seen_by;
 

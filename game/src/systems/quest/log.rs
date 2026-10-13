@@ -1,7 +1,6 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
 use ui::{Check, ConfirmOptions, OnTap};
 
@@ -247,7 +246,7 @@ fn contents(world: &World, page: &Page) -> Box<dyn Scene> {
     if listed.is_empty() {
         rows.push(Box::new(bsn! {
             Node { padding: {UiRect::all(Val::Px(spacing::XL))} }
-            Children [ {EntityScene(caption(empty_note(page.tab)))} ]
+            Children [ @{caption(empty_note(page.tab))} ]
         }));
     }
     let list: Box<dyn Scene> = Box::new(bsn! {
@@ -272,7 +271,7 @@ fn group(category: &str) -> impl Scene + use<> {
     let ink = ui::theme::theme().surface_floating.on;
     bsn! {
         Node { padding: {UiRect::new(Val::Px(spacing::L), Val::Px(spacing::L), Val::Px(spacing::L), Val::Px(spacing::S))} }
-        Children [ {EntityScene(ui::styled_text(category.to_uppercase(), ink.with_alpha(0.5), typography::LABEL))} ]
+        Children [ @{ui::styled_text(category.to_uppercase(), ink.with_alpha(0.5), typography::LABEL)} ]
     }
 }
 
@@ -314,17 +313,20 @@ fn row(
         }
         BackgroundColor({background})
         Pickable { should_block_lower: true, is_hoverable: true }
-        ui::component(ui::CursorStyle::Pointer)
-        on(move |click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands| {
+        ui::CursorStyle::Pointer
+        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
             if input.clicked(InputAction::Select, &click) {
                 commands.queue(move |world: &mut World| select(world, tab, quest));
             }
         })
         Children [
-            {EntityScene(icon(assets, def.icon(content), ROW_ICON))},
-            ( Node { flex_grow: 1.0 } Pickable::IGNORE Children [ {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::LABEL))} ] ),
-            {status},
-            {tracked},
+            @{icon(assets, def.icon(content), ROW_ICON)}
+            --
+            Node { flex_grow: 1.0 } Pickable::IGNORE Children [ @{ui::styled_text(def.title.as_str(), ink, typography::LABEL)} ]
+            --
+            {status}
+            --
+            {tracked}
         ]
     })
 }
@@ -384,8 +386,9 @@ fn detail(
         Box::new(bsn! {
             Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, flex_wrap: FlexWrap::Wrap }
             Children [
-                {EntityScene(ui::styled_text(def.title.as_str(), ink, typography::NAME))},
-                {EntityScene(tag(&def.kinds(), palette::AMBER_70))},
+                @{ui::styled_text(def.title.as_str(), ink, typography::NAME)}
+                --
+                @{tag(&def.kinds(), palette::AMBER_70)}
             ]
         }),
         Box::new(caption(def.meta(&page.parties, quest))),
@@ -498,9 +501,11 @@ fn timer(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(icon(assets, &InterfaceIcon::Timed.get(content).image, 16.0))},
-            {EntityScene(live_text(log, quest, Countdown::LeftDetail, palette::AMBER_80, typography::LABEL))},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(live_bar(content, log, quest))} ] ),
+            @{icon(assets, &InterfaceIcon::Timed.get(content).image, 16.0)}
+            --
+            @{live_text(log, quest, Countdown::LeftDetail, palette::AMBER_80, typography::LABEL)}
+            --
+            Node { flex_grow: 1.0 } Children [ @{live_bar(content, log, quest)} ]
         ]
     }
 }
@@ -513,7 +518,7 @@ fn footer(page: &Page, quest: QuestId) -> impl Scene + use<> {
         .active(quest)
         .map(|_| -> Box<dyn Scene> {
             Box::new(bsn! {
-                {ui::button_styled(ui::button::intent::DANGER, ui::ButtonSize::Sm, "Abandon")}
+                @{ui::button_styled(ui::button::intent::DANGER, ui::ButtonSize::Sm, "Abandon")}
                 on(move |_: On<ui::Activate>, mut commands: Commands| {
                     commands.queue(move |world: &mut World| confirm_abandon(world, quest));
                 })
@@ -529,34 +534,30 @@ fn footer(page: &Page, quest: QuestId) -> impl Scene + use<> {
             padding: {UiRect::top(Val::Px(spacing::L))},
         }
         Children [
-            (
-                Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
-                Children [
-                    (
-                        {ui::checkbox(check)}
-                        on(move |change: On<ui::ValueChange<bool>>, mut commands: Commands| {
-                            let tracked = change.value;
-                            commands.queue(move |world: &mut World| {
-                                world.write_message(QuestRequest::Track { quest, tracked });
-                            });
-                        })
-                        Children [ {EntityScene(ui::checkbox_indicator())} ]
-                    ),
-                    (
-                        {ui::styled_text("Track on HUD", ink, typography::BODY)}
-                        Pickable { should_block_lower: true, is_hoverable: true }
-                        ui::component(ui::CursorStyle::Pointer)
-                        on(move |click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands| {
-                            if input.clicked(InputAction::Select, &click) {
-                                commands.queue(move |world: &mut World| {
-                                    world.write_message(QuestRequest::Track { quest, tracked: !tracked });
-                                });
-                            }
-                        })
-                    ),
-                ]
-            ),
-            {abandon},
+            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
+            Children [
+                @{ui::checkbox(check)}
+                on(move |change: On<ui::ValueChange<bool>>, mut commands: Commands| {
+                    let tracked = change.value;
+                    commands.queue(move |world: &mut World| {
+                        world.write_message(QuestRequest::Track { quest, tracked });
+                    });
+                })
+                Children [ @{ui::checkbox_indicator()} ]
+                --
+                @{ui::styled_text("Track on HUD", ink, typography::BODY)}
+                Pickable { should_block_lower: true, is_hoverable: true }
+                ui::CursorStyle::Pointer
+                on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
+                    if input.clicked(InputAction::Select, &click) {
+                        commands.queue(move |world: &mut World| {
+                            world.write_message(QuestRequest::Track { quest, tracked: !tracked });
+                        });
+                    }
+                })
+            ]
+            --
+            {abandon}
         ]
     }
 }

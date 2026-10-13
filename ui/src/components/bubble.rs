@@ -4,13 +4,12 @@ use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
 use bevy_picking::hover::Hovered;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{CommandsSceneExt, Scene, bsn, template_value};
+use bevy_scene::{CommandsSceneExt, Scene, bsn};
 use bevy_ui::{
     AlignItems, BorderRadius, Display, FlexDirection, Node, Overflow, PositionType, UiRect,
     UiTransform, Val, Val2,
 };
 
-use crate::component;
 use crate::components::rich_text::{RichText, rich_text};
 use crate::components::text::styled_text;
 use crate::cursor::ClickThrough;
@@ -78,40 +77,37 @@ pub struct SpeechLine {
 pub fn speech_bubble(bubble: SpeechBubble) -> impl Scene {
     let presence = bubble_presence(bubble.tail);
     bsn! {
-        component(bubble)
+        bubble
         Node { position_type: PositionType::Absolute }
         UiTransform
-        component(Hovered::default())
+        Hovered
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            (
-                component(BubblePart::Frame)
-                Node { align_items: AlignItems::Center }
-                component(presence)
+            ~{BubblePart::Frame}
+            Node { align_items: AlignItems::Center }
+            presence
+            Pickable { should_block_lower: false, is_hoverable: true }
+            Children [
+                BubbleBody
+                body_style()
                 Pickable { should_block_lower: false, is_hoverable: true }
                 Children [
-                    (
-                        BubbleBody
-                        template_value(body_style())
-                        Pickable { should_block_lower: false, is_hoverable: true }
-                        Children [
-                            ( component(BubblePart::Header) Node { column_gap: Val::Px({spacing::M}) } Pickable::IGNORE ),
-                            (
-                                component(BubblePart::Lines)
-                                Node {
-                                    flex_direction: FlexDirection::Column,
-                                    row_gap: Val::Px({spacing::M}),
-                                    max_width: Val::Px(WIDEST),
-                                }
-                                Pickable::IGNORE
-                            ),
-                            ( component(BubblePart::Fold) Node { display: Display::None } Pickable::IGNORE ),
-                        ]
-                    ),
-                    ( component(BubblePart::Tail) template_value(tail_style()) Pickable::IGNORE ),
+                    ~{BubblePart::Header} Node { column_gap: Val::Px({spacing::M}) } Pickable::IGNORE
+                    --
+                    ~{BubblePart::Lines}
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px({spacing::M}),
+                        max_width: Val::Px(WIDEST),
+                    }
+                    Pickable::IGNORE
+                    --
+                    ~{BubblePart::Fold} Node { display: Display::None } Pickable::IGNORE
                 ]
-            ),
+                --
+                ~{BubblePart::Tail} tail_style() Pickable::IGNORE
+            ]
         ]
     }
 }
@@ -335,14 +331,12 @@ fn line_scene(line: BubbleLine) -> impl Scene {
             max_height: Val::Px({LINE_HEIGHT * SHOWN_TEXT_LINES}),
             overflow: Overflow::clip(),
         }
-        component(LINE_PRESENCE)
+        LINE_PRESENCE
         Pickable::IGNORE
         Children [
-            (
-                {rich_text(text, true)}
-                component(SpeechLine { key: line.key })
-                component(Opacity(read_opacity(line.read)))
-            )
+            @{rich_text(text, true)}
+            ~{SpeechLine { key: line.key }}
+            Opacity(read_opacity(line.read))
         ]
     }
 }

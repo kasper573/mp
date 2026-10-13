@@ -1,11 +1,10 @@
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{Scene, bsn, template_value};
-use bevy_text::{FontSource, FontWeight, TextFont};
+use bevy_scene::{Scene, bsn};
+use bevy_text::{FontSource, FontSourceTemplate, FontWeight, TextFont, TextFontTemplate};
 use bevy_ui::widget::Text;
 
 use bevy_color::Color;
 
-use crate::component;
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::typography::{self, Typography};
@@ -26,15 +25,24 @@ pub fn styled_text(content: impl Into<String>, color: Color, typography: Typogra
     let style = Style::new().text_color(color);
     bsn! {
         Text({content.into()})
-        component(font(typography))
+        font_template(typography)
         Pickable { should_block_lower: false, is_hoverable: false }
-        template_value(style)
+        style
     }
 }
 
 pub(crate) fn font(typography: Typography) -> TextFont {
     TextFont {
         font: FontSource::Family(typography.family.into()),
+        font_size: typography.font_size.into(),
+        weight: FontWeight(typography.weight),
+        ..Default::default()
+    }
+}
+
+pub(crate) fn font_template(typography: Typography) -> TextFontTemplate {
+    TextFontTemplate {
+        font: FontSourceTemplate::Family(typography.family.into()),
         font_size: typography.font_size.into(),
         weight: FontWeight(typography.weight),
         ..Default::default()

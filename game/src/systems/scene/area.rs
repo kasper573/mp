@@ -17,7 +17,6 @@ use crate::systems::movement::RenderPosition;
 use crate::systems::player::AreaDrawn;
 use crate::systems::player::session::{self, Viewpoint};
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::{RichPiece, RichText};
 
 use crate::core::render::dynamic_z;
@@ -487,7 +486,7 @@ fn death_banner() -> impl Scene {
         }
         GlobalZIndex({ui::tokens::layer::ALERTS})
         Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ {EntityScene(ui::rich_text(death_text(), false))} ]
+        Children [ @{ui::rich_text(death_text(), false)} ]
     }
 }
 

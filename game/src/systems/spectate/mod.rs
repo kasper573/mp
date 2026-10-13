@@ -160,7 +160,7 @@ pub fn arrive(world: &mut World, transfer: SpectatorTransfer) {
 }
 
 pub fn client_left(
-    remove: On<Remove, ClientId>,
+    remove: On<Remove<ClientId>>,
     clients: Query<(Entity, &ClientId)>,
     mut spectators: ResMut<Spectators>,
 ) {

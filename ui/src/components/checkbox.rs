@@ -1,4 +1,4 @@
-use bevy_scene::{Scene, bsn, on, template_value};
+use bevy_scene::{Scene, bsn, on};
 use bevy_ui::{AlignItems, BorderRadius, Checkable, JustifyContent, Node, UiRect, Val};
 use bevy_ui_widgets::{Checkbox, checkbox_self_update};
 
@@ -22,7 +22,7 @@ pub fn checkbox(checked: Check) -> impl Scene {
         Checkable
         on(checkbox_self_update)
         StartChecked({checked != Check::Off})
-        template_value(box_style())
+        box_style()
     }
 }
 
@@ -35,10 +35,10 @@ pub fn checkbox_indicator() -> impl Scene {
         }
         InheritChecked
         Gated
-        template_value(Style::new()
+        Style::new()
             .border_color(theme().primary.on)
             .rotate(std::f32::consts::FRAC_PI_4)
-            .translate(bevy_math::Vec2::new(0.0, -1.0)))
+            .translate(bevy_math::Vec2::new(0.0, -1.0))
     }
 }
 

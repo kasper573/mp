@@ -137,7 +137,7 @@ fn show_intro(world: &mut World) {
         emblem,
     };
     let stacked = bsn! {
-        {ui::intro(intro)}
+        @{ui::intro(intro)}
         Node { grid_row: {GridPlacement::start(1)}, grid_column: {GridPlacement::start(1)} }
     };
     if let Ok(mut spawned) = world.spawn_scene(stacked) {

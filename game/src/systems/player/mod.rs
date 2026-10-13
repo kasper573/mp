@@ -217,7 +217,7 @@ pub(crate) fn conn_player(world: &World, conn: Entity) -> Option<Entity> {
 }
 
 pub fn greet(
-    add: On<Add, ClientId>,
+    add: On<Add<ClientId>>,
     clients: Query<&ClientId>,
     mut welcome: MessageWriter<ToClients<Welcome>>,
 ) {
@@ -231,7 +231,7 @@ pub fn greet(
 }
 
 pub fn client_left(
-    remove: On<Remove, ClientId>,
+    remove: On<Remove<ClientId>>,
     clients: Query<(Entity, &ClientId)>,
     mut players: ResMut<Players>,
     mut commands: Commands,

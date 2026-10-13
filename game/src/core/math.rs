@@ -82,7 +82,7 @@ impl Rng {
 
     pub fn from_entropy() -> Rng {
         let mut seed = [0u8; 8];
-        getrandom::getrandom(&mut seed).expect("os entropy for rng seed");
+        getrandom::fill(&mut seed).expect("os entropy for rng seed");
         Rng::new(u64::from_le_bytes(seed))
     }
 

@@ -3,8 +3,8 @@ use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Id as ItemId;
 use crate::systems::item::{INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, card};
 use crate::systems::player::session;
+use bevy::ecs::template::template;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use std::hash::{Hash, Hasher};
 use ui::tokens::palette;
 use ui::{Align, Carriable, Side, TooltipText, text_colored, tooltip, tooltip_content};
@@ -13,7 +13,7 @@ use crate::systems::hud::{
     HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, slot_node,
 };
 use crate::systems::input::map::{ActionInput, InputAction, InputMap, input};
-use ui::{RichPiece, component};
+use ui::RichPiece;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct InventoryGrid;
@@ -197,9 +197,9 @@ fn slot(content: &Content, cell: &CellData) -> Box<dyn Scene> {
 
 fn empty_slot() -> impl Scene {
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(SLOT_BORDER))
+        BorderColor::all(SLOT_BORDER)
     }
 }
 
@@ -229,13 +229,18 @@ fn filled_slot(content: &Content, slot: u32, filled: &Filled) -> impl Scene {
         hint: Some(hint_pieces(&filled.hints)),
     };
     let item = filled.item;
+    let carriable = Carriable {
+        image: filled.icon.clone(),
+        payload: slot as u64,
+        input: InputAction::CarryItem.into(),
+    };
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(border))
-        {tooltip(false)}
-        component(Carriable { image: filled.icon.clone(), payload: slot as u64, input: InputAction::CarryItem.into() })
-        on(move |click: On<Pointer<Click>>, input: ActionInput, actions: Option<Res<SlotActions>>, mut commands: Commands| {
+        BorderColor::all(border)
+        @{tooltip(false)}
+        template(move |_| Ok(carriable.clone()))
+        on(move |click: On<PointerClick>, input: ActionInput, actions: Option<Res<SlotActions>>, mut commands: Commands| {
             let candidates = actions
                 .iter()
                 .flat_map(|actions| actions.0.iter().map(|action| action.action))
@@ -246,24 +251,20 @@ fn filled_slot(content: &Content, slot: u32, filled: &Filled) -> impl Scene {
             }
         })
         Children [
-            (
-                Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-                component(ImageNode::new(filled.icon.clone()).with_color(tint))
-                Pickable { should_block_lower: false, is_hoverable: false }
-            ),
-            (
-                {tooltip_content(Side::Bottom, Align::Start, 0.0)}
-                Children [ {EntityScene(ui::tooltip_text(tip))} ]
-            ),
-            (
-                Node {
-                    position_type: PositionType::Absolute,
-                    right: Val::Px(2.0),
-                    bottom: Val::Px(0.0),
-                }
-                Pickable { should_block_lower: false, is_hoverable: false }
-                Children [ {EntityScene(text_colored(count, Color::WHITE))} ]
-            ),
+            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
+            ImageNode { image: {filled.icon.clone()}, color: tint }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            --
+            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
+            Children [ @{ui::tooltip_text(tip)} ]
+            --
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(2.0),
+                bottom: Val::Px(0.0),
+            }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            Children [ @{text_colored(count, Color::WHITE)} ]
         ]
     }
 }

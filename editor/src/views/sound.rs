@@ -102,42 +102,43 @@ pub struct Decoded {
 }
 
 pub fn decode(bytes: &[u8]) -> Option<Decoded> {
-    use symphonia::core::audio::SampleBuffer;
+    use symphonia::core::codecs::CodecParameters;
+    use symphonia::core::formats::TrackType;
     use symphonia::core::io::MediaSourceStream;
     let stream = MediaSourceStream::new(
         Box::new(std::io::Cursor::new(bytes.to_vec())),
         Default::default(),
     );
-    let probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &Default::default(),
             stream,
-            &Default::default(),
-            &Default::default(),
+            Default::default(),
+            Default::default(),
         )
         .ok()?;
-    let mut format = probed.format;
-    let track = format.default_track()?;
+    let track = format.default_track(TrackType::Audio)?;
     let track_id = track.id;
-    let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &Default::default())
-        .ok()?;
+    let Some(CodecParameters::Audio(params)) = track.codec_params.clone() else {
+        return None;
+    };
+    let codec = symphonia::default::get_codecs().get_audio_decoder(params.codec)?;
+    let mut decoder = (codec.factory)(&params, &Default::default()).ok()?;
     let mut samples = Vec::new();
     let mut channels = 0;
     let mut rate = 0;
-    while let Ok(packet) = format.next_packet() {
-        if packet.track_id() != track_id {
+    while let Ok(Some(packet)) = format.next_packet() {
+        if packet.track_id != track_id {
             continue;
         }
         let Ok(audio) = decoder.decode(&packet) else {
             continue;
         };
-        let spec = *audio.spec();
-        channels = spec.channels.count() as u32;
-        rate = spec.rate;
-        let mut buffer = SampleBuffer::<f32>::new(audio.capacity() as u64, spec);
-        buffer.copy_interleaved_ref(audio);
-        samples.extend_from_slice(buffer.samples());
+        channels = audio.spec().channels().count() as u32;
+        rate = audio.spec().rate();
+        let mut buffer = Vec::with_capacity(audio.frames() * channels as usize);
+        audio.copy_to_vec_interleaved(&mut buffer);
+        samples.extend_from_slice(&buffer);
     }
     (channels > 0 && !samples.is_empty()).then_some(Decoded {
         channels,

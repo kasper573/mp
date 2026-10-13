@@ -5,8 +5,8 @@ use bevy_asset::Handle;
 use bevy_color::{Alpha, Color};
 use bevy_ecs::hierarchy::{ChildOf, Children};
 use bevy_ecs::prelude::*;
-use bevy_picking::prelude::{Click, Over, Pickable, Pointer};
-use bevy_scene::{EntityScene, Scene, bsn, on, template_value};
+use bevy_picking::prelude::{Pickable, PointerClick, PointerOver};
+use bevy_scene::{Scene, bsn, on};
 use bevy_time::Time;
 use bevy_ui::widget::ImageNode;
 use bevy_ui::{
@@ -15,7 +15,6 @@ use bevy_ui::{
 };
 
 use crate::Side;
-use crate::component;
 use crate::components::chip::{ChipOptions, chip, key_hint};
 use crate::components::input::{CatalogInput, InputRef, input_cap};
 use crate::components::rich_text::{RichPiece, RichText, Typewriter, rich_text};
@@ -130,35 +129,35 @@ pub fn dialogue_box(options: DialogueBoxOptions) -> impl Scene {
             node.border = UiRect::all(Val::Px(2.0));
             node.border_radius = BorderRadius::all(Val::Px(radius::M));
         });
-    let plate = speaker.map(|(name, side)| EntityScene(name_plate(name, side)));
+    let plate = Vec::from_iter(speaker.map(|(name, side)| name_plate(name, side)));
     let line = RichText {
         size: typography::LINE.font_size,
         ..line
     };
     let continue_mark = styled_text("↓", surface.on, typography::HINT);
     bsn! {
-        component(DialogueBox { advance })
-        template_value(frame)
+        ~{DialogueBox { advance }}
+        frame
         Pickable { should_block_lower: true, is_hoverable: true }
         on(finish_on_click)
         Children [
-            {plate},
-            ( {rich_text(line, typed)} DialogueLine ),
-            {EntityScene(choice_list(choices, pick))},
-            (
-                DialogueContinue
-                Node {
-                    position_type: PositionType::Absolute,
-                    right: Val::Px({spacing::XXL}),
-                    bottom: Val::Px({spacing::L}),
-                    display: Display::None,
-                }
-                Children [ {EntityScene(continue_mark)} ]
-            ),
-            (
-                Node { position_type: PositionType::Absolute, bottom: Val::Px(-12.0), left: Val::Px({spacing::XL}) }
-                Children [ {EntityScene(key_hint(hint, theme().surface_trough))} ]
-            ),
+            {plate}
+            --
+            @{rich_text(line, typed)} DialogueLine
+            --
+            @{choice_list(choices, pick)}
+            --
+            DialogueContinue
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px({spacing::XXL}),
+                bottom: Val::Px({spacing::L}),
+                display: Display::None,
+            }
+            Children [ @{continue_mark} ]
+            --
+            Node { position_type: PositionType::Absolute, bottom: Val::Px(-12.0), left: Val::Px({spacing::XL}) }
+            Children [ @{key_hint(hint, theme().surface_trough)} ]
         ]
     }
 }
@@ -183,22 +182,19 @@ pub fn dialogue_panel(options: DialoguePanelOptions) -> impl Scene {
         ..Node::default()
     };
     bsn! {
-        template_value(frame)
+        frame
         BackgroundColor({surface.base})
-        component(BorderColor::all(surface.border))
+        BorderColor::all(surface.border)
         Children [
-            (
-                Node { width: Val::Percent(100.0), padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} }
-                BackgroundColor({header.base})
-                Children [ {EntityScene(styled_text(title, header.on, typography::BODY))} ]
-            ),
-            (
-                Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
-                Children [ (
-                    Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
-                    Children [ {EntityScene(content)} ]
-                ) ]
-            ),
+            Node { width: Val::Percent(100.0), padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} }
+            BackgroundColor({header.base})
+            Children [ @{styled_text(title, header.on, typography::BODY)} ]
+            --
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
+            Children [
+                Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
+                Children [ @{content} ]
+            ]
         ]
     }
 }
@@ -214,7 +210,7 @@ pub fn choice_list(choices: Vec<ChoiceOptions>, pick: InputRef) -> impl Scene {
         .map(|(index, choice)| -> Box<dyn Scene> { Box::new(choice_row(index, choice)) })
         .collect();
     bsn! {
-        component(ChoiceList { selected, pick })
+        ~{ChoiceList { selected, pick }}
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(2.0) }
         Children [ {rows} ]
     }
@@ -331,7 +327,7 @@ pub(crate) fn mark_selected_choice(
     mut commands: Commands,
 ) {
     for (list, kids) in &lists {
-        for (row, choice, checked) in rows.iter_many(kids) {
+        for (row, choice, checked) in rows.iter_many(kids).matched() {
             let selected = choice.index == list.selected;
             if selected && !checked {
                 commands.entity(row).insert(Checked);
@@ -362,7 +358,7 @@ pub(crate) fn shake_refused(
 }
 
 fn finish_on_click(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     boxes: Query<&DialogueBox>,
     gestures: CatalogInput,
     mut commands: Commands,
@@ -401,8 +397,8 @@ fn name_plate(name: String, side: Side) -> impl Scene {
             node.border_radius = BorderRadius::all(Val::Px(radius::S));
         });
     bsn! {
-        template_value(style)
-        Children [ {EntityScene(styled_text(name, surface.on, typography::NAME))} ]
+        style
+        Children [ @{styled_text(name, surface.on, typography::NAME)} ]
     }
 }
 
@@ -439,17 +435,13 @@ fn choice_row(index: usize, choice: ChoiceOptions) -> impl Scene {
         color: label_color,
         ..label
     };
-    let shortcut = shortcut.map(|input| {
-        EntityScene(input_cap(
-            input,
-            typography::BODY.font_size,
-            ink.with_alpha(0.7),
-        ))
-    });
+    let shortcut = Vec::from_iter(
+        shortcut.map(|input| input_cap(input, typography::BODY.font_size, ink.with_alpha(0.7))),
+    );
     let icon = icon.map(|image| {
         bsn! {
             Node { width: Val::Px(ICON), height: Val::Px(ICON) }
-            component(ImageNode::new(image))
+            ImageNode { image: {image} }
         }
     });
     let chips: Vec<Box<dyn Scene>> = chips
@@ -457,22 +449,25 @@ fn choice_row(index: usize, choice: ChoiceOptions) -> impl Scene {
         .map(|options| -> Box<dyn Scene> { Box::new(chip(options)) })
         .collect();
     bsn! {
-        template_value(style)
+        style
         ChoiceRow { index: {index}, locked: {locked} }
         UiTransform
         on(pick_on_click)
         on(select_on_hover)
         Children [
-            {shortcut},
-            {icon},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(rich_text(label, false))} ] ),
-            ( Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center } Children [ {chips} ] ),
+            {shortcut}
+            --
+            {icon}
+            --
+            Node { flex_grow: 1.0 } Children [ @{rich_text(label, false)} ]
+            --
+            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center } Children [ {chips} ]
         ]
     }
 }
 
 fn pick_on_click(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     rows: Query<&ChoiceRow>,
     parents: Query<&ChildOf>,
     lists: Query<&ChoiceList>,
@@ -497,7 +492,7 @@ fn pick_on_click(
 }
 
 fn select_on_hover(
-    over: On<Pointer<Over>>,
+    over: On<PointerOver>,
     rows: Query<&ChoiceRow>,
     parents: Query<&ChildOf>,
     is_list: Query<(), With<ChoiceList>>,

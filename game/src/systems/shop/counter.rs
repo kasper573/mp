@@ -1,9 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap, component};
+use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap};
 
 use super::{Id as ShopId, OfferView, Sale, ShopRequest, ShopView, WareRefusal};
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
@@ -135,8 +134,9 @@ fn counter(playing: bool) -> Box<dyn Scene> {
             padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))},
         }
         Children [
-            ( ShopTabs Node { column_gap: Val::Px({spacing::M}) } ),
-            ( ShopWants Node ),
+            ShopTabs Node { column_gap: Val::Px({spacing::M}) }
+            --
+            ShopWants Node
         ]
     };
     let split = ui::split_view(
@@ -154,14 +154,16 @@ fn counter(playing: bool) -> Box<dyn Scene> {
             flex_direction: FlexDirection::Column,
         }
         Children [
-            {EntityScene(header)},
-            ( Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) } Children [ {EntityScene(split)} ] ),
-            ( ShopFooter Node { padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} } ),
+            @{header}
+            --
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) } Children [ @{split} ]
+            --
+            ShopFooter Node { padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} }
         ]
     };
     if playing {
         Box::new(bsn! {
-            {column}
+            @{column}
             CarryTarget
             on(|carried: On<Carried>, mut commands: Commands| {
                 let slot = carried.payload as u32;
@@ -432,7 +434,7 @@ fn empty_note(tab: ShopTab) -> impl Scene {
     };
     bsn! {
         Node { padding: {UiRect::all(Val::Px(spacing::XL))} }
-        Children [ {EntityScene(ui::styled_text(note, ink.with_alpha(0.6), typography::CAPTION))} ]
+        Children [ @{ui::styled_text(note, ink.with_alpha(0.6), typography::CAPTION)} ]
     }
 }
 
@@ -443,7 +445,7 @@ fn tab_button(tab: ShopTab, label: String, active: bool) -> impl Scene {
         ui::button::intent::SECONDARY
     };
     bsn! {
-        {ui::button_styled(intent, ui::ButtonSize::Sm, label)}
+        @{ui::button_styled(intent, ui::ButtonSize::Sm, label)}
         on(move |_: On<ui::Activate>, mut commands: Commands| {
             commands.queue(move |world: &mut World| select(world, tab, 0));
         })
@@ -492,31 +494,28 @@ fn row(
         }
         BackgroundColor({background})
         Pickable { should_block_lower: true, is_hoverable: true }
-        ui::component(ui::CursorStyle::Pointer)
-        on(move |click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands| {
+        ui::CursorStyle::Pointer
+        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
             if input.clicked(InputAction::Select, &click) {
                 commands.queue(move |world: &mut World| select(world, tab, index));
             }
         })
         Children [
-            (
-                Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                component(ImageNode::new(assets.load(def.icon.path())))
-                Pickable::IGNORE
-            ),
-            (
-                Node { flex_direction: FlexDirection::Column, flex_grow: 1.0 }
-                Pickable::IGNORE
-                Children [
-                    {EntityScene(ui::styled_text(name, ink, typography::LABEL))},
-                    {note},
-                ]
-            ),
-            (
-                Node { flex_direction: FlexDirection::Column, align_items: AlignItems::End, row_gap: Val::Px({spacing::S}) }
-                Pickable::IGNORE
-                Children [ {chips} ]
-            ),
+            Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
+            ImageNode { image: {assets.load(def.icon.path())} }
+            Pickable::IGNORE
+            --
+            Node { flex_direction: FlexDirection::Column, flex_grow: 1.0 }
+            Pickable::IGNORE
+            Children [
+                @{ui::styled_text(name, ink, typography::LABEL)}
+                --
+                {note}
+            ]
+            --
+            Node { flex_direction: FlexDirection::Column, align_items: AlignItems::End, row_gap: Val::Px({spacing::S}) }
+            Pickable::IGNORE
+            Children [ {chips} ]
         ]
     })
 }
@@ -555,28 +554,30 @@ fn detail(world: &World, shelf: &Shelf, ware: &Ware, index: usize) -> impl Scene
     bsn! {
         Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0), height: Val::Percent(100.0) }
         Children [
-            (
-                Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
-                Children [ {EntityScene(ui::scrolled(Box::new(bsn! {
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
+            Children [
+                @{ui::scrolled(Box::new(bsn! {
                     Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-                    Children [ {EntityScene(sheet)} ]
-                })))} ]
-            ),
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px({spacing::M}),
-                    padding: {UiRect::all(Val::Px(spacing::XL))},
-                    border: {UiRect::top(Val::Px(1.0))},
-                }
-                component(BorderColor::all(family.border))
-                Children [
-                    {EntityScene(ui::styled_text(price, ink.with_alpha(0.6), typography::LABEL))},
-                    ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {costs} ] ),
-                    ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {notes} ] ),
-                    {action},
-                ]
-            ),
+                    Children [ @{sheet} ]
+                }))}
+            ]
+            --
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px({spacing::M}),
+                padding: {UiRect::all(Val::Px(spacing::XL))},
+                border: {UiRect::top(Val::Px(1.0))},
+            }
+            BorderColor::all(family.border)
+            Children [
+                @{ui::styled_text(price, ink.with_alpha(0.6), typography::LABEL)}
+                --
+                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {costs} ]
+                --
+                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {notes} ]
+                --
+                {action}
+            ]
         ]
     }
 }
@@ -593,7 +594,7 @@ fn trade_button(tab: ShopTab, ware: &Ware, index: usize) -> impl Scene + use<> {
         (None, ShopTab::Buyback) => (ui::button::intent::PRIMARY, "Buy back".to_owned()),
     };
     bsn! {
-        {ui::button_styled(intent, ui::ButtonSize::Md, label)}
+        @{ui::button_styled(intent, ui::ButtonSize::Md, label)}
         on(move |_: On<ui::Activate>, mut commands: Commands| {
             commands.queue(move |world: &mut World| trade(world, tab, index));
         })
@@ -655,11 +656,10 @@ fn cost_row(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
         Children [
-            (
-                Node { width: Val::Px(16.0), height: Val::Px(16.0) }
-                component(ImageNode::new(assets.load(stack.item.get(content).icon.path())))
-            ),
-            {EntityScene(ui::styled_text(label, color, typography::BODY))},
+            Node { width: Val::Px(16.0), height: Val::Px(16.0) }
+            ImageNode { image: {assets.load(stack.item.get(content).icon.path())} }
+            --
+            @{ui::styled_text(label, color, typography::BODY)}
         ]
     }
 }

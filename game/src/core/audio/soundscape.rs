@@ -149,7 +149,7 @@ impl SoundscapeVoice {
             return;
         }
         let tween = AudioTween::linear(elapsed.into());
-        instance.set_decibels(decibels(mixed.0), tween.clone());
+        instance.set_decibels(decibels(mixed.0), tween);
         instance.set_panning(mixed.1, tween);
         self.applied = Some(mixed);
     }

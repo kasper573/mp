@@ -40,7 +40,7 @@ impl Window for StatsWindow {
 fn content() -> Box<dyn Scene> {
     Box::new(bsn! {
         Node { width: Val::Percent(100.0) }
-        Children [ ( {text_colored(String::new(), Color::WHITE)} StatsText ) ]
+        Children [ @{text_colored(String::new(), Color::WHITE)} StatsText ]
     })
 }
 

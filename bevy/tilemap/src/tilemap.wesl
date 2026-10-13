@@ -1,4 +1,4 @@
-#import bevy_sprite::mesh2d_vertex_output::VertexOutput
+import bevy_sprite_render::mesh2d::vertex_output::VertexOutput;
 
 // A whole flat layer drawn as one quad, sampled per fragment: the index texture holds the tile id and
 // flips for each cell, the frame map remaps a tile id to its currently-animated id, and the atlas is

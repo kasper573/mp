@@ -1,10 +1,9 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use strum::VariantArray;
 use ui::tokens::{palette, spacing, typography};
-use ui::{RichSpan, RichText, component};
+use ui::{RichSpan, RichText};
 
 use super::{
     HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally,
@@ -219,25 +218,22 @@ fn body(tab: HistoryTab) -> impl Scene {
         HistoryBody { tab: {tab}, built: None }
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
         Children [
-            ( {ui::scroll_area()}
+            @{ui::scroll_area()}
+            Children [
+              @{ui::scroll_viewport()}
+              ui::PinToBottom
               Children [
-                ( {ui::scroll_viewport()}
-                  {ui::component(ui::PinToBottom::default())}
-                  Children [
-                    (
-                        HistoryList
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px({spacing::S}),
-                            width: Val::Percent(100.0),
-                            padding: {UiRect::axes(Val::Px(spacing::XL), Val::Px(spacing::L))},
-                        }
-                    )
-                  ]
-                ),
-                ( {ui::scroll_bar()} Children [ {EntityScene(ui::scroll_thumb())} ] )
+                HistoryList
+                Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px({spacing::S}),
+                    width: Val::Percent(100.0),
+                    padding: {UiRect::axes(Val::Px(spacing::XL), Val::Px(spacing::L))},
+                }
               ]
-            )
+              --
+              @{ui::scroll_bar()} Children [ @{ui::scroll_thumb()} ]
+            ]
         ]
     }
 }
@@ -380,8 +376,8 @@ fn note(text: String, ink: Color, bar: bool) -> impl Scene {
             node.border_radius = BorderRadius::all(Val::Px(ui::tokens::radius::S));
         });
     bsn! {
-        template_value(frame)
-        Children [ {EntityScene(ui::styled_text(text, ink, typography::CAPTION))} ]
+        frame
+        Children [ @{ui::styled_text(text, ink, typography::CAPTION)} ]
     }
 }
 
@@ -477,14 +473,11 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
     Box::new(bsn! {
         Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::FlexStart, width: Val::Percent(100.0) }
         Children [
-            (
-                Node { width: Val::Px(TIME_WIDTH), flex_shrink: 0.0 }
-                Children [ {EntityScene(ui::styled_text(time, ink.with_alpha(0.5), typography::CAPTION))} ]
-            ),
-            (
-                Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, flex_grow: 1.0, min_width: Val::Px(0.0), margin: {UiRect::left(Val::Px(indent))} }
-                Children [ {icon}, {EntityScene(line)} ]
-            ),
+            Node { width: Val::Px(TIME_WIDTH), flex_shrink: 0.0 }
+            Children [ @{ui::styled_text(time, ink.with_alpha(0.5), typography::CAPTION)} ]
+            --
+            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, flex_grow: 1.0, min_width: Val::Px(0.0), margin: {UiRect::left(Val::Px(indent))} }
+            Children [ {icon} -- @{line} ]
         ]
     })
 }
@@ -492,12 +485,12 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
 fn header(text: String, ink: Color) -> impl Scene {
     bsn! {
         Node { margin: {UiRect::top(Val::Px(spacing::M))}, width: Val::Percent(100.0) }
-        Children [ {EntityScene(ui::styled_text(text, ink.with_alpha(0.75), typography::LABEL))} ]
+        Children [ @{ui::styled_text(text, ink.with_alpha(0.75), typography::LABEL)} ]
     }
 }
 
 fn divider(text: String, ink: Color) -> impl Scene {
-    let line = || {
+    let line = move || {
         ui::Style::new()
             .background(ink.with_alpha(0.25))
             .node(|node| {
@@ -508,9 +501,11 @@ fn divider(text: String, ink: Color) -> impl Scene {
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0), margin: {UiRect::vertical(Val::Px(spacing::M))} }
         Children [
-            ( template_value(line()) ),
-            {EntityScene(ui::styled_text(text, ink.with_alpha(0.7), typography::CAPTION))},
-            ( template_value(line()) ),
+            line()
+            --
+            @{ui::styled_text(text, ink.with_alpha(0.7), typography::CAPTION)}
+            --
+            line()
         ]
     }
 }
@@ -518,7 +513,7 @@ fn divider(text: String, ink: Color) -> impl Scene {
 fn icon_image(image: Handle<Image>) -> impl Scene {
     bsn! {
         Node { width: Val::Px(ICON), height: Val::Px(ICON), flex_shrink: 0.0 }
-        component(ImageNode::new(image))
+        ImageNode { image: {image} }
         Pickable::IGNORE
     }
 }

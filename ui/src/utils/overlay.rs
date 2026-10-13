@@ -4,12 +4,11 @@ use bevy_camera::visibility::Visibility;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
-use bevy_picking::prelude::{Click, Out, Over, Pickable, Pointer, Press};
+use bevy_picking::prelude::{Pickable, PointerClick, PointerOut, PointerOver, PointerPress};
 use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::{Display, GlobalZIndex, Node, PositionType, UiTransform, Val};
 
-use crate::component;
 use crate::cursor::CursorStyle;
 use crate::motion::transition::{EMPHASIZED_ENTER, EMPHASIZED_EXIT};
 use crate::motion::{Motion, Transform2d};
@@ -59,9 +58,9 @@ pub struct OverlayContent {
 impl OverlayContent {
     pub fn animated(enter: Transform2d, exit: Transform2d) -> impl Scene {
         bsn! {
-            component(OverlayContent { enter, exit, closing_at: None, was_open: false })
+            OverlayContent { enter, exit, closing_at: None, was_open: false }
             Motion
-            component(Opacity(0.0))
+            Opacity(0.0)
             UiTransform
         }
     }
@@ -165,7 +164,7 @@ pub fn set_overlay_open(world: &mut World, entity: Entity, open: bool) {
 }
 
 pub(crate) fn on_overlay_action(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     actions: Query<&OverlayAction>,
     parents: Query<&ChildOf>,
     has_action: Query<(), With<OverlayAction>>,
@@ -193,7 +192,7 @@ pub(crate) fn on_overlay_action(
 }
 
 pub(crate) fn dismiss_on_press(
-    press: On<Pointer<Press>>,
+    press: On<PointerPress>,
     dismissables: Query<Entity, (With<Open>, With<Dismissable>)>,
     parents: Query<&ChildOf>,
     mut opens: Query<&mut Open>,
@@ -317,7 +316,7 @@ pub struct TooltipClock {
 }
 
 pub(crate) fn tooltip_over(
-    over: On<Pointer<Over>>,
+    over: On<PointerOver>,
     time: Res<Time>,
     clock: Res<TooltipClock>,
     parents: Query<&ChildOf>,
@@ -346,7 +345,7 @@ pub(crate) fn tooltip_over(
 }
 
 pub(crate) fn tooltip_out(
-    out: On<Pointer<Out>>,
+    out: On<PointerOut>,
     time: Res<Time>,
     mut clock: ResMut<TooltipClock>,
     parents: Query<&ChildOf>,

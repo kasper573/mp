@@ -1,7 +1,5 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use serde::{Deserialize, Serialize};
-use ui::component;
 use ui::{Geom, OnSettle, OnTap, SnapGrid, text_colored, widget};
 
 use crate::core::audio::mix::{AudioFader, AudioMix, AudioVolume};
@@ -119,7 +117,7 @@ pub(crate) fn tooltip_label(text: impl Into<String>) -> impl Scene {
         Node { padding: {UiRect::axes(Val::Px(6.0), Val::Px(3.0))} }
         BackgroundColor({TOOLTIP_BG})
         Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ {EntityScene(text_colored(text.into(), Color::WHITE))} ]
+        Children [ @{text_colored(text.into(), Color::WHITE)} ]
     }
 }
 
@@ -452,7 +450,7 @@ fn spawn_hud(
     for (name, widget) in widgets(*mode) {
         let pos = widget_pos(&settings, name, widget.fallback(screen_w));
         let built = widget.build(pos, name);
-        scenes.push(Box::new(bsn! { {built} HudPiece }));
+        scenes.push(Box::new(bsn! { @{built} HudPiece }));
     }
     for (window, _) in windows(*mode) {
         scenes.push(Box::new(launcher(
@@ -526,7 +524,7 @@ fn launcher(
     let def = window_def(window);
     let pos = widget_pos(settings, window, launcher_pos(window, mode, screen_w));
     bsn! {
-        {widget(ui::WidgetOptions {
+        @{widget(ui::WidgetOptions {
             pos,
             icon: assets.load(def.icon().get(content).image.path()),
             badge: Some(def.toggle().into()),
@@ -534,7 +532,7 @@ fn launcher(
             on_tap: OnTap::new(move |world| open_window(world, window)),
             on_settle: OnSettle::new(move |world, geom| persist_widget(world, window, geom)),
         })}
-        component(WindowView { window, open: false })
+        ~{WindowView { window, open: false }}
         HudPiece
     }
 }
@@ -543,7 +541,7 @@ fn window_scene(world: &World, window: &'static str, screen: Vec2) -> impl Scene
     let def = window_def(window);
     let centered = ((screen - def.size()) / 2.0).max(Vec2::splat(8.0));
     bsn! {
-        {placed_window(
+        @{placed_window(
             world,
             window,
             (centered, def.size()),
@@ -553,7 +551,7 @@ fn window_scene(world: &World, window: &'static str, screen: Vec2) -> impl Scene
             def.contents(world),
             def.tab(world),
         )}
-        component(WindowView { window, open: true })
+        ~{WindowView { window, open: true }}
     }
 }
 

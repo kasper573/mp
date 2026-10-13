@@ -1,7 +1,7 @@
 use bevy_color::Color;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{
     AlignItems, BorderRadius, BoxShadow, ComputedNode, Display, Node, PositionType, ShadowStyle,
     UiGlobalTransform, Val,
@@ -10,9 +10,8 @@ use bevy_ui_widgets::ValueChange;
 use bevy_window::{PrimaryWindow, Window};
 
 use bevy_math::Vec2;
-use bevy_picking::prelude::{Drag, Pointer};
+use bevy_picking::prelude::PointerDrag;
 
-use crate::component;
 use crate::cursor::CursorStyle;
 use crate::state::ancestor_with;
 use crate::style::Style;
@@ -41,35 +40,35 @@ pub fn slider(value: f32, min: f32, max: f32) -> impl Scene {
             min: {min},
             max: {max},
         }
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.width = Val::Percent(100.0);
             node.height = Val::Px(size::STEP_600);
             node.display = Display::Flex;
             node.align_items = AlignItems::Center;
-        }))
+        })
     }
 }
 
 pub fn slider_track() -> impl Scene {
     bsn! {
-        template_value(Style::new().background(theme().scrim_dark).node(|node| {
+        Style::new().background(theme().scrim_dark).node(|node| {
             node.flex_grow = 1.0;
             node.height = Val::Px(size::STEP_100);
             node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
             node.position_type = PositionType::Relative;
-        }))
+        })
     }
 }
 
 pub fn slider_range() -> impl Scene {
     bsn! {
         SliderRange
-        template_value(Style::new().background(theme().primary.base).node(|node| {
+        Style::new().background(theme().primary.base).node(|node| {
             node.position_type = PositionType::Absolute;
             node.left = Val::Px(0.0);
             node.height = Val::Percent(100.0);
             node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
-        }))
+        })
     }
 }
 
@@ -83,8 +82,8 @@ pub fn slider_thumb() -> impl Scene {
     }]);
     bsn! {
         SliderThumb
-        component(box_shadow)
-        template_value(Style::new()
+        box_shadow
+        Style::new()
             .background(theme().surface_canvas.base)
             .node(|node| {
                 node.width = Val::Px(size::STEP_600);
@@ -93,7 +92,7 @@ pub fn slider_thumb() -> impl Scene {
                 node.position_type = PositionType::Absolute;
                 node.top = Val::Px(-10.0);
             })
-            .translate(Vec2::new(-(size::STEP_600 / 2.0), 0.0)))
+            .translate(Vec2::new(-(size::STEP_600 / 2.0), 0.0))
     }
 }
 
@@ -124,7 +123,7 @@ pub(crate) fn sync_slider(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn on_thumb_drag(
-    drag: On<Pointer<Drag>>,
+    drag: On<PointerDrag>,
     thumbs: Query<(), With<SliderThumb>>,
     parents: Query<&ChildOf>,
     has_state: Query<(), With<SliderState>>,

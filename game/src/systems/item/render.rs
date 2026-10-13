@@ -77,7 +77,7 @@ fn use_sounds(
 }
 
 fn attach_drop_sprite(
-    add: On<Add, DroppedItem>,
+    add: On<Add<DroppedItem>>,
     drops: Query<&DroppedItem>,
     content: Res<Content>,
     assets: Res<AssetServer>,

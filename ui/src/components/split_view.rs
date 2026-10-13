@@ -1,9 +1,8 @@
 use bevy_color::Color;
 use bevy_ecs::hierarchy::Children;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{BorderColor, FlexDirection, Node, UiRect, Val};
 
-use crate::component;
 use crate::components::scroll_area::scrolled;
 use crate::components::text::styled_text;
 use crate::style::Style;
@@ -17,20 +16,17 @@ pub fn split_view(list: Box<dyn Scene>, detail: Box<dyn Scene>) -> impl Scene {
     bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), flex_direction: FlexDirection::Row }
         Children [
-            (
-                Node {
-                    max_width: Val::Percent({LIST_WIDEST}),
-                    height: Val::Percent(100.0),
-                    flex_shrink: 0.0,
-                    border: {UiRect::right(Val::Px(1.0))},
-                }
-                component(divider)
-                Children [ {EntityScene(scrolled(list))} ]
-            ),
-            (
-                Node { flex_grow: 1.0, flex_basis: Val::Px(0.0), min_width: Val::Px(0.0), height: Val::Percent(100.0) }
-                Children [ {EntityScene(detail)} ]
-            ),
+            Node {
+                max_width: Val::Percent({LIST_WIDEST}),
+                height: Val::Percent(100.0),
+                flex_shrink: 0.0,
+                border: {UiRect::right(Val::Px(1.0))},
+            }
+            divider
+            Children [ @{scrolled(list)} ]
+            --
+            Node { flex_grow: 1.0, flex_basis: Val::Px(0.0), min_width: Val::Px(0.0), height: Val::Percent(100.0) }
+            Children [ @{detail} ]
         ]
     }
 }
@@ -48,10 +44,11 @@ pub fn list_header(title: impl Into<String>, aside: impl Into<String>) -> impl S
         );
     });
     bsn! {
-        template_value(style)
+        style
         Children [
-            {EntityScene(styled_text(title.into(), family.on, typography::LABEL))},
-            {EntityScene(styled_text(aside.into(), family.on, typography::CAPTION))},
+            @{styled_text(title.into(), family.on, typography::LABEL)}
+            --
+            @{styled_text(aside.into(), family.on, typography::CAPTION)}
         ]
     }
 }

@@ -104,7 +104,7 @@ struct Active {
 struct RaiseCounter(u64);
 
 fn on_press(
-    press: On<Pointer<Press>>,
+    press: On<PointerPress>,
     roots: Query<(), With<DragRoot>>,
     mut dragged: ResMut<Dragged>,
     mut counter: ResMut<RaiseCounter>,
@@ -117,7 +117,7 @@ fn on_press(
 }
 
 fn raise_opened(
-    opened: On<Add, DragRoot>,
+    opened: On<Add<DragRoot>>,
     mut counter: ResMut<RaiseCounter>,
     mut commands: Commands,
 ) {
@@ -136,7 +136,7 @@ fn raise(entity: Entity, counter: &mut RaiseCounter, commands: &mut Commands) {
 
 #[allow(clippy::too_many_arguments)]
 fn on_drag_start(
-    drag: On<Pointer<DragStart>>,
+    drag: On<PointerDragStart>,
     handles: Query<(), With<DragHandle>>,
     resizers: Query<&ResizeHandle>,
     is_root: Query<(), With<DragRoot>>,
@@ -168,7 +168,7 @@ fn on_drag_start(
 }
 
 fn on_drag(
-    drag: On<Pointer<Drag>>,
+    drag: On<PointerDrag>,
     snap: Res<SnapGrid>,
     mut state: ResMut<DragState>,
     mut nodes: Query<&mut Node>,
@@ -193,7 +193,7 @@ fn on_drag(
 type AnyHandle = Or<(With<DragHandle>, With<ResizeHandle>)>;
 
 fn on_drag_end(
-    drag: On<Pointer<DragEnd>>,
+    drag: On<PointerDragEnd>,
     handles: Query<(), AnyHandle>,
     is_root: Query<(), With<DragRoot>>,
     parents: Query<&ChildOf>,
@@ -211,7 +211,7 @@ fn on_drag_end(
 }
 
 fn on_click(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     taps: Query<&OnTap>,
     is_root: Query<(), With<DragRoot>>,
     parents: Query<&ChildOf>,

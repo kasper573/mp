@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::palette;
 use ui::{
     CastDepth, CastMember, ChipOptions, ChoiceOptions, DialogueBoxOptions, Family, RichPiece, Side,
@@ -204,30 +203,29 @@ fn spawn_stage(mut commands: Commands) {
         GlobalZIndex({ui::tokens::layer::STAGE})
         Pickable::IGNORE
         Children [
-            {EntityScene(ui::cast())},
-            (
-                StageBoxHost
+            @{ui::cast()}
+            --
+            StageBoxHost
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                right: Val::Px(0.0),
+                bottom: Val::Px(28.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+            }
+            Pickable::IGNORE
+            Children [
+                StagePanels
                 Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    right: Val::Px(0.0),
-                    bottom: Val::Px(28.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
+                    width: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexEnd,
+                    column_gap: Val::Px({ui::tokens::spacing::L}),
+                    margin: {UiRect::bottom(Val::Px(ui::tokens::spacing::XL))},
                 }
                 Pickable::IGNORE
-                Children [ (
-                    StagePanels
-                    Node {
-                        width: Val::Percent(100.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::FlexEnd,
-                        column_gap: Val::Px({ui::tokens::spacing::L}),
-                        margin: {UiRect::bottom(Val::Px(ui::tokens::spacing::XL))},
-                    }
-                    Pickable::IGNORE
-                ) ]
-            ),
+            ]
         ]
     });
 }
@@ -496,7 +494,7 @@ fn refuse(world: &mut World, refused: RefusedPick) {
     }
 }
 
-fn advance_on_click(click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands) {
+fn advance_on_click(click: On<PointerClick>, input: ActionInput, mut commands: Commands) {
     if !input.clicked(InputAction::Advance, &click) {
         return;
     }

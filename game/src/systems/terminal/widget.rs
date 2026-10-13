@@ -1,7 +1,6 @@
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::terminal::TerminalKind;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use bevy_terminal::TerminalInput;
 
 use crate::systems::hud::{HudAudience, Window, reconcile_children};
@@ -64,35 +63,32 @@ fn tab_scene(terminal: TerminalKind) -> impl Scene {
             flex_direction: FlexDirection::Column,
         }
         Children [
-            ( Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+            Children [
+              @{ui::scroll_area()}
               Children [
-                ( {ui::scroll_area()}
-                  Children [
-                    ( {ui::scroll_viewport()}
-                      {ui::component(ui::PinToBottom::default())}
-                      Children [
-                        (
-                            Node {
-                                flex_direction: FlexDirection::Column,
-                                width: Val::Percent(100.0),
-                                padding: {UiRect::all(Val::Px(4.0))},
-                            }
-                            {ui::component(TerminalLog { terminal })}
-                        )
-                      ]
-                    ),
-                    ( {ui::scroll_bar()} Children [ {EntityScene(ui::scroll_thumb())} ] )
-                  ]
-                )
+                @{ui::scroll_viewport()}
+                ui::PinToBottom
+                Children [
+                  Node {
+                      flex_direction: FlexDirection::Column,
+                      width: Val::Percent(100.0),
+                      padding: {UiRect::all(Val::Px(4.0))},
+                  }
+                  ~{TerminalLog { terminal }}
+                ]
+                --
+                @{ui::scroll_bar()} Children [ @{ui::scroll_thumb()} ]
               ]
-            ),
-            {EntityScene(ui::text_input(ui::TextInputOptions {
+            ]
+            --
+            @{ui::text_input(ui::TextInputOptions {
                 on_submit: ui::OnSubmit::new(move |world, text| {
                     world.write_message(TerminalInput { terminal, text });
                 }),
                 submit: InputAction::SubmitText.into(),
                 blur: InputAction::Dismiss.into(),
-            }))}
+            })}
         ]
     }
 }

@@ -1,7 +1,5 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::button::intent;
-use ui::component;
 use ui::{
     Activate, ButtonSize, DragHandle, DragRoot, OnSettle, RichPiece, RichText, button_styled,
     text_colored,
@@ -81,23 +79,25 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
         ..default()
     };
     Box::new(bsn! {
-        template_value(node)
+        node
         BackgroundColor({PANEL_BG})
-        component(BorderColor::all(BORDER))
+        BorderColor::all(BORDER)
         DragRoot
         DragHandle
-        component(OnSettle::new(move |world, geom| persist_widget(world, id, geom)))
+        ~{OnSettle::new(move |world, geom| persist_widget(world, id, geom))}
         Children [
-            ( {text_colored(String::new(), Color::WHITE)} WatchedName ),
-            (
-                template_value(controls)
-                Children [
-                    ( {button_styled(intent::PRIMARY, ButtonSize::Sm, "<")} on(step(SpectateRequest::Previous)) ),
-                    ( {text_colored(String::new(), Color::WHITE)} WatchedPlace ),
-                    ( {button_styled(intent::PRIMARY, ButtonSize::Sm, ">")} on(step(SpectateRequest::Next)) ),
-                ]
-            ),
-            {EntityScene(ui::rich_text(switch_hint(), false))},
+            @{text_colored(String::new(), Color::WHITE)} WatchedName
+            --
+            controls
+            Children [
+                @{button_styled(intent::PRIMARY, ButtonSize::Sm, "<")} on(step(SpectateRequest::Previous))
+                --
+                @{text_colored(String::new(), Color::WHITE)} WatchedPlace
+                --
+                @{button_styled(intent::PRIMARY, ButtonSize::Sm, ">")} on(step(SpectateRequest::Next))
+            ]
+            --
+            @{ui::rich_text(switch_hint(), false)}
         ]
     })
 }
@@ -178,12 +178,13 @@ fn show_nobody_playing(world: &mut World) {
 fn nobody_playing() -> impl Scene {
     bsn! {
         NobodyPlaying
-        template_value(crate::systems::scene::screen_node())
+        crate::systems::scene::screen_node()
         BackgroundColor({BLANK_BG})
         GlobalZIndex({ui::tokens::layer::BACKDROP})
         Children [
-            {EntityScene(text_colored("Nobody is playing right now", Color::WHITE))},
-            {EntityScene(text_colored("Spectating starts as soon as someone joins", HINT))},
+            @{text_colored("Nobody is playing right now", Color::WHITE)}
+            --
+            @{text_colored("Spectating starts as soon as someone joins", HINT)}
         ]
     }
 }

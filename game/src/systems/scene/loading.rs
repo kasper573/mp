@@ -374,24 +374,22 @@ fn loading_card(model: &CardModel) -> impl UiScene + use<> {
         )));
     }
     if model.retry {
-        body.push(Box::new(bsn! { {button("Retry")} on(retry) }));
+        body.push(Box::new(bsn! { @{button("Retry")} on(retry) }));
     }
     bsn! {
         LoadingUi
-        template_value(super::screen_node())
+        super::screen_node()
         BackgroundColor({background})
         GlobalZIndex({ui::tokens::layer::SYSTEM})
         Children [
-            (
-                {card(CardOptions { floating: true, ..default() })}
-                Node {
-                    min_width: Val::Px(280.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px({ui::tokens::spacing::M}),
-                }
-                Children [ {body} ]
-            ),
+            @{card(CardOptions { floating: true, ..default() })}
+            Node {
+                min_width: Val::Px(280.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px({ui::tokens::spacing::M}),
+            }
+            Children [ {body} ]
         ]
     }
 }

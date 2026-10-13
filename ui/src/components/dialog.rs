@@ -1,8 +1,7 @@
 use bevy_ecs::hierarchy::Children;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 
-use crate::component;
 use crate::components::confirm::Modal;
 use bevy_ui::{
     AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, Overflow, PositionType, UiRect,
@@ -20,7 +19,7 @@ pub fn dialog(open: bool, trigger: impl Scene, content: impl Scene) -> impl Scen
 }
 
 pub fn dialog_close() -> impl Scene {
-    bsn! { component(OverlayAction::Close) }
+    bsn! { ~{OverlayAction::Close} }
 }
 
 // Without `Pickable::IGNORE` this full-screen centering container sits over the whole UI at the
@@ -31,47 +30,41 @@ pub(crate) fn modal(
     trigger: impl Scene,
     content: impl Scene,
 ) -> impl Scene {
-    let scrim_close = dismiss.then_some(component(OverlayAction::Close));
+    let scrim_close = dismiss.then_some(bsn! { ~{OverlayAction::Close} });
     bsn! {
         Open({open})
         Modal
         Children [
-            (
-                component(OverlayAction::Open)
-                Children [ {EntityScene(trigger)} ]
-            ),
-            (
+            ~{OverlayAction::Open}
+            Children [ @{trigger} ]
+            --
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(0.0),
+                left: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+            }
+            Portal
+            Pickable::IGNORE
+            Children [
                 Node {
                     position_type: PositionType::Absolute,
                     top: Val::Px(0.0),
                     left: Val::Px(0.0),
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
                 }
-                Portal
-                Pickable::IGNORE
-                Children [
-                    (
-                        Node {
-                            position_type: PositionType::Absolute,
-                            top: Val::Px(0.0),
-                            left: Val::Px(0.0),
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                        }
-                        {scrim_close}
-                        {OverlayContent::animated(Transform2d::IDENTITY, Transform2d::IDENTITY)}
-                        template_value(Style::new().background(theme().scrim_dark))
-                    ),
-                    (
-                        {OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
-                        template_value(panel_style())
-                        {content}
-                    )
-                ]
-            )
+                @{scrim_close}
+                @{OverlayContent::animated(Transform2d::IDENTITY, Transform2d::IDENTITY)}
+                Style::new().background(theme().scrim_dark)
+                --
+                @{OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
+                panel_style()
+                @{content}
+            ]
         ]
     }
 }

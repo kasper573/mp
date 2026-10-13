@@ -1,4 +1,4 @@
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::Val;
 
 use crate::Orientation;
@@ -11,11 +11,11 @@ pub fn separator(orientation: Orientation) -> impl Scene {
         Orientation::Vertical => (Val::Px(1.0), Val::Percent(100.0)),
     };
     bsn! {
-        template_value(Style::new()
+        Style::new()
             .background(theme().surface_canvas.border)
             .node(move |node| {
                 node.width = width;
                 node.height = height;
-            }))
+            })
     }
 }

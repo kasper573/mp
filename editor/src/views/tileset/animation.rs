@@ -630,9 +630,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, grid: &Gri
                 )
             }
             _ => {
-                for each in &mut offsets.ms {
-                    *each = ms;
-                }
+                offsets.ms.fill(ms);
                 format!(
                     "Every frame lasts {ms} ms on {} tiles of {key}",
                     common.tiles.len()

@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_color::{Color, Mix};
+use bevy_curve::cubic_splines::CubicSegment;
 use bevy_ecs::prelude::*;
-use bevy_math::cubic_splines::CubicSegment;
 use bevy_math::{Rot2, Vec2};
 use bevy_text::TextColor;
 use bevy_time::Time;

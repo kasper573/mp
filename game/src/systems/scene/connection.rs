@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_replicon::prelude::RepliconChannels;
 use renet2::{ConnectionConfig, RenetClient};
@@ -141,10 +140,10 @@ fn connecting(mut commands: Commands, phase: Res<ScreenTransitionPhase>) {
     let background = overlay(*phase);
     commands.spawn_scene(bsn! {
         ConnectionUi
-        template_value(super::screen_node())
+        super::screen_node()
         BackgroundColor({background})
         GlobalZIndex({ui::tokens::layer::SYSTEM})
-        Children [ {EntityScene(text_colored("Connecting…", Color::WHITE))} ]
+        Children [ @{text_colored("Connecting…", Color::WHITE)} ]
     });
 }
 
@@ -169,13 +168,15 @@ fn lost(world: &mut World) {
     let background = overlay(*world.resource::<ScreenTransitionPhase>());
     let _ = world.spawn_scene(bsn! {
         ConnectionUi
-        template_value(super::screen_node())
+        super::screen_node()
         BackgroundColor({background})
         GlobalZIndex({ui::tokens::layer::SYSTEM})
         Children [
-            {EntityScene(text_colored("Connection lost", Color::WHITE))},
-            {EntityScene(text_colored("Reconnecting…", Color::WHITE))},
-            ( {button("Retry now")} on(retry_now) ),
+            @{text_colored("Connection lost", Color::WHITE)}
+            --
+            @{text_colored("Reconnecting…", Color::WHITE)}
+            --
+            @{button("Retry now")} on(retry_now)
         ]
     });
 }

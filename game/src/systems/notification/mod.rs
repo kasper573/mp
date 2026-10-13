@@ -13,7 +13,6 @@ use std::borrow::Cow;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use bevy_replicon::prelude::{SendTargets, ToClients};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -540,38 +539,36 @@ fn spawn_places(mut commands: Commands) {
         Pickable::IGNORE
         GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
         Children [
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px({ui::tokens::spacing::L}),
-                    width: Val::Percent(100.0),
-                }
-                Pickable::IGNORE
-                Children [
-                    {EntityScene(ui::alert_bar())},
-                    {EntityScene(ui::captions())},
-                    (
-                        {ui::toaster(ui::SonnerPosition::TopCenter)}
-                        error::ErrorToaster
-                        Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
-                    ),
-                ]
-            ),
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px({ui::tokens::spacing::XL}),
-                    width: Val::Percent(100.0),
-                    margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
-                }
-                Pickable::IGNORE
-                Children [
-                    ( intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE ),
-                    {EntityScene(ui::milestones())},
-                ]
-            ),
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px({ui::tokens::spacing::L}),
+                width: Val::Percent(100.0),
+            }
+            Pickable::IGNORE
+            Children [
+                @{ui::alert_bar()}
+                --
+                @{ui::captions()}
+                --
+                @{ui::toaster(ui::SonnerPosition::TopCenter)}
+                error::ErrorToaster
+                Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
+            ]
+            --
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px({ui::tokens::spacing::XL}),
+                width: Val::Percent(100.0),
+                margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
+            }
+            Pickable::IGNORE
+            Children [
+                intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE
+                --
+                @{ui::milestones()}
+            ]
         ]
     });
 }

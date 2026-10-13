@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bevy::ecs::system::SystemParam;
-use bevy::picking::events::{Click, Pointer};
+use bevy::picking::events::PointerClick;
 use bevy::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -224,7 +224,7 @@ impl InputMap {
     pub fn clicked(
         &self,
         action: InputAction,
-        click: &Pointer<Click>,
+        click: &PointerClick,
         keys: &ButtonInput<KeyCode>,
     ) -> bool {
         self.bindings(action).iter().any(|binding| match binding {
@@ -293,7 +293,7 @@ impl ActionInput<'_> {
         self.map.just_pressed(action, &self.keys, &self.mouse)
     }
 
-    pub fn clicked(&self, action: InputAction, click: &Pointer<Click>) -> bool {
+    pub fn clicked(&self, action: InputAction, click: &PointerClick) -> bool {
         self.map.clicked(action, click, &self.keys)
     }
 }

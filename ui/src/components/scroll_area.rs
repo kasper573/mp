@@ -1,8 +1,8 @@
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
-use bevy_input::mouse::MouseScrollUnit;
-use bevy_picking::prelude::{Drag, Pointer, Scroll};
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_input::mouse::MouseScrollPixelsPerLine;
+use bevy_picking::prelude::{PointerDrag, PointerScroll};
+use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::{
     BorderRadius, ComputedNode, Display, FlexDirection, Node, Overflow, PositionType,
@@ -54,19 +54,16 @@ pub fn scrolled(content: Box<dyn Scene>) -> impl Scene {
     bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
         Children [
-            ( {scroll_area()}
+            @{scroll_area()}
+            Children [
+              @{scroll_viewport()}
               Children [
-                ( {scroll_viewport()}
-                  Children [
-                    (
-                        Node { width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(4.0))} }
-                        Children [ {EntityScene(content)} ]
-                    )
-                  ]
-                ),
-                ( {scroll_bar()} Children [ {EntityScene(scroll_thumb())} ] )
+                Node { width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(4.0))} }
+                Children [ @{content} ]
               ]
-            )
+              --
+              @{scroll_bar()} Children [ @{scroll_thumb()} ]
+            ]
         ]
     }
 }
@@ -74,13 +71,13 @@ pub fn scrolled(content: Box<dyn Scene>) -> impl Scene {
 pub fn scroll_area() -> impl Scene {
     bsn! {
         ScrollRoot
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.flex_direction = FlexDirection::Row;
             node.overflow = Overflow::clip();
             node.position_type = PositionType::Relative;
             node.width = Val::Percent(100.0);
             node.padding = UiRect::right(Val::Px(BAR_WIDTH));
-        }))
+        })
     }
 }
 
@@ -89,19 +86,19 @@ pub fn scroll_viewport() -> impl Scene {
         ScrollViewport
         ScrollPosition::default()
         ScrollTarget::default()
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.overflow = Overflow::scroll_y();
             node.flex_grow = 1.0;
             node.height = Val::Percent(100.0);
             node.flex_direction = FlexDirection::Column;
-        }))
+        })
     }
 }
 
 pub fn scroll_bar() -> impl Scene {
     bsn! {
         ScrollBar
-        template_value(Style::new()
+        Style::new()
             .background(theme().surface_canvas.hover)
             .node(|node| {
                 node.display = Display::None;
@@ -111,14 +108,14 @@ pub fn scroll_bar() -> impl Scene {
                 node.top = Val::Px(0.0);
                 node.bottom = Val::Px(0.0);
                 node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
-            }))
+            })
     }
 }
 
 pub fn scroll_thumb() -> impl Scene {
     bsn! {
         ScrollThumbMark
-        template_value(Style::new()
+        Style::new()
             .background(
                 StatefulPaint::new(theme().surface_canvas.border)
                     .hover(theme().surface_canvas.on)
@@ -130,7 +127,7 @@ pub fn scroll_thumb() -> impl Scene {
                 node.left = Val::Px(2.0);
                 node.width = Val::Px(6.0);
                 node.border_radius = BorderRadius::all(Val::Px(radius::PILL));
-            }))
+            })
     }
 }
 
@@ -139,7 +136,8 @@ pub fn scroll_corner() -> impl Scene {
 }
 
 pub(crate) fn on_scroll(
-    mut scroll: On<Pointer<Scroll>>,
+    mut scroll: On<PointerScroll>,
+    pixels_per_line: Res<MouseScrollPixelsPerLine>,
     mut viewports: Query<(&ComputedNode, &mut ScrollTarget), With<ScrollViewport>>,
 ) {
     let Ok((view, mut target)) = viewports.get_mut(scroll.entity) else {
@@ -148,11 +146,7 @@ pub(crate) fn on_scroll(
     scroll.propagate(false);
     let scale = view.inverse_scale_factor;
     let max = (view.content_size.y * scale - view.size.y * scale).max(0.0);
-    let delta = scroll.y
-        * match scroll.unit {
-            MouseScrollUnit::Line => MouseScrollUnit::SCROLL_UNIT_CONVERSION_FACTOR,
-            MouseScrollUnit::Pixel => 1.0,
-        };
+    let delta = scroll.to_pixels(&pixels_per_line).y;
     target.0 = (target.0 - delta).clamp(0.0, max);
 }
 
@@ -194,7 +188,7 @@ pub(crate) fn pin_to_bottom(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn on_thumb_drag(
-    drag: On<Pointer<Drag>>,
+    drag: On<PointerDrag>,
     thumbs: Query<(), With<ScrollThumbMark>>,
     parents: Query<&ChildOf>,
     is_root: Query<(), With<ScrollRoot>>,

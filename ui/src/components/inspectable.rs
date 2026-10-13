@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use bevy_scene::{EntityScene, Scene, bsn, on};
+use bevy_scene::{Scene, bsn, on};
 
 use crate::components::input::{CatalogInput, InputRef};
 use crate::components::tooltip::{TooltipText, tooltip, tooltip_content, tooltip_text};
 use crate::cursor::CursorStyle;
 use crate::drag::OnTap;
-use crate::{Align, Side, component};
+use crate::{Align, Side};
 
 #[derive(Clone)]
 pub struct InspectableOptions {
@@ -25,24 +25,23 @@ pub fn inspectable(options: InspectableOptions, content: impl Scene) -> impl Sce
         on_inspect,
     } = options;
     bsn! {
-        {tooltip(false)}
+        @{tooltip(false)}
         Node
-        component(on_inspect)
-        component(InspectedBy(input))
+        on_inspect
+        ~{InspectedBy(input)}
         Pickable { should_block_lower: true, is_hoverable: true }
         on(inspect)
         Children [
-            {EntityScene(content)},
-            (
-                {tooltip_content(Side::Top, Align::Center, 4.0)}
-                Children [ {EntityScene(tooltip_text(text))} ]
-            ),
+            @{content}
+            --
+            @{tooltip_content(Side::Top, Align::Center, 4.0)}
+            Children [ @{tooltip_text(text)} ]
         ]
     }
 }
 
 fn inspect(
-    mut click: On<Pointer<Click>>,
+    mut click: On<PointerClick>,
     inspectables: Query<(&OnTap, &InspectedBy)>,
     gestures: CatalogInput,
     mut commands: Commands,

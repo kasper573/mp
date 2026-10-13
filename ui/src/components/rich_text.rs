@@ -6,13 +6,12 @@ use bevy_color::{Alpha, Color};
 use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{CommandsSceneExt, Scene, bsn, template_value};
+use bevy_scene::{CommandsSceneExt, Scene, bsn};
 use bevy_text::{FontStyle, FontWeight, TextColor, TextFont, TextSpan};
 use bevy_time::Time;
 use bevy_ui::widget::Text;
 use bevy_ui::{AlignItems, FlexDirection, FlexWrap, Node, UiRect, UiTransform, Val, Val2};
 
-use crate::component;
 use crate::components::input::{InputCatalog, InputRef, input_cap};
 use crate::components::text::font;
 use crate::theme::theme;
@@ -184,9 +183,9 @@ pub fn rich_text(text: RichText, typed: bool) -> impl Scene {
         shown: 0,
     };
     bsn! {
-        template_value(node)
-        component(text)
-        component(typewriter)
+        node
+        text
+        typewriter
         Pickable { should_block_lower: false, is_hoverable: false }
     }
 }
@@ -316,7 +315,7 @@ pub(crate) fn type_rich_text(
             typewriter.shown = shown;
         }
         let mut laid_words = words.iter_many_mut(&laid.0);
-        while let Some((word, mut visibility)) = laid_words.fetch_next() {
+        while let Some(Ok((word, mut visibility))) = laid_words.fetch_next() {
             if let Some(at) = word.cap_at {
                 let next = if shown > at {
                     Visibility::Inherited

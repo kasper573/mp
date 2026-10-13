@@ -2,23 +2,21 @@ use std::time::Duration;
 
 use std::collections::HashMap;
 
-use bevy::asset::{RenderAssetUsages, load_internal_asset, uuid_handle};
+use bevy::asset::{AssetPath, RenderAssetUsages, embedded_asset, embedded_path};
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{
     AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat, TextureUsages,
 };
-use bevy::shader::{Shader, ShaderRef};
+use bevy::shader::ShaderRef;
 use bevy::sprite::Anchor;
 use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dPlugin};
-
-const TILEMAP_SHADER: Handle<Shader> = uuid_handle!("9d3c6e1a-4b2f-4a8c-9e7d-1f2a3b4c5d6e");
 
 pub struct TilemapPlugin;
 
 impl Plugin for TilemapPlugin {
     fn build(&self, app: &mut App) {
-        load_internal_asset!(app, TILEMAP_SHADER, "tilemap.wgsl", Shader::from_wgsl);
+        embedded_asset!(app, "tilemap.wesl");
         app.add_plugins(Material2dPlugin::<TilemapMaterial>::default())
             .add_systems(Update, (animate_sprites, animate_tilemaps));
     }
@@ -152,7 +150,9 @@ pub struct TilemapMaterial {
 
 impl Material2d for TilemapMaterial {
     fn fragment_shader() -> ShaderRef {
-        ShaderRef::Handle(TILEMAP_SHADER)
+        ShaderRef::Path(
+            AssetPath::from_path_buf(embedded_path!("tilemap.wesl")).with_source("embedded"),
+        )
     }
 
     fn alpha_mode(&self) -> AlphaMode2d {

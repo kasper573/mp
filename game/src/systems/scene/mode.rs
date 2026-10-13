@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::{Activate, button, text_colored};
 
 use super::Scene;
@@ -31,11 +30,13 @@ struct ModeUi;
 fn choose_mode(mut commands: Commands) {
     commands.spawn_scene(bsn! {
         ModeUi
-        template_value(super::screen_node())
+        super::screen_node()
         Children [
-            {EntityScene(text_colored("Choose a mode", Color::WHITE))},
-            ( {button("Play")} on(enter(Mode::Play)) ),
-            ( {button("Spectate")} on(enter(Mode::Spectate)) ),
+            @{text_colored("Choose a mode", Color::WHITE)}
+            --
+            @{button("Play")} on(enter(Mode::Play))
+            --
+            @{button("Spectate")} on(enter(Mode::Spectate))
         ]
     });
 }

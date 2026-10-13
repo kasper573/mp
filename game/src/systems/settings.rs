@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::button::intent as button_intent;
 use ui::tokens::typography;
 use ui::{Activate, ButtonSize, ValueChange, button_styled};
@@ -85,11 +84,15 @@ fn content(world: &World) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Start, row_gap: Val::Px(6.0) }
         Children [
-            {EntityScene(toggle_button(settings, &SNAPPING))},
-            {EntityScene(text_speed_row(settings))},
-            {EntityScene(toggle_button(settings, &REDUCED_MOTION))},
-            {EntityScene(transition_row(settings))},
-            {EntityScene(audio_section(settings))},
+            @{toggle_button(settings, &SNAPPING)}
+            --
+            @{text_speed_row(settings)}
+            --
+            @{toggle_button(settings, &REDUCED_MOTION)}
+            --
+            @{transition_row(settings)}
+            --
+            @{audio_section(settings)}
         ]
     })
 }
@@ -98,11 +101,10 @@ fn text_speed_row(settings: &Settings) -> impl Scene + use<> {
     bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Px(SLIDER_WIDTH), padding: {UiRect::vertical(Val::Px(6.0))} }
         Children [
-            (
-                {ui::styled_text(text_speed_label(settings), ui::theme::theme().surface_canvas.on, typography::BODY)}
-                TextSpeedLabel
-            ),
-            {EntityScene(slider(settings, SettingSlider::TextSpeed))},
+            @{ui::styled_text(text_speed_label(settings), ui::theme::theme().surface_canvas.on, typography::BODY)}
+            TextSpeedLabel
+            --
+            @{slider(settings, SettingSlider::TextSpeed)}
         ]
     }
 }
@@ -117,22 +119,22 @@ fn transition_row(settings: &Settings) -> impl Scene + use<> {
     bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Px(SLIDER_WIDTH), padding: {UiRect::vertical(Val::Px(6.0))} }
         Children [
-            {EntityScene(ui::styled_text("area transition", ui::theme::theme().surface_canvas.on, typography::BODY))},
-            (
-                {ui::dropdown(settings.screen_transition().label())}
-                on(|picked: On<ValueChange<String>>, mut settings: ResMut<Settings>| {
-                    if let Some(transition) = ScreenTransition::ALL
-                        .into_iter()
-                        .find(|transition| transition.label() == picked.value)
-                    {
-                        settings.set_screen_transition(transition);
-                    }
-                })
-                Children [
-                    {EntityScene(ui::dropdown_trigger())},
-                    ( {ui::dropdown_content()} Children [ {choices} ] ),
-                ]
-            ),
+            @{ui::styled_text("area transition", ui::theme::theme().surface_canvas.on, typography::BODY)}
+            --
+            @{ui::dropdown(settings.screen_transition().label())}
+            on(|picked: On<ValueChange<String>>, mut settings: ResMut<Settings>| {
+                if let Some(transition) = ScreenTransition::ALL
+                    .into_iter()
+                    .find(|transition| transition.label() == picked.value)
+                {
+                    settings.set_screen_transition(transition);
+                }
+            })
+            Children [
+                @{ui::dropdown_trigger()}
+                --
+                @{ui::dropdown_content()} Children [ {choices} ]
+            ]
         ]
     }
 }
@@ -145,8 +147,9 @@ fn audio_section(settings: &Settings) -> impl Scene + use<> {
     bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(4.0), width: {Val::Px(SLIDER_WIDTH + FADER_NAME_WIDTH)}, padding: {UiRect::top(Val::Px(6.0))} }
         Children [
-            {EntityScene(ui::styled_text("Audio", ui::theme::theme().surface_canvas.on, typography::NAME))},
-            {faders},
+            @{ui::styled_text("Audio", ui::theme::theme().surface_canvas.on, typography::NAME)}
+            --
+            {faders}
         ]
     }
 }
@@ -155,14 +158,11 @@ fn fader_row(settings: &Settings, fader: AudioFader) -> impl Scene + use<> {
     bsn! {
         Node { flex_direction: FlexDirection::Row, align_items: AlignItems::Center }
         Children [
-            (
-                {ui::styled_text(fader_name(fader), ui::theme::theme().surface_canvas.on, typography::BODY)}
-                Node { width: Val::Px(FADER_NAME_WIDTH) }
-            ),
-            (
-                Node { flex_grow: 1.0 }
-                Children [ {EntityScene(slider(settings, SettingSlider::Volume(fader)))} ]
-            ),
+            @{ui::styled_text(fader_name(fader), ui::theme::theme().surface_canvas.on, typography::BODY)}
+            Node { width: Val::Px(FADER_NAME_WIDTH) }
+            --
+            Node { flex_grow: 1.0 }
+            Children [ @{slider(settings, SettingSlider::Volume(fader))} ]
         ]
     }
 }
@@ -170,14 +170,13 @@ fn fader_row(settings: &Settings, fader: AudioFader) -> impl Scene + use<> {
 fn slider(settings: &Settings, slider: SettingSlider) -> impl Scene + use<> {
     let (min, max) = slider.range();
     bsn! {
-        {ui::slider(slider.value(settings), min, max)}
+        @{ui::slider(slider.value(settings), min, max)}
         on(move |changed: On<ValueChange<f32>>, mut settings: ResMut<Settings>| {
             slider.set(&mut settings, changed.value);
         })
         Children [
-            ( {ui::slider_track()}
-              Children [ {EntityScene(ui::slider_range())}, {EntityScene(ui::slider_thumb())} ]
-            )
+            @{ui::slider_track()}
+            Children [ @{ui::slider_range()} -- @{ui::slider_thumb()} ]
         ]
     }
 }
@@ -228,8 +227,8 @@ fn fader_name(fader: AudioFader) -> &'static str {
 
 fn toggle_button(settings: &Settings, toggle: &'static Toggle) -> impl Scene + use<> {
     bsn! {
-        {button_styled(button_intent::PRIMARY, ButtonSize::Md, (toggle.label)(settings))}
-        ui::component(ToggleButton(toggle))
+        @{button_styled(button_intent::PRIMARY, ButtonSize::Md, (toggle.label)(settings))}
+        ~{ToggleButton(toggle)}
         on(move |_: On<Activate>, mut commands: Commands| {
             commands.queue(move |world: &mut World| {
                 (toggle.flip)(&mut world.resource_mut::<Settings>());

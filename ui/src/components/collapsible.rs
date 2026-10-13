@@ -1,4 +1,4 @@
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{AlignItems, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val};
 use bevy_ui_widgets::Button;
 
@@ -18,11 +18,11 @@ pub fn collapsible(open: bool) -> impl Scene {
             toggleable: true,
             initial: {open.then(|| OPEN.to_owned()).into_iter().collect::<Vec<_>>()},
         }
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.flex_direction = FlexDirection::Column;
             node.width = Val::Percent(100.0);
             node.row_gap = Val::Px(spacing::L);
-        }))
+        })
     }
 }
 
@@ -31,7 +31,7 @@ pub fn collapsible_trigger() -> impl Scene {
         Button
         SelectItem { value: {OPEN.to_owned()} }
         SelectTrigger
-        template_value(Style::new()
+        Style::new()
             .text_color(theme().surface_canvas.on)
             .background(
                 StatefulPaint::new(bevy_color::Color::NONE).hover(theme().surface_canvas.hover),
@@ -43,7 +43,7 @@ pub fn collapsible_trigger() -> impl Scene {
                 node.justify_content = JustifyContent::SpaceBetween;
                 node.align_items = AlignItems::Center;
                 node.padding = UiRect::axes(Val::Px(spacing::M), Val::Px(spacing::L));
-            }))
+            })
     }
 }
 
@@ -57,7 +57,7 @@ pub fn collapsible_content() -> impl Scene {
 
 pub fn collapsible_body() -> impl Scene {
     bsn! {
-        template_value(Style::new()
+        Style::new()
             .text_color(theme().surface_canvas.on)
             .node(|node| {
                 node.padding = UiRect::new(
@@ -66,6 +66,6 @@ pub fn collapsible_body() -> impl Scene {
                     Val::Px(spacing::S),
                     Val::Px(spacing::L),
                 );
-            }))
+            })
     }
 }

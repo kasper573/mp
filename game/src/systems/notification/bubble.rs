@@ -403,7 +403,7 @@ fn draw(
         }
         None => world
             .spawn_scene(bsn! {
-                {ui::speech_bubble(bubble)}
+                @{ui::speech_bubble(bubble)}
                 GlobalZIndex({ui::tokens::layer::BUBBLES})
             })
             .map(|spawned| spawned.id())
@@ -456,7 +456,7 @@ fn draw_edge_folds(
             }
             None => {
                 let Ok(spawned) = world.spawn_scene(bsn! {
-                    {ui::speech_bubble(bubble)}
+                    @{ui::speech_bubble(bubble)}
                     GlobalZIndex({ui::tokens::layer::BUBBLES})
                 }) else {
                     continue;

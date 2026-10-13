@@ -88,12 +88,12 @@ bevy_picking.workspace = true
 bevy_replicon = { workspace = true, features = ["client", "server"] }
 bevy_state.workspace = true
 bevy_time = { workspace = true, features = ["std"] }
-bevy_kira_audio = { version = "0.26.0-rc.1", default-features = false }
+bevy_kira_audio = { version = "0.27", default-features = false }
 # bevy_kira_audio fails to build without kira's symphonia feature, which otherwise only its own audio
 # loaders turn on.
-kira = { version = "0.10", default-features = false, features = ["symphonia"] }
-base64 = "0.22"
-symphonia = { version = "0.5", default-features = false, features = ["flac", "wav", "pcm"] }
+kira = { version = "0.12", default-features = false, features = ["symphonia"] }
+base64 = "0.23"
+symphonia = { version = "0.6", default-features = false, features = ["flac", "wav", "pcm"] }
 csv = "1"
 futures-timer = { version = "3", features = ["wasm-bindgen"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
@@ -101,8 +101,8 @@ derive_more = { version = "2", features = ["add", "add_assign"] }
 euclid = { version = "0.22", features = ["serde"] }
 pathfinding = "4"
 oorandom = "11"
-getrandom = "0.2"
-gloo-net = { version = "0.6", default-features = false, features = ["http"] }
+getrandom = "0.4"
+gloo-net = { version = "0.7", default-features = false, features = ["http"] }
 console_error_panic_hook = "0.1"
 rayon.workspace = true
 strum = { workspace = true, features = ["derive"] }
@@ -113,7 +113,7 @@ serde_json.workspace = true
 serde_path_to_error = "0.1"
 blake3 = "1"
 schemars = "1"
-png = "0.17"
+png = "0.18"
 tar = "0.4"
 flate2 = "1"
 postcard = { version = "1", features = ["alloc"] }
@@ -142,19 +142,19 @@ web-sys = { version = "0.3", features = [
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 bevy = { workspace = true, features = ["x11", "multi_threaded"] }
 axum.workspace = true
-tokio-tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 ctrlc.workspace = true
 envy.workspace = true
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 metrics = "0.24"
-rand = "0.9"
+rand = "0.10"
 service = { path = "../service" }
 tokio.workspace = true
 ureq = { workspace = true, features = ["rustls", "platform-verifier"] }
-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
+tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optional = true }
-cargo_metadata = "0.19"
+cargo_metadata = "0.23"
 syn = { workspace = true, features = ["visit"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 
@@ -162,4 +162,4 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 # so enabling it natively would drag the whole (unused) render stack into the server binary.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy = { workspace = true, features = ["reflect_auto_register"] }
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }

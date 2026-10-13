@@ -1,7 +1,6 @@
 use bevy_scene::{Scene, bsn};
 use bevy_ui::{GlobalZIndex, Node, OverrideClip, PositionType};
 
-use crate::component;
 use crate::overlay::{Dismissable, Open, OverlayAction, OverlayContent, POPPER_ENTER, POPPER_EXIT};
 use crate::place::Placement;
 use crate::tokens::layer;
@@ -16,7 +15,7 @@ pub fn popover(open: bool) -> impl Scene {
 
 pub fn popover_trigger() -> impl Scene {
     bsn! {
-        component(OverlayAction::Toggle)
+        ~{OverlayAction::Toggle}
     }
 }
 
@@ -26,12 +25,12 @@ pub fn popover_content(side: Side, align: Align, offset: f32) -> impl Scene {
         GlobalZIndex({layer::ANCHORED})
         OverrideClip
         Placement { side: {side}, align: {align}, offset: {offset} }
-        {OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
+        @{OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
     }
 }
 
 pub fn popover_close() -> impl Scene {
     bsn! {
-        component(OverlayAction::Close)
+        ~{OverlayAction::Close}
     }
 }

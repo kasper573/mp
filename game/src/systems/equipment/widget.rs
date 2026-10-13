@@ -4,14 +4,12 @@ use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::card;
 use crate::systems::player::session;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::{Align, RichPiece, Side, TooltipText, tooltip, tooltip_content};
 
 use crate::systems::hud::{
     HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, slot_node, tooltip_label,
 };
 use crate::systems::input::map::{ActionInput, InputAction, input};
-use ui::component;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct EquipmentGrid;
@@ -112,15 +110,13 @@ fn cell_scene(content: &Content, cell: &CellData) -> Box<dyn Scene> {
 
 fn empty_slot(slot: EquipmentSlot) -> impl Scene {
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(SLOT_BORDER))
-        {tooltip(false)}
+        BorderColor::all(SLOT_BORDER)
+        @{tooltip(false)}
         Children [
-            (
-                {tooltip_content(Side::Bottom, Align::Start, 0.0)}
-                Children [ {EntityScene(tooltip_label(slot.label().to_owned()))} ]
-            ),
+            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
+            Children [ @{tooltip_label(slot.label().to_owned())} ]
         ]
     }
 }
@@ -147,12 +143,12 @@ fn worn_slot(
         ),
     };
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(SLOT_BORDER))
-        {tooltip(false)}
-        ui::component(ui::CursorStyle::Pointer)
-        on(move |click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands| {
+        BorderColor::all(SLOT_BORDER)
+        @{tooltip(false)}
+        ui::CursorStyle::Pointer
+        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
             if input.clicked(InputAction::UseItem, &click) {
                 commands.queue(move |world: &mut World| session::unequip(world, slot));
             } else if input.clicked(InputAction::InspectItem, &click) {
@@ -160,15 +156,12 @@ fn worn_slot(
             }
         })
         Children [
-            (
-                Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-                component(ImageNode::new(icon))
-                Pickable { should_block_lower: false, is_hoverable: false }
-            ),
-            (
-                {tooltip_content(Side::Bottom, Align::Start, 0.0)}
-                Children [ {EntityScene(ui::tooltip_text(tip))} ]
-            ),
+            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
+            ImageNode { image: {icon} }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            --
+            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
+            Children [ @{ui::tooltip_text(tip)} ]
         ]
     }
 }

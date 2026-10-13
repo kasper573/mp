@@ -3,11 +3,9 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use crate::systems::effect::{EffectContext, active_effects};
 use crate::systems::player::session;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::{Align, DragHandle, DragRoot, OnSettle, Side, tooltip, tooltip_content};
 
 use crate::systems::hud::{reconcile_children, slot_node, tooltip_label};
-use ui::component;
 
 #[derive(Component, Default, Clone)]
 struct EffectsGrid;
@@ -40,12 +38,12 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
         ..default()
     };
     Box::new(bsn! {
-        template_value(node)
+        node
         BackgroundColor({crate::systems::hud::PANEL_BG})
         DragRoot
         DragHandle
         EffectsGrid
-        component(OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom)))
+        ~{OnSettle::new(move |world, geom| crate::systems::hud::persist_widget(world, id, geom))}
     })
 }
 
@@ -94,18 +92,15 @@ fn effect_icons(world: &World) -> Vec<IconData> {
 fn icon_scene(data: &IconData) -> Box<dyn Scene> {
     let label = data.label.clone();
     Box::new(bsn! {
-        template_value(slot_node())
-        {tooltip(false)}
+        slot_node()
+        @{tooltip(false)}
         Children [
-            (
-                Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-                component(ImageNode::new(data.icon.clone()))
-                Pickable { should_block_lower: false, is_hoverable: false }
-            ),
-            (
-                {tooltip_content(Side::Bottom, Align::Start, 0.0)}
-                Children [ {EntityScene(tooltip_label(label))} ]
-            ),
+            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
+            ImageNode { image: {data.icon.clone()} }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            --
+            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
+            Children [ @{tooltip_label(label)} ]
         ]
     })
 }

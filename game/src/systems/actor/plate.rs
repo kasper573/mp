@@ -249,14 +249,14 @@ fn plate(label: Label) -> impl Scene {
     };
     let name = label.name.map(|name| {
         bsn! {
-            {ui::styled_text(name, label.color, typography::LABEL)}
-            ui::component(shadow)
+            @{ui::styled_text(name, label.color, typography::LABEL)}
+            shadow
         }
     });
     let role = label.role.map(|role| {
         bsn! {
-            {ui::styled_text(format!("<{role}>"), Color::WHITE.with_alpha(0.7), typography::CAPTION)}
-            ui::component(shadow)
+            @{ui::styled_text(format!("<{role}>"), Color::WHITE.with_alpha(0.7), typography::CAPTION)}
+            shadow
         }
     });
     bsn! {
@@ -270,9 +270,11 @@ fn plate(label: Label) -> impl Scene {
         GlobalZIndex({ui::tokens::layer::BACKDROP})
         Pickable::IGNORE
         Children [
-            ( PlateIcons Node { column_gap: Val::Px(2.0) } Pickable::IGNORE ),
-            {name},
-            {role},
+            PlateIcons Node { column_gap: Val::Px(2.0) } Pickable::IGNORE
+            --
+            {name}
+            --
+            {role}
         ]
     }
 }

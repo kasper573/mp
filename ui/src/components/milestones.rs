@@ -7,7 +7,6 @@ use bevy_scene::{Scene, bsn};
 use bevy_ui::widget::TextShadow;
 use bevy_ui::{AlignItems, FlexDirection, Node, Val};
 
-use crate::component;
 use crate::components::captions::{CountHost, LabelledLine, LineHost, PlaceParts, label_text};
 use crate::components::rich_text::RichText;
 use crate::components::text::styled_text;
@@ -48,16 +47,15 @@ pub fn milestones() -> impl Scene {
             align_items: AlignItems::Center,
             row_gap: Val::Px({spacing::L}),
         }
-        component(Hovered::default())
+        Hovered
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            (
-                LineHost
-                Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: Val::Px({spacing::XL}) }
-                Pickable { should_block_lower: false, is_hoverable: true }
-            ),
-            ( CountHost Node Pickable { should_block_lower: false, is_hoverable: true } ),
+            LineHost
+            Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: Val::Px({spacing::XL}) }
+            Pickable { should_block_lower: false, is_hoverable: true }
+            --
+            CountHost Node Pickable { should_block_lower: false, is_hoverable: true }
         ]
     }
 }
@@ -89,8 +87,9 @@ fn milestone_row(line: LabelledLine) -> impl Scene {
         Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center, row_gap: Val::Px({spacing::S}) }
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            ( {label_text(&line.label, line.replaced, palette::SLATE_100.with_alpha(0.85))} component(shadow) ),
-            ( {styled_text(words, palette::AMBER_80, LINE)} component(shadow) ),
+            @{label_text(&line.label, line.replaced, palette::SLATE_100.with_alpha(0.85))} shadow
+            --
+            @{styled_text(words, palette::AMBER_80, LINE)} shadow
         ]
     }
 }

@@ -3,14 +3,15 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use bevy_input::ButtonInput;
 use bevy_input::keyboard::{KeyCode, KeyboardInput};
+use bevy_input_focus::tab_navigation::TabIndex;
 use bevy_input_focus::{FocusedInput, InputFocus};
-use bevy_scene::{Scene, bsn, on, template_value};
+use bevy_scene::{Scene, bsn, on};
 use bevy_text::{EditableText, TextEdit};
 use bevy_ui::{UiRect, Val};
+use bevy_ui_widgets::TextInput;
 
-use crate::component;
 use crate::components::input::{CatalogInput, InputCatalog, InputRef};
-use crate::components::text::font;
+use crate::components::text::font_template;
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::typography;
@@ -41,11 +42,12 @@ pub(crate) struct FieldInputs {
 pub fn text_input(opts: TextInputOptions) -> impl Scene {
     let family = theme().surface_inset;
     bsn! {
-        component(EditableText::default())
-        component(opts.on_submit)
-        component(FieldInputs { submit: opts.submit, blur: opts.blur })
-        component(font(typography::BODY))
-        template_value(Style::new()
+        TextInput
+        TabIndex
+        opts.on_submit
+        ~{FieldInputs { submit: opts.submit, blur: opts.blur }}
+        font_template(typography::BODY)
+        Style::new()
             .background(family.base)
             .text_color(family.on)
             .border_color(family.border)
@@ -53,7 +55,7 @@ pub fn text_input(opts: TextInputOptions) -> impl Scene {
                 node.width = Val::Percent(100.0);
                 node.padding = UiRect::axes(Val::Px(6.0), Val::Px(3.0));
                 node.border = UiRect::all(Val::Px(1.0));
-            }))
+            })
         on(request_submit)
     }
 }

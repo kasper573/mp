@@ -8,13 +8,13 @@ use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup, Update};
 use bevy_asset::{AssetServer, Handle};
 use bevy_camera::visibility::VisibilitySystems;
 use bevy_ecs::prelude::*;
-use bevy_ecs::template::{FnTemplate, TemplateContext};
+use bevy_input_focus::pointer_focus::PointerFocusPlugin;
 use bevy_picking::PickingSystems;
-use bevy_scene::{Scene, ScenePlugin};
+use bevy_scene::ScenePlugin;
 use bevy_text::{EditableText, Font, FontSource, TextFont};
 use bevy_ui::UiSystems;
 use bevy_ui_widgets::{
-    Button, ButtonPlugin, Checkbox, CheckboxPlugin, EditableTextInputPlugin, ScrollAreaPlugin,
+    Button, ButtonPlugin, Checkbox, CheckboxPlugin, ScrollAreaPlugin, TextInputPlugin,
 };
 
 use utils::motion::MotionPlugin;
@@ -62,8 +62,11 @@ impl Plugin for UiPlugin {
         if !app.is_plugin_added::<ScrollAreaPlugin>() {
             app.add_plugins(ScrollAreaPlugin);
         }
-        if !app.is_plugin_added::<EditableTextInputPlugin>() {
-            app.add_plugins(EditableTextInputPlugin);
+        if !app.is_plugin_added::<TextInputPlugin>() {
+            app.add_plugins(TextInputPlugin);
+        }
+        if !app.is_plugin_added::<PointerFocusPlugin>() {
+            app.add_plugins(PointerFocusPlugin);
         }
         if !app.is_plugin_added::<ScenePlugin>() {
             app.add_plugins(ScenePlugin);
@@ -218,10 +221,6 @@ struct FontsLoaded(bool);
 /// font stands in until then, so text before any font arrives still reads.
 #[derive(Component)]
 struct StandInFont(FontSource);
-
-pub fn component<C: Component + Clone>(value: C) -> impl Scene {
-    FnTemplate(move |_: &mut TemplateContext| Ok(value.clone()))
-}
 
 fn load_fonts(assets: Option<Res<AssetServer>>, files: Res<FontFiles>, mut commands: Commands) {
     let Some(assets) = assets else {

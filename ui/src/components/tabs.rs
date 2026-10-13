@@ -1,5 +1,5 @@
 use bevy_color::Color;
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{AlignItems, FlexDirection, JustifyContent, UiRect, Val};
 use bevy_ui_widgets::Button;
 
@@ -16,22 +16,22 @@ pub fn tabs(value: Option<String>) -> impl Scene {
             toggleable: false,
             initial: {value.into_iter().collect::<Vec<_>>()},
         }
-        template_value(Style::new().node(|node| {
+        Style::new().node(|node| {
             node.flex_direction = FlexDirection::Column;
             node.width = Val::Percent(100.0);
-        }))
+        })
     }
 }
 
 pub fn tabs_list() -> impl Scene {
     bsn! {
-        template_value(Style::new()
+        Style::new()
             .node(|node| {
                 node.flex_direction = FlexDirection::Row;
                 node.width = Val::Percent(100.0);
                 node.border = UiRect::bottom(Val::Px(1.0));
             })
-            .border_color(theme().surface_canvas.border))
+            .border_color(theme().surface_canvas.border)
     }
 }
 
@@ -41,7 +41,7 @@ pub fn tabs_trigger(value: impl Into<String>) -> impl Scene {
         Button
         SelectItem { value: {value_str} }
         SelectTrigger
-        template_value(trigger_style())
+        trigger_style()
     }
 }
 

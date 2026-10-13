@@ -1,9 +1,8 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{RichSpan, RichText, component};
+use ui::{RichSpan, RichText};
 
 use super::{Notification, NotificationKind, NotificationSent};
 use crate::core::time::Seconds;
@@ -93,11 +92,9 @@ fn spawn_feed(mut commands: Commands) {
         Pickable::IGNORE
         GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
         Children [
-            (
-                {ui::compact_toaster(WIDEST)}
-                FeedToaster
-                Children [ {EntityScene(more_chip())} ]
-            )
+            @{ui::compact_toaster(WIDEST)}
+            FeedToaster
+            Children [ @{more_chip()} ]
         ]
     });
 }
@@ -133,10 +130,10 @@ fn show_in(world: &mut World, toaster: Entity, notification: Notification) {
     };
     let body = content(world.resource::<AssetServer>(), &notification);
     let row = bsn! {
-        {ui::compact_toast(lasts)}
-        component(FeedRow(notification.clone()))
-        component(BorderColor::all(border))
-        Children [ {EntityScene(body)} ]
+        @{ui::compact_toast(lasts)}
+        ~{FeedRow(notification.clone())}
+        BorderColor::all(border)
+        Children [ @{body} ]
     };
     if let Ok(mut spawned) = world.spawn_scene(row) {
         spawned.insert(ChildOf(toaster));
@@ -242,7 +239,7 @@ fn content(assets: &AssetServer, notification: &Notification) -> impl Scene + us
         .map(|icon| -> Box<dyn Scene> {
             Box::new(bsn! {
                 Node { width: Val::Px(ICON), height: Val::Px(ICON), flex_shrink: 0.0 }
-                component(ImageNode::new(assets.load(icon)))
+                ImageNode { image: {assets.load(icon)} }
                 Pickable::IGNORE
             })
         })
@@ -251,7 +248,7 @@ fn content(assets: &AssetServer, notification: &Notification) -> impl Scene + us
     bsn! {
         Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, min_width: Val::Px(0.0) }
         Pickable::IGNORE
-        Children [ {icon}, {EntityScene(line)} ]
+        Children [ {icon} -- @{line} ]
     }
 }
 
@@ -265,8 +262,8 @@ fn more_chip() -> impl Scene {
         });
     bsn! {
         MoreChip
-        template_value(frame)
-        component(MORE_PRESENCE)
+        frame
+        MORE_PRESENCE
         ui::ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
     }
