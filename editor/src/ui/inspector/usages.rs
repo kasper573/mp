@@ -56,20 +56,17 @@ pub fn show_usages_grouped(editor: &mut Editor, ui: &mut Ui, table: &str, key: &
                     ui.label(theme::mono(kind).size(13.0));
                     ui.label(theme::faint("·"));
                 }
-                if *count > 1 {
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if *count > 1 {
                         ui.label(theme::muted(format!("× {count}")).monospace().size(12.0));
+                    }
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                         ui.add(
                             egui::Label::new(theme::mono(file).size(13.0).color(theme::CODE))
                                 .truncate(),
                         );
                     });
-                } else {
-                    ui.add(
-                        egui::Label::new(theme::mono(file).size(13.0).color(theme::CODE))
-                            .truncate(),
-                    );
-                }
+                });
             })
             .response
             .interact(Sense::click());

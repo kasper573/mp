@@ -264,9 +264,11 @@ fn inset(
     ui.add_space(4.0);
 }
 
+// Feet stand at a tile's center, so the cell edges lie half a tile to either side of them.
 fn draw_grid(painter: &egui::Painter, rect: ERect, feet: egui::Pos2, tile: f32) {
     let stroke = egui::Stroke::new(1.0, theme::BORDER);
-    let mut x = feet.x - ((feet.x - rect.min.x) / tile).ceil() * tile;
+    let edge = feet - Vec2::splat(tile / 2.0);
+    let mut x = edge.x - ((edge.x - rect.min.x) / tile).ceil() * tile;
     while x <= rect.max.x {
         painter.line_segment(
             [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
@@ -274,7 +276,7 @@ fn draw_grid(painter: &egui::Painter, rect: ERect, feet: egui::Pos2, tile: f32) 
         );
         x += tile;
     }
-    let mut y = feet.y - ((feet.y - rect.min.y) / tile).ceil() * tile;
+    let mut y = edge.y - ((edge.y - rect.min.y) / tile).ceil() * tile;
     while y <= rect.max.y {
         painter.line_segment(
             [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],

@@ -136,7 +136,21 @@ impl std::ops::BitOrAssign for FormChange {
     }
 }
 
-pub const LABEL_WIDTH: f32 = 124.0;
+const LABEL_WIDTH: f32 = 124.0;
+
+// The column is allocated at its full width whatever the label's length, so every value beside it
+// starts on the same line.
+pub fn label_column(ui: &mut Ui) -> Ui {
+    let (rect, _) = ui.allocate_exact_size(
+        egui::vec2(LABEL_WIDTH, ui.spacing().interact_size.y),
+        egui::Sense::hover(),
+    );
+    ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(rect)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+    )
+}
 
 pub fn value(
     ui: &mut Ui,
@@ -456,15 +470,7 @@ pub fn object_without(
             continue;
         }
         ui.horizontal(|ui| {
-            let (label_rect, _) = ui.allocate_exact_size(
-                egui::vec2(LABEL_WIDTH, ui.spacing().interact_size.y),
-                egui::Sense::hover(),
-            );
-            let mut label_ui = ui.new_child(
-                egui::UiBuilder::new()
-                    .max_rect(label_rect)
-                    .layout(egui::Layout::left_to_right(egui::Align::Center)),
-            );
+            let mut label_ui = label_column(ui);
             {
                 let ui = &mut label_ui;
                 if optional && !present {

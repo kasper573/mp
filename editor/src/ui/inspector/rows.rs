@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use egui::{Align, Layout, RichText, Ui, Vec2};
+use egui::{RichText, Ui};
 use game::core::content::ModuleRule;
 use serde_json::Value;
 
@@ -318,13 +318,7 @@ pub(super) fn shared_field(
 ) {
     let distinct = rows.distinct(path);
     ui.horizontal(|ui| {
-        ui.allocate_ui_with_layout(
-            Vec2::new(forms::LABEL_WIDTH, ui.spacing().interact_size.y),
-            Layout::left_to_right(Align::Center),
-            |ui| {
-                ui.label(theme::muted(name).monospace().size(13.0));
-            },
-        );
+        forms::label_column(ui).label(theme::muted(name).monospace().size(13.0));
         if let [only] = distinct.as_slice() {
             let mut shared = only.clone();
             ui.vertical(|ui| {

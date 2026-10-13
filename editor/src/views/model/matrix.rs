@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use strum::VariantArray;
 
 const CELL: f32 = 58.0;
-const LABEL_W: f32 = 100.0;
+const LABEL_W: f32 = 120.0;
 const PREVIEW: Vec2 = Vec2::new(180.0, 350.0);
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
@@ -49,18 +49,17 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 ui.horizontal(|ui| {
                     let first = strip_of(row, ModelStrip { action, ..ModelStrip::default() });
                     let total = super::total_ms(&first);
-                    ui.allocate_ui_with_layout(
-                        Vec2::new(LABEL_W, CELL + 22.0),
-                        egui::Layout::top_down(egui::Align::Min),
-                        |ui| {
-                            ui.add_space(6.0);
-                            ui.label(theme::mono(action.key()).color(theme::CODE).size(13.0));
-                            ui.label(
-                                theme::muted(format!("{} · {total} ms", first.len())).size(12.0),
-                            );
-                            ui.label(theme::faint(play_rule(action)).size(11.5));
-                        },
+                    let (column, _) =
+                        ui.allocate_exact_size(Vec2::new(LABEL_W, CELL + 22.0), Sense::hover());
+                    let mut column = ui.new_child(
+                        egui::UiBuilder::new()
+                            .max_rect(column)
+                            .layout(egui::Layout::top_down(egui::Align::Min)),
                     );
+                    column.add_space(6.0);
+                    column.label(theme::mono(action.key()).color(theme::CODE).size(13.0));
+                    column.label(theme::muted(format!("{} · {total} ms", first.len())).size(12.0));
+                    column.label(theme::faint(play_rule(action)).size(11.5));
                     for &direction in DirectionName::VARIANTS {
                         let this = ModelStrip { action, direction };
                         let frames = strip_of(row, this);

@@ -8,7 +8,6 @@ use serde_json::Value;
 use super::{ModelSheet, StripFrame};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
-use crate::views::area::TILE_PX;
 use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
 use game::systems::actor::model::ActionName;
 
@@ -260,7 +259,7 @@ pub fn backdrop(
     zoom: f32,
 ) -> egui::Pos2 {
     painter.rect_filled(rect, 6.0, Color32::from_rgb(78, 128, 52));
-    let feet = rect.center() + Vec2::new(0.0, TILE_PX * zoom / 2.0);
+    let feet = rect.center();
     let Some(SpawnGround { area, at, .. }) = spawn_ground(editor) else {
         return feet;
     };
@@ -280,7 +279,7 @@ pub fn backdrop(
         },
         width: (rect.width() * ppp) as u32,
         height: (rect.height() * ppp) as u32,
-        center: Pos::new(at.x + 0.5, at.y + 0.5),
+        center: at,
         zoom: zoom * ppp,
         generation,
         live: true,

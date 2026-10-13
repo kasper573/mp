@@ -425,13 +425,7 @@ fn first_class_card(
         ui.add_space(4.0);
         if fixture {
             ui.horizontal(|ui| {
-                ui.allocate_ui_with_layout(
-                    Vec2::new(forms::LABEL_WIDTH, ui.spacing().interact_size.y),
-                    Layout::left_to_right(Align::Center),
-                    |ui| {
-                        ui.label(theme::muted("key"));
-                    },
-                );
+                forms::label_column(ui).label(theme::muted("key"));
                 egui::Frame::new()
                     .fill(theme::INPUT)
                     .stroke(egui::Stroke::new(1.0, theme::BORDER))
