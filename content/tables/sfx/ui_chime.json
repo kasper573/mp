@@ -1,5 +1,6 @@
 {
   "file": "audio/interface/chime.wav",
+  "role": "interface",
   "volume": 0.47,
   "pitch": 1.0
 }

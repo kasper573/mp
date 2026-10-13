@@ -11,7 +11,6 @@ use strum::VariantArray;
 
 use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};
 use crate::app::Editor;
-use crate::forms;
 use crate::project::{ProjectFiles, row_file};
 use crate::schema;
 
@@ -253,13 +252,9 @@ pub struct AreaRange {
 impl AreaRange {
     pub fn text(&self) -> String {
         if self.low == self.high {
-            forms::trim_number(self.low)
+            self.low.to_string()
         } else {
-            format!(
-                "{}–{}",
-                forms::trim_number(self.low),
-                forms::trim_number(self.high)
-            )
+            format!("{}–{}", self.low, self.high)
         }
     }
 

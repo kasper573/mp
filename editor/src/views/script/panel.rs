@@ -16,11 +16,11 @@ use serde_json::Value;
 use super::nodes::{self, NodeReads};
 use super::{ScriptDoc, ScriptOwner, ScriptPanel, ScriptPath, ScriptRef, run};
 use crate::app::Editor;
+use crate::condition;
 use crate::project::{RowSelection, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-use crate::{condition, forms};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, panel: ScriptPanel) {
     match panel {
@@ -520,7 +520,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         .values()
         .filter(|node| node.kind() == "wait")
         .filter_map(|node| node["seconds"].as_f64())
-        .map(|s| format!("{} s", forms::trim_number(s)))
+        .map(|s| format!("{} s", s))
         .collect();
     if !seconds.is_empty() {
         waits.push(seconds.join(", "));
@@ -540,11 +540,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
 }
 
 fn place_coords(place: &Place) -> String {
-    format!(
-        "{}, {}",
-        forms::trim_number(f64::from(place.at.x)),
-        forms::trim_number(f64::from(place.at.y))
-    )
+    format!("{}, {}", place.at.x, place.at.y)
 }
 
 fn stack_text(doc: &ScriptDoc, field: &str, item: &str) -> String {

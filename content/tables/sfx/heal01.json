@@ -1,5 +1,6 @@
 {
   "file": "audio/buffs/heal01.wav",
+  "role": "combat",
   "volume": {
     "min": 0.18,
     "max": 0.22

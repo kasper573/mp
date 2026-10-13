@@ -1,5 +1,6 @@
 {
   "file": "audio/movement/landing01.wav",
+  "role": "movement",
   "volume": {
     "min": 0.61,
     "max": 0.76

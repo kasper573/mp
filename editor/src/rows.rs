@@ -12,7 +12,7 @@ use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
 use crate::views::area::placement;
 use crate::views::world;
-use crate::{forms, schema, usages};
+use crate::{schema, usages};
 
 pub const KEY_MAX: usize = 64;
 
@@ -494,14 +494,11 @@ fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
         }
         let text = match value {
             Value::Number(number) => match name.as_str() {
-                "chance" => format!("{}%", forms::trim_number(number.as_f64().unwrap_or(0.0))),
+                "chance" => format!("{}%", number.as_f64().unwrap_or(0.0)),
                 "amount" | "count" | "times" => {
-                    format!("× {}", forms::trim_number(number.as_f64().unwrap_or(0.0)))
+                    format!("× {}", number.as_f64().unwrap_or(0.0))
                 }
-                _ => format!(
-                    "{name} {}",
-                    forms::trim_number(number.as_f64().unwrap_or(0.0))
-                ),
+                _ => format!("{name} {}", number.as_f64().unwrap_or(0.0)),
             },
             Value::String(text) => format!("{name} {text}"),
             Value::Bool(true) => name.clone(),

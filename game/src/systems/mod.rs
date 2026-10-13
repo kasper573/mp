@@ -426,6 +426,7 @@ pub fn registry() -> ContentRegistry {
     let mut registry = ContentRegistry::default();
     registry
         .row::<crate::core::audio::playback::SfxDef>()
+        .row::<crate::core::audio::playback::SfxRoleDef>()
         .row::<attention::AttentionDef>()
         .row::<input::map::InputDef>()
         .row::<interface::CursorDef>()

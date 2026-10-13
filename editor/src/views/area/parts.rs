@@ -40,13 +40,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
     for (index, part) in parts.iter().enumerate() {
         let kind = part.kind_or("part");
         let at = super::shapes::bounds(part, None)
-            .map(|b| {
-                format!(
-                    "{}, {}",
-                    forms::trim_number(b.min().x as f64),
-                    forms::trim_number(b.min().y as f64)
-                )
-            })
+            .map(|b| format!("{}, {}", b.min().x, b.min().y))
             .unwrap_or_default();
         let on = selected.contains(&index);
         let full = ui.available_rect_before_wrap();

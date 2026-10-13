@@ -14,7 +14,8 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
     });
     folder.write(
         "tables/sfx/splash.json",
-        &json!({ "file": "audio/combat/splash.wav", "volume": 1.0, "pitch": 1.0 }).to_string(),
+        &json!({ "file": "audio/combat/splash.wav", "role": "combat", "volume": 1.0, "pitch": 1.0 })
+            .to_string(),
     );
     folder.remove("tables/input/interact.json");
     folder.write("tables/job/apprentice.json", "{ \"name\": 3 }");

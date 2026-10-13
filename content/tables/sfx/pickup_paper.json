@@ -1,5 +1,6 @@
 {
   "file": "audio/items/pickup/paper.wav",
+  "role": "items",
   "volume": 0.11,
   "pitch": {
     "min": 0.95,

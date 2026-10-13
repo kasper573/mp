@@ -1,5 +1,6 @@
 {
   "file": "audio/items/pickup/bone.wav",
+  "role": "items",
   "volume": 0.35,
   "pitch": {
     "min": 0.95,

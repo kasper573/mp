@@ -1,5 +1,6 @@
 {
   "file": "audio/movement/step_rock01.wav",
+  "role": "movement",
   "volume": {
     "min": 0.79,
     "max": 0.99

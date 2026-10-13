@@ -528,14 +528,7 @@ fn start(
         });
         widgets::kv(ui, "at", |ui| {
             if at_spawn {
-                ui.label(
-                    theme::mono(format!(
-                        "{}, {}",
-                        forms::trim_number(at.x as f64),
-                        forms::trim_number(at.y as f64)
-                    ))
-                    .size(13.0),
-                );
+                ui.label(theme::mono(format!("{}, {}", at.x, at.y)).size(13.0));
                 ui.label(theme::faint("tiles").size(12.0));
             } else {
                 let (mut x, mut y) = (at.x, at.y);
@@ -1381,8 +1374,8 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         Value::Object(place) => format!(
             "{} · {}, {}",
             place.text_or("area", "?"),
-            forms::trim_number(place["x"].as_f64().unwrap_or(0.0)),
-            forms::trim_number(place["y"].as_f64().unwrap_or(0.0))
+            place["x"].as_f64().unwrap_or(0.0),
+            place["y"].as_f64().unwrap_or(0.0)
         ),
         _ => format!(
             "{} · the initial spawn",
@@ -1390,15 +1383,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ),
     };
     widgets::kv_text(ui, "level", format!("{level}{next}"));
-    widgets::kv_text(
-        ui,
-        "health",
-        format!(
-            "{} of {}",
-            forms::trim_number(health as f64),
-            forms::trim_number(health as f64)
-        ),
-    );
+    widgets::kv_text(ui, "health", format!("{} of {}", health, health));
     widgets::kv_text(ui, "starts", starts);
     widgets::kv_code(ui, "file", row_file(TABLE, key));
     ui.add_space(6.0);

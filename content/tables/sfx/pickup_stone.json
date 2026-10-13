@@ -1,5 +1,6 @@
 {
   "file": "audio/items/pickup/stone.wav",
+  "role": "items",
   "volume": 0.26,
   "pitch": {
     "min": 0.95,

@@ -756,8 +756,8 @@ pub fn place_text(value: &Value) -> Option<String> {
     Some(format!(
         "{} {}, {}",
         map.text_or("area", "?"),
-        forms::trim_number(map["x"].as_f64().unwrap_or(0.0)),
-        forms::trim_number(map["y"].as_f64().unwrap_or(0.0))
+        map["x"].as_f64().unwrap_or(0.0),
+        map["y"].as_f64().unwrap_or(0.0)
     ))
 }
 
@@ -1074,7 +1074,6 @@ fn var(text: impl Into<String>) -> SummaryPiece {
 }
 
 pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>> {
-    let trim = forms::trim_number;
     match FlowKind::of(node) {
         Some(FlowKind::On) => vec![event_pieces(node)],
         Some(FlowKind::If) => vec![expression_pieces(&node["test"])],
@@ -1092,7 +1091,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
             line.push(muted(" times"));
             if let Some(at_most) = node["at_most"].as_f64() {
                 line.push(muted(" · at most "));
-                line.push(strong(trim(at_most)));
+                line.push(strong(at_most.to_string()));
             }
             vec![line]
         }
@@ -1103,7 +1102,7 @@ pub fn pieces(node: &Value, catalogue: &NodeCatalogue) -> Vec<Vec<SummaryPiece>>
                 line.push(muted(" · the next tick"));
             } else if let Some(at_most) = node["at_most"].as_f64() {
                 line.push(muted(" · at most "));
-                line.push(strong(trim(at_most)));
+                line.push(strong(at_most.to_string()));
             }
             vec![line]
         }
@@ -1227,7 +1226,6 @@ fn stack_pieces(list: &[Value]) -> Vec<SummaryPiece> {
 }
 
 fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
-    let trim = forms::trim_number;
     let mut line = Vec::new();
     match event_of(node) {
         Some("interacted") => {
@@ -1235,7 +1233,7 @@ fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
             line.push(strong(node.text_or("verb", "use")));
             if let Some(reach) = node["reach"].as_f64() {
                 line.push(muted(" · reach "));
-                line.push(strong(trim(reach)));
+                line.push(strong(reach.to_string()));
                 line.push(muted(" tiles"));
             }
         }
@@ -1243,7 +1241,7 @@ fn event_pieces(node: &Value) -> Vec<SummaryPiece> {
             line.push(strong(node.text_or("by", "characters")));
             if let Some(within) = node["within"].as_f64() {
                 line.push(muted(" within "));
-                line.push(strong(trim(within)));
+                line.push(strong(within.to_string()));
             }
         }
         Some("stood_on") => {

@@ -1,5 +1,6 @@
 {
   "file": "audio/interface/rising_chime.wav",
+  "role": "interface",
   "volume": 0.15,
   "pitch": 1.0
 }

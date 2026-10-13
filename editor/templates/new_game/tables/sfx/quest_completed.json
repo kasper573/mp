@@ -1,5 +1,6 @@
 {
   "file": "audio/interface/quest_completed.wav",
+  "role": "interface",
   "volume": 0.3,
   "pitch": 1.0
 }

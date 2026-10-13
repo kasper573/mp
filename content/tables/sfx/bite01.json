@@ -1,5 +1,6 @@
 {
   "file": "audio/combat/bite01.wav",
+  "role": "combat",
   "volume": {
     "min": 0.57,
     "max": 0.71

@@ -300,7 +300,7 @@ pub(super) fn scenery_rows(ui: &mut Ui, module: &mut Value, path: &str) -> bool 
         let current = module["sort"].as_f64();
         let id = ui.id().with((path, "sort"));
         let shown = current
-            .map(forms::trim_number)
+            .map(|number| number.to_string())
             .unwrap_or_else(|| "flat".to_owned());
         let typed = forms::drafted(ui, id, &shown, |ui, draft| {
             forms::boxed_input(

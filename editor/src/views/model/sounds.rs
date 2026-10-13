@@ -6,11 +6,11 @@ use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use game::core::audio;
 use game::core::audio::loader::{self, DecodedAudio};
 use game::core::audio::mix::{AudioCategory, AudioMix};
-use game::core::audio::playback::SfxScalar;
+use game::core::audio::playback::{SfxRoleDef, SfxScalar};
+use game::core::content::ContentRow;
 use game::core::math::Rng;
 
 use crate::app::Editor;
-use crate::forms;
 use crate::project::{ContentEdit, ProjectFiles, hash, row_file};
 use crate::ui::{theme, widgets};
 
@@ -151,52 +151,33 @@ pub fn draw_wave(painter: &egui::Painter, rect: ERect, bins: &[f32], colour: Col
     ));
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum SoundRole {
-    Combat,
-    Movement,
-    Items,
-    Interface,
-    Ambient,
-    Other,
+pub struct SfxRole {
+    pub key: String,
+    pub def: SfxRoleDef,
 }
 
-impl SoundRole {
-    pub fn of_path(path: &str) -> SoundRole {
-        let lower = path.to_lowercase();
-        if lower.contains("combat") {
-            SoundRole::Combat
-        } else if lower.contains("step") || lower.contains("movement") {
-            SoundRole::Movement
-        } else if lower.contains("item") || lower.contains("pickup") || lower.contains("trade") {
-            SoundRole::Items
-        } else if lower.contains("interface") || lower.contains("ui") {
-            SoundRole::Interface
-        } else if lower.contains("ambien") {
-            SoundRole::Ambient
-        } else {
-            SoundRole::Other
-        }
-    }
+pub fn sfx_roles(editor: &Editor) -> Vec<SfxRole> {
+    let Some(project) = editor.project.as_ref() else {
+        return Vec::new();
+    };
+    let mut keys: Vec<&str> = project.files.keys_of(SfxRoleDef::TABLE).collect();
+    keys.sort_unstable();
+    keys.into_iter()
+        .filter_map(|key| sfx_role(editor, key))
+        .collect()
+}
 
-    pub fn target_lufs(self) -> f64 {
-        match self {
-            SoundRole::Combat | SoundRole::Other => -23.0,
-            SoundRole::Items | SoundRole::Interface => -28.0,
-            SoundRole::Movement => -33.0,
-            SoundRole::Ambient => -35.0,
-        }
-    }
+pub fn role_of_sfx(editor: &Editor, sfx: &str) -> Option<SfxRole> {
+    let row = editor.row_value("sfx", sfx)?;
+    sfx_role(editor, row["role"].as_str()?)
+}
 
-    pub fn place(self) -> &'static str {
-        match self {
-            SoundRole::Combat | SoundRole::Other => "level with voices",
-            SoundRole::Items => "below the voices, where items sit",
-            SoundRole::Interface => "below the voices, where the interface sits",
-            SoundRole::Movement => "lowest, where footsteps sit",
-            SoundRole::Ambient => "under the music",
-        }
-    }
+fn sfx_role(editor: &Editor, key: &str) -> Option<SfxRole> {
+    let row = editor.row_value(SfxRoleDef::TABLE, key)?;
+    Some(SfxRole {
+        key: key.to_owned(),
+        def: serde_json::from_value(row).ok()?,
+    })
 }
 
 pub struct LoudnessVerdict {
@@ -206,15 +187,15 @@ pub struct LoudnessVerdict {
     pub peak: String,
 }
 
-pub fn verdict(loudness: EffectLoudness, gain: f32, role: SoundRole) -> LoudnessVerdict {
+pub fn verdict(loudness: EffectLoudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerdict {
     let level = loudness.loudest_at(gain);
-    let target = role.target_lufs();
+    let target = role.loudness.0;
     let off = level - target;
     let ok = off.abs() <= 1.0;
     let loudness_text = if ok {
         format!(
-            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, {}",
-            role.place()
+            "{level:.1} LUFS over its loudest {LOUDEST_WINDOW_MS} ms, at the {} level",
+            role.name
         )
     } else if off > 0.0 {
         format!(
@@ -287,33 +268,26 @@ pub fn footstep_of(editor: &Editor, surface: Option<&str>) -> Option<String> {
     chosen.map(|surface| surface.footstep.clone())
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
-pub enum SoundFilter {
-    Combat,
-    Movement,
-    #[default]
-    All,
-}
-
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let keys = sfx_keys(editor);
+    let roles = sfx_roles(editor);
     let (search, filter) = {
         let view = &editor.views.model.view(key);
-        (view.sound_search.clone(), view.sound_filter)
+        (view.sound_search.clone(), view.sound_role.clone())
     };
     let mut search_text = search.clone();
-    let mut new_filter = filter;
+    let mut new_filter = filter.clone();
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.allocate_ui(Vec2::new(220.0, 26.0), |ui| {
             widgets::search_box(ui, &mut search_text, "Search sounds", None);
         });
-        for (option, label) in [
-            (SoundFilter::Combat, "combat".to_owned()),
-            (SoundFilter::Movement, "movement".to_owned()),
-            (SoundFilter::All, format!("all · {}", keys.len())),
-        ] {
+        let options = roles
+            .iter()
+            .map(|role| (Some(role.key.clone()), role.def.name.to_lowercase()))
+            .chain([(None, format!("all · {}", keys.len()))]);
+        for (option, label) in options {
             let on = filter == option;
             if widgets::toggle_chip(ui, &label, on).clicked() {
                 new_filter = option;
@@ -325,16 +299,12 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .iter()
         .filter(|sfx| search.is_empty() || sfx.contains(&search.to_lowercase()))
     {
-        let Some(file) = sfx_file(editor, sfx) else {
+        if sfx_file(editor, sfx).is_none() {
             continue;
-        };
-        let role = SoundRole::of_path(&file);
-        let keep = match filter {
-            SoundFilter::Combat => role == SoundRole::Combat,
-            SoundFilter::Movement => role == SoundRole::Movement,
-            SoundFilter::All => true,
-        };
-        if !keep {
+        }
+        if let Some(wanted) = &filter
+            && role_of_sfx(editor, sfx).is_none_or(|role| &role.key != wanted)
+        {
             continue;
         }
         listed.push((sfx.clone(), wave_of_sfx(editor, sfx)));
@@ -376,7 +346,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str) {
     {
         let view = editor.views.model.view_mut(key);
         view.sound_search = search_text;
-        view.sound_filter = new_filter;
+        view.sound_role = new_filter;
     }
     if let Some(sfx) = play {
         editor.views.model.sfx_to_play.push(sfx);
@@ -479,18 +449,8 @@ fn scalar_of(editor: &Editor, sfx: &str, field: &str) -> SfxScalar {
 
 fn scalar_text(scalar: SfxScalar) -> (String, f32) {
     match scalar {
-        SfxScalar::Fixed(fixed) => (
-            format!("{} · the row's", forms::trim_number(f64::from(fixed))),
-            fixed,
-        ),
-        SfxScalar::Random { min, max } => (
-            format!(
-                "{} to {}, at random · the row's",
-                forms::trim_number(f64::from(min)),
-                forms::trim_number(f64::from(max))
-            ),
-            max,
-        ),
+        SfxScalar::Fixed(fixed) => (format!("{fixed} · the row's"), fixed),
+        SfxScalar::Random { min, max } => (format!("{min} to {max}, at random · the row's"), max),
     }
 }
 

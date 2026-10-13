@@ -3,7 +3,6 @@ use serde_json::Value;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
-use crate::forms;
 use crate::project::{ContentEdit, RowSelection};
 use crate::ui::{theme, widgets};
 use crate::views::area::TILE_PX;
@@ -199,10 +198,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                 egui::Align2::CENTER_CENTER,
                 format!(
                     "frame {} × {} px · hitbox {} × {} tiles",
-                    sheet.frame_width,
-                    sheet.frame_height,
-                    forms::trim_number(width as f64),
-                    forms::trim_number(height as f64)
+                    sheet.frame_width, sheet.frame_height, width, height
                 ),
                 egui::FontId::monospace(12.0),
                 theme::MUTED,

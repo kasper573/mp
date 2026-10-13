@@ -139,7 +139,7 @@ fn cell_text(value: &Value) -> String {
         Value::Bool(flag) => if *flag { "yes" } else { "no" }.to_owned(),
         Value::Number(number) => number
             .as_f64()
-            .map(forms::trim_number)
+            .map(|number| number.to_string())
             .unwrap_or_else(|| number.to_string()),
         Value::String(text) => text.clone(),
         Value::Array(items) => format!("{} items", items.len()),
@@ -1380,13 +1380,7 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                 widgets::kv_text(
                     ui,
                     &format!("{} rows", values.len()),
-                    format!(
-                        "{} to {} · {count} are {} to {}",
-                        forms::trim_number(low),
-                        forms::trim_number(high),
-                        forms::trim_number(from),
-                        forms::trim_number(to)
-                    ),
+                    format!("{} to {} · {count} are {} to {}", low, high, from, to),
                 );
             } else {
                 let texts: Vec<String> = rows.iter().filter_map(|row| column.text(row)).collect();
@@ -1524,8 +1518,8 @@ fn histogram(ui: &mut Ui, values: &[f64], highlight: Option<f64>) {
         };
         painter.rect_filled(bar, 2.0, colour);
         let label = match integral && bins as f64 == high - low + 1.0 {
-            true => forms::trim_number(low + index as f64),
-            false => forms::trim_number(low + span * index as f64 / bins as f64),
+            true => (low + index as f64).to_string(),
+            false => (low + span * index as f64 / bins as f64).to_string(),
         };
         if bins <= 12 {
             painter.text(

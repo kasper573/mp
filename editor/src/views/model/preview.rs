@@ -7,7 +7,6 @@ use serde_json::Value;
 
 use super::{ModelSheet, StripFrame};
 use crate::app::Editor;
-use crate::forms;
 use crate::ui::{theme, widgets};
 use crate::views::area::TILE_PX;
 use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
@@ -194,13 +193,7 @@ pub fn controls(
         {
             preview.muted = !preview.muted;
         }
-        if with_speed
-            && widgets::chip(
-                ui,
-                &format!("{}×", forms::trim_number(preview.speed as f64)),
-            )
-            .clicked()
-        {
+        if with_speed && widgets::chip(ui, &format!("{}×", preview.speed)).clicked() {
             preview.speeds = (preview.speeds + 1) % SPEEDS.len();
             preview.speed = SPEEDS[preview.speeds];
         }

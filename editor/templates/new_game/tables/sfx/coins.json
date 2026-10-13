@@ -1,5 +1,6 @@
 {
   "file": "audio/interface/coins.wav",
+  "role": "interface",
   "volume": 0.46,
   "pitch": 1.0
 }

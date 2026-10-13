@@ -84,7 +84,7 @@ showcase: build wasm e2e-stack-up
 # Records the ui gallery on SCENE (a tab name): `just gallery-demo "toasts (sonner)" 8 "mousemove 800 523 click 1"`.
 gallery-demo scene seconds="6" input="":
     cargo build --release -p ui --bin gallery
-    scripts/record.sh {{quote(demo_dir / "gallery-" + kebabcase(scene) + ".webm")}} "rift ui gallery" {{seconds}} {{quote(input)}} "" \
+    just record {{quote(demo_dir / "gallery-" + kebabcase(scene) + ".webm")}} "rift ui gallery" {{seconds}} {{quote(input)}} "" \
       target/release/gallery {{quote(scene)}}
 
 # The art exports sit beside the copy, so import scenes find them.
@@ -97,7 +97,7 @@ editor-demo scene seconds="8" input="" hook="":
     trap 'rm -rf "$WORK"' EXIT
     cp -r content "$WORK/game"
     cp -r art "$WORK/art"
-    scripts/record.sh {{quote(demo_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
+    just record {{quote(demo_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
 # Frames sampled evenly across VIDEO, tiled into one image beside it: a recording at a glance.
@@ -111,10 +111,6 @@ contact-sheet video:
 render-actor names="" animations="" loops="4":
     RIFT_RENDER_CONTENT_DIR=content cargo run --quiet -p game --bin render-actor -- {{quote(names)}} {{quote(animations)}} {{loops}} \
       target/render/actor-{{ if names == "" { "all" } else { replace(names, ",", "+") } }}-{{ if animations == "" { "all" } else { replace(animations, ",", "+") } }}-x{{loops}}.mp4
-
-# Synthesizes the generated sound effects into content/assets/audio.
-synth-sfx:
-    scripts/synth-sfx.sh
 
 # Players are congested (all on the spawn tile, one shared view) by default; `dist` spreads them for distinct views.
 [doc("The highest area count sustained within the tick budget.")]
@@ -138,6 +134,32 @@ up flags:
     rm -rf target/stack/content && mkdir -p target/stack && cp -r content target/stack/content
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
     {{compose}} {{flags}} up -d --build --wait
+
+# Films COMMAND's window titled TITLE on a private virtual display to OUT, playing INPUT (an xdotool
+# command chain in window pixels) and running HOOK (a shell line) while it records.
+[private]
+[positional-arguments]
+record out title seconds input hook +command:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export out=$1 title=$2 seconds=$3 input=$4 hook=$5
+    shift 5
+    mkdir -p "$(dirname "$out")"
+    xvfb-run -a -s "-screen 0 2560x1440x24" bash -euo pipefail -c '
+      "$@" & app=$!
+      window=$(xdotool search --sync --name "$title" | head -1)
+      xdotool windowmove --sync "$window" 0 0
+      xdotool windowfocus --sync "$window"
+      eval "$(xdotool getwindowgeometry --shell "$window")"
+      # The window maps before bevy has rendered into it.
+      sleep 2
+      ffmpeg -v error -y -f x11grab -framerate 30 -video_size "${WIDTH}x${HEIGHT}" -i "$DISPLAY+$X,$Y" \
+        -t "$seconds" -c:v libvpx -b:v 4M -deadline realtime -cpu-used 8 "$out" & recording=$!
+      [ -z "$hook" ] || bash -c "$hook" &
+      [ -z "$input" ] || xdotool $input
+      wait $recording
+      kill $app' _ "$@"
+    echo "$out"
 
 [private]
 playwright *args:

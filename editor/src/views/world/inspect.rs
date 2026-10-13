@@ -346,16 +346,12 @@ fn colour_bar(ui: &mut Ui, ranges: &ColourRanges, unit: &str) {
         );
         ui.painter().rect_filled(slice, 0.0, viridis(from));
     }
-    let number = |value: f64| {
-        theme::faint(forms::trim_number(value))
-            .monospace()
-            .size(11.0)
-    };
+    let number = |value: f64| theme::faint(value.to_string()).monospace().size(11.0);
     ui.horizontal(|ui| {
         ui.label(number(ranges.low));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.label(
-                theme::faint(format!("{} {unit}", forms::trim_number(ranges.high)))
+                theme::faint(format!("{} {unit}", ranges.high))
                     .monospace()
                     .size(11.0),
             );

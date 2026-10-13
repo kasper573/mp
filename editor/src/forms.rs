@@ -630,7 +630,7 @@ fn geometry(
     let number = |name: &str| {
         value[name]
             .as_f64()
-            .map(trim_number)
+            .map(|number| number.to_string())
             .unwrap_or_else(|| "0".to_owned())
     };
     let current = match kind {
@@ -975,7 +975,10 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
 
 fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("chance");
-    let current = value.as_f64().map(trim_number).unwrap_or_default();
+    let current = value
+        .as_f64()
+        .map(|number| number.to_string())
+        .unwrap_or_default();
     let mut draft = cx
         .state
         .drafts
@@ -1132,7 +1135,10 @@ pub fn number(
     integer: bool,
 ) -> FormChange {
     let id = ui.id().with(path).with("number");
-    let current = value.as_f64().map(trim_number).unwrap_or_default();
+    let current = value
+        .as_f64()
+        .map(|number| number.to_string())
+        .unwrap_or_default();
     let mut draft = cx
         .state
         .drafts
@@ -1169,10 +1175,10 @@ pub fn number(
                             path.to_owned(),
                             match (min, max) {
                                 (Some(min), Some(max)) => {
-                                    format!("{} to {} only", trim_number(min), trim_number(max))
+                                    format!("{} to {} only", min, max)
                                 }
-                                (Some(min), None) => format!("at least {}", trim_number(min)),
-                                (None, Some(max)) => format!("at most {}", trim_number(max)),
+                                (Some(min), None) => format!("at least {}", min),
+                                (None, Some(max)) => format!("at most {}", max),
                                 (None, None) => String::new(),
                             },
                         );
@@ -1199,15 +1205,7 @@ pub fn number(
 }
 
 pub fn tiles(value: f32) -> String {
-    trim_number((value as f64 * 1000.0).round() / 1000.0)
-}
-
-pub fn trim_number(value: f64) -> String {
-    if value.fract() == 0.0 && value.abs() < 1e15 {
-        format!("{}", value as i64)
-    } else {
-        format!("{value}")
-    }
+    ((value as f64 * 1000.0).round() / 1000.0).to_string()
 }
 
 pub fn boxed_input(

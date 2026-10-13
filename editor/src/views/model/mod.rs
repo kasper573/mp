@@ -116,7 +116,7 @@ pub struct ModelView {
     pub face: Option<String>,
     pub hitbox_drag: Option<hitbox::HitboxHandle>,
     pub sound_search: String,
-    pub sound_filter: sounds::SoundFilter,
+    pub sound_role: Option<String>,
     pub last_sound: Option<String>,
     pub confirm: Option<strip::StripConfirm>,
     pub removing: Option<FaceRemoval>,

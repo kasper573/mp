@@ -3,10 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::core::assets::AssetRef;
+use crate::core::audio::Lufs;
 use crate::core::audio::decibels;
 use crate::core::audio::loader::AudioLoader;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
-use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::content::{Content, ContentId, ContentRow, RowCheck};
 use crate::core::math::{Pos, Rng, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds};
@@ -46,12 +47,29 @@ pub type SfxId = ContentId<SfxDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
     pub file: AssetRef,
+    pub role: SfxRoleId,
     pub volume: SfxScalar,
     pub pitch: SfxScalar,
 }
 
 impl ContentRow for SfxDef {
     const TABLE: &'static str = "sfx";
+}
+
+pub type SfxRoleId = ContentId<SfxRoleDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct SfxRoleDef {
+    pub name: String,
+    pub loudness: Lufs,
+}
+
+impl ContentRow for SfxRoleDef {
+    const TABLE: &'static str = "sfx_role";
+
+    fn check(&self, cx: &mut RowCheck) {
+        cx.text("/name", &self.name, 1, 40);
+    }
 }
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

@@ -12,8 +12,8 @@ use serde_json::Value;
 use crate::app::Editor;
 use crate::forms::{FormAction, FormCx};
 use crate::project::row_file;
+use crate::thumbs;
 use crate::ui::{theme, widgets};
-use crate::{forms, thumbs};
 
 pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     let Some(npc) = module["npc"].as_str().map(str::to_owned) else {
@@ -31,9 +31,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     widgets::kv_text(
         ui,
         "respawn",
-        respawn.map_or("never".to_owned(), |after| {
-            format!("{} s", forms::trim_number(after))
-        }),
+        respawn.map_or("never".to_owned(), |after| format!("{} s", after)),
     );
     let scripts: Vec<String> = modules
         .iter()
@@ -47,10 +45,12 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
                     .map(|(k, v)| {
                         format!(
                             "{k} {}",
-                            v.as_f64().map(forms::trim_number).unwrap_or_else(|| v
-                                .as_str()
-                                .map(str::to_owned)
-                                .unwrap_or_else(|| v.to_string()))
+                            v.as_f64()
+                                .map(|number| number.to_string())
+                                .unwrap_or_else(|| v
+                                    .as_str()
+                                    .map(str::to_owned)
+                                    .unwrap_or_else(|| v.to_string()))
                         )
                     })
                     .collect();
@@ -73,7 +73,7 @@ pub(super) fn from_npc(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
         },
     );
     if let Some(health) = row["stats"]["health"].as_f64() {
-        widgets::kv_text(ui, "health", forms::trim_number(health));
+        widgets::kv_text(ui, "health", health.to_string());
     }
     ui.add_space(4.0);
     if widgets::chip_coloured(ui, &format!("npc/ {npc} →"), theme::INPUT, theme::CODE).clicked() {

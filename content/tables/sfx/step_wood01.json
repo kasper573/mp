@@ -1,5 +1,6 @@
 {
   "file": "audio/movement/step_wood01.wav",
+  "role": "movement",
   "volume": {
     "min": 0.76,
     "max": 0.95

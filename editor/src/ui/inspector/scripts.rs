@@ -289,7 +289,7 @@ pub(super) fn script_summary(module: &Value) -> String {
                     value
                         .as_str()
                         .map(str::to_owned)
-                        .or_else(|| value.as_f64().map(forms::trim_number))
+                        .or_else(|| value.as_f64().map(|number| number.to_string()))
                         .unwrap_or_else(|| value.to_string())
                 ));
             }
@@ -397,12 +397,9 @@ pub fn summary_of(module: &Value) -> String {
             Value::String(text) => parts.push(text.clone()),
             Value::Number(number) => parts.push(match name.as_str() {
                 "count" | "amount" | "times" => {
-                    format!("× {}", forms::trim_number(number.as_f64().unwrap_or(0.0)))
+                    format!("× {}", number.as_f64().unwrap_or(0.0))
                 }
-                _ => format!(
-                    "{name} {}",
-                    forms::trim_number(number.as_f64().unwrap_or(0.0))
-                ),
+                _ => format!("{name} {}", number.as_f64().unwrap_or(0.0)),
             }),
             Value::Array(items) => parts.push(format!("{} {name}", items.len())),
             Value::Object(nodes) if name == "nodes" => parts.push(format!("{} nodes", nodes.len())),
@@ -423,7 +420,7 @@ pub fn module_lines(module: &Value) -> String {
         match value {
             Value::String(text) => text.clone(),
             Value::Number(number) => {
-                let number = forms::trim_number(number.as_f64().unwrap_or(0.0));
+                let number = number.as_f64().unwrap_or(0.0).to_string();
                 if name == "chance" {
                     format!("{number}%")
                 } else {

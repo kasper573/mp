@@ -483,15 +483,15 @@ fn cue_card(
                     }
                 }
                 widgets::section(ui, "Against the mix, at its loudest");
-                let file = super::sounds::sfx_file(editor, &sound).unwrap_or_default();
-                let role = super::sounds::SoundRole::of_path(&file);
-                match wave.as_ref().and_then(|wave| wave.loudness) {
-                    Some(loudness) => {
-                        let verdict = super::sounds::verdict(loudness, gain, role);
+                let role = super::sounds::role_of_sfx(editor, &sound);
+                match (wave.as_ref().and_then(|wave| wave.loudness), role) {
+                    (Some(loudness), Some(role)) => {
+                        let verdict = super::sounds::verdict(loudness, gain, &role.def);
                         verdict_row(ui, "loudness", verdict.ok, &verdict.loudness);
                         verdict_row(ui, "peak", verdict.peak_ok, &verdict.peak);
                     }
-                    None => widgets::kv_text(ui, "loudness", "not measured"),
+                    (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
+                    (_, None) => widgets::kv_text(ui, "loudness", "no role to measure against"),
                 }
                 if let Some(wave) = &wave {
                     let left = total.saturating_sub(starts);
@@ -917,11 +917,7 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Form
     let height = value["hitbox"]["height"].as_f64().unwrap_or(1.0);
     widgets::kv(ui, "hitbox", |ui| {
         let id = ui.id().with("hitbox-draft");
-        let shown = format!(
-            "{} × {}",
-            forms::trim_number(width),
-            forms::trim_number(height)
-        );
+        let shown = format!("{} × {}", width, height);
         let typed = forms::drafted(ui, id, &shown, |ui, draft| {
             forms::boxed_input(ui, Some("tiles"), |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {

@@ -1,5 +1,6 @@
 {
   "file": "audio/movement/step_grass01.wav",
+  "role": "movement",
   "volume": {
     "min": 0.72,
     "max": 0.9

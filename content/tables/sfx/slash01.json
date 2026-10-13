@@ -1,5 +1,6 @@
 {
   "file": "audio/combat/slash01.wav",
+  "role": "combat",
   "volume": {
     "min": 0.5,
     "max": 0.63

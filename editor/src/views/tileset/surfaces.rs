@@ -130,9 +130,10 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::WARN);
     }
     let (_, gain) = sounds::volume_of(editor, &footstep);
-    match wave.as_ref().and_then(|wave| wave.loudness) {
-        Some(loudness) => {
-            let verdict = sounds::verdict(loudness, gain, sounds::SoundRole::Movement);
+    let role = sounds::role_of_sfx(editor, &footstep);
+    match (wave.as_ref().and_then(|wave| wave.loudness), role) {
+        (Some(loudness), Some(role)) => {
+            let verdict = sounds::verdict(loudness, gain, &role.def);
             widgets::kv(ui, "loudness", |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.label(
@@ -146,7 +147,8 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
                 });
             });
         }
-        None => widgets::kv_text(ui, "loudness", "not measured"),
+        (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
+        (_, None) => widgets::kv_text(ui, "loudness", "no role to measure against"),
     }
     widgets::kv_text(
         ui,
