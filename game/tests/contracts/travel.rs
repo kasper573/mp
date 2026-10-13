@@ -3,15 +3,14 @@ use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::AreaObject;
 use game::systems::area::transition::Crossing;
-use game::systems::history::History;
-use game::systems::input::map::InputMap;
+use game::systems::dialogue::Conversation;
 use game::systems::movement::{MoveRequest, Position, position};
 use game::systems::notification::Notification;
 use game::systems::player::commands_locked;
 
 use crate::support::{
-    Sim, content, conversation, count, errors, give, heard_the_news, labels, leave, locked, object,
-    pick, remember, row, spawn_area, spoken, talk,
+    Sim, conversation, count, errors, give, heard_the_news, labels, leave, locked, object, pick,
+    remember, row, spawn_area, spoken, talk, townsperson,
 };
 
 fn forest_road(sim: &mut Sim) -> Pos<Tiles> {
@@ -38,61 +37,67 @@ fn crossed(sim: &mut Sim, player: Entity, within: f32) -> bool {
     sim.run_until(within, |world| world.get::<Crossing>(player).is_some())
 }
 
-fn halts(sim: &mut Sim, player: Entity) -> u32 {
-    let inputs = InputMap::new(content());
-    sim.world()
-        .get::<History>(player)
-        .map(|history| {
-            history
-                .records()
-                .filter(|record| {
-                    record.entry.by.as_deref() == Some("Ilsa")
-                        && record.entry.text.words(&inputs).starts_with("Halt!")
-                })
-                .map(|record| record.entry.repeats)
-                .sum()
-        })
-        .unwrap_or_default()
+fn halted(sim: &mut Sim, player: Entity) -> bool {
+    sim.run_until(15.0, |world| {
+        world
+            .get::<Conversation>(player)
+            .is_some_and(|now| now.node == "halt")
+    })
 }
 
 #[test]
-fn without_a_pass_the_forest_road_is_plain_ground() {
+fn without_a_pass_the_forest_road_is_ground_and_ilsa_halts_you_on_it() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
+    let ilsa = townsperson(&mut sim, row("Ilsa"));
     let road = forest_road(&mut sim);
 
     head_for_the_forest_road(&mut sim, 1);
-    assert!(arrived(&mut sim, player, road));
+    assert!(halted(&mut sim, player), "Ilsa never stopped you");
+    let halt = conversation(&mut sim, player).expect("halted");
+    assert_eq!(halt.with, Some(ilsa));
+    assert!(position(sim.world(), player).is_some_and(|at| at.distance(road) < Tiles(0.5)));
+    assert!(commands_locked(sim.world(), player));
+    assert!(!labels(&halt).contains(&"I have a Road Pass.".to_owned()));
+    assert!(locked(&halt, "I'm ready for the forest road."));
+    pick(&mut sim, 1, player, "I'm ready for the forest road.");
+    assert_eq!(errors(&sim, 1), vec!["Needs Level 3".to_owned()]);
+
+    leave(&mut sim, 1, player);
+    head_for_the_forest_road(&mut sim, 1);
     assert!(
-        !crossed(&mut sim, player, 2.0),
+        !crossed(&mut sim, player, 3.0),
         "the warp took you without a pass"
     );
     assert!(conversation(&mut sim, player).is_none());
-    assert!(!commands_locked(sim.world(), player));
 }
 
 #[test]
-fn ilsa_calls_halt_as_you_come_near_and_again_when_you_come_back() {
+fn ilsa_halts_you_each_time_you_step_back_onto_the_road() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let road = forest_road(&mut sim);
-
     head_for_the_forest_road(&mut sim, 1);
-    assert!(arrived(&mut sim, player, road));
-    sim.run_until(1.0, |_| false);
-    assert_eq!(halts(&mut sim, player), 1);
+    assert!(halted(&mut sim, player));
+    leave(&mut sim, 1, player);
 
-    let away = Pos::new(road.x + 6.0, road.y + 3.0);
-    sim.world()
-        .entity_mut(player)
-        .insert(Position { pos: away });
-    sim.run_until(1.0, |_| false);
-    assert_eq!(halts(&mut sim, player), 1);
-
+    let off = Pos::new(road.x - 2.0, road.y);
+    sim.send(1, MoveRequest { pos: off });
+    assert!(arrived(&mut sim, player, off));
     head_for_the_forest_road(&mut sim, 1);
-    assert!(arrived(&mut sim, player, road));
-    sim.run_until(1.0, |_| false);
-    assert_eq!(halts(&mut sim, player), 2);
+    assert!(halted(&mut sim, player), "Ilsa let you try twice");
+}
+
+#[test]
+fn walking_past_the_forest_road_is_no_business_of_ilsas() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let road = forest_road(&mut sim);
+    let past = Pos::new(road.x - 2.0, road.y - 1.0);
+
+    sim.send(1, MoveRequest { pos: past });
+    assert!(arrived(&mut sim, player, past));
+    assert!(conversation(&mut sim, player).is_none());
 }
 
 #[test]
@@ -118,11 +123,10 @@ fn a_road_pass_opens_the_forest_road_without_a_word_from_ilsa() {
     let crossing = *sim.world().get::<Crossing>(player).expect("crossing");
     assert_eq!(crossing.dest_area, row("Forest"));
     assert!(conversation(&mut sim, player).is_none());
-    assert_eq!(halts(&mut sim, player), 0);
 }
 
 #[test]
-fn walking_across_the_forest_road_without_a_pass_goes_nowhere() {
+fn crossing_the_forest_road_on_the_way_elsewhere_is_no_business_of_ilsas() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let road = forest_road(&mut sim);

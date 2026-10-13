@@ -618,6 +618,14 @@ pub fn objects(modules: &[Flattened]) -> impl Iterator<Item = (u32, &ObjectDef)>
         })
 }
 
+pub fn npcs(modules: &[Flattened]) -> impl Iterator<Item = crate::systems::npc::Id> + '_ {
+    modules.iter().filter_map(|placed| match &placed.module {
+        AreaModule::Resident(resident) => Some(resident.npc),
+        AreaModule::Population(population) => Some(population.npc),
+        _ => None,
+    })
+}
+
 pub fn residents(modules: &[Flattened]) -> impl Iterator<Item = crate::systems::npc::Id> + '_ {
     modules.iter().filter_map(|placed| match &placed.module {
         AreaModule::Resident(resident) => Some(resident.npc),

@@ -18,8 +18,9 @@ import {
 // much of them, and on software rendering, where frames come slowly. So it walks for precision over
 // pace: every click is aimed from rest, at a spot exactly on screen and clear of the interface.
 
-// Only on-screen tiles can be clicked, so a far target is approached hop by hop, each one nearer. A
-// function target is re-read every hop, for things that move. While the player walks, the ground under
+// Only on-screen tiles can be clicked, so a far target is approached hop by hop, each the open tile
+// nearest it (a sidestep when someone stands in the way). A function target is re-read every hop,
+// for things that move. While the player walks, the ground under
 // the cursor slides, and a click lands short of where it aimed.
 export async function travel(
   page: Page,
@@ -49,9 +50,9 @@ export async function travel(
     }
     if (Date.now() > deadline) throw new Error(`never got ${tile} on screen`);
     const me = snapshot.me?.at;
-    const nearer = (step: Tile) => !me || distance(step, tile) < distance(me, tile) - 0.5;
+    const moves = (step: Tile) => !me || distance(step, me) >= 1;
     const ground = await openGround(page, snapshot);
-    const hop = closestTile(ground.filter((step) => nearer(step) && !inWarp(snapshot, step)), tile);
+    const hop = closestTile(ground.filter((step) => moves(step) && !inWarp(snapshot, step)), tile);
     if (!hop) {
       if (Date.now() > deadline) throw new Error(`no open ground on screen leads toward ${tile}`);
       await page.waitForTimeout(500);

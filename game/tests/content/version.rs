@@ -19,7 +19,7 @@ fn the_shipped_folder_carries_the_version_of_this_build() {
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(game::systems::registry().version().0, "aa3ebe40");
+    assert_eq!(game::systems::registry().version().0, "b105be3e");
 }
 
 #[test]

@@ -38,18 +38,18 @@ test(
       await waitForWorld(page, loadReference("island.png"));
     },
     play: async (page) => {
-      await caption(page, "Some places speak up on their own: Ilsa watches the forest road");
+      await caption(page, "Some places start a conversation on their own: Ilsa watches the forest road");
       const road = (await probe(page)).portals.find((portal) => portal.name === "forest-road")!;
       await travelTo(page, road.at);
-      await waitFor(page, ({ history }) => history.records.some((record) => record.by === "Ilsa" && record.text.startsWith("Halt!")), "Ilsa never called out");
-      await caption(page, "Without a pass the road is just ground. Come near, and she calls out over her head", { at: "top" });
-      await page.waitForTimeout(2500);
-      await caption(page, "Ilsa shows only what she means to: the road opens at level 3", { at: "top" });
-      await talkTo(page, "ilsa");
+      await onStage(page, "halt");
+      await caption(page, "Without a pass the road is just ground. Standing on it, she stops you and your commands lock", {
+        at: "top",
+      });
       await readToChoices(page, 1400);
+      await caption(page, "Ilsa shows only what she means to: the road opens at level 3", { at: "top" });
       await hoverUi(page, "I'm ready for the forest road.");
       await page.waitForTimeout(2500);
-      await pick(page, "Never mind.");
+      await pick(page, "I'll turn back.");
       await conversationOver(page);
 
       await caption(page, "Talk to her, though, and a fish changes her mind");

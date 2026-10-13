@@ -196,6 +196,9 @@ pub struct AreaObject {
 #[derive(Component, Default)]
 pub struct InsideObjects(Vec<Entity>);
 
+#[derive(Component, Default)]
+pub struct StandingOn(Vec<Entity>);
+
 pub fn spawn_all(world: &mut World) {
     let zone = world.resource::<crate::systems::WorldArea>().0;
     let content = *world.resource::<Content>();
@@ -304,6 +307,7 @@ pub fn track(
     objects: &mut QueryState<(Entity, &AreaObject, &AreaTag)>,
     mut now: Local<Vec<Entity>>,
 ) {
+    let watchers = watchers(world);
     let instances = world.resource::<RiftInstances>();
     let crossed = |object: Entity| {
         [EventKind::Entered, EventKind::Left].iter().any(|kind| {
@@ -312,10 +316,20 @@ pub fn track(
                 .contains(&Owner::Entity(OwnerKind::Object, object))
         })
     };
-    let placed: Vec<(Entity, ObjectShape, area::Id)> = objects
+    let watched = |object: &AreaObject, area: area::Id| {
+        watchers
+            .iter()
+            .any(|watcher| watcher.area == area && Some(&watcher.object) == object.name.as_ref())
+    };
+    let placed: Vec<Placed> = objects
         .iter(world)
-        .filter(|(entity, ..)| crossed(*entity))
-        .map(|(entity, object, tag)| (entity, object.shape, tag.area))
+        .filter(|(entity, object, tag)| crossed(*entity) || watched(object, tag.area))
+        .map(|(entity, object, tag)| Placed {
+            entity,
+            name: object.name.clone(),
+            shape: object.shape,
+            area: tag.area,
+        })
         .collect();
     if placed.is_empty() {
         return;
@@ -330,11 +344,16 @@ pub fn track(
         now.extend(
             placed
                 .iter()
-                .filter(|(_, shape, area)| *area == area_id && shape.covers_cell(cell))
-                .filter(|(object, _, _)| crate::systems::visibility::present(world, *object, actor))
-                .map(|(object, _, _)| *object),
+                .filter(|object| object.area == area_id && object.shape.covers_cell(cell))
+                .filter(|object| crate::systems::visibility::present(world, object.entity, actor))
+                .map(|object| object.entity),
         );
         now.sort_unstable();
+        let talking = dialogue::in_conversation(world, actor);
+        let is_npc = world.get::<Npc>(actor).is_some();
+        if !talking {
+            stand(world, &placed, &watchers, actor, &now, is_npc);
+        }
         let unchanged = world
             .get::<InsideObjects>(actor)
             .map_or(now.is_empty(), |inside| inside.0 == *now);
@@ -345,8 +364,6 @@ pub fn track(
             .get::<InsideObjects>(actor)
             .map(|inside| inside.0.clone())
             .unwrap_or_default();
-        let talking = dialogue::in_conversation(world, actor);
-        let is_npc = world.get::<Npc>(actor).is_some();
         let mut after = before.clone();
         for object in now.iter().filter(|object| !before.contains(object)) {
             if talking {
@@ -363,6 +380,105 @@ pub fn track(
         if after != before {
             world.entity_mut(actor).insert(InsideObjects(after));
         }
+    }
+}
+
+struct Placed {
+    entity: Entity,
+    name: Option<String>,
+    shape: ObjectShape,
+    area: area::Id,
+}
+
+struct Watcher {
+    npc: Entity,
+    area: area::Id,
+    object: String,
+}
+
+fn watchers(world: &World) -> Vec<Watcher> {
+    let instances = world.resource::<RiftInstances>();
+    let mut watchers = Vec::new();
+    for owner in instances.owners_answering(EventKind::StoodOn) {
+        let Owner::Entity(OwnerKind::Npc, npc) = *owner else {
+            continue;
+        };
+        let Some(area) = world.get::<AreaTag>(npc).map(|tag| tag.area) else {
+            continue;
+        };
+        for event in instances.entries(*owner, EventKind::StoodOn) {
+            if let RiftEvent::StoodOn { object, .. } = event {
+                watchers.push(Watcher {
+                    npc,
+                    area,
+                    object: object.clone(),
+                });
+            }
+        }
+    }
+    watchers
+}
+
+fn stand(
+    world: &mut World,
+    placed: &[Placed],
+    watchers: &[Watcher],
+    actor: Entity,
+    inside: &[Entity],
+    is_npc: bool,
+) {
+    let before: Vec<Entity> = world
+        .get::<StandingOn>(actor)
+        .map(|on| on.0.clone())
+        .unwrap_or_default();
+    let standing: Vec<Entity> = if crate::systems::movement::moving(world, actor) {
+        before
+            .iter()
+            .copied()
+            .filter(|object| inside.contains(object))
+            .collect()
+    } else {
+        inside.to_vec()
+    };
+    if standing == before {
+        return;
+    }
+    for object in standing.iter().filter(|object| !before.contains(object)) {
+        raise_standing(world, placed, watchers, *object, actor, is_npc);
+    }
+    world.entity_mut(actor).insert(StandingOn(standing));
+}
+
+fn raise_standing(
+    world: &mut World,
+    placed: &[Placed],
+    watchers: &[Watcher],
+    object: Entity,
+    actor: Entity,
+    is_npc: bool,
+) {
+    let Some(stood) = placed.iter().find(|placed| placed.entity == object) else {
+        return;
+    };
+    let Some(name) = stood.name.clone() else {
+        return;
+    };
+    let mut instances = world.resource_mut::<RiftInstances>();
+    for watcher in watchers
+        .iter()
+        .filter(|watcher| watcher.area == stood.area && watcher.object == name)
+    {
+        let name = name.clone();
+        instances.raise(
+            Owner::Entity(OwnerKind::Npc, watcher.npc),
+            EventKind::StoodOn,
+            Some(actor),
+            Vec::new(),
+            move |event| match event {
+                RiftEvent::StoodOn { by, object } => *object == name && by.admits(is_npc),
+                _ => false,
+            },
+        );
     }
 }
 

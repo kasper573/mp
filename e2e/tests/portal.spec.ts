@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { provisionAccount, signIn } from "../helpers/account";
 import { playAs } from "../helpers/character";
-import { captureScene, holding, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
+import { captureScene, holding, leaveConversation, MAP_MATCH, probe, waitFor, waitForWorld } from "../helpers/game";
 import { loadReference, resemblance } from "../helpers/image";
 import { conversationOver, onStage, pick, readToChoices, talkTo } from "../helpers/talk";
 import { travel } from "./travel";
@@ -17,11 +17,10 @@ test("the forest road holds you without a pass and crosses with one", async ({ p
   expect(road, "the island has a forest road").toBeDefined();
 
   await travel(page, road!.at);
-  await waitFor(page, ({ history }) => history.records.some((record) => record.by === "Ilsa" && record.text.startsWith("Halt!")), "Ilsa never called out as you came near");
-  await page.waitForTimeout(2000);
-  const standing = await probe(page);
-  expect(standing.area).toBe("island");
-  expect(standing.stage).toBeNull();
+  const held = await waitFor(page, ({ stage }) => stage, "Ilsa never halted you on the road");
+  expect(held.node).toBe("halt");
+  expect((await probe(page)).area).toBe("island");
+  await leaveConversation(page);
 
   await talkTo(page, "ilsa", travel);
   await readToChoices(page, 300);

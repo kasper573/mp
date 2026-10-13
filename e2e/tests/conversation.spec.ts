@@ -9,13 +9,17 @@ import { openGround, travel, waitAtRest } from "./travel";
 // Townsfolk stroll, and a click on one talks instead of walking: the open ground farthest from anyone
 // stays open until the click lands.
 async function openGroundAway(page: Page, from: Tile): Promise<Tile> {
-  const snapshot = await probe(page);
-  const others = snapshot.actors.filter((actor) => actor.id !== snapshot.me?.id).map((actor) => actor.at);
-  const room = (tile: Tile) => Math.min(...others.map((at) => distance(at, tile)));
-  const ground = (await openGround(page, snapshot)).filter((tile) => distance(tile, from) >= 2);
-  const tile = ground.sort((a, b) => room(b) - room(a)).at(0);
-  if (!tile) throw new Error("no open ground beside the conversation");
-  return tile;
+  const deadline = Date.now() + 15_000;
+  for (;;) {
+    const snapshot = await probe(page);
+    const others = snapshot.actors.filter((actor) => actor.id !== snapshot.me?.id).map((actor) => actor.at);
+    const room = (tile: Tile) => Math.min(...others.map((at) => distance(at, tile)));
+    const ground = (await openGround(page, snapshot)).filter((tile) => distance(tile, from) >= 2);
+    const tile = ground.sort((a, b) => room(b) - room(a)).at(0);
+    if (tile) return tile;
+    if (Date.now() > deadline) throw new Error("no open ground beside the conversation");
+    await page.waitForTimeout(500);
+  }
 }
 
 test("a conversation drops world clicks until Esc leaves it", async ({ page }) => {

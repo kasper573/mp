@@ -619,6 +619,33 @@ pub fn check_all(loading: &mut Loading) {
                 _ => {}
             }
         }
+        if row.kind == OwnerKind::Npc {
+            let npc: ContentId<NpcDef> = ContentId::new(row.row);
+            let watched = procedures
+                .iter()
+                .flat_map(|procedure| procedure.entry(EventKind::StoodOn));
+            for (_, event) in watched {
+                let RiftEvent::StoodOn { object, .. } = event else {
+                    continue;
+                };
+                let placed = content.ids::<AreaDef>().any(|area| {
+                    let modules = area::placed(&content, area);
+                    area::npcs(modules).any(|placed| placed == npc)
+                        && area::objects(modules)
+                            .any(|(_, placed)| placed.name.as_deref() == Some(object))
+                });
+                if !placed {
+                    loading.json_error(
+                        &site.file,
+                        &site.pointer,
+                        "watched object not here",
+                        format!("{label} watches {object}"),
+                        "an object of that name in an area the npc is placed in",
+                        None,
+                    );
+                }
+            }
+        }
         if row.kind == OwnerKind::Object && may_do.answers(EventKind::Interacted) {
             let area: ContentId<AreaDef> = ContentId::new(row.row);
             let labelled = area::objects(area::placed(&content, area))

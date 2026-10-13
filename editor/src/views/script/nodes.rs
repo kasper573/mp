@@ -1165,6 +1165,11 @@ fn event_pieces(node: &Value) -> Vec<Piece> {
                 line.push(strong(trim(within)));
             }
         }
+        Some("stood_on") => {
+            line.push(strong(node.text_or("by", "characters")));
+            line.push(muted(" on "));
+            line.push(strong(node.text_or("object", "?")));
+        }
         Some("started") => line.push(muted("the owner spawned")),
         Some("run") => line.push(muted("started by a run node")),
         Some(_) | None => {

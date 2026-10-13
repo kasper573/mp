@@ -72,13 +72,6 @@
           ],
           "done": "remember_bribe"
         },
-        "came_near": {
-          "type": "on",
-          "event": "came_near",
-          "within": 3.5,
-          "by": "characters",
-          "next": "no_pass"
-        },
         "clan_pass": {
           "type": "items",
           "give": [
@@ -144,19 +137,88 @@
           "done": "fish"
         },
         "halt": {
-          "type": "say",
-          "text": [
+          "type": "dialogue",
+          "lines": [
             {
-              "text": "Halt!",
-              "voice": "shout",
-              "motion": "shake"
+              "by": {
+                "type": "npc",
+                "npc": "ilsa",
+                "face": "angry"
+              },
+              "text": [
+                {
+                  "text": "Halt!",
+                  "voice": "shout",
+                  "motion": "shake"
+                },
+                " Nobody takes the ",
+                {
+                  "text": "forest road",
+                  "ink": "place"
+                },
+                " without a pass."
+              ]
             },
-            " Nobody takes the ",
             {
-              "text": "forest road",
-              "ink": "place"
+              "by": {
+                "type": "npc",
+                "npc": "ilsa",
+                "face": "thinking"
+              },
+              "text": [
+                "Unless you're seasoned enough to survive what's out there."
+              ]
+            }
+          ],
+          "choices": [
+            {
+              "label": [
+                "I have a Road Pass."
+              ],
+              "requires": {
+                "type": "at_least",
+                "a": {
+                  "type": "holding",
+                  "item": "road_pass"
+                },
+                "b": 1
+              },
+              "reveal": [
+                "needs"
+              ],
+              "to": "lets_you_pass"
             },
-            " without a pass."
+            {
+              "label": [
+                "I'm ready for the forest road."
+              ],
+              "requires": {
+                "type": "at_least",
+                "a": {
+                  "type": "level"
+                },
+                "b": 3
+              },
+              "reveal": [
+                "locked",
+                "needs"
+              ],
+              "to": "earn_pass"
+            },
+            {
+              "label": [
+                "Here, for your trouble."
+              ],
+              "reveal": [
+                "costs"
+              ],
+              "to": "buy_pass"
+            },
+            {
+              "label": [
+                "I'll turn back."
+              ]
+            }
           ]
         },
         "has_pass": {
@@ -381,6 +443,13 @@
               ]
             }
           ]
+        },
+        "watches_road": {
+          "type": "on",
+          "event": "stood_on",
+          "by": "characters",
+          "object": "forest-road",
+          "next": "no_pass"
         }
       }
     }

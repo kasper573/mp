@@ -5,21 +5,26 @@ import { playAs } from "../helpers/character";
 import { caption, chapter, soundscapeMixer } from "../helpers/demo";
 import {
   arrivedIn,
+  canvasSize,
   clickUi,
+  clickable,
   closestTile,
+  distance,
   findUi,
   focusGame,
   holding,
   hoverUi,
   nearest,
+  occupied,
   probe,
   travelTo,
   waitFor,
   waitForWorld,
   walkTo,
+  type Tile,
 } from "../helpers/game";
 import { loadReference } from "../helpers/image";
-import { conversationOver, onStage, pick, readToChoices, talkTo } from "../helpers/talk";
+import { conversationOver, onStage, pick, readToChoices } from "../helpers/talk";
 
 test(
   "Travel",
@@ -35,14 +40,12 @@ test(
       const { area: home, portals } = await probe(page);
       const road = portals.find((portal) => portal.name === "forest-road")!;
       await travelTo(page, road.at);
-      await waitFor(page, ({ history }) => history.records.some((record) => record.by === "Ilsa" && record.text.startsWith("Halt!")), "Ilsa never called out");
-      await caption(page, "The forest road is locked without a pass: you just stand on it, and its warden calls out", {
+      await onStage(page, "halt");
+      await caption(page, "The forest road is locked without a pass: stand on it, and its warden stops you", {
         at: "top",
       });
-      await page.waitForTimeout(2500);
-      await caption(page, "Twenty Gold buys a pass", { at: "top" });
-      await talkTo(page, "ilsa");
       await readToChoices(page, 1200);
+      await caption(page, "Twenty Gold buys a pass", { at: "top" });
       await hoverUi(page, "Here, for your trouble.");
       await page.waitForTimeout(1500);
       await pick(page, "Here, for your trouble.");
@@ -53,6 +56,7 @@ test(
       await waitFor(page, (snapshot) => holding(snapshot, "road_pass") === 1, "the pass never arrived");
       await caption(page, "With the pass in your bag, the same warp takes you through: the island crumbles away, and the forest rises around you");
       const hideMixer = await soundscapeMixer(page);
+      await stepOff(page, road.at);
       await travelTo(page, road.at);
       await waitFor(page, (snapshot) => arrivedIn(snapshot, road.to), `never arrived in ${road.to}`);
       await caption(page, `Welcome to the ${road.to.toLowerCase()}: its own music and birdsong crossfade in over the harbour's`);
@@ -92,6 +96,16 @@ const TRANSITIONS: [string, string][] = [
   ["Dither dissolve", "Dither dissolve: the area fizzles out pixel by pixel, and the next fizzles in around you"],
   ["Fade", "Fade: plain and quick"],
 ];
+
+// A warp fires on stepping in, so standing on it with a fresh pass takes a step away and back.
+async function stepOff(page: Page, warp: Tile): Promise<void> {
+  const snapshot = await probe(page);
+  const size = await canvasSize(page);
+  const beside = snapshot.walkable.filter(
+    (tile) => distance(tile, warp) >= 2 && !occupied(snapshot, tile) && clickable(snapshot, tile, size),
+  );
+  await walkTo(page, closestTile(beside, warp)!);
+}
 
 async function chooseTransition(page: Page, current: string, next: string): Promise<void> {
   await focusGame(page);

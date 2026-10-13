@@ -15,6 +15,7 @@ pub enum EventKind {
     Run,
     Entered,
     Left,
+    StoodOn,
     Discovered,
     Died,
     LeveledUp,
@@ -52,6 +53,10 @@ pub enum RiftEvent {
     },
     Left {
         by: Who,
+    },
+    StoodOn {
+        by: Who,
+        object: String,
     },
     Discovered,
     Died {
@@ -122,6 +127,7 @@ impl EventDef for RiftEvent {
             RiftEvent::Run => EventKind::Run,
             RiftEvent::Entered { .. } => EventKind::Entered,
             RiftEvent::Left { .. } => EventKind::Left,
+            RiftEvent::StoodOn { .. } => EventKind::StoodOn,
             RiftEvent::Discovered => EventKind::Discovered,
             RiftEvent::Died { .. } => EventKind::Died,
             RiftEvent::LeveledUp => EventKind::LeveledUp,
@@ -147,6 +153,7 @@ impl EventDef for RiftEvent {
             RiftEvent::Started => PLACED,
             RiftEvent::Run => ANY,
             RiftEvent::Entered { .. } | RiftEvent::Left { .. } => OBJECT_OR_AREA,
+            RiftEvent::StoodOn { .. } => NPC,
             RiftEvent::Discovered | RiftEvent::Died { .. } | RiftEvent::LeveledUp => AREA,
             RiftEvent::Interacted { .. } | RiftEvent::Heard { .. } => OBJECT_OR_NPC,
             RiftEvent::CameNear { .. } | RiftEvent::Attacked | RiftEvent::Defeated => NPC,
