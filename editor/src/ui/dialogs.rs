@@ -123,7 +123,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
                                 ui.label(theme::strong(&template.name));
                                 ui.label(theme::muted("from game.json"));
                             });
-                            widgets::kv_code(ui, "spawn", &template.spawn);
+                            widgets::kv_code(ui, "initial spawn", &template.initial_spawn);
                             widgets::kv(ui, "holds", |ui| {
                                 let mut parts: Vec<String> = vec!["game.json".to_owned(), "every fixture".to_owned()];
                                 for (table, keys) in &template.tables {

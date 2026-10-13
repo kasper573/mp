@@ -309,7 +309,7 @@ pub enum Drag {
         file: String,
         pointer: String,
     },
-    Spawn,
+    InitialSpawn,
     Stamp {
         placed: Vec<Pos<Tiles>>,
         last: Pos<Tiles>,

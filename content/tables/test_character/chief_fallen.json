@@ -87,5 +87,5 @@
       ]
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

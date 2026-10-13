@@ -49,7 +49,11 @@ impl Layout {
 }
 
 pub fn npcs_per_area(content: &Content) -> usize {
-    let area = content.built::<GameSettings>().bench.get(content);
+    let area = content
+        .built::<GameSettings>()
+        .initial_spawn
+        .area
+        .get(content);
     area.modules
         .iter()
         .map(|module| match module {
@@ -98,8 +102,12 @@ pub fn step_single_threaded(worlds: &mut [App]) {
 }
 
 fn build_world(layout: Layout, assets: &Content, ordinal: u64) -> (App, Roster) {
-    let mut app =
-        game::systems::server_app(assets.built::<GameSettings>().bench, ordinal, CLOCK, assets);
+    let mut app = game::systems::server_app(
+        assets.built::<GameSettings>().initial_spawn.area,
+        ordinal,
+        CLOCK,
+        assets,
+    );
     app.insert_resource(game::core::math::Rng::from_entropy());
     app.insert_resource(SpawnRules {
         policy: layout.spawn_policy(),

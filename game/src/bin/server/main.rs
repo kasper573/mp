@@ -162,7 +162,7 @@ fn simulate(
     } = settings;
     let spawn = area_ids
         .iter()
-        .position(|id| *id == assets.built::<GameSettings>().spawn.area)
+        .position(|id| *id == assets.built::<GameSettings>().initial_spawn.area)
         .unwrap_or(0);
     let mut worlds: Vec<App> = area_ids
         .iter()
@@ -407,9 +407,11 @@ struct Wire(u64);
 fn select_areas(content: &Content, areas: ServedAreas) -> Vec<game::systems::area::Id> {
     match areas {
         ServedAreas::Real => content.ids::<AreaDef>().collect(),
-        // The bench area is one template instanced `count` times; the count is bounded only by the
-        // machine, not by how many area rows the content table happens to define.
-        ServedAreas::Bench(count) => vec![content.built::<GameSettings>().bench; count],
+        // The initial spawn's area is one template instanced `count` times; the count is bounded
+        // only by the machine, not by how many area rows the content table happens to define.
+        ServedAreas::Bench(count) => {
+            vec![content.built::<GameSettings>().initial_spawn.area; count]
+        }
     }
 }
 

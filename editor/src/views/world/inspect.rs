@@ -101,7 +101,7 @@ fn overview(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas, layout: &Layout) {
     );
     widgets::kv_text(
         ui,
-        "from the spawn",
+        "from the initial spawn",
         if unreached == 0 {
             format!("every area, at most {furthest} warps away")
         } else {
@@ -299,7 +299,7 @@ fn colour_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
         });
     });
     ui.add_space(8.0);
-    widgets::section(ui, "By distance from the spawn");
+    widgets::section(ui, "By distance from the initial spawn");
     let mut rows: Vec<DistanceRow> = atlas
         .areas
         .keys()
@@ -496,7 +496,7 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &Atlas) {
         unreached.is_empty(),
         &if unreached.is_empty() {
             format!(
-                "all {} areas can be reached from the spawn",
+                "all {} areas can be reached from the initial spawn",
                 atlas.areas.len()
             )
         } else {
@@ -871,8 +871,8 @@ fn inspect_cards(
                     info.size.width,
                     info.size.height,
                     match atlas.distances.get(first) {
-                        Some(0) => "the spawn".to_owned(),
-                        Some(d) => format!("{d} warps from the spawn"),
+                        Some(0) => "the initial spawn".to_owned(),
+                        Some(d) => format!("{d} warps from the initial spawn"),
                         None => "no warp reaches it".to_owned(),
                     }
                 ))

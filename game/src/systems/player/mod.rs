@@ -313,7 +313,7 @@ fn spawn_position(
     zone: area::Id,
     area: &area::Area,
 ) -> Pos<Tiles> {
-    let spawn = world.resource::<GameSettings>().spawn;
+    let spawn = world.resource::<GameSettings>().initial_spawn;
     let fallback = || area.fallback_spawn();
     match policy {
         SpawnPolicy::Map if spawn.area == zone => spawn.at,

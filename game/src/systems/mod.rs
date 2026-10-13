@@ -103,9 +103,8 @@ pub struct WorldArea(pub area::Id);
 pub struct GameSettings {
     pub name: String,
     pub content_version: crate::core::content::ContentVersion,
-    pub spawn: script::Place,
+    pub initial_spawn: script::Place,
     pub player: player::Id,
-    pub bench: area::Id,
 }
 
 #[derive(Bundle)]
@@ -455,10 +454,10 @@ impl crate::core::content::Settings for GameSettings {
 fn check_settings(loading: &mut crate::core::content::Loading) {
     let content = loading.content();
     let settings = content.built::<GameSettings>();
-    if let Err(problem) = area::check_place(&content, settings.spawn) {
+    if let Err(problem) = area::check_place(&content, settings.initial_spawn) {
         loading.json_error(
             "game.json",
-            "/spawn",
+            "/initial_spawn",
             problem.rule,
             problem.found,
             problem.expected,

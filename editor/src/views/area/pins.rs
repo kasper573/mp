@@ -17,12 +17,12 @@ pub struct Arrival {
     pub file: String,
     pub pointer: String,
     pub at: Pos<Tiles>,
-    pub spawn: bool,
+    pub initial_spawn: bool,
 }
 
 #[derive(Clone, Debug)]
 pub enum PinHit {
-    Spawn,
+    InitialSpawn,
     Place { file: String, pointer: String },
 }
 
@@ -44,12 +44,12 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<Arrival> {
         let (Some(x), Some(y)) = (place["x"].as_f64(), place["y"].as_f64()) else {
             continue;
         };
-        let spawn = usage.file == "game.json" && parent == "/spawn";
+        let initial_spawn = usage.file == "game.json" && parent == "/initial_spawn";
         out.push(Arrival {
             file: usage.file.clone(),
             pointer: parent.to_owned(),
             at: Pos::new(x as f32, y as f32),
-            spawn,
+            initial_spawn,
         });
     }
     out
@@ -84,15 +84,15 @@ pub fn draw_arrivals(editor: &Editor, painter: &egui::Painter, frame: &Frame) {
     let canvas = frame.canvas;
     for arrival in arrivals(editor, &frame.area_key) {
         let at = canvas.to_screen(arrival.at);
-        let color = if arrival.spawn {
+        let color = if arrival.initial_spawn {
             Color32::from_rgb(120, 255, 160)
         } else {
             Color32::from_rgb(255, 190, 90)
         };
         pin(painter, at, color);
         if canvas.scale() >= 4.0 {
-            let text = if arrival.spawn {
-                "⚑ spawn".to_owned()
+            let text = if arrival.initial_spawn {
+                "⚑ initial spawn".to_owned()
             } else {
                 format!("⚑ {}", chip_label(editor, &arrival))
             };
@@ -140,8 +140,8 @@ pub fn pin_at(editor: &Editor, frame: &Frame, pointer: Pos2) -> Option<PinHit> {
         let at = frame.canvas.to_screen(arrival.at);
         let hit = egui::Rect::from_min_max(at + Vec2::new(-8.0, -20.0), at + Vec2::new(8.0, 2.0));
         if hit.contains(pointer) {
-            return Some(if arrival.spawn {
-                PinHit::Spawn
+            return Some(if arrival.initial_spawn {
+                PinHit::InitialSpawn
             } else {
                 PinHit::Place {
                     file: arrival.file,
@@ -155,7 +155,7 @@ pub fn pin_at(editor: &Editor, frame: &Frame, pointer: Pos2) -> Option<PinHit> {
 
 pub fn open_pin(editor: &mut Editor, pin: PinHit) {
     match pin {
-        PinHit::Spawn => {
+        PinHit::InitialSpawn => {
             editor.toast("The game's spawn: set in game.json; drag the pin to move it")
         }
         PinHit::Place { file, pointer } => {
@@ -198,21 +198,21 @@ pub fn set_spawn(editor: &mut Editor, frame: &Frame, at: Pos<Tiles>) {
     else {
         return;
     };
-    game["spawn"] = serde_json::json!({ "area": frame.area_key, "x": at.x, "y": at.y });
+    game["initial_spawn"] = serde_json::json!({ "area": frame.area_key, "x": at.x, "y": at.y });
     let mut edit = Edit::new(format!(
-        "Set the spawn to {} {}, {}",
+        "Set the initial spawn to {} {}, {}",
         frame.area_key, at.x, at.y
     ));
     edit.write_json("game.json", &game);
     editor.apply(edit);
 }
 
-pub fn spawn_place(files: &crate::project::Files) -> Option<(String, Pos<Tiles>)> {
+pub fn initial_spawn_place(files: &crate::project::Files) -> Option<(String, Pos<Tiles>)> {
     let game = files.json("game.json")?;
-    let area = game["spawn"]["area"].as_str()?.to_owned();
+    let area = game["initial_spawn"]["area"].as_str()?.to_owned();
     let at = Pos::new(
-        game["spawn"]["x"].as_f64()? as f32,
-        game["spawn"]["y"].as_f64()? as f32,
+        game["initial_spawn"]["x"].as_f64()? as f32,
+        game["initial_spawn"]["y"].as_f64()? as f32,
     );
     Some((area, at))
 }

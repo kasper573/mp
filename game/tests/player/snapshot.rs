@@ -121,9 +121,11 @@ fn a_character_joined_from_a_row_is_that_character() {
 #[test]
 fn a_start_of_its_own_moves_the_character_and_nothing_else() {
     let island = row("island");
-    let spawn = content().built::<GameSettings>().spawn;
+    let spawn = content().built::<GameSettings>().initial_spawn;
     let snapshot = CharacterSnapshot {
-        start: CharacterStart::Spawn(game::systems::player::snapshot::AtSpawn::Spawn),
+        start: CharacterStart::InitialSpawn(
+            game::systems::player::snapshot::AtInitialSpawn::InitialSpawn,
+        ),
         ..tess(spawn)
     };
     let here = Place {

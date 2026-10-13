@@ -842,7 +842,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
     let Some((spawn_area, at)) = editor
         .project
         .as_ref()
-        .and_then(|project| pins::spawn_place(&project.files))
+        .and_then(|project| pins::initial_spawn_place(&project.files))
     else {
         return;
     };
@@ -853,7 +853,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
     let mut pick = false;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "place", "spawn", "", |_| {});
+        widgets::card_header(ui, "place", "initial spawn", "", |_| {});
         ui.add_space(4.0);
         {
             let Editor {
@@ -865,8 +865,8 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
             let project = project.as_ref().expect("project");
             let root = Value::Null;
             let mut cx = FormCx::new(project, &root, shapes, form, &mut actions);
-            widgets::kv(ui, "spawn", |ui| {
-                crate::picker::row(ui, &mut cx, "area", &mut picked, "/spawn/area");
+            widgets::kv(ui, "initial spawn", |ui| {
+                crate::picker::row(ui, &mut cx, "area", &mut picked, "/initial_spawn/area");
             });
         }
         widgets::kv(ui, "at", |ui| {
@@ -900,7 +900,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
             .as_ref()
             .and_then(|p| p.files.json_owned("game.json"))
             .unwrap_or(Value::Null);
-        game["spawn"] = pins::place_json(
+        game["initial_spawn"] = pins::place_json(
             &picked,
             game::core::math::Pos::new(
                 (size.width / 2.0).floor() + 0.5,
@@ -918,7 +918,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
         editor.pick = Some(crate::app::PickRequest {
             what: crate::app::PickWhat::Place {
                 file: "game.json".to_owned(),
-                pointer: "/spawn".to_owned(),
+                pointer: "/initial_spawn".to_owned(),
             },
             area: Some(key.to_owned()),
         });
@@ -932,7 +932,7 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content) {
 fn ways_in(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let arrivals: Vec<pins::Arrival> = pins::arrivals(editor, key)
         .into_iter()
-        .filter(|arrival| !arrival.spawn)
+        .filter(|arrival| !arrival.initial_spawn)
         .collect();
     let name = editor
         .row_value("area", key)

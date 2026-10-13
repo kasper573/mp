@@ -1257,7 +1257,7 @@ fn send<M: bevy::ecs::message::Message>(world: &mut World, conn: Entity, message
 }
 
 fn area_for(content: &Content, owner: &Bound) -> Option<(area::Id, Pos<Tiles>)> {
-    let spawn = content.built::<game::systems::GameSettings>().spawn;
+    let spawn = content.built::<game::systems::GameSettings>().initial_spawn;
     match owner.row.kind {
         OwnerKind::Area | OwnerKind::Object | OwnerKind::Blueprint => {
             let area: area::Id = game::core::content::ContentId::new(owner.row.row);
@@ -1348,7 +1348,7 @@ fn snapshot_for(
                 .first()
                 .cloned()
                 .ok_or("no job row for a fresh character")?;
-            serde_json::json!({ "name": "Tester", "job": job, "start": "spawn" })
+            serde_json::json!({ "name": "Tester", "job": job, "start": "initial_spawn" })
         }
     };
     let (parsed, _) = with_content(ContentScope::of(content), || {

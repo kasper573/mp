@@ -1,11 +1,10 @@
 {
   "name": "Rift",
-  "content_version": "be23a940",
-  "spawn": {
+  "content_version": "aa3ebe40",
+  "initial_spawn": {
     "area": "island",
     "x": 39.0,
     "y": 29.0
   },
-  "player": "adventurer",
-  "bench": "island"
+  "player": "adventurer"
 }

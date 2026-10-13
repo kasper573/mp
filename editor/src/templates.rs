@@ -10,7 +10,7 @@ pub struct Template {
     pub name: String,
     pub areas: Vec<String>,
     pub files: usize,
-    pub spawn: String,
+    pub initial_spawn: String,
     pub tables: Vec<(String, Vec<String>)>,
 }
 
@@ -44,11 +44,11 @@ pub fn list() -> Vec<Template> {
                 .get_file(dir.path().join("game.json"))
                 .and_then(|file| serde_json::from_slice::<serde_json::Value>(file.contents()).ok())
                 .unwrap_or_default();
-            let spawn = format!(
+            let initial_spawn = format!(
                 "{} · {}, {}",
-                game["spawn"].text_or("area", "?"),
-                game["spawn"]["x"].as_f64().unwrap_or_default(),
-                game["spawn"]["y"].as_f64().unwrap_or_default()
+                game["initial_spawn"].text_or("area", "?"),
+                game["initial_spawn"]["x"].as_f64().unwrap_or_default(),
+                game["initial_spawn"]["y"].as_f64().unwrap_or_default()
             );
             let tables = dir
                 .get_dir(dir.path().join("tables"))
@@ -81,7 +81,7 @@ pub fn list() -> Vec<Template> {
                 name,
                 areas,
                 files: count_files(dir),
-                spawn,
+                initial_spawn,
                 tables,
             }
         })

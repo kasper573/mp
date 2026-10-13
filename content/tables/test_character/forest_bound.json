@@ -19,5 +19,5 @@
       "state": "active"
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

@@ -75,7 +75,7 @@ pub(super) fn select_input(
             });
         } else if let Some(pin) = pin {
             view.drag = Some(match pin {
-                pins::PinHit::Spawn => Drag::Spawn,
+                pins::PinHit::InitialSpawn => Drag::InitialSpawn,
                 pins::PinHit::Place { file, pointer } => Drag::Pin { file, pointer },
             });
         } else if let Some(hit) = hit {
@@ -324,7 +324,7 @@ pub(super) fn finish_select_drag(
             };
             pins::move_pin(editor, frame, &file, &pointer, at);
         }
-        Drag::Spawn => {
+        Drag::InitialSpawn => {
             let at = if modifiers.alt {
                 snap_sixteenth(tile)
             } else {

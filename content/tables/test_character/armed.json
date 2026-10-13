@@ -9,5 +9,5 @@
       "item": "bone_shield"
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

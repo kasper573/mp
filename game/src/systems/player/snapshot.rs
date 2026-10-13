@@ -61,14 +61,14 @@ impl ContentRow for CharacterSnapshot {
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum CharacterStart {
-    Spawn(AtSpawn),
+    InitialSpawn(AtInitialSpawn),
     At(Place),
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AtSpawn {
-    Spawn,
+pub enum AtInitialSpawn {
+    InitialSpawn,
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -156,7 +156,7 @@ pub struct JoinAs {
 
 pub fn start_of(content: &Content, snapshot: &CharacterSnapshot) -> Place {
     match snapshot.start {
-        CharacterStart::Spawn(_) => content.built::<GameSettings>().spawn,
+        CharacterStart::InitialSpawn(_) => content.built::<GameSettings>().initial_spawn,
         CharacterStart::At(place) => place,
     }
 }

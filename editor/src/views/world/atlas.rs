@@ -18,7 +18,7 @@ use crate::value::RowValue;
 pub struct Atlas {
     pub areas: BTreeMap<String, AreaInfo>,
     pub warps: Vec<Warp>,
-    pub spawn: String,
+    pub initial_spawn: String,
     pub distances: BTreeMap<String, u32>,
     pub owners: Vec<Owner>,
     pub quests: Vec<QuestInfo>,
@@ -118,9 +118,9 @@ impl Atlas {
         let scripts = content
             .has_built::<RiftScripts>()
             .then(|| content.built::<RiftScripts>());
-        atlas.spawn = content
+        atlas.initial_spawn = content
             .built::<game::systems::GameSettings>()
-            .spawn
+            .initial_spawn
             .area
             .key(&content)
             .to_owned();
@@ -295,7 +295,7 @@ impl Atlas {
                 });
             }
         }
-        atlas.distances = atlas.distances_from(&atlas.spawn);
+        atlas.distances = atlas.distances_from(&atlas.initial_spawn);
         atlas.build_quests(content, files);
         atlas
     }

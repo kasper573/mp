@@ -66,7 +66,7 @@ pub fn row<Id: Named>(name: &str) -> Id {
 }
 
 pub fn spawn_area() -> game::systems::area::Id {
-    content().built::<GameSettings>().spawn.area
+    content().built::<GameSettings>().initial_spawn.area
 }
 
 pub struct Sim {

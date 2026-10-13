@@ -7,5 +7,5 @@
       "count": 10
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

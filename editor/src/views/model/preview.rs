@@ -251,7 +251,7 @@ pub fn keys(ui: &Ui, preview: &mut Preview, frames: &[FrameData]) {
 
 pub fn spawn_ground(editor: &Editor) -> Option<(String, Pos<Tiles>, String)> {
     let content = editor.project.as_ref()?.content?;
-    let place = &content.built::<game::systems::GameSettings>().spawn;
+    let place = &content.built::<game::systems::GameSettings>().initial_spawn;
     let name = place.area.get(&content).name.clone();
     Some((place.area.key(&content).to_owned(), place.at, name))
 }

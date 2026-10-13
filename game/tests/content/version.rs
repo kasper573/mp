@@ -19,7 +19,7 @@ fn the_shipped_folder_carries_the_version_of_this_build() {
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(game::systems::registry().version().0, "be23a940");
+    assert_eq!(game::systems::registry().version().0, "aa3ebe40");
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn another_version_is_refused_last() {
     let folder = TempFolder::of_template();
     folder.edit("game.json", |game| {
         game["content_version"] = serde_json::Value::String("deadbeef".to_owned());
-        game["spawn"]["area"] = serde_json::Value::String("strat".to_owned());
+        game["initial_spawn"]["area"] = serde_json::Value::String("strat".to_owned());
     });
 
     let report = load(&folder.0).err().expect("refused");

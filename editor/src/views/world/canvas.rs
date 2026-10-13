@@ -173,8 +173,6 @@ pub fn show(
     }
     let ppp = ui.ctx().pixels_per_point();
     let mut requests = Vec::new();
-    let settings = content.built::<game::systems::GameSettings>();
-    let bench = settings.bench.key(&content);
     for card in &placed {
         if !card.frame.intersects(rect) {
             continue;
@@ -405,12 +403,8 @@ pub fn show(
                 11.0,
             );
         }
-        if key == &atlas.spawn {
-            let text = if key == bench {
-                "⚑ spawn · bench".to_owned()
-            } else {
-                "⚑ spawn".to_owned()
-            };
+        if key == &atlas.initial_spawn {
+            let text = "⚑ initial spawn".to_owned();
             chip(
                 &painter,
                 card.frame.left_top() + Vec2::new(0.0, -6.0),

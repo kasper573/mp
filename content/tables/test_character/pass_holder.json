@@ -6,5 +6,5 @@
       "item": "road_pass"
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

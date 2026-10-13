@@ -6,5 +6,5 @@
       "item": "rusty_sword"
     }
   ],
-  "start": "spawn"
+  "start": "initial_spawn"
 }

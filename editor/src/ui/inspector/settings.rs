@@ -59,7 +59,7 @@ pub fn show_game(editor: &mut Editor, ui: &mut Ui) {
                     },
                     area: None,
                 });
-                editor.toast("Click a walkable cell on an area to put the spawn there");
+                editor.toast("Click a walkable cell on an area to put the initial spawn there");
             }
             FormAction::OpenScript { .. }
             | FormAction::NewRow { .. }

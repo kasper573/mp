@@ -6,7 +6,7 @@ palette out of range  1    start not known  1    unknown row  1
 wrong type  1
 
 ## Errors, by file and line
-game.json:4:12  /spawn
+game.json:4:20  /initial_spawn
   rule      not walkable
   found     start 40, 40
   expected  a place on a walkable cell of start, outside every warp object

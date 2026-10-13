@@ -570,7 +570,7 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     let spawn_area = content.map(|content| {
         content
             .built::<game::systems::GameSettings>()
-            .spawn
+            .initial_spawn
             .area
             .key(&content)
             .to_owned()
@@ -600,8 +600,8 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
                 Value::Object(place) => place.text_or("area", "?").to_owned(),
                 _ => spawn_area
                     .clone()
-                    .map(|area| format!("the spawn · {area}"))
-                    .unwrap_or_else(|| "the spawn".to_owned()),
+                    .map(|area| format!("the initial spawn · {area}"))
+                    .unwrap_or_else(|| "the initial spawn".to_owned()),
             };
             Some(TestCharacter {
                 key: key.to_owned(),

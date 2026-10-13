@@ -9,8 +9,8 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
     let folder = TempFolder::of_template();
     folder.edit("game.json", |game| {
         game["player"] = json!("adventurr");
-        game["spawn"]["x"] = json!(40.0);
-        game["spawn"]["y"] = json!(40.0);
+        game["initial_spawn"]["x"] = json!(40.0);
+        game["initial_spawn"]["y"] = json!(40.0);
     });
     folder.write(
         "tables/sfx/splash.json",

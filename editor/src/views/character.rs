@@ -512,10 +512,10 @@ fn start(
 ) -> Changed {
     let mut changed = Changed::default();
     let spawn = cx.content.map(|content| {
-        let place = &content.built::<game::systems::GameSettings>().spawn;
+        let place = &content.built::<game::systems::GameSettings>().initial_spawn;
         (place.area.key(&content).to_owned(), place.at)
     });
-    let at_spawn = value["start"].as_str() == Some("spawn");
+    let at_spawn = value["start"].as_str() == Some("initial_spawn");
     let (area_key, at) = if at_spawn {
         spawn.clone().unwrap_or_default()
     } else {
@@ -531,7 +531,7 @@ fn start(
         widgets::kv(ui, "area", |ui| {
             if at_spawn {
                 ui.label(theme::mono(format!("area/ {area_key}")).size(13.0));
-                ui.label(theme::faint("· the spawn").size(12.0));
+                ui.label(theme::faint("· the initial spawn").size(12.0));
             } else {
                 let mut draft = area_key.clone();
                 if crate::picker::row(ui, cx, "area", &mut draft, "/start/area") {
@@ -646,10 +646,10 @@ fn start(
                 });
             }
             if ui
-                .add_enabled(!at_spawn, egui::Button::new("Use the spawn"))
+                .add_enabled(!at_spawn, egui::Button::new("Use the initial spawn"))
                 .clicked()
             {
-                value["start"] = Value::String("spawn".to_owned());
+                value["start"] = Value::String("initial_spawn".to_owned());
                 changed = Changed::at("/start");
             }
         });
@@ -1410,7 +1410,10 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
             crate::forms::trim_number(place["x"].as_f64().unwrap_or(0.0)),
             crate::forms::trim_number(place["y"].as_f64().unwrap_or(0.0))
         ),
-        _ => format!("{} · the spawn", settings.spawn.area.key(&content)),
+        _ => format!(
+            "{} · the initial spawn",
+            settings.initial_spawn.area.key(&content)
+        ),
     };
     widgets::kv_text(ui, "level", format!("{level}{next}"));
     widgets::kv_text(
