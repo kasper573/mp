@@ -6,19 +6,21 @@ pub mod intro;
 mod rows;
 
 pub use intro::IntroAppearance;
-pub use rows::{NotificationRow, NotificationRows, RowPlace, shown as shown_rows};
+pub use rows::{NotificationRow, NotificationRows};
 
 use std::borrow::Cow;
 
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
+use bevy_egui::EguiPrimaryContextPass;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
 use crate::core::platform::ClientPlatform;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
@@ -30,7 +32,7 @@ use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::player::Players;
-use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::screen::ClientScreen;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
 use crate::systems::text::{self, LineText, Motion, Span};
@@ -42,6 +44,10 @@ const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
 const LATE_AFTER: Seconds = Seconds(2.0);
 const LONGEST_ROW_WORDS: usize = 30;
+const COLUMN_TOP: f32 = 16.0;
+const GROUP_GAP: f32 = 8.0;
+const CENTRE_BELOW: f32 = 0.15;
+const CENTRE_GAP: f32 = 16.0;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -164,6 +170,18 @@ pub fn notify_from(
 pub fn record(world: &mut World, player: Entity, notification: &Notification) {
     let entry = notification.history_entry(world.resource::<Content>());
     history::record(world, player, entry);
+}
+
+pub fn captions(world: &World) -> NotificationRows {
+    rows::shown::<rows::Captions>(world)
+}
+
+pub fn alerts(world: &World) -> NotificationRows {
+    rows::shown::<rows::Alerts>(world)
+}
+
+pub fn milestones(world: &World) -> NotificationRows {
+    rows::shown::<rows::Milestones>(world)
 }
 
 impl Notification {
@@ -457,71 +475,37 @@ pub struct NotificationPlugin;
 
 impl Plugin for NotificationPlugin {
     fn build(&self, app: &mut App) {
-        rows::plugin::<ui::Captions>(app);
-        rows::plugin::<ui::AlertBar>(app);
-        rows::plugin::<ui::Milestones>(app);
+        rows::plugin::<rows::Captions>(app);
+        rows::plugin::<rows::Alerts>(app);
+        rows::plugin::<rows::Milestones>(app);
+        error::plugin(app);
         app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
-            .add_observer(rows::close_alert)
-            .add_systems(OnEnter(ClientScreen::Area), spawn_places)
-            .add_systems(OnExit(ClientScreen::Area), despawn_all::<PlacesRoot>)
             .add_systems(
                 Update,
                 (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                draw_column
+                    .in_set(Band::Notices)
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
 
-#[derive(Component, Default, Clone)]
-struct PlacesRoot;
-
-const CENTRE_BELOW: f32 = 15.0;
-
-fn spawn_places(mut commands: Commands) {
-    commands.spawn_scene(bsn! {
-        PlacesRoot
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            padding: {UiRect::top(Val::Px(ui::tokens::spacing::XL))},
-        }
-        Pickable::IGNORE
-        GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
-        Children [
-            Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px({ui::tokens::spacing::L}),
-                width: Val::Percent(100.0),
-            }
-            Pickable::IGNORE
-            Children [
-                @{ui::alert_bar()}
-                --
-                @{ui::captions()}
-                --
-                @{ui::toaster(ui::SonnerPosition::TopCenter)}
-                error::ErrorToaster
-                Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
-            ]
-            --
-            Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px({ui::tokens::spacing::XL}),
-                width: Val::Percent(100.0),
-                margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
-            }
-            Pickable::IGNORE
-            Children [
-                intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE
-                --
-                @{ui::milestones()}
-            ]
-        ]
-    });
+/// The notices down the middle of the screen: alerts, captions and the error at the top, and an
+/// area's intro and the milestones further down.
+fn draw_column(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let screen = gui.content_rect();
+    let alerts = rows::draw_alerts(world, &gui, screen.top() + COLUMN_TOP);
+    let captions = rows::draw_captions(world, &gui, alerts + GROUP_GAP);
+    let error = error::draw(world, &gui, captions + GROUP_GAP);
+    let centre = error + screen.height() * CENTRE_BELOW;
+    let intro = intro::draw(world, &gui, centre);
+    rows::draw_milestones(world, &gui, intro + CENTRE_GAP);
 }
 
 fn deliver(world: &mut World, mut cursor: Local<MessageCursor<NotificationSent>>) {
@@ -558,14 +542,14 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
     match &notification_sent.notification.kind {
         NotificationKind::Speech { .. } => bubble::say(world, notification_sent),
         NotificationKind::Narration { label, .. } => {
-            rows::join::<ui::Captions>(world, label.clone(), notification_sent)
+            rows::join::<rows::Captions>(world, label.clone(), notification_sent)
         }
         NotificationKind::Alert { label, .. } => {
-            rows::join::<ui::AlertBar>(world, label.clone(), notification_sent)
+            rows::join::<rows::Alerts>(world, label.clone(), notification_sent)
         }
         NotificationKind::Error { .. } => error::toast(world, notification_sent),
         NotificationKind::Milestone { label, .. } => {
-            rows::join::<ui::Milestones>(world, label.clone(), notification_sent)
+            rows::join::<rows::Milestones>(world, label.clone(), notification_sent)
         }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),

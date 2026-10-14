@@ -1,15 +1,12 @@
 use bevy::prelude::*;
-use ui::text_colored;
+use egui::Ui;
 
-use crate::systems::hud::{HudAudience, Window, single_tab};
+use crate::systems::hud::{HudAudience, Window};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::job;
 use crate::systems::player::session;
 use crate::systems::stat;
-
-#[derive(Component, Default, Clone)]
-struct StatsText;
 
 pub struct StatsWindow;
 
@@ -26,38 +23,30 @@ impl Window for StatsWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Stats
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        single_tab(self.title(), ui::scrolled(content()))
-    }
-    fn sync(&self, world: &mut World) {
-        sync_stats(world)
-    }
-}
-
-fn content() -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node { width: Val::Percent(100.0) }
-        Children [ @{text_colored(String::new(), Color::WHITE)} StatsText ]
-    })
-}
-
-fn sync_stats(world: &mut World) {
-    let text = stats_text(world);
-    let mut query = world.query_filtered::<&mut Text, With<StatsText>>();
-    for mut node in query.iter_mut(world) {
-        node.0 = text.clone();
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let lines = stats_lines(world);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                for line in lines {
+                    ui.label(line);
+                }
+            });
     }
 }
 
-fn stats_text(world: &World) -> String {
+fn stats_lines(world: &World) -> Vec<String> {
     let Some(me) = session::my_character(world) else {
-        return String::new();
+        return Vec::new();
     };
     let entity = me.id();
     let stats = stat::effective_all(world, entity);
-    let mut lines = vec![format!("Level {}", job::level(world, entity))];
-    for stat in &stats.0 {
-        lines.push(format!("{}: {:.1}", stat.label(), stat.value));
-    }
-    lines.join("\n")
+    std::iter::once(format!("Level {}", job::level(world, entity)))
+        .chain(
+            stats
+                .0
+                .iter()
+                .map(|stat| format!("{}: {:.1}", stat.label(), stat.value)),
+        )
+        .collect()
 }

@@ -4,17 +4,15 @@ use bevy::window::PrimaryWindow;
 
 use super::present::Viewport;
 use super::screen::{ToScreen, ToTile};
+use crate::core::gui;
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 
 #[derive(Component)]
 pub(crate) struct WorldCamera;
 
-#[derive(Component, Default, Clone)]
-pub struct WorldOverlay;
-
 pub fn cursor_tile(world: &mut World) -> Option<Pos<Tiles>> {
-    if world.resource::<ui::InterfaceCursor>().captured() {
+    if gui::pointer_claimed(world) {
         return None;
     }
     let cursor = world

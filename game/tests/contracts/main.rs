@@ -19,3 +19,4 @@ mod summon;
 mod support;
 mod templates;
 mod travel;
+mod typewriter;

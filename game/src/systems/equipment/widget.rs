@@ -1,20 +1,16 @@
 use bevy::prelude::*;
+use egui::{Sense, Ui, Vec2};
 use strum::VariantArray;
-use ui::{Align, RichPiece, Side, TooltipText, tooltip, tooltip_content};
 
 use crate::core::content::Content;
+use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
-use crate::systems::hud::{
-    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
-    tooltip_label,
-};
-use crate::systems::input::map::{ActionInput, InputAction, input};
+use crate::systems::hud::{self, HudAudience, Window};
+use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceIcon;
+use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::item::{ItemId, card};
 use crate::systems::player::session;
-
-#[derive(Component, Default, Clone)]
-struct EquipmentGrid;
 
 pub struct EquipmentWindow;
 
@@ -31,120 +27,66 @@ impl Window for EquipmentWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Equipment
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        single_tab(self.title(), ui::scrolled(content()))
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let worn = worn(world);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::splat(2.0);
+                ui.horizontal_wrapped(|ui| {
+                    for &(kind, item) in &worn {
+                        ui.push_id(("equipment slot", kind.label()), |ui| match item {
+                            Some(item) => worn_slot(ui, world, kind, item),
+                            None => empty_slot(ui, world, kind),
+                        });
+                    }
+                });
+            });
     }
-    fn sync(&self, world: &mut World) {
-        sync_equipment(world)
-    }
 }
 
-fn content() -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            flex_wrap: FlexWrap::Wrap,
-            align_content: AlignContent::FlexStart,
-        }
-        EquipmentGrid
-    })
-}
-
-#[derive(Hash)]
-struct CellData {
-    slot: EquipmentSlot,
-    worn: Option<(ItemId, Handle<Image>)>,
-}
-
-fn sync_equipment(world: &mut World) {
-    let cells = equipment_cells(world);
-    let mut grids = world.query_filtered::<Entity, With<EquipmentGrid>>();
-    let Some(grid) = grids.iter(world).next() else {
-        return;
-    };
-    reconcile_children(world, grid, &cells, |world, index| {
-        cell_scene(world.resource::<Content>(), &cells[index])
-    });
-}
-
-fn equipment_cells(world: &World) -> Vec<CellData> {
-    let content = world.resource::<Content>();
+fn worn(world: &World) -> Vec<(EquipmentSlot, Option<ItemId>)> {
     let equipment = session::my_character(world).and_then(|me| me.get::<Equipment>());
-    let assets = world.resource::<AssetServer>();
     EquipmentSlot::VARIANTS
         .iter()
-        .copied()
-        .map(|slot| {
+        .map(|&slot| {
             let item = equipment.and_then(|equipment| equipment.slots.get(&slot).copied());
-            CellData {
-                slot,
-                worn: item.map(|item| (item, assets.load(item.get(content).icon.path()))),
-            }
+            (slot, item)
         })
         .collect()
 }
 
-fn cell_scene(content: &Content, cell: &CellData) -> Box<dyn Scene> {
-    match &cell.worn {
-        Some((item, icon)) => Box::new(worn_slot(content, cell.slot, *item, icon.clone())),
-        None => Box::new(empty_slot(cell.slot)),
-    }
+fn empty_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot) {
+    slot(ui, world, SlotLook::EMPTY, Sense::hover()).on_hover_text(kind.label());
 }
 
-fn empty_slot(slot: EquipmentSlot) -> impl Scene {
-    bsn! {
-        slot_node()
-        BackgroundColor({SLOT_BG})
-        BorderColor::all(SLOT_BORDER)
-        @{tooltip(false)}
-        Children [
-            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
-            Children [ @{tooltip_label(slot.label().to_owned())} ]
-        ]
-    }
-}
-
-fn worn_slot(
-    content: &Content,
-    slot: EquipmentSlot,
-    item: ItemId,
-    icon: Handle<Image>,
-) -> impl Scene {
-    let def = item.get(content);
-    let tip = TooltipText {
-        title: def.name.to_owned(),
-        lines: vec![vec![RichPiece::text(card::overview(def))]],
-        hint: Some(
-            card::inspect_hint()
-                .into_iter()
-                .chain([
-                    RichPiece::text(" · "),
-                    input(InputAction::UseItem),
-                    RichPiece::text(" to take it off"),
-                ])
-                .collect(),
-        ),
+fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) {
+    let content = *world.resource::<Content>();
+    let def = item.get(&content);
+    let look = SlotLook {
+        icon: Some(&def.icon),
+        count: 1,
+        outline: None,
+        faded: false,
     };
-    bsn! {
-        slot_node()
-        BackgroundColor({SLOT_BG})
-        BorderColor::all(SLOT_BORDER)
-        @{tooltip(false)}
-        ui::CursorStyle::Pointer
-        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
-            if input.clicked(InputAction::UseItem, &click) {
-                commands.write_message(UnequipRequest { slot });
-            } else if input.clicked(InputAction::InspectItem, &click) {
-                commands.queue(move |world: &mut World| card::open(world, item));
-            }
-        })
-        Children [
-            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-            ImageNode { image: {icon} }
-            Pickable { should_block_lower: false, is_hoverable: false }
-            --
-            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
-            Children [ @{ui::tooltip_text(tip)} ]
-        ]
+    let response = slot(ui, world, look, Sense::click());
+    if map::clicked(world, InputAction::UseItem, &response) {
+        world.write_message(UnequipRequest { slot: kind });
+    } else if map::clicked(world, InputAction::InspectItem, &response) {
+        card::open(world, item);
     }
+    let hint = StyledLine::new(
+        card::inspect_hint()
+            .into_iter()
+            .chain([
+                TextPiece::text(" · "),
+                input(InputAction::UseItem),
+                TextPiece::text(" to take it off"),
+            ])
+            .collect(),
+    );
+    let lines = [card::overview(def)];
+    response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_ui(|ui| hud::tooltip(ui, world, &def.name, &lines, Some(&hint)));
 }

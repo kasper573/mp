@@ -2,22 +2,20 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use bevy::prelude::*;
+use egui::Ui;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
-use ui::button::intent as button_intent;
-use ui::tokens::typography;
-use ui::{Activate, ButtonSize, SnapGrid, ValueChange, button_styled};
 
 use crate::core::audio::mix::{AudioCategory, AudioFader, AudioMix, AudioVolume};
 use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
-use crate::systems::hud::{HudAudience, Window, single_tab};
+use crate::core::text::{MotionPreference, TypewriterSpeed};
+use crate::systems::hud::{HudAudience, Window};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 
-const SLIDER_WIDTH: f32 = 240.0;
-const FADER_NAME_WIDTH: f32 = 80.0;
+const SLIDER_WIDTH: f32 = 220.0;
 
 pub(crate) fn plugin(app: &mut App) {
     let settings = UserSettings::load(&*app.world().resource::<ClientPlatform>().0);
@@ -61,188 +59,84 @@ impl Window for SettingsWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Settings
     }
-    fn contents(&self, world: &World) -> Vec<ui::WindowContent> {
-        single_tab(self.title(), ui::scrolled(content(world)))
-    }
-    fn sync(&self, world: &mut World) {
-        sync_labels(world)
-    }
-}
-
-struct Toggle {
-    label: fn(&UserSettings) -> &'static str,
-    flip: fn(&mut UserSettings),
-}
-
-static SNAPPING: Toggle = Toggle {
-    label: |settings| {
-        if settings.snapping_enabled() {
-            "ui snapping enabled"
-        } else {
-            "ui snapping disabled"
-        }
-    },
-    flip: UserSettings::toggle_snapping,
-};
-
-static REDUCED_MOTION: Toggle = Toggle {
-    label: |settings| {
-        if settings.reduced_motion() {
-            "reduced motion on"
-        } else {
-            "reduced motion off"
-        }
-    },
-    flip: UserSettings::toggle_reduced_motion,
-};
-
-#[derive(Clone, Copy)]
-enum SettingSlider {
-    TextSpeed,
-    Volume(AudioFader),
-}
-
-#[derive(Component, Clone)]
-struct ToggleButton(&'static Toggle);
-
-#[derive(Component, Clone, Default)]
-struct TextSpeedLabel;
-
-fn content(world: &World) -> Box<dyn Scene> {
-    let settings = world.resource::<UserSettings>();
-    Box::new(bsn! {
-        Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Start, row_gap: Val::Px(6.0) }
-        Children [
-            @{toggle_button(settings, &SNAPPING)}
-            --
-            @{text_speed_row(settings)}
-            --
-            @{toggle_button(settings, &REDUCED_MOTION)}
-            --
-            @{transition_row(settings)}
-            --
-            @{audio_section(settings)}
-        ]
-    })
-}
-
-fn text_speed_row(settings: &UserSettings) -> impl Scene + use<> {
-    bsn! {
-        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Px(SLIDER_WIDTH), padding: {UiRect::vertical(Val::Px(6.0))} }
-        Children [
-            @{ui::styled_text(text_speed_label(settings), ui::theme::theme().surface_canvas.on, typography::BODY)}
-            TextSpeedLabel
-            --
-            @{slider(settings, SettingSlider::TextSpeed)}
-        ]
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                show_settings(ui, &mut world.resource_mut::<UserSettings>())
+            });
     }
 }
 
-fn transition_row(settings: &UserSettings) -> impl Scene + use<> {
-    let choices: Vec<Box<dyn Scene>> = ScreenTransition::VARIANTS
-        .iter()
-        .map(|transition| -> Box<dyn Scene> {
-            Box::new(ui::dropdown_item(transition.as_ref(), transition.as_ref()))
-        })
-        .collect();
-    bsn! {
-        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Px(SLIDER_WIDTH), padding: {UiRect::vertical(Val::Px(6.0))} }
-        Children [
-            @{ui::styled_text("area transition", ui::theme::theme().surface_canvas.on, typography::BODY)}
-            --
-            @{ui::dropdown(settings.screen_transition().as_ref())}
-            on(|picked: On<ValueChange<String>>, mut settings: ResMut<UserSettings>| {
-                if let Ok(transition) = picked.value.parse() {
-                    settings.set_screen_transition(transition);
-                }
-            })
-            Children [
-                @{ui::dropdown_trigger()}
-                --
-                @{ui::dropdown_content()} Children [ {choices} ]
-            ]
-        ]
+fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
+    let mut snapping = settings.snapping_enabled();
+    if ui.checkbox(&mut snapping, "UI snapping").changed() {
+        settings.toggle_snapping();
     }
-}
-
-fn audio_section(settings: &UserSettings) -> impl Scene + use<> {
-    let faders: Vec<Box<dyn Scene>> = iter::once(AudioFader::Master)
-        .chain(
-            AudioCategory::VARIANTS
-                .iter()
-                .copied()
-                .map(AudioFader::Category),
-        )
-        .map(|fader| -> Box<dyn Scene> { Box::new(fader_row(settings, fader)) })
-        .collect();
-    bsn! {
-        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(4.0), width: {Val::Px(SLIDER_WIDTH + FADER_NAME_WIDTH)}, padding: {UiRect::top(Val::Px(6.0))} }
-        Children [
-            @{ui::styled_text("Audio", ui::theme::theme().surface_canvas.on, typography::NAME)}
-            --
-            {faders}
-        ]
+    let mut reduced = settings.reduced_motion();
+    if ui.checkbox(&mut reduced, "Reduced motion").changed() {
+        settings.toggle_reduced_motion();
     }
-}
-
-fn fader_row(settings: &UserSettings, fader: AudioFader) -> impl Scene + use<> {
-    bsn! {
-        Node { flex_direction: FlexDirection::Row, align_items: AlignItems::Center }
-        Children [
-            @{ui::styled_text(fader_name(fader), ui::theme::theme().surface_canvas.on, typography::BODY)}
-            Node { width: Val::Px(FADER_NAME_WIDTH) }
-            --
-            Node { flex_grow: 1.0 }
-            Children [ @{slider(settings, SettingSlider::Volume(fader))} ]
-        ]
-    }
-}
-
-fn slider(settings: &UserSettings, slider: SettingSlider) -> impl Scene + use<> {
-    let (min, max) = slider.range();
-    bsn! {
-        @{ui::slider(slider.value(settings), min, max)}
-        on(move |changed: On<ValueChange<f32>>, mut settings: ResMut<UserSettings>| {
-            slider.set(&mut settings, changed.value);
-        })
-        Children [
-            @{ui::slider_track()}
-            Children [ @{ui::slider_range()} -- @{ui::slider_thumb()} ]
-        ]
-    }
-}
-
-fn text_speed_label(settings: &UserSettings) -> String {
-    format!(
-        "text speed {} letters a second",
-        settings.letters_per_second().0 as u32
+    ui.add_space(4.0);
+    let mut speed = settings.letters_per_second().0;
+    ui.spacing_mut().slider_width = SLIDER_WIDTH;
+    let slider = egui::Slider::new(
+        &mut speed,
+        LettersPerSecond::SLOWEST.0..=LettersPerSecond::FASTEST.0,
     )
+    .step_by(1.0)
+    .suffix(" letters a second")
+    .text("Text speed");
+    if ui.add(slider).changed() {
+        settings.set_letters_per_second(LettersPerSecond(speed.round()));
+    }
+    ui.add_space(4.0);
+    transition_picker(ui, settings);
+    ui.add_space(8.0);
+    ui.heading("Audio");
+    for fader in iter::once(AudioFader::Master).chain(
+        AudioCategory::VARIANTS
+            .iter()
+            .copied()
+            .map(AudioFader::Category),
+    ) {
+        fader_slider(ui, settings, fader);
+    }
 }
 
-impl SettingSlider {
-    fn value(self, settings: &UserSettings) -> f32 {
-        match self {
-            SettingSlider::TextSpeed => settings.letters_per_second().0,
-            SettingSlider::Volume(fader) => settings.volume(fader).0,
+fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
+    ui.horizontal(|ui| {
+        ui.label("Area transition");
+        let current = settings.screen_transition();
+        let mut picked = current;
+        egui::ComboBox::from_id_salt("area transition")
+            .selected_text(current.as_ref())
+            .show_ui(ui, |ui| {
+                for &transition in ScreenTransition::VARIANTS {
+                    ui.selectable_value(&mut picked, transition, transition.as_ref());
+                }
+            });
+        if picked != current {
+            settings.set_screen_transition(picked);
         }
-    }
+    });
+}
 
-    fn range(self) -> (f32, f32) {
-        match self {
-            SettingSlider::TextSpeed => (LettersPerSecond::SLOWEST.0, LettersPerSecond::FASTEST.0),
-            SettingSlider::Volume(_) => (AudioVolume::SILENT.0, AudioVolume::FULL.0),
-        }
-    }
-
-    fn set(self, settings: &mut UserSettings, value: f32) {
-        match self {
-            SettingSlider::TextSpeed => {
-                settings.set_letters_per_second(LettersPerSecond(value.round()));
-            }
-            SettingSlider::Volume(fader) => {
-                settings.set_volume(fader, AudioVolume((value * 100.0).round() / 100.0));
-            }
-        }
+fn fader_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, fader: AudioFader) {
+    let mut volume = settings.volume(fader).0;
+    let slider = egui::Slider::new(&mut volume, AudioVolume::SILENT.0..=AudioVolume::FULL.0)
+        .custom_formatter(|value, _| format!("{:.0}%", value * 100.0))
+        .custom_parser(|typed| {
+            typed
+                .trim()
+                .trim_end_matches('%')
+                .parse::<f64>()
+                .ok()
+                .map(|percent| percent / 100.0)
+        })
+        .text(fader_name(fader));
+    if ui.add(slider).changed() {
+        settings.set_volume(fader, AudioVolume((volume * 100.0).round() / 100.0));
     }
 }
 
@@ -253,53 +147,13 @@ fn fader_name(fader: AudioFader) -> &'static str {
     }
 }
 
-fn toggle_button(settings: &UserSettings, toggle: &'static Toggle) -> impl Scene + use<> {
-    bsn! {
-        @{button_styled(button_intent::PRIMARY, ButtonSize::Md, (toggle.label)(settings))}
-        ~{ToggleButton(toggle)}
-        on(move |_: On<Activate>, mut commands: Commands| {
-            commands.queue(move |world: &mut World| {
-                (toggle.flip)(&mut world.resource_mut::<UserSettings>());
-            });
-        })
-    }
-}
-
-fn sync_labels(world: &mut World) {
-    if !world.is_resource_changed::<UserSettings>() {
-        return;
-    }
-    let buttons: Vec<(&'static Toggle, Vec<Entity>)> = world
-        .query::<(&ToggleButton, &Children)>()
-        .iter(world)
-        .map(|(button, children)| (button.0, children.iter().collect()))
-        .collect();
-    let speed = text_speed_label(world.resource::<UserSettings>());
-    let labels: Vec<(Entity, String)> = world
-        .query_filtered::<Entity, With<TextSpeedLabel>>()
-        .iter(world)
-        .map(|entity| (entity, speed.clone()))
-        .collect();
-    let texts: Vec<(Entity, String)> = buttons
-        .into_iter()
-        .flat_map(|(toggle, texts)| {
-            let label = (toggle.label)(world.resource::<UserSettings>()).to_owned();
-            texts.into_iter().map(move |text| (text, label.clone()))
-        })
-        .chain(labels)
-        .collect();
-    for (entity, label) in texts {
-        if let Some(mut text) = world.get_mut::<Text>(entity)
-            && text.0 != label
-        {
-            text.0 = label;
-        }
-    }
-}
-
 impl UserSettings {
     pub(crate) fn snapping_enabled(&self) -> bool {
         self.ui.snap.is_some()
+    }
+
+    pub(crate) fn snap(&self) -> Option<WindowPx> {
+        self.ui.snap
     }
 
     pub(crate) fn toggle_snapping(&mut self) {
@@ -440,17 +294,15 @@ fn persist(settings: Res<UserSettings>, platform: Res<ClientPlatform>) {
 
 fn apply(
     settings: Res<UserSettings>,
-    mut grid: ResMut<SnapGrid>,
-    mut speed: ResMut<ui::TypewriterSpeed>,
-    mut motion: ResMut<ui::MotionPreference>,
+    mut speed: ResMut<TypewriterSpeed>,
+    mut motion: ResMut<MotionPreference>,
     mut audio_mix: ResMut<AudioMix>,
     mut transition: ResMut<ScreenTransitionPreference>,
 ) {
     if !settings.is_changed() {
         return;
     }
-    grid.0 = settings.ui.snap.map(|snap| snap.0);
-    *speed = ui::TypewriterSpeed(Some(settings.text.letters_per_second.0));
+    *speed = TypewriterSpeed(Some(settings.text.letters_per_second.0));
     motion.reduced = settings.text.reduced_motion;
     *audio_mix = settings.sound;
     transition.0 = settings.screen.transition;

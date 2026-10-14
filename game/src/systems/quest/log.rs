@@ -1,11 +1,10 @@
 use bevy::prelude::*;
+use design_tokens::{TextRole, color, family, widgets};
+use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 use strum::IntoStaticStr;
-use ui::tokens::{palette, spacing, typography};
-use ui::{Check, ConfirmOptions, OnTap};
 
 use super::card::{
-    Countdown, caption, icon, live_bar, live_text, objective_row, picks, reward_chips, section,
-    steady, tag,
+    Countdown, caption, objective_row, picks, reward_chips, section, tag, time_left,
 };
 use super::{
     ActiveQuest, FinishedQuest, Parties, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest,
@@ -13,8 +12,8 @@ use super::{
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::script::ChoiceReveal;
-use crate::systems::hud::{self, HudAudience, Window, spawn_ui};
-use crate::systems::input::map::{ActionInput, InputAction};
+use crate::systems::hud::{self, Confirm, HudAudience, Window};
+use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
 use crate::systems::item::{Inventory, ItemFlag, ItemStack};
@@ -24,6 +23,7 @@ use crate::systems::screen::ClientScreen;
 use crate::systems::screen::mode::ClientMode;
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
+const LIST_WIDTH: f32 = 250.0;
 const ROW_ICON: f32 = 20.0;
 
 pub struct QuestLogPlugin;
@@ -54,20 +54,13 @@ impl Window for QuestLogWindow {
     fn size(&self) -> Vec2 {
         SIZE
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        [LogTab::Active, LogTab::Completed]
-            .into_iter()
-            .map(|tab| ui::WindowContent {
-                title: tab.title().into(),
-                scene: Box::new(bsn! {
-                    QuestLogBody { tab: {tab}, built: None }
-                    Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
-                }),
-            })
-            .collect()
-    }
-    fn sync(&self, world: &mut World) {
-        sync_bodies(world)
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let tabs = [LogTab::Active, LogTab::Completed].map(|tab| (tab, tab.title().to_owned()));
+        let mut tab = world.resource::<Browse>().tab;
+        widgets::tab_strip(ui, &tabs, &mut tab);
+        world.resource_mut::<Browse>().tab = tab;
+        let page = Page::of(world, tab);
+        page_ui(ui, world, &page);
     }
 }
 
@@ -94,6 +87,7 @@ impl LogTab {
 
 #[derive(Resource, Default)]
 struct Browse {
+    tab: LogTab,
     active: Option<QuestId>,
     completed: Option<QuestId>,
 }
@@ -105,12 +99,6 @@ impl Browse {
             LogTab::Completed => self.completed,
         }
     }
-}
-
-#[derive(Component, Default, Clone)]
-struct QuestLogBody {
-    tab: LogTab,
-    built: Option<u64>,
 }
 
 struct Page {
@@ -126,54 +114,25 @@ fn forget(mut browse: ResMut<Browse>) {
     *browse = Browse::default();
 }
 
-fn sync_bodies(world: &mut World) {
-    let bodies: Vec<(Entity, QuestLogBody)> = world
-        .query::<(Entity, &QuestLogBody)>()
-        .iter(world)
-        .map(|(entity, body)| (entity, body.clone()))
-        .collect();
-    if bodies.is_empty() {
-        return;
-    }
-    let seen = world.resource::<Viewpoint>().0;
-    let log = seen
-        .and_then(|seen| world.get::<QuestLog>(seen))
-        .cloned()
-        .unwrap_or_default();
-    let inventory = seen
-        .and_then(|seen| world.get::<Inventory>(seen))
-        .cloned()
-        .unwrap_or_else(Inventory::empty);
-    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
-    for (entity, body) in bodies {
-        let page = Page {
-            parties: world.resource::<Parties>().clone(),
-            tab: body.tab,
-            selected: world.resource::<Browse>().of(body.tab),
-            log: log.clone(),
-            inventory: inventory.clone(),
-            playing,
-        };
-        let key = hud::fingerprint(&(
-            page.tab,
-            steady(&page.log),
-            &page.inventory.slots,
-            page.selected,
-            playing,
-        ));
-        if body.built == Some(key) {
-            continue;
-        }
-        if let Some(mut body) = world.get_mut::<QuestLogBody>(entity) {
-            body.built = Some(key);
-        }
-        let scene = contents(world, &page);
-        world.entity_mut(entity).despawn_related::<Children>();
-        spawn_ui(world, scene).insert(ChildOf(entity));
-    }
-}
-
 impl Page {
+    fn of(world: &World, tab: LogTab) -> Page {
+        let seen = world.resource::<Viewpoint>().0;
+        Page {
+            parties: world.resource::<Parties>().clone(),
+            tab,
+            log: seen
+                .and_then(|seen| world.get::<QuestLog>(seen))
+                .cloned()
+                .unwrap_or_default(),
+            inventory: seen
+                .and_then(|seen| world.get::<Inventory>(seen))
+                .cloned()
+                .unwrap_or_else(Inventory::empty),
+            selected: world.resource::<Browse>().of(tab),
+            playing: *world.resource::<ClientMode>() == ClientMode::Play,
+        }
+    }
+
     fn listed(&self, content: &Content) -> Vec<QuestId> {
         let mut quests: Vec<QuestId> = match self.tab {
             LogTab::Active => self.log.active.iter().map(|active| active.quest).collect(),
@@ -209,11 +168,30 @@ impl Page {
     }
 }
 
-fn contents(world: &World, page: &Page) -> Box<dyn Scene> {
-    let content = world.resource::<Content>();
-    let assets = world.resource::<AssetServer>();
-    let listed = page.listed(content);
+fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
+    let content = *world.resource::<Content>();
+    let listed = page.listed(&content);
     let shown = page.shown(&listed);
+    egui::Panel::left(egui::Id::new(("quest list", page.tab.title())))
+        .resizable(false)
+        .exact_size(LIST_WIDTH)
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink(false)
+                .show(ui, |ui| list(ui, world, page, &listed, shown));
+        });
+    egui::ScrollArea::vertical()
+        .id_salt(("quest detail", page.tab.title()))
+        .auto_shrink(false)
+        .show(ui, |ui| {
+            if let Some(quest) = shown {
+                detail(ui, world, page, quest);
+            }
+        });
+}
+
+fn list(ui: &mut Ui, world: &mut World, page: &Page, listed: &[QuestId], shown: Option<QuestId>) {
+    let content = *world.resource::<Content>();
     let (title, aside) = match page.tab {
         LogTab::Active => (
             "Active quests",
@@ -221,31 +199,33 @@ fn contents(world: &World, page: &Page) -> Box<dyn Scene> {
         ),
         LogTab::Completed => ("Completed", page.log.finished.len().to_string()),
     };
-    let mut rows: Vec<Box<dyn Scene>> = vec![Box::new(ui::list_header(title, aside))];
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(title).family(family::medium()));
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.label(RichText::new(aside).color(color::MUTED));
+        });
+    });
     let mut category = None;
-    for &quest in &listed {
-        let def = quest.get(content);
+    for &quest in listed {
+        let def = quest.get(&content);
         if category != Some(&def.category) {
             category = Some(&def.category);
-            rows.push(Box::new(group(&def.category)));
+            ui.add_space(6.0);
+            ui.label(
+                RichText::new(def.category.to_uppercase())
+                    .size(TextRole::Small.size())
+                    .family(family::medium())
+                    .color(color::FAINT),
+            );
         }
-        rows.push(row(content, assets, page, quest, shown == Some(quest)));
+        ui.push_id(("quest row", quest.index()), |ui| {
+            row(ui, world, page, quest, shown == Some(quest));
+        });
     }
     if listed.is_empty() {
-        rows.push(Box::new(bsn! {
-            Node { padding: {UiRect::all(Val::Px(spacing::XL))} }
-            Children [ @{caption(empty_note(page.tab))} ]
-        }));
+        ui.add_space(8.0);
+        caption(ui, empty_note(page.tab));
     }
-    let list: Box<dyn Scene> = Box::new(bsn! {
-        Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0) }
-        Children [ {rows} ]
-    });
-    let detail: Box<dyn Scene> = match shown {
-        Some(quest) => Box::new(detail(content, assets, page, quest)),
-        None => Box::new(bsn! { Node }),
-    };
-    Box::new(ui::split_view(list, Box::new(ui::scrolled(detail))))
 }
 
 fn empty_note(tab: LogTab) -> &'static str {
@@ -255,94 +235,64 @@ fn empty_note(tab: LogTab) -> &'static str {
     }
 }
 
-fn group(category: &str) -> impl Scene + use<> {
-    let ink = ui::theme::theme().surface_floating.on;
-    bsn! {
-        Node { padding: {UiRect::new(Val::Px(spacing::L), Val::Px(spacing::L), Val::Px(spacing::L), Val::Px(spacing::S))} }
-        Children [ @{ui::styled_text(category.to_uppercase(), ink.with_alpha(0.5), typography::LABEL)} ]
+fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bool) {
+    let content = *world.resource::<Content>();
+    let def = quest.get(&content);
+    let fill = if selected {
+        color::ACCENT_SOFT
+    } else {
+        Color32::TRANSPARENT
+    };
+    let response = egui::Frame::new()
+        .fill(fill)
+        .corner_radius(design_tokens::WIDGET_RADIUS)
+        .inner_margin(egui::Margin::symmetric(6, 4))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.horizontal(|ui| {
+                hud::icon(ui, world, def.icon(&content), ROW_ICON);
+                ui.label(RichText::new(def.title.as_str()).family(family::medium()));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if page.log.tracked.contains(&quest) {
+                        hud::icon(ui, world, &InterfaceIcon::Tracked.get(&content).image, 14.0);
+                    }
+                    let (status, colour) = status(&content, page, quest);
+                    ui.label(
+                        RichText::new(status)
+                            .size(TextRole::Small.size())
+                            .color(colour),
+                    );
+                });
+            });
+        })
+        .response
+        .interact(Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    if response.hovered() && !selected {
+        ui.painter().rect_filled(
+            response.rect,
+            design_tokens::WIDGET_RADIUS,
+            Color32::from_white_alpha(8),
+        );
+    }
+    if map::clicked(world, InputAction::Select, &response) {
+        select(world, page.tab, quest);
     }
 }
 
-fn row(
-    content: &Content,
-    assets: &AssetServer,
-    page: &Page,
-    quest: QuestId,
-    selected: bool,
-) -> Box<dyn Scene> {
-    let ink = ui::theme::theme().surface_floating.on;
-    let def = quest.get(content);
-    let status: Vec<Box<dyn Scene>> = vec![status(content, page, quest)];
-    let tracked: Vec<Box<dyn Scene>> = page
-        .log
-        .tracked
-        .contains(&quest)
-        .then(|| -> Box<dyn Scene> {
-            Box::new(icon(
-                assets,
-                &InterfaceIcon::Tracked.get(content).image,
-                14.0,
-            ))
-        })
-        .into_iter()
-        .collect();
-    let background = if selected {
-        ui::theme::theme().surface_inset.base
-    } else {
-        Color::NONE
-    };
-    let tab = page.tab;
-    Box::new(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            column_gap: Val::Px({spacing::L}),
-            padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))},
-        }
-        BackgroundColor({background})
-        Pickable { should_block_lower: true, is_hoverable: true }
-        ui::CursorStyle::Pointer
-        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
-            if input.clicked(InputAction::Select, &click) {
-                commands.queue(move |world: &mut World| select(world, tab, quest));
-            }
-        })
-        Children [
-            @{icon(assets, def.icon(content), ROW_ICON)}
-            --
-            Node { flex_grow: 1.0 } Pickable::IGNORE Children [ @{ui::styled_text(def.title.as_str(), ink, typography::LABEL)} ]
-            --
-            {status}
-            --
-            {tracked}
-        ]
-    })
-}
-
-fn status(content: &Content, page: &Page, quest: QuestId) -> Box<dyn Scene> {
-    let ink = ui::theme::theme().surface_floating.on.with_alpha(0.7);
-    let fixed = |text: &str, color: Color| -> Box<dyn Scene> {
-        Box::new(ui::styled_text(text.to_owned(), color, typography::CAPTION))
-    };
-    let live = |shows: Countdown, color: Color| -> Box<dyn Scene> {
-        Box::new(live_text(
-            &page.log,
-            quest,
-            shows,
-            color,
-            typography::CAPTION,
-        ))
-    };
+fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
+    let ink = color::TEXT.gamma_multiply(0.7);
     let def = quest.get(content);
     if let Some(active) = page.active(quest) {
         if def.decision().is_some() {
-            return fixed("choice", palette::AMBER_80);
+            return ("choice".to_owned(), color::WARN);
         }
         if active.ready {
-            return fixed("ready", palette::AMBER_80);
+            return ("ready".to_owned(), color::WARN);
         }
         if active.left.is_some() {
-            return live(Countdown::Left, palette::AMBER_80);
+            let left = Countdown::Left.label(&page.log, quest).unwrap_or_default();
+            return (left, color::WARN);
         }
         let counted = def
             .progress(content, &page.parties, active, Some(&page.inventory))
@@ -350,204 +300,150 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> Box<dyn Scene> {
             .find(|progress| progress.counted && !progress.done())
             .map(|progress| format!("{}/{}", progress.have, progress.need))
             .unwrap_or_default();
-        return fixed(&counted, ink);
+        return (counted, ink);
     }
     match page.finished(quest) {
         Some(finished) if finished.result == QuestResult::Failed => {
-            fixed("failed", palette::CRIMSON_80)
+            ("failed".to_owned(), color::DANGER)
         }
-        Some(finished) if finished.resets_in.is_some() => live(Countdown::Resets, ink),
-        Some(_) => fixed("done", ink),
-        None => fixed("", ink),
+        Some(finished) if finished.resets_in.is_some() => (
+            Countdown::Resets
+                .label(&page.log, quest)
+                .unwrap_or_default(),
+            ink,
+        ),
+        Some(_) => ("done".to_owned(), ink),
+        None => (String::new(), ink),
     }
 }
 
-fn detail(
-    content: &Content,
-    assets: &AssetServer,
-    page: &Page,
-    quest: QuestId,
-) -> impl Scene + use<> {
-    let ink = ui::theme::theme().surface_floating.on;
-    let def = quest.get(content);
-    let mut parts: Vec<Box<dyn Scene>> = vec![
-        Box::new(bsn! {
-            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, flex_wrap: FlexWrap::Wrap }
-            Children [
-                @{ui::styled_text(def.title.as_str(), ink, typography::NAME)}
-                --
-                @{tag(&def.kinds(), palette::AMBER_70)}
-            ]
-        }),
-        Box::new(caption(def.meta(&page.parties, quest))),
-    ];
+fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
+    let content = *world.resource::<Content>();
+    let def = quest.get(&content);
+    ui.spacing_mut().item_spacing.y = 8.0;
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(def.title.as_str()).font(TextRole::Heading.font_id()));
+        tag(ui, &def.kinds(), color::WARN);
+    });
+    caption(ui, def.meta(&page.parties, quest));
     if page
         .active(quest)
         .is_some_and(|active| active.left.is_some())
     {
-        parts.push(Box::new(timer(content, assets, &page.log, quest)));
+        timer(ui, world, page, quest);
     }
-    parts.push(Box::new(ui::styled_text(
-        format!("\u{201c}{}\u{201d}", def.blurb),
-        ink.with_alpha(0.85),
-        typography::BODY,
-    )));
-    parts.push(Box::new(section("Objectives")));
+    ui.label(
+        RichText::new(format!("\u{201c}{}\u{201d}", def.blurb))
+            .color(color::TEXT.gamma_multiply(0.85)),
+    );
+    section(ui, "Objectives");
+    let fresh = ActiveQuest::fresh(&content, quest);
     let progress = def.progress(
-        content,
+        &content,
         &page.parties,
-        page.active(quest)
-            .unwrap_or(&ActiveQuest::fresh(content, quest)),
+        page.active(quest).unwrap_or(&fresh),
         Some(&page.inventory),
     );
     let finished = page.finished(quest);
-    parts.extend(def.objectives().zip(progress).map(
-        |(objective, mut progress)| -> Box<dyn Scene> {
-            let color = match finished.map(|finished| finished.result) {
-                Some(QuestResult::Completed) => palette::EMERALD_80,
-                Some(QuestResult::Failed) => ink.with_alpha(0.6),
-                None if progress.done() => palette::EMERALD_80,
-                None => ink,
-            };
-            progress.counted &= finished.is_none();
-            Box::new(objective_row(content, assets, objective, &progress, color))
-        },
-    ));
+    for (index, (objective, mut progress)) in def.objectives().zip(progress).enumerate() {
+        let colour = match finished.map(|finished| finished.result) {
+            Some(QuestResult::Completed) => color::OK,
+            Some(QuestResult::Failed) => color::MUTED,
+            None if progress.done() => color::OK,
+            None => color::TEXT,
+        };
+        progress.counted &= finished.is_none();
+        ui.push_id(("objective", index), |ui| {
+            objective_row(ui, world, objective, &progress, colour);
+        });
+    }
     if let Some(paths) = def.decision() {
-        parts.push(Box::new(section("Choices")));
-        parts.extend(paths.iter().map(|path| -> Box<dyn Scene> {
-            Box::new(ui::styled_text(
-                format!("{}: {}", path.choice, path.means.join("; ")),
-                ink,
-                typography::BODY,
-            ))
-        }));
+        section(ui, "Choices");
+        for path in paths {
+            ui.label(format!("{}: {}", path.choice, path.means.join("; ")));
+        }
     }
     let handed_in = finished.is_some_and(|finished| finished.result == QuestResult::Completed);
     if def.reveals(ChoiceReveal::Gains) || handed_in {
-        parts.push(Box::new(section("Rewards")));
-        parts.push(Box::new(reward_chips(content, assets, def)));
+        section(ui, "Rewards");
+        reward_chips(ui, world, def);
     }
     if def.reveals(ChoiceReveal::Gains) && !def.pick_one().is_empty() && finished.is_none() {
-        parts.push(Box::new(section("Pick one when you return")));
-        parts.push(Box::new(picks(content, assets, def)));
+        section(ui, "Pick one when you return");
+        picks(ui, world, def);
     }
     if def.time_limit().is_some() {
-        parts.push(Box::new(section("If time runs out")));
-        parts.push(Box::new(ui::styled_text(
-            format!("The quest fails. {}.", def.retry_hint(&page.parties, quest)),
-            ink,
-            typography::BODY,
-        )));
+        section(ui, "If time runs out");
+        ui.label(format!(
+            "The quest fails. {}.",
+            def.retry_hint(&page.parties, quest)
+        ));
     }
     if let Some(finished) = finished {
-        parts.push(match finished.result {
-            QuestResult::Completed if finished.resets_in.is_some() => Box::new(live_text(
-                &page.log,
-                quest,
-                Countdown::ResetsDetail,
-                palette::EMERALD_80,
-                typography::LABEL,
-            )),
-            QuestResult::Completed => Box::new(ui::styled_text(
-                "Completed",
-                palette::EMERALD_80,
-                typography::LABEL,
-            )),
-            QuestResult::Failed if finished.offered_again => Box::new(ui::styled_text(
+        let (outcome, colour) = match finished.result {
+            QuestResult::Completed if finished.resets_in.is_some() => (
+                Countdown::ResetsDetail
+                    .label(&page.log, quest)
+                    .unwrap_or_default(),
+                color::OK,
+            ),
+            QuestResult::Completed => ("Completed".to_owned(), color::OK),
+            QuestResult::Failed if finished.offered_again => (
                 format!("Failed · {}", def.retry_hint(&page.parties, quest)),
-                palette::CRIMSON_80,
-                typography::LABEL,
-            )),
-            QuestResult::Failed => Box::new(ui::styled_text(
-                "Failed",
-                palette::CRIMSON_80,
-                typography::LABEL,
-            )),
-        });
+                color::DANGER,
+            ),
+            QuestResult::Failed => ("Failed".to_owned(), color::DANGER),
+        };
+        ui.label(
+            RichText::new(outcome)
+                .family(family::medium())
+                .color(colour),
+        );
     }
-    if page.playing && page.log.trackable(content, quest) {
-        parts.push(Box::new(footer(page, quest)));
-    }
-    bsn! {
-        Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px({spacing::L}),
-            padding: {UiRect::all(Val::Px(spacing::XL))},
-            width: Val::Percent(100.0),
-        }
-        Children [ {parts} ]
+    if page.playing && page.log.trackable(&content, quest) {
+        footer(ui, world, page, quest);
     }
 }
 
-fn timer(
-    content: &Content,
-    assets: &AssetServer,
-    log: &QuestLog,
-    quest: QuestId,
-) -> impl Scene + use<> {
-    bsn! {
-        Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
-        Children [
-            @{icon(assets, &InterfaceIcon::Timed.get(content).image, 16.0)}
-            --
-            @{live_text(log, quest, Countdown::LeftDetail, palette::AMBER_80, typography::LABEL)}
-            --
-            Node { flex_grow: 1.0 } Children [ @{live_bar(content, log, quest)} ]
-        ]
-    }
+fn timer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
+    let content = *world.resource::<Content>();
+    ui.horizontal(|ui| {
+        hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 16.0);
+        let left = Countdown::LeftDetail
+            .label(&page.log, quest)
+            .unwrap_or_default();
+        ui.label(
+            RichText::new(left)
+                .family(family::medium())
+                .color(color::WARN),
+        );
+        ui.add(
+            egui::ProgressBar::new(time_left(&content, &page.log, quest))
+                .desired_height(6.0)
+                .fill(color::WARN),
+        );
+    });
 }
 
-fn footer(page: &Page, quest: QuestId) -> impl Scene + use<> {
-    let ink = ui::theme::theme().surface_floating.on;
-    let tracked = page.log.tracked.contains(&quest);
-    let check = if tracked { Check::On } else { Check::Off };
-    let abandon: Vec<Box<dyn Scene>> = page
-        .active(quest)
-        .map(|_| -> Box<dyn Scene> {
-            Box::new(bsn! {
-                @{ui::button_styled(ui::button::intent::DANGER, ui::ButtonSize::Sm, "Abandon")}
-                on(move |_: On<ui::Activate>, mut commands: Commands| {
-                    commands.queue(move |world: &mut World| confirm_abandon(world, quest));
-                })
-            })
-        })
-        .into_iter()
-        .collect();
-    bsn! {
-        Node {
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
-            width: Val::Percent(100.0),
-            padding: {UiRect::top(Val::Px(spacing::L))},
+fn footer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let tracked = page.log.tracked.contains(&quest);
+        let mut track = tracked;
+        if ui.checkbox(&mut track, "Track on HUD").changed() {
+            world.write_message(QuestRequest::Track {
+                quest,
+                tracked: track,
+            });
         }
-        Children [
-            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
-            Children [
-                @{ui::checkbox(check)}
-                on(move |change: On<ui::ValueChange<bool>>, mut commands: Commands| {
-                    let tracked = change.value;
-                    commands.queue(move |world: &mut World| {
-                        world.write_message(QuestRequest::Track { quest, tracked });
-                    });
-                })
-                Children [ @{ui::checkbox_indicator()} ]
-                --
-                @{ui::styled_text("Track on HUD", ink, typography::BODY)}
-                Pickable { should_block_lower: true, is_hoverable: true }
-                ui::CursorStyle::Pointer
-                on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
-                    if input.clicked(InputAction::Select, &click) {
-                        commands.queue(move |world: &mut World| {
-                            world.write_message(QuestRequest::Track { quest, tracked: !tracked });
-                        });
-                    }
-                })
-            ]
-            --
-            {abandon}
-        ]
-    }
+        if page.active(quest).is_some() {
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if widgets::danger(ui, "Abandon").clicked() {
+                    confirm_abandon(world, quest);
+                }
+            });
+        }
+    });
 }
 
 fn confirm_abandon(world: &mut World, quest: QuestId) {
@@ -567,18 +463,18 @@ fn confirm_abandon(world: &mut World, quest: QuestId) {
     let body = taken
         .chain(["Your progress is lost.".to_owned(), again])
         .collect();
-    let dialog = ui::confirm_dialog(ConfirmOptions {
-        title: format!("Abandon {}?", def.title),
-        body,
-        confirm: "Abandon quest".to_owned(),
-        cancel: "Keep quest".to_owned(),
-        on_confirm: OnTap::new(move |world| {
-            world.write_message(QuestRequest::Abandon { quest });
-        }),
-        on_cancel: OnTap::new(|_| {}),
-        keep: InputAction::TakeDefault.into(),
-    });
-    spawn_ui(world, dialog);
+    hud::confirm(
+        world,
+        Confirm {
+            title: format!("Abandon {}?", def.title),
+            body,
+            confirm: "Abandon quest".to_owned(),
+            cancel: "Keep quest".to_owned(),
+            on_confirm: Box::new(move |world| {
+                world.write_message(QuestRequest::Abandon { quest });
+            }),
+        },
+    );
 }
 
 fn quest_note(world: &World, stack: ItemStack) -> Option<String> {

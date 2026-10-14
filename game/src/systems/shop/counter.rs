@@ -1,21 +1,28 @@
 use bevy::prelude::*;
-use ui::tokens::{palette, spacing, typography};
-use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap};
+use design_tokens::{CHIP_RADIUS, TextRole, color, widgets};
+use egui::{Align, Id, Layout, RichText, Sense, Stroke, Ui, UiBuilder};
 
 use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::content::Content;
-use crate::systems::dialogue::stage;
-use crate::systems::hud::{self, spawn_ui};
-use crate::systems::input::map::{ActionInput, InputAction, input};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
+use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
+use crate::systems::hud::{self, Confirm};
+use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
+use crate::systems::item::widget::{
+    CarriedSlot, SlotAction, SlotVerdict, slot_action, slot_verdict_source,
+};
 use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::screen::ClientScreen;
 use crate::systems::screen::mode::ClientMode;
 
-const COUNTER_SIZE: Vec2 = Vec2::new(620.0, 400.0);
+const COUNTER_WIDTH: f32 = 620.0;
+const COUNTER_HEIGHT: f32 = 400.0;
+const LIST_WIDTH: f32 = 250.0;
 const ICON: f32 = 28.0;
+const COST_ICON: f32 = 16.0;
+const CHIP_ICON: f32 = 14.0;
 
 pub struct ShopCounterPlugin;
 
@@ -31,13 +38,15 @@ impl Plugin for ShopCounterPlugin {
                 verb: "sell",
             },
         );
+        stage::dock(
+            app,
+            DockedPanel {
+                head,
+                show: show_counter,
+            },
+        );
         app.init_resource::<Browse>()
-            .add_systems(
-                Update,
-                (show_counter, sync_counter)
-                    .chain()
-                    .run_if(in_state(ClientScreen::Area)),
-            )
+            .add_systems(Update, notice_counter.run_if(in_state(ClientScreen::Area)))
             .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
@@ -66,256 +75,7 @@ pub enum ShopTab {
 struct Browse {
     tab: ShopTab,
     selected: usize,
-    synced: Option<u64>,
-}
-
-#[derive(Component, Default, Clone)]
-struct CounterPanel;
-
-#[derive(Component, Default, Clone)]
-struct ShopTabs;
-
-#[derive(Component, Default, Clone)]
-struct ShopWants;
-
-#[derive(Component, Default, Clone)]
-struct ShopList;
-
-#[derive(Component, Default, Clone)]
-struct ShopDetail;
-
-#[derive(Component, Default, Clone)]
-struct ShopFooter;
-
-fn forget(mut browse: ResMut<Browse>) {
-    *browse = Browse::default();
-}
-
-fn show_counter(world: &mut World) {
-    let content = *world.resource::<Content>();
-    let shop = view(world).map(|shown| shown.shop);
-    let panel = world
-        .query_filtered::<Entity, With<CounterPanel>>()
-        .iter(world)
-        .next();
-    match (shop, panel) {
-        (Some(shop), None) => {
-            *world.resource_mut::<Browse>() = Browse::default();
-            let playing = *world.resource::<ClientMode>() == ClientMode::Play;
-            let panel = ui::DialoguePanelOptions {
-                title: shop.get(&content).title.to_owned(),
-                width: Val::Px(COUNTER_SIZE.x),
-                height: Val::Px(COUNTER_SIZE.y),
-                content: counter(playing),
-            };
-            if let Some(panel) = stage::show_panel(world, panel) {
-                world.entity_mut(panel).insert(CounterPanel);
-            }
-            InterfaceSound::UiOpen.play(world);
-        }
-        (None, Some(panel)) => {
-            world.entity_mut(panel).despawn();
-            world.resource_mut::<Browse>().synced = None;
-        }
-        _ => {}
-    }
-}
-
-fn counter(playing: bool) -> Box<dyn Scene> {
-    let header = bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::SpaceBetween,
-            padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))},
-        }
-        Children [
-            ShopTabs Node { column_gap: Val::Px({spacing::M}) }
-            --
-            ShopWants Node
-        ]
-    };
-    let split = ui::split_view(
-        Box::new(
-            bsn! { ShopList Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0) } },
-        ),
-        Box::new(
-            bsn! { ShopDetail Node { width: Val::Percent(100.0), height: Val::Percent(100.0) } },
-        ),
-    );
-    let column = bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-        }
-        Children [
-            @{header}
-            --
-            Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) } Children [ @{split} ]
-            --
-            ShopFooter Node { padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} }
-        ]
-    };
-    if playing {
-        Box::new(bsn! {
-            @{column}
-            CarryTarget
-            on(|carried: On<Carried>, mut commands: Commands| {
-                let slot = carried.payload as u32;
-                commands.queue(move |world: &mut World| request_sale(world, slot));
-            })
-        })
-    } else {
-        Box::new(column)
-    }
-}
-
-fn sync_counter(world: &mut World) {
-    let content = *world.resource::<Content>();
-    let Some(shown) = view(world).cloned() else {
-        return;
-    };
-    let Some(parts) = Parts::find(world) else {
-        return;
-    };
-    let inventory = world
-        .resource::<Viewpoint>()
-        .0
-        .and_then(|seen| world.get::<Inventory>(seen))
-        .cloned()
-        .unwrap_or_else(Inventory::empty);
-    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
-    let browse = world.resource::<Browse>();
-    let synced = hud::fingerprint(&(
-        &shown,
-        &inventory.slots,
-        browse.tab,
-        browse.selected,
-        playing,
-    ));
-    if browse.synced == Some(synced) {
-        return;
-    }
-    let shelf = Shelf {
-        shown,
-        inventory,
-        tab: browse.tab,
-        selected: browse.selected,
-        playing,
-    };
-    world.resource_mut::<Browse>().synced = Some(synced);
-    let wares = shelf.wares(&content);
-    let selected = shelf.selected.min(wares.len().saturating_sub(1));
-
-    let tabs = [
-        (ShopTab::Wares, "Wares".to_owned()),
-        (
-            ShopTab::Buyback,
-            format!("Buy back ({})", shelf.shown.buyback.len()),
-        ),
-    ];
-    let tab_keys: Vec<(ShopTab, &String, bool)> = tabs
-        .iter()
-        .map(|(tab, label)| (*tab, label, shelf.tab == *tab))
-        .collect();
-    hud::reconcile_children(world, parts.tabs, &tab_keys, |_, index| {
-        let (tab, label) = tabs[index].clone();
-        Box::new(tab_button(tab, label, shelf.tab == tab))
-    });
-
-    let wants = shelf.shown.shop.get(&content).wants(&content);
-    hud::reconcile_children(world, parts.wants, &[&wants], |_, _| {
-        Box::new(ui::styled_text(
-            wants_note(&wants),
-            palette::AMBER_80,
-            typography::CAPTION,
-        ))
-    });
-
-    let list_keys: Vec<u64> = if wares.is_empty() {
-        vec![hud::fingerprint(&shelf.tab)]
-    } else {
-        wares
-            .iter()
-            .enumerate()
-            .map(|(index, ware)| {
-                hud::fingerprint(&(
-                    shelf.tab,
-                    index,
-                    ware,
-                    index == selected,
-                    held(&shelf.inventory, ware),
-                ))
-            })
-            .collect()
-    };
-    hud::reconcile_children(world, parts.list, &list_keys, |world, index| {
-        match wares.get(index) {
-            Some(ware) => row(
-                world.resource::<Content>(),
-                world.resource::<AssetServer>(),
-                &shelf,
-                ware,
-                index,
-                index == selected,
-            ),
-            None => Box::new(empty_note(shelf.tab)),
-        }
-    });
-
-    let detail_keys: Vec<(ShopTab, usize, &Ware, Vec<u32>, bool)> = wares
-        .get(selected)
-        .map(|ware| {
-            (
-                shelf.tab,
-                selected,
-                ware,
-                held(&shelf.inventory, ware),
-                shelf.playing,
-            )
-        })
-        .into_iter()
-        .collect();
-    hud::reconcile_children(world, parts.detail, &detail_keys, |world, _| {
-        Box::new(detail(world, &shelf, &wares[selected], selected))
-    });
-
-    let selling = shelf.playing && !wants.is_empty();
-    hud::reconcile_children(world, parts.footer, &[selling], |_, _| {
-        Box::new(sell_hint(selling))
-    });
-}
-
-struct Parts {
-    tabs: Entity,
-    wants: Entity,
-    list: Entity,
-    detail: Entity,
-    footer: Entity,
-}
-
-impl Parts {
-    fn find(world: &mut World) -> Option<Parts> {
-        Some(Parts {
-            tabs: single::<ShopTabs>(world)?,
-            wants: single::<ShopWants>(world)?,
-            list: single::<ShopList>(world)?,
-            detail: single::<ShopDetail>(world)?,
-            footer: single::<ShopFooter>(world)?,
-        })
-    }
-}
-
-fn single<C: Component>(world: &mut World) -> Option<Entity> {
-    world.query_filtered::<Entity, With<C>>().iter(world).next()
-}
-
-fn held(inventory: &Inventory, ware: &Ware) -> Vec<u32> {
-    ware.price
-        .iter()
-        .map(|stack| inventory.count(stack.item))
-        .collect()
+    open: Option<ShopId>,
 }
 
 struct Shelf {
@@ -326,7 +86,6 @@ struct Shelf {
     playing: bool,
 }
 
-#[derive(Hash)]
 struct Ware {
     item: ItemId,
     count: u32,
@@ -334,6 +93,329 @@ struct Ware {
     note: Option<String>,
     refusal: Option<WareRefusal>,
 }
+
+fn forget(mut browse: ResMut<Browse>) {
+    *browse = Browse::default();
+}
+
+fn notice_counter(world: &mut World) {
+    let shop = view(world).map(|shown| shown.shop);
+    if world.resource::<Browse>().open == shop {
+        return;
+    }
+    *world.resource_mut::<Browse>() = Browse {
+        open: shop,
+        ..Browse::default()
+    };
+    if shop.is_some() {
+        InterfaceSound::UiOpen.play(world);
+    }
+}
+
+fn head(world: &World) -> Option<PanelHead> {
+    let content = world.resource::<Content>();
+    view(world).map(|shown| PanelHead {
+        title: shown.shop.get(content).title.to_owned(),
+        width: COUNTER_WIDTH,
+        fixed_height: Some(COUNTER_HEIGHT),
+    })
+}
+
+fn show_counter(ui: &mut Ui, world: &mut World) {
+    let Some(shelf) = shelf(world) else {
+        return;
+    };
+    if !shelf.playing {
+        counter(ui, world, &shelf);
+        return;
+    }
+    let zone = egui::Frame::new();
+    let (_, dropped) = ui.dnd_drop_zone::<CarriedSlot, _>(zone, |ui| counter(ui, world, &shelf));
+    if let Some(dropped) = dropped {
+        request_sale(world, dropped.0);
+    }
+}
+
+fn shelf(world: &World) -> Option<Shelf> {
+    let shown = view(world)?.clone();
+    let inventory = world
+        .resource::<Viewpoint>()
+        .0
+        .and_then(|seen| world.get::<Inventory>(seen))
+        .cloned()
+        .unwrap_or_else(Inventory::empty);
+    let browse = world.resource::<Browse>();
+    Some(Shelf {
+        shown,
+        inventory,
+        tab: browse.tab,
+        selected: browse.selected,
+        playing: *world.resource::<ClientMode>() == ClientMode::Play,
+    })
+}
+
+fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
+    let content = *world.resource::<Content>();
+    let wares = shelf.wares(&content);
+    let selected = shelf.selected.min(wares.len().saturating_sub(1));
+    let wants = shelf.shown.shop.get(&content).wants(&content);
+    ui.set_min_size(ui.available_size());
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(10, 0))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let tabs = [
+                    (ShopTab::Wares, "Wares".to_owned()),
+                    (
+                        ShopTab::Buyback,
+                        format!("Buy back ({})", shelf.shown.buyback.len()),
+                    ),
+                ];
+                let mut tab = shelf.tab;
+                widgets::tab_strip(ui, &tabs, &mut tab);
+                if tab != shelf.tab {
+                    select(world, tab, 0);
+                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(wants_note(&wants))
+                            .size(TextRole::Small.size())
+                            .color(color::WARN),
+                    );
+                });
+            });
+        });
+    let selling = shelf.playing && !wants.is_empty();
+    egui::Panel::bottom(Id::new("shop-footer"))
+        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 6)))
+        .show_separator_line(true)
+        .show(ui, |ui| sell_hint(ui, world, selling));
+    egui::Panel::left(Id::new("shop-list"))
+        .resizable(false)
+        .exact_size(LIST_WIDTH)
+        .frame(egui::Frame::new())
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| list(ui, world, shelf, &wares, selected));
+        });
+    egui::CentralPanel::default()
+        .frame(egui::Frame::new())
+        .show(ui, |ui| {
+            if let Some(ware) = wares.get(selected) {
+                detail(ui, world, shelf, ware, selected);
+            }
+        });
+}
+
+fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected: usize) {
+    if wares.is_empty() {
+        let note = match shelf.tab {
+            ShopTab::Wares => "Nothing for sale",
+            ShopTab::Buyback => "Nothing sold here yet",
+        };
+        ui.add_space(16.0);
+        ui.label(
+            RichText::new(note)
+                .size(TextRole::Small.size())
+                .color(color::MUTED),
+        );
+        return;
+    }
+    ui.spacing_mut().item_spacing.y = 0.0;
+    for (index, ware) in wares.iter().enumerate() {
+        let response = ui
+            .push_id(("ware", index), |ui| {
+                row(ui, world, shelf, ware, index == selected)
+            })
+            .inner;
+        if map::clicked(world, InputAction::Select, &response) {
+            select(world, shelf.tab, index);
+        }
+    }
+}
+
+fn row(
+    ui: &mut Ui,
+    world: &mut World,
+    shelf: &Shelf,
+    ware: &Ware,
+    selected: bool,
+) -> egui::Response {
+    let content = *world.resource::<Content>();
+    let def = ware.item.get(&content);
+    let name = counted(&def.name, ware.count);
+    let note = unavailable(ware)
+        .map(|reason| (reason, color::DANGER))
+        .or_else(|| ware.note.clone().map(|note| (note, color::MUTED)));
+    let background = ui.painter().add(egui::Shape::Noop);
+    let row = ui.scope_builder(
+        UiBuilder::new()
+            .sense(Sense::click())
+            .layout(Layout::left_to_right(Align::Center)),
+        |ui| {
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(8, 4))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.vertical(|ui| {
+                            for stack in &ware.price {
+                                price_chip(ui, world, &shelf.inventory, *stack);
+                            }
+                        });
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                            hud::icon(ui, world, &def.icon, ICON);
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 1.0;
+                                ui.label(
+                                    RichText::new(&name).family(design_tokens::family::medium()),
+                                );
+                                if let Some((note, ink)) = &note {
+                                    ui.label(
+                                        RichText::new(note)
+                                            .size(TextRole::Small.size())
+                                            .color(*ink),
+                                    );
+                                }
+                            });
+                        });
+                    });
+                });
+        },
+    );
+    let response = row.response;
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, &name)
+    });
+    let visuals = ui.style().interact_selectable(&response, selected);
+    if selected || response.hovered() {
+        ui.painter().set(
+            background,
+            egui::epaint::RectShape::filled(response.rect, 4.0, visuals.weak_bg_fill),
+        );
+    }
+    response
+}
+
+fn detail(ui: &mut Ui, world: &mut World, shelf: &Shelf, ware: &Ware, index: usize) {
+    let content = *world.resource::<Content>();
+    egui::Panel::bottom(Id::new("shop-price"))
+        .frame(egui::Frame::new().inner_margin(egui::Margin::same(12)))
+        .show_separator_line(true)
+        .show(ui, |ui| {
+            let price = match ware.count {
+                1 => "Price".to_owned(),
+                count => format!("Price for {count}"),
+            };
+            ui.label(
+                RichText::new(price)
+                    .size(TextRole::Small.size())
+                    .color(color::MUTED)
+                    .family(design_tokens::family::medium()),
+            );
+            for stack in &ware.price {
+                let have = shelf.inventory.count(stack.item);
+                let ink = if have >= stack.count {
+                    color::TEXT
+                } else {
+                    color::DANGER
+                };
+                let item = stack.item.get(&content);
+                ui.horizontal(|ui| {
+                    hud::icon(ui, world, &item.icon, COST_ICON);
+                    ui.label(
+                        RichText::new(format!("{} {} · You have {have}", stack.count, item.name))
+                            .color(ink),
+                    );
+                });
+            }
+            for (note, ink) in ware
+                .note
+                .iter()
+                .map(|note| (note.clone(), color::MUTED))
+                .chain(unavailable(ware).map(|reason| (reason, color::DANGER)))
+            {
+                ui.label(RichText::new(note).size(TextRole::Small.size()).color(ink));
+            }
+            if shelf.playing {
+                ui.add_space(4.0);
+                if trade_button(ui, shelf.tab, ware).clicked() {
+                    trade(world, shelf.tab, index);
+                }
+            }
+        });
+    egui::CentralPanel::default()
+        .frame(egui::Frame::new().inner_margin(egui::Margin::same(12)))
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| card::sheet(ui, world, ware.item));
+        });
+}
+
+fn trade_button(ui: &mut Ui, tab: ShopTab, ware: &Ware) -> egui::Response {
+    match (&ware.refusal, tab) {
+        (Some(WareRefusal::Unaffordable(_)), _) => widgets::danger(ui, "Can't afford"),
+        (Some(WareRefusal::Unavailable(_)), _) => ui.add(egui::Button::new(
+            RichText::new("Unavailable").color(color::MUTED),
+        )),
+        (None, ShopTab::Wares) => widgets::primary(ui, "Buy"),
+        (None, ShopTab::Buyback) => widgets::primary(ui, "Buy back"),
+    }
+}
+
+fn trade(world: &mut World, tab: ShopTab, index: usize) {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
+        return;
+    }
+    let index = index as u32;
+    match tab {
+        ShopTab::Wares => {
+            world.write_message(ShopRequest::Buy { offer: index });
+        }
+        ShopTab::Buyback => {
+            world.write_message(ShopRequest::Buyback { sale: index });
+        }
+    }
+    InterfaceSound::UiPick.play(world);
+}
+
+fn price_chip(ui: &mut Ui, world: &mut World, inventory: &Inventory, stack: ItemStack) {
+    let covered = inventory.count(stack.item) >= stack.count;
+    let ink = if covered { color::WARN } else { color::DANGER };
+    let icon = stack.item.get(world.resource::<Content>()).icon.clone();
+    egui::Frame::new()
+        .fill(ink.gamma_multiply(0.12))
+        .stroke(Stroke::new(1.0, ink.gamma_multiply(0.6)))
+        .corner_radius(CHIP_RADIUS)
+        .inner_margin(egui::Margin::symmetric(6, 1))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 3.0;
+                hud::icon(ui, world, &icon, CHIP_ICON);
+                ui.label(RichText::new(stack.count.to_string()).size(12.5).color(ink));
+            });
+        });
+}
+
+fn sell_hint(ui: &mut Ui, world: &mut World, selling: bool) {
+    if !selling {
+        return;
+    }
+    let hint = StyledLine::new(vec![
+        input(InputAction::SellItem),
+        TextPiece::text(" or "),
+        input(InputAction::CarryItem),
+        TextPiece::text(" from your bag to sell"),
+    ]);
+    let look = TextLook {
+        size: TextRole::Small.size(),
+        color: color::MUTED,
+    };
+    text::show(ui, world, &hint, look, None);
+}
+
 impl Shelf {
     fn wares(&self, content: &Content) -> Vec<Ware> {
         match self.tab {
@@ -391,266 +473,6 @@ fn wants_note(wants: &[String]) -> String {
         "Buys nothing".to_owned()
     } else {
         format!("Buys {}", wants.join(", "))
-    }
-}
-
-fn sell_hint(selling: bool) -> impl Scene {
-    let ink = ui::theme::theme().surface_floating.on;
-    let pieces = if selling {
-        vec![
-            input(InputAction::SellItem),
-            ui::RichPiece::text(" or "),
-            input(InputAction::CarryItem),
-            ui::RichPiece::text(" from your bag to sell"),
-        ]
-    } else {
-        Vec::new()
-    };
-    ui::rich_text(
-        ui::RichText {
-            pieces,
-            size: typography::CAPTION.font_size,
-            color: ink.with_alpha(0.6),
-        },
-        false,
-    )
-}
-
-fn empty_note(tab: ShopTab) -> impl Scene {
-    let ink = ui::theme::theme().surface_floating.on;
-    let note = match tab {
-        ShopTab::Wares => "Nothing for sale",
-        ShopTab::Buyback => "Nothing sold here yet",
-    };
-    bsn! {
-        Node { padding: {UiRect::all(Val::Px(spacing::XL))} }
-        Children [ @{ui::styled_text(note, ink.with_alpha(0.6), typography::CAPTION)} ]
-    }
-}
-
-fn tab_button(tab: ShopTab, label: String, active: bool) -> impl Scene {
-    let intent = if active {
-        ui::button::intent::PRIMARY
-    } else {
-        ui::button::intent::SECONDARY
-    };
-    bsn! {
-        @{ui::button_styled(intent, ui::ButtonSize::Sm, label)}
-        on(move |_: On<ui::Activate>, mut commands: Commands| {
-            commands.queue(move |world: &mut World| select(world, tab, 0));
-        })
-    }
-}
-
-fn row(
-    content: &Content,
-    assets: &AssetServer,
-    shelf: &Shelf,
-    ware: &Ware,
-    index: usize,
-    selected: bool,
-) -> Box<dyn Scene> {
-    let ink = ui::theme::theme().surface_floating.on;
-    let def = ware.item.get(content);
-    let name = counted(&def.name, ware.count);
-    let note = unavailable(ware)
-        .map(|reason| (reason, palette::CRIMSON_80))
-        .or_else(|| ware.note.clone().map(|note| (note, ink.with_alpha(0.6))));
-    let note: Vec<Box<dyn Scene>> = note
-        .into_iter()
-        .map(|(note, color)| -> Box<dyn Scene> {
-            Box::new(ui::styled_text(note, color, typography::CAPTION))
-        })
-        .collect();
-    let chips: Vec<Box<dyn Scene>> = ware
-        .price
-        .iter()
-        .map(|stack| -> Box<dyn Scene> {
-            Box::new(price_chip(content, assets, &shelf.inventory, *stack))
-        })
-        .collect();
-    let background = if selected {
-        ui::theme::theme().surface_inset.base
-    } else {
-        Color::NONE
-    };
-    let tab = shelf.tab;
-    Box::new(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            column_gap: Val::Px({spacing::L}),
-            padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))},
-        }
-        BackgroundColor({background})
-        Pickable { should_block_lower: true, is_hoverable: true }
-        ui::CursorStyle::Pointer
-        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
-            if input.clicked(InputAction::Select, &click) {
-                commands.queue(move |world: &mut World| select(world, tab, index));
-            }
-        })
-        Children [
-            Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-            ImageNode { image: {assets.load(def.icon.path())} }
-            Pickable::IGNORE
-            --
-            Node { flex_direction: FlexDirection::Column, flex_grow: 1.0 }
-            Pickable::IGNORE
-            Children [
-                @{ui::styled_text(name, ink, typography::LABEL)}
-                --
-                {note}
-            ]
-            --
-            Node { flex_direction: FlexDirection::Column, align_items: AlignItems::End, row_gap: Val::Px({spacing::S}) }
-            Pickable::IGNORE
-            Children [ {chips} ]
-        ]
-    })
-}
-
-fn detail(world: &World, shelf: &Shelf, ware: &Ware, index: usize) -> impl Scene + use<> {
-    let content = world.resource::<Content>();
-    let assets = world.resource::<AssetServer>();
-    let family = ui::theme::theme().surface_floating;
-    let ink = family.on;
-    let costs: Vec<Box<dyn Scene>> = ware
-        .price
-        .iter()
-        .map(|stack| -> Box<dyn Scene> {
-            Box::new(cost_row(content, assets, &shelf.inventory, *stack))
-        })
-        .collect();
-    let notes: Vec<Box<dyn Scene>> = ware
-        .note
-        .iter()
-        .map(|note| (note.clone(), ink.with_alpha(0.7)))
-        .chain(unavailable(ware).map(|reason| (reason, palette::CRIMSON_80)))
-        .map(|(note, color)| -> Box<dyn Scene> {
-            Box::new(ui::styled_text(note, color, typography::CAPTION))
-        })
-        .collect();
-    let action: Vec<Box<dyn Scene>> = shelf
-        .playing
-        .then(|| -> Box<dyn Scene> { Box::new(trade_button(shelf.tab, ware, index)) })
-        .into_iter()
-        .collect();
-    let price = match ware.count {
-        1 => "Price".to_owned(),
-        count => format!("Price for {count}"),
-    };
-    let sheet = card::sheet(world, ware.item);
-    bsn! {
-        Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0), height: Val::Percent(100.0) }
-        Children [
-            Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
-            Children [
-                @{ui::scrolled(Box::new(bsn! {
-                    Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-                    Children [ @{sheet} ]
-                }))}
-            ]
-            --
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px({spacing::M}),
-                padding: {UiRect::all(Val::Px(spacing::XL))},
-                border: {UiRect::top(Val::Px(1.0))},
-            }
-            BorderColor::all(family.border)
-            Children [
-                @{ui::styled_text(price, ink.with_alpha(0.6), typography::LABEL)}
-                --
-                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {costs} ]
-                --
-                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {notes} ]
-                --
-                {action}
-            ]
-        ]
-    }
-}
-
-fn trade_button(tab: ShopTab, ware: &Ware, index: usize) -> impl Scene + use<> {
-    let (intent, label) = match (&ware.refusal, tab) {
-        (Some(WareRefusal::Unaffordable(_)), _) => {
-            (ui::button::intent::DANGER, "Can't afford".to_owned())
-        }
-        (Some(WareRefusal::Unavailable(_)), _) => {
-            (ui::button::intent::MUTED, "Unavailable".to_owned())
-        }
-        (None, ShopTab::Wares) => (ui::button::intent::PRIMARY, "Buy".to_owned()),
-        (None, ShopTab::Buyback) => (ui::button::intent::PRIMARY, "Buy back".to_owned()),
-    };
-    bsn! {
-        @{ui::button_styled(intent, ui::ButtonSize::Md, label)}
-        on(move |_: On<ui::Activate>, mut commands: Commands| {
-            commands.queue(move |world: &mut World| trade(world, tab, index));
-        })
-    }
-}
-
-fn trade(world: &mut World, tab: ShopTab, index: usize) {
-    if *world.resource::<ClientMode>() != ClientMode::Play {
-        return;
-    }
-    let index = index as u32;
-    match tab {
-        ShopTab::Wares => {
-            world.write_message(ShopRequest::Buy { offer: index });
-        }
-        ShopTab::Buyback => {
-            world.write_message(ShopRequest::Buyback { sale: index });
-        }
-    }
-    InterfaceSound::UiPick.play(world);
-}
-
-fn price_chip(
-    content: &Content,
-    assets: &AssetServer,
-    inventory: &Inventory,
-    stack: ItemStack,
-) -> impl Scene + use<> {
-    let covered = inventory.count(stack.item) >= stack.count;
-    ui::chip(ChipOptions {
-        label: stack.count.to_string(),
-        icon: Some(assets.load(stack.item.get(content).icon.path())),
-        family: Family::outline(if covered {
-            palette::AMBER_70
-        } else {
-            palette::CRIMSON_70
-        }),
-        inspect: None,
-    })
-}
-
-fn cost_row(
-    content: &Content,
-    assets: &AssetServer,
-    inventory: &Inventory,
-    stack: ItemStack,
-) -> impl Scene + use<> {
-    let have = inventory.count(stack.item);
-    let color = if have >= stack.count {
-        ui::theme::theme().surface_floating.on
-    } else {
-        palette::CRIMSON_80
-    };
-    let label = format!(
-        "{} {} · You have {have}",
-        stack.count,
-        stack.item.get(content).name
-    );
-    bsn! {
-        Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
-        Children [
-            Node { width: Val::Px(16.0), height: Val::Px(16.0) }
-            ImageNode { image: {assets.load(stack.item.get(content).icon.path())} }
-            --
-            @{ui::styled_text(label, color, typography::BODY)}
-        ]
     }
 }
 
@@ -725,23 +547,23 @@ fn request_sale(world: &mut World, slot: u32) {
 fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemStack], slot: u32) {
     let content = *world.resource::<Content>();
     let name = &stack.item.get(&content).name;
-    let dialog = ui::confirm_dialog(ConfirmOptions {
-        title: format!("Sell {name}?"),
-        body: vec![
-            format!(
-                "{} pays {}.",
-                shop.get(&content).title,
-                paid(&content, pays, stack.count)
-            ),
-            "You can buy it back for the same until you leave the game.".to_owned(),
-        ],
-        confirm: "Sell".to_owned(),
-        cancel: "Keep".to_owned(),
-        on_confirm: OnTap::new(move |world| sell(world, slot, stack)),
-        on_cancel: OnTap::new(|_| {}),
-        keep: InputAction::TakeDefault.into(),
-    });
-    spawn_ui(world, dialog);
+    hud::confirm(
+        world,
+        Confirm {
+            title: format!("Sell {name}?"),
+            body: vec![
+                format!(
+                    "{} pays {}.",
+                    shop.get(&content).title,
+                    paid(&content, pays, stack.count)
+                ),
+                "You can buy it back for the same until you leave the game.".to_owned(),
+            ],
+            confirm: "Sell".to_owned(),
+            cancel: "Keep".to_owned(),
+            on_confirm: Box::new(move |world| sell(world, slot, stack)),
+        },
+    );
 }
 
 fn sell(world: &mut World, slot: u32, stack: ItemStack) {

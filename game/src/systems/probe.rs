@@ -4,22 +4,19 @@ use bevy::diagnostic::FrameCount;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::{MouseButtonInput, MouseWheel};
-use bevy::input_focus::InputFocus;
-use bevy::picking::PickingSystems;
-use bevy::picking::events::PointerClick;
 use bevy::prelude::*;
-use bevy::text::EditableText;
-use bevy::ui::ComputedNode;
 use bevy::window::PrimaryWindow;
+use bevy_egui::{EguiOutput, EguiPostUpdateSet, PrimaryEguiContext};
 use serde::{Deserialize, Serialize};
 
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::Listener;
 use crate::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
 use crate::core::content::{Content, ContentScope, with_content};
+use crate::core::gui::{self, GuiContext, WorldLayers};
 use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
+use crate::core::render::tile_to_window;
 use crate::core::render::transition::ScreenTransitionPhase;
-use crate::core::render::{WorldOverlay, tile_to_window};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::model::ModelId;
@@ -30,13 +27,13 @@ use crate::systems::combat::{self, Attitude};
 use crate::systems::dialogue::stage;
 use crate::systems::history::widget::{self as history, HistoryBook};
 use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
+use crate::systems::hud;
 use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::interact;
-use crate::systems::item::card::ItemCardWindow;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
 use crate::systems::movement::Position;
-use crate::systems::notification::{NotificationRows, bubble, error, feed, intro, shown_rows};
+use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro};
 use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
@@ -53,7 +50,12 @@ pub trait ProbeChannel {
 pub fn install(app: &mut App, channel: impl ProbeChannel + 'static) {
     app.insert_non_send(Probe(Box::new(channel)))
         .init_resource::<ProbeInputSeen>()
-        .add_systems(PreUpdate, count_input.after(PickingSystems::Last))
+        .init_resource::<DrawnUi>()
+        .add_systems(PreUpdate, (count_input, read_accessibly))
+        .add_systems(
+            PostUpdate,
+            (copy_drawn_ui, count_clicks).after(EguiPostUpdateSet::ProcessOutput),
+        )
         .add_systems(Last, publish);
 }
 
@@ -187,6 +189,8 @@ pub struct ProbeUiElement {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProbeStage {
     pub node: String,
+    /// The dialogue box as last drawn.
+    pub rect: Option<Rect<WindowPx>>,
     pub with: Option<Entity>,
     pub line: usize,
     pub lines: usize,
@@ -326,10 +330,13 @@ pub struct ProbeVoice {
 
 struct Probe(Box<dyn ProbeChannel>);
 
+/// The interface as egui's accessibility tree described it on the last frame drawn.
+#[derive(Resource, Default)]
+struct DrawnUi(Option<accesskit::TreeUpdate>);
+
 fn count_input(
     mut seen: ResMut<ProbeInputSeen>,
     mut buttons: MessageReader<MouseButtonInput>,
-    mut clicks: MessageReader<PointerClick>,
     mut wheels: MessageReader<MouseWheel>,
     mut keys: MessageReader<KeyboardInput>,
 ) {
@@ -339,14 +346,59 @@ fn count_input(
             ButtonState::Released => seen.mouse_releases += 1,
         }
     }
-    if let Some(run) = clicks.read().map(|click| click.count).max() {
-        seen.click_run = run;
-    }
     seen.wheel_turns += wheels.read().count() as u32;
     for key in keys.read() {
         if key.state == ButtonState::Pressed && !key.repeat {
             seen.key_presses += 1;
         }
+    }
+}
+
+// Players never pay for the accessibility tree; only a client the driver watches turns it on.
+fn read_accessibly(gui: Option<Res<GuiContext>>) {
+    if let Some(gui) = gui
+        && gui.is_added()
+    {
+        gui.0.enable_accesskit();
+    }
+}
+
+fn copy_drawn_ui(
+    outputs: Query<&EguiOutput, With<PrimaryEguiContext>>,
+    mut drawn: ResMut<DrawnUi>,
+) {
+    if let Some(update) = outputs
+        .iter()
+        .find_map(|output| output.platform_output.accesskit_update.clone())
+    {
+        drawn.0 = Some(update);
+    }
+}
+
+fn count_clicks(gui: Option<Res<GuiContext>>, mut seen: ResMut<ProbeInputSeen>) {
+    let Some(gui) = gui else {
+        return;
+    };
+    let run = gui.0.input(|input| {
+        let pointer = &input.pointer;
+        let primary = egui::PointerButton::Primary;
+        if pointer.button_triple_clicked(primary) {
+            Some(3)
+        } else if pointer.button_double_clicked(primary) {
+            Some(2)
+        } else {
+            [
+                primary,
+                egui::PointerButton::Secondary,
+                egui::PointerButton::Middle,
+            ]
+            .into_iter()
+            .any(|button| pointer.button_clicked(button))
+            .then_some(1)
+        }
+    });
+    if let Some(run) = run {
+        seen.click_run = run;
     }
 }
 
@@ -371,7 +423,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         .and_then(|seen| world.get::<AreaTag>(seen))
         .map(|tag| tag.area);
     let view = view(world);
-    let rows = choice_rows(world);
+    let rows = stage::choice_rects(world);
     let input_map = world.resource::<InputMap>().clone();
     let history_tab = history::shown_tab(world);
     let window = world
@@ -394,6 +446,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         claim: gestures::claim(world),
         stage: stage::view(world).map(|view| ProbeStage {
             node: view.node,
+            rect: stage::dialogue_rect(world).map(window_rect),
             with: view.with,
             line: view.line,
             lines: view.lines,
@@ -407,7 +460,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 .map(|(index, choice)| ProbeChoice {
                     label: choice.label,
                     locked: choice.locked,
-                    rect: rows.get(&index).copied(),
+                    rect: rows.get(&index).copied().map(window_rect),
                 })
                 .collect(),
         }),
@@ -423,17 +476,10 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 .map(|record| record_line(record, &input_map))
                 .collect(),
         },
-        item_card: world
-            .query::<(Entity, &ItemCardWindow)>()
-            .iter(world)
-            .next()
-            .map(|(entity, card)| (entity, card.item))
-            .and_then(|(entity, item)| {
-                Some(ProbeItemCard {
-                    item,
-                    rect: ui::node_rect(world, entity).map(window_rect)?,
-                })
-            }),
+        item_card: item::card::shown(world).map(|(item, rect)| ProbeItemCard {
+            item,
+            rect: window_rect(rect),
+        }),
         shop: shop::counter::view(world).map(|shown| ProbeShop {
             shop: shown.shop,
             offers: shown
@@ -760,90 +806,98 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
     exits
 }
 
+/// What the interface shows that a player can read or work: text, images, fields and controls,
+/// less what is scrolled or clipped out of sight.
 fn ui(world: &mut World) -> Vec<ProbeUiElement> {
-    let spans: HashMap<Entity, String> = world
-        .query::<(Entity, &TextSpan)>()
-        .iter(world)
-        .map(|(entity, span)| (entity, span.0.clone()))
-        .collect();
-    let focused = world.get_resource::<InputFocus>().and_then(InputFocus::get);
-    let mut nodes = world.query::<(
-        Entity,
-        &ComputedNode,
-        &InheritedVisibility,
-        Option<&Text>,
-        Option<&ui::RichText>,
-        Option<&Children>,
-        Option<&ImageNode>,
-        Option<&EditableText>,
-        Has<ui::SliderThumb>,
-        &UiGlobalTransform,
-        Option<&CalculatedClip>,
-    )>();
-    let assets = world.resource::<AssetServer>();
-    let catalog = world.resource::<ui::InputCatalog>();
-    nodes
-        .iter(world)
-        .filter(|(entity, node, visibility, .., at, clip)| {
-            visibility.get()
-                && node.size().min_element() > 0.0
-                && !leaving(world, *entity)
-                && clip.is_none_or(|clip| clip.contains_point(at.translation))
+    let Some(gui) = gui::context(world) else {
+        return Vec::new();
+    };
+    let Some(tree) = world.resource::<DrawnUi>().0.as_ref() else {
+        return Vec::new();
+    };
+    let drawn: HashMap<u64, egui::WidgetRect> = gui.viewport(|viewport| {
+        viewport
+            .prev_pass
+            .widgets
+            .layers()
+            .flat_map(|(_, widgets)| widgets.iter())
+            .map(|widget| (widget.id.value(), *widget))
+            .collect()
+    });
+    let world_layers = world.resource::<WorldLayers>();
+    let titles = hud::window_titles(world)
+        .into_iter()
+        .map(|title| ProbeUiElement {
+            text: Some(title.title),
+            image: None,
+            editable: false,
+            focused: false,
+            click_through: false,
+            in_world: false,
+            slider: None,
+            rect: window_rect(title.rect),
+        });
+    tree.nodes
+        .iter()
+        .filter(|(_, node)| shown_role(node.role()))
+        .filter_map(|(id, node)| {
+            let widget = drawn.get(&id.0)?;
+            let bounds = node.bounds()?;
+            let rect = egui::Rect::from_min_max(
+                egui::pos2(bounds.x0 as f32, bounds.y0 as f32),
+                egui::pos2(bounds.x1 as f32, bounds.y1 as f32),
+            );
+            if rect.width() <= 0.0
+                || rect.height() <= 0.0
+                || !widget.interact_rect.contains(rect.center())
+            {
+                return None;
+            }
+            let role = node.role();
+            let image = (role == accesskit::Role::Image)
+                .then(|| node.label().map(str::to_owned))
+                .flatten();
+            let text = (role != accesskit::Role::Image)
+                .then(|| node.label().or(node.value()).map(str::to_owned))
+                .flatten()
+                .filter(|text| !text.is_empty());
+            let slider = (role == accesskit::Role::Slider)
+                .then(|| node.numeric_value())
+                .flatten()
+                .map(|value| value as f32);
+            let editable = role == accesskit::Role::TextInput;
+            if text.is_none() && image.is_none() && !editable && slider.is_none() {
+                return None;
+            }
+            Some(ProbeUiElement {
+                text,
+                image,
+                editable,
+                focused: tree.focus == *id,
+                click_through: gui.layer_id_at(rect.center()) != Some(widget.layer_id),
+                in_world: world_layers.contains(widget.layer_id),
+                slider,
+                rect: window_rect(rect),
+            })
         })
-        .filter_map(
-            |(entity, _, _, text, rich, children, image, field, thumb, ..)| {
-                let text = text
-                    .map(|text| {
-                        let spanned = children
-                            .into_iter()
-                            .flatten()
-                            .filter_map(|child| spans.get(child).map(String::as_str));
-                        std::iter::once(text.0.as_str()).chain(spanned).collect()
-                    })
-                    .or_else(|| rich.map(|rich| rich.plain(catalog)))
-                    .or_else(|| field.map(|field| field.value().to_string()))
-                    .filter(|text: &String| !text.is_empty());
-                let image = image
-                    .and_then(|image| assets.get_path(image.image.id()))
-                    .map(|path| path.to_string())
-                    .map(|path| {
-                        path.strip_prefix("assets/")
-                            .map_or(path.clone(), str::to_owned)
-                    });
-                let slider = thumb
-                    .then(|| {
-                        ui::self_and_ancestors(world, entity)
-                            .find_map(|up| world.get::<ui::SliderState>(up))
-                    })
-                    .flatten()
-                    .map(|state| state.value);
-                if text.is_none() && image.is_none() && field.is_none() && slider.is_none() {
-                    return None;
-                }
-                Some(ProbeUiElement {
-                    text,
-                    image,
-                    editable: field.is_some(),
-                    focused: focused == Some(entity),
-                    click_through: ui::clicks_through(world, entity),
-                    in_world: ui::self_and_ancestors(world, entity)
-                        .any(|up| world.get::<WorldOverlay>(up).is_some()),
-                    slider,
-                    rect: window_rect(ui::node_rect(world, entity)?),
-                })
-            },
-        )
+        .chain(titles)
         .collect()
 }
 
-fn choice_rows(world: &mut World) -> HashMap<usize, Rect<WindowPx>> {
-    world
-        .query::<(Entity, &ui::ChoiceRow)>()
-        .iter(world)
-        .filter_map(|(entity, row)| {
-            Some((row.index, ui::node_rect(world, entity).map(window_rect)?))
-        })
-        .collect()
+fn shown_role(role: accesskit::Role) -> bool {
+    use accesskit::Role;
+    matches!(
+        role,
+        Role::Label
+            | Role::Button
+            | Role::CheckBox
+            | Role::RadioButton
+            | Role::ComboBox
+            | Role::Slider
+            | Role::TextInput
+            | Role::Image
+            | Role::Link
+    )
 }
 
 fn notifications(world: &mut World) -> ProbeNotifications {
@@ -857,66 +911,41 @@ fn notifications(world: &mut World) -> ProbeNotifications {
             replaced: shown.replaced,
             lines: shown.lines,
             folded: shown.folded,
-            rect: shown
-                .drawn
-                .and_then(|drawn| ui::node_rect(world, drawn))
-                .map(window_rect),
+            rect: shown.rect.map(window_rect),
         })
         .collect();
-    let edge_folds = bubble::edge_folds(world)
-        .into_iter()
-        .filter_map(|fold| world.get::<ui::SpeechBubble>(fold))
-        .filter_map(|fold| fold.folded_speakers.map(|speakers| speakers.0))
-        .collect();
+    let edge_folds = bubble::edge_folds(world);
     ProbeNotifications {
         bubbles,
         edge_folds,
-        captions: shown_rows::<ui::Captions>(world),
-        alerts: shown_rows::<ui::AlertBar>(world),
+        captions: notification::captions(world),
+        alerts: notification::alerts(world),
         error: error::shown(world),
-        milestones: shown_rows::<ui::Milestones>(world),
+        milestones: notification::milestones(world),
         intro: intro::shown(world).map(|(title, text)| ProbeIntro { title, text }),
     }
 }
 
-fn leaving(world: &World, entity: Entity) -> bool {
-    ui::self_and_ancestors(world, entity).any(|up| world.get::<ui::Leaving>(up).is_some())
-}
-
-fn window_rect(rect: bevy::math::Rect) -> Rect<WindowPx> {
+fn window_rect(rect: egui::Rect) -> Rect<WindowPx> {
     Rect::new(
         Pos::new(rect.min.x, rect.min.y),
         Size::new(rect.width(), rect.height()),
     )
 }
 
+/// Where the interface takes the pointer from the world: every area drawn that takes clicks.
 fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
-    let blocking: HashMap<Entity, Rect<WindowPx>> = world
-        .query::<(
-            Entity,
-            &ComputedNode,
-            &InheritedVisibility,
-            Option<&Pickable>,
-        )>()
-        .iter(world)
-        .filter(|(entity, node, visibility, pickable)| {
-            visibility.get()
-                && node.size().min_element() > 0.0
-                && pickable.is_none_or(|pickable| pickable.is_hoverable)
-                && !leaving(world, *entity)
-        })
-        .map(|(entity, ..)| entity)
-        .collect::<Vec<_>>()
+    let Some(gui) = gui::context(world) else {
+        return Vec::new();
+    };
+    let layers: Vec<egui::LayerId> =
+        gui.memory(|memory| memory.areas().visible_layer_ids().into_iter().collect());
+    layers
         .into_iter()
-        .filter_map(|entity| Some((entity, window_rect(ui::node_rect(world, entity)?))))
-        .collect();
-    blocking
-        .iter()
-        .filter(|&(&entity, _)| {
-            ui::self_and_ancestors(world, entity)
-                .skip(1)
-                .all(|up| !blocking.contains_key(&up))
-        })
-        .map(|(_, rect)| *rect)
+        .filter_map(|layer| egui::AreaState::load(&gui, layer.id))
+        .filter(|area| area.interactable)
+        .map(|area| area.rect())
+        .filter(|rect| rect.width() > 0.0 && rect.height() > 0.0)
+        .map(window_rect)
         .collect()
 }

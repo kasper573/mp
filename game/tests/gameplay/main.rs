@@ -1,4 +1,6 @@
 mod conversation;
+mod stage;
+mod terminal;
 mod travel;
 
 use std::path::Path;

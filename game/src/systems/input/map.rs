@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 
 use bevy::ecs::system::SystemParam;
-use bevy::picking::events::PointerClick;
 use bevy::prelude::*;
-use schemars::JsonSchema;
+use bevy_egui::helpers::bevy_to_egui_physical_key;
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
-use ui::{
-    CatalogEntry, ClickGesture, DragGesture, InputCatalog, InputRef, KeyGesture, KeyModifiers,
-    RichPiece,
-};
 
 use crate::core::content::{Content, ContentRow, Fixture};
+use crate::core::text::{InputRef, KeyNames, TextPiece};
 
 #[derive(
     JsonSchema,
@@ -83,7 +80,7 @@ pub enum InputBinding {
     Key(KeyGesture),
     AnyKey,
     Mouse {
-        #[schemars(schema_with = "ui::mouse_button_schema")]
+        #[schemars(schema_with = "mouse_button_schema")]
         button: MouseButton,
         #[serde(flatten)]
         modifiers: KeyModifiers,
@@ -211,16 +208,42 @@ impl InputMap {
         })
     }
 
+    /// Whether egui saw this action's click on a widget, with the binding's keys held.
     pub fn clicked(
         &self,
         action: InputAction,
-        click: &PointerClick,
+        response: &egui::Response,
         keys: &ButtonInput<KeyCode>,
     ) -> bool {
         self.bindings(action).iter().any(|binding| match binding {
-            InputBinding::Click(gesture) => gesture.matches(click, keys),
+            InputBinding::Click(gesture) => gesture.clicked(response, keys),
             _ => false,
         })
+    }
+
+    pub fn drag_started(
+        &self,
+        action: InputAction,
+        response: &egui::Response,
+        keys: &ButtonInput<KeyCode>,
+    ) -> bool {
+        self.bindings(action).iter().any(|binding| match binding {
+            InputBinding::Drag(gesture) => gesture.started(response, keys),
+            _ => false,
+        })
+    }
+
+    /// The action's first key binding, as egui names it.
+    pub fn shortcut(&self, action: InputAction) -> Option<egui::KeyboardShortcut> {
+        self.bindings(action)
+            .iter()
+            .find_map(|binding| match binding {
+                InputBinding::Key(gesture) => Some(egui::KeyboardShortcut::new(
+                    gesture.modifiers.egui(),
+                    bevy_to_egui_physical_key(&gesture.key)?,
+                )),
+                _ => None,
+            })
     }
 
     pub fn just_pressed_index(
@@ -234,38 +257,11 @@ impl InputMap {
             .position(|action| self.just_pressed(*action, keys, mouse))
     }
 
-    fn catalog(&self) -> InputCatalog {
-        InputCatalog(
+    fn key_names(&self) -> KeyNames {
+        KeyNames(
             InputAction::VARIANTS
                 .iter()
-                .map(|&action| {
-                    let bindings = self.bindings(action);
-                    let entry = CatalogEntry {
-                        name: self.name(action).unwrap_or_default(),
-                        keys: bindings
-                            .iter()
-                            .filter_map(|binding| match binding {
-                                InputBinding::Key(gesture) => Some(*gesture),
-                                _ => None,
-                            })
-                            .collect(),
-                        clicks: bindings
-                            .iter()
-                            .filter_map(|binding| match binding {
-                                InputBinding::Click(gesture) => Some(*gesture),
-                                _ => None,
-                            })
-                            .collect(),
-                        drags: bindings
-                            .iter()
-                            .filter_map(|binding| match binding {
-                                InputBinding::Drag(gesture) => Some(*gesture),
-                                _ => None,
-                            })
-                            .collect(),
-                    };
-                    (action.into(), entry)
-                })
+                .map(|&action| (action.into(), self.name(action).unwrap_or_default()))
                 .collect(),
         )
     }
@@ -283,8 +279,8 @@ impl ActionInput<'_> {
         self.map.just_pressed(action, &self.keys, &self.mouse)
     }
 
-    pub fn clicked(&self, action: InputAction, click: &PointerClick) -> bool {
-        self.map.clicked(action, click, &self.keys)
+    pub fn clicked(&self, action: InputAction, response: &egui::Response) -> bool {
+        self.map.clicked(action, response, &self.keys)
     }
 }
 
@@ -312,8 +308,26 @@ pub fn pressed(world: &World, action: InputAction) -> bool {
     )
 }
 
-pub fn input(action: InputAction) -> RichPiece {
-    RichPiece::Input(action.into())
+pub fn clicked(world: &World, action: InputAction, response: &egui::Response) -> bool {
+    world
+        .resource::<InputMap>()
+        .clicked(action, response, world.resource::<ButtonInput<KeyCode>>())
+}
+
+pub fn drag_started(world: &World, action: InputAction, response: &egui::Response) -> bool {
+    world.resource::<InputMap>().drag_started(
+        action,
+        response,
+        world.resource::<ButtonInput<KeyCode>>(),
+    )
+}
+
+pub fn shortcut(world: &World, action: InputAction) -> Option<egui::KeyboardShortcut> {
+    world.resource::<InputMap>().shortcut(action)
+}
+
+pub fn input(action: InputAction) -> TextPiece {
+    TextPiece::Key(action.into())
 }
 
 impl From<InputAction> for InputRef {
@@ -329,8 +343,135 @@ pub(super) fn plugin(app: &mut App) {
     );
 }
 
-fn publish(map: Res<InputMap>, mut catalog: ResMut<InputCatalog>) {
-    *catalog = map.catalog();
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct KeyGesture {
+    #[schemars(schema_with = "key_code_schema")]
+    pub key: KeyCode,
+    #[serde(flatten)]
+    pub modifiers: KeyModifiers,
+}
+
+impl KeyGesture {
+    pub fn just_pressed(&self, keys: &ButtonInput<KeyCode>) -> bool {
+        keys.just_pressed(self.key) && KeyModifiers::held(keys) == self.modifiers
+    }
+
+    pub fn pressed(&self, keys: &ButtonInput<KeyCode>) -> bool {
+        keys.pressed(self.key) && KeyModifiers::held(keys) == self.modifiers
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct ClickGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
+    pub button: MouseButton,
+    pub times: u8,
+    #[serde(flatten)]
+    pub modifiers: KeyModifiers,
+}
+
+impl ClickGesture {
+    fn clicked(&self, response: &egui::Response, keys: &ButtonInput<KeyCode>) -> bool {
+        let Some(button) = pointer_button(self.button) else {
+            return false;
+        };
+        let clicked = match self.times {
+            0 | 1 => response.clicked_by(button),
+            2 => response.double_clicked_by(button),
+            _ => response.triple_clicked_by(button),
+        };
+        clicked && KeyModifiers::held(keys) == self.modifiers
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct DragGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
+    pub button: MouseButton,
+    #[serde(flatten)]
+    pub modifiers: KeyModifiers,
+}
+
+impl DragGesture {
+    fn started(&self, response: &egui::Response, keys: &ButtonInput<KeyCode>) -> bool {
+        pointer_button(self.button).is_some_and(|button| response.drag_started_by(button))
+            && KeyModifiers::held(keys) == self.modifiers
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct KeyModifiers {
+    #[serde(skip_serializing_if = "is_false")]
+    pub ctrl: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub shift: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub alt: bool,
+    #[serde(skip_serializing_if = "is_false")]
+    pub super_key: bool,
+}
+
+impl KeyModifiers {
+    pub const NONE: KeyModifiers = KeyModifiers {
+        ctrl: false,
+        shift: false,
+        alt: false,
+        super_key: false,
+    };
+
+    pub const fn and(self, other: KeyModifiers) -> KeyModifiers {
+        KeyModifiers {
+            ctrl: self.ctrl || other.ctrl,
+            shift: self.shift || other.shift,
+            alt: self.alt || other.alt,
+            super_key: self.super_key || other.super_key,
+        }
+    }
+
+    pub fn held(keys: &ButtonInput<KeyCode>) -> KeyModifiers {
+        KeyModifiers {
+            ctrl: keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]),
+            shift: keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]),
+            alt: keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]),
+            super_key: keys.any_pressed([KeyCode::SuperLeft, KeyCode::SuperRight]),
+        }
+    }
+
+    fn egui(self) -> egui::Modifiers {
+        egui::Modifiers {
+            alt: self.alt,
+            ctrl: self.ctrl,
+            shift: self.shift,
+            mac_cmd: self.super_key,
+            command: self.ctrl,
+        }
+    }
+}
+
+pub fn key_code_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::keyboard::KeyCode", "type": ["string", "object"] })
+}
+
+pub fn mouse_button_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::mouse::MouseButton", "type": ["string", "object"] })
+}
+
+fn publish(map: Res<InputMap>, mut names: ResMut<KeyNames>) {
+    *names = map.key_names();
+}
+
+fn is_false(flag: &bool) -> bool {
+    !*flag
+}
+
+fn pointer_button(button: MouseButton) -> Option<egui::PointerButton> {
+    match button {
+        MouseButton::Left => Some(egui::PointerButton::Primary),
+        MouseButton::Right => Some(egui::PointerButton::Secondary),
+        MouseButton::Middle => Some(egui::PointerButton::Middle),
+        _ => None,
+    }
 }
 
 fn held_prefix(modifiers: KeyModifiers) -> String {

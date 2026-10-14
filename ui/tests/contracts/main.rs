@@ -1,1 +1,0 @@
-mod rich_text;

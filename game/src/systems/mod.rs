@@ -319,7 +319,8 @@ pub fn client_app(
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
-            ui::UiPlugin,
+            crate::core::gui::GuiPlugin,
+            crate::core::text::TextPlugin,
             crate::core::net::transport::SocketClientPlugin,
             crate::core::interpolate::SnapshotPlugin {
                 period: REPLICATION_PERIOD,
@@ -354,7 +355,6 @@ pub fn client_app(
             spectate::widget::SpectatorPlugin,
             terminal::TerminalPlugin,
         ));
-    ui::theme::set_theme(ui::themes::dark::THEME);
     app
 }
 
@@ -413,7 +413,9 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     world.insert_resource(content.built::<quest::Parties>().clone());
     world.insert_resource(content.built::<script::RiftScripts>().clone());
     world.insert_resource(content.built::<GameSettings>().clone());
-    world.insert_resource(ui::FontFiles(interface::font_files(&content)));
+    if let Some(fonts) = interface::theme_fonts(&content, &synced.assets) {
+        world.insert_resource(crate::core::gui::GuiFonts(fonts));
+    }
     world.insert_resource(input::map::InputMap::new(&content));
     world.insert_resource(content);
     world.insert_resource(synced);

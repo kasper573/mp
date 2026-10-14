@@ -6,6 +6,7 @@ pub mod mode;
 use bevy::prelude::*;
 use renet2::RenetClient;
 
+use crate::core::gui::Band;
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
@@ -93,21 +94,39 @@ fn announce(world: &mut World) {
     world.remove_resource::<Announce>();
 }
 
-pub(crate) fn screen_node() -> Node {
-    Node {
-        position_type: PositionType::Absolute,
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        flex_direction: FlexDirection::Column,
-        align_items: AlignItems::Center,
-        justify_content: JustifyContent::Center,
-        row_gap: Val::Px(16.0),
-        ..default()
+/// A screen of the system's own between play: centred above everything but modals, over a
+/// backdrop that hides the world when there is one.
+pub(crate) fn system_screen<R>(
+    gui: &egui::Context,
+    id: &str,
+    backdrop: Option<egui::Color32>,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let shown = egui::Area::new(egui::Id::new(("screen", id)))
+        .order(Band::System.order())
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(gui, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.spacing_mut().item_spacing.y = 16.0;
+                add(ui)
+            })
+            .inner
+        });
+    let content = shown.response.layer_id;
+    match backdrop {
+        Some(fill) => {
+            let behind = egui::Area::new(egui::Id::new(("backdrop", id)))
+                .order(Band::System.order())
+                .fixed_pos(egui::Pos2::ZERO)
+                .show(gui, |ui| {
+                    let screen = ui.ctx().content_rect();
+                    ui.painter().rect_filled(screen, 0.0, fill);
+                    ui.allocate_rect(screen, egui::Sense::click());
+                });
+            gui.move_to_top(behind.response.layer_id);
+            gui.set_sublayer(behind.response.layer_id, content);
+        }
+        None => gui.move_to_top(content),
     }
-}
-
-pub(crate) fn despawn_all<M: Component>(entities: Query<Entity, With<M>>, mut commands: Commands) {
-    for entity in &entities {
-        commands.entity(entity).despawn();
-    }
+    shown
 }

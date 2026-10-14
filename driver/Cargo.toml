@@ -6,7 +6,6 @@ description = "Plays the game as a player would: a native game server, and deskt
 
 [dependencies]
 game = { path = "../game" }
-ui = { path = "../ui" }
 bevy_ecs.workspace = true
 bevy_input.workspace = true
 serde.workspace = true

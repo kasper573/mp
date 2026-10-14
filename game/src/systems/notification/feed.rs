@@ -1,16 +1,18 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use ui::RichText;
-use ui::tokens::{palette, spacing, typography};
+use egui::emath::{TSTransform, easing};
+use egui::{Align, Color32, Id, Layout, Pos2, Rect, Stroke, Vec2};
 
+use super::rows::{self, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD};
+use crate::core::gui::{self, Band};
+use crate::core::text::{self, StyledLine};
 use crate::core::time::Seconds;
 use crate::systems::dialogue::stage;
 use crate::systems::history::RecordTally;
 use crate::systems::history::widget::tallied;
-use crate::systems::hud::spawn_ui;
-use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::screen::ClientScreen;
 
 const READING_MIN: Seconds = Seconds(3.0);
 const READING_MAX: Seconds = Seconds(6.0);
@@ -18,120 +20,236 @@ const EDGE: f32 = 24.0;
 const WIDEST: f32 = 320.0;
 const NARROWEST: f32 = 140.0;
 const ICON: f32 = 16.0;
-const MORE_PRESENCE: ui::Presence = ui::Presence::new(
-    ui::PresenceMove::new(
-        ui::Transform2d::new(Vec2::new(16.0, 0.0), 0.96),
-        ui::Timing::new(260, ui::Easing::Standard),
-    ),
-    ui::PresenceMove::new(
-        ui::Transform2d::new(Vec2::new(16.0, 0.0), 0.96),
-        ui::Timing::new(160, ui::Easing::StandardAccelerate),
-    ),
-)
-.hidden();
+const SIZE: f32 = 12.0;
+const GAP: f32 = 4.0;
+const PADDING: Vec2 = Vec2::new(8.0, 2.0);
+const BORDER: f32 = 1.0;
+const SHOWN: usize = 3;
+const HELD: usize = 8;
+const BUMP_SCALE: f32 = 1.08;
+const BUMP_SECONDS: f64 = 0.25;
+const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
+const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
+const SLATE_50: Color32 = Color32::from_rgb(73, 74, 80);
+const CRIMSON_70: Color32 = Color32::from_rgb(221, 84, 80);
+const TOAST_PRESENCE: Presence = Presence {
+    enter: Move::new(Vec2::new(24.0, 0.0), 1.0, 0.25),
+    exit: Move::new(Vec2::new(18.0, 0.0), 0.96, 0.2),
+};
+const MORE_PRESENCE: Presence = Presence {
+    enter: Move::new(Vec2::new(16.0, 0.0), 0.96, 0.26),
+    exit: Move::new(Vec2::new(16.0, 0.0), 0.96, 0.16),
+};
 
 pub struct FeedPlugin;
 
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(ClientScreen::Area), spawn_feed)
-            .add_systems(OnExit(ClientScreen::Area), despawn_all::<FeedRoot>)
+        app.init_resource::<Feed>()
+            .add_systems(Update, age.run_if(in_state(ClientScreen::Area)))
             .add_systems(
-                Update,
-                (count_more, fit_beside_box).run_if(in_state(ClientScreen::Area)),
-            );
+                bevy_egui::EguiPrimaryContextPass,
+                draw.in_set(Band::Notices)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
 pub fn show(world: &mut World, notification_sent: NotificationSent) {
-    let Some(toaster) = world
-        .query_filtered::<Entity, With<FeedToaster>>()
-        .iter(world)
-        .next()
-    else {
+    let notification = notification_sent.notification;
+    let mut feed = world.resource_mut::<Feed>();
+    let merge = feed.toasts.iter().enumerate().find_map(|(index, shown)| {
+        merged(&shown.notification, &notification).map(|merged| (index, merged))
+    });
+    if let Some((index, merged)) = merge {
+        let mut toast = feed.toasts.remove(index);
+        toast.notification = merged;
+        toast.age = Duration::ZERO;
+        toast.bumped = true;
+        feed.toasts.push(toast);
         return;
-    };
-    show_in(world, toaster, notification_sent.notification);
-}
-
-pub fn rows(world: &mut World) -> Vec<String> {
-    let mut rows: Vec<(Entity, String)> = world
-        .query::<(Entity, &FeedRow, &ui::Toast)>()
-        .iter(world)
-        .filter(|(_, _, toast)| !toast.leaving)
-        .map(|(entity, row, _)| (entity, label(&row.0)))
-        .collect();
-    let order: Vec<Entity> = world
-        .query_filtered::<&Children, With<FeedToaster>>()
-        .iter(world)
-        .flat_map(|children| children.iter().collect::<Vec<_>>())
-        .collect();
-    rows.sort_by_key(|(entity, _)| order.iter().position(|kid| kid == entity));
-    rows.into_iter().map(|(_, label)| label).collect()
-}
-
-#[derive(Component, Default, Clone)]
-struct FeedRoot;
-
-#[derive(Component, Default, Clone)]
-struct FeedToaster;
-
-#[derive(Component, Default, Clone)]
-struct MoreChip;
-
-#[derive(Component, Clone)]
-struct FeedRow(Notification);
-
-fn spawn_feed(mut commands: Commands) {
-    commands.spawn_scene(bsn! {
-        FeedRoot
-        Node { position_type: PositionType::Absolute, width: Val::Percent(100.0), height: Val::Percent(100.0) }
-        Pickable::IGNORE
-        GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
-        Children [
-            @{ui::compact_toaster(WIDEST)}
-            FeedToaster
-            Children [ @{more_chip()} ]
-        ]
+    }
+    feed.keys += 1;
+    let key = feed.keys;
+    feed.toasts.push(FeedToast {
+        key,
+        lasts: Duration::from_secs_f32(reading_time(&notification).0),
+        notification,
+        age: Duration::ZERO,
+        bumped: false,
+        bumped_at: None,
     });
 }
 
-fn show_in(world: &mut World, toaster: Entity, notification: Notification) {
-    let alive: Vec<(Entity, Notification)> = world
-        .query::<(Entity, &FeedRow, &ui::Toast)>()
-        .iter(world)
-        .filter(|(_, _, toast)| !toast.leaving)
-        .map(|(entity, row, _)| (entity, row.0.clone()))
-        .collect();
-    let merge = alive
-        .into_iter()
-        .find_map(|(entity, shown)| merged(&shown, &notification).map(|merged| (entity, merged)));
-    if let Some((row, merged)) = merge {
-        world.entity_mut(row).despawn_related::<Children>();
-        world.entity_mut(row).insert(FeedRow(merged.clone()));
-        let assets = world.resource::<AssetServer>().clone();
-        spawn_ui(world, content(&assets, &merged)).insert(ChildOf(row));
-        ui::bump_toast(world, row);
+pub fn rows(world: &World) -> Vec<String> {
+    world
+        .resource::<Feed>()
+        .toasts
+        .iter()
+        .map(|toast| label(&toast.notification))
+        .collect()
+}
+
+#[derive(Resource, Default)]
+struct Feed {
+    toasts: Vec<FeedToast>,
+    fades: Fades<FeedToast>,
+    more: Fades<u32>,
+    drawn: Vec<Rect>,
+    keys: u64,
+}
+
+#[derive(Clone)]
+struct FeedToast {
+    key: u64,
+    notification: Notification,
+    age: Duration,
+    lasts: Duration,
+    bumped: bool,
+    bumped_at: Option<f64>,
+}
+
+fn forget(mut feed: ResMut<Feed>) {
+    *feed = Feed::default();
+}
+
+fn age(world: &mut World) {
+    let expanded = rows::hovered(world, &world.resource::<Feed>().drawn);
+    if expanded {
         return;
     }
-    let lasts = Duration::from_secs_f32(reading_time(&notification).0);
-    let failure = matches!(
-        notification.kind,
-        NotificationKind::Feed { failure: true, .. }
+    let delta = world.resource::<Time>().delta();
+    let mut feed = world.resource_mut::<Feed>();
+    for toast in &mut feed.toasts {
+        toast.age += delta;
+    }
+    feed.toasts.retain(|toast| toast.age < toast.lasts);
+}
+
+// Newest at the bottom right, older ones stacked above it, and a count of what doesn't fit on top.
+fn draw(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let (now, still) = rows::clock(world, &gui);
+    let screen = gui.content_rect();
+    let room = stage::box_right(world).map_or(WIDEST, |right| {
+        (screen.width() - right - 2.0 * EDGE).clamp(NARROWEST, WIDEST)
+    });
+    let expanded = rows::hovered(world, &world.resource::<Feed>().drawn);
+    let limit = if expanded { HELD } else { SHOWN };
+    let mut feed = world.resource_mut::<Feed>();
+    for toast in &mut feed.toasts {
+        if std::mem::take(&mut toast.bumped) {
+            toast.bumped_at = Some(now);
+        }
+    }
+    let overflow = feed.toasts.len().saturating_sub(limit);
+    let order: Vec<u64> = feed.toasts.iter().map(|toast| toast.key).collect();
+    let current: Vec<(u64, FeedToast)> = feed
+        .toasts
+        .iter()
+        .skip(overflow)
+        .map(|toast| (toast.key, toast.clone()))
+        .collect();
+    let mut toasts = feed.fades.sync(now, TOAST_PRESENCE, still, current);
+    toasts.sort_by_key(|(toast, _)| order.iter().position(|&key| key == toast.key));
+    let more = feed.more.sync(
+        now,
+        MORE_PRESENCE,
+        still,
+        (overflow > 0).then_some((0, overflow as u32)),
     );
-    let border = if failure {
-        palette::CRIMSON_70
-    } else {
-        ui::theme::theme().surface_elevated.border.with_alpha(0.6)
-    };
-    let body = content(world.resource::<AssetServer>(), &notification);
-    let row = bsn! {
-        @{ui::compact_toast(lasts)}
-        ~{FeedRow(notification.clone())}
-        BorderColor::all(border)
-        Children [ @{body} ]
-    };
-    spawn_ui(world, row).insert(ChildOf(toaster));
+    let mut bottom = screen.bottom() - EDGE;
+    let mut drawn = Vec::new();
+    for (
+        FeedToast {
+            key,
+            notification,
+            bumped_at,
+            ..
+        },
+        look,
+    ) in toasts.into_iter().rev()
+    {
+        let line = feed_line(&notification);
+        let icon = icon_of(&notification);
+        let chrome = 2.0 * (PADDING.x + BORDER) + if icon.is_some() { ICON + GAP } else { 0.0 };
+        let text_size = text::measure(
+            &gui,
+            world,
+            &line,
+            rows::look(SIZE, SLATE_90),
+            (room - chrome).max(0.0),
+        );
+        let size = Vec2::new(
+            chrome + text_size.x,
+            text_size.y.max(ICON) + 2.0 * (PADDING.y + BORDER),
+        );
+        let rect = Rect::from_min_size(
+            Pos2::new(screen.right() - EDGE - size.x, bottom - size.y),
+            size,
+        );
+        let icon = icon.and_then(|icon| gui::image_file(world, &icon));
+        let failure = matches!(
+            notification.kind,
+            NotificationKind::Feed { failure: true, .. }
+        );
+        let border = if failure {
+            CRIMSON_70
+        } else {
+            SLATE_50.gamma_multiply(0.6)
+        };
+        let shown = egui::Area::new(Id::new(("feed", key)))
+            .order(Band::Notices.order())
+            .interactable(false)
+            .fade_in(false)
+            .fixed_pos(rect.min)
+            .show(&gui, |ui| {
+                ui.multiply_opacity(look.opacity);
+                egui::Frame::new()
+                    .fill(SLATE_40.gamma_multiply(0.72))
+                    .stroke(Stroke::new(BORDER, border))
+                    .corner_radius(8.0)
+                    .inner_margin(egui::Margin::symmetric(PADDING.x as i8, PADDING.y as i8))
+                    .show(ui, |ui| {
+                        ui.set_width(size.x - 2.0 * (PADDING.x + BORDER));
+                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                            ui.spacing_mut().item_spacing.x = GAP;
+                            if let Some(icon) = &icon {
+                                ui.add(icon.widget(Vec2::splat(ICON)));
+                            }
+                            ui.allocate_ui(text_size, |ui| {
+                                text::show(ui, world, &line, rows::look(SIZE, SLATE_90), None);
+                            });
+                        });
+                    });
+            });
+        let swell = bumped_at.filter(|_| !still).map_or(1.0, |at| {
+            let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
+            1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
+        });
+        let swell = TSTransform::new(rect.center().to_vec2() * (1.0 - swell), swell);
+        gui.set_transform_layer(shown.response.layer_id, look.around(rect) * swell);
+        drawn.push(rect);
+        bottom = rect.top() - GAP;
+    }
+    for (more, look) in more {
+        let shown = egui::Area::new(Id::new("feed-more"))
+            .order(Band::Notices.order())
+            .interactable(false)
+            .fade_in(false)
+            .pivot(egui::Align2::RIGHT_BOTTOM)
+            .fixed_pos(Pos2::new(screen.right() - EDGE, bottom))
+            .show(&gui, |ui| {
+                ui.multiply_opacity(look.opacity);
+                rows::count_chip(ui, world, more);
+            });
+        gui.set_transform_layer(shown.response.layer_id, look.around(shown.response.rect));
+        drawn.push(shown.response.rect);
+    }
+    world.resource_mut::<Feed>().drawn = drawn;
 }
 
 fn merged(shown: &Notification, newer: &Notification) -> Option<Notification> {
@@ -186,113 +304,20 @@ fn tally_of(notification: &Notification) -> Option<RecordTally> {
     }
 }
 
-fn content(assets: &AssetServer, notification: &Notification) -> impl Scene + use<> {
-    let ink = ui::theme::theme().surface_elevated.on;
-    let icon = match &notification.kind {
+fn icon_of(notification: &Notification) -> Option<String> {
+    match &notification.kind {
         NotificationKind::Feed { icon, .. } => icon.clone(),
         _ => None,
-    };
-    let mut text = notification.text.rich();
-    tallied(&mut text, tally_of(notification), icon.is_some(), ink);
-    let line = ui::rich_text(
-        RichText {
-            size: typography::CAPTION.font_size,
-            color: ink,
-            ..text
-        },
-        false,
+    }
+}
+
+fn feed_line(notification: &Notification) -> StyledLine {
+    let mut line = notification.text.styled();
+    tallied(
+        &mut line,
+        tally_of(notification),
+        icon_of(notification).is_some(),
+        SLATE_90,
     );
-    let icon: Vec<Box<dyn Scene>> = icon
-        .map(|icon| -> Box<dyn Scene> {
-            Box::new(bsn! {
-                Node { width: Val::Px(ICON), height: Val::Px(ICON), flex_shrink: 0.0 }
-                ImageNode { image: {assets.load(icon)} }
-                Pickable::IGNORE
-            })
-        })
-        .into_iter()
-        .collect();
-    bsn! {
-        Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, min_width: Val::Px(0.0) }
-        Pickable::IGNORE
-        Children [ {icon} -- @{line} ]
-    }
-}
-
-fn more_chip() -> impl Scene {
-    let surface = ui::theme::theme().surface_elevated;
-    let frame = ui::Style::new()
-        .background(surface.base.with_alpha(0.55))
-        .node(|node| {
-            node.padding = UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::S));
-            node.border_radius = BorderRadius::all(Val::Px(ui::tokens::radius::M));
-        });
-    bsn! {
-        MoreChip
-        frame
-        MORE_PRESENCE
-        ui::ClickThrough
-        Pickable { should_block_lower: false, is_hoverable: true }
-    }
-}
-
-fn count_more(world: &mut World) {
-    let Some((toaster, overflow)) = world
-        .query_filtered::<(Entity, &ui::Toaster), With<FeedToaster>>()
-        .iter(world)
-        .next()
-        .map(|(entity, toaster)| (entity, toaster.overflow))
-    else {
-        return;
-    };
-    let Some(chip) = world.get::<Children>(toaster).and_then(|kids| {
-        kids.iter()
-            .find(|&kid| world.get::<MoreChip>(kid).is_some())
-    }) else {
-        return;
-    };
-    let shown = world.get::<ShownMore>(chip).map(|shown| shown.0);
-    if shown == Some(overflow) {
-        return;
-    }
-    world.entity_mut(chip).insert(ShownMore(overflow));
-    if let Some(mut presence) = world.get_mut::<ui::Presence>(chip) {
-        presence.shown = overflow > 0;
-    }
-    if overflow == 0 {
-        return;
-    }
-    world.entity_mut(chip).despawn_related::<Children>();
-    let ink = ui::theme::theme().surface_elevated.on.with_alpha(0.75);
-    let text = ui::rich_text(
-        RichText {
-            size: typography::CAPTION.font_size,
-            color: ink,
-            ..super::rows::more_text(overflow as u32)
-        },
-        false,
-    );
-    spawn_ui(world, text).insert(ChildOf(chip));
-}
-
-#[derive(Component)]
-struct ShownMore(usize);
-
-fn fit_beside_box(world: &mut World) {
-    let Ok(screen) = world
-        .query::<&bevy::window::Window>()
-        .single(world)
-        .map(|window| window.resolution.width())
-    else {
-        return;
-    };
-    let room = stage::box_right(world).map_or(WIDEST, |right| {
-        (screen - right - 2.0 * EDGE).clamp(NARROWEST, WIDEST)
-    });
-    let mut toasters = world.query_filtered::<&mut Node, With<FeedToaster>>();
-    for mut node in toasters.iter_mut(world) {
-        if node.max_width != Val::Px(room) {
-            node.max_width = Val::Px(room);
-        }
-    }
+    line
 }

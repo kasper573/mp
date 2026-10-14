@@ -7,10 +7,10 @@ use game::core::math::{Offset, Pos, WindowPx};
 use game::core::tiling::{Cell, TilePos, Tiles};
 use game::systems::area;
 use game::systems::input::gestures::ClickClaim;
+use game::systems::input::map::KeyModifiers;
 use game::systems::input::map::{InputAction, InputBinding, InputMap};
 use game::systems::movement::Grid;
 use game::systems::probe::{ProbeBody, ProbeShop, ProbeSnapshot, ProbeStage, ProbeUiElement};
-use ui::KeyModifiers;
 
 use crate::content::{content, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};

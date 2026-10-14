@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::{CursorIcon, SystemCursorIcon};
-use ui::{CursorStyle, InterfaceCursor};
 
+use crate::core::gui;
 use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
 
@@ -9,22 +9,35 @@ pub struct InterfaceGesture;
 
 impl Gesture for InterfaceGesture {
     fn claim(&self, world: &mut World) -> Option<ClickClaim> {
-        world
-            .resource::<InterfaceCursor>()
-            .captured()
-            .then_some(ClickClaim::Interface)
+        gui::pointer_claimed(world).then_some(ClickClaim::Interface)
     }
 
     fn drive(&self, _world: &mut World, _start: bool) {}
 
     fn cursor(&self, world: &mut World) -> Option<CursorIcon> {
-        let shape = match world.resource::<InterfaceCursor>().style()? {
-            CursorStyle::Default => CursorShape::Default,
-            CursorStyle::Pointer => CursorShape::Pointer,
-            CursorStyle::Grab => CursorShape::Grab,
-            CursorStyle::Grabbing => CursorShape::Grabbing,
-            CursorStyle::Resize => CursorShape::Resize,
-            CursorStyle::Text => return Some(CursorIcon::System(SystemCursorIcon::Text)),
+        use egui::CursorIcon as Asked;
+        let shape = match gui::cursor(world) {
+            Asked::PointingHand => CursorShape::Pointer,
+            Asked::Grab => CursorShape::Grab,
+            Asked::Grabbing | Asked::Move | Asked::AllScroll => CursorShape::Grabbing,
+            Asked::ResizeHorizontal
+            | Asked::ResizeNeSw
+            | Asked::ResizeNwSe
+            | Asked::ResizeVertical
+            | Asked::ResizeEast
+            | Asked::ResizeSouthEast
+            | Asked::ResizeSouth
+            | Asked::ResizeSouthWest
+            | Asked::ResizeWest
+            | Asked::ResizeNorthWest
+            | Asked::ResizeNorth
+            | Asked::ResizeNorthEast
+            | Asked::ResizeColumn
+            | Asked::ResizeRow => CursorShape::Resize,
+            Asked::Text | Asked::VerticalText => {
+                return Some(CursorIcon::System(SystemCursorIcon::Text));
+            }
+            _ => CursorShape::Default,
         };
         Some(content_cursor(world, shape))
     }

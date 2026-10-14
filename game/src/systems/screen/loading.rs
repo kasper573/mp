@@ -4,19 +4,21 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy::winit::{UpdateMode, WinitSettings};
-use ui::{Activate, CardOptions, button, card, styled_text, text_colored};
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::{TextRole, color};
+use egui::RichText;
 
-use super::{ClientScreen, SERVER_RETRY, despawn_all};
+use super::{ClientScreen, SERVER_RETRY, system_screen};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
 };
 use crate::core::content::version;
+use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
 use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform, StartParams};
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::time::Seconds;
-use crate::systems::hud::spawn_ui;
 use crate::systems::install_content;
 
 #[derive(Resource)]
@@ -33,9 +35,12 @@ impl Plugin for LoadingPlugin {
                 (poll, show).chain().run_if(in_state(ClientScreen::Loading)),
             )
             .add_systems(
-                OnExit(ClientScreen::Loading),
-                (despawn_all::<LoadingUi>, forget),
-            );
+                EguiPrimaryContextPass,
+                loading_card
+                    .in_set(Band::System)
+                    .run_if(in_state(ClientScreen::Loading)),
+            )
+            .add_systems(OnExit(ClientScreen::Loading), forget);
     }
 }
 
@@ -59,9 +64,6 @@ struct Shown {
     card: Option<CardModel>,
     announced: Option<String>,
 }
-
-#[derive(Component, Default, Clone)]
-struct LoadingUi;
 
 #[derive(Clone, PartialEq)]
 struct CardModel {
@@ -197,14 +199,6 @@ fn show(world: &mut World) {
     if world.resource::<Shown>().card.as_ref() == Some(&model) {
         return;
     }
-    let ui: Vec<Entity> = world
-        .query_filtered::<Entity, With<LoadingUi>>()
-        .iter(world)
-        .collect();
-    for entity in ui {
-        world.entity_mut(entity).despawn();
-    }
-    spawn_ui(world, loading_card(&model));
     if let Ok(mut window) = world
         .query_filtered::<&mut Window, With<bevy::window::PrimaryWindow>>()
         .single_mut(world)
@@ -357,64 +351,49 @@ fn announcement(model: &CardModel, progress: &SyncProgress) -> String {
     parts.join(". ")
 }
 
-fn loading_card(model: &CardModel) -> impl Scene + use<> {
-    let theme = ui::theme::theme();
-    let color = theme.surface_elevated.on;
-    let background = if model.veiled {
-        Color::NONE
-    } else {
-        super::connection::OVERLAY_BG
+fn loading_card(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
     };
-    let mut body: Vec<Box<dyn Scene>> = vec![Box::new(styled_text(
-        model.title.clone(),
-        color,
-        ui::tokens::typography::NAME,
-    ))];
-    for line in &model.lines {
-        body.push(Box::new(text_colored(line.clone(), color)));
+    let Some(model) = world.resource::<Shown>().card.clone() else {
+        return;
+    };
+    let backdrop = (!model.veiled).then_some(super::connection::OVERLAY_BG);
+    let retry = system_screen(&gui, "loading", backdrop, |ui| {
+        egui::Frame::popup(ui.style())
+            .inner_margin(egui::Margin::symmetric(24, 18))
+            .show(ui, |ui| {
+                ui.set_min_width(280.0);
+                ui.vertical_centered(|ui| {
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    ui.heading(&model.title);
+                    for line in &model.lines {
+                        ui.label(line);
+                    }
+                    let small = |text: &str| {
+                        RichText::new(text)
+                            .size(TextRole::Small.size())
+                            .color(color::MUTED)
+                    };
+                    for note in &model.notes {
+                        ui.label(small(note));
+                    }
+                    model.retry_in.as_ref().is_some_and(|retry_in| {
+                        ui.label(small(retry_in));
+                        ui.button("Retry").clicked()
+                    })
+                })
+                .inner
+            })
+            .inner
+    })
+    .inner;
+    if retry && world.get_resource::<Syncing>().is_none() {
+        let failures = world
+            .remove_resource::<LoadingFailure>()
+            .map_or(0, |failure| failure.failures);
+        start(world, failures);
     }
-    for note in &model.notes {
-        body.push(Box::new(styled_text(
-            note.clone(),
-            color,
-            ui::tokens::typography::CAPTION,
-        )));
-    }
-    if let Some(retry_in) = &model.retry_in {
-        body.push(Box::new(styled_text(
-            retry_in.clone(),
-            color,
-            ui::tokens::typography::CAPTION,
-        )));
-        body.push(Box::new(bsn! { @{button("Retry")} on(retry) }));
-    }
-    bsn! {
-        LoadingUi
-        super::screen_node()
-        BackgroundColor({background})
-        GlobalZIndex({ui::tokens::layer::SYSTEM})
-        Children [
-            @{card(CardOptions { floating: true, ..default() })}
-            Node {
-                min_width: Val::Px(280.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px({ui::tokens::spacing::M}),
-            }
-            Children [ {body} ]
-        ]
-    }
-}
-
-fn retry(_: On<Activate>, mut commands: Commands) {
-    commands.queue(|world: &mut World| {
-        if world.get_resource::<Syncing>().is_none() {
-            let failures = world
-                .remove_resource::<LoadingFailure>()
-                .map_or(0, |failure| failure.failures);
-            start(world, failures);
-        }
-    });
 }
 
 fn megabytes(bytes: u64) -> String {

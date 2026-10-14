@@ -93,7 +93,7 @@ pub(super) fn setup(
         },
         RenderLayers::layer(PRESENT_LAYER),
         Msaa::Off,
-        IsDefaultUiCamera,
+        bevy_egui::PrimaryEguiContext,
     ));
 
     commands.spawn((

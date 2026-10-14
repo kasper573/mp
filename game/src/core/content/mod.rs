@@ -38,6 +38,11 @@ pub fn asset_file(path: &str) -> String {
     format!("assets/{path}")
 }
 
+/// The asset a loader path names: the inverse of `asset_file`.
+pub fn asset_of(file: &str) -> &str {
+    file.strip_prefix("assets/").unwrap_or(file)
+}
+
 pub fn named<Row: ContentRow>(
     world: &bevy_ecs::world::World,
     key: &str,

@@ -1,16 +1,15 @@
 use std::time::Duration;
 
-use bevy::color::Color;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use strum::{IntoStaticStr, VariantArray};
-use ui::tokens::palette;
-use ui::{RichPiece, RichSpan, RichText, TextMotion, TextVoice};
-
 use crate::core::script::{Expr, Value};
+use crate::core::text::{StyledLine, StyledSpan, TextMotion, TextPiece, TextVoice};
 use crate::core::time::Millis;
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::script::RiftScripting;
+use design_tokens::ink;
+use egui::Color32;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(try_from = "SpanRow", into = "SpanRow")]
@@ -272,28 +271,28 @@ impl LineText {
             .sum()
     }
 
-    pub fn rich(&self) -> RichText {
-        RichText::new(self.0.iter().flat_map(SpanText::pieces).collect())
+    pub fn styled(&self) -> StyledLine {
+        StyledLine::new(self.0.iter().flat_map(SpanText::pieces).collect())
     }
 }
 
 impl SpanText {
-    fn pieces(&self) -> Vec<RichPiece> {
+    fn pieces(&self) -> Vec<TextPiece> {
         let (text, fx) = match self {
             SpanText::Text { text, fx } => (text, fx),
             SpanText::Input(action) => return vec![map::input(*action)],
         };
-        let mut span = RichSpan::plain(text.clone());
+        let mut span = StyledSpan::plain(text.clone());
         let mut pause = None;
         for fx in fx {
             match *fx {
-                Fx::Ink(ink) => span = span.color(ink.color()),
+                Fx::Ink(ink) => span = span.ink(ink.color()),
                 Fx::Voice(Voice::Whisper) => span = span.voice(TextVoice::Whisper),
                 Fx::Voice(Voice::Shout) => span = span.voice(TextVoice::Shout),
                 Fx::Motion(motion) => span = span.motion(motion.text_motion()),
                 Fx::Slow => span = span.slow(),
                 Fx::PauseAfter(wait) => {
-                    pause = Some(RichPiece::Pause(Duration::from_secs_f32(wait.seconds().0)));
+                    pause = Some(TextPiece::Pause(Duration::from_secs_f32(wait.seconds().0)));
                 }
             }
         }
@@ -312,13 +311,13 @@ impl Motion {
 }
 
 impl Ink {
-    pub fn color(self) -> Color {
+    pub fn color(self) -> Color32 {
         match self {
-            Ink::Danger => palette::CRIMSON_80,
-            Ink::Item => palette::AMBER_80,
-            Ink::Place => palette::AZURE_80,
-            Ink::Name => palette::EMERALD_80,
-            Ink::Magic => palette::VIOLET_80,
+            Ink::Danger => ink::DANGER,
+            Ink::Item => ink::ITEM,
+            Ink::Place => ink::PLACE,
+            Ink::Name => ink::NAME,
+            Ink::Magic => ink::MAGIC,
         }
     }
 }

@@ -65,12 +65,13 @@ impl Desktop {
         token: String,
         folder: &Path,
         recorded: bool,
+        size: (u32, u32),
     ) -> Desktop {
         std::fs::create_dir_all(folder).expect("a folder for the desktop");
-        let screen = Screen::open(folder);
+        let screen = Screen::open(folder, size);
         let speakers = Speakers::plug();
-        let recording = recorded
-            .then(|| Recording::start(&screen.display, SCREEN, &speakers.monitor(), folder));
+        let recording =
+            recorded.then(|| Recording::start(&screen.display, size, &speakers.monitor(), folder));
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a probe port");
         let config = ClientConfig {
             game_server_url: server.http_url(),
@@ -396,7 +397,7 @@ struct Screen {
 }
 
 impl Screen {
-    fn open(folder: &Path) -> Screen {
+    fn open(folder: &Path, size: (u32, u32)) -> Screen {
         let name = format!(
             "rift-playtest-{}-{}",
             std::process::id(),
@@ -414,8 +415,8 @@ impl Screen {
                 "--idle-time=0",
                 "--modules=systemd-notify.so",
             ])
-            .arg(format!("--width={}", SCREEN.0))
-            .arg(format!("--height={}", SCREEN.1))
+            .arg(format!("--width={}", size.0))
+            .arg(format!("--height={}", size.1))
             .arg(format!("--socket={name}"))
             .arg(format!("--log={}", folder.join("compositor.log").display()))
             .env("NOTIFY_SOCKET", format!("@{name}"))
@@ -426,7 +427,7 @@ impl Screen {
         await_ready(&notices, &mut compositor, folder);
         let mut x = Command::new("Xwayland")
             .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
-            .arg(format!("{}x{}", SCREEN.0, SCREEN.1))
+            .arg(format!("{}x{}", size.0, size.1))
             .env("WAYLAND_DISPLAY", &name)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

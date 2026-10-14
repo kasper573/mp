@@ -1,19 +1,20 @@
 use bevy::prelude::*;
-use ui::button::intent;
-use ui::{
-    Activate, ButtonSize, DragHandle, DragRoot, OnSettle, RichPiece, RichText, button_styled,
-    text_colored,
-};
+use bevy_egui::EguiPrimaryContextPass;
+use bevy_egui::input::egui_wants_any_keyboard_input;
+use design_tokens::{TextRole, color};
+use egui::{Align, Id, Layout, Pos2, Rect, RichText, Ui};
 
 use super::{SpectateRequest, Spectating};
+use crate::core::gui::{self, Band};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::actor::Name;
-use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget, spawn_ui};
+use crate::systems::hud::{self, HudAudience, Widget};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::player::session::{SpectateStatus, Viewpoint};
-use crate::systems::screen::{ClientScreen, despawn_all, mode::ClientMode};
+use crate::systems::screen::{ClientScreen, mode::ClientMode};
 
-const BLANK_BG: Color = Color::srgb(0.07, 0.07, 0.07);
-const HINT: Color = Color::srgb(0.6, 0.6, 0.6);
+const BLANK: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
+const MIN_WIDTH: f32 = 180.0;
 
 pub struct SpectatorPlugin;
 
@@ -21,11 +22,18 @@ impl Plugin for SpectatorPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (step_keys.run_if(not(ui::typing)), show_nobody_playing)
+            step_keys
+                .run_if(not(egui_wants_any_keyboard_input))
                 .run_if(in_state(ClientScreen::Area))
                 .run_if(resource_equals(ClientMode::Spectate)),
         )
-        .add_systems(OnExit(ClientScreen::Area), despawn_all::<NobodyPlaying>);
+        .add_systems(
+            EguiPrimaryContextPass,
+            nobody_playing
+                .in_set(Band::World)
+                .run_if(in_state(ClientScreen::Area))
+                .run_if(resource_equals(ClientMode::Spectate)),
+        );
     }
 }
 
@@ -35,85 +43,38 @@ impl Widget for SpectatorWidget {
     fn audience(&self) -> HudAudience {
         HudAudience::Spectators
     }
-    fn fallback(&self, _: f32) -> Vec2 {
-        Vec2::new(8.0, 8.0)
+    fn fallback(&self, screen: Rect) -> Pos2 {
+        screen.min + egui::vec2(8.0, 8.0)
     }
-    fn build(&self, pos: Vec2, id: &'static str) -> Box<dyn Scene> {
-        build(pos, id)
-    }
-    fn sync(&self, world: &mut World) {
+    fn show(&self, ui: &mut Ui, world: &mut World) {
         let (watched, place) = panel_text(world);
-        set_text::<WatchedName>(world, watched);
-        set_text::<WatchedPlace>(world, place);
+        hud::panel().show(ui, |ui| {
+            ui.set_min_width(MIN_WIDTH);
+            ui.label(watched);
+            ui.horizontal(|ui| {
+                if ui.button("<").clicked() {
+                    world.write_message(SpectateRequest::Previous);
+                }
+                ui.label(place);
+                if ui.button(">").clicked() {
+                    world.write_message(SpectateRequest::Next);
+                }
+            });
+            let look = TextLook {
+                size: TextRole::Small.size(),
+                color: color::MUTED,
+            };
+            text::show(ui, world, &switch_hint(), look, None);
+        });
     }
 }
 
-#[derive(Component, Default, Clone)]
-struct WatchedName;
-
-#[derive(Component, Default, Clone)]
-struct WatchedPlace;
-
-#[derive(Component, Default, Clone)]
-struct NobodyPlaying;
-
-fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
-    let node = Node {
-        position_type: PositionType::Absolute,
-        left: Val::Px(pos.x),
-        top: Val::Px(pos.y),
-        min_width: Val::Px(180.0),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(6.0),
-        border: UiRect::all(Val::Px(1.0)),
-        padding: UiRect::all(Val::Px(8.0)),
-        ..default()
-    };
-    let controls = Node {
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        column_gap: Val::Px(8.0),
-        ..default()
-    };
-    Box::new(bsn! {
-        node
-        BackgroundColor({PANEL_BG})
-        BorderColor::all(BORDER)
-        DragRoot
-        DragHandle
-        ~{OnSettle::new(move |world, geom| persist_widget(world, id, geom))}
-        Children [
-            @{text_colored(String::new(), Color::WHITE)} WatchedName
-            --
-            controls
-            Children [
-                @{button_styled(intent::PRIMARY, ButtonSize::Sm, "<")} on(step(SpectateRequest::Previous))
-                --
-                @{text_colored(String::new(), Color::WHITE)} WatchedPlace
-                --
-                @{button_styled(intent::PRIMARY, ButtonSize::Sm, ">")} on(step(SpectateRequest::Next))
-            ]
-            --
-            @{ui::rich_text(switch_hint(), false)}
-        ]
-    })
-}
-
-fn step(request: SpectateRequest) -> impl Fn(On<Activate>, Commands) + Clone {
-    move |_, mut commands| {
-        commands.write_message(request);
-    }
-}
-
-fn switch_hint() -> RichText {
-    RichText {
-        color: HINT,
-        ..RichText::new(vec![
-            map::input(InputAction::SpectatePrevious),
-            map::input(InputAction::SpectateNext),
-            RichPiece::text(" to switch"),
-        ])
-    }
+fn switch_hint() -> StyledLine {
+    StyledLine::new(vec![
+        map::input(InputAction::SpectatePrevious),
+        map::input(InputAction::SpectateNext),
+        TextPiece::text(" to switch"),
+    ])
 }
 
 fn step_keys(world: &mut World) {
@@ -147,41 +108,28 @@ fn panel_text(world: &World) -> (String, String) {
     }
 }
 
-fn set_text<M: Component>(world: &mut World, content: String) {
-    let mut texts = world.query_filtered::<&mut Text, With<M>>();
-    for mut text in texts.iter_mut(world) {
-        if text.0 != content {
-            text.0.clone_from(&content);
-        }
-    }
-}
-
 // Without a player to watch there is nothing of the world to see, so none of it shows.
-fn show_nobody_playing(world: &mut World) {
-    let nobody = world.resource::<SpectateStatus>().0 == Some(Spectating::Nobody);
-    let shown = world
-        .query_filtered::<Entity, With<NobodyPlaying>>()
-        .iter(world)
-        .next();
-    match (nobody, shown) {
-        (true, None) => {
-            spawn_ui(world, nobody_playing());
-        }
-        (false, Some(screen)) => world.entity_mut(screen).despawn(),
-        _ => {}
+fn nobody_playing(world: &mut World) {
+    if world.resource::<SpectateStatus>().0 != Some(Spectating::Nobody) {
+        return;
     }
-}
-
-fn nobody_playing() -> impl Scene {
-    bsn! {
-        NobodyPlaying
-        crate::systems::screen::screen_node()
-        BackgroundColor({BLANK_BG})
-        GlobalZIndex({ui::tokens::layer::BACKDROP})
-        Children [
-            @{text_colored("Nobody is playing right now", Color::WHITE)}
-            --
-            @{text_colored("Spectating starts as soon as someone joins", HINT)}
-        ]
-    }
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let screen = gui.content_rect();
+    egui::Area::new(Id::new("nobody playing"))
+        .order(Band::World.order())
+        .fixed_pos(screen.min)
+        .interactable(false)
+        .show(&gui, |ui| {
+            ui.painter().rect_filled(screen, 0.0, BLANK);
+            ui.allocate_ui_with_layout(screen.size(), Layout::top_down(Align::Center), |ui| {
+                ui.set_min_size(screen.size());
+                ui.add_space(screen.height() / 2.0 - 24.0);
+                ui.label(RichText::new("Nobody is playing right now").color(color::TEXT));
+                ui.label(
+                    RichText::new("Spectating starts as soon as someone joins").color(color::MUTED),
+                );
+            });
+        });
 }

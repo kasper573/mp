@@ -58,43 +58,39 @@ fn play(shoot: &mut Shoot) {
     });
 
     me.caption("Windows snap to a grid — toggle it in Settings");
-    me.click_ui(UiTarget::starting("ui snapping"));
+    me.click_ui(UiTarget::starting("UI snapping"));
     me.hold();
-    me.click_ui(UiTarget::starting("ui snapping"));
+    me.click_ui(UiTarget::starting("UI snapping"));
     me.caption("Text speed is a slider, in letters a second");
-    let before = me.find_ui(UiTarget::starting("text speed")).text;
-    me.drag_ui(
-        UiTarget::new("a slider", |element, _| element.slider.is_some()),
-        Offset::new(70.0, 0.0),
-    );
+    let before = me.find_ui(slider("Text speed")).slider;
+    me.drag_ui(slider("Text speed"), Offset::new(70.0, 0.0));
     me.wait_until("the text speed to change", |snapshot| {
-        UiTarget::starting("text speed")
+        slider("Text speed")
             .find(snapshot)
-            .map(|speed| &speed.text)
-            != Some(&before)
+            .map(|speed| speed.slider)
+            != Some(before)
     });
     me.caption("Reduced motion is a setting too");
-    me.click_ui(UiTarget::starting("reduced motion"));
+    me.click_ui(UiTarget::starting("Reduced motion"));
     me.caption(
         "Sound has a volume each: master, music, ambience, effects and voice, all halfway to start",
     );
-    me.scroll_until(UiTarget::starting("reduced motion"), "Voice");
+    me.scroll_until(UiTarget::starting("Reduced motion"), "Voice");
     me.caption("Halfway is the mix as balanced, with room to turn any of them up or down");
     me.show_mixer();
-    let mut faders = Faders::default();
     me.caption("Music is the soundscape's first channel: turned down, the harbour theme fades out");
-    faders.set(&mut me, "Music", 0.0);
+    set_fader(&mut me, "Music", 0.0);
     me.caption("Ambience is every other channel: down goes the surf, and the island falls silent");
-    faders.set(&mut me, "Ambience", 0.0);
+    set_fader(&mut me, "Ambience", 0.0);
     me.caption("Effects are the game's sounds: in the quiet, your footsteps…");
     let home = me.come_to_rest();
     me.walk_by(Offset::new(3.0, 0.0));
     me.caption("…which go quiet too with effects turned down");
-    faders.set(&mut me, "Effects", 0.0);
+    set_fader(&mut me, "Effects", 0.0);
     me.walk_to(home);
     me.caption("Back to halfway, everything plays as balanced again");
     for fader in ["Music", "Ambience", "Effects"] {
-        faders.set(&mut me, fader, 0.5);
+        set_fader(&mut me, fader, 0.5);
     }
     me.hold();
     me.hide_mixer();
@@ -112,8 +108,8 @@ fn play(shoot: &mut Shoot) {
     me.caption("Voice is how characters speak: at halfway, Grisha's greeting babbles…");
     hear_out_greeting(&mut me);
     me.act(InputAction::ToggleSettings);
-    me.scroll_until(UiTarget::starting("reduced motion"), "Voice");
-    faders.set(&mut me, "Voice", 0.0);
+    me.scroll_until(UiTarget::starting("Reduced motion"), "Voice");
+    set_fader(&mut me, "Voice", 0.0);
     me.act(InputAction::Dismiss);
     me.caption("…and with voice turned down, the same greeting is silent");
     hear_out_greeting(&mut me);
@@ -143,53 +139,37 @@ fn hear_out_greeting(me: &mut Player) {
     me.leave_conversation();
 }
 
-// A thumb sits over its value along the track, so the track's width turns a value into a drag
-// distance. Dragging one all the way down measures it.
-#[derive(Default)]
-struct Faders {
-    track: Option<f32>,
-}
-
-const PAST_EMPTY: f32 = 300.0;
+// Pressing a slider moves it to the press, so a drag from the middle of its track lands a value
+// at the same share of the track's width away.
 const TOLERANCE: f32 = 0.02;
 
-impl Faders {
-    fn set(&mut self, me: &mut Player, fader: &str, value: f32) {
-        let before = me.find_ui(thumb(fader));
-        let at = before.slider.expect("a slider");
-        let by = match self.track {
-            _ if value == 0.0 => -PAST_EMPTY,
-            Some(track) => (value - at) * track,
-            None => panic!("a fader is turned all the way down before any is set between"),
-        };
-        me.drag_ui(thumb(fader), Offset::new(by, 0.0));
-        let reached = thumb(fader);
-        let after = me.wait_for(
-            &format!("the {fader} volume to reach {value}"),
-            |snapshot| {
-                reached
-                    .find(snapshot)
-                    .filter(|thumb| {
-                        thumb
-                            .slider
-                            .is_some_and(|now| (now - value).abs() <= TOLERANCE)
-                    })
-                    .cloned()
-            },
-        );
-        if value == 0.0 && at > 0.0 && self.track.is_none() {
-            self.track = Some((before.rect.origin.x - after.rect.origin.x) / at);
-        }
-    }
+fn set_fader(me: &mut Player, fader: &str, value: f32) {
+    let track = me.find_ui(slider(fader)).rect.size.width;
+    let by = match value {
+        0.0 => -track,
+        1.0 => track,
+        _ => (value - 0.5) * track,
+    };
+    me.drag_ui(slider(fader), Offset::new(by, 0.0));
+    let reached = slider(fader);
+    me.wait_for(
+        &format!("the {fader} volume to reach {value}"),
+        |snapshot| {
+            reached
+                .find(snapshot)
+                .filter(|track| {
+                    track
+                        .slider
+                        .is_some_and(|now| (now - value).abs() <= TOLERANCE)
+                })
+                .cloned()
+        },
+    );
 }
 
-// The slider thumb on the fader's row.
-fn thumb(fader: &str) -> UiTarget {
-    let label = UiTarget::text(fader);
-    UiTarget::new(format!("the {fader} thumb"), move |element, snapshot| {
-        element.slider.is_some()
-            && label
-                .find(snapshot)
-                .is_some_and(|label| (element.rect.center().y - label.rect.center().y).abs() < 12.0)
+fn slider(name: &str) -> UiTarget {
+    let name = name.to_owned();
+    UiTarget::new(format!("the {name} slider"), move |element, _| {
+        element.slider.is_some() && element.text.as_deref() == Some(name.as_str())
     })
 }

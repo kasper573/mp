@@ -22,24 +22,33 @@ fn play(shoot: &mut Shoot) {
     friend.walk_by(Offset::new(-3.0, -1.0));
     me.caption("Every player's name floats over their head");
     me.find_ui(name.as_str());
-    me.caption("Press C for the terminal, where everyone can chat");
+    me.caption("Press C for the terminal, where everyone can chat: type, and Enter sends");
     say(&mut me, "hello! anyone around?");
     say(&mut friend, "hi! let's go hunt some orcs");
     me.find_ui(UiTarget::containing("let's go hunt some orcs"));
     me.caption("It also takes commands — /commands lists them");
+    me.act(InputAction::ToggleTerminal);
     submit(&mut me, "/commands");
 }
 
+// Esc hands the keys back to the game, so the C that follows closes the terminal.
 fn say(player: &mut Player, text: &str) {
     player.act(InputAction::ToggleTerminal);
     submit(player, text);
+    player.act(InputAction::Dismiss);
+    player.wait_until("the field to let go of the keys", |snapshot| {
+        typing_field().find(snapshot).is_none()
+    });
+    player.act(InputAction::ToggleTerminal);
+    player.wait_until("the terminal to close", |snapshot| {
+        text_field().find(snapshot).is_none()
+    });
 }
 
 // Keys typed before the field holds focus, or a submit sent before every key has landed, would be
 // lost: each step waits for the game to catch up.
 fn submit(player: &mut Player, text: &str) {
-    player.click_ui(text_field());
-    player.find_ui(text_field().and("with focus", |element, _| element.focused));
+    player.find_ui(typing_field());
     let field = text_field();
     player.type_text(text, |snapshot| {
         field
@@ -47,8 +56,17 @@ fn submit(player: &mut Player, text: &str) {
             .is_some_and(|field| field.text.as_deref() == Some(text))
     });
     player.act(InputAction::SubmitText);
+    player.wait_until("the line to be sent", |snapshot| {
+        typing_field()
+            .find(snapshot)
+            .is_some_and(|field| field.text.is_none())
+    });
 }
 
 fn text_field() -> UiTarget {
     UiTarget::new("the text field", |element, _| element.editable)
+}
+
+fn typing_field() -> UiTarget {
+    text_field().and("with focus", |element, _| element.focused)
 }

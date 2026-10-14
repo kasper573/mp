@@ -2,24 +2,26 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use ui::{RichPiece, RichText};
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::{TextRole, color};
 
-use super::{ClientScreen, despawn_all};
+use super::ClientScreen;
 use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
 use crate::core::content::media::ImageSizes;
+use crate::core::gui::{self, Band};
 use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
 use crate::core::render::transition::{self, WorldViewSystems};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::area::{self, AreaId, AreaTag, tileset};
-use crate::systems::hud::spawn_ui;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::AreaDrawn;
@@ -39,15 +41,17 @@ impl Plugin for AreaPlugin {
                     carry_view_across.before(WorldViewSystems),
                     (spawn_area_tiles, play_area_soundscape).in_set(WorldViewSystems),
                     retain_loaded_images,
-                    sync_death_banner,
                 )
                     .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnEnter(ClientScreen::Area), restart_patience)
             .add_systems(
-                OnExit(ClientScreen::Area),
-                (despawn_all::<DeathBanner>, silence_soundscape, leave_area),
-            );
+                EguiPrimaryContextPass,
+                death_notice
+                    .in_set(Band::Notices)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(OnEnter(ClientScreen::Area), restart_patience)
+            .add_systems(OnExit(ClientScreen::Area), (silence_soundscape, leave_area));
     }
 }
 
@@ -463,47 +467,31 @@ impl TileSheets {
     }
 }
 
-#[derive(Component, Default, Clone)]
-struct DeathBanner;
-
-fn sync_death_banner(world: &mut World) {
-    let dead = session::is_dead(world);
-    let banner = world
-        .query_filtered::<Entity, With<DeathBanner>>()
-        .iter(world)
-        .next();
-    match (dead, banner) {
-        (true, None) => {
-            spawn_ui(world, death_banner());
-        }
-        (false, Some(banner)) => world.entity_mut(banner).despawn(),
-        _ => {}
+/// The death notice reads over any ground, so its line sits in a popup frame. It takes no clicks:
+/// respawning is a key the line names.
+fn death_notice(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    if !session::is_dead(world) {
+        return;
     }
-}
-
-fn death_banner() -> impl Scene {
-    bsn! {
-        DeathBanner
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-        }
-        GlobalZIndex({ui::tokens::layer::ALERTS})
-        Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ @{ui::rich_text(death_text(), false)} ]
-    }
-}
-
-fn death_text() -> RichText {
-    RichText {
-        color: Color::WHITE,
-        ..RichText::new(vec![
-            RichPiece::text("You died! Press "),
-            map::input(InputAction::Respawn),
-            RichPiece::text(" to respawn"),
-        ])
-    }
+    let line = StyledLine::new(vec![
+        TextPiece::text("You died! Press "),
+        map::input(InputAction::Respawn),
+        TextPiece::text(" to respawn"),
+    ]);
+    egui::Area::new(egui::Id::new("death"))
+        .order(Band::Notices.order())
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .interactable(false)
+        .show(&gui, |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                let look = TextLook {
+                    size: TextRole::Body.size(),
+                    color: color::TEXT,
+                };
+                text::show(ui, world, &line, look, None);
+            });
+        });
 }

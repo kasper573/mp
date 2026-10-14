@@ -1,16 +1,15 @@
 use bevy::prelude::*;
-use ui::tokens::{palette, spacing, typography};
-use ui::{DragHandle, DragRoot, OnSettle};
+use design_tokens::{TextRole, color, family};
+use egui::{Align, Color32, Layout, Pos2, Rect, RichText, Ui};
 
-use super::card::{Countdown, icon, live_text};
+use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
-use crate::systems::hud::{self, HudAudience, Widget, spawn_ui};
+use crate::systems::hud::{self, HudAudience, Widget};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::screen::ClientScreen;
 
 const WIDTH: f32 = 230.0;
 const MARK: f32 = 16.0;
@@ -19,9 +18,7 @@ pub struct QuestTrackerPlugin;
 
 impl Plugin for QuestTrackerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Folded>()
-            .init_resource::<Built>()
-            .add_systems(OnExit(ClientScreen::Area), forget);
+        app.init_resource::<Folded>();
     }
 }
 
@@ -31,47 +28,44 @@ impl Widget for QuestTrackerWidget {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }
-    fn fallback(&self, screen_w: f32) -> Vec2 {
-        Vec2::new(screen_w - hud::WIDGET.0 - WIDTH - 24.0, 8.0)
+    fn fallback(&self, screen: Rect) -> Pos2 {
+        Pos2::new(
+            screen.right() - hud::WIDGET.0 - WIDTH - 24.0,
+            screen.top() + 8.0,
+        )
     }
-    fn build(&self, pos: Vec2, id: &'static str) -> Box<dyn Scene> {
-        let node = Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(pos.x),
-            top: Val::Px(pos.y),
-            width: Val::Px(WIDTH),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(spacing::S),
-            padding: UiRect::all(Val::Px(6.0)),
-            border: UiRect::all(Val::Px(1.0)),
-            display: Display::None,
-            ..default()
-        };
-        Box::new(bsn! {
-            node
-            BackgroundColor({hud::PANEL_BG})
-            BorderColor::all(hud::BORDER)
-            DragRoot
-            DragHandle
-            QuestTracker
-            ~{OnSettle::new(move |world, geom| hud::persist_widget(world, id, geom))}
-        })
-    }
-    fn sync(&self, world: &mut World) {
-        sync_tracker(world)
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let entries = entries(world);
+        if entries.is_empty() {
+            return;
+        }
+        let log = world
+            .resource::<Viewpoint>()
+            .0
+            .and_then(|seen| world.get::<QuestLog>(seen))
+            .cloned()
+            .unwrap_or_default();
+        hud::panel().show(ui, |ui| {
+            ui.set_width(WIDTH);
+            ui.spacing_mut().item_spacing.y = 4.0;
+            let folded = world.resource::<Folded>().0;
+            header(ui, world, entries.len(), folded);
+            if folded {
+                return;
+            }
+            for entry in &entries {
+                ui.push_id(("tracked", entry.quest.index()), |ui| {
+                    entry_rows(ui, world, &log, entry);
+                });
+            }
+        });
     }
 }
-
-#[derive(Component, Default, Clone)]
-struct QuestTracker;
 
 #[derive(Resource, Default)]
 struct Folded(bool);
 
-#[derive(Resource, Default)]
-struct Built(Option<u64>);
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tone {
     Plain,
     Done,
@@ -79,7 +73,6 @@ enum Tone {
     Bad,
 }
 
-#[derive(Debug, Hash)]
 struct Entry {
     quest: QuestId,
     mark: Option<&'static AssetRef>,
@@ -87,59 +80,80 @@ struct Entry {
     rows: Vec<(String, Count, Tone)>,
 }
 
-#[derive(Debug, Hash)]
 enum Count {
     Fixed(String),
     Live(Countdown),
 }
 
-fn forget(mut built: ResMut<Built>) {
-    built.0 = None;
+impl Tone {
+    fn colour(self) -> Color32 {
+        match self {
+            Tone::Plain => color::TEXT.gamma_multiply(0.75),
+            Tone::Done => color::OK.gamma_multiply(0.7),
+            Tone::Next => color::WARN,
+            Tone::Bad => color::DANGER,
+        }
+    }
 }
 
-fn sync_tracker(world: &mut World) {
-    let Some(panel) = world
-        .query_filtered::<Entity, With<QuestTracker>>()
-        .iter(world)
-        .next()
-    else {
-        return;
+fn header(ui: &mut Ui, world: &mut World, count: usize, folded: bool) {
+    let (title, toggle) = if folded {
+        (format!("QUESTS ({count})"), "+")
+    } else {
+        ("QUESTS".to_owned(), "–")
     };
-    let entries = entries(world);
-    let log = world
-        .resource::<Viewpoint>()
-        .0
-        .and_then(|seen| world.get::<QuestLog>(seen))
-        .cloned()
-        .unwrap_or_default();
-    let folded = world.resource::<Folded>().0;
-    let key = hud::fingerprint(&(&entries, folded));
-    if world.resource::<Built>().0 == Some(key) {
-        return;
-    }
-    world.resource_mut::<Built>().0 = Some(key);
-    if let Some(mut node) = world.get_mut::<Node>(panel) {
-        node.display = if entries.is_empty() {
-            Display::None
-        } else {
-            Display::Flex
-        };
-    }
-    let header = header(entries.len(), folded);
-    let content = world.resource::<Content>();
-    let assets = world.resource::<AssetServer>();
-    let mut parts: Vec<Box<dyn Scene>> = vec![Box::new(header)];
-    if !folded {
-        parts.extend(
-            entries
-                .iter()
-                .map(|entry| entry_scene(content, assets, &log, entry)),
+    ui.horizontal(|ui| {
+        ui.label(
+            RichText::new(title)
+                .size(TextRole::Small.size())
+                .family(family::medium())
+                .color(color::MUTED),
         );
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if ui.small_button(toggle).clicked() {
+                world.resource_mut::<Folded>().0 = !folded;
+            }
+        });
+    });
+}
+
+fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
+    let content = *world.resource::<Content>();
+    let small = TextRole::Small.size();
+    ui.horizontal(|ui| {
+        if let Some(mark) = entry.mark {
+            hud::icon(ui, world, mark, MARK);
+        }
+        ui.label(
+            RichText::new(entry.quest.get(&content).title.as_str())
+                .family(family::medium())
+                .color(color::TEXT),
+        );
+        if entry.timed {
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                let left = Countdown::Left.label(log, entry.quest).unwrap_or_default();
+                ui.label(RichText::new(left).size(small).color(color::WARN));
+                hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 12.0);
+            });
+        }
+    });
+    for (label, count, tone) in &entry.rows {
+        let colour = tone.colour();
+        let count = match count {
+            Count::Fixed(count) => count.clone(),
+            Count::Live(shows) => shows.label(log, entry.quest).unwrap_or_default(),
+        };
+        ui.horizontal(|ui| {
+            ui.add_space(8.0);
+            ui.label(RichText::new(label.as_str()).size(small).color(colour));
+            if !count.is_empty() {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(RichText::new(count).size(small).color(colour));
+                });
+            }
+        });
     }
-    world.entity_mut(panel).despawn_related::<Children>();
-    for part in parts {
-        spawn_ui(world, part).insert(ChildOf(panel));
-    }
+    ui.add_space(2.0);
 }
 
 fn entries(world: &World) -> Vec<Entry> {
@@ -220,110 +234,4 @@ fn entries(world: &World) -> Vec<Entry> {
             })
         })
         .collect()
-}
-
-fn header(count: usize, folded: bool) -> impl Scene {
-    let ink = ui::theme::theme().surface_floating.on;
-    let (title, toggle) = if folded {
-        (format!("QUESTS ({count})"), "+")
-    } else {
-        ("QUESTS".to_owned(), "–")
-    };
-    bsn! {
-        Node { justify_content: JustifyContent::SpaceBetween, align_items: AlignItems::Center, width: Val::Percent(100.0) }
-        Pickable::IGNORE
-        Children [
-            @{ui::styled_text(title, ink.with_alpha(0.7), typography::LABEL)}
-            --
-            @{ui::button_styled(ui::button::intent::SECONDARY, ui::ButtonSize::Sm, toggle)}
-            on(|_: On<ui::Activate>, mut commands: Commands| {
-                commands.queue(|world: &mut World| {
-                    let mut folded = world.resource_mut::<Folded>();
-                    folded.0 = !folded.0;
-                });
-            })
-        ]
-    }
-}
-
-fn entry_scene(
-    content: &Content,
-    assets: &AssetServer,
-    log: &QuestLog,
-    entry: &Entry,
-) -> Box<dyn Scene> {
-    let ink = ui::theme::theme().surface_floating.on;
-    let mark: Vec<Box<dyn Scene>> = entry
-        .mark
-        .map(|mark| -> Box<dyn Scene> { Box::new(icon(assets, mark, MARK)) })
-        .into_iter()
-        .collect();
-    let quest = entry.quest;
-    let timer: Vec<Box<dyn Scene>> = entry
-        .timed
-        .then(|| -> Box<dyn Scene> {
-            Box::new(bsn! {
-                Node { column_gap: Val::Px({spacing::S}), align_items: AlignItems::Center }
-                Children [
-                    @{icon(assets, &InterfaceIcon::Timed.get(content).image, 12.0)}
-                    --
-                    @{live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION)}
-                ]
-            })
-        })
-        .into_iter()
-        .collect();
-    let rows: Vec<Box<dyn Scene>> = entry
-        .rows
-        .iter()
-        .map(|(label, count, tone)| -> Box<dyn Scene> {
-            let color = match tone {
-                Tone::Plain => ink.with_alpha(0.75),
-                Tone::Done => palette::EMERALD_80.with_alpha(0.7),
-                Tone::Next => palette::AMBER_80,
-                Tone::Bad => palette::CRIMSON_80,
-            };
-            let count: Box<dyn Scene> = match count {
-                Count::Fixed(count) => {
-                    Box::new(ui::styled_text(count.clone(), color, typography::CAPTION))
-                }
-                Count::Live(shows) => {
-                    Box::new(live_text(log, quest, *shows, color, typography::CAPTION))
-                }
-            };
-            let count = vec![count];
-            Box::new(bsn! {
-                Node {
-                    justify_content: JustifyContent::SpaceBetween,
-                    column_gap: Val::Px({spacing::L}),
-                    padding: {UiRect::left(Val::Px(spacing::L))},
-                    width: Val::Percent(100.0),
-                }
-                Pickable::IGNORE
-                Children [
-                    @{ui::styled_text(label.clone(), color, typography::CAPTION)}
-                    --
-                    {count}
-                ]
-            })
-        })
-        .collect();
-    let title = quest.get(content).title.as_str();
-    Box::new(bsn! {
-        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(1.0), width: Val::Percent(100.0) }
-        Pickable::IGNORE
-        Children [
-            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
-            Pickable::IGNORE
-            Children [
-                {mark}
-                --
-                Node { flex_grow: 1.0 } Children [ @{ui::styled_text(title, ink, typography::LABEL)} ]
-                --
-                {timer}
-            ]
-            --
-            {rows}
-        ]
-    })
 }

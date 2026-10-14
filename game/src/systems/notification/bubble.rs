@@ -1,22 +1,25 @@
 use std::time::Duration;
 
-use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use ui::{BubbleLine, BubbleTail, FoldedSpeakers, SpeechBubble};
+use bevy_egui::EguiPrimaryContextPass;
+use egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
 
+use super::rows::{self, Fades, Look, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent};
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleId, BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
+use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
-use crate::core::render::{WorldOverlay, tile_to_window};
+use crate::core::render::tile_to_window;
+use crate::core::text::{self, StyledLine, Typewriter};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::{Action, Actor, plate};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
-use crate::systems::hud::{self, spawn_ui};
+use crate::systems::hud;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::NpcId;
 use crate::systems::player::session::Viewpoint;
@@ -29,15 +32,41 @@ const SMALL_WINDOW: f32 = 960.0;
 const REPLACE_AFTER: Seconds = Seconds(2.0);
 const READ_LINGERS: Seconds = Seconds(0.6);
 const FIGHTING_WITHIN: Tiles = Tiles(3.0);
-const EDGE: f32 = ui::tokens::spacing::L;
-const CROWN_GAP: f32 = ui::tokens::spacing::M;
+const EDGE: f32 = 8.0;
+const CROWN_GAP: f32 = 4.0;
+
+const WIDEST: f32 = 290.0;
+const LINE_SIZE: f32 = 15.0;
+const LINES_HIGH: f32 = 63.0;
+const PADDING: egui::Vec2 = egui::vec2(10.0, 6.0);
+const BORDER: f32 = 1.0;
+const RADIUS: f32 = 8.0;
+const PART_GAP: f32 = 2.0;
+const LINE_GAP: f32 = 4.0;
+const TAIL: f32 = 12.0;
+const TAIL_OUT: f32 = TAIL / 2.0;
+const READ_OPACITY: f32 = 0.5;
+const INK: Color32 = Color32::from_rgb(228, 234, 239);
+const FILL: Color32 = Color32::from_rgb(41, 46, 45);
+const OUTLINE: Color32 = Color32::from_rgb(73, 74, 80);
+// The offsets are those of a bubble whose tail points down; `Tail::turn` turns them to its tail.
+const PRESENCE: Presence = Presence {
+    enter: Move::new(egui::vec2(0.0, 10.0), 0.82, 0.32),
+    exit: Move::new(egui::vec2(0.0, -8.0), 0.94, 0.2),
+};
 
 pub struct BubblePlugin;
 
 impl Plugin for BubblePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Bubbles>()
-            .add_systems(Update, place_bubbles.run_if(in_state(ClientScreen::Area)))
+            .add_systems(Update, tick.run_if(in_state(ClientScreen::Area)))
+            .add_systems(
+                EguiPrimaryContextPass,
+                place
+                    .in_set(Band::World)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
             .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
@@ -50,12 +79,10 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
         .speaker
         .filter(|&body| world.get_entity(body).is_ok());
     let mut bubbles = world.resource_mut::<Bubbles>();
-    bubbles.keys += 1;
-    let key = bubbles.keys;
     let line = SpokenLine {
-        key,
         notification: notification_sent.notification,
         read_by: None,
+        typing: None,
     };
     match bubbles
         .speakers
@@ -81,13 +108,9 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
     }
 }
 
-pub fn edge_folds(world: &World) -> Vec<Entity> {
-    world
-        .resource::<Bubbles>()
-        .edge_folds
-        .iter()
-        .map(|(_, entity)| *entity)
-        .collect()
+/// How many speakers each fold at the screen's edge stands for, as last drawn.
+pub fn edge_folds(world: &World) -> Vec<u32> {
+    world.resource::<Bubbles>().edge_folds.clone()
 }
 
 pub fn shown(world: &World) -> Vec<NotificationBubble> {
@@ -98,7 +121,7 @@ pub fn shown(world: &World) -> Vec<NotificationBubble> {
         .map(|speaking| NotificationBubble {
             speaker: speaking.speaker,
             body: speaking.body,
-            drawn: speaking.drawn.map(|drawn| drawn.entity),
+            rect: speaking.drawn.map(|drawn| drawn.rect),
             replaced: speaking.replaced,
             lines: speaking
                 .lines
@@ -113,7 +136,7 @@ pub fn shown(world: &World) -> Vec<NotificationBubble> {
 pub struct NotificationBubble {
     pub speaker: NpcId,
     pub body: Option<Entity>,
-    pub drawn: Option<Entity>,
+    pub rect: Option<egui::Rect>,
     pub replaced: u32,
     pub lines: Vec<String>,
     pub folded: bool,
@@ -122,8 +145,8 @@ pub struct NotificationBubble {
 #[derive(Resource, Default)]
 struct Bubbles {
     speakers: Vec<Speaking>,
-    edge_folds: Vec<(Edge, Entity)>,
-    keys: u64,
+    edge_folds: Vec<u32>,
+    fades: Fades<BubbleDraw>,
     arrivals: u64,
 }
 
@@ -141,14 +164,34 @@ struct Speaking {
 
 #[derive(Clone, Copy)]
 struct Drawn {
-    entity: Entity,
+    rect: egui::Rect,
     folded: bool,
 }
 
+/// A line the speaker said, typed out by its own entity once the bubble shows it.
 struct SpokenLine {
-    key: u64,
     notification: Notification,
     read_by: Option<Duration>,
+    typing: Option<Entity>,
+}
+
+/// What one bubble shows, kept as drawn so it can ease out after its speaker goes.
+#[derive(Clone)]
+struct BubbleDraw {
+    key: u64,
+    header: Option<String>,
+    lines: Vec<LineDraw>,
+    fold: Option<String>,
+    tail: Option<Tail>,
+    tail_offset: f32,
+    rect: egui::Rect,
+}
+
+#[derive(Clone)]
+struct LineDraw {
+    text: StyledLine,
+    shown: Option<usize>,
+    read: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,6 +200,14 @@ enum Edge {
     Right,
     Top,
     Bottom,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Tail {
+    Down,
+    Up,
+    Left,
+    Right,
 }
 
 enum Spot {
@@ -173,7 +224,7 @@ struct Room {
 #[derive(Clone, Copy)]
 struct Perch {
     tip: Vec2,
-    tail: Option<BubbleTail>,
+    tail: Option<Tail>,
     tail_offset: f32,
 }
 
@@ -198,7 +249,8 @@ impl Speaking {
         self.newest = Some(line);
     }
 
-    fn tick(&mut self, delta: Duration, typed: &[bool]) {
+    /// Moves the speaker's lines along, and hands back the typing of those it let go.
+    fn tick(&mut self, delta: Duration, typed: &[bool]) -> Vec<Entity> {
         self.clock += delta;
         let now = self.clock;
         let mut previous_read_by: Option<Duration> = None;
@@ -209,49 +261,118 @@ impl Speaking {
             }
             previous_read_by = line.read_by;
         }
+        let mut dropped = Vec::new();
         if now >= self.changed + Duration::from(REPLACE_AFTER)
             && let Some(newest) = self.newest.take()
         {
-            self.lines.remove(0);
+            dropped.extend(self.lines.remove(0).typing);
             self.lines.push(newest);
             self.changed = now;
         }
         let lingers = Duration::from(READ_LINGERS);
-        self.lines
-            .retain(|line| line.read_by.is_none_or(|read_by| now < read_by + lingers));
+        let (kept, gone): (Vec<SpokenLine>, Vec<SpokenLine>) = std::mem::take(&mut self.lines)
+            .into_iter()
+            .partition(|line| line.read_by.is_none_or(|read_by| now < read_by + lingers));
+        self.lines = kept;
+        dropped.extend(gone.into_iter().filter_map(|line| line.typing));
+        dropped
     }
 
     fn done(&self) -> bool {
         self.lines.is_empty() && self.newest.is_none()
     }
 
-    fn shown_lines(&self, typed: &[bool]) -> Vec<BubbleLine> {
-        let now = self.clock;
-        let mut lines = Vec::new();
-        for (index, line) in self.lines.iter().enumerate() {
-            if index > 0 && !typed[index - 1] {
-                break;
-            }
-            lines.push(BubbleLine {
-                key: line.key,
-                text: line.notification.text.rich(),
-                read: line.read_by.is_some_and(|read_by| now >= read_by),
-            });
-        }
-        lines
+    /// The lines on show: each waits for the one before it to finish typing.
+    fn shown_lines(&self, typed: &[bool]) -> usize {
+        (1..self.lines.len())
+            .find(|&index| !typed[index - 1])
+            .unwrap_or(self.lines.len())
+    }
+
+    fn typing(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.lines.iter().filter_map(|line| line.typing)
     }
 }
 
-fn forget(mut bubbles: ResMut<Bubbles>) {
-    *bubbles = Bubbles::default();
+impl Tail {
+    fn axis(self) -> egui::Vec2 {
+        match self {
+            Tail::Down => egui::Vec2::Y,
+            Tail::Up => -egui::Vec2::Y,
+            Tail::Left => -egui::Vec2::X,
+            Tail::Right => egui::Vec2::X,
+        }
+    }
+
+    fn turn(tail: Option<Tail>, offset: egui::Vec2) -> egui::Vec2 {
+        match tail {
+            Some(Tail::Down) | None => offset,
+            Some(Tail::Up) => -offset,
+            Some(Tail::Left) => egui::vec2(-offset.y, offset.x),
+            Some(Tail::Right) => egui::vec2(offset.y, -offset.x),
+        }
+    }
 }
 
-fn place_bubbles(world: &mut World) {
-    let content = *world.resource::<Content>();
+impl BubbleDraw {
+    fn body(&self) -> egui::Rect {
+        let rect = self.rect;
+        match self.tail {
+            None => rect,
+            Some(Tail::Down) => rect.with_max_y(rect.max.y - TAIL_OUT),
+            Some(Tail::Up) => rect.with_min_y(rect.min.y + TAIL_OUT),
+            Some(Tail::Left) => rect.with_min_x(rect.min.x + TAIL_OUT),
+            Some(Tail::Right) => rect.with_max_x(rect.max.x - TAIL_OUT),
+        }
+    }
+}
+
+fn forget(world: &mut World) {
+    let bubbles = std::mem::take(&mut *world.resource_mut::<Bubbles>());
+    for speaking in &bubbles.speakers {
+        despawn_all(world, speaking.typing());
+    }
+}
+
+fn tick(world: &mut World) {
+    let delta = world.resource::<Time>().delta();
+    let mut bubbles = std::mem::take(&mut *world.resource_mut::<Bubbles>());
+    let (gone, mut speakers): (Vec<Speaking>, Vec<Speaking>) =
+        bubbles.speakers.into_iter().partition(|speaking| {
+            speaking
+                .body
+                .is_some_and(|body| world.get_entity(body).is_err() || dead(world, body))
+        });
+    for speaking in &gone {
+        despawn_all(world, speaking.typing());
+    }
+    for speaking in &mut speakers {
+        let held = speaking
+            .drawn
+            .is_some_and(|drawn| rows::hovered(world, &[drawn.rect]));
+        if held {
+            continue;
+        }
+        let typed = typed_lines(world, speaking);
+        let dropped = speaking.tick(delta, &typed);
+        despawn_all(world, dropped);
+    }
+    speakers.retain(|speaking| !speaking.done());
+    bubbles.speakers = speakers;
+    *world.resource_mut::<Bubbles>() = bubbles;
+}
+
+// The speakers that matter most to the player get full bubbles; the rest fold to a sign that
+// someone speaks, at their head or, off screen, at the edge toward them.
+fn place(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
     let Some(window) = window_size(world) else {
         return;
     };
-    let delta = world.resource::<Time>().delta();
+    let (now, still) = rows::clock(world, &gui);
+    let content = *world.resource::<Content>();
     let mut room = Room::of(world, window);
     let viewer = world
         .resource::<Viewpoint>()
@@ -259,33 +380,6 @@ fn place_bubbles(world: &mut World) {
         .and_then(|seen| body_at(world, seen));
     let talking_to = stage::view(world).and_then(|view| view.with);
     let mut bubbles = std::mem::take(&mut *world.resource_mut::<Bubbles>());
-    bubbles.speakers.retain(|speaking| {
-        let gone = speaking
-            .body
-            .is_some_and(|body| world.get_entity(body).is_err() || dead(world, body));
-        if gone && let Some(drawn) = speaking.drawn {
-            world.entity_mut(drawn.entity).insert(ui::Leaving);
-        }
-        !gone
-    });
-    for speaking in &mut bubbles.speakers {
-        let held = speaking
-            .drawn
-            .and_then(|drawn| world.get::<Hovered>(drawn.entity))
-            .is_some_and(Hovered::get);
-        let typed = typed_lines(world, speaking);
-        if !held {
-            speaking.tick(delta, &typed);
-        }
-    }
-    bubbles.speakers.retain(|speaking| {
-        if speaking.done()
-            && let Some(drawn) = speaking.drawn
-        {
-            world.entity_mut(drawn.entity).insert(ui::Leaving);
-        }
-        !speaking.done()
-    });
     let spots: Vec<Spot> = bubbles
         .speakers
         .iter()
@@ -312,163 +406,296 @@ fn place_bubbles(world: &mut World) {
     } else {
         FULL
     };
+    let mut draws: Vec<(u64, BubbleDraw)> = Vec::new();
     let mut folded_off: Vec<(Edge, Vec2, u32)> = Vec::new();
-    for (place, &index) in order.iter().enumerate() {
-        let is_full = place < full;
-        let speaking = &bubbles.speakers[index];
-        let size = drawn_size(world, speaking.drawn);
-        let perch = match (&spots[index], is_full) {
-            (Spot::Off { edge, toward }, false) => {
-                match folded_off.iter_mut().find(|(fold, ..)| fold == edge) {
-                    Some((_, _, count)) => *count += 1,
-                    None => folded_off.push((*edge, *toward, 1)),
-                }
-                if let Some(drawn) = bubbles.speakers[index].drawn.take() {
-                    world.entity_mut(drawn.entity).insert(ui::Leaving);
-                }
-                continue;
+    for (seat, &index) in order.iter().enumerate() {
+        let is_full = seat < full;
+        if let (Spot::Off { edge, toward }, false) = (&spots[index], is_full) {
+            match folded_off.iter_mut().find(|(fold, ..)| fold == edge) {
+                Some((_, _, count)) => *count += 1,
+                None => folded_off.push((*edge, *toward, 1)),
             }
-            (Spot::Off { edge, toward }, true) => Perch::docked(*edge, *toward, room.bounds),
-            (Spot::Head { crown, feet }, _) => Perch::over_head(*crown, *feet, size, room.bounds),
-            (Spot::Nowhere, _) => Perch::loose(room.bounds),
+            bubbles.speakers[index].drawn = None;
+            continue;
+        }
+        let speaking = &mut bubbles.speakers[index];
+        start_typing(world, speaking);
+        let hovered = speaking
+            .drawn
+            .is_some_and(|drawn| rows::hovered(world, &[drawn.rect]));
+        let folded = !is_full && !hovered;
+        let mut draw = speech(world, &content, speaking, folded);
+        let body = body_size(&gui, world, &draw);
+        let perch = match &spots[index] {
+            Spot::Off { edge, toward } => Perch::docked(*edge, *toward, room.bounds),
+            Spot::Head { crown, feet } => {
+                Perch::over_head(*crown, *feet, framed(body, Some(Tail::Down)), room.bounds)
+            }
+            Spot::Nowhere => Perch::loose(room.bounds),
         };
+        let size = framed(body, perch.tail);
         let perch = room.settle(perch, size);
-        let typed = typed_lines(world, speaking);
-        let bubble = SpeechBubble {
-            speaker: speaking.speaker.get(&content).name.to_owned(),
-            replaced: speaking.replaced,
-            lines: speaking.shown_lines(&typed),
-            tail: perch.tail,
-            tail_offset: perch.tail_offset,
-            folded_speakers: (!is_full).then_some(FoldedSpeakers(1)),
-        };
-        let entity = draw(
-            world,
-            &mut bubbles.speakers[index],
-            bubble,
-            perch.root(),
-            !is_full,
-        );
-        let babbling = if is_full {
-            babble_of(world, &bubbles.speakers[index]).map(|babble| Babbling {
+        draw.tail = perch.tail;
+        draw.tail_offset = perch.tail_offset;
+        draw.rect = egui_rect(perch.rect(size));
+        speaking.drawn = Some(Drawn {
+            rect: draw.rect,
+            folded,
+        });
+        draws.push((draw.key, draw));
+        let babbling = is_full
+            .then(|| babble_of(world, speaking))
+            .flatten()
+            .map(|babble| Babbling {
                 babble,
-                place: match bubbles.speakers[index]
-                    .body
-                    .and_then(|body| body_at(world, body))
-                {
+                place: match speaking.body.and_then(|body| body_at(world, body)) {
                     Some(at) => SfxPlace::World(at),
                     None => SfxPlace::Interface,
                 },
-                rank: BabbleRank((FULL - place.min(FULL)) as u32),
-            })
-        } else {
-            None
-        };
-        let keys: Vec<u64> = bubbles.speakers[index]
-            .lines
-            .iter()
-            .map(|line| line.key)
-            .collect();
-        for key in keys {
-            let Some(line) = ui::speech_line(world, entity, key) else {
-                continue;
-            };
+                rank: BabbleRank((FULL - seat.min(FULL)) as u32),
+            });
+        for typing in speaking.typing().collect::<Vec<_>>() {
             match babbling {
                 Some(babbling) => {
-                    world.entity_mut(line).insert(babbling);
+                    world.entity_mut(typing).insert(babbling);
                 }
                 None => {
-                    world.entity_mut(line).remove::<Babbling>();
+                    world.entity_mut(typing).remove::<Babbling>();
                 }
             }
         }
     }
-    draw_edge_folds(world, &mut bubbles, &folded_off, &mut room);
-    *world.resource_mut::<Bubbles>() = bubbles;
-}
-
-fn draw(
-    world: &mut World,
-    speaking: &mut Speaking,
-    bubble: SpeechBubble,
-    anchor: Vec2,
-    folded: bool,
-) -> Entity {
-    let entity = bubble_at(world, speaking.drawn.map(|drawn| drawn.entity), bubble);
-    speaking.drawn = Some(Drawn { entity, folded });
-    position(world, entity, anchor);
-    entity
-}
-
-fn draw_edge_folds(
-    world: &mut World,
-    bubbles: &mut Bubbles,
-    folded_off: &[(Edge, Vec2, u32)],
-    room: &mut Room,
-) {
-    bubbles.edge_folds.retain(|(edge, entity)| {
-        let keep = folded_off.iter().any(|(fold, ..)| fold == edge);
-        if !keep {
-            world.entity_mut(*entity).insert(ui::Leaving);
-        }
-        keep
-    });
-    for &(edge, toward, count) in folded_off {
-        let drawn = bubbles
-            .edge_folds
-            .iter()
-            .find(|(fold, _)| *fold == edge)
-            .map(|&(_, entity)| entity);
-        let size = drawn
-            .and_then(|entity| ui::node_rect(world, entity))
-            .map_or(Vec2::ZERO, |rect| rect.size());
-        let perch = room.settle(Perch::docked(edge, toward, room.bounds), size);
-        let bubble = SpeechBubble {
-            speaker: String::new(),
-            replaced: 0,
+    bubbles.edge_folds = folded_off.iter().map(|&(.., count)| count).collect();
+    for &(edge, toward, count) in &folded_off {
+        let mut draw = BubbleDraw {
+            key: u64::MAX - edge as u64,
+            header: None,
             lines: Vec::new(),
-            tail: perch.tail,
-            tail_offset: perch.tail_offset,
-            folded_speakers: Some(FoldedSpeakers(count)),
+            fold: Some(fold_text(count)),
+            tail: None,
+            tail_offset: 0.0,
+            rect: egui::Rect::NOTHING,
         };
-        let entity = bubble_at(world, drawn, bubble);
-        if drawn.is_none() {
-            bubbles.edge_folds.push((edge, entity));
-        }
-        position(world, entity, perch.root());
+        let perch = Perch::docked(edge, toward, room.bounds);
+        let size = framed(body_size(&gui, world, &draw), perch.tail);
+        let perch = room.settle(perch, size);
+        draw.tail = perch.tail;
+        draw.tail_offset = perch.tail_offset;
+        draw.rect = egui_rect(perch.rect(size));
+        draws.push((draw.key, draw));
+    }
+    let shown = bubbles.fades.sync(now, PRESENCE, still, draws);
+    *world.resource_mut::<Bubbles>() = bubbles;
+    for (draw, look) in shown {
+        paint(world, &gui, &draw, look);
     }
 }
 
-fn bubble_at(world: &mut World, drawn: Option<Entity>, bubble: SpeechBubble) -> Entity {
-    match drawn {
-        Some(entity) => {
-            if let Some(mut shown) = world.get_mut::<SpeechBubble>(entity)
-                && *shown != bubble
-            {
-                *shown = bubble;
-            }
-            entity
+fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) {
+    let area = gui::world_area(world, ("bubble", draw.key))
+        .fade_in(false)
+        .fixed_pos(draw.rect.min);
+    let shown = area.show(gui, |ui| {
+        ui.multiply_opacity(look.opacity);
+        let body = draw.body();
+        ui.painter().rect(
+            body,
+            RADIUS,
+            FILL.gamma_multiply(0.94),
+            Stroke::new(BORDER, OUTLINE),
+            StrokeKind::Inside,
+        );
+        let inner = body.shrink2(PADDING + egui::Vec2::splat(BORDER));
+        let mut content = ui.new_child(
+            UiBuilder::new()
+                .max_rect(inner)
+                .layout(Layout::top_down(Align::Min)),
+        );
+        content.spacing_mut().item_spacing.y = PART_GAP;
+        if let Some(header) = &draw.header {
+            content.label(
+                egui::RichText::new(header)
+                    .font(rows::label_font())
+                    .color(INK.gamma_multiply(0.7)),
+            );
         }
-        None => spawn_ui(
-            world,
-            bsn! {
-                @{ui::speech_bubble(bubble)}
-                GlobalZIndex({ui::tokens::layer::BUBBLES})
-                WorldOverlay
-            },
-        )
-        .id(),
-    }
-}
-
-fn position(world: &mut World, entity: Entity, anchor: Vec2) {
-    let Some(mut node) = world.get_mut::<Node>(entity) else {
-        return;
+        if !draw.lines.is_empty() {
+            content.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = LINE_GAP;
+                for line in &draw.lines {
+                    ui.scope(|ui| {
+                        if line.read {
+                            ui.multiply_opacity(READ_OPACITY);
+                        }
+                        let size = text::measure(
+                            ui.ctx(),
+                            world,
+                            &line.text,
+                            rows::look(LINE_SIZE, INK),
+                            WIDEST,
+                        );
+                        let clipped = egui::vec2(size.x, size.y.min(LINES_HIGH));
+                        let (rect, _) = ui.allocate_exact_size(clipped, Sense::hover());
+                        let mut text_ui = ui.new_child(
+                            UiBuilder::new()
+                                .max_rect(rect)
+                                .layout(Layout::top_down(Align::Min)),
+                        );
+                        text_ui.set_clip_rect(rect.intersect(ui.clip_rect()));
+                        text::show(
+                            &mut text_ui,
+                            world,
+                            &line.text,
+                            rows::look(LINE_SIZE, INK),
+                            line.shown,
+                        );
+                    });
+                }
+            });
+        }
+        if let Some(fold) = &draw.fold {
+            content.label(
+                egui::RichText::new(fold)
+                    .font(rows::label_font())
+                    .color(INK),
+            );
+        }
+        if let Some(tail) = draw.tail {
+            paint_tail(ui, body, tail, draw.tail_offset);
+        }
+        ui.allocate_rect(draw.rect, Sense::hover());
+    });
+    let look = Look {
+        offset: Tail::turn(draw.tail, look.offset),
+        ..look
     };
-    let (left, top) = (Val::Px(anchor.x.round()), Val::Px(anchor.y.round()));
-    if node.left != left || node.top != top {
-        node.left = left;
-        node.top = top;
+    gui.set_transform_layer(shown.response.layer_id, look.around(draw.rect));
+}
+
+// The tail is the outer half of a square turned on its corner, its base laid over the body's
+// outline so the two read as one shape.
+fn paint_tail(ui: &egui::Ui, body: egui::Rect, tail: Tail, offset: f32) {
+    let out = tail.axis();
+    let along = egui::vec2(out.y.abs(), out.x.abs());
+    let edge = match tail {
+        Tail::Down => body.center_bottom(),
+        Tail::Up => body.center_top(),
+        Tail::Left => body.left_center(),
+        Tail::Right => body.right_center(),
+    };
+    let base = edge + along * offset;
+    let reach = TAIL * std::f32::consts::FRAC_1_SQRT_2;
+    let (start, end, tip) = (
+        base - along * reach,
+        base + along * reach,
+        base + out * reach,
+    );
+    let fill = FILL.gamma_multiply(0.94);
+    ui.painter().add(Shape::convex_polygon(
+        vec![start, tip, end],
+        fill,
+        Stroke::NONE,
+    ));
+    ui.painter().line_segment(
+        [start + along * BORDER, end - along * BORDER],
+        Stroke::new(BORDER * 2.0, fill),
+    );
+    let outline = Stroke::new(BORDER, OUTLINE);
+    ui.painter().line_segment([start, tip], outline);
+    ui.painter().line_segment([tip, end], outline);
+}
+
+fn speech(world: &World, content: &Content, speaking: &Speaking, folded: bool) -> BubbleDraw {
+    let name = speaking.speaker.get(content).name.to_owned();
+    let header = match speaking.replaced {
+        0 => name,
+        replaced => format!("{name} +{replaced}"),
+    };
+    let typed = typed_lines(world, speaking);
+    let now = speaking.clock;
+    let lines = speaking.lines[..speaking.shown_lines(&typed)]
+        .iter()
+        .map(|line| {
+            let typing = line
+                .typing
+                .and_then(|typing| world.get::<Typewriter>(typing));
+            LineDraw {
+                text: line.notification.text.styled(),
+                shown: typing.and_then(Typewriter::shown),
+                read: line.read_by.is_some_and(|read_by| now >= read_by),
+            }
+        })
+        .collect();
+    BubbleDraw {
+        key: speaking.arrived,
+        header: (!folded).then_some(header),
+        lines: if folded { Vec::new() } else { lines },
+        fold: folded.then(|| fold_text(1)),
+        tail: None,
+        tail_offset: 0.0,
+        rect: egui::Rect::NOTHING,
+    }
+}
+
+fn fold_text(speakers: u32) -> String {
+    match speakers {
+        0 | 1 => "\u{2026}".to_owned(),
+        speakers => format!("\u{2026} {speakers}"),
+    }
+}
+
+/// The body's size, laid out as `paint` will lay it out.
+fn body_size(gui: &egui::Context, world: &World, draw: &BubbleDraw) -> egui::Vec2 {
+    let label = |text: &str| {
+        gui.fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), rows::label_font(), INK))
+            .size()
+    };
+    let mut parts: Vec<egui::Vec2> = Vec::new();
+    parts.extend(draw.header.as_deref().map(label));
+    if !draw.lines.is_empty() {
+        let lines: Vec<egui::Vec2> = draw
+            .lines
+            .iter()
+            .map(|line| {
+                let size =
+                    text::measure(gui, world, &line.text, rows::look(LINE_SIZE, INK), WIDEST);
+                egui::vec2(size.x, size.y.min(LINES_HIGH))
+            })
+            .collect();
+        parts.push(stacked(&lines, LINE_GAP));
+    }
+    parts.extend(draw.fold.as_deref().map(label));
+    stacked(&parts, PART_GAP) + 2.0 * (PADDING + egui::Vec2::splat(BORDER))
+}
+
+fn stacked(parts: &[egui::Vec2], gap: f32) -> egui::Vec2 {
+    let width = parts.iter().map(|part| part.x).fold(0.0, f32::max);
+    let height =
+        parts.iter().map(|part| part.y).sum::<f32>() + gap * parts.len().saturating_sub(1) as f32;
+    egui::vec2(width, height)
+}
+
+/// A body's size with its tail, which reaches half its length past the body's edge.
+fn framed(body: egui::Vec2, tail: Option<Tail>) -> Vec2 {
+    let tail = match tail {
+        Some(Tail::Down | Tail::Up) => egui::vec2(0.0, TAIL_OUT),
+        Some(Tail::Left | Tail::Right) => egui::vec2(TAIL_OUT, 0.0),
+        None => egui::Vec2::ZERO,
+    };
+    let size = body + tail;
+    Vec2::new(size.x, size.y)
+}
+
+fn start_typing(world: &mut World, speaking: &mut Speaking) {
+    let typed = typed_lines(world, speaking);
+    let shown = speaking.shown_lines(&typed);
+    for line in &mut speaking.lines[..shown] {
+        if line.typing.is_none() {
+            let typing = world
+                .spawn((line.notification.text.styled(), Typewriter::default()))
+                .id();
+            line.typing = Some(typing);
+        }
     }
 }
 
@@ -478,13 +705,20 @@ fn typed_lines(world: &World, speaking: &Speaking) -> Vec<bool> {
         .iter()
         .map(|line| {
             line.read_by.is_some()
-                || speaking
-                    .drawn
-                    .and_then(|drawn| ui::speech_line(world, drawn.entity, line.key))
-                    .and_then(|text| world.get::<ui::Typewriter>(text))
-                    .is_some_and(ui::Typewriter::is_finished)
+                || line
+                    .typing
+                    .and_then(|typing| world.get::<Typewriter>(typing))
+                    .is_some_and(Typewriter::is_finished)
         })
         .collect()
+}
+
+fn despawn_all(world: &mut World, entities: impl IntoIterator<Item = Entity>) {
+    for entity in entities.into_iter().collect::<Vec<_>>() {
+        if let Ok(typing) = world.get_entity_mut(entity) {
+            typing.despawn();
+        }
+    }
 }
 
 fn babble_of(world: &World, speaking: &Speaking) -> Option<BabbleId> {
@@ -527,9 +761,12 @@ fn spot(world: &mut World, speaking: &Speaking, window: Vec2) -> Spot {
 }
 
 impl Room {
-    fn of(world: &mut World, window: Vec2) -> Room {
-        let mut taken = hud::pieces(world);
-        taken.extend(stage::rects(world));
+    fn of(world: &World, window: Vec2) -> Room {
+        let taken = hud::pieces(world)
+            .into_iter()
+            .chain(stage::rects(world))
+            .map(|rect| Rect::new(rect.min.x, rect.min.y, rect.max.x, rect.max.y))
+            .collect();
         Room {
             bounds: Rect::from_corners(Vec2::splat(EDGE), window - EDGE),
             taken,
@@ -537,7 +774,7 @@ impl Room {
     }
 
     fn settle(&mut self, mut perch: Perch, size: Vec2) -> Perch {
-        let reach = ui::bubble_tail_reach(size.dot(perch.cross()));
+        let reach = tail_reach(size.dot(perch.cross()));
         for _ in 0..=self.taken.len() {
             let rect = perch.rect(size);
             let Some(push) = self.taken.iter().find_map(|&taken| push_out(rect, taken)) else {
@@ -555,9 +792,9 @@ impl Perch {
     fn over_head(crown: Vec2, feet: Vec2, size: Vec2, bounds: Rect) -> Perch {
         let above = Vec2::new(crown.x, crown.y - CROWN_GAP);
         let (tip, tail) = if above.y - size.y < bounds.min.y {
-            (feet, BubbleTail::Up)
+            (feet, Tail::Up)
         } else {
-            (above, BubbleTail::Down)
+            (above, Tail::Down)
         };
         Perch {
             tip,
@@ -570,10 +807,10 @@ impl Perch {
         let along_x = toward.x.clamp(bounds.min.x, bounds.max.x);
         let along_y = toward.y.clamp(bounds.min.y, bounds.max.y);
         let (tip, tail) = match edge {
-            Edge::Left => (Vec2::new(bounds.min.x, along_y), BubbleTail::Left),
-            Edge::Right => (Vec2::new(bounds.max.x, along_y), BubbleTail::Right),
-            Edge::Top => (Vec2::new(along_x, bounds.min.y), BubbleTail::Up),
-            Edge::Bottom => (Vec2::new(along_x, bounds.max.y), BubbleTail::Down),
+            Edge::Left => (Vec2::new(bounds.min.x, along_y), Tail::Left),
+            Edge::Right => (Vec2::new(bounds.max.x, along_y), Tail::Right),
+            Edge::Top => (Vec2::new(along_x, bounds.min.y), Tail::Up),
+            Edge::Bottom => (Vec2::new(along_x, bounds.max.y), Tail::Down),
         };
         Perch {
             tip,
@@ -592,8 +829,8 @@ impl Perch {
 
     fn cross(self) -> Vec2 {
         match self.tail {
-            Some(BubbleTail::Down | BubbleTail::Up) | None => Vec2::X,
-            Some(BubbleTail::Left | BubbleTail::Right) => Vec2::Y,
+            Some(Tail::Down | Tail::Up) | None => Vec2::X,
+            Some(Tail::Left | Tail::Right) => Vec2::Y,
         }
     }
 
@@ -604,10 +841,10 @@ impl Perch {
     fn rect(self, size: Vec2) -> Rect {
         let root = self.root();
         let min = match self.tail {
-            Some(BubbleTail::Down) => root - Vec2::new(size.x / 2.0, size.y),
-            Some(BubbleTail::Up) => root - Vec2::new(size.x / 2.0, 0.0),
-            Some(BubbleTail::Left) => root - Vec2::new(0.0, size.y / 2.0),
-            Some(BubbleTail::Right) => root - Vec2::new(size.x, size.y / 2.0),
+            Some(Tail::Down) => root - Vec2::new(size.x / 2.0, size.y),
+            Some(Tail::Up) => root - Vec2::new(size.x / 2.0, 0.0),
+            Some(Tail::Left) => root - Vec2::new(0.0, size.y / 2.0),
+            Some(Tail::Right) => root - Vec2::new(size.x, size.y / 2.0),
             None => root,
         };
         Rect::from_corners(min, min + size)
@@ -625,6 +862,11 @@ impl Perch {
         self.tip += by - cross * along + cross * (offset - wanted);
         self.tail_offset = offset;
     }
+}
+
+/// How far the tail may slide from the middle of the body's side and still meet it squarely.
+fn tail_reach(body_extent: f32) -> f32 {
+    (body_extent / 2.0 - RADIUS - TAIL).max(0.0)
 }
 
 fn push_out(rect: Rect, taken: Rect) -> Option<Vec2> {
@@ -657,10 +899,14 @@ fn pull_in(rect: Rect, bounds: Rect) -> Vec2 {
     )
 }
 
-fn drawn_size(world: &World, drawn: Option<Drawn>) -> Vec2 {
-    drawn
-        .and_then(|drawn| ui::node_rect(world, drawn.entity))
-        .map_or(Vec2::ZERO, |rect| rect.size())
+fn egui_rect(rect: Rect) -> egui::Rect {
+    egui::Rect::from_min_max(
+        egui::pos2(rect.min.x.round(), rect.min.y.round()),
+        egui::pos2(
+            rect.min.x.round() + rect.width(),
+            rect.min.y.round() + rect.height(),
+        ),
+    )
 }
 
 fn body_at(world: &World, body: Entity) -> Option<Pos<Tiles>> {

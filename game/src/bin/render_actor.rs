@@ -5,6 +5,7 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 
 use bevy::asset::{AssetPlugin, LoadState};
+use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{RenderTarget, ScalingMode};
 use bevy::image::ImageSampler;
 use bevy::log::{Level, LogPlugin};
@@ -13,6 +14,7 @@ use bevy::render::RenderPlugin;
 use bevy::render::render_resource::TextureFormat;
 use bevy::render::settings::{Backends, RenderCreation, WgpuSettings};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+use bevy::sprite::Anchor;
 use bevy::window::ExitCondition;
 use game::core::content::{Content, FilesystemFolder};
 use game::core::math::{Direction, Size, WorldPx};
@@ -31,6 +33,7 @@ const PAD: f32 = 12.0;
 const TARGET_WIDTH: f32 = 1600.0;
 const LABEL_BAND: f32 = 36.0;
 const CAPTION_BAND: f32 = 56.0;
+const LABELS: RenderLayers = RenderLayers::layer(1);
 const COLUMNS: [Direction; 8] = [
     Direction::S,
     Direction::SW,
@@ -299,17 +302,34 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
         layout.width as f32 / layout.zoom,
         layout.height as f32 / layout.zoom,
     );
-    let camera = world
-        .spawn((
-            Camera2d,
-            RenderTarget::Image(target.clone().into()),
-            Projection::Orthographic(OrthographicProjection {
-                scaling_mode: ScalingMode::Fixed { width, height },
-                ..OrthographicProjection::default_2d()
-            }),
-            Msaa::Off,
-        ))
-        .id();
+    world.spawn((
+        Camera2d,
+        RenderTarget::Image(target.clone().into()),
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::Fixed { width, height },
+            ..OrthographicProjection::default_2d()
+        }),
+        Msaa::Off,
+    ));
+    // Labels draw unzoomed, through a camera of their own, so they stay crisp at any zoom.
+    world.spawn((
+        Camera2d,
+        Camera {
+            order: 1,
+            clear_color: ClearColorConfig::None,
+            ..default()
+        },
+        RenderTarget::Image(target.clone().into()),
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::Fixed {
+                width: layout.width as f32,
+                height: layout.height as f32,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+        Msaa::Off,
+        LABELS,
+    ));
 
     let band_top = height / 2.0 - LABEL_BAND / layout.zoom;
     let left = -width / 2.0;
@@ -331,39 +351,25 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
             Slot(dir),
         ));
         world.spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(layout.cell.width * layout.zoom * column as f32),
-                width: Val::Px(layout.cell.width * layout.zoom),
-                top: Val::Px(8.0),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            UiTargetCamera(camera),
-            children![(
-                Text::new(dir.as_ref().to_uppercase()),
-                TextFont::from_font_size(18.0),
-                TextColor(Color::srgb_u8(0xb8, 0xbe, 0xc8)),
-            )],
+            Text2d::new(dir.as_ref().to_uppercase()),
+            TextFont::from_font_size(18.0),
+            TextColor(Color::srgb_u8(0xb8, 0xbe, 0xc8)),
+            Anchor::TOP_CENTER,
+            Transform::from_xyz(
+                layout.cell.width * layout.zoom * (column as f32 + 0.5) - layout.width as f32 / 2.0,
+                layout.height as f32 / 2.0 - 8.0,
+                0.0,
+            ),
+            LABELS,
         ));
     }
     world.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            height: Val::Px(CAPTION_BAND),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        },
-        UiTargetCamera(camera),
-        children![(
-            Text::default(),
-            TextFont::from_font_size(26.0),
-            TextColor(Color::WHITE),
-            Caption,
-        )],
+        Text2d::default(),
+        TextFont::from_font_size(26.0),
+        TextColor(Color::WHITE),
+        Transform::from_xyz(0.0, CAPTION_BAND / 2.0 - layout.height as f32 / 2.0, 0.0),
+        LABELS,
+        Caption,
     ));
 
     world.insert_resource(Reel {
@@ -381,7 +387,7 @@ fn advance(
     content: Res<Content>,
     assets: Res<AssetServer>,
     mut slots: Query<(&Slot, &mut Sprite, &mut Visibility)>,
-    mut caption: Single<&mut Text, With<Caption>>,
+    mut caption: Single<&mut Text2d, With<Caption>>,
 ) {
     if reel.next >= reel.total {
         return;
@@ -409,12 +415,15 @@ fn advance(
         *visibility = Visibility::Inherited;
     }
     let loop_number = frame / clip.frames_per_loop + 1;
-    caption.set_if_neq(Text::new(format!(
+    let label = format!(
         "{} - {}   loop {loop_number}/{}",
         clip.model.key(&content),
         clip.action.as_ref(),
         clip.loops
-    )));
+    );
+    if caption.0 != label {
+        caption.0 = label;
+    }
     let index = reel.next;
     commands
         .spawn(Screenshot::image(reel.target.clone()))
