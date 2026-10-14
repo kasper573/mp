@@ -4,7 +4,7 @@ pub mod present;
 pub mod screen;
 pub mod transition;
 
-pub use camera::{WorldToWindow, cursor_tile, tile_to_window};
+pub use camera::{WorldOverlay, WorldToWindow, cursor_tile, tile_to_window};
 pub use screen::ToScreen;
 
 use std::collections::HashMap;

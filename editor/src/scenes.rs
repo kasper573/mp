@@ -1,6 +1,5 @@
-use game::systems::area;
-use game::systems::area::AreaDef;
 use game::systems::area::world_map::{Note, Region};
+use game::systems::area::{self, AreaDef};
 
 use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};
 use crate::project::{ContentEdit, RowSelection};

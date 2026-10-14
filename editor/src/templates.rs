@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use include_dir::{Dir, include_dir};
+use walkdir::WalkDir;
 
 use crate::project::files::GAME_FILE;
 use crate::value::RowValue;
@@ -192,12 +193,16 @@ fn write_name(folder: &Path, name: &str) -> Result<(), String> {
 }
 
 fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(to).map_err(|error| error.to_string())?;
-    for entry in std::fs::read_dir(from).map_err(|error| error.to_string())? {
+    for entry in WalkDir::new(from) {
         let entry = entry.map_err(|error| error.to_string())?;
-        let target = to.join(entry.file_name());
-        if entry.path().is_dir() {
-            copy_dir(&entry.path(), &target)?;
+        let target = to.join(
+            entry
+                .path()
+                .strip_prefix(from)
+                .expect("a walked entry lies under its root"),
+        );
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(target).map_err(|error| error.to_string())?;
         } else {
             std::fs::copy(entry.path(), target).map_err(|error| error.to_string())?;
         }

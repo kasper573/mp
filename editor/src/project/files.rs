@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use game::core::content::MemoryFolder;
+use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;
 
@@ -22,7 +24,26 @@ struct Stored {
 impl ProjectFiles {
     pub fn read_dir(root: &Path) -> io::Result<ProjectFiles> {
         let mut files = ProjectFiles::default();
-        walk(root, root, &mut files)?;
+        let entries = WalkDir::new(root)
+            .min_depth(1)
+            .follow_links(true)
+            .into_iter()
+            .filter_entry(|entry| !hidden(entry.file_name()));
+        for entry in entries {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let relative = entry
+                .path()
+                .strip_prefix(root)
+                .expect("a walked file lies under its root")
+                .components()
+                .map(|part| part.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+            files.insert(relative, FileBytes::from(std::fs::read(entry.path())?));
+        }
         Ok(files)
     }
 
@@ -174,31 +195,7 @@ impl PartialEq for FileChange {
     }
 }
 
-fn walk(root: &Path, dir: &Path, into: &mut ProjectFiles) -> io::Result<()> {
-    let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .collect();
-    entries.sort();
-    for path in entries {
-        let name = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or_default()
-            .to_owned();
-        if name.starts_with('.') || name.ends_with(".tmp") {
-            continue;
-        }
-        if path.is_dir() {
-            walk(root, &path, into)?;
-        } else if let Ok(relative) = path.strip_prefix(root) {
-            let relative = relative
-                .components()
-                .map(|part| part.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/");
-            into.insert(relative, FileBytes::from(std::fs::read(&path)?));
-        }
-    }
-    Ok(())
+fn hidden(name: &OsStr) -> bool {
+    name.to_str()
+        .is_some_and(|name| name.starts_with('.') || name.ends_with(".tmp"))
 }

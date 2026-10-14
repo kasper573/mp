@@ -38,7 +38,6 @@ fn main() {
 
 fn window(vsync: bool) -> Window {
     Window {
-        title: "Rift".to_owned(),
         present_mode: if vsync {
             PresentMode::AutoVsync
         } else {

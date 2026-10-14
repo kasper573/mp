@@ -18,16 +18,19 @@ use bevy_replicon::prelude::*;
 use bevy_replicon_renet2::RenetChannelsExt;
 use bevy_state::prelude::*;
 use game::core::content::sync::Manifest;
+use game::core::net::SessionRequest;
 use game::core::net::transport::{ClientSocket, SocketClientPlugin};
-use game::core::platform::ServerSocket;
+use game::core::platform::{ServerSocket, SocketState};
+use game::systems::TICK_HZ;
+use game::systems::launch::fake_token;
 use game::systems::player::JoinRequest;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
 
-const TICK: Duration = Duration::from_millis(33);
-const BUDGET_MS: f64 = 40.0;
+use crate::search::{BUDGET_MS, Search};
+
 /// Search clamp for the player root-find; the real limit is the server's client cap or its tick time.
 const MAX_PLAYERS: usize = 50_000;
 /// Open this many sockets before pumping, so already-connected clients keep draining while we connect.
@@ -74,7 +77,7 @@ fn run_fixed(http_url: &str, ws_url: &str, count: usize) {
     );
     let mut report = Instant::now();
     loop {
-        pump(&mut clients, TICK);
+        pump(&mut clients, TICK_HZ.period());
         if report.elapsed() >= Duration::from_secs(2) {
             println!(
                 "[loadtest] connected {}/{}",
@@ -93,9 +96,7 @@ fn run_dyn(http_url: &str, ws_url: &str) {
     println!("[loadtest] root-finding the {BUDGET_MS:.0}ms/tick player equilibrium ({ws_url})");
     let mut clients: Vec<App> = Vec::new();
     let mut next_id = 0usize;
-    let mut under: Option<(usize, f64)> = None;
-    let mut over: Option<(usize, f64)> = None;
-    let mut previous: Option<(usize, f64)> = None;
+    let mut search = Search::up_to(MAX_PLAYERS);
     let mut next = Some(1usize);
     while let Some(target) = next {
         set_player_count(&mut clients, http_url, ws_url, &mut next_id, target);
@@ -104,14 +105,7 @@ fn run_dyn(http_url: &str, ws_url: &str) {
         let verdict = if ms <= BUDGET_MS { "ok" } else { "over" };
         println!("[loadtest]   {live:>6} players  →  server {ms:6.2}ms/tick  {verdict}");
 
-        let last = (live, ms);
-        if ms <= BUDGET_MS {
-            if under.is_none_or(|(highest, _)| live >= highest) {
-                under = Some(last);
-            }
-        } else if over.is_none_or(|(lowest, _)| live <= lowest) {
-            over = Some(last);
-        }
+        next = search.next_after(live, ms);
         // Couldn't OPEN as many sockets as asked (not merely "not all connected yet") while still under
         // budget: the limit is the machine's or server's connection ceiling, not tick time, and that
         // count is the answer. Compare opened sockets, not `live`, so a slow handshake isn't mistaken
@@ -120,10 +114,8 @@ fn run_dyn(http_url: &str, ws_url: &str) {
             println!("[loadtest] connection ceiling at {live} players (could not open more)");
             break;
         }
-        next = search::project(BUDGET_MS, MAX_PLAYERS, under, over, previous, last);
-        previous = Some(last);
     }
-    match under {
+    match search.sustained() {
         Some((players, ms)) => println!(
             "[loadtest] equilibrium: ~{players} concurrent players sustained at {ms:.1}ms/tick (budget {BUDGET_MS:.0}ms)"
         ),
@@ -169,7 +161,7 @@ fn pump(clients: &mut [App], duration: Duration) {
         for client in clients.iter_mut() {
             client.update();
         }
-        if let Some(remaining) = TICK.checked_sub(frame.elapsed()) {
+        if let Some(remaining) = TICK_HZ.period().checked_sub(frame.elapsed()) {
             std::thread::sleep(remaining);
         }
         if Instant::now() >= deadline {
@@ -245,7 +237,7 @@ fn build_client(http_url: &str, ws_url: &str, index: usize) -> Option<App> {
     Some(app)
 }
 
-fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
+fn fetch_ticket(http_url: &str, account: &str) -> Option<String> {
     let manifest = ureq::get(format!("{http_url}/content/manifest"))
         .call()
         .ok()?
@@ -253,18 +245,24 @@ fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
         .read_to_string()
         .ok()?;
     let manifest: Manifest = serde_json::from_str(&manifest).ok()?;
-    let body = serde_json::json!({ "build": manifest.build, "rows": manifest.rows.hash });
+    let request = SessionRequest {
+        build: manifest.build,
+        rows: manifest.rows.hash,
+    };
     let mut response = ureq::post(format!("{http_url}/session"))
-        .header("Authorization", format!("fake:{fake_id}"))
+        .header(
+            "Authorization",
+            format!("Bearer {}", fake_token(account, &[])),
+        )
         .header("Content-Type", "application/json")
-        .send(body.to_string())
+        .send(serde_json::to_string(&request).ok()?)
         .ok()?;
     Some(response.body_mut().read_to_string().ok()?.trim().to_owned())
 }
 
 struct WsSocket {
     ws: RefCell<tungstenite::WebSocket<MaybeTlsStream<TcpStream>>>,
-    open: Cell<bool>,
+    state: Cell<SocketState>,
 }
 
 impl WsSocket {
@@ -277,7 +275,7 @@ impl WsSocket {
         }
         Some(WsSocket {
             ws: RefCell::new(ws),
-            open: Cell::new(true),
+            state: Cell::new(SocketState::Open),
         })
     }
 }
@@ -287,13 +285,13 @@ impl ServerSocket for WsSocket {
         match self.ws.borrow_mut().read() {
             Ok(Message::Binary(data)) => Some(data.to_vec()),
             Ok(Message::Close(_)) => {
-                self.open.set(false);
+                self.state.set(SocketState::Closed);
                 None
             }
             Ok(_) => None,
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => None,
             Err(_) => {
-                self.open.set(false);
+                self.state.set(SocketState::Closed);
                 None
             }
         }
@@ -308,16 +306,12 @@ impl ServerSocket for WsSocket {
             Ok(()) => {}
             // A non-blocking write that couldn't flush fully is buffered for the next send.
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {}
-            Err(_) => self.open.set(false),
+            Err(_) => self.state.set(SocketState::Closed),
         }
     }
 
-    fn is_open(&self) -> bool {
-        self.open.get()
-    }
-
-    fn is_closed(&self) -> bool {
-        !self.open.get()
+    fn state(&self) -> SocketState {
+        self.state.get()
     }
 }
 

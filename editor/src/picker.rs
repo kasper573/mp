@@ -1,6 +1,5 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::systems::area;
-use game::systems::area::{AreaDef, AreaModule};
+use game::systems::area::{self, AreaDef, AreaModule};
 use game::systems::npc::{self, NpcDef};
 use game::systems::script::{OwnerKind, RiftScripts};
 

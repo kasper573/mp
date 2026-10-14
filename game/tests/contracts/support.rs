@@ -19,15 +19,16 @@ use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::interact::InteractRequest;
 use game::systems::item::{self, Inventory, ItemId, ItemStack};
-use game::systems::memory;
-use game::systems::memory::MemoryId;
-use game::systems::movement::position;
+use game::systems::memory::{self, MemoryId};
+use game::systems::movement::{Position, position};
 use game::systems::notification::{
     Notification, NotificationId, NotificationKind, NotificationSent,
 };
 use game::systems::npc::{self, Npc, NpcId, Pack};
+use game::systems::player::snapshot::JoinAs;
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
 use game::systems::script::condition;
+use game::systems::stat::{self, StatKind};
 use game::systems::{GameSettings, WorldArea, from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
@@ -125,15 +126,13 @@ impl Sim {
 
     pub fn join(&mut self, client: u32) -> Entity {
         self.connect(client);
-        self.send(client, JoinRequest);
-        self.tick();
-        self.send(client, AreaDrawn);
-        *self
-            .world()
-            .resource::<Players>()
-            .0
-            .get(&ClientId(client))
-            .expect("joined player")
+        self.enter(client)
+    }
+
+    pub fn join_as(&mut self, client: u32, join_as: JoinAs) -> Entity {
+        let conn = self.connect(client);
+        self.world().entity_mut(conn).insert(join_as);
+        self.enter(client)
     }
 
     pub fn notified(&self, client: u32) -> Vec<NotificationSent> {
@@ -178,6 +177,18 @@ impl Sim {
             .find(|node| (min..=max).contains(&from.distance(*node)))
             .expect("a reachable walkable tile in range")
     }
+
+    fn enter(&mut self, client: u32) -> Entity {
+        self.send(client, JoinRequest);
+        self.tick();
+        self.send(client, AreaDrawn);
+        *self
+            .world()
+            .resource::<Players>()
+            .0
+            .get(&ClientId(client))
+            .expect("joined player")
+    }
 }
 
 pub fn townsperson(sim: &mut Sim, who: NpcId) -> Entity {
@@ -200,6 +211,15 @@ pub fn object(sim: &mut Sim, name: &str) -> Entity {
         .expect("an object on the map")
 }
 
+pub fn object_center(sim: &mut Sim, name: &str) -> Pos<Tiles> {
+    let entity = object(sim, name);
+    sim.world()
+        .get::<AreaObject>(entity)
+        .expect("an area object")
+        .shape
+        .center()
+}
+
 pub fn remember(sim: &mut Sim, player: Entity, key: MemoryId) {
     memory::set(sim.world(), player, key, Value::Bool(true));
 }
@@ -211,7 +231,7 @@ pub fn remembered(sim: &mut Sim, player: Entity, key: MemoryId) -> bool {
 pub fn counted(sim: &mut Sim, player: Entity, key: MemoryId) -> i64 {
     match memory::get(sim.world(), player, key) {
         Value::Int(count) => count,
-        other => panic!("{key:?} holds {other:?}, not a count"),
+        other => panic!("{} holds {other:?}, not a count", key.key(content())),
     }
 }
 
@@ -249,29 +269,34 @@ pub fn labels(conversation: &Conversation) -> Vec<String> {
 
 pub fn pick(sim: &mut Sim, client: u32, player: Entity, label: &str) -> Option<Conversation> {
     let now = conversation(sim, player).expect("talking");
-    let choice =
-        now.choices
-            .iter()
-            .position(|choice| choice.label.words(&InputMap::new(content())) == label)
-            .unwrap_or_else(|| panic!("no choice {label:?} in {:?}", labels(&now))) as u32;
     sim.send(
         client,
         ConversationRequest::Pick {
             step: now.step,
-            choice,
+            choice: choice(&now, label),
         },
     );
     sim.tick();
     conversation(sim, player)
 }
 
-pub fn locked(conversation: &Conversation, label: &str) -> bool {
+pub fn choice(conversation: &Conversation, label: &str) -> u32 {
     conversation
         .choices
         .iter()
-        .find(|choice| choice.label.words(&InputMap::new(content())) == label)
-        .unwrap_or_else(|| panic!("no choice {label:?} in {:?}", labels(conversation)))
-        .locked
+        .position(|choice| choice.label.words(&InputMap::new(content())) == label)
+        .unwrap_or_else(|| panic!("no choice {label:?} in {:?}", labels(conversation))) as u32
+}
+
+pub fn locked(conversation: &Conversation, label: &str) -> bool {
+    conversation.choices[choice(conversation, label) as usize].locked
+}
+
+pub fn told(sim: &Sim, client: u32) -> Vec<Notification> {
+    sim.notified(client)
+        .into_iter()
+        .map(|sent| sent.notification)
+        .collect()
 }
 
 pub fn errors(sim: &Sim, client: u32) -> Vec<String> {
@@ -304,6 +329,24 @@ pub fn count(sim: &mut Sim, player: Entity, item: ItemId) -> u32 {
         .count(item)
 }
 
+pub fn slot_of(sim: &mut Sim, player: Entity, item: ItemId) -> u32 {
+    sim.world()
+        .get::<Inventory>(player)
+        .expect("bag")
+        .slots
+        .iter()
+        .position(|stack| stack.item == item)
+        .expect("in the bag") as u32
+}
+
+pub fn health(sim: &mut Sim, who: Entity) -> f32 {
+    stat::effective(sim.world(), who, StatKind::Health)
+}
+
+pub fn place(sim: &mut Sim, entity: Entity, at: Pos<Tiles>) {
+    sim.world().entity_mut(entity).insert(Position { pos: at });
+}
+
 pub fn spoken(id: NotificationId) -> Notification {
     let def = id.get(content());
     def.notification(condition::spoken(
@@ -311,27 +354,6 @@ pub fn spoken(id: NotificationId) -> Notification {
         Entity::PLACEHOLDER,
         &def.text,
     ))
-}
-
-#[derive(Resource, Default)]
-struct Notified(Vec<(Entity, NotificationSent)>);
-
-fn collect_notified(
-    mut sent: MessageReader<ToClients<NotificationSent>>,
-    mut notified: ResMut<Notified>,
-) {
-    for message in sent.read() {
-        if let Some(conn) = addressee(message) {
-            notified.0.push((conn, message.message.clone()));
-        }
-    }
-}
-
-fn addressee(message: &ToClients<NotificationSent>) -> Option<Entity> {
-    match message.targets {
-        SendTargets::Single(Sender::Client(conn)) => Some(conn),
-        _ => None,
-    }
 }
 
 pub fn settle(sim: &mut Sim) {
@@ -365,4 +387,25 @@ fn drawn_seed() -> u64 {
     let seed = Rng::random_seed();
     eprintln!("rng seed {seed}");
     seed
+}
+
+#[derive(Resource, Default)]
+struct Notified(Vec<(Entity, NotificationSent)>);
+
+fn collect_notified(
+    mut sent: MessageReader<ToClients<NotificationSent>>,
+    mut notified: ResMut<Notified>,
+) {
+    for message in sent.read() {
+        if let Some(conn) = addressee(message) {
+            notified.0.push((conn, message.message.clone()));
+        }
+    }
+}
+
+fn addressee(message: &ToClients<NotificationSent>) -> Option<Entity> {
+    match message.targets {
+        SendTargets::Single(Sender::Client(conn)) => Some(conn),
+        _ => None,
+    }
 }

@@ -2,9 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align, Color32, Layout, Sense, Stroke as EStroke, Ui, Vec2};
 use game::core::content::Content;
-use game::systems::area;
-use game::systems::area::AreaId;
 use game::systems::area::tileset::TilesetDef;
+use game::systems::area::{self, AreaId};
 use strum::VariantArray;
 
 use super::brush::{TerrainPick, TilePick};

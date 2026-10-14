@@ -8,20 +8,6 @@ use crate::support::{Sim, content, row, spawn_area};
 
 const HOUR: u64 = 3_600_000;
 
-fn at(millis: u64) -> WallClock {
-    WallClock {
-        now: UnixMillis(millis),
-        reset: UtcHour::try_from(4).expect("hour"),
-    }
-}
-
-fn later(clock: WallClock, seconds: f32) -> WallClock {
-    WallClock {
-        now: clock.now.after(Seconds(seconds)),
-        ..clock
-    }
-}
-
 #[test]
 fn a_memory_reads_as_zero_until_set_and_again_once_forgotten() {
     let clock = at(100 * HOUR);
@@ -142,4 +128,18 @@ fn the_world_reads_and_writes_a_players_memory() {
         memory::get(sim.world(), player, row("SidedWithOrcs")),
         Value::Bool(false)
     );
+}
+
+fn at(millis: u64) -> WallClock {
+    WallClock {
+        now: UnixMillis(millis),
+        reset: UtcHour::try_from(4).expect("hour"),
+    }
+}
+
+fn later(clock: WallClock, seconds: f32) -> WallClock {
+    WallClock {
+        now: clock.now.after(Seconds(seconds)),
+        ..clock
+    }
 }

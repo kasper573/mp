@@ -7,8 +7,7 @@ use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport, MAX_IMAGE_PX};
 use super::records::ImportRecord;
-use crate::views::model;
-use crate::views::model::{ModelStrip, StripFrame};
+use crate::views::model::{self, ModelStrip, StripFrame};
 
 pub type StripMapping = BTreeMap<String, Option<String>>;
 

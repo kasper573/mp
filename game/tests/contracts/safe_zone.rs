@@ -2,79 +2,11 @@ use bevy_ecs::prelude::*;
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::{self, Area, Wild};
-use game::systems::movement::{self, MoveRequest, Position, position};
+use game::systems::movement::{self, MoveRequest, position};
 use game::systems::npc::{self, NpcId, Pack};
 use game::systems::reach::{self, ReachAct};
 
-use crate::support::{Sim, content, row, spawn_area};
-
-struct Edge {
-    lair: Pos<Tiles>,
-    doorstep: Pos<Tiles>,
-    refuge: Pos<Tiles>,
-}
-
-fn edge(map: &Area) -> Edge {
-    let ground = &map.grid;
-    let outside = &map.wild_grid;
-    outside
-        .nodes()
-        .iter()
-        .find_map(|&doorstep| {
-            let refuge = ground.nodes().iter().copied().find(|&inside| {
-                map.safe(inside)
-                    && (3.0..=4.5).contains(&doorstep.distance(inside).0)
-                    && ground.component(inside) == ground.component(doorstep)
-            })?;
-            let lair = outside.nodes().iter().copied().find(|&out| {
-                (2.5..=3.5).contains(&out.distance(doorstep).0)
-                    && out.distance(refuge).0 > doorstep.distance(refuge).0 + 2.0
-                    && outside.component(out) == outside.component(doorstep)
-            })?;
-            Some(Edge {
-                lair,
-                doorstep,
-                refuge,
-            })
-        })
-        .expect("a safe zone with open ground beside it")
-}
-
-fn on_safe_ground(world: &World, entity: Entity) -> bool {
-    match (area::of(world, entity), position(world, entity)) {
-        (Some(area), Some(at)) => area.safe(at),
-        _ => false,
-    }
-}
-
-fn place(sim: &mut Sim, entity: Entity, at: Pos<Tiles>) {
-    sim.world().entity_mut(entity).insert(Position { pos: at });
-}
-
-fn wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
-    let monster = npc::spawn(sim.world(), what, at, spawn_area(), Pack(u32::MAX));
-    sim.world().entity_mut(monster).insert(Wild);
-    monster
-}
-
-fn unscripted_wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
-    let monster = npc::spawn_actor(sim.world(), what.get(content()), at, spawn_area());
-    sim.world().entity_mut(monster).insert(Wild);
-    monster
-}
-
-fn summon(sim: &mut Sim, player: Entity, what: NpcId) -> Entity {
-    npc::summon(sim.world(), what, 1, player, None, Some(player))
-        .first()
-        .copied()
-        .expect("summoned")
-}
-
-fn hunted_by(sim: &mut Sim, hunter: Entity, player: Entity) -> bool {
-    sim.run_until(5.0, |world| {
-        reach::intent(world, hunter, ReachAct::Attack) == Some(player)
-    })
-}
+use crate::support::{Sim, content, place, row, spawn_area};
 
 #[test]
 fn wild_monsters_never_set_foot_in_a_safe_zone() {
@@ -159,4 +91,68 @@ fn a_wild_flyer_flies_around_a_safe_zone_instead_of_over_it() {
 
     assert!(arrived, "the bat never got there");
     assert!(!trespassed);
+}
+
+struct Edge {
+    lair: Pos<Tiles>,
+    doorstep: Pos<Tiles>,
+    refuge: Pos<Tiles>,
+}
+
+fn edge(map: &Area) -> Edge {
+    let ground = &map.grid;
+    let outside = &map.wild_grid;
+    outside
+        .nodes()
+        .iter()
+        .find_map(|&doorstep| {
+            let refuge = ground.nodes().iter().copied().find(|&inside| {
+                map.safe(inside)
+                    && (3.0..=4.5).contains(&doorstep.distance(inside).0)
+                    && ground.component(inside) == ground.component(doorstep)
+            })?;
+            let lair = outside.nodes().iter().copied().find(|&out| {
+                (2.5..=3.5).contains(&out.distance(doorstep).0)
+                    && out.distance(refuge).0 > doorstep.distance(refuge).0 + 2.0
+                    && outside.component(out) == outside.component(doorstep)
+            })?;
+            Some(Edge {
+                lair,
+                doorstep,
+                refuge,
+            })
+        })
+        .expect("a safe zone with open ground beside it")
+}
+
+fn on_safe_ground(world: &World, entity: Entity) -> bool {
+    match (area::of(world, entity), position(world, entity)) {
+        (Some(area), Some(at)) => area.safe(at),
+        _ => false,
+    }
+}
+
+fn wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
+    let monster = npc::spawn(sim.world(), what, at, spawn_area(), Pack(u32::MAX));
+    sim.world().entity_mut(monster).insert(Wild);
+    monster
+}
+
+fn unscripted_wild(sim: &mut Sim, what: NpcId, at: Pos<Tiles>) -> Entity {
+    let monster = npc::spawn_actor(sim.world(), what.get(content()), at, spawn_area());
+    sim.world().entity_mut(monster).insert(Wild);
+    monster
+}
+
+fn summon(sim: &mut Sim, player: Entity, what: NpcId) -> Entity {
+    npc::summon(sim.world(), what, 1, player, None, Some(player))
+        .first()
+        .copied()
+        .expect("summoned")
+}
+
+fn hunted_by(sim: &mut Sim, hunter: Entity, player: Entity) -> bool {
+    sim.run_until(5.0, |world| {
+        reach::intent(world, hunter, ReachAct::Attack) == Some(player)
+    })
 }

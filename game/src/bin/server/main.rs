@@ -22,7 +22,7 @@ use game::core::net::SessionRequest;
 use game::core::net::auth::TokenClaims;
 use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::account::{Identity, Role};
+use game::systems::account::{AccountId, Identity, Role};
 use game::systems::area::{self, AreaDef, AreaId, transition};
 use game::systems::launch::{
     AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig,
@@ -92,7 +92,7 @@ fn main() {
     let metrics = service::recorder();
     let sessions = Sessions::default();
     let online = Online::default();
-    let area_ids = select_areas(&content, config.areas);
+    let area_ids = select_areas(&content, &config);
     let http = Http {
         sessions: sessions.clone(),
         auth: match config.auth {
@@ -114,65 +114,26 @@ fn main() {
         .block_on(tokio::net::TcpListener::bind(http_bind))
         .unwrap_or_else(|error| panic!("cannot bind {http_bind}: {error}"));
     let http_addr = listener.local_addr().expect("bound http address");
-    let test_characters = http.test_characters.clone();
+    let lobby = Lobby {
+        spawn: area_ids
+            .iter()
+            .position(|id| *id == content.built::<GameSettings>().initial_spawn.area)
+            .unwrap_or(0),
+        area_ids,
+        policy: config.player_spawn_type,
+        online,
+        test_characters: http.test_characters.clone(),
+    };
     let api = serve_http(listener, http, metrics);
 
-    let settings = Settings {
-        area_ids,
-        max_clients: config.max_clients,
-        rules: SpawnRules {
-            policy: config.player_spawn_type,
-            immortal: config.player_immortal,
-        },
-        rng_seed: seeded(config.rng_seed),
-        reset: config.daily_reset_utc_hour,
-        test_characters,
+    let rules = SpawnRules {
+        policy: config.player_spawn_type,
+        immortal: config.player_immortal,
     };
-    simulate(
-        ws_bind,
-        http_addr,
-        sessions,
-        online,
-        runtime.handle().clone(),
-        content,
-        settings,
-        api,
-    );
-}
-
-struct Settings {
-    area_ids: Vec<AreaId>,
-    max_clients: usize,
-    rules: SpawnRules,
-    rng_seed: u64,
-    reset: UtcHour,
-    test_characters: Option<TestCharacters>,
-}
-
-#[allow(clippy::too_many_arguments)]
-fn simulate(
-    ws_bind: SocketAddr,
-    http_addr: SocketAddr,
-    sessions: Sessions,
-    online: Online,
-    runtime: tokio::runtime::Handle,
-    content: Content,
-    settings: Settings,
-    api: impl Future<Output = ()> + Send + 'static,
-) {
-    let Settings {
-        area_ids,
-        max_clients,
-        rules,
-        rng_seed,
-        reset,
-        test_characters,
-    } = settings;
-    let spawn = area_ids
-        .iter()
-        .position(|id| *id == content.built::<GameSettings>().initial_spawn.area)
-        .unwrap_or(0);
-    let mut worlds: Vec<App> = area_ids
+    let reset = config.daily_reset_utc_hour;
+    let rng_seed = seeded(config.rng_seed);
+    let worlds: Vec<App> = lobby
+        .area_ids
         .iter()
         .enumerate()
         .map(|(ordinal, &id)| {
@@ -186,15 +147,12 @@ fn simulate(
             )
         })
         .collect();
-
-    let (connection_config, client_channels) = {
-        let channels = worlds[0].world().resource::<RepliconChannels>();
-        let config =
-            ConnectionConfig::from_channels(channels.server_configs(), channels.client_configs());
-        (config, channels.client_channels().len())
-    };
-    let mut server = RenetServer::new(connection_config);
-    let mut transport = WsTransport::bind(ws_bind, sessions, max_clients, runtime.clone());
+    let transport = WsTransport::bind(
+        ws_bind,
+        sessions,
+        config.max_clients,
+        runtime.handle().clone(),
+    );
     // Opened only once players can connect, so a passing health check means the game is playable.
     runtime.spawn(api);
 
@@ -207,7 +165,25 @@ fn simulate(
         },
     };
     println!("{}", serde_json::to_string(&ready).expect("a ready line"));
+    simulate(worlds, transport, &lobby, reset);
+}
 
+struct Lobby {
+    area_ids: Vec<AreaId>,
+    spawn: usize,
+    policy: SpawnPolicy,
+    online: Online,
+    test_characters: Option<TestCharacters>,
+}
+
+fn simulate(mut worlds: Vec<App>, mut transport: WsTransport, lobby: &Lobby, reset: UtcHour) {
+    let (connection_config, client_channels) = {
+        let channels = worlds[0].world().resource::<RepliconChannels>();
+        let config =
+            ConnectionConfig::from_channels(channels.server_configs(), channels.client_configs());
+        (config, channels.client_channels().len())
+    };
+    let mut server = RenetServer::new(connection_config);
     let mut conns: HashMap<u64, Conn> = HashMap::new();
     let mut transfers: Vec<Transfer> = Vec::new();
     let mut next_client = 1u32;
@@ -230,7 +206,7 @@ fn simulate(
                     counter!("rift_client_connections_opened_total").increment(1);
                     let identity = transport.take_identity(client_id);
                     let account = identity.as_ref().map(|identity| identity.id.clone());
-                    let mut accounts = online.0.lock().expect("online lock");
+                    let mut accounts = lobby.online.0.lock().expect("online lock");
                     let mut join_as = None;
                     let (client, area) =
                         match account.as_ref().and_then(|account| accounts.get(account)) {
@@ -241,31 +217,33 @@ fn simulate(
                                 let area = conns
                                     .values()
                                     .find(|conn| conn.client == client)
-                                    .map_or(spawn, |conn| conn.area);
+                                    .map_or(lobby.spawn, |conn| conn.area);
                                 (client, area)
                             }
                             None => {
                                 let client = ClientId(next_client);
                                 next_client += 1;
                                 join_as = account.as_ref().and_then(|account| {
-                                    test_characters
+                                    lobby
+                                        .test_characters
                                         .as_ref()
                                         .and_then(|characters| characters.take(account))
                                 });
                                 if let Some(account) = account {
                                     accounts.insert(account, client);
                                 }
-                                let area = match (&join_as, rules.policy) {
-                                    (Some(join_as), _) => area_ids
+                                let area = match (&join_as, lobby.policy) {
+                                    (Some(join_as), _) => lobby
+                                        .area_ids
                                         .iter()
                                         .position(|&id| id == join_as.start.area)
-                                        .unwrap_or(spawn),
+                                        .unwrap_or(lobby.spawn),
                                     (None, SpawnPolicy::Dist) => {
                                         let area = next_area % worlds.len();
                                         next_area += 1;
                                         area
                                     }
-                                    (None, SpawnPolicy::Map) => spawn,
+                                    (None, SpawnPolicy::Map) => lobby.spawn,
                                 };
                                 (client, area)
                             }
@@ -290,7 +268,8 @@ fn simulate(
                     if let Some(conn) = conns.remove(&client_id) {
                         worlds[conn.area].world_mut().despawn(conn.entity);
                         if !conns.values().any(|other| other.client == conn.client) {
-                            online
+                            lobby
+                                .online
                                 .0
                                 .lock()
                                 .expect("online lock")
@@ -419,12 +398,15 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, areas: ServedAreas) -> Vec<AreaId> {
-    match areas {
+fn select_areas(content: &Content, config: &ServerConfig) -> Vec<AreaId> {
+    match config.areas {
         ServedAreas::Real => content.ids::<AreaDef>().collect(),
-        // The initial spawn's area is one template instanced `count` times; the count is bounded
-        // only by the machine, not by how many area rows the content table happens to define.
-        ServedAreas::Bench(count) => {
+        // The initial spawn's area is one template instanced many times; the count is bounded only
+        // by the machine, not by how many area rows the content table happens to define.
+        ServedAreas::Bench => {
+            let count = config
+                .bench_areas
+                .expect("RIFT_GAME_SERVER_BENCH_AREAS: how many areas a bench serves");
             vec![content.built::<GameSettings>().initial_spawn.area; count]
         }
     }
@@ -598,18 +580,18 @@ impl Sessions {
 }
 
 #[derive(Clone, Default)]
-struct Online(Arc<Mutex<HashMap<String, ClientId>>>);
+struct Online(Arc<Mutex<HashMap<AccountId, ClientId>>>);
 
 #[derive(Clone)]
 struct TestCharacters {
     content: Content,
     areas: Vec<AreaId>,
-    pending: Arc<Mutex<HashMap<String, JoinAs>>>,
+    pending: Arc<Mutex<HashMap<AccountId, JoinAs>>>,
     online: Online,
 }
 
 impl TestCharacters {
-    fn take(&self, account: &str) -> Option<JoinAs> {
+    fn take(&self, account: &AccountId) -> Option<JoinAs> {
         self.pending.lock().expect("pending lock").remove(account)
     }
 }
@@ -749,14 +731,7 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
         .start
         .unwrap_or_else(|| snapshot::start_of(&content, character.get(&content)));
     if let Err(problem) = area::check_place(&content, start) {
-        return (
-            StatusCode::BAD_REQUEST,
-            format!(
-                "bad start: {}, expected {}",
-                problem.found, problem.expected
-            ),
-        )
-            .into_response();
+        return (StatusCode::BAD_REQUEST, format!("bad start: {problem}")).into_response();
     }
     if !characters.areas.contains(&start.area) {
         return (
@@ -792,28 +767,18 @@ fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
         .strip_prefix("Bearer ")
         .unwrap_or(authorization);
     let claims = match &http.auth {
-        Auth::Oidc(verifier) => verifier
-            .lock()
-            .expect("verifier lock")
-            .verify(token)
-            .map_err(|_| StatusCode::UNAUTHORIZED)?,
-        Auth::Fake => {
-            let claims = TokenClaims::read_unverified(token)
-                .filter(|claims| !claims.sub.is_empty())
-                .ok_or(StatusCode::UNAUTHORIZED)?;
-            auth::Claims {
-                name: claims
-                    .preferred_username
-                    .unwrap_or_else(|| claims.sub.clone()),
-                subject: claims.sub,
-                roles: claims.realm_access.roles,
-            }
-        }
-    };
+        Auth::Oidc(verifier) => verifier.lock().expect("verifier lock").verify(token).ok(),
+        Auth::Fake => TokenClaims::read_unverified(token),
+    }
+    .filter(|claims| !claims.sub.is_empty())
+    .ok_or(StatusCode::UNAUTHORIZED)?;
     Ok(Identity {
-        id: claims.subject,
-        name: claims.name,
+        name: claims
+            .preferred_username
+            .unwrap_or_else(|| claims.sub.clone()),
+        id: AccountId(claims.sub),
         roles: claims
+            .realm_access
             .roles
             .iter()
             .filter_map(|role| role.parse::<Role>().ok())

@@ -16,15 +16,13 @@ use crate::systems::effect::{self, Effect};
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{DroppedItem, Inventory, ItemId};
 use crate::systems::job::{self, Job, JobId};
-use crate::systems::memory;
-use crate::systems::memory::MemoryId;
+use crate::systems::memory::{self, MemoryId};
 use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, NpcId, Pack, body};
 use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
 use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::stat::{self, StatKind, Stats};
-use crate::systems::visibility;
-use crate::systems::visibility::Presence;
+use crate::systems::visibility::{self, Presence};
 
 #[derive(Resource, Default)]
 pub struct ActorRoster {

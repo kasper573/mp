@@ -10,29 +10,6 @@ use game::systems::reach::{self, ReachAct, Tether};
 
 use crate::support::{Sim, row, spawn_area};
 
-fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
-    sim.world()
-        .spawn((
-            Position { pos: at },
-            AreaTag { area: spawn_area() },
-            DroppedItem {
-                item: row("Bone"),
-                count: 2,
-            },
-            Reservation {
-                by: None,
-                at: Seconds(0.0),
-            },
-        ))
-        .id()
-}
-
-fn bones(world: &World, player: Entity) -> u32 {
-    world
-        .get::<Inventory>(player)
-        .map_or(0, |inventory| inventory.count(row("Bone")))
-}
-
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {
     let mut sim = Sim::area(spawn_area());
@@ -99,4 +76,27 @@ fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
 
     world.despawn(orc);
     assert!(!tether.holds(world, player));
+}
+
+fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
+    sim.world()
+        .spawn((
+            Position { pos: at },
+            AreaTag { area: spawn_area() },
+            DroppedItem {
+                item: row("Bone"),
+                count: 2,
+            },
+            Reservation {
+                by: None,
+                at: Seconds(0.0),
+            },
+        ))
+        .id()
+}
+
+fn bones(world: &World, player: Entity) -> u32 {
+    world
+        .get::<Inventory>(player)
+        .map_or(0, |inventory| inventory.count(row("Bone")))
 }

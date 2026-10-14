@@ -39,8 +39,7 @@ use crate::app::Editor;
 use crate::project::{ProjectFiles, RowSelection, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
-use crate::value;
-use crate::value::RowValue;
+use crate::value::{self, RowValue};
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use game::core::content::{Content, ContentBuilder, ContentId, ContentScope, with_content};
+use game::core::content::{Content, ContentBuilder, ContentScope, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
 use game::core::script::{EffectDef, ScriptError};
 use game::systems::item::ItemId;
 use game::systems::memory::MemoryId;
 use game::systems::script::{
-    EventKind, OwnerKind, Place, Procedure, Reach, ScriptDef, ScriptId, ScriptModule,
+    EventKind, OwnerKind, Place, Procedure, Reach, ScriptDef, ScriptModule,
 };
 use game::systems::shop::ShopId;
 use serde_json::{Value, json};
@@ -24,68 +24,7 @@ const OWNERS: [OwnerKind; 6] = [
     OwnerKind::Shop,
 ];
 
-fn compile(
-    owner: OwnerKind,
-    modules: &[&'static ScriptModule],
-) -> Result<Vec<Arc<Procedure>>, ScriptError> {
-    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
-}
-
-fn entry(owner: OwnerKind, next: &str) -> Value {
-    match owner {
-        OwnerKind::Object | OwnerKind::Npc => json!({
-            "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next
-        }),
-        OwnerKind::Item => json!({ "type": "on", "event": "used", "next": next }),
-        OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
-        OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
-        OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
-        OwnerKind::Blueprint | OwnerKind::Any => unreachable!("no entry for {owner:?}"),
-    }
-}
-
-fn every_capability() -> Vec<Value> {
-    vec![
-        json!({ "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } }),
-        json!({ "type": "heal", "by": "full" }),
-        json!({ "type": "damage", "by": 10.0 }),
-        json!({ "type": "buff", "stat": "health", "by": 10.0, "seconds": 10.0 }),
-        json!({ "type": "clear_buffs" }),
-        json!({ "type": "items", "take": [{ "item": "gold" }] }),
-        json!({ "type": "use_item", "item": "tattered_map" }),
-        json!({ "type": "equip", "item": "road_pass" }),
-        json!({ "type": "unequip", "slot": "weapon" }),
-        json!({ "type": "drop_items", "item": "gold", "count": 1 }),
-        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold" }], "for": "subject" }),
-        json!({ "type": "clear_ground_items", "within": 10.0 }),
-        json!({
-            "type": "move_items", "from": { "type": "subject" }, "to": { "type": "subject" },
-            "items": [{ "item": "gold" }]
-        }),
-        json!({ "type": "grant_xp", "xp": 1 }),
-        json!({ "type": "set_job", "job": "adventurer" }),
-        json!({ "type": "remember", "memory": "bribed_ilsa" }),
-        json!({ "type": "forget", "memories": ["bribed_ilsa"] }),
-        json!({ "type": "offer_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "accept_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "turn_in", "quest": "x_marks_the_spot" }),
-        json!({ "type": "fail_quest", "quest": "x_marks_the_spot" }),
-        json!({ "type": "complete_task", "quest": "x_marks_the_spot", "task": "find_stone" }),
-        json!({ "type": "decide", "quest": "shamans_plea", "path": "Keep them" }),
-        json!({ "type": "open_shop", "shop": "honesty_box" }),
-        json!({ "type": "notify", "notification": "gulls" }),
-        json!({ "type": "say", "text": ["Hm."] }),
-        json!({ "type": "wander", "priority": 1 }),
-        json!({ "type": "walk_to", "to": { "type": "subject" }, "within": 1, "priority": 3 }),
-        json!({ "type": "attack", "target": { "type": "subject" }, "within": 10.0, "priority": 5 }),
-        json!({ "type": "stop", "priority": 9 }),
-        json!({ "type": "face", "toward": { "type": "subject" } }),
-        json!({ "type": "set_attitude", "attitude": "hostile" }),
-        json!({ "type": "spawn_npcs", "npc": "orc", "count": 1, "near": "subject", "shown": "everyone" }),
-        json!({ "type": "despawn" }),
-        json!({ "type": "play_sound", "sfx": "ui_pick", "for": "subject" }),
-    ]
-}
+const FUNCTIONS: [&str; 2] = ["helper", "loops"];
 
 #[test]
 fn every_capability_compiles_for_exactly_the_owners_it_lists() {
@@ -213,55 +152,6 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
     }
 }
 
-const HELPER: ScriptId = ContentId::new(0);
-const LOOPS: ScriptId = ContentId::new(1);
-
-/// Two shared functions, in a content of their own: one returns, the other calls itself.
-fn functions() -> Content {
-    let keys = vec!["helper".to_owned(), "loops".to_owned()];
-    let mut scope = ContentScope::new();
-    scope.table::<ScriptDef>(keys.clone());
-    let parse = |value: Value| -> ScriptDef {
-        let (parsed, _) = with_content(scope.clone(), || serde_json::from_value(value));
-        parsed.expect("a script row")
-    };
-    let helper = parse(json!({
-        "owner": "any",
-        "nodes": {
-            "run": { "type": "on", "event": "run", "next": "done" },
-            "done": { "type": "return" }
-        }
-    }));
-    let loops = parse(json!({
-        "owner": "any",
-        "nodes": {
-            "run": { "type": "on", "event": "run", "next": "again" },
-            "again": { "type": "run", "script": "loops" }
-        }
-    }));
-    let mut tables = ContentBuilder::default();
-    tables.table::<ScriptDef>(vec![
-        ("helper".to_owned(), helper),
-        ("loops".to_owned(), loops),
-    ]);
-    tables.build()
-}
-
-fn calling(script: &str) -> &'static ScriptModule {
-    let mut scope = ContentScope::new();
-    scope.table::<ScriptDef>(vec!["helper".to_owned(), "loops".to_owned()]);
-    let (parsed, _) = with_content(scope, || {
-        serde_json::from_value::<ScriptModule>(json!({
-            "type": "inline_script",
-            "nodes": {
-                "on": { "type": "on", "event": "started", "next": "call" },
-                "call": { "type": "run", "script": script }
-            }
-        }))
-    });
-    Box::leak(Box::new(parsed.expect("a module")))
-}
-
 #[test]
 fn a_script_that_runs_itself_is_refused() {
     let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[calling("loops")])
@@ -272,7 +162,6 @@ fn a_script_that_runs_itself_is_refused() {
 
     assert_eq!(error.rule, "runs itself");
     assert!(error.expected.contains("loops"), "{}", error.expected);
-    assert_eq!(LOOPS.index(), 1);
 }
 
 #[test]
@@ -285,7 +174,6 @@ fn may_do_names_the_functions_a_script_calls() {
     assert_eq!(may_do.answers, vec![EventKind::Started]);
     assert!(may_do.reaches.is_empty());
     assert!(!may_do.waits);
-    assert_eq!(HELPER.index(), 0);
 }
 
 #[test]
@@ -320,4 +208,111 @@ fn a_shared_script_row_reads_back_as_written() {
     assert_eq!(def.owner, OwnerKind::Npc);
     assert_eq!(def.variables.len(), 1);
     assert_eq!(def.nodes.len(), 2);
+}
+
+fn compile(
+    owner: OwnerKind,
+    modules: &[&'static ScriptModule],
+) -> Result<Vec<Arc<Procedure>>, ScriptError> {
+    compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
+}
+
+fn entry(owner: OwnerKind, next: &str) -> Value {
+    match owner {
+        OwnerKind::Object | OwnerKind::Npc => json!({
+            "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next
+        }),
+        OwnerKind::Item => json!({ "type": "on", "event": "used", "next": next }),
+        OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
+        OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
+        OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
+        OwnerKind::Blueprint | OwnerKind::Any => unreachable!("no entry for {owner:?}"),
+    }
+}
+
+fn every_capability() -> Vec<Value> {
+    vec![
+        json!({ "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } }),
+        json!({ "type": "heal", "by": "full" }),
+        json!({ "type": "damage", "by": 10.0 }),
+        json!({ "type": "buff", "stat": "health", "by": 10.0, "seconds": 10.0 }),
+        json!({ "type": "clear_buffs" }),
+        json!({ "type": "items", "take": [{ "item": "gold" }] }),
+        json!({ "type": "use_item", "item": "tattered_map" }),
+        json!({ "type": "equip", "item": "road_pass" }),
+        json!({ "type": "unequip", "slot": "weapon" }),
+        json!({ "type": "drop_items", "item": "gold", "count": 1 }),
+        json!({ "type": "spawn_ground_items", "items": [{ "item": "gold" }], "for": "subject" }),
+        json!({ "type": "clear_ground_items", "within": 10.0 }),
+        json!({
+            "type": "move_items", "from": { "type": "subject" }, "to": { "type": "subject" },
+            "items": [{ "item": "gold" }]
+        }),
+        json!({ "type": "grant_xp", "xp": 1 }),
+        json!({ "type": "set_job", "job": "adventurer" }),
+        json!({ "type": "remember", "memory": "bribed_ilsa" }),
+        json!({ "type": "forget", "memories": ["bribed_ilsa"] }),
+        json!({ "type": "offer_quest", "quest": "x_marks_the_spot" }),
+        json!({ "type": "accept_quest", "quest": "x_marks_the_spot" }),
+        json!({ "type": "turn_in", "quest": "x_marks_the_spot" }),
+        json!({ "type": "fail_quest", "quest": "x_marks_the_spot" }),
+        json!({ "type": "complete_task", "quest": "x_marks_the_spot", "task": "find_stone" }),
+        json!({ "type": "decide", "quest": "shamans_plea", "path": "Keep them" }),
+        json!({ "type": "open_shop", "shop": "honesty_box" }),
+        json!({ "type": "notify", "notification": "gulls" }),
+        json!({ "type": "say", "text": ["Hm."] }),
+        json!({ "type": "wander", "priority": 1 }),
+        json!({ "type": "walk_to", "to": { "type": "subject" }, "within": 1, "priority": 3 }),
+        json!({ "type": "attack", "target": { "type": "subject" }, "within": 10.0, "priority": 5 }),
+        json!({ "type": "stop", "priority": 9 }),
+        json!({ "type": "face", "toward": { "type": "subject" } }),
+        json!({ "type": "set_attitude", "attitude": "hostile" }),
+        json!({ "type": "spawn_npcs", "npc": "orc", "count": 1, "near": "subject", "shown": "everyone" }),
+        json!({ "type": "despawn" }),
+        json!({ "type": "play_sound", "sfx": "ui_pick", "for": "subject" }),
+    ]
+}
+
+fn functions() -> Content {
+    let mut scope = ContentScope::new();
+    scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
+    let parse = |value: Value| -> ScriptDef {
+        let (parsed, _) = with_content(scope.clone(), || serde_json::from_value(value));
+        parsed.expect("a script row")
+    };
+    let helper = parse(json!({
+        "owner": "any",
+        "nodes": {
+            "run": { "type": "on", "event": "run", "next": "done" },
+            "done": { "type": "return" }
+        }
+    }));
+    let loops = parse(json!({
+        "owner": "any",
+        "nodes": {
+            "run": { "type": "on", "event": "run", "next": "again" },
+            "again": { "type": "run", "script": "loops" }
+        }
+    }));
+    let mut tables = ContentBuilder::default();
+    tables.table::<ScriptDef>(vec![
+        ("helper".to_owned(), helper),
+        ("loops".to_owned(), loops),
+    ]);
+    tables.build()
+}
+
+fn calling(script: &str) -> &'static ScriptModule {
+    let mut scope = ContentScope::new();
+    scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
+    let (parsed, _) = with_content(scope, || {
+        serde_json::from_value::<ScriptModule>(json!({
+            "type": "inline_script",
+            "nodes": {
+                "on": { "type": "on", "event": "started", "next": "call" },
+                "call": { "type": "run", "script": script }
+            }
+        }))
+    });
+    Box::leak(Box::new(parsed.expect("a module")))
 }

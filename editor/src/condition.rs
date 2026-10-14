@@ -1,8 +1,7 @@
 use egui::{Color32, FontId, RichText, Stroke, Ui};
 use serde_json::Value;
 
-use crate::forms;
-use crate::forms::{FormChange, FormCx, fits};
+use crate::forms::{self, FormChange, FormCx, fits};
 use crate::schema::{self, SchemaKind, SchemaVariant};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;

@@ -10,6 +10,9 @@ use crate::core::tiling::Tiles;
 #[derive(Component)]
 pub(crate) struct WorldCamera;
 
+#[derive(Component, Default, Clone)]
+pub struct WorldOverlay;
+
 pub fn cursor_tile(world: &mut World) -> Option<Pos<Tiles>> {
     if world.resource::<ui::InterfaceCursor>().captured() {
         return None;

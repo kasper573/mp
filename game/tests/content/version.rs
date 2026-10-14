@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use game::core::content::{ContentRegistry, ContentRow};
 use game::systems::registry;
 use schemars::JsonSchema;
@@ -31,7 +29,7 @@ fn another_version_is_refused_last() {
         game["initial_spawn"]["area"] = serde_json::Value::String("strat".to_owned());
     });
 
-    let report = load(&folder.0).err().expect("refused");
+    let report = load(folder.path()).err().expect("refused");
 
     let rules: Vec<&str> = report
         .errors
@@ -42,6 +40,14 @@ fn another_version_is_refused_last() {
     assert!(rules.contains(&"unknown row"), "{rules:?}");
     let version = report.errors.last().expect("an error");
     assert_eq!(version.problem.found, "\"deadbeef\"");
+}
+
+#[test]
+fn only_a_changed_shape_moves_the_version() {
+    assert_eq!(version_of::<Narrow>(), version_of::<SameShape>());
+    assert_ne!(version_of::<Narrow>(), version_of::<Wide>());
+    assert_ne!(version_of::<Narrow>(), version_of::<Retyped>());
+    assert_eq!(version_of::<Narrow>().len(), 8);
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -87,13 +93,4 @@ fn version_of<Row: ContentRow>() -> String {
     let mut registry = ContentRegistry::default();
     registry.row::<Row>();
     registry.version().0
-}
-
-#[test]
-fn only_a_changed_shape_moves_the_version() {
-    assert_eq!(version_of::<Narrow>(), version_of::<SameShape>());
-    assert_ne!(version_of::<Narrow>(), version_of::<Wide>());
-    assert_ne!(version_of::<Narrow>(), version_of::<Retyped>());
-    assert_eq!(version_of::<Narrow>().len(), 8);
-    let _: BTreeMap<String, String> = BTreeMap::new();
 }

@@ -241,12 +241,18 @@ impl Player {
     }
 
     // The first frame in which the interface no longer moves: windows ease open, and lists glide as
-    // they scroll.
+    // they scroll. What rides on the world moves with it, and never settles while anyone walks.
     pub fn settled(&mut self) -> ProbeSnapshot {
         let mut last = Vec::new();
         self.wait_for("the interface to settle", |snapshot| {
-            let settled = snapshot.ui == last;
-            last.clone_from(&snapshot.ui);
+            let interface: Vec<ProbeUiElement> = snapshot
+                .ui
+                .iter()
+                .filter(|element| !element.in_world)
+                .cloned()
+                .collect();
+            let settled = interface == last;
+            last = interface;
             settled.then(|| snapshot.clone())
         })
     }
@@ -675,7 +681,8 @@ impl Player {
                 );
                 continue;
             };
-            if !takes(&self.point_at(at), target) || !takes(&self.click(), target) {
+            let fair = |seen: &ProbeSnapshot| takes(seen, target) || in_the_way(seen, target);
+            if !fair(&self.point_at(at)) || !fair(&self.click()) {
                 continue;
             }
             // Approaching takes a while: done once it lands, or a fresh try once the player stands
@@ -822,6 +829,12 @@ fn detour(
 
 // The goal itself, or for a goal off the walkways (someone behind a counter), the ground the player
 // can walk to nearest it.
+// An enemy in front of the target takes the click, as it would take a player's: the way to the
+// target leads through it.
+fn in_the_way(seen: &ProbeSnapshot, target: Entity) -> bool {
+    matches!(seen.claim, ClickClaim::Attack(enemy) if enemy != target)
+}
+
 fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos<Tiles>> {
     let region = grid.component(grid.nearest_walkable(from)?)?;
     grid.nodes()

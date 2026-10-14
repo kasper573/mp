@@ -3,6 +3,8 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
+use walkdir::WalkDir;
+
 use super::files::{FileBytes, ProjectFiles};
 
 pub struct SaveOutcome {
@@ -73,24 +75,19 @@ pub fn save(
 }
 
 pub fn clean_leftovers(root: &Path) {
-    fn walk(dir: &Path) {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.filter_map(Result::ok) {
-            let path = entry.path();
-            if path.is_dir() {
-                walk(&path);
-            } else if path
+    let leftovers = WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_file())
+        .filter(|entry| {
+            entry
                 .file_name()
-                .and_then(|name| name.to_str())
+                .to_str()
                 .is_some_and(|name| name.starts_with('.') && name.ends_with(".tmp"))
-            {
-                let _ = std::fs::remove_file(&path);
-            }
-        }
+        });
+    for leftover in leftovers {
+        let _ = std::fs::remove_file(leftover.path());
     }
-    walk(root);
 }
 
 fn write_atomic(root: &Path, file: &str, bytes: &FileBytes) -> Result<(), String> {

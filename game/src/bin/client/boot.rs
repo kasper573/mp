@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::platform::{WebPlatform, primary_window, read_start_params};
 
+// Edition 2024 spells every extern block unsafe; wasm-bindgen still exposes its imports as safe fns.
 #[wasm_bindgen(module = "/src/bin/client/audio-unlock.js")]
 unsafe extern "C" {
     fn audio_unlock();

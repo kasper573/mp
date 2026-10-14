@@ -31,15 +31,15 @@ const PAD: f32 = 12.0;
 const TARGET_WIDTH: f32 = 1600.0;
 const LABEL_BAND: f32 = 36.0;
 const CAPTION_BAND: f32 = 56.0;
-const COLUMNS: [(Direction, &str); 8] = [
-    (Direction::S, "S"),
-    (Direction::SW, "SW"),
-    (Direction::W, "W"),
-    (Direction::NW, "NW"),
-    (Direction::N, "N"),
-    (Direction::NE, "NE"),
-    (Direction::E, "E"),
-    (Direction::SE, "SE"),
+const COLUMNS: [Direction; 8] = [
+    Direction::S,
+    Direction::SW,
+    Direction::W,
+    Direction::NW,
+    Direction::N,
+    Direction::NE,
+    Direction::E,
+    Direction::SE,
 ];
 
 #[derive(Deserialize)]
@@ -241,7 +241,7 @@ fn plan(content: &Content, models: &[ModelId], animations: &str, loops: usize) -
 fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     let longest = COLUMNS
         .iter()
-        .map(|&(dir, _)| model.timing(action, dir).duration)
+        .map(|&dir| model.timing(action, dir).duration)
         .fold(Seconds(0.0), |a, b| if b > a { b } else { a });
     let length = if action == Action::Dead {
         longest + DEATH_HOLD
@@ -313,7 +313,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
 
     let band_top = height / 2.0 - LABEL_BAND / layout.zoom;
     let left = -width / 2.0;
-    for (column, &(dir, label)) in COLUMNS.iter().enumerate() {
+    for (column, &dir) in COLUMNS.iter().enumerate() {
         let x = left + layout.cell.width * (column as f32 + 0.5);
         let shade = if column % 2 == 0 { 0x4f } else { 0x48 };
         world.spawn((
@@ -341,7 +341,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
             },
             UiTargetCamera(camera),
             children![(
-                Text::new(label),
+                Text::new(dir.as_ref().to_uppercase()),
                 TextFont::from_font_size(18.0),
                 TextColor(Color::srgb_u8(0xb8, 0xbe, 0xc8)),
             )],
@@ -389,7 +389,7 @@ fn advance(
     for (id, sheet) in &reel.sheets {
         match assets.load_state(sheet) {
             LoadState::Loaded => {}
-            LoadState::Failed(error) => fail(&format!("{id:?} sheet: {error}")),
+            LoadState::Failed(error) => fail(&format!("{} sheet: {error}", id.key(&content))),
             _ => return,
         }
     }
@@ -410,8 +410,8 @@ fn advance(
     }
     let loop_number = frame / clip.frames_per_loop + 1;
     caption.set_if_neq(Text::new(format!(
-        "{:?} - {}   loop {loop_number}/{}",
-        clip.model,
+        "{} - {}   loop {loop_number}/{}",
+        clip.model.key(&content),
         clip.action.as_ref(),
         clip.loops
     )));

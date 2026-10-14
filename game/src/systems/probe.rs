@@ -18,8 +18,8 @@ use crate::core::audio::playback::Listener;
 use crate::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
 use crate::core::content::{Content, ContentScope, with_content};
 use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
-use crate::core::render::tile_to_window;
 use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::{WorldOverlay, tile_to_window};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::model::ModelId;
@@ -41,8 +41,7 @@ use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
-use crate::systems::shop;
-use crate::systems::shop::ShopId;
+use crate::systems::shop::{self, ShopId};
 use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
@@ -180,6 +179,7 @@ pub struct ProbeUiElement {
     pub editable: bool,
     pub focused: bool,
     pub click_through: bool,
+    pub in_world: bool,
     pub slider: Option<f32>,
     pub rect: Rect<WindowPx>,
 }
@@ -826,6 +826,8 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                     editable: field.is_some(),
                     focused: focused == Some(entity),
                     click_through: ui::clicks_through(world, entity),
+                    in_world: ui::self_and_ancestors(world, entity)
+                        .any(|up| world.get::<WorldOverlay>(up).is_some()),
                     slider,
                     rect: window_rect(ui::node_rect(world, entity)?),
                 })

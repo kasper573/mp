@@ -3,6 +3,7 @@ use std::path::Path;
 
 use game::core::content::write;
 use game::systems::registry;
+use walkdir::WalkDir;
 
 use crate::support::{TempFolder, load, repo};
 
@@ -21,16 +22,16 @@ fn a_folder_written_from_scratch_lists_every_row_and_grid() {
     let folder = repo().join("content");
     let content = load(&folder).unwrap_or_else(|report| panic!("{report}"));
     let fresh = TempFolder::of_template();
-    let _ = std::fs::remove_dir_all(fresh.0.join("tables"));
-    let _ = std::fs::remove_file(fresh.0.join("game.json"));
+    std::fs::remove_dir_all(fresh.path().join("tables")).expect("the template's tables");
+    std::fs::remove_file(fresh.path().join("game.json")).expect("the template's game.json");
 
-    let writer = write(&registry(), content, &fresh.0).expect("written");
+    let writer = write(&registry(), content, fresh.path()).expect("written");
 
     let written: BTreeSet<String> = writer.written().iter().cloned().collect();
     assert_eq!(written, rows_and_grids(&folder));
     for file in &written {
         assert_eq!(
-            std::fs::read(fresh.0.join(file)).expect("fresh"),
+            std::fs::read(fresh.path().join(file)).expect("fresh"),
             std::fs::read(folder.join(file)).expect("shipped"),
             "{file} differs"
         );
@@ -38,21 +39,15 @@ fn a_folder_written_from_scratch_lists_every_row_and_grid() {
 }
 
 fn rows_and_grids(folder: &Path) -> BTreeSet<String> {
-    let mut files = BTreeSet::new();
-    files.insert("game.json".to_owned());
-    walk(&folder.join("tables"), "tables", &mut files);
-    files
-}
-
-fn walk(dir: &Path, prefix: &str, into: &mut BTreeSet<String>) {
-    for entry in std::fs::read_dir(dir).expect("read dir") {
-        let entry = entry.expect("entry");
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let path = format!("{prefix}/{name}");
-        if entry.file_type().expect("type").is_dir() {
-            walk(&entry.path(), &path, into);
-        } else {
-            into.insert(path);
-        }
-    }
+    let tables = WalkDir::new(folder.join("tables"))
+        .into_iter()
+        .map(|entry| entry.expect("an entry"))
+        .filter(|entry| entry.file_type().is_file())
+        .map(|entry| {
+            let relative = entry.path().strip_prefix(folder).expect("under the folder");
+            relative.to_string_lossy().replace('\\', "/")
+        });
+    std::iter::once("game.json".to_owned())
+        .chain(tables)
+        .collect()
 }

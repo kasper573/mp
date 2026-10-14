@@ -1,4 +1,4 @@
-use bevy_ecs::world::World;
+use bevy_ecs::prelude::*;
 use game::core::script::Expr;
 use game::core::tiling::Tiles;
 use game::systems::combat::{AttackRequest, Attitude};
@@ -13,12 +13,6 @@ use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
 use crate::support::{Sim, content, remember, row, spawn_area, townsperson};
-
-fn orc_near(sim: &mut Sim, player: bevy_ecs::entity::Entity) -> bevy_ecs::entity::Entity {
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(2.0), Tiles(4.0));
-    npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX))
-}
 
 #[test]
 fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {
@@ -90,12 +84,11 @@ fn a_monster_spawned_for_one_player_ignores_everyone_else() {
 
 #[test]
 fn presence_by_condition_follows_the_players_memory() {
-    let pell_dead: &'static Condition = Box::leak(Box::new(Expr::Query(RiftQuery::Memory {
+    let pell_dead = Expr::Query(RiftQuery::Memory {
         of: None,
         memory: row("PellDead"),
-    })));
-    let pell_alive: &'static Condition =
-        Box::leak(Box::new(Expr::Not(Box::new(pell_dead.clone()))));
+    });
+    let pell_alive: &'static Condition = Box::leak(Box::new(Expr::Not(Box::new(pell_dead))));
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let orc = orc_near(&mut sim, player);
@@ -127,4 +120,10 @@ fn a_world_that_serves_no_area_judges_an_items_requirements() {
     let viewer = world.spawn_empty().id();
 
     assert!(!condition::holds(&world, viewer, requirement));
+}
+
+fn orc_near(sim: &mut Sim, player: Entity) -> Entity {
+    let start = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_near(start, Tiles(2.0), Tiles(4.0));
+    npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX))
 }

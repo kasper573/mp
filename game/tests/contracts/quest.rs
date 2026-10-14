@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use game::systems::dialogue::{ConversationPanel, ConversationRequest};
 use game::systems::item::{
-    DropItemRequest, DroppedItem, INVENTORY_MAX, Inventory, ItemId, ItemStack, UseItemRequest,
+    DropItemRequest, DroppedItem, INVENTORY_MAX, Inventory, ItemStack, UseItemRequest,
 };
 use game::systems::player::Xp;
 use game::systems::quest::{self, QuestLog, QuestRequest, QuestResult};
@@ -9,48 +9,8 @@ use game::systems::shop::ShopRequest;
 
 use crate::support::{
     Sim, content, conversation, count, errors, give, heard_the_news, labels, later, leave, locked,
-    object, open_with, pick, remembered, row, settle, slay, spawn_area, talk,
+    object, open_with, pick, remembered, row, settle, slay, slot_of, spawn_area, talk,
 };
-
-fn slot_of(sim: &mut Sim, player: Entity, item: ItemId) -> u32 {
-    sim.world()
-        .get::<Inventory>(player)
-        .expect("bag")
-        .slots
-        .iter()
-        .position(|stack| stack.item == item)
-        .expect("in the bag") as u32
-}
-
-fn log(sim: &mut Sim, player: Entity) -> QuestLog {
-    sim.world()
-        .get::<QuestLog>(player)
-        .cloned()
-        .expect("a quest log")
-}
-
-fn level_up(sim: &mut Sim, player: Entity) {
-    sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
-}
-
-fn qualify_for_bats(sim: &mut Sim, player: Entity) {
-    level_up(sim, player);
-    quest::accept(sim.world(), player, row("LetterForTheCaptain")).expect("the letter");
-    quest::turn_in(sim.world(), player, row("LetterForTheCaptain"), None).expect("delivered");
-}
-
-fn fill_bag(sim: &mut Sim, player: Entity) {
-    let free = INVENTORY_MAX as usize
-        - sim
-            .world()
-            .get::<Inventory>(player)
-            .expect("bag")
-            .slots
-            .len();
-    for _ in 0..free {
-        give(sim, player, row("RustySword"), 1);
-    }
-}
 
 #[test]
 fn accepting_a_quest_logs_it_tracks_it_and_hands_over_its_items() {
@@ -419,4 +379,34 @@ fn giving_ugra_the_tusks_fails_maras_quest_and_is_remembered() {
     let friend = talk(&mut sim, 1, player, row("Ugra"));
     assert_eq!(friend.node, "friend");
     assert!(labels(&friend).contains(&"Rest for the Fallen".to_owned()));
+}
+
+fn log(sim: &mut Sim, player: Entity) -> QuestLog {
+    sim.world()
+        .get::<QuestLog>(player)
+        .cloned()
+        .expect("a quest log")
+}
+
+fn level_up(sim: &mut Sim, player: Entity) {
+    sim.world().get_mut::<Xp>(player).expect("xp").gain(100_000);
+}
+
+fn qualify_for_bats(sim: &mut Sim, player: Entity) {
+    level_up(sim, player);
+    quest::accept(sim.world(), player, row("LetterForTheCaptain")).expect("the letter");
+    quest::turn_in(sim.world(), player, row("LetterForTheCaptain"), None).expect("delivered");
+}
+
+fn fill_bag(sim: &mut Sim, player: Entity) {
+    let free = INVENTORY_MAX as usize
+        - sim
+            .world()
+            .get::<Inventory>(player)
+            .expect("bag")
+            .slots
+            .len();
+    for _ in 0..free {
+        give(sim, player, row("RustySword"), 1);
+    }
 }

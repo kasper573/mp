@@ -7,6 +7,7 @@ use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::area::AreaModule;
 use game::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
 use game::systems::{GameSettings, from_client, server_app, start_server, step_areas};
+use strum::AsRefStr;
 
 pub const PLAYERS_PER_AREA: usize = 25;
 
@@ -25,7 +26,8 @@ pub type Roster = Vec<Entity>;
 
 /// How the area's players are positioned, which sets how much their areas-of-interest overlap. Maps
 /// directly onto the server's [`SpawnPolicy`], so the bench spreads players exactly as production does.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, AsRefStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum Layout {
     /// Every player spawns on the spawn tile, so all clients share one identical area-of-interest —
     /// the worst case for replicating nearby entities to many overlapping viewers.
@@ -36,13 +38,6 @@ pub enum Layout {
 }
 
 impl Layout {
-    pub fn label(self) -> &'static str {
-        match self {
-            Layout::Congested => "congested",
-            Layout::Distributed => "distributed",
-        }
-    }
-
     fn spawn_policy(self) -> SpawnPolicy {
         match self {
             Layout::Congested => SpawnPolicy::Map,

@@ -9,29 +9,6 @@ use game::systems::rewards::KillCredited;
 
 use crate::support::{Sim, row, spawn_area};
 
-fn orc(sim: &mut Sim, near: Entity) -> Entity {
-    let world = sim.world();
-    let at = position(world, near).expect("player position");
-    npc::spawn(world, row("Orc"), at, spawn_area(), Pack(u32::MAX))
-}
-
-fn kill(sim: &mut Sim, victim: Entity, killer: Entity) {
-    sim.world().write_message(Died {
-        entity: victim,
-        killer: Some(killer),
-    });
-}
-
-fn credits(sim: &mut Sim, ticks: usize) -> Vec<KillCredited> {
-    let mut cursor = MessageCursor::<KillCredited>::default();
-    let mut seen = Vec::new();
-    for _ in 0..ticks {
-        sim.tick();
-        seen.extend(sim.read(&mut cursor));
-    }
-    seen
-}
-
 #[test]
 fn a_reserved_kill_credits_the_reserving_player_once() {
     let mut sim = Sim::area(spawn_area());
@@ -76,4 +53,27 @@ fn deaths_stay_observable_to_every_reader() {
             .iter()
             .any(|died| died.entity == victim)
     );
+}
+
+fn orc(sim: &mut Sim, near: Entity) -> Entity {
+    let world = sim.world();
+    let at = position(world, near).expect("player position");
+    npc::spawn(world, row("Orc"), at, spawn_area(), Pack(u32::MAX))
+}
+
+fn kill(sim: &mut Sim, victim: Entity, killer: Entity) {
+    sim.world().write_message(Died {
+        entity: victim,
+        killer: Some(killer),
+    });
+}
+
+fn credits(sim: &mut Sim, ticks: usize) -> Vec<KillCredited> {
+    let mut cursor = MessageCursor::<KillCredited>::default();
+    let mut seen = Vec::new();
+    for _ in 0..ticks {
+        sim.tick();
+        seen.extend(sim.read(&mut cursor));
+    }
+    seen
 }

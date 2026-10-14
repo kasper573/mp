@@ -54,7 +54,7 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
         .expect("json"),
     );
 
-    let report = load(&folder.0).err().expect("refused");
+    let report = load(folder.path()).err().expect("refused");
 
     let text = report.to_string();
     let body = text
@@ -86,7 +86,7 @@ fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
     folder.write("tables/area/cove/ground.csv", &"0,0,0,0\n".repeat(4));
     folder.write("tables/area/cove/walk.csv", &"1,1,1,1\n".repeat(4));
 
-    let report = load(&folder.0).err().expect("refused");
+    let report = load(folder.path()).err().expect("refused");
 
     let palette: Vec<(ErrorPlace, &str)> = report
         .errors

@@ -6,42 +6,9 @@ use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
 use crate::support::{
-    Sim, content, count, give, heard_the_news, later, pick, remember, remembered, row, settle,
-    spawn_area, talk, townsperson,
+    Sim, content, count, give, health, heard_the_news, later, pick, remember, remembered, row,
+    settle, spawn_area, talk, townsperson,
 };
-
-fn summoned(sim: &mut Sim, what: NpcId) -> Vec<Entity> {
-    let world = sim.world();
-    world
-        .query::<(Entity, &Npc)>()
-        .iter(world)
-        .filter(|(_, npc)| npc.def == what)
-        .map(|(entity, _)| entity)
-        .collect()
-}
-
-fn lose_at_dice(sim: &mut Sim, client: u32, player: Entity) {
-    let mut node = talk(sim, client, player, row("Pell")).node;
-    for _ in 0..40 {
-        let roll = if node == "hello" {
-            "Roll the dice."
-        } else if node == "loses" {
-            "Roll again."
-        } else if node == "wins" {
-            return;
-        } else {
-            panic!("Pell is at {node:?}");
-        };
-        node = pick(sim, client, player, roll)
-            .expect("still at the table")
-            .node;
-    }
-    panic!("never lost a roll");
-}
-
-fn health(sim: &mut Sim, who: Entity) -> f32 {
-    stat::effective(sim.world(), who, StatKind::Health)
-}
 
 #[test]
 fn pells_dice_take_ten_gold_a_roll_and_pay_twenty_on_a_win() {
@@ -183,4 +150,33 @@ fn a_townsperson_turned_hostile_can_be_fought_until_they_return_friendly() {
         .0;
     assert!(sim.run_until(respawn + 5.0, |world| !stat::is_dead(world, bram)));
     assert_eq!(sim.world().get::<Attitude>(bram), Some(&Attitude::Friendly));
+}
+
+fn summoned(sim: &mut Sim, what: NpcId) -> Vec<Entity> {
+    let world = sim.world();
+    world
+        .query::<(Entity, &Npc)>()
+        .iter(world)
+        .filter(|(_, npc)| npc.def == what)
+        .map(|(entity, _)| entity)
+        .collect()
+}
+
+fn lose_at_dice(sim: &mut Sim, client: u32, player: Entity) {
+    let mut node = talk(sim, client, player, row("Pell")).node;
+    for _ in 0..40 {
+        let roll = if node == "hello" {
+            "Roll the dice."
+        } else if node == "loses" {
+            "Roll again."
+        } else if node == "wins" {
+            return;
+        } else {
+            panic!("Pell is at {node:?}");
+        };
+        node = pick(sim, client, player, roll)
+            .expect("still at the table")
+            .node;
+    }
+    panic!("never lost a roll");
 }

@@ -1,49 +1,18 @@
 use bevy_ecs::prelude::*;
 use game::core::content::Fixture;
-use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::attention::{Attention, AttentionId, AttentionMark};
 use game::systems::dialogue::{Conversation, ConversationRequest};
-use game::systems::input::map::InputMap;
-use game::systems::item::{Inventory, ItemStack};
-use game::systems::movement::{MoveRequest, Position, position};
+use game::systems::movement::{MoveRequest, moving, position};
 use game::systems::player::commands_locked;
 use game::systems::script::{self, EventKind, RiftInstances};
 use game::systems::stat::{self, StatKind};
 
-use crate::support::{Sim, content, counted, errors, row, spawn_area, talk, townsperson};
-
-fn conversation(sim: &mut Sim, player: Entity) -> Option<Conversation> {
-    sim.world().get::<Conversation>(player).cloned()
-}
-
-fn choice(conversation: &Conversation, label: &str) -> u32 {
-    conversation
-        .choices
-        .iter()
-        .position(|choice| choice.label.words(&InputMap::new(content())) == label)
-        .unwrap_or_else(|| panic!("no choice {label:?}")) as u32
-}
-
-fn give_gold(sim: &mut Sim, player: Entity, count: u32) {
-    sim.world()
-        .get_mut::<Inventory>(player)
-        .expect("bag")
-        .exchange(content(), &[], &[ItemStack::new(row("Gold"), count)])
-        .expect("room for gold");
-}
-
-fn gold(sim: &mut Sim, player: Entity) -> u32 {
-    sim.world()
-        .get::<Inventory>(player)
-        .expect("bag")
-        .count(row("Gold"))
-}
-
-fn place(sim: &mut Sim, player: Entity, at: Pos<Tiles>) {
-    sim.world().entity_mut(player).insert(Position { pos: at });
-}
+use crate::support::{
+    Sim, choice, content, conversation, count, counted, errors, give, place, row, spawn_area, talk,
+    townsperson,
+};
 
 #[test]
 fn a_conversation_reaches_the_client_as_the_world_holds_it() {
@@ -68,6 +37,8 @@ fn talking_walks_into_reach_opens_the_greeting_and_locks_commands() {
 
     assert_eq!(opened.node, "hello");
     assert_eq!(opened.with, Some(grisha));
+    // A step under way when the greeting opens still ends on its tile.
+    assert!(sim.run_until(1.0, |world| !moving(world, player)));
     let at = position(sim.world(), player).expect("position");
     let grisha_at = position(sim.world(), grisha).expect("position");
     assert!(at.distance(grisha_at) <= Tiles(2.0 + std::f32::consts::SQRT_2));
@@ -89,7 +60,7 @@ fn talking_walks_into_reach_opens_the_greeting_and_locks_commands() {
 fn a_pick_answers_its_step_once() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    give_gold(&mut sim, player, 30);
+    give(&mut sim, player, row("Gold"), 30);
     let opened = talk(&mut sim, 1, player, row("Grisha"));
     let round = ConversationRequest::Pick {
         step: opened.step,
@@ -100,14 +71,14 @@ fn a_pick_answers_its_step_once() {
     sim.send(1, round);
     sim.tick();
 
-    assert_eq!(gold(&mut sim, player), 20);
+    assert_eq!(count(&mut sim, player, row("Gold")), 20);
     let now = conversation(&mut sim, player).expect("still talking");
     assert_eq!(now.node, "round");
     assert_eq!(counted(&mut sim, player, row("InnFavour")), 1);
 
     sim.send(1, round);
     sim.tick();
-    assert_eq!(gold(&mut sim, player), 20);
+    assert_eq!(count(&mut sim, player, row("Gold")), 20);
 }
 
 #[test]

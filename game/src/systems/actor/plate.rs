@@ -8,7 +8,7 @@ use ui::tokens::{palette, typography};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::render::transition::ScreenTransitionPhase;
-use crate::core::render::{WorldToWindow, tile_to_window};
+use crate::core::render::{WorldOverlay, WorldToWindow, tile_to_window};
 use crate::core::tiling::Tiles;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
 use crate::systems::area::AreaObject;
@@ -63,9 +63,6 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
         }
     }
 }
-
-#[derive(Component, Default, Clone)]
-struct WorldOverlay;
 
 #[derive(Resource, Default)]
 struct Plates(HashMap<Entity, Entity>);

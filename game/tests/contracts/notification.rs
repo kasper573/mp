@@ -1,87 +1,21 @@
 use bevy_ecs::prelude::*;
-use game::core::math::{Offset, Pos};
-use game::core::tiling::Tiles;
+use game::core::math::Offset;
+use game::systems::area::AreaId;
 use game::systems::area::transition::{self, Crossing};
-use game::systems::area::{AreaId, AreaObject};
 use game::systems::dialogue::Conversation;
 use game::systems::history::{History, HistoryTopic};
 use game::systems::input::map::InputMap;
-use game::systems::movement::{Position, position};
+use game::systems::movement::position;
 use game::systems::notification::{self, Notification, NotificationKind, NotificationSent};
 use game::systems::npc::{self, Pack};
 use game::systems::player::{AreaDrawn, Xp, commands_locked};
-use game::systems::quest;
-use game::systems::quest::QuestId;
+use game::systems::quest::{self, QuestId};
 use game::systems::text::LineText;
 
 use crate::support::{
-    Sim, content, later, object, remembered, row, settle, spawn_area, spoken, townsperson,
+    Sim, content, later, object_center, place, remembered, row, settle, spawn_area, spoken, told,
+    townsperson,
 };
-
-fn told(sim: &Sim, client: u32) -> Vec<Notification> {
-    sim.notified(client)
-        .into_iter()
-        .map(|sent| sent.notification)
-        .collect()
-}
-
-fn recorded(sim: &mut Sim, player: Entity) -> Vec<(HistoryTopic, Option<String>, String, u32)> {
-    sim.world()
-        .get::<History>(player)
-        .map(|history| {
-            history
-                .records()
-                .map(|record| {
-                    let entry = &record.entry;
-                    let text = entry.text.words(&InputMap::new(content()));
-                    (entry.topic, entry.by.clone(), text, entry.repeats)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn narration(label: &'static str, text: String) -> Notification {
-    Notification::new(
-        NotificationKind::Narration {
-            label: label.into(),
-            sfx: None,
-        },
-        LineText::plain(text),
-    )
-}
-
-fn object_center(sim: &mut Sim, name: &str) -> Pos<Tiles> {
-    let entity = object(sim, name);
-    sim.world()
-        .get::<AreaObject>(entity)
-        .expect("an area object")
-        .shape
-        .center()
-}
-
-fn travel(from: &mut Sim, player: Entity, to: AreaId) -> (Sim, Entity) {
-    let mut there = Sim::area(to);
-    there.connect(1);
-    from.world().entity_mut(player).insert(Crossing {
-        dest_area: to,
-        dest: there.map().fallback_spawn(),
-    });
-    let traveler = transition::departing(from.world())
-        .pop()
-        .expect("a traveler");
-    let arrived = transition::arrive(there.world(), traveler);
-    there.send(1, AreaDrawn);
-    settle(&mut there);
-    (there, arrived)
-}
-
-fn intros(sim: &Sim, client: u32) -> usize {
-    told(sim, client)
-        .iter()
-        .filter(|notification| matches!(notification.kind, NotificationKind::Intro { .. }))
-        .count()
-}
 
 #[test]
 fn stepping_onto_the_pier_narrates_the_gulls_once() {
@@ -90,22 +24,16 @@ fn stepping_onto_the_pier_narrates_the_gulls_once() {
     let start = position(sim.world(), player).expect("position");
     let pier = object_center(&mut sim, "ferry-pier");
 
-    sim.world()
-        .entity_mut(player)
-        .insert(Position { pos: pier });
+    place(&mut sim, player, pier);
     settle(&mut sim);
     assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
     assert!(!commands_locked(sim.world(), player));
 
     later(&mut sim, 30.0);
     sim.forget_notified();
-    sim.world()
-        .entity_mut(player)
-        .insert(Position { pos: start });
+    place(&mut sim, player, start);
     settle(&mut sim);
-    sim.world()
-        .entity_mut(player)
-        .insert(Position { pos: pier });
+    place(&mut sim, player, pier);
     settle(&mut sim);
     assert_eq!(told(&sim, 1), Vec::new());
     assert!(remembered(&mut sim, player, row("HeardGulls")));
@@ -145,9 +73,7 @@ fn the_orc_chief_speaks_to_players_on_maras_errand_from_its_own_body() {
     settle(&mut sim);
     quest::accept(sim.world(), player, row("TusksForTheChief")).expect("accepted");
     let at = position(sim.world(), player).expect("position");
-    sim.world()
-        .entity_mut(bystander)
-        .insert(Position { pos: at });
+    place(&mut sim, bystander, at);
     sim.forget_notified();
 
     let chief = npc::spawn(
@@ -332,4 +258,53 @@ fn errors_and_feed_lines_answer_every_action() {
         notification::notify(sim.world(), player, refused.clone());
     }
     assert_eq!(told(&sim, 1), vec![refused; 20]);
+}
+
+fn recorded(sim: &mut Sim, player: Entity) -> Vec<(HistoryTopic, Option<String>, String, u32)> {
+    sim.world()
+        .get::<History>(player)
+        .map(|history| {
+            history
+                .records()
+                .map(|record| {
+                    let entry = &record.entry;
+                    let text = entry.text.words(&InputMap::new(content()));
+                    (entry.topic, entry.by.clone(), text, entry.repeats)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn narration(label: &'static str, text: String) -> Notification {
+    Notification::new(
+        NotificationKind::Narration {
+            label: label.into(),
+            sfx: None,
+        },
+        LineText::plain(text),
+    )
+}
+
+fn travel(from: &mut Sim, player: Entity, to: AreaId) -> (Sim, Entity) {
+    let mut there = Sim::area(to);
+    there.connect(1);
+    from.world().entity_mut(player).insert(Crossing {
+        dest_area: to,
+        dest: there.map().fallback_spawn(),
+    });
+    let traveler = transition::departing(from.world())
+        .pop()
+        .expect("a traveler");
+    let arrived = transition::arrive(there.world(), traveler);
+    there.send(1, AreaDrawn);
+    settle(&mut there);
+    (there, arrived)
+}
+
+fn intros(sim: &Sim, client: u32) -> usize {
+    told(sim, client)
+        .iter()
+        .filter(|notification| matches!(notification.kind, NotificationKind::Intro { .. }))
+        .count()
 }

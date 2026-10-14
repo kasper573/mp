@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_replicon_renet2::RepliconRenetClientPlugin;
 use bevy_replicon_renet2::renet2::{RenetClient, RenetClientPlugin, RenetReceive, RenetSend};
 
-use crate::core::platform::ServerSocket;
+use crate::core::platform::{ServerSocket, SocketState};
 
 pub struct ClientSocket(pub Box<dyn ServerSocket>);
 
@@ -34,17 +34,18 @@ fn receive(
     while let Some(packet) = socket.0.recv() {
         client.process_packet(&packet);
     }
-    if socket.0.is_open() && client.is_connecting() {
-        client.set_connected();
-    }
-    // renet has no internal timeout, so a closed socket is the only liveness signal. The connection
-    // ends with its resources: replicon starts a connection when a client resource is added, so the
-    // next one must not overwrite this one.
-    if socket.0.is_closed() {
-        commands.remove_resource::<RenetClient>();
-        commands.queue(|world: &mut World| {
-            world.remove_non_send::<ClientSocket>();
-        });
+    match socket.0.state() {
+        SocketState::Open if client.is_connecting() => client.set_connected(),
+        // renet has no internal timeout, so a closed socket is the only liveness signal. The
+        // connection ends with its resources: replicon starts a connection when a client resource is
+        // added, so the next one must not overwrite this one.
+        SocketState::Closed => {
+            commands.remove_resource::<RenetClient>();
+            commands.queue(|world: &mut World| {
+                world.remove_non_send::<ClientSocket>();
+            });
+        }
+        SocketState::Connecting | SocketState::Open => {}
     }
 }
 

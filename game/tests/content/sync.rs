@@ -15,128 +15,6 @@ use crate::support::{TempFolder, load};
 
 const FILES: &str = "/content/files/";
 
-struct FakeServer {
-    served: RefCell<ServedContent>,
-    requests: RefCell<Vec<String>>,
-    corrupt_once: RefCell<HashSet<String>>,
-    deploy_on_404: RefCell<Option<(String, ServedContent)>>,
-}
-
-impl FakeServer {
-    fn new(served: ServedContent) -> FakeServer {
-        FakeServer {
-            served: RefCell::new(served),
-            requests: RefCell::new(Vec::new()),
-            corrupt_once: RefCell::new(HashSet::new()),
-            deploy_on_404: RefCell::new(None),
-        }
-    }
-
-    fn requested_hashes(&self) -> Vec<String> {
-        self.requests
-            .borrow()
-            .iter()
-            .filter_map(|path| path.strip_prefix(FILES))
-            .map(str::to_owned)
-            .collect()
-    }
-
-    fn manifests_requested(&self) -> usize {
-        self.requests
-            .borrow()
-            .iter()
-            .filter(|path| *path == "/content/manifest")
-            .count()
-    }
-
-    fn forget_requests(&self) {
-        self.requests.borrow_mut().clear();
-    }
-}
-
-impl ContentSource for FakeServer {
-    fn get(&self, path: &str) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
-        self.requests.borrow_mut().push(path.to_owned());
-        let result = if path == "/content/manifest" {
-            Ok(serde_json::to_vec(&self.served.borrow().manifest).expect("a manifest"))
-        } else if let Some(hash) = path.strip_prefix(FILES) {
-            let gone = self
-                .deploy_on_404
-                .borrow()
-                .as_ref()
-                .is_some_and(|(missing, _)| missing == hash);
-            if gone {
-                let (_, next) = self.deploy_on_404.borrow_mut().take().expect("a deploy");
-                *self.served.borrow_mut() = next;
-                Err(FetchFailure::Status {
-                    status: 404,
-                    body: String::new(),
-                })
-            } else if self.corrupt_once.borrow_mut().remove(hash) {
-                Ok(b"not the file".to_vec())
-            } else {
-                self.served
-                    .borrow()
-                    .file(hash)
-                    .map(|bytes| bytes.to_vec())
-                    .ok_or(FetchFailure::Status {
-                        status: 404,
-                        body: String::new(),
-                    })
-            }
-        } else {
-            Err(FetchFailure::Status {
-                status: 400,
-                body: String::new(),
-            })
-        };
-        Box::pin(std::future::ready(result))
-    }
-}
-
-fn served(folder: &TempFolder) -> ServedContent {
-    let content = load(&folder.0).unwrap_or_else(|report| panic!("{report}"));
-    ServedContent::new(
-        &content,
-        &FilesystemFolder(folder.0.clone()),
-        version::build(),
-        "Rift",
-    )
-    .expect("the folder is served")
-}
-
-fn quickly() -> SyncPolicy {
-    SyncPolicy {
-        timeout: Duration::from_secs(5),
-        first_backoff: Duration::from_millis(1),
-        longest_backoff: Duration::from_millis(2),
-        ..SyncPolicy::default()
-    }
-}
-
-fn run(server: &FakeServer, store: &dyn ContentStore) -> Result<SyncedContent, SyncError> {
-    block_on(sync(
-        server,
-        store,
-        version::build(),
-        quickly(),
-        SyncStatus::default(),
-    ))
-}
-
-fn expected_hashes(served: &ServedContent, index: &SyncedContent) -> HashSet<String> {
-    index
-        .index
-        .files
-        .iter()
-        .map(|file| file.hash.clone())
-        .chain([
-            served.manifest.index.hash.clone(),
-            served.manifest.rows.hash.clone(),
-        ])
-        .collect()
-}
-
 #[test]
 fn a_first_visit_fetches_everything_and_the_next_day_only_the_manifest() {
     let folder = TempFolder::of_template();
@@ -229,14 +107,7 @@ fn a_bad_hash_is_fetched_again() {
 fn a_file_gone_from_the_server_restarts_from_the_manifest() {
     let before = TempFolder::of_template();
     let after = TempFolder::of_template();
-    {
-        use std::io::Write;
-        let mut wav = std::fs::OpenOptions::new()
-            .append(true)
-            .open(after.0.join("assets/audio/combat/slash03.wav"))
-            .expect("the sound opens");
-        wav.write_all(&[0; 16]).expect("the sound grows");
-    }
+    after.append("assets/audio/combat/slash03.wav", &[0; 16]);
     let v1 = served(&before);
     let v2 = served(&after);
     let changed = v1.manifest.index.hash.clone();
@@ -259,14 +130,7 @@ fn a_deploy_fetches_only_what_changed_and_drops_what_it_replaced() {
     after.edit("tables/job/adventurer.json", |row| {
         row["name"] = serde_json::Value::String("Wanderer".to_owned());
     });
-    {
-        use std::io::Write;
-        let mut wav = std::fs::OpenOptions::new()
-            .append(true)
-            .open(after.0.join("assets/audio/combat/slash03.wav"))
-            .expect("the sound opens");
-        wav.write_all(&[0; 16]).expect("the sound grows");
-    }
+    after.append("assets/audio/combat/slash03.wav", &[0; 16]);
     let server = FakeServer::new(served(&before));
     let store = MemoryStore::default();
     let v1 = run(&server, &store).expect("the first visit syncs");
@@ -359,4 +223,126 @@ fn another_build_is_refused_before_anything_downloads() {
     );
     assert!(server.requested_hashes().is_empty());
     assert!(store.hashes().is_empty());
+}
+
+fn served(folder: &TempFolder) -> ServedContent {
+    let content = load(folder.path()).unwrap_or_else(|report| panic!("{report}"));
+    ServedContent::new(
+        &content,
+        &FilesystemFolder(folder.path().to_path_buf()),
+        version::build(),
+        "Rift",
+    )
+    .expect("the folder is served")
+}
+
+fn quickly() -> SyncPolicy {
+    SyncPolicy {
+        timeout: Duration::from_secs(5),
+        first_backoff: Duration::from_millis(1),
+        longest_backoff: Duration::from_millis(2),
+        ..SyncPolicy::default()
+    }
+}
+
+fn run(server: &FakeServer, store: &dyn ContentStore) -> Result<SyncedContent, SyncError> {
+    block_on(sync(
+        server,
+        store,
+        version::build(),
+        quickly(),
+        SyncStatus::default(),
+    ))
+}
+
+fn expected_hashes(served: &ServedContent, index: &SyncedContent) -> HashSet<String> {
+    index
+        .index
+        .files
+        .iter()
+        .map(|file| file.hash.clone())
+        .chain([
+            served.manifest.index.hash.clone(),
+            served.manifest.rows.hash.clone(),
+        ])
+        .collect()
+}
+
+struct FakeServer {
+    served: RefCell<ServedContent>,
+    requests: RefCell<Vec<String>>,
+    corrupt_once: RefCell<HashSet<String>>,
+    deploy_on_404: RefCell<Option<(String, ServedContent)>>,
+}
+
+impl FakeServer {
+    fn new(served: ServedContent) -> FakeServer {
+        FakeServer {
+            served: RefCell::new(served),
+            requests: RefCell::new(Vec::new()),
+            corrupt_once: RefCell::new(HashSet::new()),
+            deploy_on_404: RefCell::new(None),
+        }
+    }
+
+    fn requested_hashes(&self) -> Vec<String> {
+        self.requests
+            .borrow()
+            .iter()
+            .filter_map(|path| path.strip_prefix(FILES))
+            .map(str::to_owned)
+            .collect()
+    }
+
+    fn manifests_requested(&self) -> usize {
+        self.requests
+            .borrow()
+            .iter()
+            .filter(|path| *path == "/content/manifest")
+            .count()
+    }
+
+    fn forget_requests(&self) {
+        self.requests.borrow_mut().clear();
+    }
+}
+
+impl ContentSource for FakeServer {
+    fn get(&self, path: &str) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
+        self.requests.borrow_mut().push(path.to_owned());
+        let result = if path == "/content/manifest" {
+            Ok(serde_json::to_vec(&self.served.borrow().manifest).expect("a manifest"))
+        } else if let Some(hash) = path.strip_prefix(FILES) {
+            let gone = self
+                .deploy_on_404
+                .borrow()
+                .as_ref()
+                .is_some_and(|(missing, _)| missing == hash);
+            if gone {
+                let (_, next) = self.deploy_on_404.borrow_mut().take().expect("a deploy");
+                *self.served.borrow_mut() = next;
+                Err(FetchFailure::Status {
+                    status: 404,
+                    body: String::new(),
+                })
+            } else if self.corrupt_once.borrow_mut().remove(hash) {
+                Ok(b"not the file".to_vec())
+            } else {
+                self.served
+                    .borrow()
+                    .file(hash)
+                    .map(|bytes| bytes.to_vec())
+                    .ok_or(FetchFailure::Status {
+                        status: 404,
+                        body: String::new(),
+                    })
+            }
+        } else {
+            Err(FetchFailure::Status {
+                status: 400,
+                body: String::new(),
+            })
+        };
+        Box::pin(std::future::ready(result))
+    }
 }

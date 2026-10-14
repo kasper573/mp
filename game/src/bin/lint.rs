@@ -1,10 +1,12 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use cargo_metadata::MetadataCommand;
+use serde::Deserialize;
 use syn::UseTree;
 use syn::visit::{self, Visit};
+use walkdir::{DirEntry, WalkDir};
 
 fn main() {
     let metadata = MetadataCommand::new()
@@ -38,16 +40,27 @@ fn main() {
 }
 
 fn opted_in(metadata: &serde_json::Value) -> bool {
-    metadata
-        .get("lint")
-        .and_then(|lint| lint.get("game"))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false)
+    LintMetadata::deserialize(metadata).is_ok_and(|metadata| metadata.lint.game)
+}
+
+#[derive(Deserialize)]
+struct LintMetadata {
+    #[serde(default)]
+    lint: LintSwitches,
+}
+
+#[derive(Deserialize, Default)]
+struct LintSwitches {
+    #[serde(default)]
+    game: bool,
 }
 
 fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
-    let mut files = Vec::new();
-    collect_rs(src, &mut files);
+    let files = WalkDir::new(src)
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(DirEntry::into_path)
+        .filter(|path| path.extension().is_some_and(|ext| ext == "rs"));
     for file in files {
         let rel = file
             .strip_prefix(src)
@@ -68,20 +81,6 @@ fn check_crate(name: &str, src: &Path, out: &mut Vec<String>) {
                     "[{name}] src/{rel}:{line}: `{call}` — code names content: use a fixture, or a setting in game.json"
                 ));
             }
-        }
-    }
-}
-
-fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_rs(&path, out);
-        } else if path.extension().is_some_and(|ext| ext == "rs") {
-            out.push(path);
         }
     }
 }

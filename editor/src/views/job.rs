@@ -3,8 +3,7 @@ use game::systems::stat::StatKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
-use crate::forms;
-use crate::forms::{FormChange, FormCx};
+use crate::forms::{self, FormChange, FormCx};
 use crate::ui::{theme, widgets};
 
 pub const TABLE: &str = "job";

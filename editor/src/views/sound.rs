@@ -3,8 +3,7 @@ use game::core::audio::loader;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
-use game::systems::area;
-use game::systems::area::AreaId;
+use game::systems::area::{self, AreaId};
 
 use crate::app::Editor;
 use crate::ui::theme;

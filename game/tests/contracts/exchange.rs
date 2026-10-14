@@ -2,13 +2,6 @@ use game::systems::item::{ExchangeRefusal, Inventory, ItemStack};
 
 use crate::support::{content, row};
 
-fn bag(max: u32, slots: &[ItemStack]) -> Inventory {
-    Inventory {
-        slots: slots.to_vec(),
-        max,
-    }
-}
-
 #[test]
 fn a_hand_in_frees_the_slot_its_reward_needs() {
     let mut inventory = bag(
@@ -124,4 +117,11 @@ fn taking_up_to_stacks_takes_what_is_held_and_no_more() {
     assert_eq!(inventory.count(row("OrcTusk")), 0);
     assert_eq!(inventory.count(row("Gold")), 0);
     assert_eq!(inventory.count(row("Bone")), 1);
+}
+
+fn bag(max: u32, slots: &[ItemStack]) -> Inventory {
+    Inventory {
+        slots: slots.to_vec(),
+        max,
+    }
 }

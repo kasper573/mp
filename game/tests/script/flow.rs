@@ -5,7 +5,7 @@ use game::core::script::compile::compile_owner;
 use game::core::tiling::Tiles;
 use game::systems::dialogue::Conversation;
 use game::systems::item::ItemId;
-use game::systems::movement::{Position, position};
+use game::systems::movement::position;
 use game::systems::notification::NotificationId;
 use game::systems::npc::body::{self, Act, Priority};
 use game::systems::npc::{self, NpcId, Pack};
@@ -15,88 +15,9 @@ use serde_json::{Value, json};
 
 use crate::json::{inline, inline_with};
 use crate::support::{
-    Sim, content, conversation, count, errors, give, later, leave, pick, remembered, row,
-    spawn_area, spoken,
+    Sim, content, conversation, count, errors, give, health, later, leave, pick, place, remembered,
+    row, spawn_area, spoken,
 };
-
-fn say(text: &str, choices: Vec<(&str, Option<&str>)>) -> Value {
-    let choices: Vec<Value> = choices
-        .into_iter()
-        .map(|(label, to)| match to {
-            Some(to) => json!({ "label": [label], "to": to }),
-            None => json!({ "label": [label] }),
-        })
-        .collect();
-    json!({
-        "type": "dialogue",
-        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
-        "choices": choices,
-    })
-}
-
-fn interacted(next: &str) -> Value {
-    json!({ "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next })
-}
-
-fn remember(key: &str, next: Option<&str>) -> Value {
-    match next {
-        Some(next) => json!({ "type": "remember", "memory": key, "next": next }),
-        None => json!({ "type": "remember", "memory": key }),
-    }
-}
-
-fn compiled(modules: &[&'static ScriptModule]) -> Vec<Arc<Procedure>> {
-    compile_owner(content(), OwnerKind::Npc, "test/npc", modules).expect("compiles")
-}
-
-fn scripted_npc(
-    sim: &mut Sim,
-    beside: Entity,
-    modules: &[&'static ScriptModule],
-) -> (Entity, Owner) {
-    let at = position(sim.world(), beside).expect("position");
-    let spot = sim.walkable_near(at, Tiles(1.0), Tiles(1.5));
-    let npc = npc::spawn(
-        sim.world(),
-        row::<NpcId>("Grisha"),
-        spot,
-        spawn_area(),
-        Pack(u32::MAX),
-    );
-    let owner = Owner::Entity(OwnerKind::Npc, npc);
-    let procedures = compiled(modules);
-    let mut instances = sim.world().resource_mut::<RiftInstances>();
-    instances.remove_owner(owner);
-    instances.spawn_owner(owner, procedures);
-    instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
-    sim.tick();
-    (npc, owner)
-}
-
-fn raise(sim: &mut Sim, owner: Owner, kind: EventKind, subject: Entity) {
-    sim.world().resource_mut::<RiftInstances>().raise(
-        owner,
-        kind,
-        Some(subject),
-        Vec::new(),
-        |_| true,
-    );
-}
-
-fn health(sim: &mut Sim, who: Entity) -> f32 {
-    stat::effective(sim.world(), who, StatKind::Health)
-}
-
-fn notified(sim: &Sim, client: u32, ids: &[NotificationId]) -> Vec<NotificationId> {
-    sim.notified(client)
-        .into_iter()
-        .filter_map(|sent| {
-            ids.iter()
-                .copied()
-                .find(|id| sent.notification.text == spoken(*id).text)
-        })
-        .collect()
-}
 
 #[test]
 fn a_wait_pauses_the_flow_and_an_effect_takes_the_output_it_earns() {
@@ -237,7 +158,7 @@ fn an_attack_loses_a_target_that_leaves_its_range() {
 
     let here = position(sim.world(), player).expect("position");
     let far = sim.walkable_near(here, Tiles(14.0), Tiles(30.0));
-    sim.world().entity_mut(player).insert(Position { pos: far });
+    place(&mut sim, player, far);
     assert!(sim.run_until(5.0, |world| body::target(world, npc).is_none()));
     sim.tick();
     assert!(remembered(&mut sim, player, row("SidedWithOrcs")));
@@ -312,4 +233,79 @@ fn an_npc_can_be_the_subject_of_a_flow() {
     sim.tick();
 
     assert_eq!(health(&mut sim, patient), full);
+}
+
+fn say(text: &str, choices: Vec<(&str, Option<&str>)>) -> Value {
+    let choices: Vec<Value> = choices
+        .into_iter()
+        .map(|(label, to)| match to {
+            Some(to) => json!({ "label": [label], "to": to }),
+            None => json!({ "label": [label] }),
+        })
+        .collect();
+    json!({
+        "type": "dialogue",
+        "lines": [{ "by": { "type": "narrator" }, "text": [text] }],
+        "choices": choices,
+    })
+}
+
+fn interacted(next: &str) -> Value {
+    json!({ "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next })
+}
+
+fn remember(key: &str, next: Option<&str>) -> Value {
+    match next {
+        Some(next) => json!({ "type": "remember", "memory": key, "next": next }),
+        None => json!({ "type": "remember", "memory": key }),
+    }
+}
+
+fn compiled(modules: &[&'static ScriptModule]) -> Vec<Arc<Procedure>> {
+    compile_owner(content(), OwnerKind::Npc, "test/npc", modules).expect("compiles")
+}
+
+fn scripted_npc(
+    sim: &mut Sim,
+    beside: Entity,
+    modules: &[&'static ScriptModule],
+) -> (Entity, Owner) {
+    let at = position(sim.world(), beside).expect("position");
+    let spot = sim.walkable_near(at, Tiles(1.0), Tiles(1.5));
+    let npc = npc::spawn(
+        sim.world(),
+        row::<NpcId>("Grisha"),
+        spot,
+        spawn_area(),
+        Pack(u32::MAX),
+    );
+    let owner = Owner::Entity(OwnerKind::Npc, npc);
+    let procedures = compiled(modules);
+    let mut instances = sim.world().resource_mut::<RiftInstances>();
+    instances.remove_owner(owner);
+    instances.spawn_owner(owner, procedures);
+    instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
+    sim.tick();
+    (npc, owner)
+}
+
+fn raise(sim: &mut Sim, owner: Owner, kind: EventKind, subject: Entity) {
+    sim.world().resource_mut::<RiftInstances>().raise(
+        owner,
+        kind,
+        Some(subject),
+        Vec::new(),
+        |_| true,
+    );
+}
+
+fn notified(sim: &Sim, client: u32, ids: &[NotificationId]) -> Vec<NotificationId> {
+    sim.notified(client)
+        .into_iter()
+        .filter_map(|sent| {
+            ids.iter()
+                .copied()
+                .find(|id| sent.notification.text == spoken(*id).text)
+        })
+        .collect()
 }

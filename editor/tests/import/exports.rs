@@ -4,33 +4,6 @@ use std::path::{Path, PathBuf};
 use image::{GenericImage, RgbaImage};
 use serde_json::json;
 
-pub fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("rift-import-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).expect("a temp dir");
-    dir
-}
-
-fn bbox(image: &RgbaImage) -> (u32, u32, u32, u32) {
-    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0, 0);
-    for (x, y, pixel) in image.enumerate_pixels() {
-        if pixel[3] != 0 {
-            x0 = x0.min(x);
-            y0 = y0.min(y);
-            x1 = x1.max(x + 1);
-            y1 = y1.max(y + 1);
-        }
-    }
-    if x0 == u32::MAX {
-        return (0, 0, 1, 1);
-    }
-    (x0, y0, x1 - x0, y1 - y0)
-}
-
-fn save(path: &Path, image: &RgbaImage) {
-    image.save(path).expect("saves");
-}
-
 pub fn aseprite(
     dir: &Path,
     name: &str,
@@ -249,4 +222,24 @@ pub fn spaced_grid(
     let path = dir.join(format!("{name}.png"));
     save(&path, &out);
     path
+}
+
+fn bbox(image: &RgbaImage) -> (u32, u32, u32, u32) {
+    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0, 0);
+    for (x, y, pixel) in image.enumerate_pixels() {
+        if pixel[3] != 0 {
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x + 1);
+            y1 = y1.max(y + 1);
+        }
+    }
+    if x0 == u32::MAX {
+        return (0, 0, 1, 1);
+    }
+    (x0, y0, x1 - x0, y1 - y0)
+}
+
+fn save(path: &Path, image: &RgbaImage) {
+    image.save(path).expect("saves");
 }

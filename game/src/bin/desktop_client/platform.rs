@@ -1,19 +1,15 @@
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Waker};
 use std::time::{Duration, SystemTime};
 
 use bevy::window::Window;
 use game::core::content::store::ContentStore;
-use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket};
+use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, SocketState};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
 use game::systems::probe::ProbeChannel;
 use tungstenite::Message;
@@ -76,7 +72,7 @@ impl Platform for DesktopPlatform {
 
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
         let agent = self.agent.clone();
-        offload(move || {
+        Box::pin(blocking::unblock(move || {
             let mut response = agent
                 .get(&url)
                 .call()
@@ -88,7 +84,7 @@ impl Platform for DesktopPlatform {
                 .limit(u64::MAX)
                 .read_to_vec()
                 .map_err(|error| FetchFailure::Transport(error.to_string()))
-        })
+        }))
     }
 
     fn post(
@@ -98,7 +94,7 @@ impl Platform for DesktopPlatform {
         body: String,
     ) -> LocalFuture<Result<String, FetchFailure>> {
         let agent = self.agent.clone();
-        offload(move || {
+        Box::pin(blocking::unblock(move || {
             let mut response = agent
                 .post(&url)
                 .header("Authorization", &authorization)
@@ -110,7 +106,7 @@ impl Platform for DesktopPlatform {
                 .body_mut()
                 .read_to_string()
                 .map_err(|error| FetchFailure::Transport(error.to_string()))
-        })
+        }))
     }
 
     fn content_store(&self) -> Box<dyn ContentStore> {
@@ -198,68 +194,17 @@ fn refused(response: &mut ureq::http::Response<ureq::Body>) -> Result<(), FetchF
     })
 }
 
-fn offload<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> LocalFuture<T> {
-    let shared: Arc<Mutex<Offloaded<T>>> = Arc::default();
-    std::thread::spawn({
-        let shared = shared.clone();
-        move || {
-            let result = work();
-            let mut slot = shared.lock().expect("offload lock");
-            slot.result = Some(result);
-            if let Some(waker) = slot.waker.take() {
-                waker.wake();
-            }
-        }
-    });
-    Box::pin(OffloadFuture(shared))
-}
-
-struct Offloaded<T> {
-    result: Option<T>,
-    waker: Option<Waker>,
-}
-
-impl<T> Default for Offloaded<T> {
-    fn default() -> Offloaded<T> {
-        Offloaded {
-            result: None,
-            waker: None,
-        }
-    }
-}
-
-struct OffloadFuture<T>(Arc<Mutex<Offloaded<T>>>);
-
-impl<T> Future for OffloadFuture<T> {
-    type Output = T;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<T> {
-        let mut slot = self.0.lock().expect("offload lock");
-        match slot.result.take() {
-            Some(result) => Poll::Ready(result),
-            None => {
-                slot.waker = Some(cx.waker().clone());
-                Poll::Pending
-            }
-        }
-    }
-}
-
-const CONNECTING: u8 = 0;
-const OPEN: u8 = 1;
-const CLOSED: u8 = 2;
-
 struct ThreadSocket {
     incoming: Mutex<Receiver<Vec<u8>>>,
     outgoing: Sender<Vec<u8>>,
-    state: Arc<AtomicU8>,
+    state: Arc<Mutex<SocketState>>,
 }
 
 impl ThreadSocket {
     fn open(url: &str) -> ThreadSocket {
         let (incoming_tx, incoming) = channel();
         let (outgoing, outgoing_rx) = channel();
-        let state = Arc::new(AtomicU8::new(CONNECTING));
+        let state = Arc::new(Mutex::new(SocketState::Connecting));
         std::thread::spawn({
             let state = state.clone();
             let url = url.to_owned();
@@ -279,25 +224,26 @@ impl ServerSocket for ThreadSocket {
     }
 
     fn send(&self, packet: &[u8]) {
-        if self.state.load(Ordering::Relaxed) == OPEN {
+        if self.state() == SocketState::Open {
             let _ = self.outgoing.send(packet.to_vec());
         }
     }
 
-    fn is_open(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == OPEN
-    }
-
-    fn is_closed(&self) -> bool {
-        self.state.load(Ordering::Relaxed) == CLOSED
+    fn state(&self) -> SocketState {
+        *self.state.lock().expect("socket state lock")
     }
 }
 
-fn drive(url: &str, state: &AtomicU8, incoming: &Sender<Vec<u8>>, outgoing: &Receiver<Vec<u8>>) {
+fn drive(
+    url: &str,
+    state: &Mutex<SocketState>,
+    incoming: &Sender<Vec<u8>>,
+    outgoing: &Receiver<Vec<u8>>,
+) {
+    let set = |to: SocketState| *state.lock().expect("socket state lock") = to;
     let Ok((mut ws, _)) = tungstenite::connect(url).map_err(|error| eprintln!("{url}: {error}"))
     else {
-        state.store(CLOSED, Ordering::Relaxed);
-        return;
+        return set(SocketState::Closed);
     };
     let nonblocking = match ws.get_ref() {
         MaybeTlsStream::Plain(tcp) => tcp.set_nonblocking(true),
@@ -305,11 +251,10 @@ fn drive(url: &str, state: &AtomicU8, incoming: &Sender<Vec<u8>>, outgoing: &Rec
         _ => Ok(()),
     };
     if nonblocking.is_err() {
-        state.store(CLOSED, Ordering::Relaxed);
-        return;
+        return set(SocketState::Closed);
     }
-    state.store(OPEN, Ordering::Relaxed);
-    let closed = || state.store(CLOSED, Ordering::Relaxed);
+    set(SocketState::Open);
+    let closed = || set(SocketState::Closed);
     loop {
         loop {
             match outgoing.try_recv() {

@@ -13,6 +13,7 @@ mod quest;
 mod reach;
 mod safe_zone;
 mod shop;
+mod snapshot;
 mod summon;
 mod support;
 mod templates;

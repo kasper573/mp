@@ -13,90 +13,13 @@ use serde_json::Value;
 
 const CONTENT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../content");
 
-fn row(table: &str, key: &str) -> Value {
-    let text =
-        std::fs::read_to_string(format!("{CONTENT}/tables/{table}/{key}.json")).expect("the row");
-    serde_json::from_str(&text).expect("json")
-}
-
-fn asset(path: &str) -> RgbaImage {
-    image::open(format!("{CONTENT}/assets/{path}"))
-        .expect("the asset")
-        .into_rgba8()
-}
-
-fn strips_of(row: &Value, sheet: &RgbaImage) -> Vec<(String, Vec<(RgbaImage, u32)>)> {
-    let (fw, fh) = (
-        row["sprites"]["frame_size"]["width"].as_u64().unwrap() as u32,
-        row["sprites"]["frame_size"]["height"].as_u64().unwrap() as u32,
-    );
-    let columns = sheet.width() / fw;
-    model::strip_names()
-        .into_iter()
-        .map(|name| {
-            let (action, direction) = name.split_once('_').unwrap();
-            let frames = row["sprites"]["actions"][action][direction]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|frame| {
-                    let index = frame["frame"].as_u64().unwrap() as u32;
-                    let cut = image::imageops::crop_imm(
-                        sheet,
-                        (index % columns) * fw,
-                        (index / columns) * fh,
-                        fw,
-                        fh,
-                    )
-                    .to_image();
-                    (cut, frame["ms"].as_u64().unwrap() as u32)
-                })
-                .collect();
-            (name, frames)
-        })
-        .collect()
-}
-
-fn palette(text: &str) -> Vec<PaletteRow> {
-    let file = grid::GridFile {
-        path: "palette.csv",
-        text,
-    };
-    grid::read_palette(file, &mut Vec::new()).expect("a palette")
-}
-
-fn fill(image: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, colour: [u8; 4]) {
-    for dy in 0..h {
-        for dx in 0..w {
-            image.put_pixel(x + dx, y + dy, image::Rgba(colour));
-        }
-    }
-}
-
-fn plan_for(
-    row: &Value,
-    sheet: &RgbaImage,
-    export: &formats::AnimationExport,
-    record: Option<&ImportRecord>,
-) -> model::ModelImportPlan {
-    let (mapping, _) = model::default_mapping(export);
-    model::plan(
-        Some(row),
-        Some(sheet),
-        export,
-        &mapping,
-        &BTreeMap::new(),
-        record,
-    )
-}
-
 #[test]
 fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
-    let dir = exports::temp_dir("aseprite");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let strips = strips_of(&row, &sheet);
-    let files = exports::aseprite(&dir, "farmer-girl", &strips, true);
+    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, true);
     let dropped = formats::sort_out(&files).expect("a sheet and its json");
     let export = formats::decode(&dropped).expect("decodes");
     assert_eq!(export.kind, ExportFormat::SheetJson);
@@ -146,11 +69,11 @@ fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
 
 #[test]
 fn a_texturepacker_sheet_with_rotated_frames_imports_alike() {
-    let dir = exports::temp_dir("texturepacker");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let strips = strips_of(&row, &sheet);
-    let files = exports::texturepacker(&dir, "farmer-girl", &strips);
+    let files = exports::texturepacker(dir.path(), "farmer-girl", &strips);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     assert_eq!(export.strips.len(), 40);
     assert!(!export.timed(), "TexturePacker carries no durations");
@@ -175,11 +98,11 @@ fn a_texturepacker_sheet_with_rotated_frames_imports_alike() {
 
 #[test]
 fn a_grid_asks_the_frame_size_and_maps_rows_by_order() {
-    let dir = exports::temp_dir("grid");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let strips = strips_of(&row, &sheet);
-    let file = exports::grid(&dir, "farmer-girl", &strips, (48, 64));
+    let file = exports::grid(dir.path(), "farmer-girl", &strips, (48, 64));
     let mut export = formats::decode(&formats::sort_out(&[file]).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Grid);
     assert!(export.strips.is_empty());
@@ -198,11 +121,11 @@ fn a_grid_asks_the_frame_size_and_maps_rows_by_order() {
 
 #[test]
 fn a_numbered_sequence_imports_and_a_gap_is_refused() {
-    let dir = exports::temp_dir("sequence");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let strips = strips_of(&row, &sheet);
-    let files = exports::sequence(&dir, &strips[8..11]);
+    let files = exports::sequence(dir.path(), &strips[8..11]);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Sequence);
     assert_eq!(export.strips.len(), 3);
@@ -217,12 +140,12 @@ fn a_numbered_sequence_imports_and_a_gap_is_refused() {
 
 #[test]
 fn a_gif_and_an_apng_carry_their_lengths() {
-    let dir = exports::temp_dir("animated");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let water = asset("tilesets/beach-tileset.png");
     let frames: Vec<RgbaImage> = (0..4)
         .map(|k| image::imageops::crop_imm(&water, (1 + 9 * k) * 16, 16, 112, 112).to_image())
         .collect();
-    let gif = exports::gif(&dir, "beach-water", &frames, 25);
+    let gif = exports::gif(dir.path(), "beach-water", &frames, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Gif);
     assert_eq!(export.frame, (112, 112));
@@ -232,7 +155,7 @@ fn a_gif_and_an_apng_carry_their_lengths() {
         strip.frames.iter().map(|f| f.ms).collect::<Vec<_>>(),
         vec![Some(250); 4]
     );
-    let apng = exports::apng(&dir, "beach-water", &frames, (1, 3));
+    let apng = exports::apng(dir.path(), "beach-water", &frames, (1, 3));
     let export = formats::decode(&formats::sort_out(&[apng]).unwrap()).expect("decodes");
     assert_eq!(export.kind, ExportFormat::Apng);
     assert_eq!(export.strips[0].frames[0].ms, Some(333), "half up");
@@ -243,7 +166,7 @@ fn a_gif_and_an_apng_carry_their_lengths() {
 
 #[test]
 fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
-    let dir = exports::temp_dir("again");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let mut strips = strips_of(&row, &sheet);
@@ -256,7 +179,7 @@ fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
         .unwrap();
     attack_s.1.remove(2);
     attack_s.1.remove(1);
-    let files = exports::aseprite(&dir, "farmer-girl", &strips, true);
+    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, true);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     let plan = plan_for(&row, &sheet, &export, None);
     let run = plan.strips.iter().find(|s| s.name == "run_e").unwrap();
@@ -303,11 +226,11 @@ fn importing_again_keeps_the_cues_that_still_fit_and_asks_for_the_rest() {
 
 #[test]
 fn importing_again_asks_before_replacing_lengths_edited_here() {
-    let dir = exports::temp_dir("retimed");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let mut row = row("model", "farmer_girl");
     let sheet = asset("models/farmer-girl.png");
     let strips = strips_of(&row, &sheet);
-    let files = exports::aseprite(&dir, "farmer-girl", &strips, false);
+    let files = exports::aseprite(dir.path(), "farmer-girl", &strips, false);
     let export = formats::decode(&formats::sort_out(&files).unwrap()).expect("decodes");
     let (mapping, _) = model::default_mapping(&export);
     let plan = model::plan(
@@ -361,10 +284,10 @@ fn importing_again_asks_before_replacing_lengths_edited_here() {
 
 #[test]
 fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
-    let dir = exports::temp_dir("tileset");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("tileset", "beach_tileset");
     let old = asset("tilesets/beach-tileset.png");
-    let spaced = exports::spaced_grid(&dir, "beach-tileset", &old, 16, 2, 1, 1);
+    let spaced = exports::spaced_grid(dir.path(), "beach-tileset", &old, 16, 2, 1, 1);
     let export = formats::decode(&formats::sort_out(&[spaced]).unwrap()).unwrap();
     let settings = tileset::TileGridSettings {
         tile: 16,
@@ -458,7 +381,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
         assert_eq!(old.flip, new.flip);
     }
 
-    let game = dir.join("game");
+    let game = dir.path().join("game");
     editor::templates::new_game_from(std::path::Path::new(CONTENT), "Beach", &game).unwrap();
     wide.save(game.join("assets/tilesets/beach-tileset.png"))
         .unwrap();
@@ -472,7 +395,7 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     }
     let loaded = game::systems::load_content(
         std::sync::Arc::new(game::core::content::FilesystemFolder(game)),
-        "cargo test",
+        "cargo test failed",
     );
     if let Err(report) = &loaded {
         panic!("the folder loads after the re-import:\n{report}");
@@ -508,13 +431,13 @@ fn a_gone_tile_still_painted_blocks_until_replaced() {
 
 #[test]
 fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
-    let dir = exports::temp_dir("animation");
+    let dir = tempfile::tempdir().expect("a scratch folder");
     let row = row("tileset", "beach_tileset");
     let water = asset("tilesets/beach-tileset.png");
     let frames: Vec<RgbaImage> = (0..4)
         .map(|k| image::imageops::crop_imm(&water, (1 + 9 * k) * 16, 16, 112, 112).to_image())
         .collect();
-    let gif = exports::gif(&dir, "beach-water", &frames, 25);
+    let gif = exports::gif(dir.path(), "beach-water", &frames, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).unwrap();
     let plan = tileset::anim_plan(&water, &row, &export, true, (1, 1)).expect("plans");
     assert_eq!(plan.animated(), 33);
@@ -534,7 +457,7 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     assert_eq!(tiles, vec![37, 46, 55, 64]);
     assert!(animation.iter().all(|f| f["ms"] == 250));
     let frozen = exports::gif(
-        &dir,
+        dir.path(),
         "beach-still",
         &[frames[0].clone(), frames[0].clone()],
         25,
@@ -544,7 +467,7 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
     assert!(still.is_err(), "a block that never changes is refused");
     let mut fresh = frames.clone();
     fill(&mut fresh[1], 0, 0, 16, 16, [9, 9, 9, 255]);
-    let gif = exports::gif(&dir, "beach-water-new", &fresh, 25);
+    let gif = exports::gif(dir.path(), "beach-water-new", &fresh, 25);
     let export = formats::decode(&formats::sort_out(&[gif]).unwrap()).unwrap();
     let plan = tileset::anim_plan(&water, &row, &export, true, (1, 1)).unwrap();
     assert_eq!(plan.new_images.len(), 1);
@@ -559,4 +482,81 @@ fn an_animation_lands_on_a_block_reusing_frames_found_by_pixels() {
         new_row["tiles"]["37"]["animation"][1]["tile"],
         Value::from(36 * 26)
     );
+}
+
+fn row(table: &str, key: &str) -> Value {
+    let text =
+        std::fs::read_to_string(format!("{CONTENT}/tables/{table}/{key}.json")).expect("the row");
+    serde_json::from_str(&text).expect("json")
+}
+
+fn asset(path: &str) -> RgbaImage {
+    image::open(format!("{CONTENT}/assets/{path}"))
+        .expect("the asset")
+        .into_rgba8()
+}
+
+fn strips_of(row: &Value, sheet: &RgbaImage) -> Vec<(String, Vec<(RgbaImage, u32)>)> {
+    let (fw, fh) = (
+        row["sprites"]["frame_size"]["width"].as_u64().unwrap() as u32,
+        row["sprites"]["frame_size"]["height"].as_u64().unwrap() as u32,
+    );
+    let columns = sheet.width() / fw;
+    model::strip_names()
+        .into_iter()
+        .map(|name| {
+            let (action, direction) = name.split_once('_').unwrap();
+            let frames = row["sprites"]["actions"][action][direction]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|frame| {
+                    let index = frame["frame"].as_u64().unwrap() as u32;
+                    let cut = image::imageops::crop_imm(
+                        sheet,
+                        (index % columns) * fw,
+                        (index / columns) * fh,
+                        fw,
+                        fh,
+                    )
+                    .to_image();
+                    (cut, frame["ms"].as_u64().unwrap() as u32)
+                })
+                .collect();
+            (name, frames)
+        })
+        .collect()
+}
+
+fn palette(text: &str) -> Vec<PaletteRow> {
+    let file = grid::GridFile {
+        path: "palette.csv",
+        text,
+    };
+    grid::read_palette(file, &mut Vec::new()).expect("a palette")
+}
+
+fn fill(image: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, colour: [u8; 4]) {
+    for dy in 0..h {
+        for dx in 0..w {
+            image.put_pixel(x + dx, y + dy, image::Rgba(colour));
+        }
+    }
+}
+
+fn plan_for(
+    row: &Value,
+    sheet: &RgbaImage,
+    export: &formats::AnimationExport,
+    record: Option<&ImportRecord>,
+) -> model::ModelImportPlan {
+    let (mapping, _) = model::default_mapping(export);
+    model::plan(
+        Some(row),
+        Some(sheet),
+        export,
+        &mapping,
+        &BTreeMap::new(),
+        record,
+    )
 }

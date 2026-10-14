@@ -10,14 +10,13 @@ use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleId, BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
 use crate::core::math::Pos;
-use crate::core::render::tile_to_window;
+use crate::core::render::{WorldOverlay, tile_to_window};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::{Action, Actor, plate};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
-use crate::systems::hud;
-use crate::systems::hud::spawn_ui;
+use crate::systems::hud::{self, spawn_ui};
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::NpcId;
 use crate::systems::player::session::Viewpoint;
@@ -455,6 +454,7 @@ fn bubble_at(world: &mut World, drawn: Option<Entity>, bubble: SpeechBubble) -> 
             bsn! {
                 @{ui::speech_bubble(bubble)}
                 GlobalZIndex({ui::tokens::layer::BUBBLES})
+                WorldOverlay
             },
         )
         .id(),

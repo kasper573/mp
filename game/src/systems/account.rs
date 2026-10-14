@@ -4,10 +4,13 @@ use strum::{AsRefStr, EnumString, VariantArray};
 #[derive(Component, Clone, Debug, PartialEq, Eq)]
 #[component(immutable)]
 pub struct Identity {
-    pub id: String,
+    pub id: AccountId,
     pub name: String,
     pub roles: Vec<Role>,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AccountId(pub String);
 
 impl Identity {
     pub fn has_role(&self, role: Role) -> bool {

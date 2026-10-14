@@ -43,6 +43,10 @@ pub struct Playtest {
 impl Playtest {
     pub fn start(setup: PlaytestSetup) -> Playtest {
         content::load(&setup.content);
+        // What an earlier playtest left behind there, its players' profiles among it, plays no part.
+        if setup.folder.exists() {
+            std::fs::remove_dir_all(&setup.folder).expect("the earlier playtest's folder cleared");
+        }
         std::fs::create_dir_all(&setup.folder).expect("a folder for the playtest");
         let server = Server::start(
             &setup.server_binary,

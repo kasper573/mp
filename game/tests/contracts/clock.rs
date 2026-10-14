@@ -3,10 +3,6 @@ use game::core::time::{GameDay, Seconds, UnixMillis, UtcHour};
 const HOUR: u64 = 3_600_000;
 const DAY: u64 = 24 * HOUR;
 
-fn hour(value: u8) -> UtcHour {
-    UtcHour::try_from(value).expect("valid hour")
-}
-
 #[test]
 fn the_day_rolls_over_exactly_at_the_reset_hour() {
     let reset = hour(4);
@@ -45,4 +41,8 @@ fn durations_round_trip_through_wall_time() {
     assert_eq!(later, UnixMillis(3_500));
     assert_eq!(later.since(start), Seconds(2.5));
     assert_eq!(start.since(later), Seconds(0.0));
+}
+
+fn hour(value: u8) -> UtcHour {
+    UtcHour::try_from(value).expect("valid hour")
 }

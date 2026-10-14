@@ -4,14 +4,6 @@ use ui::{RichPiece, RichSpan, TypewriterSpeed, reveal_duration, revealed};
 
 const TEN_PER_SECOND: TypewriterSpeed = TypewriterSpeed(Some(10.0));
 
-fn span(text: &'static str) -> RichPiece {
-    RichSpan::plain(text).into()
-}
-
-fn ms(millis: u64) -> Duration {
-    Duration::from_millis(millis)
-}
-
 #[test]
 fn characters_appear_at_the_typing_speed() {
     let line = [span("abcd")];
@@ -41,4 +33,12 @@ fn instant_speed_shows_everything_at_once() {
     let instant = TypewriterSpeed(None);
     assert_eq!(revealed(&line, instant, ms(0)), 4);
     assert_eq!(reveal_duration(&line, instant), ms(0));
+}
+
+fn span(text: &'static str) -> RichPiece {
+    RichSpan::plain(text).into()
+}
+
+fn ms(millis: u64) -> Duration {
+    Duration::from_millis(millis)
 }

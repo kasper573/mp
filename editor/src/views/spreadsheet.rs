@@ -9,8 +9,7 @@ use game::systems::script::RiftScripts;
 use serde_json::Value;
 
 use crate::app::Editor;
-use crate::forms;
-use crate::forms::{FormCx, FormState};
+use crate::forms::{self, FormCx, FormState};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::schema::{self, SchemaKind};
 use crate::tabs::EditorTab;

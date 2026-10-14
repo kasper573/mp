@@ -4,7 +4,9 @@ use std::rc::Rc;
 
 use bevy::prelude::*;
 use game::core::content::store::ContentStore;
-use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, StartParams};
+use game::core::platform::{
+    FetchFailure, LocalFuture, Platform, ServerSocket, SocketState, StartParams,
+};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
@@ -147,7 +149,6 @@ impl Platform for WebPlatform {
 
 pub fn primary_window() -> Window {
     Window {
-        title: "rift mmo".to_owned(),
         canvas: Some(CANVAS.to_owned()),
         ..default()
     }
@@ -192,13 +193,6 @@ struct WsSocket {
     state: Rc<Cell<SocketState>>,
     _handlers: [Closure<dyn FnMut()>; 3],
     _on_message: Closure<dyn FnMut(web_sys::MessageEvent)>,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum SocketState {
-    Connecting,
-    Open,
-    Closed,
 }
 
 impl WsSocket {
@@ -249,12 +243,8 @@ impl ServerSocket for WsSocket {
         }
     }
 
-    fn is_open(&self) -> bool {
-        self.state.get() == SocketState::Open
-    }
-
-    fn is_closed(&self) -> bool {
-        self.state.get() == SocketState::Closed
+    fn state(&self) -> SocketState {
+        self.state.get()
     }
 }
 

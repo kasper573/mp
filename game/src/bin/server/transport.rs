@@ -5,6 +5,7 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use game::systems::account::Identity;
 use renet2::RenetServer;
+use serde::Deserialize;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
@@ -223,10 +224,12 @@ async fn serve(stream: TcpStream, sessions: Sessions, events: mpsc::UnboundedSen
 }
 
 fn ticket(request: &Request) -> Option<u64> {
-    request
-        .uri()
-        .query()?
-        .split('&')
-        .find_map(|pair| pair.strip_prefix("ticket="))
-        .and_then(|value| value.parse().ok())
+    serde_urlencoded::from_str::<TicketQuery>(request.uri().query()?)
+        .ok()
+        .map(|query| query.ticket)
+}
+
+#[derive(Deserialize)]
+struct TicketQuery {
+    ticket: u64,
 }

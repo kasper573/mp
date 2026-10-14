@@ -314,9 +314,7 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
     let goal = {
         let mut rng = world.resource_mut::<Rng>();
         match (leash.zip(home), roams) {
-            (Some((leash, home)), _) => (0..16)
-                .filter_map(|_| grid.random_reachable(&mut rng, at))
-                .find(|node| node.distance(home) <= leash),
+            (Some((leash, home)), _) => grid.random_reachable_near(&mut rng, at, home, leash),
             (None, Some(roams)) => grid.random_reachable_within(&mut rng, at, roams),
             (None, None) => grid.random_reachable(&mut rng, at),
         }

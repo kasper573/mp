@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
-use crate::core::math::{Direction, Offset, Pos, Rect, Rng};
+use crate::core::math::{Direction, Offset, Pos, Rect, Rng, Size};
 use crate::core::tiling::{
-    Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, Tiles, TilesPerSec,
+    Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, TileRect, Tiles, TilesPerSec,
 };
 use crate::core::time::Seconds;
 use crate::systems::actor::{Action, Actor, ActorModel, set_facing};
@@ -356,11 +356,40 @@ impl Grid {
         from: Pos<Tiles>,
         bounds: Rect<Tiles>,
     ) -> Option<Pos<Tiles>> {
-        let component = self.component(from)? as usize;
-        pick(
+        let nodes = bounds.tiles().map(Cell::center);
+        self.random_reachable_among(rng, from, nodes.filter(|&node| bounds.contains(node)))
+    }
+
+    pub fn random_reachable_near(
+        &self,
+        rng: &mut Rng,
+        from: Pos<Tiles>,
+        center: Pos<Tiles>,
+        radius: Tiles,
+    ) -> Option<Pos<Tiles>> {
+        let square = Rect::new(
+            center - Offset::new(radius.0, radius.0),
+            Size::new(2.0 * radius.0, 2.0 * radius.0),
+        );
+        let nodes = square.tiles().map(Cell::center);
+        self.random_reachable_among(
             rng,
-            &within(self.nodes_by_component.get(component)?, bounds),
+            from,
+            nodes.filter(|&node| node.distance(center) <= radius),
         )
+    }
+
+    fn random_reachable_among(
+        &self,
+        rng: &mut Rng,
+        from: Pos<Tiles>,
+        nodes: impl Iterator<Item = Pos<Tiles>>,
+    ) -> Option<Pos<Tiles>> {
+        let component = self.component(from)?;
+        let reachable: Vec<Pos<Tiles>> = nodes
+            .filter(|&node| self.component(node) == Some(component))
+            .collect();
+        pick(rng, &reachable)
     }
 
     fn component_at_cell(&self, c: CellPos) -> Option<u32> {

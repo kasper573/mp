@@ -161,6 +161,9 @@ tokio.workspace = true
 ureq = { workspace = true, features = ["rustls", "platform-verifier"] }
 tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+blocking = "1"
+walkdir = "2"
+serde_urlencoded = "0.7"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optional = true }
 cargo_metadata = "0.23"
 syn = { workspace = true, features = ["visit"] }
@@ -169,6 +172,7 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 # The gameplay tests play through the same driver as the showcase.
 [dev-dependencies]
 driver = { path = "../driver" }
+tempfile = "3"
 
 # Wasm-only features: `reflect_auto_register`'s #[used] registration slices defeat --gc-sections,
 # so enabling it natively would drag the whole (unused) render stack into the server binary.

@@ -25,6 +25,8 @@ impl Credentials {
 pub struct TokenClaims {
     #[serde(default)]
     pub sub: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azp: Option<String>,
     #[serde(default)]
     pub preferred_username: Option<String>,
     #[serde(default)]

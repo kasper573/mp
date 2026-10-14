@@ -1,58 +1,16 @@
 use bevy_ecs::prelude::*;
 use game::core::tiling::Tiles;
-use game::systems::dialogue::ConversationRequest;
 use game::systems::interact::InteractRequest;
-use game::systems::item::{Inventory, ItemId, ItemStack};
-use game::systems::movement::{Position, position};
+use game::systems::item::{ItemId, ItemStack};
+use game::systems::movement::position;
 use game::systems::npc::NpcId;
 use game::systems::script::Speaker;
 use game::systems::shop::{ShopId, ShopRequest, ShopView};
 
 use crate::support::{
-    Sim, content, conversation, count, give, later, object, pick, row, spawn_area, talk,
-    townsperson,
+    Sim, content, conversation, count, give, later, leave, object, pick, place, row, slot_of,
+    spawn_area, talk, townsperson,
 };
-
-fn shown(sim: &mut Sim, player: Entity) -> Option<ShopView> {
-    sim.world().get::<ShopView>(player).cloned()
-}
-
-fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: NpcId) -> ShopView {
-    talk(sim, client, player, keeper);
-    pick(sim, client, player, ask_of(keeper));
-    assert!(
-        sim.run_until(20.0, |world| world.get::<ShopView>(player).is_some()),
-        "the shop with {keeper:?} never opened"
-    );
-    shown(sim, player).expect("the shop opened")
-}
-
-fn ask_of(keeper: NpcId) -> &'static str {
-    if keeper == row("Mara") {
-        "Show me your wares."
-    } else if keeper == row("Wren") {
-        "I've brought bones."
-    } else {
-        panic!("{keeper:?} keeps no shop")
-    }
-}
-
-fn slot_of(sim: &mut Sim, player: Entity, item: ItemId) -> u32 {
-    sim.world()
-        .get::<Inventory>(player)
-        .expect("bag")
-        .slots
-        .iter()
-        .position(|stack| stack.item == item)
-        .expect("in the bag") as u32
-}
-
-fn offer_of(shop: ShopId, item: ItemId) -> u32 {
-    shop.get(content())
-        .sells()
-        .position(|offer| offer.item == item)
-        .expect("on sale") as u32
-}
 
 #[test]
 fn asking_a_keeper_opens_the_shop_and_buying_trades_the_price_for_the_goods() {
@@ -190,9 +148,7 @@ fn walking_out_of_reach_closes_the_shop() {
     let at = position(sim.world(), player).expect("position");
 
     let away = sim.walkable_near(at, Tiles(8.0), Tiles(12.0));
-    sim.world()
-        .entity_mut(player)
-        .insert(Position { pos: away });
+    place(&mut sim, player, away);
     sim.tick();
 
     assert!(shown(&mut sim, player).is_none());
@@ -203,10 +159,8 @@ fn leaving_the_conversation_closes_the_shop() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     browse(&mut sim, 1, player, row("Mara"));
-    let step = conversation(&mut sim, player).expect("browsing").step;
 
-    sim.send(1, ConversationRequest::Leave { step });
-    sim.tick();
+    leave(&mut sim, 1, player);
 
     assert!(conversation(&mut sim, player).is_none());
     assert!(shown(&mut sim, player).is_none());
@@ -242,4 +196,36 @@ fn a_map_object_can_keep_a_shop() {
     sim.tick();
     assert_eq!(count(&mut sim, player, row("FishSteak")), 1);
     assert_eq!(count(&mut sim, player, row("Gold")), 0);
+}
+
+fn shown(sim: &mut Sim, player: Entity) -> Option<ShopView> {
+    sim.world().get::<ShopView>(player).cloned()
+}
+
+fn browse(sim: &mut Sim, client: u32, player: Entity, keeper: NpcId) -> ShopView {
+    talk(sim, client, player, keeper);
+    pick(sim, client, player, ask_of(keeper));
+    assert!(
+        sim.run_until(20.0, |world| world.get::<ShopView>(player).is_some()),
+        "the shop with {} never opened",
+        keeper.key(content())
+    );
+    shown(sim, player).expect("the shop opened")
+}
+
+fn ask_of(keeper: NpcId) -> &'static str {
+    if keeper == row("Mara") {
+        "Show me your wares."
+    } else if keeper == row("Wren") {
+        "I've brought bones."
+    } else {
+        panic!("{} keeps no shop", keeper.key(content()))
+    }
+}
+
+fn offer_of(shop: ShopId, item: ItemId) -> u32 {
+    shop.get(content())
+        .sells()
+        .position(|offer| offer.item == item)
+        .expect("on sale") as u32
 }

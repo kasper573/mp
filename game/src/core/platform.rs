@@ -20,8 +20,14 @@ pub struct StartParams {
 pub trait ServerSocket: 'static {
     fn recv(&self) -> Option<Vec<u8>>;
     fn send(&self, packet: &[u8]);
-    fn is_open(&self) -> bool;
-    fn is_closed(&self) -> bool;
+    fn state(&self) -> SocketState;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SocketState {
+    Connecting,
+    Open,
+    Closed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

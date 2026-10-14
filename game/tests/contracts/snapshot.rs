@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use game::core::math::Pos;
 use game::core::script::Value;
-use game::core::time::Seconds;
+use game::core::time::{Seconds, UnixMillis, WallClock};
 use game::systems::GameSettings;
 use game::systems::actor::Name;
+use game::systems::area::AreaId;
 use game::systems::area::transition::Discovered;
 use game::systems::dialogue;
 use game::systems::effect::{Effect, TimedEffects};
@@ -14,11 +15,11 @@ use game::systems::item::{Inventory, ItemStack};
 use game::systems::job::Job;
 use game::systems::memory;
 use game::systems::movement::Position;
-use game::systems::player::Xp;
 use game::systems::player::snapshot::{
     AtInitialSpawn, CharacterSnapshot, CharacterStart, HeardLine, JoinAs, MemoryValue, QuestState,
     SnapshotEffect, SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
 };
+use game::systems::player::{SpawnPolicy, SpawnRules, Xp};
 use game::systems::quest::{QuestLog, QuestResult};
 use game::systems::script::Place;
 use game::systems::shop::{Sale, ShopLedger};
@@ -26,6 +27,11 @@ use game::systems::stat::{StatKind, StatMap, Stats};
 use game::systems::text::LineText;
 
 use crate::support::{CLOCK, Sim, content, row};
+
+const LATER: WallClock = WallClock {
+    now: UnixMillis(1_000_000_000),
+    ..CLOCK
+};
 
 #[test]
 fn a_character_joined_from_a_row_is_that_character() {
@@ -35,7 +41,7 @@ fn a_character_joined_from_a_row_is_that_character() {
         at: Pos::new(12.0, 10.0),
     };
     let snapshot = tess(start);
-    let mut sim = Sim::area(forest);
+    let mut sim = returning_to(forest);
 
     let player = sim.join_as(
         1,
@@ -79,7 +85,7 @@ fn a_character_joined_from_a_row_is_that_character() {
     let timed = world.get::<TimedEffects>(player).expect("effects");
     assert_eq!(timed.0.len(), 1);
     assert_eq!(timed.0[0].effect, Effect::Chasing);
-    assert_eq!(timed.0[0].until, CLOCK.now.after(Seconds(30.0)));
+    assert_eq!(timed.0[0].until, LATER.now.after(Seconds(30.0)));
     let log = world.get::<QuestLog>(player).expect("quest log");
     let tusks = log
         .active(row("tusks_for_the_chief"))
@@ -115,7 +121,7 @@ fn a_character_joined_from_a_row_is_that_character() {
     let records: Vec<_> = history.records().collect();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].entry.text, LineText::plain("Hello"));
-    assert_eq!(records[0].at, CLOCK.now.before(Seconds(5.0)));
+    assert_eq!(records[0].at, LATER.now.before(Seconds(5.0)));
 }
 
 #[test]
@@ -130,7 +136,7 @@ fn a_start_of_its_own_moves_the_character_and_nothing_else() {
         area: island,
         at: Pos::new(spawn.at.x + 3.0, spawn.at.y),
     };
-    let mut sim = Sim::area(island);
+    let mut sim = returning_to(island);
 
     let player = sim.join_as(
         1,
@@ -152,6 +158,18 @@ fn a_start_of_its_own_moves_the_character_and_nothing_else() {
             .expect("known areas")
             .knows(island)
     );
+}
+
+// A snapshot counts its times back from now, which needs a clock well past zero, and its stats
+// hold only for a mortal character.
+fn returning_to(area: AreaId) -> Sim {
+    let mut sim = Sim::area(area);
+    sim.world().insert_resource(LATER);
+    sim.world().insert_resource(SpawnRules {
+        policy: SpawnPolicy::Map,
+        immortal: false,
+    });
+    sim
 }
 
 fn tess(start: Place) -> CharacterSnapshot {

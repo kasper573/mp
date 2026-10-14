@@ -1,50 +1,18 @@
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
-use game::core::math::{Pos, Rng};
+use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::combat::{AttackRequest, Attitude};
-use game::systems::movement::{Position, position};
+use game::systems::movement::position;
 use game::systems::npc::{self, NpcId, Pack, body};
 use game::systems::script::{EventKind, Owner, OwnerKind, Procedure, RiftInstances};
 use game::systems::stat::{self, StatKind};
 use serde_json::json;
 
 use crate::json::inline_with;
-use crate::support::{Sim, content, row, spawn_area, townsperson};
-
-const SEED: u64 = 7;
-
-fn sim() -> (Sim, Entity, Pos<Tiles>) {
-    let mut sim = Sim::area(spawn_area());
-    sim.world().insert_resource(Rng::new(SEED));
-    let player = sim.join(1);
-    sim.run_until(1.0, |_| false);
-    let at = position(sim.world(), player).expect("position");
-    (sim, player, at)
-}
-
-fn monster(sim: &mut Sim, who: &str, near: Pos<Tiles>, pack: u32) -> Entity {
-    let spot = sim.walkable_near(near, Tiles(3.0), Tiles(4.0));
-    let npc = npc::spawn(
-        sim.world(),
-        row::<NpcId>(who),
-        spot,
-        spawn_area(),
-        Pack(pack),
-    );
-    sim.tick();
-    npc
-}
-
-fn targets(sim: &mut Sim, npc: Entity, player: Entity, within: f32) -> bool {
-    sim.run_until(within, |world| body::target(world, npc) == Some(player))
-}
-
-fn health(sim: &mut Sim, who: Entity) -> f32 {
-    stat::effective(sim.world(), who, StatKind::Health)
-}
+use crate::support::{Sim, content, health, place, row, spawn_area, townsperson};
 
 #[test]
 fn an_aggressive_monster_picks_a_character_in_its_aggro_range_and_drops_one_beyond_it() {
@@ -58,7 +26,7 @@ fn an_aggressive_monster_picks_a_character_in_its_aggro_range_and_drops_one_beyo
     assert!(targets(&mut sim, skeleton, player, 3.0));
 
     let far = sim.walkable_near(at, Tiles(16.0), Tiles(40.0));
-    sim.world().entity_mut(player).insert(Position { pos: far });
+    place(&mut sim, player, far);
     assert!(sim.run_until(5.0, |world| body::target(world, skeleton).is_none()));
 }
 
@@ -81,6 +49,10 @@ fn a_protective_monster_fights_whoever_attacks_its_pack() {
 
     assert!(!targets(&mut sim, chief, player, 3.0));
 
+    // The pack wandered meanwhile, and the chief guards it only within its aggro range.
+    let beside = sim.walkable_near(at, Tiles(1.0), Tiles(2.0));
+    place(&mut sim, orc, beside);
+    place(&mut sim, chief, beside);
     sim.send(1, AttackRequest { target: orc });
     assert!(targets(&mut sim, chief, player, 5.0));
 }
@@ -122,6 +94,48 @@ fn idle_stroll_keeps_its_leash() {
         farthest <= Tiles(leash.0 + 1.0),
         "strayed {farthest:?} from home"
     );
+}
+
+#[test]
+fn two_npcs_targeting_each_other_fight() {
+    let (mut sim, _, at) = sim();
+    let first = brawling_npc(&mut sim, at, 1);
+    let second = brawling_npc(&mut sim, at, 2);
+    sim.tick();
+    let full = [health(&mut sim, first), health(&mut sim, second)];
+
+    assert!(sim.run_until(5.0, |world| {
+        body::target(world, first) == Some(second) && body::target(world, second) == Some(first)
+    }));
+    assert!(sim.run_until(10.0, |world| {
+        stat::effective(world, first, StatKind::Health) < full[0]
+            && stat::effective(world, second, StatKind::Health) < full[1]
+    }));
+}
+
+fn sim() -> (Sim, Entity, Pos<Tiles>) {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    sim.run_until(1.0, |_| false);
+    let at = position(sim.world(), player).expect("position");
+    (sim, player, at)
+}
+
+fn monster(sim: &mut Sim, who: &str, near: Pos<Tiles>, pack: u32) -> Entity {
+    let spot = sim.walkable_near(near, Tiles(3.0), Tiles(4.0));
+    let npc = npc::spawn(
+        sim.world(),
+        row::<NpcId>(who),
+        spot,
+        spawn_area(),
+        Pack(pack),
+    );
+    sim.tick();
+    npc
+}
+
+fn targets(sim: &mut Sim, npc: Entity, player: Entity, within: f32) -> bool {
+    sim.run_until(within, |world| body::target(world, npc) == Some(player))
 }
 
 fn brawler() -> Vec<Arc<Procedure>> {
@@ -175,21 +189,4 @@ fn brawling_npc(sim: &mut Sim, near: Pos<Tiles>, pack: u32) -> Entity {
     instances.spawn_owner(owner, brawler());
     instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
     npc
-}
-
-#[test]
-fn two_npcs_targeting_each_other_fight() {
-    let (mut sim, _, at) = sim();
-    let first = brawling_npc(&mut sim, at, 1);
-    let second = brawling_npc(&mut sim, at, 2);
-    sim.tick();
-    let full = [health(&mut sim, first), health(&mut sim, second)];
-
-    assert!(sim.run_until(5.0, |world| {
-        body::target(world, first) == Some(second) && body::target(world, second) == Some(first)
-    }));
-    assert!(sim.run_until(10.0, |world| {
-        stat::effective(world, first, StatKind::Health) < full[0]
-            && stat::effective(world, second, StatKind::Health) < full[1]
-    }));
 }

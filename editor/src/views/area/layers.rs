@@ -1,7 +1,6 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
 use game::core::content::{Content, load};
-use game::systems::area;
-use game::systems::area::AreaId;
+use game::systems::area::{self, AreaId};
 use serde_json::Value;
 
 use super::grid;
