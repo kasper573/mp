@@ -16,6 +16,7 @@ use super::store::ContentStore;
 use super::table::Content;
 use crate::core::math::Rng;
 use crate::core::platform::{FetchFailure, LocalFuture};
+use crate::core::time::{Backoff, Seconds};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -105,8 +106,7 @@ pub trait ContentSource {
 pub struct SyncPolicy {
     pub timeout: Duration,
     pub tries: u32,
-    pub first_backoff: Duration,
-    pub longest_backoff: Duration,
+    pub backoff: Backoff,
     pub at_once: usize,
     pub restarts: u32,
 }
@@ -116,8 +116,10 @@ impl Default for SyncPolicy {
         SyncPolicy {
             timeout: Duration::from_secs(30),
             tries: 5,
-            first_backoff: Duration::from_millis(500),
-            longest_backoff: Duration::from_secs(8),
+            backoff: Backoff {
+                first: Seconds(0.5),
+                longest: Seconds(8.0),
+            },
             at_once: 16,
             restarts: 5,
         }
@@ -483,15 +485,12 @@ impl Run<'_> {
                 return Err(Attempt::Failed(format!("{path}: {failed}")));
             }
             self.status.update(|progress| progress.retrying += 1);
-            Delay::new(self.backoff(failures)).await;
+            let wait = self
+                .policy
+                .backoff
+                .after(failures, &mut self.rng.borrow_mut());
+            Delay::new(wait.into()).await;
             self.status.update(|progress| progress.retrying -= 1);
         }
-    }
-
-    fn backoff(&self, failures: u32) -> Duration {
-        let doubled = self.policy.first_backoff * 2u32.saturating_pow(failures - 1);
-        let base = doubled.min(self.policy.longest_backoff);
-        let jitter = 0.5 + self.rng.borrow_mut().rand_float();
-        base.mul_f32(jitter)
     }
 }

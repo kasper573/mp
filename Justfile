@@ -9,12 +9,14 @@ lint:
     cargo clippy --release --all-targets -- -D warnings
     cargo clippy --release -p game --lib --bin client --target wasm32-unknown-unknown -- -D warnings
 
+# Every test lives in a tests/ folder; the libs' and bins' own test harnesses would build for nothing.
 test:
-    cargo test --release -p game -p ui -p editor
+    cargo test --release -p game -p ui -p editor --test '*'
 
 # The website and game server binaries, and the roles the auth stack syncs from.
-build: roles
-    cargo build --release -p website -p game --bin website --bin game-server
+build:
+    cargo build --release -p website -p game --bin website --bin game-server --bin kc-roles
+    target/release/kc-roles > docker/keycloak/roles.conf
 
 # The browser client bundle the website serves; content syncs from the game server at boot.
 wasm:
@@ -48,7 +50,7 @@ reset:
 logs:
     {{compose}} logs --no-color
 
-kc-provision: roles
+kc-provision: build
     {{compose}} up -d --build keycloak
 
 # No service names: compose's build sections are the single source of truth for what we publish.
@@ -62,6 +64,23 @@ e2e filter="": build wasm e2e-stack-up (e2e-run filter)
 
 # The stack without its observability services, which the e2e doesn't exercise and which start slowest.
 e2e-stack-up: (up "")
+
+# The e2e stack but the website, which packages the wasm: all it waits on can start while that compiles.
+e2e-stack-ahead: (up "" "rift-game-server reverse-proxy")
+
+# The e2e builds two ways. deploy: what production ships, the server at the release default and the
+# wasm shrunk with z + LTO + strip for mobile Safari's per-tab memory. fast: the server unoptimized
+# and the wasm without LTO, which takes minutes even with every dependency built.
+e2e-server flavor:
+    {{ if flavor == "deploy" { "" } else if flavor == "fast" { "CARGO_PROFILE_RELEASE_OPT_LEVEL=0" } else { error("flavor: deploy or fast") } }} just build
+
+e2e-client flavor:
+    CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_STRIP=symbols {{ if flavor == "deploy" { "CARGO_PROFILE_RELEASE_LTO=true" } else if flavor == "fast" { "" } else { error("flavor: deploy or fast") } }} just wasm
+
+# The e2e stack's images that don't package the build, so they can be made while it compiles.
+e2e-stack-images:
+    {{compose}} build keycloak reverse-proxy
+    {{compose}} pull postgres
 
 # LP_NUM_THREADS bounds each headed browser's Mesa threads so parallel workers don't thrash.
 [doc("The Playwright suite against a running stack, on a virtual display.")]
@@ -119,15 +138,12 @@ loadtest count="dyn":
 
 loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
 
+# The content copy is synced in place, never replaced, so a running game server keeps the folder it mounted.
 [private]
-roles:
-    cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
-
-[private]
-up flags:
-    rm -rf target/stack/content && mkdir -p target/stack && cp -r content target/stack/content
+up flags services="":
+    mkdir -p target/stack/content && rsync -a --delete content/ target/stack/content/
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
-    {{compose}} {{flags}} up -d --build --wait
+    {{compose}} {{flags}} up -d --build --wait {{services}}
 
 # Films COMMAND's window titled TITLE on a private virtual display to OUT, playing INPUT (an xdotool
 # command chain in window pixels) and running HOOK (a shell line) while it records.

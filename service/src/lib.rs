@@ -4,35 +4,23 @@ use std::sync::Arc;
 use axum::Router;
 use axum::ServiceExt;
 use axum::extract::Request;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use axum::routing::get;
 use axum_prometheus::PrometheusMetricLayerBuilder;
 use axum_prometheus::metrics_exporter_prometheus::PrometheusBuilder;
-use pyroscope::backend::{BackendConfig, PprofConfig, pprof_backend};
-use pyroscope::pyroscope::{PyroscopeAgent, PyroscopeAgentBuilder, PyroscopeAgentRunning};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 use tower_http::normalize_path::NormalizePath;
 
 pub use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
-pub use tikv_jemallocator::Jemalloc;
+pub use profiling::{CpuProfiler, ServiceAllocator, profiler};
 
-#[macro_export]
-macro_rules! heap_profiling {
-    () => {
-        $crate::heap_profiling!($crate::Jemalloc, $crate::Jemalloc);
-    };
-    ($allocator:ty, $init:expr) => {
-        #[global_allocator]
-        static GLOBAL_ALLOCATOR: $allocator = $init;
-
-        // SAFETY: jemalloc reads its options from this one symbol at startup, and nothing else
-        // exports it.
-        #[unsafe(export_name = "malloc_conf")]
-        pub static MALLOC_CONF: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:19\0";
-    };
-}
+// jemalloc doesn't build for MSVC and pyroscope samples only Linux and macOS, so elsewhere the
+// services run on the system allocator, unprofiled.
+#[cfg_attr(
+    not(any(target_os = "linux", target_os = "macos")),
+    path = "unprofiled.rs"
+)]
+mod profiling;
 
 pub async fn serve(name: &str, at: SocketAddr, router: Router) {
     let app = track(router, recorder());
@@ -74,51 +62,5 @@ pub fn track(router: Router, handle: PrometheusHandle) -> Router {
                 handle.render()
             }),
         )
-        .route("/debug/pprof/heap", get(heap_profile))
-}
-
-async fn heap_profile() -> impl IntoResponse {
-    let Some(controller) = jemalloc_pprof::PROF_CTL.as_ref() else {
-        return (StatusCode::NOT_FOUND, "heap profiling is not enabled").into_response();
-    };
-    match controller.lock().await.dump_pprof() {
-        Ok(pprof) => pprof.into_response(),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
-    }
-}
-
-pub fn profiler(
-    application: &str,
-    enabled: bool,
-    sample_hz: u32,
-) -> Option<PyroscopeAgent<PyroscopeAgentRunning>> {
-    if !enabled {
-        return None;
-    }
-    #[derive(serde::Deserialize)]
-    struct Profiling {
-        base: String,
-    }
-    let profiling: Profiling = envy::prefixed("PYROSCOPE_")
-        .from_env()
-        .expect("PYROSCOPE_* environment");
-    Some(
-        PyroscopeAgentBuilder::new(
-            profiling.base,
-            application,
-            sample_hz,
-            "pyroscope-rs",
-            env!("CARGO_PKG_VERSION"),
-            pprof_backend(
-                PprofConfig {
-                    sample_rate: sample_hz,
-                },
-                BackendConfig::default(),
-            ),
-        )
-        .build()
-        .expect("build pyroscope agent")
-        .start()
-        .expect("start pyroscope agent"),
-    )
+        .route("/debug/pprof/heap", get(profiling::heap_profile))
 }

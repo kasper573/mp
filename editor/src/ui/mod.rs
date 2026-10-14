@@ -190,10 +190,11 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     {
         editor.dialogs.push(ModalDialog::Keys);
     }
-    let (f5, shift_f5, f6, ctrl_t) = ctx.input_mut(|i| {
+    // egui ignores an extra Shift when it matches a key, so Shift+F5 is taken before F5 can claim it.
+    let (shift_f5, f5, f6, ctrl_t) = ctx.input_mut(|i| {
         (
-            i.consume_key(Modifiers::NONE, Key::F5),
             i.consume_key(Modifiers::SHIFT, Key::F5),
+            i.consume_key(Modifiers::NONE, Key::F5),
             i.consume_key(Modifiers::NONE, Key::F6),
             i.consume_key(Modifiers::COMMAND, Key::T),
         )

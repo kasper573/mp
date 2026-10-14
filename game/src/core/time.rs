@@ -4,6 +4,8 @@ use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::core::math::Rng;
+
 #[derive(
     JsonSchema,
     Serialize,
@@ -247,6 +249,20 @@ pub struct GameDay(pub u64);
 impl GameDay {
     pub fn of(now: UnixMillis, reset: UtcHour) -> GameDay {
         GameDay(now.0.saturating_sub(u64::from(reset.0) * HOUR_MILLIS) / DAY_MILLIS)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Backoff {
+    pub first: Seconds,
+    pub longest: Seconds,
+}
+
+impl Backoff {
+    pub fn after(self, failures: u32, rng: &mut Rng) -> Seconds {
+        let doubled = self.first * 2f32.powi(failures.saturating_sub(1).min(16) as i32);
+        // Jittered, so clients that failed together don't all try again together.
+        doubled.min(self.longest) * (0.5 + rng.rand_float())
     }
 }
 

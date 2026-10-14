@@ -6,9 +6,15 @@ pub mod mode;
 use bevy::prelude::*;
 use renet2::RenetClient;
 
+use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
+
+const SERVER_RETRY: Backoff = Backoff {
+    first: Seconds(1.0),
+    longest: Seconds(30.0),
+};
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ClientScreen {

@@ -24,17 +24,17 @@ static BYTES: AtomicU64 = AtomicU64::new(0);
 
 struct Counting;
 
-// SAFETY: every call goes unchanged to jemalloc, which upholds GlobalAlloc's contract; counting
-// touches only atomics and never allocates.
+// SAFETY: every call goes unchanged to the services' allocator, which upholds GlobalAlloc's
+// contract; counting touches only atomics and never allocates.
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         ALLOCS.fetch_add(1, Relaxed);
         BYTES.fetch_add(layout.size() as u64, Relaxed);
-        unsafe { service::Jemalloc.alloc(layout) }
+        unsafe { service::ServiceAllocator.alloc(layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { service::Jemalloc.dealloc(ptr, layout) }
+        unsafe { service::ServiceAllocator.dealloc(ptr, layout) }
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
@@ -42,7 +42,7 @@ unsafe impl GlobalAlloc for Counting {
         if new_size > layout.size() {
             BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
         }
-        unsafe { service::Jemalloc.realloc(ptr, layout, new_size) }
+        unsafe { service::ServiceAllocator.realloc(ptr, layout, new_size) }
     }
 }
 
