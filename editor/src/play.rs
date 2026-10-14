@@ -16,7 +16,7 @@ use game::systems::launch::{
 };
 use game::systems::player::SpawnPolicy;
 use game::systems::script::Place;
-use process_wrap::std::{ChildWrapper, CommandWrap, ProcessGroup};
+use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
@@ -890,7 +890,7 @@ fn spawn(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut wrap = CommandWrap::from(command);
-    wrap.wrap(ProcessGroup::leader());
+    as_one(&mut wrap);
     let mut child = wrap.spawn()?;
     let stdin = child.stdin().take();
     if let Some(stdout) = child.stdout().take() {
@@ -966,6 +966,18 @@ impl Drop for Process {
         }
         let _ = self.child.start_kill();
     }
+}
+
+// So that killing the process kills whatever it started too. process-wrap leaves the platform to its
+// user: POSIX groups processes in a process group, Windows in a job object.
+#[cfg(unix)]
+fn as_one(wrap: &mut CommandWrap) {
+    wrap.wrap(process_wrap::std::ProcessGroup::leader());
+}
+
+#[cfg(windows)]
+fn as_one(wrap: &mut CommandWrap) {
+    wrap.wrap(process_wrap::std::JobObject);
 }
 
 fn plain(line: &str) -> String {
