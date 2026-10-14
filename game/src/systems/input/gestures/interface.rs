@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::{CursorIcon, SystemCursorIcon};
 use ui::{CursorStyle, InterfaceCursor};
 
-use crate::systems::input::gestures::{Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
 
 pub struct InterfaceGesture;
@@ -12,8 +12,11 @@ impl Gesture for InterfaceGesture {
         0
     }
 
-    fn claims(&self, world: &mut World) -> bool {
-        world.resource::<InterfaceCursor>().captured()
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        world
+            .resource::<InterfaceCursor>()
+            .captured()
+            .then_some(ClickClaim::Interface)
     }
 
     fn drive(&self, _world: &mut World, _start: bool) {}

@@ -1,6 +1,8 @@
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::future::Future;
-use std::io::ErrorKind;
+use std::io::{BufRead, BufReader, ErrorKind, Write};
+use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -13,6 +15,7 @@ use bevy::window::Window;
 use game::core::content::store::ContentStore;
 use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
+use game::systems::probe::ProbeChannel;
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
 
@@ -135,6 +138,52 @@ impl Platform for DesktopPlatform {
     fn relaunch(&self, build: &str) -> bool {
         eprintln!("the server runs build {build}; start a matching desktop-client");
         false
+    }
+}
+
+// The driver asks with a line, and each line asked is answered with the snapshot of a frame after it.
+pub struct SocketProbe {
+    asked: Receiver<()>,
+    pending: Cell<usize>,
+    answers: RefCell<TcpStream>,
+}
+
+impl SocketProbe {
+    pub fn connect(driver: SocketAddr) -> SocketProbe {
+        let answers = TcpStream::connect(driver)
+            .unwrap_or_else(|error| panic!("the probe's driver at {driver}: {error}"));
+        let questions = answers
+            .try_clone()
+            .expect("a second handle on the probe socket");
+        let (ask, asked) = channel();
+        std::thread::spawn(move || {
+            for _ in BufReader::new(questions).lines().map_while(Result::ok) {
+                if ask.send(()).is_err() {
+                    return;
+                }
+            }
+        });
+        SocketProbe {
+            asked,
+            pending: Cell::new(0),
+            answers: RefCell::new(answers),
+        }
+    }
+}
+
+impl ProbeChannel for SocketProbe {
+    fn awaited(&self) -> bool {
+        self.pending
+            .set(self.pending.get() + self.asked.try_iter().count());
+        self.pending.get() > 0
+    }
+
+    // A driver that hung up wants no more answers.
+    fn deliver(&self, snapshot: &str) {
+        let mut answers = self.answers.borrow_mut();
+        for _ in 0..self.pending.replace(0) {
+            let _ = writeln!(answers, "{snapshot}");
+        }
     }
 }
 

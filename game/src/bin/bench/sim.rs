@@ -3,7 +3,6 @@ use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::ConnectedClient;
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
 use game::core::content::Content;
-use game::core::math::Rng;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::area::AreaModule;
 use game::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
@@ -18,6 +17,9 @@ const CLOCK: WallClock = WallClock {
 
 /// Ticks stepped before sampling, so spawn waves and connect churn settle out of the measurement.
 pub const WARMUP: usize = 30;
+
+// Runs play out alike, so they compare.
+const SEED: u64 = 1931;
 
 pub type Roster = Vec<Entity>;
 
@@ -118,10 +120,10 @@ fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster)
     let mut app = server_app(
         content.built::<GameSettings>().initial_spawn.area,
         ordinal,
+        SEED,
         CLOCK,
         content,
     );
-    app.insert_resource(Rng::from_entropy());
     app.insert_resource(SpawnRules {
         policy: layout.spawn_policy(),
         immortal: false,

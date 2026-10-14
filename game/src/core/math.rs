@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct WorldPx(pub f32);
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+pub struct WindowPx(pub f32);
+
 #[derive(
     JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd, Default,
 )]
@@ -94,9 +97,18 @@ impl Rng {
     }
 
     pub fn from_entropy() -> Rng {
+        Rng::new(Rng::random_seed())
+    }
+
+    // Worlds draw apart from one another, each the same way on every run with the same seed.
+    pub fn for_world(seed: u64, ordinal: u64) -> Rng {
+        Rng::new(seed.wrapping_add(ordinal))
+    }
+
+    pub fn random_seed() -> u64 {
         let mut seed = [0u8; 8];
         getrandom::fill(&mut seed).expect("os entropy for rng seed");
-        Rng::new(u64::from_le_bytes(seed))
+        u64::from_le_bytes(seed)
     }
 
     pub fn rand_float(&mut self) -> f32 {

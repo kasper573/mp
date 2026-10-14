@@ -12,7 +12,7 @@ use game::systems::GameSettings;
 use game::systems::job::JobDef;
 use game::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
-    SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest,
+    SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest, fake_token,
 };
 use game::systems::player::SpawnPolicy;
 use game::systems::script::Place;
@@ -844,6 +844,7 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         content_dir: folder.to_path_buf(),
         player_spawn_type: SpawnPolicy::Map,
         player_immortal: false,
+        rng_seed: None,
         daily_reset_utc_hour: UtcHour::MIDNIGHT,
         auth: launch::AuthMode::Fake,
         test_characters: launch::Switch::On,
@@ -868,17 +869,15 @@ fn spawn_client(
     let config = ClientConfig {
         game_server_url: format!("http://{LOCALHOST}:{}", ports.http),
         game_server_ws_url: format!("ws://{LOCALHOST}:{}", ports.ws),
-        access_token: fake_token(character),
+        access_token: fake_token(character, &[]),
         profile_dir: profile,
         exit_on_stdin_eof: true,
+        vsync: true,
+        probe: None,
     };
     let mut command = Command::new(binaries.join(CLIENT));
     command.envs(launch::env_of(CLIENT_ENV_PREFIX, &config));
     spawn(command, CLIENT, sender)
-}
-
-fn fake_token(character: &str) -> String {
-    format!("fake:{character}")
 }
 
 fn spawn(
@@ -951,7 +950,7 @@ fn hand_over(
     }
     .map_err(|error| error.to_string())?;
     let response = ureq::post(format!("http://{LOCALHOST}:{http}{TEST_CHARACTER_ROUTE}"))
-        .header("Authorization", fake_token(character))
+        .header("Authorization", fake_token(character, &[]))
         .send(body.as_bytes());
     match response {
         Ok(_) => Ok(()),

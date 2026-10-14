@@ -1,10 +1,9 @@
 import { test } from "@playwright/test";
 
 import { register } from "../helpers/account";
-import { waitForWorld } from "../helpers/game";
-import { loadReference } from "../helpers/image";
+import { loadReference, looksLike } from "../helpers/image";
 
-test("a new player spawns into the island scene", async ({ page }) => {
+test("a new player loads into the game at the spawn location", async ({ page }) => {
   await register(page);
-  await waitForWorld(page, loadReference("island.png"));
+  await looksLike(page, loadReference("island.png"));
 });

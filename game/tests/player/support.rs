@@ -5,14 +5,13 @@ use std::sync::{Arc, LazyLock};
 use bevy_app::App;
 use bevy_ecs::message::Message;
 use bevy_ecs::prelude::*;
-use bevy_time::TimeUpdateStrategy;
 use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
 use game::core::math::Rng;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::area::Id as AreaId;
 use game::systems::player::snapshot::JoinAs;
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
-use game::systems::{TICK_HZ, from_client, load_content, start_server};
+use game::systems::{from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(1_000_000_000),
@@ -45,13 +44,11 @@ pub struct Sim {
 
 impl Sim {
     pub fn area(area: AreaId) -> Sim {
-        let mut app = game::systems::server_app(area, 0, CLOCK, content());
-        app.insert_resource(Rng::new(1));
+        let mut app = game::systems::server_app(area, 0, drawn_seed(), CLOCK, content());
         app.insert_resource(SpawnRules {
             policy: SpawnPolicy::Map,
             immortal: false,
         });
-        app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
         start_server(&mut app);
         Sim {
             app,
@@ -81,4 +78,11 @@ impl Sim {
         let conn = self.conns[&client];
         from_client(self.world(), conn, message);
     }
+}
+
+// Tests hold on any seed: the one drawn shows in a failing test's output, to play it out again.
+fn drawn_seed() -> u64 {
+    let seed = Rng::random_seed();
+    eprintln!("rng seed {seed}");
+    seed
 }

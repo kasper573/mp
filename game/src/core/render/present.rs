@@ -92,6 +92,7 @@ pub(super) fn setup(
             ..default()
         },
         RenderLayers::layer(PRESENT_LAYER),
+        Msaa::Off,
         IsDefaultUiCamera,
     ));
 

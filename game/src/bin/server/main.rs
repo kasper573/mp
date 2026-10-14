@@ -18,6 +18,7 @@ use bevy_replicon_renet2::RenetChannelsExt;
 use game::core::content::sync::{ServedContent, well_formed_hash};
 use game::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
 use game::core::math::Rng;
+use game::core::net::auth::TokenClaims;
 use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::account::{Identity, Role};
@@ -123,6 +124,7 @@ fn main() {
             policy: config.player_spawn_type,
             immortal: config.player_immortal,
         },
+        rng_seed: seeded(config.rng_seed),
         reset: config.daily_reset_utc_hour,
         test_characters,
     };
@@ -142,6 +144,7 @@ struct Settings {
     area_ids: Vec<area::Id>,
     max_clients: usize,
     rules: SpawnRules,
+    rng_seed: u64,
     reset: UtcHour,
     test_characters: Option<TestCharacters>,
 }
@@ -161,6 +164,7 @@ fn simulate(
         area_ids,
         max_clients,
         rules,
+        rng_seed,
         reset,
         test_characters,
     } = settings;
@@ -171,7 +175,16 @@ fn simulate(
     let mut worlds: Vec<App> = area_ids
         .iter()
         .enumerate()
-        .map(|(ordinal, &id)| build_world(id, &content, rules, ordinal as u64, wall_clock(reset)))
+        .map(|(ordinal, &id)| {
+            build_world(
+                id,
+                &content,
+                rules,
+                rng_seed,
+                ordinal as u64,
+                wall_clock(reset),
+            )
+        })
         .collect();
 
     let (connection_config, client_channels) = {
@@ -417,15 +430,22 @@ fn select_areas(content: &Content, areas: ServedAreas) -> Vec<area::Id> {
     }
 }
 
+// Logged, so whatever happened can be played out again.
+fn seeded(configured: Option<u64>) -> u64 {
+    let seed = configured.unwrap_or_else(Rng::random_seed);
+    println!("rng seed {seed}");
+    seed
+}
+
 fn build_world(
     area: area::Id,
     content: &Content,
     rules: SpawnRules,
+    rng_seed: u64,
     ordinal: u64,
     clock: WallClock,
 ) -> App {
-    let mut app = server_app(area, ordinal, clock, content);
-    app.insert_resource(Rng::from_entropy());
+    let mut app = server_app(area, ordinal, rng_seed, clock, content);
     app.insert_resource(rules);
     start_server(&mut app);
     app
@@ -777,25 +797,25 @@ fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
     let token = authorization
         .strip_prefix("Bearer ")
         .unwrap_or(authorization);
-    let verifier = match &http.auth {
-        Auth::Oidc(verifier) => verifier,
+    let claims = match &http.auth {
+        Auth::Oidc(verifier) => verifier
+            .lock()
+            .expect("verifier lock")
+            .verify(token)
+            .map_err(|_| StatusCode::UNAUTHORIZED)?,
         Auth::Fake => {
-            let id = token.strip_prefix("fake:").unwrap_or(token);
-            if id.is_empty() {
-                return Err(StatusCode::UNAUTHORIZED);
+            let claims = TokenClaims::read_unverified(token)
+                .filter(|claims| !claims.sub.is_empty())
+                .ok_or(StatusCode::UNAUTHORIZED)?;
+            auth::Claims {
+                name: claims
+                    .preferred_username
+                    .unwrap_or_else(|| claims.sub.clone()),
+                subject: claims.sub,
+                roles: claims.realm_access.roles,
             }
-            return Ok(Identity {
-                id: id.to_owned(),
-                name: id.to_owned(),
-                roles: Vec::new(),
-            });
         }
     };
-    let claims = verifier
-        .lock()
-        .expect("verifier lock")
-        .verify(token)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
     Ok(Identity {
         id: claims.subject,
         name: claims.name,

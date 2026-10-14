@@ -1,11 +1,13 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::content::version;
+use crate::core::net::auth::{RealmAccess, TokenClaims};
 use crate::core::time::UtcHour;
+use crate::systems::account::Role;
 use crate::systems::player::SpawnPolicy;
 use crate::systems::script::Place;
 
@@ -13,6 +15,18 @@ pub const BUILD_INFO_FLAG: &str = "--build-info";
 pub const SERVER_ENV_PREFIX: &str = "RIFT_GAME_SERVER_";
 pub const CLIENT_ENV_PREFIX: &str = "RIFT_CLIENT_";
 pub const TEST_CHARACTER_ROUTE: &str = "/test/character";
+
+/// What a server on fake auth takes as an account's sign-in.
+pub fn fake_token(account: &str, roles: &[Role]) -> String {
+    TokenClaims {
+        sub: account.to_owned(),
+        preferred_username: Some(account.to_owned()),
+        realm_access: RealmAccess {
+            roles: roles.iter().map(|role| role.as_ref().to_owned()).collect(),
+        },
+    }
+    .unsigned()
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BuildInfo {
@@ -59,6 +73,7 @@ pub struct ServerConfig {
     pub content_dir: PathBuf,
     pub player_spawn_type: SpawnPolicy,
     pub player_immortal: bool,
+    pub rng_seed: Option<u64>,
     pub daily_reset_utc_hour: UtcHour,
     pub auth: AuthMode,
     pub test_characters: Switch,
@@ -121,6 +136,8 @@ pub struct ClientConfig {
     pub access_token: String,
     pub profile_dir: PathBuf,
     pub exit_on_stdin_eof: bool,
+    pub vsync: bool,
+    pub probe: Option<SocketAddr>,
 }
 
 pub fn env_of<T: Serialize>(prefix: &str, config: &T) -> Vec<(String, String)> {
@@ -128,6 +145,7 @@ pub fn env_of<T: Serialize>(prefix: &str, config: &T) -> Vec<(String, String)> {
     let fields = value.as_object().expect("a flat config");
     fields
         .iter()
+        .filter(|(_, value)| !value.is_null())
         .map(|(field, value)| {
             let text = match value {
                 Value::String(text) => text.clone(),

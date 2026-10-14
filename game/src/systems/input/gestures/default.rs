@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
-use crate::systems::input::gestures::{Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
 
 pub struct DefaultGesture;
@@ -11,8 +11,8 @@ impl Gesture for DefaultGesture {
         6
     }
 
-    fn claims(&self, _world: &mut World) -> bool {
-        true
+    fn claim(&self, _world: &mut World) -> Option<ClickClaim> {
+        Some(ClickClaim::Nothing)
     }
 
     fn drive(&self, _world: &mut World, _start: bool) {}

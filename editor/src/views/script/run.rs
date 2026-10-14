@@ -8,7 +8,7 @@ use bevy::time::TimeUpdateStrategy;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use egui::{RichText, Ui};
 use game::core::content::Content;
-use game::core::math::{Pos, Rng};
+use game::core::math::Pos;
 use game::core::script::{
     FlowKey, FlowSteering, FlowTrace, Owner, OwnerKind, Pause, TraceStep, Value as ScriptValue,
     ValueType,
@@ -44,6 +44,8 @@ use crate::value::RowValue;
 
 const CLIENT: u32 = 1;
 const MAX_TICKS: usize = 2_000;
+// Every run of a script plays out alike.
+const RUN_SEED: u64 = 1;
 
 #[derive(Clone, Debug)]
 pub struct RunSetup {
@@ -1090,13 +1092,11 @@ fn start_run(
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
         reset: UtcHour::MIDNIGHT,
     };
-    let mut app = systems::server_app(area_id, 0, clock, &content);
-    app.insert_resource(Rng::new(1));
+    let mut app = systems::server_app(area_id, 0, RUN_SEED, clock, &content);
     app.insert_resource(SpawnRules {
         policy: SpawnPolicy::Map,
         immortal: true,
     });
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
     app.insert_resource(FlowTrace::default());
     app.insert_resource(FlowSteering::default());
     systems::start_server(&mut app);

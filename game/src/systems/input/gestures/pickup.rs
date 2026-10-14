@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
 use crate::core::render;
-use crate::systems::input::gestures::{Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
 use crate::systems::item;
 use crate::systems::player::session;
@@ -14,18 +14,16 @@ impl Gesture for PickupGesture {
         3
     }
 
-    fn claims(&self, world: &mut World) -> bool {
-        session::is_alive(world)
-            && render::cursor_tile(world)
-                .and_then(|point| item::pickable_at(world, point))
-                .is_some()
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        if !session::is_alive(world) {
+            return None;
+        }
+        let point = render::cursor_tile(world)?;
+        item::pickable_at(world, point).map(ClickClaim::Pickup)
     }
 
     fn drive(&self, world: &mut World, start: bool) {
-        if start
-            && let Some(point) = render::cursor_tile(world)
-            && let Some(target) = item::pickable_at(world, point)
-        {
+        if start && let Some(ClickClaim::Pickup(target)) = self.claim(world) {
             session::pickup(world, target);
         }
     }

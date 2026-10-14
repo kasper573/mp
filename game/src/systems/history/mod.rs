@@ -133,6 +133,13 @@ impl HistoryEntry {
 }
 
 impl RecordTally {
+    pub fn line(self, text: &str) -> String {
+        match self {
+            RecordTally::Change(change) => format!("{} {text}", signed(change)),
+            RecordTally::Progress { have, need } => format!("{text} {have}/{need}"),
+        }
+    }
+
     pub fn merged(self, newer: RecordTally) -> Option<RecordTally> {
         match (self, newer) {
             (RecordTally::Change(old), RecordTally::Change(new))
@@ -234,5 +241,12 @@ pub fn backfill(
             .map(|history| history.records().cloned().collect())
             .unwrap_or_default();
         visibility::send_to(world, conn, HistoryNews::Backfill { subject, records });
+    }
+}
+
+pub fn signed(change: i32) -> String {
+    match change > 0 {
+        true => format!("+{change}"),
+        false => format!("\u{2212}{}", change.unsigned_abs()),
     }
 }

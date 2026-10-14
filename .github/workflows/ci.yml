@@ -61,9 +61,20 @@ jobs:
         # Unoptimized: lint and unit tests don't ship, so build them fast regardless of branch.
         env:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
+        # The gameplay tests record each client from a sound server sink. The sound server stops with
+        # them, so the e2e below still runs on a runner without audio devices.
         run: |
           just lint
+          pulseaudio --start --exit-idle-time=-1
           just test
+          pulseaudio --kill
+      - name: Save gameplay test artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gameplay-artifacts
+          path: target/tmp/gameplay/
+          if-no-files-found: ignore
       - name: Build
         # main deploys the server at the release default and the wasm shrunk with z + LTO + strip
         # (~44MB) for mobile Safari's per-tab memory. Branches build the server unoptimized (not the

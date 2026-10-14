@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,13 +11,33 @@ export interface Image {
   data: Buffer;
 }
 
-export function decode(png: Buffer): Image {
-  const { width, height, data } = PNG.sync.read(png);
-  return { width, height, data };
-}
+// "Basically the same place" as a reference: the matching map scores ~0.83, the other ~0.03, so 0.5
+// is a wide margin.
+export const MAP_MATCH = 0.5;
 
 export function loadReference(name: string): Image {
   return decode(readFileSync(join(__dirname, "..", "snapshots", name)));
+}
+
+// What the canvas shows: the frames drawn while the game is still loading look like nothing yet. The
+// browser build reports nothing of the game's frames, so a slow machine is given minutes rather than a
+// frame count.
+export async function looksLike(page: Page, reference: Image): Promise<void> {
+  const deadline = Date.now() + DRAW_WITHIN_MS;
+  let best = 0;
+  while (Date.now() < deadline) {
+    const shot = decode(await page.locator("#glcanvas").screenshot());
+    best = Math.max(best, resemblance(shot, reference));
+    if (best >= MAP_MATCH) return;
+  }
+  throw new Error(`the canvas never looked like the reference (best resemblance ${best.toFixed(2)})`);
+}
+
+const DRAW_WITHIN_MS = 300_000;
+
+export function decode(png: Buffer): Image {
+  const { width, height, data } = PNG.sync.read(png);
+  return { width, height, data };
 }
 
 const HIST_BINS = 8;

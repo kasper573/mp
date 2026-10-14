@@ -64,7 +64,7 @@ impl ScreenTransition {
 #[derive(Resource, Default, Clone, Copy)]
 pub struct ScreenTransitionPreference(pub ScreenTransition);
 
-#[derive(Resource, Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Resource, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScreenTransitionPhase {
     #[default]

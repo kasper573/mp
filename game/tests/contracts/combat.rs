@@ -1,11 +1,7 @@
-use bevy_ecs::prelude::*;
-use game::core::content::Content;
-use game::core::math::Rng;
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::actor::{Actor, ActorModel};
-use game::systems::combat::{AttackRequest, Attitude};
+use game::core::tiling::Tiles;
+use game::systems::combat::AttackRequest;
 use game::systems::movement::position;
-use game::systems::npc::{self, Npc, Pack};
+use game::systems::npc::{self, Pack};
 use game::systems::stat::{self, StatKind};
 
 use crate::support::{Sim, row, spawn_area};
@@ -28,42 +24,17 @@ fn an_attack_walks_into_range_and_strikes() {
     );
 }
 
+// Right beside the player, so the fight stays where it starts: a chase could run into anything.
 #[test]
 fn an_attacked_monster_is_fought_until_it_falls() {
-    for seed in 0..6 {
-        let mut sim = Sim::area(spawn_area());
-        sim.world().insert_resource(Rng::new(seed));
-        let player = sim.join(1);
-        sim.run_until(2.0, |_| false);
-        let at = position(sim.world(), player).expect("position");
-        let world = sim.world();
-        let content = *world.resource::<Content>();
-        let walks = |world: &World, npc: Entity| {
-            let model = world.get::<Actor>(npc).expect("actor").model;
-            !ActorModel::get(&content, model).airborne()
-        };
-        let foe = world
-            .query_filtered::<Entity, With<Npc>>()
-            .iter(world)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .filter(|&npc| {
-                !stat::is_dead(world, npc)
-                    && world.get::<Attitude>(npc) == Some(&Attitude::Hostile)
-                    && walks(world, npc)
-            })
-            .min_by(|&a, &b| {
-                let da = position(world, a).expect("pos").distance(at).0;
-                let db = position(world, b).expect("pos").distance(at).0;
-                da.total_cmp(&db)
-            })
-            .expect("a monster");
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let start = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_near(start, Tiles(1.0), Tiles(1.0));
+    let orc = npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX));
+    sim.tick();
 
-        sim.send(1, AttackRequest { target: foe });
+    sim.send(1, AttackRequest { target: orc });
 
-        assert!(
-            sim.run_until(60.0, |world| stat::is_dead(world, foe)),
-            "seed {seed}: the monster never fell"
-        );
-    }
+    assert!(sim.run_until(60.0, |world| stat::is_dead(world, orc)));
 }

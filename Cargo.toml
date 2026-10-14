@@ -6,6 +6,8 @@ members = [
     "bevy/terminal",
     "bevy/terminal/macros",
     "game",
+    "driver",
+    "showcase",
     "editor",
     "service",
     "website",

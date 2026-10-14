@@ -29,12 +29,13 @@ impl Plugin for ClientSessionPlugin {
         );
         crate::systems::protocol(app);
         app.init_resource::<MyClient>()
+            .init_resource::<MyCharacter>()
             .init_resource::<SpectateStatus>()
             .init_resource::<Viewpoint>();
         app.add_systems(Update, record_welcome);
         app.add_systems(
             PreUpdate,
-            (record_spectating, track_viewpoint.in_set(WorldViewSystems))
+            (record_spectating, track_characters.in_set(WorldViewSystems))
                 .chain()
                 .after(ClientSystems::Receive),
         );
@@ -48,6 +49,9 @@ impl Plugin for ClientSessionPlugin {
 
 #[derive(Resource, Default)]
 pub struct MyClient(pub Option<ClientId>);
+
+#[derive(Resource, Default)]
+struct MyCharacter(Option<Entity>);
 
 /// What the server last told this client about whom it spectates; `None` until it has.
 #[derive(Resource, Default)]
@@ -63,12 +67,10 @@ pub fn my_id(world: &World) -> Option<ClientId> {
 }
 
 pub fn my_character(world: &World) -> Option<EntityRef<'_>> {
-    let mine = my_id(world)?;
-    world.iter_entities().find(|entity| {
-        entity
-            .get::<Owner>()
-            .is_some_and(|owner| owner.client == mine)
-    })
+    world
+        .resource::<MyCharacter>()
+        .0
+        .and_then(|character| world.get_entity(character).ok())
 }
 
 pub fn is_dead(world: &World) -> bool {
@@ -150,21 +152,26 @@ fn followed_client(me: &MyClient, status: &SpectateStatus) -> Option<ClientId> {
     }
 }
 
-fn track_viewpoint(
+fn track_characters(
     me: Res<MyClient>,
     status: Res<SpectateStatus>,
     characters: Query<(Entity, &Owner)>,
+    mut mine: ResMut<MyCharacter>,
     mut viewpoint: ResMut<Viewpoint>,
 ) {
-    let followed = followed_client(&me, &status);
-    let character = followed.and_then(|client| {
+    let character_of = |client: ClientId| {
         characters
             .iter()
             .find(|(_, owner)| owner.client == client)
             .map(|(character, _)| character)
-    });
-    if viewpoint.0 != character {
-        viewpoint.0 = character;
+    };
+    let my_character = me.0.and_then(character_of);
+    if mine.0 != my_character {
+        mine.0 = my_character;
+    }
+    let followed = followed_client(&me, &status).and_then(character_of);
+    if viewpoint.0 != followed {
+        viewpoint.0 = followed;
     }
 }
 

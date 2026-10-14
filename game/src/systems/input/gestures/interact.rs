@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
 use crate::core::render;
-use crate::systems::input::gestures::{Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interact;
 use crate::systems::player::session;
 
@@ -13,8 +13,11 @@ impl Gesture for InteractGesture {
         4
     }
 
-    fn claims(&self, world: &mut World) -> bool {
-        session::is_alive(world) && target(world).is_some()
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        if !session::is_alive(world) {
+            return None;
+        }
+        target(world).map(ClickClaim::Interact)
     }
 
     fn drive(&self, world: &mut World, start: bool) {

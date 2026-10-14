@@ -3,7 +3,7 @@ use bevy::window::CursorIcon;
 
 use crate::core::render;
 use crate::systems::combat;
-use crate::systems::input::gestures::{Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
 use crate::systems::interface::CursorShape;
 use crate::systems::player::session;
 
@@ -14,17 +14,16 @@ impl Gesture for AttackGesture {
         2
     }
 
-    fn claims(&self, world: &mut World) -> bool {
-        session::is_alive(world)
-            && render::cursor_tile(world)
-                .is_some_and(|point| combat::enemy_at(world, point).is_some())
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        if !session::is_alive(world) {
+            return None;
+        }
+        let point = render::cursor_tile(world)?;
+        combat::enemy_at(world, point).map(ClickClaim::Attack)
     }
 
     fn drive(&self, world: &mut World, start: bool) {
-        if start
-            && let Some(point) = render::cursor_tile(world)
-            && let Some(target) = combat::enemy_at(world, point)
-        {
+        if start && let Some(ClickClaim::Attack(target)) = self.claim(world) {
             session::attack(world, target);
         }
     }

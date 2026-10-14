@@ -21,6 +21,7 @@ pub mod movement;
 pub mod notification;
 pub mod npc;
 pub mod player;
+pub mod probe;
 pub mod quest;
 pub mod reach;
 pub mod rewards;
@@ -121,6 +122,7 @@ pub struct Character {
 pub fn server_app(
     area: area::Id,
     ordinal: u64,
+    rng_seed: u64,
     clock: crate::core::time::WallClock,
     assets: &Content,
 ) -> App {
@@ -140,6 +142,12 @@ pub fn server_app(
     app.insert_resource(input::map::InputMap::new(assets));
     app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
+    // Every tick steps the same span of game time however long it took, so a seeded world plays out
+    // alike tick for tick.
+    app.insert_resource(bevy_time::TimeUpdateStrategy::ManualDuration(
+        TICK_HZ.period(),
+    ));
+    app.insert_resource(crate::core::math::Rng::for_world(rng_seed, ordinal));
     app.add_plugins(
         bevy_app::PluginGroup::build(bevy_replicon::prelude::RepliconPlugins)
             .set(RepliconSharedPlugin {

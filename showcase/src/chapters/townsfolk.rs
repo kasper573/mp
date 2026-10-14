@@ -1,0 +1,82 @@
+use driver::{Player, UiTarget, content, fixture, holding, resident_home, townsperson};
+use game::core::math::{Offset, Pos};
+use game::core::tiling::Tiles;
+use game::systems::input::gestures::ClickClaim;
+use game::systems::input::map::InputAction;
+use game::systems::probe::ProbeSnapshot;
+
+use crate::chapters::Chapter;
+use crate::shoot::Shoot;
+
+pub const CHAPTER: Chapter = Chapter {
+    name: "townsfolk",
+    title: "Townsfolk",
+    summary: "Who lives on the island, and what they have for you",
+    play,
+};
+
+const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
+
+fn play(shoot: &mut Shoot) {
+    let player = shoot.join_as("swordsman", Some(resident_home("island", "mara")));
+    let mut me = shoot.roll(player);
+    me.caption("Loot at a townsperson's feet? A click picks it up before it talks");
+    let host = me.wait_for("Mara", |snapshot| townsperson(snapshot, "mara").cloned());
+    me.caption_top(&format!(
+        "You arrived right where {} stands: drop a sword at her feet",
+        host.name
+    ));
+    me.act(InputAction::ToggleInventory);
+    me.act_on_ui(InputAction::DropItem, UiTarget::image(SWORD));
+    me.wait_until("the sword to drop", |snapshot| {
+        holding(snapshot, "rusty_sword") == 0
+    });
+    me.act(InputAction::ToggleInventory);
+    walk_below(&mut me, |_| Some(host.at));
+    let sword = me.wait_for("the sword on the ground", |snapshot| {
+        snapshot
+            .items
+            .iter()
+            .find(|item| item.item.key(content()) == "rusty_sword")
+            .cloned()
+    });
+    let under_foot = sword.at - Offset::new(0.0, 0.3);
+    let pointed = me.point_at_tile(under_foot);
+    assert_eq!(
+        pointed.claim,
+        ClickClaim::Pickup(sword.id),
+        "the sword under her feet takes the click"
+    );
+    me.hold();
+    me.click();
+    me.wait_until(
+        "the sword back in the bag, with no conversation",
+        |snapshot| holding(snapshot, "rusty_sword") == 1 && snapshot.stage.is_none(),
+    );
+
+    me.caption("Seven townsfolk live around the harbour — name plates show who they are");
+    walk_below(&mut me, |snapshot| {
+        townsperson(snapshot, "mara").map(|mara| mara.at)
+    });
+    me.caption("An icon over a head is the most important thing they have for you");
+    me.caption("Things on the map can be used too: a notice board, a chest by the tide");
+    walk_below(&mut me, |snapshot| {
+        fixture(snapshot, "tide-chest").map(|chest| chest.at)
+    });
+    let chest = me.wait_for("the tide chest", |snapshot| {
+        fixture(snapshot, "tide-chest").cloned()
+    });
+    me.point_at_tile(chest.aim);
+    me.hold();
+    let board = me.wait_for("the notice board", |snapshot| {
+        fixture(snapshot, "notice-board").cloned()
+    });
+    walk_below(&mut me, |_| Some(board.at));
+    me.point_at_tile(board.aim);
+    me.hold();
+}
+
+// Clear of what it stands below, so the click walks there instead of using it.
+fn walk_below(me: &mut Player, target: impl Fn(&ProbeSnapshot) -> Option<Pos<Tiles>>) {
+    me.walk_toward(|snapshot| target(snapshot).map(|at| at + Offset::new(0.0, 2.5)));
+}

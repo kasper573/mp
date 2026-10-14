@@ -1,7 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 compose := "docker compose -f docker/docker-compose.yaml -f docker/docker-compose.test.yaml --profile test"
-demo_dir := "target/demo"
+showcase_dir := "target/showcase"
 
 lint:
     cargo fmt --check
@@ -68,28 +68,23 @@ e2e-stack-up: (up "")
 e2e-run filter="":
     LP_NUM_THREADS=2 xvfb-run -a just playwright {{filter}}
 
-# Records demo chapters (e2e/demos/) against a fresh stack to target/demo/<chapter>.webm: `just demo combat`.
-demo filter="": build wasm e2e-stack-up (demo-run filter)
+# Records showcase chapters, all at once as far as the cores go, to target/showcase/NN-<chapter>.mp4:
+# `just showcase combat travel`. Naming none records every chapter and stitches them into
+# target/showcase/showcase.mp4.
+showcase *chapters:
+    cargo build --release -p showcase -p game --bin showcase --bin game-server --bin desktop-client
+    RIFT_SHOWCASE_CONTENT_DIR=$PWD/content RIFT_SHOWCASE_OUT_DIR=$PWD/{{showcase_dir}} RIFT_SHOWCASE_CORES_PER_CHAPTER=5 \
+      target/release/showcase {{chapters}}
 
-demo-run filter="":
-    RIFT_DEMO_DIR=$PWD/{{demo_dir}} just playwright -c demo.config.ts {{filter}}
-
-# Every chapter in file-name order, stitched into one video of the whole game.
-showcase: build wasm e2e-stack-up
-    rm -f {{demo_dir}}/[0-9]*.webm
-    just demo-run
-    ffmpeg -v error -y -f concat -safe 0 -i <(printf "file '$PWD/%s'\n" {{demo_dir}}/[0-9]*.webm) -c copy {{demo_dir}}/showcase.webm
-    @echo {{demo_dir}}/showcase.webm
-
-# Records the ui gallery on SCENE (a tab name): `just gallery-demo "toasts (sonner)" 8 "mousemove 800 523 click 1"`.
-gallery-demo scene seconds="6" input="":
+# Records the ui gallery on SCENE (a tab name): `just gallery-showcase "toasts (sonner)" 8 "mousemove 800 523 click 1"`.
+gallery-showcase scene seconds="6" input="":
     cargo build --release -p ui --bin gallery
-    just record {{quote(demo_dir / "gallery-" + kebabcase(scene) + ".webm")}} "rift ui gallery" {{seconds}} {{quote(input)}} "" \
+    just record {{quote(showcase_dir / "gallery-" + kebabcase(scene) + ".webm")}} "rift ui gallery" {{seconds}} {{quote(input)}} "" \
       target/release/gallery {{quote(scene)}}
 
 # The art exports sit beside the copy, so import scenes find them.
 [doc("Records the editor on a copy of the example content at SCENE; HOOK runs with WORK naming the copy's parent.")]
-editor-demo scene seconds="8" input="" hook="":
+editor-showcase scene seconds="8" input="" hook="":
     #!/usr/bin/env bash
     set -euo pipefail
     cargo build --release -p editor
@@ -97,7 +92,7 @@ editor-demo scene seconds="8" input="" hook="":
     trap 'rm -rf "$WORK"' EXIT
     cp -r content "$WORK/game"
     cp -r art "$WORK/art"
-    just record {{quote(demo_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
+    just record {{quote(showcase_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
 # Frames sampled evenly across VIDEO, tiled into one image beside it: a recording at a glance.
@@ -113,9 +108,10 @@ render-actor names="" animations="" loops="4":
       target/render/actor-{{ if names == "" { "all" } else { replace(names, ",", "+") } }}-{{ if animations == "" { "all" } else { replace(animations, ",", "+") } }}-x{{loops}}.mp4
 
 # Players are congested (all on the spawn tile, one shared view) by default; `dist` spreads them for distinct views.
-[doc("The highest area count sustained within the tick budget.")]
+[doc("The server's highest area count sustained within the tick budget, then the client's frame rate through a playthrough.")]
 bench mode="":
     RIFT_BENCH_CONTENT_DIR=content cargo run --release -p game --bin bench -- {{mode}}
+    cargo bench -p game --bench client
 
 loadtest count="dyn":
     RIFT_LOADTEST_HTTP_URL=http://127.0.0.1:9998 RIFT_LOADTEST_WS_URL=ws://127.0.0.1:9999 \
@@ -127,8 +123,6 @@ loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
 roles:
     cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
 
-# The stack's game server reads a copy of the content folder, so a demo chapter can change it and
-# restart the server to show a content deploy.
 [private]
 up flags:
     rm -rf target/stack/content && mkdir -p target/stack && cp -r content target/stack/content

@@ -29,6 +29,10 @@ path = "src/bin/render_actor.rs"
 name = "desktop-client"
 path = "src/bin/desktop_client/main.rs"
 
+[[bench]]
+name = "client"
+harness = false
+
 [features]
 # Opt-in CPU (pprof flamegraph) + allocation profiling of a fixed workload.
 # Build with `--profile profiling --features profiling` for debug symbols.
@@ -159,6 +163,10 @@ pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"], optiona
 cargo_metadata = "0.23"
 syn = { workspace = true, features = ["visit"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
+
+# The gameplay tests play through the same driver as the showcase.
+[dev-dependencies]
+driver = { path = "../driver" }
 
 # Wasm-only features: `reflect_auto_register`'s #[used] registration slices defeat --gc-sections,
 # so enabling it natively would drag the whole (unused) render stack into the server binary.

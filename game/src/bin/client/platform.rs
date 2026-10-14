@@ -6,8 +6,8 @@ use bevy::prelude::*;
 use game::core::content::store::ContentStore;
 use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, StartParams};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
+use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsCast, JsValue};
 
 use crate::store::WebStore;
 
@@ -165,13 +165,6 @@ pub fn read_start_params() -> StartParams {
         game_server_url: attribute("data-game-server-url"),
         game_server_ws_url: attribute("data-game-server-ws-url"),
     }
-}
-
-pub fn expose_global_fn(name: &str, hook: impl Fn() -> Option<String> + 'static) {
-    let hook = Closure::<dyn Fn() -> Option<String>>::new(hook);
-    js_sys::Reflect::set(&js_sys::global(), &JsValue::from_str(name), hook.as_ref())
-        .unwrap_or_else(|_| panic!("expose {name} on the JS global"));
-    hook.forget(); // hand the closure to JS for the page's lifetime
 }
 
 fn storage() -> Option<web_sys::Storage> {

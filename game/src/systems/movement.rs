@@ -284,7 +284,7 @@ fn route(world: &World, entity: Entity, goal: Pos<Tiles>) -> Option<Vec<CellPos>
     if navigator.flies && navigator.clear(at, goal) {
         return Some(vec![goal.cell()]);
     }
-    let mut path = astar(navigator.grid, at.cell(), goal.cell())?;
+    let mut path = navigator.grid.path(at.cell(), goal.cell())?;
     if path.len() > 1 {
         path.remove(0);
     }
@@ -375,6 +375,34 @@ impl Grid {
         })
     }
 
+    /// The cheapest walk between two cells, both ends included.
+    pub fn path(&self, start: CellPos, goal: CellPos) -> Option<Vec<CellPos>> {
+        if !self.connects(start, goal) {
+            return None;
+        }
+        let (path, _cost) = pathfinding::prelude::astar(
+            &start,
+            |&c| {
+                NEIGHBORS_8.iter().filter_map(move |&(dx, dy)| {
+                    let next = c.step((dx, dy));
+                    let cost = if dx != 0 && dy != 0 {
+                        DIAGONAL
+                    } else {
+                        ORTHOGONAL
+                    };
+                    self.cell_walkable(next).then_some((next, cost))
+                })
+            },
+            |&c| {
+                let dx = (c.x - goal.x).unsigned_abs();
+                let dy = (c.y - goal.y).unsigned_abs();
+                (dx.max(dy) - dx.min(dy)) * ORTHOGONAL + dx.min(dy) * DIAGONAL
+            },
+            |&node| node == goal,
+        )?;
+        Some(path)
+    }
+
     pub fn nearest_walkable(&self, p: Pos<Tiles>) -> Option<Pos<Tiles>> {
         let from = p.cell();
         if self.cell_walkable(from) {
@@ -462,33 +490,6 @@ fn pick(rng: &mut Rng, nodes: &[Pos<Tiles>]) -> Option<Pos<Tiles>> {
         return None;
     }
     Some(nodes[rng.rand_range(0..nodes.len() as u32) as usize])
-}
-
-fn astar(grid: &Grid, start: CellPos, goal: CellPos) -> Option<Vec<CellPos>> {
-    if !grid.connects(start, goal) {
-        return None;
-    }
-    let (path, _cost) = pathfinding::prelude::astar(
-        &start,
-        |&c| {
-            NEIGHBORS_8.iter().filter_map(move |&(dx, dy)| {
-                let next = c.step((dx, dy));
-                let cost = if dx != 0 && dy != 0 {
-                    DIAGONAL
-                } else {
-                    ORTHOGONAL
-                };
-                grid.cell_walkable(next).then_some((next, cost))
-            })
-        },
-        |&c| {
-            let dx = (c.x - goal.x).unsigned_abs();
-            let dy = (c.y - goal.y).unsigned_abs();
-            (dx.max(dy) - dx.min(dy)) * ORTHOGONAL + dx.min(dy) * DIAGONAL
-        },
-        |&node| node == goal,
-    )?;
-    Some(path)
 }
 
 fn compute_components(size: GridSize, walkable: &[bool]) -> Vec<u32> {

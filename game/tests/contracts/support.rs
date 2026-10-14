@@ -7,7 +7,6 @@ use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use bevy_replicon::server::ServerSystems;
-use bevy_time::TimeUpdateStrategy;
 use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
 use game::core::math::{Pos, Rng};
 use game::core::script::Value;
@@ -77,13 +76,11 @@ pub struct Sim {
 
 impl Sim {
     pub fn area(area: AreaId) -> Sim {
-        let mut app = game::systems::server_app(area, 0, CLOCK, content());
-        app.insert_resource(Rng::new(1));
+        let mut app = game::systems::server_app(area, 0, drawn_seed(), CLOCK, content());
         app.insert_resource(SpawnRules {
             policy: SpawnPolicy::Map,
             immortal: true,
         });
-        app.insert_resource(TimeUpdateStrategy::ManualDuration(TICK_HZ.period()));
         app.init_resource::<Notified>().add_systems(
             bevy_app::PostUpdate,
             collect_notified.before(ServerSystems::Send),
@@ -357,4 +354,11 @@ pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
         killer: Some(player),
     });
     sim.run_until(0.2, |_| false);
+}
+
+// Tests hold on any seed: the one drawn shows in a failing test's output, to play it out again.
+fn drawn_seed() -> u64 {
+    let seed = Rng::random_seed();
+    eprintln!("rng seed {seed}");
+    seed
 }

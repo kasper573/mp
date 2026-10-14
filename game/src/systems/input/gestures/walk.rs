@@ -7,7 +7,7 @@ use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::render;
 use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::input::gestures::{ActiveTileHighlight, Gesture, content_cursor};
+use crate::systems::input::gestures::{ActiveTileHighlight, ClickClaim, Gesture, content_cursor};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::{CursorShape, InterfaceIcon};
 use crate::systems::player::session;
@@ -28,8 +28,11 @@ impl Gesture for WalkGesture {
         5
     }
 
-    fn claims(&self, world: &mut World) -> bool {
-        session::is_alive(world) && target(world).is_some()
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        if !session::is_alive(world) {
+            return None;
+        }
+        target(world).map(ClickClaim::Walk)
     }
 
     fn drive(&self, world: &mut World, start: bool) {

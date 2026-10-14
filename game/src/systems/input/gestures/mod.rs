@@ -8,18 +8,40 @@ mod walk;
 
 use bevy::prelude::*;
 use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
+use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
 use super::ActiveTileHighlight;
 use super::map::{self, InputAction};
 use crate::core::content::{Content, Fixture};
+use crate::core::math::Pos;
 use crate::core::render::transition::WorldViewSystems;
+use crate::core::tiling::Tiles;
 use crate::systems::interface::CursorShape;
 use crate::systems::scene::Scene as GameScene;
 
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+pub enum ClickClaim {
+    Interface,
+    Locked,
+    Attack(Entity),
+    Pickup(Entity),
+    Interact(Entity),
+    Walk(Pos<Tiles>),
+    Nothing,
+}
+
+pub fn claim(world: &mut World) -> ClickClaim {
+    let gestures = world.resource::<Gestures>().0.clone();
+    gestures
+        .iter()
+        .find_map(|gesture| gesture.claim(world))
+        .unwrap_or(ClickClaim::Nothing)
+}
+
 pub trait Gesture: Send + Sync {
     fn priority(&self) -> i32;
-    fn claims(&self, world: &mut World) -> bool;
+    fn claim(&self, world: &mut World) -> Option<ClickClaim>;
     fn drive(&self, world: &mut World, start: bool);
     fn cursor(&self, world: &mut World) -> Option<CursorIcon>;
     fn tile_highlight(&self, _world: &mut World) -> Option<ActiveTileHighlight> {
@@ -99,7 +121,7 @@ fn update(world: &mut World) {
     if just {
         active = gestures
             .iter()
-            .position(|gesture| gesture.claims(world))
+            .position(|gesture| gesture.claim(world).is_some())
             .map(GestureIndex);
     } else if !pressed {
         active = None;
@@ -113,7 +135,7 @@ fn update(world: &mut World) {
     let mut highlight = None;
     let mut first_claimant = true;
     for gesture in &gestures {
-        if !gesture.claims(world) {
+        if gesture.claim(world).is_none() {
             continue;
         }
         if first_claimant {

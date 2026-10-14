@@ -6,7 +6,7 @@ use ui::tokens::{palette, spacing, typography};
 use ui::{RichSpan, RichText};
 
 use super::{
-    HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally,
+    HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally, signed,
 };
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::content::{Content, Fixture};
@@ -405,19 +405,12 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
     };
     match entry.tally {
         Some(RecordTally::Change(change)) => {
-            let (sign, color) = match change > 0 {
-                true => ("+", palette::EMERALD_80),
-                false => ("\u{2212}", ink.with_alpha(0.6)),
+            let color = match (change > 0, entry.icon.is_some()) {
+                (true, true) => palette::EMERALD_80,
+                (true, false) => palette::AMBER_80,
+                (false, _) => ink.with_alpha(0.6),
             };
-            let color = match entry.icon.is_none() && change > 0 {
-                true => palette::AMBER_80,
-                false => color,
-            };
-            prefix(
-                &mut text,
-                format!("{sign}{} ", change.unsigned_abs()),
-                color,
-            );
+            prefix(&mut text, format!("{} ", signed(change)), color);
         }
         Some(RecordTally::Progress { have, need }) => {
             text.pieces

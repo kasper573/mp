@@ -7,7 +7,7 @@ use ui::{RichSpan, RichText};
 use super::{Notification, NotificationKind, NotificationSent};
 use crate::core::time::Seconds;
 use crate::systems::dialogue::stage;
-use crate::systems::history::RecordTally;
+use crate::systems::history::{RecordTally, signed};
 use crate::systems::scene::{Scene as GameScene, despawn_all};
 
 const READING_BASE: Seconds = Seconds(2.0);
@@ -179,24 +179,13 @@ fn reading_time(notification: &Notification) -> Seconds {
 
 fn label(notification: &Notification) -> String {
     let text = super::plain_words(&notification.text);
-    match tally_of(notification) {
-        Some(RecordTally::Change(change)) => format!("{} {text}", signed(change)),
-        Some(RecordTally::Progress { have, need }) => format!("{text} {have}/{need}"),
-        None => text,
-    }
+    tally_of(notification).map_or_else(|| text.clone(), |tally| tally.line(&text))
 }
 
 fn tally_of(notification: &Notification) -> Option<RecordTally> {
     match notification.kind {
         NotificationKind::Feed { tally, .. } => tally,
         _ => None,
-    }
-}
-
-fn signed(change: i32) -> String {
-    match change > 0 {
-        true => format!("+{change}"),
-        false => format!("\u{2212}{}", change.unsigned_abs()),
     }
 }
 
