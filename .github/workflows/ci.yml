@@ -21,46 +21,37 @@ env:
 
 # Every push runs lint, test and e2e side by side, each on a runner of its own; main deploys once all
 # three pass.
-#
-# rust-cache is the sole build cache, one entry per kind of build. Only main writes it and every
-# branch reads main's, so the cache holds one set of entries for main's lockfile whatever happens on
-# branches, and the entries main supersedes are the least recently used, the first evicted. Branches
-# therefore build only what main builds. A failing run saves too: the dependencies it built are no
-# different. A per-object compiler cache (sccache) is deliberately absent: on the GitHub Actions
-# backend it writes thousands of tiny entries that crowd out these.
 jobs:
   lint:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Unoptimized: lint doesn't ship.
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
-          cache-on-failure: "true"
+          cache: lint
+          recipes: lint
       - name: Lint
-        # Unoptimized: lint doesn't ship.
-        env:
-          CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
         run: just lint
 
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Unoptimized: the tests don't ship.
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           deps: test
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
-          cache-on-failure: "true"
+          cache: test
+          recipes: test
       - name: Test
-        # Unoptimized: the tests don't ship. The gameplay tests record each client from a sound server sink.
-        env:
-          CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
+        # The gameplay tests record each client from a sound server sink.
         run: |
           pulseaudio --start --exit-idle-time=-1
           just test
@@ -106,11 +97,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           deps: e2e
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: e2e-${{ env.FLAVOR }}
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
-          cache-on-failure: "true"
+          cache: e2e-${{ env.FLAVOR }}
+          recipes: build wasm e2e-server e2e-client
       - name: Build
         # While the client compiles, the browsers download and, once the server is built, the services
         # the website waits on start. Starting them ahead is only a head start: the next step starts
@@ -187,10 +175,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           deps: e2e
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: e2e-fast
-          cache-on-failure: "true"
+          cache: e2e-fast
+          recipes: build wasm e2e-server e2e-client
       - name: Build
         run: |
           just e2e-server fast
@@ -293,10 +279,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          key: archive-${{ matrix.platform }}
-          cache-on-failure: "true"
+          cache: archive-${{ matrix.platform }}
+          recipes: archive
       - name: Build the archive
         shell: bash
         run: just archive target/archive

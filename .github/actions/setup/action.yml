@@ -1,9 +1,15 @@
 name: Set up the build environment
-description: Pinned toolchain, just, and the Linux system libraries cargo can't provide.
+description: Pinned toolchain, just, the Linux system libraries cargo can't provide, and the build cache.
 inputs:
   deps:
     description: "What the job runs, which decides the Linux system packages it gets: build | test | e2e."
     default: build
+  cache:
+    description: "The build cache entry the job restores, one per kind of build."
+    required: true
+  recipes:
+    description: "The just recipes the job builds with, whose source keys the cache entry."
+    required: true
 runs:
   using: composite
   steps:
@@ -55,3 +61,24 @@ runs:
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: lts/*
+    - name: Key the build cache by the recipes
+      id: recipes
+      shell: bash
+      env:
+        RECIPES: ${{ inputs.recipes }}
+      run: |
+        hash=$(for recipe in $RECIPES; do just --show "$recipe"; done | git hash-object --stdin | cut -c1-8)
+        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+    # rust-cache is the sole build cache. Only main writes it and every branch reads main's, so it holds
+    # one set of entries for main's lockfile whatever happens on branches, and the entries main
+    # supersedes are the least recently used, the first evicted; branches therefore build only what main
+    # builds. An entry is keyed by the manifests and lockfile, the job's cargo environment and the
+    # recipes it builds with, so building differently never restores a stale entry it then can't
+    # replace. A failing run saves too: the dependencies it built are no different. A per-object
+    # compiler cache (sccache) is deliberately absent: on the GitHub Actions backend it writes thousands
+    # of tiny entries that crowd out these.
+    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      with:
+        shared-key: ${{ inputs.cache }}-${{ steps.recipes.outputs.hash }}
+        save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
+        cache-on-failure: "true"
