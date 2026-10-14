@@ -451,20 +451,22 @@ fn draw_confirm(world: &mut World) {
             ui.label(line);
         }
         ui.add_space(10.0);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let keep = ui.button(&pending.confirm.cancel);
-            if !pending.focused {
-                keep.request_focus();
-                pending.focused = true;
-            }
-            if widgets::danger(ui, &pending.confirm.confirm).clicked() {
-                decided = Some(true);
-            }
-            let keep_pressed =
-                keep_key.is_some_and(|key| ui.input_mut(|i| i.consume_shortcut(&key)));
-            if keep.clicked() || keep_pressed {
-                decided = Some(false);
-            }
+        ui.horizontal(|ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let keep = ui.button(&pending.confirm.cancel);
+                if !pending.focused {
+                    keep.request_focus();
+                    pending.focused = true;
+                }
+                if widgets::danger(ui, &pending.confirm.confirm).clicked() {
+                    decided = Some(true);
+                }
+                let keep_pressed =
+                    keep_key.is_some_and(|key| ui.input_mut(|i| i.consume_shortcut(&key)));
+                if keep.clicked() || keep_pressed {
+                    decided = Some(false);
+                }
+            });
         });
     });
     if modal.should_close() && decided.is_none() {

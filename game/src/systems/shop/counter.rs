@@ -252,32 +252,35 @@ fn row(
     let row = ui.scope_builder(
         UiBuilder::new()
             .sense(Sense::click())
-            .layout(Layout::left_to_right(Align::Center)),
+            .layout(Layout::top_down(Align::Min)),
         |ui| {
             egui::Frame::new()
                 .inner_margin(egui::Margin::symmetric(8, 4))
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.vertical(|ui| {
-                            for stack in &ware.price {
-                                price_chip(ui, world, &shelf.inventory, *stack);
-                            }
-                        });
-                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            hud::icon(ui, world, &def.icon, ICON);
+                    ui.horizontal(|ui| {
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.vertical(|ui| {
-                                ui.spacing_mut().item_spacing.y = 1.0;
-                                ui.label(
-                                    RichText::new(&name).family(design_tokens::family::medium()),
-                                );
-                                if let Some((note, ink)) = &note {
-                                    ui.label(
-                                        RichText::new(note)
-                                            .size(TextRole::Small.size())
-                                            .color(*ink),
-                                    );
+                                for stack in &ware.price {
+                                    price_chip(ui, world, &shelf.inventory, *stack);
                                 }
+                            });
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                hud::icon(ui, world, &def.icon, ICON);
+                                ui.vertical(|ui| {
+                                    ui.spacing_mut().item_spacing.y = 1.0;
+                                    ui.label(
+                                        RichText::new(&name)
+                                            .family(design_tokens::family::medium()),
+                                    );
+                                    if let Some((note, ink)) = &note {
+                                        ui.label(
+                                            RichText::new(note)
+                                                .size(TextRole::Small.size())
+                                                .color(*ink),
+                                        );
+                                    }
+                                });
                             });
                         });
                     });

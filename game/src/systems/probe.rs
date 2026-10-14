@@ -874,7 +874,7 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 image,
                 editable,
                 focused: tree.focus == *id,
-                click_through: gui.layer_id_at(rect.center()) != Some(widget.layer_id),
+                click_through: gui::layer_at(&gui, rect.center()) != Some(widget.layer_id),
                 in_world: world_layers.contains(widget.layer_id),
                 slider,
                 rect: window_rect(rect),
@@ -942,6 +942,7 @@ fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
         gui.memory(|memory| memory.areas().visible_layer_ids().into_iter().collect());
     layers
         .into_iter()
+        .filter(|&layer| layer != egui::LayerId::background())
         .filter_map(|layer| egui::AreaState::load(&gui, layer.id))
         .filter(|area| area.interactable)
         .map(|area| area.rect())

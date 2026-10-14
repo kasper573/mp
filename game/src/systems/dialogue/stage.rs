@@ -843,29 +843,31 @@ fn choice_row(
     let row = ui.scope_builder(
         UiBuilder::new()
             .max_rect(room.with_max_y(ui.max_rect().max.y))
-            .layout(Layout::left_to_right(Align::Center))
+            .layout(Layout::top_down(Align::Min))
             .sense(Sense::click()),
         |ui| {
             egui::Frame::new()
                 .inner_margin(egui::Margin::symmetric(8, 2))
                 .show(ui, |ui| {
                     ui.set_width(room.width() - 16.0);
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        chips(ui, world, choice);
-                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                            if let Some(shortcut) = &shortcut {
-                                widgets::key_hint(ui, shortcut);
-                            }
-                            if let Some(icon) = &choice.icon
-                                && let Some(image) = gui::image_file(world, icon)
-                            {
-                                ui.add(image.widget(Vec2::splat(CHOICE_ICON)));
-                            }
-                            let look = TextLook {
-                                size: TextRole::Line.size(),
-                                color: ink,
-                            };
-                            text::show(ui, world, &choice.label.styled(), look, None);
+                    ui.horizontal(|ui| {
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            chips(ui, world, choice);
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                if let Some(shortcut) = &shortcut {
+                                    widgets::key_hint(ui, shortcut);
+                                }
+                                if let Some(icon) = &choice.icon
+                                    && let Some(image) = gui::image_file(world, icon)
+                                {
+                                    ui.add(image.widget(Vec2::splat(CHOICE_ICON)));
+                                }
+                                let look = TextLook {
+                                    size: TextRole::Line.size(),
+                                    color: ink,
+                                };
+                                text::show(ui, world, &choice.label.styled(), look, None);
+                            });
                         });
                     });
                 });

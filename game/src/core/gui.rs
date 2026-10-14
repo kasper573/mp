@@ -178,7 +178,14 @@ pub fn pointer_claimed(world: &mut World) -> bool {
         .and_then(Window::cursor_position);
     gui.egui_is_using_pointer()
         || gui.dragged_id().is_some()
-        || pointer.is_some_and(|at| gui.layer_id_at(egui::pos2(at.x, at.y)).is_some())
+        || pointer.is_some_and(|at| layer_at(&gui, egui::pos2(at.x, at.y)).is_some())
+}
+
+/// The interface's layer that takes the pointer at `at`. egui keeps a root layer under the whole
+/// screen for panels to catch clicks on, which this interface never draws on.
+pub fn layer_at(gui: &egui::Context, at: egui::Pos2) -> Option<LayerId> {
+    gui.layer_id_at(at)
+        .filter(|&layer| layer != LayerId::background())
 }
 
 /// The cursor the interface asked for on its last frame.

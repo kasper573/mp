@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use egui::emath::{TSTransform, easing};
-use egui::{Align, Color32, Id, Layout, Pos2, Rect, Stroke, Vec2};
+use egui::{Color32, Id, Pos2, Rect, Stroke, Vec2};
 
 use super::rows::{self, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD};
@@ -215,7 +215,7 @@ fn draw(world: &mut World) {
                     .inner_margin(egui::Margin::symmetric(PADDING.x as i8, PADDING.y as i8))
                     .show(ui, |ui| {
                         ui.set_width(size.x - 2.0 * (PADDING.x + BORDER));
-                        ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = GAP;
                             if let Some(icon) = &icon {
                                 ui.add(icon.widget(Vec2::splat(ICON)));

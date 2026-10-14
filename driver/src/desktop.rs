@@ -110,8 +110,9 @@ impl Desktop {
             frame: 0,
             steps: File::create(folder.join("steps.log")).expect("a steps log"),
         };
-        // Nothing hands out keyboard focus on a screen without a window manager.
+        // Nothing fits windows to the screen or hands out keyboard focus without a window manager.
         let pid = desktop.client.id().to_string();
+        let (width, height) = (size.0.to_string(), size.1.to_string());
         desktop.xdotool(&[
             "search",
             "--sync",
@@ -119,6 +120,14 @@ impl Desktop {
             "--pid",
             &pid,
             ".",
+            "windowmove",
+            "--sync",
+            "0",
+            "0",
+            "windowsize",
+            "--sync",
+            &width,
+            &height,
             "windowfocus",
             "--sync",
         ]);
