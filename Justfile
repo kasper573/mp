@@ -68,6 +68,16 @@ e2e-stack-up: (up "")
 # The e2e stack but the website, which packages the wasm: all it waits on can start while that compiles.
 e2e-stack-ahead: (up "" "rift-game-server reverse-proxy")
 
+# The e2e builds two ways. deploy: what production ships, the server at the release default and the
+# wasm shrunk with z + LTO + strip (~44MB) for mobile Safari's per-tab memory. fast: the server
+# unoptimized and the wasm at opt-3, which the software-rendered browsers need to keep up, sparing the
+# minutes LTO takes.
+e2e-server flavor:
+    {{ if flavor == "deploy" { "" } else if flavor == "fast" { "CARGO_PROFILE_RELEASE_OPT_LEVEL=0" } else { error("flavor: deploy or fast") } }} just build
+
+e2e-client flavor:
+    {{ if flavor == "deploy" { "CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols" } else if flavor == "fast" { "CARGO_PROFILE_RELEASE_OPT_LEVEL=3" } else { error("flavor: deploy or fast") } }} just wasm
+
 # The e2e stack's images that don't package the build, so they can be made while it compiles.
 e2e-stack-images:
     {{compose}} build keycloak reverse-proxy

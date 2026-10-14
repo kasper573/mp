@@ -22,12 +22,12 @@ env:
 # Every push runs lint, test and e2e side by side, each on a runner of its own; main deploys once all
 # three pass.
 #
-# rust-cache is the sole build cache, one entry per job. Only main writes it and every branch reads
-# main's, so the cache holds one set of entries for main's lockfile whatever happens on branches, and
-# the entries main supersedes are the least recently used, the first evicted. Branches therefore build
-# only what main builds. A failing run saves too: the dependencies it built are no different. A
-# per-object compiler cache (sccache) is deliberately absent: on the GitHub Actions backend it writes
-# thousands of tiny entries that crowd out these.
+# rust-cache is the sole build cache, one entry per kind of build. Only main writes it and every
+# branch reads main's, so the cache holds one set of entries for main's lockfile whatever happens on
+# branches, and the entries main supersedes are the least recently used, the first evicted. Branches
+# therefore build only what main builds. A failing run saves too: the dependencies it built are no
+# different. A per-object compiler cache (sccache) is deliberately absent: on the GitHub Actions
+# backend it writes thousands of tiny entries that crowd out these.
 jobs:
   lint:
     runs-on: ubuntu-24.04
@@ -82,17 +82,10 @@ jobs:
     # fix; https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/12396 tracks that code.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        # deploy: what main ships, so its e2e runs on those exact artifacts: the server at the release
-        # default, the wasm shrunk with z + LTO + strip (~44MB) for mobile Safari's per-tab memory.
-        # fast: what branches e2e, skipping the minutes LTO takes even on a warm cache: the server
-        # unoptimized (not the e2e bottleneck), the wasm at opt-3 so the software-rendered browsers keep
-        # up. main e2es it too, so that its cache, like every other, is main's.
-        build: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt') && fromJSON('["fast", "deploy"]') || fromJSON('["fast"]') }}
     env:
-      BUILD: ${{ matrix.build }}
+      # main e2es the build it deploys, so it ships exactly what the e2e ran on; branches the one
+      # quicker to build.
+      FLAVOR: ${{ github.ref == 'refs/heads/main' && 'deploy' || 'fast' }}
       DOCKER_REGISTRY: ghcr.io
       DOCKER_USERNAME: ${{ github.repository_owner }}
       DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -115,7 +108,7 @@ jobs:
           deps: e2e
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          key: ${{ matrix.build }}
+          shared-key: e2e-${{ env.FLAVOR }}
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
           cache-on-failure: "true"
       - name: Build
@@ -123,22 +116,15 @@ jobs:
         # the website waits on start. Starting them ahead is only a head start: the next step starts
         # the stack for real.
         run: |
-          if [ "$BUILD" = deploy ]; then
-            server=()
-            client=(CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols)
-          else
-            server=(CARGO_PROFILE_RELEASE_OPT_LEVEL=0)
-            client=(CARGO_PROFILE_RELEASE_OPT_LEVEL=3)
-          fi
           (cd e2e && npm ci && npx playwright install --with-deps chrome firefox webkit ffmpeg) > "$RUNNER_TEMP/browsers.log" 2>&1 &
           browsers=$!
-          env "${server[@]}" just build
+          just e2e-server "$FLAVOR"
           {
             until [ -s "$RUNNER_TEMP/images.status" ]; do sleep 1; done
             just e2e-stack-ahead
           } > "$RUNNER_TEMP/ahead.log" 2>&1 &
           ahead=$!
-          env "${client[@]}" just wasm
+          just e2e-client "$FLAVOR"
           status=0
           wait "$browsers" || status=$?
           wait "$ahead" || echo "::warning::the stack's head start failed; starting it is up to the next step"
@@ -169,7 +155,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-artifacts-${{ matrix.build }}
+          name: e2e-artifacts
           path: |
             e2e/playwright-report/
             e2e/test-results/
@@ -180,15 +166,35 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: stack-logs-${{ matrix.build }}
+          name: stack-logs
           path: /tmp/stack.log
       - name: Build and push the stack images
-        if: ${{ github.ref == 'refs/heads/main' && matrix.build == 'deploy' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         # The website image bakes in the wasm bundle; the game-server image its server binary — both the
         # exact artifacts the e2e just ran against, repackaged for the prod registry (a docker cache hit).
         run: |
           echo "$DOCKER_PASSWORD" | docker login "$DOCKER_REGISTRY" -u "$DOCKER_USERNAME" --password-stdin
           just push-images
+
+  # Branches e2e the fast build, whose cache, like every other, only main writes, while main e2es the
+  # deploy build, so main builds the fast one here for them.
+  fast-build:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          deps: e2e
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: e2e-fast
+          cache-on-failure: "true"
+      - name: Build
+        run: |
+          just e2e-server fast
+          just e2e-client fast
 
   deploy:
     needs: [lint, test, e2e]
@@ -290,6 +296,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: archive-${{ matrix.platform }}
+          cache-on-failure: "true"
       - name: Build the archive
         shell: bash
         run: just archive target/archive
