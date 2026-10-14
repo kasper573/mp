@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use super::rows::{self, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent};
 use crate::core::assets::AssetRef;
+use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
+use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::text::{self, TextShadow};
 use crate::systems::actor::Rgba;
 use crate::systems::screen::ClientScreen;
@@ -27,6 +29,7 @@ const SHADOW: TextShadow = TextShadow {
     offset: Vec2::new(0.0, 2.0),
     color: Color32::from_black_alpha(204),
 };
+const AFTER_SETTLING: Duration = Duration::from_secs(1);
 const PRESENCE: Presence = Presence {
     enter: Move::new(Vec2::new(0.0, 14.0), 0.94, 0.8),
     exit: Move::new(Vec2::new(0.0, -8.0), 1.04, 0.6),
@@ -43,22 +46,19 @@ pub struct IntroPlugin;
 
 impl Plugin for IntroPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ShownIntro>()
-            .add_systems(Update, age.run_if(in_state(ClientScreen::Area)));
+        app.init_resource::<ShownIntro>().add_systems(
+            Update,
+            (reveal_when_settled, age).run_if(in_state(ClientScreen::Area)),
+        );
     }
 }
 
+/// An intro arrives with the area it introduces, while the transition into it still plays, so it
+/// waits for the view to settle.
 pub fn show(world: &mut World, notification_sent: NotificationSent) {
-    let stays = Duration::from(notification_sent.notification.stays());
     let mut shown = world.resource_mut::<ShownIntro>();
-    let until = shown.clock + stays;
-    shown.keys += 1;
-    let key = shown.keys;
-    shown.showing = Some(ShowingIntro {
-        key,
-        notification: notification_sent.notification,
-        until,
-    });
+    shown.waiting = Some(notification_sent.notification);
+    shown.settled_for = Duration::ZERO;
 }
 
 pub fn shown(world: &World) -> Option<(String, String)> {
@@ -177,6 +177,8 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
 
 #[derive(Resource, Default)]
 struct ShownIntro {
+    waiting: Option<Notification>,
+    settled_for: Duration,
     showing: Option<ShowingIntro>,
     clock: Duration,
     fades: Fades<(u64, Notification)>,
@@ -188,6 +190,38 @@ struct ShowingIntro {
     key: u64,
     notification: Notification,
     until: Duration,
+}
+
+fn reveal_when_settled(world: &mut World) {
+    let settled = *world.resource::<ScreenTransitionPhase>() == ScreenTransitionPhase::Idle;
+    let delta = world.resource::<Time>().delta();
+    let mut shown = world.resource_mut::<ShownIntro>();
+    shown.settled_for = if settled {
+        shown.settled_for + delta
+    } else {
+        Duration::ZERO
+    };
+    if shown.settled_for < AFTER_SETTLING {
+        return;
+    }
+    let Some(notification) = shown.waiting.take() else {
+        return;
+    };
+    let until = shown.clock + Duration::from(notification.stays());
+    shown.keys += 1;
+    let key = shown.keys;
+    let sfx = notification.kind.sfx();
+    shown.showing = Some(ShowingIntro {
+        key,
+        notification,
+        until,
+    });
+    if let Some(id) = sfx {
+        world.write_message(PlaySfx {
+            id,
+            place: SfxPlace::Interface,
+        });
+    }
 }
 
 fn age(world: &mut World) {

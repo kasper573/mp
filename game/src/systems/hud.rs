@@ -214,28 +214,66 @@ pub(crate) fn placed_window<R>(
         (screen.center() - size / 2.0).max(Pos2::new(MARGIN, MARGIN)),
         size,
     );
-    keyed_window(world, gui, title, title, centered, open, add)
+    keyed_window(
+        world,
+        gui,
+        WindowShape {
+            key: title,
+            title,
+            fallback: centered,
+            height: WindowHeight::Resizable,
+        },
+        open,
+        add,
+    )
+}
+
+pub(crate) struct WindowShape<'a> {
+    pub key: &'static str,
+    pub title: &'a str,
+    pub fallback: Rect,
+    pub height: WindowHeight,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WindowHeight {
+    Resizable,
+    FitsContent,
 }
 
 pub(crate) fn keyed_window<R>(
     world: &mut World,
     gui: &egui::Context,
-    key: &'static str,
-    title: &str,
-    fallback: Rect,
+    shape: WindowShape,
     open: &mut bool,
     add: impl FnOnce(&mut Ui, &mut World) -> R,
 ) -> Option<egui::InnerResponse<Option<R>>> {
+    let WindowShape {
+        key,
+        title,
+        fallback,
+        height,
+    } = shape;
     let id = window_id(world, key);
     let placement = world
         .resource::<UserSettings>()
         .window_placement(key)
         .map(placed_rect);
+    let default = placement.unwrap_or(fallback);
+    let default = match height {
+        WindowHeight::Resizable => default,
+        // egui lets content grow only as tall as the window first stood, which a placement
+        // saved from shorter content would cut short.
+        WindowHeight::FitsContent => {
+            Rect::from_min_size(default.min, Vec2::new(default.width(), fallback.height()))
+        }
+    };
     let window = egui::Window::new(title)
         .id(id)
         .open(open)
         .min_size(MIN_WINDOW)
-        .default_rect(placement.unwrap_or(fallback))
+        .default_rect(default)
+        .resizable([true, height == WindowHeight::Resizable])
         .constrain(true);
     let window = match placement {
         Some(placed) if !pointer_busy(gui) => window.current_pos(placed.min),

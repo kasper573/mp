@@ -531,7 +531,13 @@ fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter
 }
 
 fn show(world: &mut World, notification_sent: NotificationSent) {
-    if let Some(id) = notification_sent.notification.kind.sfx() {
+    let intro = matches!(
+        notification_sent.notification.kind,
+        NotificationKind::Intro { .. }
+    );
+    if let Some(id) = notification_sent.notification.kind.sfx()
+        && !intro
+    {
         world.write_message(PlaySfx {
             id,
             place: SfxPlace::Interface,

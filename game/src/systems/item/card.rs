@@ -6,7 +6,7 @@ use egui::{Color32, CursorIcon, Pos2, Rect, Response, RichText, Ui, Vec2};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook, TextPiece, TextVoice};
-use crate::systems::hud;
+use crate::systems::hud::{self, WindowHeight, WindowShape};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
@@ -175,19 +175,18 @@ fn draw_card(world: &mut World) {
         WINDOW_SIZE,
     );
     let mut open = true;
-    let shown = hud::keyed_window(
-        world,
-        &gui,
-        WINDOW_KEY,
-        &item.get(&content).name,
+    let shape = WindowShape {
+        key: WINDOW_KEY,
+        title: &item.get(&content).name,
         fallback,
-        &mut open,
-        |ui, world| {
-            egui::ScrollArea::vertical()
-                .auto_shrink(false)
-                .show(ui, |ui| sheet(ui, world, item));
-        },
-    );
+        height: WindowHeight::FitsContent,
+    };
+    let shown = hud::keyed_window(world, &gui, shape, &mut open, |ui, world| {
+        egui::ScrollArea::vertical()
+            .max_height(WINDOW_SIZE.y)
+            .auto_shrink([false, true])
+            .show(ui, |ui| sheet(ui, world, item));
+    });
     world.resource_mut::<ItemCard>().drawn = shown.map(|shown| (item, shown.response.rect));
     if !open {
         close(world);
