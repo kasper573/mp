@@ -1,22 +1,18 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap, component};
+use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap};
 
 use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::data::item::Id as ItemId;
+use crate::core::content::Content;
 use crate::systems::dialogue::stage;
-use crate::systems::hud;
+use crate::systems::hud::{self, spawn_ui};
 use crate::systems::input::map::{ActionInput, InputAction, input};
+use crate::systems::interface::InterfaceSound;
 use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
-use crate::systems::item::{Inventory, ItemCategory, ItemStack, card};
+use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::scene::mode::Mode;
+use crate::systems::screen::ClientScreen;
+use crate::systems::screen::mode::ClientMode;
 
 const COUNTER_SIZE: Vec2 = Vec2::new(620.0, 400.0);
 const ICON: f32 = 28.0;
@@ -40,9 +36,9 @@ impl Plugin for ShopCounterPlugin {
                 Update,
                 (show_counter, sync_counter)
                     .chain()
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -96,6 +92,7 @@ fn forget(mut browse: ResMut<Browse>) {
 }
 
 fn show_counter(world: &mut World) {
+    let content = *world.resource::<Content>();
     let shop = view(world).map(|shown| shown.shop);
     let panel = world
         .query_filtered::<Entity, With<CounterPanel>>()
@@ -104,9 +101,9 @@ fn show_counter(world: &mut World) {
     match (shop, panel) {
         (Some(shop), None) => {
             *world.resource_mut::<Browse>() = Browse::default();
-            let playing = *world.resource::<Mode>() == Mode::Play;
+            let playing = *world.resource::<ClientMode>() == ClientMode::Play;
             let panel = ui::DialoguePanelOptions {
-                title: shop.get().title.to_owned(),
+                title: shop.get(&content).title.to_owned(),
                 width: Val::Px(COUNTER_SIZE.x),
                 height: Val::Px(COUNTER_SIZE.y),
                 content: counter(playing),
@@ -114,7 +111,7 @@ fn show_counter(world: &mut World) {
             if let Some(panel) = stage::show_panel(world, panel) {
                 world.entity_mut(panel).insert(CounterPanel);
             }
-            chime(world, SfxId::UiOpen);
+            InterfaceSound::UiOpen.play(world);
         }
         (None, Some(panel)) => {
             world.entity_mut(panel).despawn();
@@ -133,8 +130,9 @@ fn counter(playing: bool) -> Box<dyn Scene> {
             padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))},
         }
         Children [
-            ( ShopTabs Node { column_gap: Val::Px({spacing::M}) } ),
-            ( ShopWants Node ),
+            ShopTabs Node { column_gap: Val::Px({spacing::M}) }
+            --
+            ShopWants Node
         ]
     };
     let split = ui::split_view(
@@ -152,14 +150,16 @@ fn counter(playing: bool) -> Box<dyn Scene> {
             flex_direction: FlexDirection::Column,
         }
         Children [
-            {EntityScene(header)},
-            ( Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) } Children [ {EntityScene(split)} ] ),
-            ( ShopFooter Node { padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} } ),
+            @{header}
+            --
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) } Children [ @{split} ]
+            --
+            ShopFooter Node { padding: {UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M))} }
         ]
     };
     if playing {
         Box::new(bsn! {
-            {column}
+            @{column}
             CarryTarget
             on(|carried: On<Carried>, mut commands: Commands| {
                 let slot = carried.payload as u32;
@@ -172,6 +172,7 @@ fn counter(playing: bool) -> Box<dyn Scene> {
 }
 
 fn sync_counter(world: &mut World) {
+    let content = *world.resource::<Content>();
     let Some(shown) = view(world).cloned() else {
         return;
     };
@@ -184,9 +185,9 @@ fn sync_counter(world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    let playing = *world.resource::<Mode>() == Mode::Play;
+    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
     let browse = world.resource::<Browse>();
-    let synced = key(&(
+    let synced = hud::fingerprint(&(
         &shown,
         &inventory.slots,
         browse.tab,
@@ -204,7 +205,7 @@ fn sync_counter(world: &mut World) {
         playing,
     };
     world.resource_mut::<Browse>().synced = Some(synced);
-    let wares = shelf.wares();
+    let wares = shelf.wares(&content);
     let selected = shelf.selected.min(wares.len().saturating_sub(1));
 
     let tabs = [
@@ -214,17 +215,17 @@ fn sync_counter(world: &mut World) {
             format!("Buy back ({})", shelf.shown.buyback.len()),
         ),
     ];
-    let tab_keys: Vec<u64> = tabs
+    let tab_keys: Vec<(ShopTab, &String, bool)> = tabs
         .iter()
-        .map(|(tab, label)| key(&(tab, label, shelf.tab == *tab)))
+        .map(|(tab, label)| (*tab, label, shelf.tab == *tab))
         .collect();
     hud::reconcile_children(world, parts.tabs, &tab_keys, |_, index| {
         let (tab, label) = tabs[index].clone();
         Box::new(tab_button(tab, label, shelf.tab == tab))
     });
 
-    let wants = shelf.shown.shop.get().wants();
-    hud::reconcile_children(world, parts.wants, &[key(&wants)], |_, _| {
+    let wants = shelf.shown.shop.get(&content).wants(&content);
+    hud::reconcile_children(world, parts.wants, &[&wants], |_, _| {
         Box::new(ui::styled_text(
             wants_note(&wants),
             palette::AMBER_80,
@@ -233,13 +234,13 @@ fn sync_counter(world: &mut World) {
     });
 
     let list_keys: Vec<u64> = if wares.is_empty() {
-        vec![key(&shelf.tab)]
+        vec![hud::fingerprint(&shelf.tab)]
     } else {
         wares
             .iter()
             .enumerate()
             .map(|(index, ware)| {
-                key(&(
+                hud::fingerprint(&(
                     shelf.tab,
                     index,
                     ware,
@@ -252,6 +253,7 @@ fn sync_counter(world: &mut World) {
     hud::reconcile_children(world, parts.list, &list_keys, |world, index| {
         match wares.get(index) {
             Some(ware) => row(
+                world.resource::<Content>(),
                 world.resource::<AssetServer>(),
                 &shelf,
                 ware,
@@ -262,16 +264,16 @@ fn sync_counter(world: &mut World) {
         }
     });
 
-    let detail_keys: Vec<u64> = wares
+    let detail_keys: Vec<(ShopTab, usize, &Ware, Vec<u32>, bool)> = wares
         .get(selected)
         .map(|ware| {
-            key(&(
+            (
                 shelf.tab,
                 selected,
                 ware,
                 held(&shelf.inventory, ware),
                 shelf.playing,
-            ))
+            )
         })
         .into_iter()
         .collect();
@@ -280,7 +282,7 @@ fn sync_counter(world: &mut World) {
     });
 
     let selling = shelf.playing && !wants.is_empty();
-    hud::reconcile_children(world, parts.footer, &[key(&selling)], |_, _| {
+    hud::reconcile_children(world, parts.footer, &[selling], |_, _| {
         Box::new(sell_hint(selling))
     });
 }
@@ -309,12 +311,6 @@ fn single<C: Component>(world: &mut World) -> Option<Entity> {
     world.query_filtered::<Entity, With<C>>().iter(world).next()
 }
 
-fn key(value: &impl std::fmt::Debug) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    format!("{value:?}").hash(&mut hasher);
-    hasher.finish()
-}
-
 fn held(inventory: &Inventory, ware: &Ware) -> Vec<u32> {
     ware.price
         .iter()
@@ -330,7 +326,7 @@ struct Shelf {
     playing: bool,
 }
 
-#[derive(Debug)]
+#[derive(Hash)]
 struct Ware {
     item: ItemId,
     count: u32,
@@ -339,14 +335,13 @@ struct Ware {
     refusal: Option<WareRefusal>,
 }
 impl Shelf {
-    fn wares(&self) -> Vec<Ware> {
+    fn wares(&self, content: &Content) -> Vec<Ware> {
         match self.tab {
             ShopTab::Wares => self
                 .shown
                 .shop
-                .get()
-                .sells
-                .iter()
+                .get(content)
+                .sells()
                 .zip(&self.shown.offers)
                 .map(|(offer, view)| Ware {
                     item: offer.item,
@@ -365,7 +360,7 @@ impl Shelf {
                     count: sale.count,
                     price: sale.paid.clone(),
                     note: None,
-                    refusal: missing(&self.inventory, &sale.paid),
+                    refusal: missing(content, &self.inventory, &sale.paid),
                 })
                 .collect(),
         }
@@ -383,9 +378,12 @@ fn stock_note(view: &OfferView) -> Option<String> {
     })
 }
 
-fn missing(inventory: &Inventory, price: &[ItemStack]) -> Option<WareRefusal> {
+fn missing(content: &Content, inventory: &Inventory, price: &[ItemStack]) -> Option<WareRefusal> {
     let mut trial = inventory.clone();
-    trial.exchange(price, &[]).err().map(WareRefusal::from)
+    trial
+        .exchange(content, price, &[])
+        .err()
+        .map(|refusal| WareRefusal::of(refusal, content))
 }
 
 fn wants_note(wants: &[String]) -> String {
@@ -426,7 +424,7 @@ fn empty_note(tab: ShopTab) -> impl Scene {
     };
     bsn! {
         Node { padding: {UiRect::all(Val::Px(spacing::XL))} }
-        Children [ {EntityScene(ui::styled_text(note, ink.with_alpha(0.6), typography::CAPTION))} ]
+        Children [ @{ui::styled_text(note, ink.with_alpha(0.6), typography::CAPTION)} ]
     }
 }
 
@@ -437,7 +435,7 @@ fn tab_button(tab: ShopTab, label: String, active: bool) -> impl Scene {
         ui::button::intent::SECONDARY
     };
     bsn! {
-        {ui::button_styled(intent, ui::ButtonSize::Sm, label)}
+        @{ui::button_styled(intent, ui::ButtonSize::Sm, label)}
         on(move |_: On<ui::Activate>, mut commands: Commands| {
             commands.queue(move |world: &mut World| select(world, tab, 0));
         })
@@ -445,6 +443,7 @@ fn tab_button(tab: ShopTab, label: String, active: bool) -> impl Scene {
 }
 
 fn row(
+    content: &Content,
     assets: &AssetServer,
     shelf: &Shelf,
     ware: &Ware,
@@ -452,8 +451,8 @@ fn row(
     selected: bool,
 ) -> Box<dyn Scene> {
     let ink = ui::theme::theme().surface_floating.on;
-    let def = ware.item.get();
-    let name = counted(def.display_name, ware.count);
+    let def = ware.item.get(content);
+    let name = counted(&def.name, ware.count);
     let note = unavailable(ware)
         .map(|reason| (reason, palette::CRIMSON_80))
         .or_else(|| ware.note.clone().map(|note| (note, ink.with_alpha(0.6))));
@@ -466,7 +465,9 @@ fn row(
     let chips: Vec<Box<dyn Scene>> = ware
         .price
         .iter()
-        .map(|stack| -> Box<dyn Scene> { Box::new(price_chip(assets, &shelf.inventory, *stack)) })
+        .map(|stack| -> Box<dyn Scene> {
+            Box::new(price_chip(content, assets, &shelf.inventory, *stack))
+        })
         .collect();
     let background = if selected {
         ui::theme::theme().surface_inset.base
@@ -483,43 +484,43 @@ fn row(
         }
         BackgroundColor({background})
         Pickable { should_block_lower: true, is_hoverable: true }
-        ui::component(ui::CursorStyle::Pointer)
-        on(move |click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands| {
+        ui::CursorStyle::Pointer
+        on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
             if input.clicked(InputAction::Select, &click) {
                 commands.queue(move |world: &mut World| select(world, tab, index));
             }
         })
         Children [
-            (
-                Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                component(ImageNode::new(assets.load(def.icon.0)))
-                Pickable::IGNORE
-            ),
-            (
-                Node { flex_direction: FlexDirection::Column, flex_grow: 1.0 }
-                Pickable::IGNORE
-                Children [
-                    {EntityScene(ui::styled_text(name, ink, typography::LABEL))},
-                    {note},
-                ]
-            ),
-            (
-                Node { flex_direction: FlexDirection::Column, align_items: AlignItems::End, row_gap: Val::Px({spacing::S}) }
-                Pickable::IGNORE
-                Children [ {chips} ]
-            ),
+            Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
+            ImageNode { image: {assets.load(def.icon.path())} }
+            Pickable::IGNORE
+            --
+            Node { flex_direction: FlexDirection::Column, flex_grow: 1.0 }
+            Pickable::IGNORE
+            Children [
+                @{ui::styled_text(name, ink, typography::LABEL)}
+                --
+                {note}
+            ]
+            --
+            Node { flex_direction: FlexDirection::Column, align_items: AlignItems::End, row_gap: Val::Px({spacing::S}) }
+            Pickable::IGNORE
+            Children [ {chips} ]
         ]
     })
 }
 
 fn detail(world: &World, shelf: &Shelf, ware: &Ware, index: usize) -> impl Scene + use<> {
+    let content = world.resource::<Content>();
     let assets = world.resource::<AssetServer>();
     let family = ui::theme::theme().surface_floating;
     let ink = family.on;
     let costs: Vec<Box<dyn Scene>> = ware
         .price
         .iter()
-        .map(|stack| -> Box<dyn Scene> { Box::new(cost_row(assets, &shelf.inventory, *stack)) })
+        .map(|stack| -> Box<dyn Scene> {
+            Box::new(cost_row(content, assets, &shelf.inventory, *stack))
+        })
         .collect();
     let notes: Vec<Box<dyn Scene>> = ware
         .note
@@ -543,28 +544,30 @@ fn detail(world: &World, shelf: &Shelf, ware: &Ware, index: usize) -> impl Scene
     bsn! {
         Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0), height: Val::Percent(100.0) }
         Children [
-            (
-                Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
-                Children [ {EntityScene(ui::scrolled(Box::new(bsn! {
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0) }
+            Children [
+                @{ui::scrolled(Box::new(bsn! {
                     Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-                    Children [ {EntityScene(sheet)} ]
-                })))} ]
-            ),
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px({spacing::M}),
-                    padding: {UiRect::all(Val::Px(spacing::XL))},
-                    border: {UiRect::top(Val::Px(1.0))},
-                }
-                component(BorderColor::all(family.border))
-                Children [
-                    {EntityScene(ui::styled_text(price, ink.with_alpha(0.6), typography::LABEL))},
-                    ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {costs} ] ),
-                    ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {notes} ] ),
-                    {action},
-                ]
-            ),
+                    Children [ @{sheet} ]
+                }))}
+            ]
+            --
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px({spacing::M}),
+                padding: {UiRect::all(Val::Px(spacing::XL))},
+                border: {UiRect::top(Val::Px(1.0))},
+            }
+            BorderColor::all(family.border)
+            Children [
+                @{ui::styled_text(price, ink.with_alpha(0.6), typography::LABEL)}
+                --
+                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}) } Children [ {costs} ]
+                --
+                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {notes} ]
+                --
+                {action}
+            ]
         ]
     }
 }
@@ -581,7 +584,7 @@ fn trade_button(tab: ShopTab, ware: &Ware, index: usize) -> impl Scene + use<> {
         (None, ShopTab::Buyback) => (ui::button::intent::PRIMARY, "Buy back".to_owned()),
     };
     bsn! {
-        {ui::button_styled(intent, ui::ButtonSize::Md, label)}
+        @{ui::button_styled(intent, ui::ButtonSize::Md, label)}
         on(move |_: On<ui::Activate>, mut commands: Commands| {
             commands.queue(move |world: &mut World| trade(world, tab, index));
         })
@@ -589,7 +592,7 @@ fn trade_button(tab: ShopTab, ware: &Ware, index: usize) -> impl Scene + use<> {
 }
 
 fn trade(world: &mut World, tab: ShopTab, index: usize) {
-    if *world.resource::<Mode>() != Mode::Play {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
     let index = index as u32;
@@ -601,14 +604,19 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
             world.write_message(ShopRequest::Buyback { sale: index });
         }
     }
-    chime(world, SfxId::UiPick);
+    InterfaceSound::UiPick.play(world);
 }
 
-fn price_chip(assets: &AssetServer, inventory: &Inventory, stack: ItemStack) -> impl Scene + use<> {
+fn price_chip(
+    content: &Content,
+    assets: &AssetServer,
+    inventory: &Inventory,
+    stack: ItemStack,
+) -> impl Scene + use<> {
     let covered = inventory.count(stack.item) >= stack.count;
     ui::chip(ChipOptions {
         label: stack.count.to_string(),
-        icon: Some(assets.load(stack.item.get().icon.0)),
+        icon: Some(assets.load(stack.item.get(content).icon.path())),
         family: Family::outline(if covered {
             palette::AMBER_70
         } else {
@@ -618,7 +626,12 @@ fn price_chip(assets: &AssetServer, inventory: &Inventory, stack: ItemStack) -> 
     })
 }
 
-fn cost_row(assets: &AssetServer, inventory: &Inventory, stack: ItemStack) -> impl Scene + use<> {
+fn cost_row(
+    content: &Content,
+    assets: &AssetServer,
+    inventory: &Inventory,
+    stack: ItemStack,
+) -> impl Scene + use<> {
     let have = inventory.count(stack.item);
     let color = if have >= stack.count {
         ui::theme::theme().surface_floating.on
@@ -628,16 +641,15 @@ fn cost_row(assets: &AssetServer, inventory: &Inventory, stack: ItemStack) -> im
     let label = format!(
         "{} {} · You have {have}",
         stack.count,
-        stack.item.get().display_name
+        stack.item.get(content).name
     );
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
         Children [
-            (
-                Node { width: Val::Px(16.0), height: Val::Px(16.0) }
-                component(ImageNode::new(assets.load(stack.item.get().icon.0)))
-            ),
-            {EntityScene(ui::styled_text(label, color, typography::BODY))},
+            Node { width: Val::Px(16.0), height: Val::Px(16.0) }
+            ImageNode { image: {assets.load(stack.item.get(content).icon.path())} }
+            --
+            @{ui::styled_text(label, color, typography::BODY)}
         ]
     }
 }
@@ -658,28 +670,36 @@ fn counted(name: &str, count: u32) -> String {
 }
 
 fn verdict(world: &World, stack: ItemStack) -> Option<SlotVerdict> {
+    let content = world.resource::<Content>();
     let shown = view(world)?;
     Some(
-        match shown.shop.get().pays_for(stack.item, &shown.declined) {
-            Ok(pays) => SlotVerdict::Wanted(format!("sells for {}", paid(pays, stack.count))),
+        match shown
+            .shop
+            .get(content)
+            .pays_for(content, stack.item, &shown.declined)
+        {
+            Ok(pays) => {
+                SlotVerdict::Wanted(format!("sells for {}", paid(content, pays, stack.count)))
+            }
             Err(refusal) => SlotVerdict::Refused(refusal),
         },
     )
 }
 
-fn paid(pays: &[ItemStack], count: u32) -> String {
+fn paid(content: &Content, pays: &[ItemStack], count: u32) -> String {
     pays.iter()
-        .map(|pay| ItemStack::new(pay.item, pay.count.saturating_mul(count)).describe())
+        .map(|pay| ItemStack::new(pay.item, pay.count.saturating_mul(count)).describe(content))
         .collect::<Vec<_>>()
         .join(" + ")
 }
 
 fn selling(world: &World) -> bool {
-    *world.resource::<Mode>() == Mode::Play && view(world).is_some()
+    *world.resource::<ClientMode>() == ClientMode::Play && view(world).is_some()
 }
 
 fn request_sale(world: &mut World, slot: u32) {
-    if *world.resource::<Mode>() != Mode::Play {
+    let content = *world.resource::<Content>();
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
     let Some((shop, declined)) = view(world).map(|shown| (shown.shop, shown.declined.clone()))
@@ -694,8 +714,8 @@ fn request_sale(world: &mut World, slot: u32) {
     else {
         return;
     };
-    match shop.get().pays_for(stack.item, &declined) {
-        Ok(pays) if stack.item.get().category() == ItemCategory::Equipment => {
+    match shop.get(&content).pays_for(&content, stack.item, &declined) {
+        Ok(pays) if stack.item.get(&content).category() == ItemCategory::Equipment => {
             confirm_sale(world, shop, stack, pays, slot);
         }
         _ => sell(world, slot, stack),
@@ -703,11 +723,16 @@ fn request_sale(world: &mut World, slot: u32) {
 }
 
 fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemStack], slot: u32) {
-    let name = stack.item.get().display_name;
+    let content = *world.resource::<Content>();
+    let name = &stack.item.get(&content).name;
     let dialog = ui::confirm_dialog(ConfirmOptions {
         title: format!("Sell {name}?"),
         body: vec![
-            format!("{} pays {}.", shop.get().title, paid(pays, stack.count)),
+            format!(
+                "{} pays {}.",
+                shop.get(&content).title,
+                paid(&content, pays, stack.count)
+            ),
             "You can buy it back for the same until you leave the game.".to_owned(),
         ],
         confirm: "Sell".to_owned(),
@@ -716,17 +741,10 @@ fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemS
         on_cancel: OnTap::new(|_| {}),
         keep: InputAction::TakeDefault.into(),
     });
-    world.spawn_scene(dialog).ok();
+    spawn_ui(world, dialog);
 }
 
 fn sell(world: &mut World, slot: u32, stack: ItemStack) {
     world.write_message(ShopRequest::Sell { slot, stack });
-    chime(world, SfxId::Coins);
-}
-
-fn chime(world: &mut World, id: SfxId) {
-    world.write_message(PlaySfx {
-        id,
-        place: SfxPlace::Interface,
-    });
+    InterfaceSound::Coins.play(world);
 }

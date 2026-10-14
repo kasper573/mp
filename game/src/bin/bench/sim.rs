@@ -1,11 +1,13 @@
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ClientId as Sender, ConnectedClient, FromClient, ServerState};
-use bevy_state::prelude::NextState;
-use game::core::assets::AssetService;
+use bevy_replicon::prelude::ConnectedClient;
+use bevy_replicon::shared::backend::server_messages::ServerMessages;
+use game::core::content::Content;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::data;
-use game::systems::player::{ClientId, JoinRequest, SpawnPolicy};
+use game::systems::area::AreaModule;
+use game::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
+use game::systems::{GameSettings, from_client, server_app, start_server, step_areas};
+use strum::AsRefStr;
 
 pub const PLAYERS_PER_AREA: usize = 25;
 
@@ -17,14 +19,15 @@ const CLOCK: WallClock = WallClock {
 /// Ticks stepped before sampling, so spawn waves and connect churn settle out of the measurement.
 pub const WARMUP: usize = 30;
 
-/// The connection entity per player (one per simulated client). Their characters are spawned by the
-/// world's own `join` system; [`connect`] later promotes them to fully replicating clients. Shared
-/// by the benchmark and the profiler so both measure the exact same simulation.
+// Runs play out alike, so they compare.
+const SEED: u64 = 1931;
+
 pub type Roster = Vec<Entity>;
 
 /// How the area's players are positioned, which sets how much their areas-of-interest overlap. Maps
 /// directly onto the server's [`SpawnPolicy`], so the bench spreads players exactly as production does.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, AsRefStr)]
+#[strum(serialize_all = "lowercase")]
 pub enum Layout {
     /// Every player spawns on the spawn tile, so all clients share one identical area-of-interest —
     /// the worst case for replicating nearby entities to many overlapping viewers.
@@ -35,13 +38,6 @@ pub enum Layout {
 }
 
 impl Layout {
-    pub fn label(self) -> &'static str {
-        match self {
-            Layout::Congested => "congested",
-            Layout::Distributed => "distributed",
-        }
-    }
-
     fn spawn_policy(self) -> SpawnPolicy {
         match self {
             Layout::Congested => SpawnPolicy::Map,
@@ -50,33 +46,33 @@ impl Layout {
     }
 }
 
-/// The NPCs each bench area spawns, read from the content layer (the same area the bench instances).
-pub fn npcs_per_area() -> usize {
-    let area = data::area::BENCH_ID.get();
-    let populations: usize = area
-        .populations
+pub fn npcs_per_area(content: &Content) -> usize {
+    let area = content
+        .built::<GameSettings>()
+        .initial_spawn
+        .area
+        .get(content);
+    area.modules
         .iter()
-        .map(|population| population.count as usize)
-        .sum();
-    populations + area.residents.len()
+        .map(|module| match module {
+            AreaModule::Population(population) => population.count as usize,
+            AreaModule::Resident(_) => 1,
+            _ => 0,
+        })
+        .sum()
 }
 
-/// Exactly `areas` instances of the benchmark area, each populated with its NPCs and players, plus
-/// each world's roster of connection entities. The area count is a pure runtime parameter — every
-/// world is an instance of the one area template, so the count built always equals the count asked for.
-pub fn worlds(areas: usize, layout: Layout, assets: &AssetService) -> (Vec<App>, Vec<Roster>) {
+pub fn worlds(areas: usize, layout: Layout, content: &Content) -> (Vec<App>, Vec<Roster>) {
     let mut worlds = Vec::with_capacity(areas);
     let mut rosters = Vec::with_capacity(areas);
     for ordinal in 0..areas {
-        let (app, roster) = build_world(layout, assets, ordinal as u64);
+        let (app, roster) = build_world(layout, content, ordinal as u64);
         worlds.push(app);
         rosters.push(roster);
     }
     (worlds, rosters)
 }
 
-/// Promotes every rostered connection into a fully replicating client, giving each its owner-scoped
-/// replicated view.
 pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
     for (app, roster) in worlds.iter_mut().zip(rosters) {
         let world = app.world_mut();
@@ -91,7 +87,8 @@ pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
 /// Advances every world one tick across all cores — the same parallel area fan-out the real server
 /// uses, so the benchmark's capacity reflects the threaded server.
 pub fn step(worlds: &mut [App]) {
-    game::systems::step_areas(worlds, CLOCK);
+    step_areas(worlds, CLOCK);
+    consume_sent(worlds);
 }
 
 /// Advances every world one tick on the calling thread only. Used by the profiler so CPU samples
@@ -101,28 +98,38 @@ pub fn step_single_threaded(worlds: &mut [App]) {
     for app in worlds.iter_mut() {
         app.update();
     }
+    consume_sent(worlds);
 }
 
-fn build_world(layout: Layout, assets: &AssetService, ordinal: u64) -> (App, Roster) {
-    let mut app = game::systems::server_app(game::data::area::BENCH_ID, ordinal, CLOCK);
-    app.insert_resource(assets.clone());
-    app.insert_resource(game::core::math::Rng::from_entropy());
-    app.insert_resource(layout.spawn_policy());
-    app.finish();
-    app.cleanup();
-    app.world_mut()
-        .resource_mut::<NextState<ServerState>>()
-        .set(ServerState::Running);
-    app.update(); // Startup `npc::spawn_all` populates the area's real NPC distribution.
+/// What the server's transport does with outgoing messages once they are on the wire.
+fn consume_sent(worlds: &mut [App]) {
+    for app in worlds.iter_mut() {
+        app.world_mut()
+            .resource_mut::<ServerMessages>()
+            .drain_sent()
+            .for_each(drop);
+    }
+}
+
+fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster) {
+    let mut app = server_app(
+        content.built::<GameSettings>().initial_spawn.area,
+        ordinal,
+        SEED,
+        CLOCK,
+        content,
+    );
+    app.insert_resource(SpawnRules {
+        policy: layout.spawn_policy(),
+        immortal: false,
+    });
+    start_server(&mut app);
 
     let world = app.world_mut();
     let mut roster = Vec::with_capacity(PLAYERS_PER_AREA);
     for index in 0..PLAYERS_PER_AREA {
         let conn = world.spawn(ClientId(index as u32 + 1)).id();
-        world.write_message(FromClient {
-            client_id: Sender::Client(conn),
-            message: JoinRequest,
-        });
+        from_client(world, conn, JoinRequest);
         roster.push(conn);
     }
     app.update(); // the real `player::join` system spawns each player's character.

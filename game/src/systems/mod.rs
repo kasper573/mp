@@ -5,28 +5,28 @@ pub mod attention;
 pub mod belongings;
 pub mod chat;
 pub mod combat;
-pub mod debug;
 pub mod dialogue;
 pub mod effect;
 pub mod equipment;
-pub mod fps;
 pub mod history;
 pub mod hud;
 pub mod input;
 pub mod interact;
+pub mod interface;
 pub mod item;
 pub mod job;
+pub mod launch;
 pub mod memory;
 pub mod movement;
 pub mod notification;
 pub mod npc;
 pub mod player;
-pub mod prop;
+pub mod probe;
 pub mod quest;
 pub mod reach;
 pub mod rewards;
-pub mod rule;
-pub mod scene;
+pub mod screen;
+pub mod script;
 pub mod settings;
 pub mod shop;
 pub mod spectate;
@@ -36,44 +36,38 @@ pub mod text;
 pub mod view;
 pub mod visibility;
 
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
 use bevy_app::App;
 use bevy_ecs::message::{Message, Messages};
-use bevy_ecs::prelude::{Bundle, Res, ResMut, Resource, World};
+use bevy_ecs::prelude::{Bundle, Entity, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
-use bevy_terminal::Terminal;
+use schemars::JsonSchema;
 
+use crate::core::assets::SyncedFiles;
+use crate::core::content::sync::SyncedContent;
+use crate::core::content::{
+    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
+    Loading, Settings,
+};
+use crate::core::platform::{ClientPlatform, Platform, StartParams};
+use crate::core::time::{Hertz, Seconds, WallClock};
+use crate::systems::area::AreaId;
+use crate::systems::player::PlayerDefId;
 use actor::{Actor, Hitbox};
 use area::AreaTag;
 use movement::Position;
+use terminal::TerminalKind;
 
-pub const TICK_HZ: crate::core::time::Hertz = crate::core::time::Hertz(30.0);
+pub const TICK_HZ: Hertz = Hertz(30.0);
 
-/// Simulation ticks per replication. The world steps every tick, but state is replicated to clients
-/// (and visibility recomputed) only every Nth tick; clients interpolate between the sparser
-/// snapshots. Replication serialization is the dominant server cost and scales with this rate, so
-/// replicating at `TICK_HZ / REPLICATION_INTERVAL` (10 Hz) rather than every tick cuts it ~3x.
+/// Replication serialization is the dominant server cost and scales with its rate, so state goes out
+/// every Nth tick (clients interpolate between the sparser snapshots) rather than every tick.
 pub const REPLICATION_INTERVAL: u64 = 3;
 
-/// Seconds of server time covered by one replication snapshot.
-pub const REPLICATION_PERIOD: crate::core::time::Seconds =
-    crate::core::time::Seconds(REPLICATION_INTERVAL as f32 / TICK_HZ.0);
-
-static TERMINALS: LazyLock<HashMap<crate::data::terminal::Id, &'static Terminal>> =
-    LazyLock::new(|| {
-        crate::data::terminal::Id::VARIANTS
-            .iter()
-            .copied()
-            .zip(crate::data::terminal::TABLE)
-            .collect()
-    });
+pub const REPLICATION_PERIOD: Seconds = Seconds(REPLICATION_INTERVAL as f32 / TICK_HZ.0);
 
 pub fn protocol(app: &mut App) {
     actor::register(app);
     crate::core::babble::register(app);
-    crate::core::interpolate::register(app);
     notification::register(app);
     area::register(app);
     attention::register(app);
@@ -88,16 +82,24 @@ pub fn protocol(app: &mut App) {
     movement::register(app);
     interact::register(app);
     npc::register(app);
-    prop::register(app);
     shop::register(app);
     quest::register(app);
     player::register(app);
     spectate::register(app);
-    bevy_terminal::register(app, &TERMINALS);
+    terminal::register(app);
 }
 
 #[derive(Resource, Clone, Copy)]
-pub struct WorldArea(pub area::Id);
+pub struct WorldArea(pub AreaId);
+
+#[derive(JsonSchema, Resource, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GameSettings {
+    pub name: String,
+    pub content_version: ContentVersion,
+    pub initial_spawn: script::Place,
+    pub player: PlayerDefId,
+}
 
 #[derive(Bundle)]
 pub struct Character {
@@ -108,10 +110,13 @@ pub struct Character {
     pub area: AreaTag,
 }
 
-/// Builds one area world. `ordinal` is the world's slot among the worlds a driver steps concurrently;
-/// it only staggers the replication phase, so identical area instances still replicate on different
-/// ticks. The driver passes each world's index.
-pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallClock) -> App {
+pub fn server_app(
+    area: AreaId,
+    ordinal: u64,
+    rng_seed: u64,
+    clock: WallClock,
+    assets: &Content,
+) -> App {
     use bevy_app::{First, PostUpdate, Startup, Update};
     use bevy_ecs::schedule::{IntoScheduleConfigs, Schedules, SingleThreadedExecutor};
     use bevy_replicon::prelude::{AuthMethod, RepliconSharedPlugin, ServerState};
@@ -120,8 +125,20 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
 
     let mut app = App::new();
     app.insert_resource(WorldArea(area));
+    app.insert_resource(assets.built::<GameSettings>().clone());
     app.insert_resource(clock);
+    app.insert_resource(*assets);
+    app.insert_resource(assets.built::<quest::Parties>().clone());
+    app.insert_resource(assets.built::<script::RiftScripts>().clone());
+    app.insert_resource(input::map::InputMap::new(assets));
+    app.init_resource::<script::RiftInstances>();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
+    // Every tick steps the same span of game time however long it took, so a seeded world plays out
+    // alike tick for tick.
+    app.insert_resource(bevy_time::TimeUpdateStrategy::ManualDuration(
+        TICK_HZ.period(),
+    ));
+    app.insert_resource(crate::core::math::Rng::for_world(rng_seed, ordinal));
     app.add_plugins(
         bevy_app::PluginGroup::build(bevy_replicon::prelude::RepliconPlugins)
             .set(RepliconSharedPlugin {
@@ -147,7 +164,15 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
         .add_observer(player::greet)
         .add_observer(player::client_left)
         .add_observer(spectate::client_left)
-        .add_systems(Startup, (npc::spawn_all, prop::spawn_all))
+        .add_systems(
+            Startup,
+            (
+                script::spawn_stateless,
+                area::object::spawn_all,
+                npc::spawn_all,
+            )
+                .chain(),
+        )
         .add_systems(First, advance_replication_clock)
         .add_systems(
             PostUpdate,
@@ -160,11 +185,9 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
             Update,
             (
                 (
-                    actor::reset,
+                    player::arrival_holds,
                     combat::regen,
-                    npc::run_ai,
                     movement::move_request,
-                    movement::move_to_portal,
                     combat::request,
                     item::use_item,
                     item::drop_item,
@@ -180,12 +203,18 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
                     .chain(),
                 (
                     (rewards::grant, quest::credit, npc::defeated).chain(),
+                    (
+                        script::query::index_actors,
+                        (area::object::track, npc::approach)
+                            .chain()
+                            .run_if(on_replication_tick),
+                    )
+                        .chain(),
+                    script::run_tick,
+                    npc::body::drive,
                     movement::advance,
                     item::pickups,
                     interact::interactions,
-                    (npc::observe, area::zone::enter_zones)
-                        .chain()
-                        .run_if(on_replication_tick),
                     (
                         dialogue::hold,
                         dialogue::refresh.run_if(on_replication_tick),
@@ -198,8 +227,12 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
                     player::respawn,
                     spectate::requests,
                     (npc::run_respawn, npc::dismiss).chain(),
-                    bevy_terminal::ingest::<crate::data::terminal::Id>,
-                    bevy_terminal::dispatch::<crate::data::terminal::Id>,
+                )
+                    .chain(),
+                (
+                    actor::settle,
+                    bevy_terminal::ingest::<TerminalKind>,
+                    bevy_terminal::dispatch::<TerminalKind>,
                     chat::rebroadcast,
                     belongings::notify_changes,
                     history::backfill,
@@ -220,12 +253,115 @@ pub fn server_app(area: area::Id, ordinal: u64, clock: crate::core::time::WallCl
     app
 }
 
-/// Steps every area world one tick, fanning the isolated worlds across all cores. Areas share only the
-/// read-only asset service, so this is embarrassingly parallel. The worlds (not the owning `App`s) are
-/// stepped directly because `App` is `!Send` (its runner box carries no `Send` bound) while `World` is
-/// `Send`; for these single-schedule headless apps `world.run_schedule(Main)` + `clear_trackers` is
-/// exactly what `App::update` does.
-pub fn step_areas(apps: &mut [App], clock: crate::core::time::WallClock) {
+pub fn start_server(app: &mut App) {
+    use bevy_replicon::prelude::ServerState;
+    use bevy_state::prelude::NextState;
+
+    app.finish();
+    app.cleanup();
+    app.world_mut()
+        .resource_mut::<NextState<ServerState>>()
+        .set(ServerState::Running);
+    app.update();
+}
+
+pub fn from_client<M: bevy_ecs::message::Message>(world: &mut World, conn: Entity, message: M) {
+    use bevy_replicon::prelude::{ClientId, FromClient};
+
+    world.write_message(FromClient {
+        client_id: ClientId::Client(conn),
+        message,
+    });
+}
+
+pub fn client_app(
+    platform: std::sync::Arc<dyn Platform>,
+    params: StartParams,
+    window: bevy::window::Window,
+) -> App {
+    use bevy::prelude::*;
+
+    let credentials = params
+        .access_token
+        .as_deref()
+        .map(crate::core::net::auth::Credentials::from_access_token);
+    let spectator = credentials.as_ref().is_some_and(|credentials| {
+        credentials
+            .roles
+            .iter()
+            .any(|role| role.parse() == Ok(account::Role::Spectate))
+    });
+
+    let mut app = App::new();
+    let files = SyncedFiles::default();
+    app.insert_resource(files.clone());
+    app.insert_resource(crate::core::math::Rng::from_entropy());
+    bevy::asset::AssetApp::register_asset_source(
+        &mut app,
+        bevy::asset::io::AssetSourceId::Default,
+        files.source(),
+    )
+    .add_plugins(
+        DefaultPlugins
+            .set(bevy::log::LogPlugin {
+                filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
+                ..default()
+            })
+            .set(WindowPlugin {
+                primary_window: Some(window),
+                ..default()
+            })
+            .set(ImagePlugin::default_nearest()),
+    );
+    if let Some(credentials) = credentials {
+        app.insert_resource(credentials);
+    }
+    app.insert_resource(params)
+        .insert_resource(ClientPlatform(platform))
+        .add_plugins((
+            ui::UiPlugin,
+            crate::core::net::transport::SocketClientPlugin,
+            crate::core::interpolate::SnapshotPlugin {
+                period: REPLICATION_PERIOD,
+            },
+            crate::core::render::RenderPlugin,
+            crate::core::audio::playback::SfxPlugin,
+            crate::core::audio::soundscape::SoundscapePlugin,
+            crate::core::babble::BabblePlugin,
+        ))
+        .add_plugins((
+            screen::ClientScreenPlugin { spectator },
+            actor::render::ActorPlugin,
+            actor::plate::PlatePlugin,
+            movement::MovementPlugin,
+            combat::render::CombatPlugin,
+            item::render::ItemsPlugin,
+            area::object::render::ObjectPlugin,
+            view::ViewPlugin,
+            player::session::ClientSessionPlugin,
+            input::InputPlugin,
+        ))
+        .add_plugins((
+            hud::HudPlugin,
+            dialogue::stage::StagePlugin,
+            notification::NotificationPlugin,
+            history::widget::HistoryPlugin,
+            shop::counter::ShopCounterPlugin,
+            item::card::ItemCardPlugin,
+            quest::card::QuestCardPlugin,
+            quest::log::QuestLogPlugin,
+            quest::tracker::QuestTrackerPlugin,
+            spectate::widget::SpectatorPlugin,
+            terminal::TerminalPlugin,
+        ));
+    ui::theme::set_theme(ui::themes::dark::THEME);
+    app
+}
+
+/// The worlds, not the owning `App`s, are stepped because `App` is `!Send` while `World` is `Send`;
+/// for these single-schedule headless apps `run_schedule(Main)` + `clear_trackers` is what
+/// `App::update` does.
+pub fn step_areas(apps: &mut [App], clock: WallClock) {
     use bevy_app::Main;
     use rayon::prelude::*;
 
@@ -240,25 +376,118 @@ pub fn step_areas(apps: &mut [App], clock: crate::core::time::WallClock) {
         });
 }
 
-pub fn check_content(assets: &crate::core::assets::AssetService) {
-    actor::check(assets);
-    area::check(assets);
-    npc::check(assets);
-    dialogue::check(
-        assets,
-        npc::conversation_starts()
-            .into_iter()
-            .chain(area::conversation_starts())
-            .chain(prop::conversation_starts())
-            .chain(shop::conversation_starts())
-            .chain(quest::conversation_starts()),
-    );
-    shop::check();
-    quest::check(assets);
-    notification::check();
+pub fn load_content(
+    folder: std::sync::Arc<dyn ContentFolder>,
+    outcome: &str,
+) -> Result<Content, LoadReport> {
+    crate::core::content::load(
+        &registry(),
+        folder,
+        crate::core::content::version::build(),
+        outcome,
+    )
 }
 
-pub(crate) fn requests<M: Message>(world: &mut World) -> Vec<FromClient<M>> {
+pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), LoadReport> {
+    let before = world.get_resource::<SyncedContent>();
+    if before.is_some_and(|before| before.same_as(&synced)) {
+        return Ok(());
+    }
+    let content = load_content(
+        std::sync::Arc::new(synced.folder()),
+        "the content did not load",
+    )?;
+    let changed = before.map(|before| synced.changed_assets(before));
+    world
+        .resource::<SyncedFiles>()
+        .replace(synced.assets.clone());
+    if let Some(changed) = changed {
+        let assets = world.resource::<bevy::asset::AssetServer>();
+        for path in changed {
+            let path = bevy::asset::AssetPath::from(path);
+            if assets.get_path_id(path.clone()).is_some() {
+                assets.reload(path);
+            }
+        }
+    }
+    world.insert_resource(content.built::<quest::Parties>().clone());
+    world.insert_resource(content.built::<script::RiftScripts>().clone());
+    world.insert_resource(content.built::<GameSettings>().clone());
+    world.insert_resource(ui::FontFiles(interface::font_files(&content)));
+    world.insert_resource(input::map::InputMap::new(&content));
+    world.insert_resource(content);
+    world.insert_resource(synced);
+    Ok(())
+}
+
+pub fn registry() -> ContentRegistry {
+    use crate::core::content::LoadStep;
+    let mut registry = ContentRegistry::default();
+    registry
+        .row::<crate::core::audio::playback::SfxDef>()
+        .row::<crate::core::audio::playback::SfxRoleDef>()
+        .row::<attention::AttentionDef>()
+        .row::<input::map::InputDef>()
+        .row::<interface::CursorDef>()
+        .row::<interface::FontDef>()
+        .row::<interface::InterfaceIconDef>()
+        .row::<item::ItemDef>()
+        .modules::<item::ItemDef>()
+        .row::<job::JobDef>()
+        .row::<memory::MemoryDef>()
+        .row::<notification::NotificationDef>()
+        .row::<npc::NpcDef>()
+        .modules::<npc::NpcDef>()
+        .row::<player::PlayerDef>()
+        .modules::<player::PlayerDef>()
+        .row::<player::snapshot::CharacterSnapshot>()
+        .row::<quest::QuestDef>()
+        .modules::<quest::QuestDef>()
+        .row::<script::ScriptDef>()
+        .row::<shop::ShopDef>()
+        .modules::<shop::ShopDef>()
+        .fixture::<input::map::InputAction>()
+        .fixture::<attention::AttentionMark>()
+        .fixture::<interface::InterfaceSound>()
+        .fixture::<interface::CursorShape>()
+        .fixture::<interface::InterfaceIcon>()
+        .fixture::<interface::FontFace>()
+        .settings::<GameSettings>()
+        .hook(LoadStep::Files, crate::core::content::media::check_media);
+    crate::core::babble::content(&mut registry);
+    actor::content(&mut registry);
+    area::content(&mut registry);
+    registry
+        .hook(LoadStep::Expand, script::build_all)
+        .hook(LoadStep::Across, shop::check_all)
+        .hook(LoadStep::Across, quest::check_all)
+        .hook(LoadStep::Across, notification::check_all)
+        .hook(LoadStep::Across, script::check_all)
+        .hook(LoadStep::Across, player::snapshot::check_all)
+        .hook(LoadStep::Settings, check_settings);
+    registry
+}
+
+impl Settings for GameSettings {
+    fn content_version(&self) -> &ContentVersion {
+        &self.content_version
+    }
+}
+
+fn check_settings(loading: &mut Loading) {
+    let content = loading.content();
+    let settings = content.built::<GameSettings>();
+    if let Err(problem) = area::check_place(&content, settings.initial_spawn) {
+        loading.json_error(
+            GAME_FILE,
+            "/initial_spawn",
+            ContentProblem::new(problem.rule, problem.found, problem.expected)
+                .near(problem.nearest),
+        );
+    }
+}
+
+pub(crate) fn drain_requests<M: Message>(world: &mut World) -> Vec<FromClient<M>> {
     world
         .resource_mut::<Messages<FromClient<M>>>()
         .drain()

@@ -5,6 +5,7 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use game::systems::account::Identity;
 use renet2::RenetServer;
+use serde::Deserialize;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
@@ -32,6 +33,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(15);
 /// accept loop and per-connection reader/writer tasks run on the shared tokio runtime and reach the
 /// single-threaded game loop only through these channels, so the loop never blocks on IO.
 pub struct WsTransport {
+    local_addr: SocketAddr,
     events: mpsc::UnboundedReceiver<Event>,
     senders: HashMap<u64, mpsc::UnboundedSender<Vec<u8>>>,
     identities: HashMap<u64, Identity>,
@@ -63,15 +65,20 @@ impl WsTransport {
         let listener = runtime
             .block_on(TcpListener::bind(addr))
             .unwrap_or_else(|error| panic!("cannot bind websocket {addr}: {error}"));
-        println!("websocket transport listening on {addr}");
+        let local_addr = listener.local_addr().expect("bound websocket address");
         let (events_tx, events) = mpsc::unbounded_channel();
         runtime.spawn(accept(listener, sessions, events_tx));
         WsTransport {
+            local_addr,
             events,
             senders: HashMap::new(),
             identities: HashMap::new(),
             max_clients,
         }
+    }
+
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
     }
 
     /// Applies every connect, packet, and disconnect that arrived since the last tick to the renet
@@ -104,8 +111,6 @@ impl WsTransport {
         }
     }
 
-    /// The identity the ticket authenticated, handed to the game loop when it processes the matching
-    /// renet `ClientConnected` event.
     pub fn take_identity(&mut self, client: u64) -> Option<Identity> {
         self.identities.remove(&client)
     }
@@ -117,7 +122,7 @@ impl WsTransport {
             };
             if let Ok(packets) = server.get_packets_to_send(client) {
                 for packet in packets {
-                    if out.send(packet).is_err() {
+                    if out.send(packet.clone()).is_err() {
                         break; // writer task gone; the reader will report the disconnect
                     }
                 }
@@ -219,10 +224,12 @@ async fn serve(stream: TcpStream, sessions: Sessions, events: mpsc::UnboundedSen
 }
 
 fn ticket(request: &Request) -> Option<u64> {
-    request
-        .uri()
-        .query()?
-        .split('&')
-        .find_map(|pair| pair.strip_prefix("ticket="))
-        .and_then(|value| value.parse().ok())
+    serde_urlencoded::from_str::<TicketQuery>(request.uri().query()?)
+        .ok()
+        .map(|query| query.ticket)
+}
+
+#[derive(Deserialize)]
+struct TicketQuery {
+    ticket: u64,
 }

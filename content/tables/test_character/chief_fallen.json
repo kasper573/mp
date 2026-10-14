@@ -1,0 +1,91 @@
+{
+  "name": "Chief Fallen",
+  "job": "adventurer",
+  "xp": 60,
+  "bag": [
+    {
+      "item": "orc_tusk",
+      "count": 7
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    },
+    {
+      "item": "rusty_sword"
+    }
+  ],
+  "quests": [
+    {
+      "quest": "tusks_for_the_chief",
+      "state": "active",
+      "progress": [
+        0,
+        1
+      ]
+    }
+  ],
+  "start": "initial_spawn"
+}

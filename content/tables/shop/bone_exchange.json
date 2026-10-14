@@ -1,0 +1,62 @@
+{
+  "title": "Bone Exchange",
+  "mark": "collector",
+  "modules": [
+    {
+      "type": "sells",
+      "item": "greater_health_potion",
+      "price": [
+        {
+          "item": "bone_token",
+          "count": 3
+        }
+      ],
+      "stock": {
+        "type": "unlimited"
+      }
+    },
+    {
+      "type": "sells",
+      "item": "tribal_helmet",
+      "price": [
+        {
+          "item": "bone_token",
+          "count": 12
+        },
+        {
+          "item": "gold",
+          "count": 20
+        }
+      ],
+      "stock": {
+        "type": "limited",
+        "count": 1,
+        "restock": 3600.0
+      }
+    },
+    {
+      "type": "buys",
+      "what": {
+        "type": "item",
+        "item": "bone"
+      },
+      "pays": [
+        {
+          "item": "bone_token"
+        }
+      ]
+    },
+    {
+      "type": "buys",
+      "what": {
+        "type": "item",
+        "item": "bat_wing"
+      },
+      "pays": [
+        {
+          "item": "bone_token"
+        }
+      ]
+    }
+  ]
+}

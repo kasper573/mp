@@ -16,3 +16,6 @@ jemalloc_pprof.workspace = true
 serde.workspace = true
 envy.workspace = true
 tokio.workspace = true
+
+[lints]
+workspace = true

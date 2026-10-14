@@ -1,0 +1,9 @@
+{
+  "file": "audio/items/pickup/coins.wav",
+  "role": "items",
+  "volume": 0.14,
+  "pitch": {
+    "min": 0.95,
+    "max": 1.05
+  }
+}

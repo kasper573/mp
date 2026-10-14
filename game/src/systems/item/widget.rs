@@ -1,20 +1,23 @@
-use crate::data::item::Id as ItemId;
-use crate::systems::item::{INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemStack, card};
-use crate::systems::player::session;
+use bevy::ecs::template::template;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
-use std::hash::{Hash, Hasher};
+use ui::RichPiece;
 use ui::tokens::palette;
 use ui::{Align, Carriable, Side, TooltipText, text_colored, tooltip, tooltip_content};
 
+use crate::core::content::Content;
 use crate::systems::hud::{
-    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, slot_node,
+    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
 };
 use crate::systems::input::map::{ActionInput, InputAction, InputMap, input};
-use ui::{RichPiece, component};
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::item::{
+    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack,
+    UseItemRequest, card,
+};
+use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
-pub(super) struct InventoryGrid;
+struct InventoryGrid;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SlotVerdict {
@@ -76,14 +79,11 @@ impl Window for InventoryWindow {
     fn toggle(&self) -> InputAction {
         InputAction::ToggleInventory
     }
-    fn icon(&self) -> &'static str {
-        "icons/equipment/bag.png"
-    }
-    fn order(&self) -> u32 {
-        0
+    fn icon(&self) -> InterfaceIcon {
+        InterfaceIcon::Bag
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content()))
+        single_tab(self.title(), ui::scrolled(content()))
     }
     fn sync(&self, world: &mut World) {
         sync_inventory(world)
@@ -101,11 +101,13 @@ fn content() -> Box<dyn Scene> {
     })
 }
 
+#[derive(Hash)]
 struct CellData {
     slot: u32,
     filled: Option<Filled>,
 }
 
+#[derive(Hash)]
 struct Filled {
     item: ItemId,
     hints: Vec<(InputAction, String)>,
@@ -115,17 +117,19 @@ struct Filled {
     verdict: Option<SlotVerdict>,
 }
 
-pub(super) fn sync_inventory(world: &mut World) {
+fn sync_inventory(world: &mut World) {
     let cells = inventory_cells(world);
     let mut grids = world.query_filtered::<Entity, With<InventoryGrid>>();
     let Some(grid) = grids.iter(world).next() else {
         return;
     };
-    let keys: Vec<u64> = cells.iter().map(cell_key).collect();
-    reconcile_children(world, grid, &keys, |_, index| slot(&cells[index]));
+    reconcile_children(world, grid, &cells, |world, index| {
+        slot(world.resource::<Content>(), &cells[index])
+    });
 }
 
 fn inventory_cells(world: &World) -> Vec<CellData> {
+    let content = world.resource::<Content>();
     let inventory = session::my_character(world).and_then(|me| me.get::<Inventory>());
     let max = inventory.map_or(INVENTORY_MAX, |inventory| inventory.max);
     let assets = world.resource::<AssetServer>();
@@ -145,11 +149,11 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
             filled: inventory
                 .and_then(|inventory| inventory.slots.get(slot as usize))
                 .map(|&stack| {
-                    let def = stack.item.get();
+                    let def = stack.item.get(content);
                     Filled {
                         item: stack.item,
                         hints: hints(map, &takeovers, def),
-                        icon: assets.load(def.icon.0),
+                        icon: assets.load(def.icon.path()),
                         count: stack.count,
                         notes: bound_note(def)
                             .into_iter()
@@ -167,44 +171,28 @@ fn bound_note(def: &ItemDef) -> Option<String> {
         .then(|| "bound · can't be sold or dropped".to_owned())
 }
 
-fn cell_key(cell: &CellData) -> u64 {
-    let mut hasher = std::hash::DefaultHasher::new();
-    cell.slot.hash(&mut hasher);
-    if let Some(filled) = &cell.filled {
-        (
-            filled.item,
-            &filled.hints,
-            filled.count,
-            &filled.notes,
-            &filled.verdict,
-        )
-            .hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
-fn slot(cell: &CellData) -> Box<dyn Scene> {
+fn slot(content: &Content, cell: &CellData) -> Box<dyn Scene> {
     match &cell.filled {
-        Some(filled) => Box::new(filled_slot(cell.slot, filled)),
+        Some(filled) => Box::new(filled_slot(content, cell.slot, filled)),
         None => Box::new(empty_slot()),
     }
 }
 
 fn empty_slot() -> impl Scene {
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(SLOT_BORDER))
+        BorderColor::all(SLOT_BORDER)
     }
 }
 
-fn filled_slot(slot: u32, filled: &Filled) -> impl Scene {
+fn filled_slot(content: &Content, slot: u32, filled: &Filled) -> impl Scene {
     let count = if filled.count > 1 {
         filled.count.to_string()
     } else {
         String::new()
     };
-    let def = filled.item.get();
+    let def = filled.item.get(content);
     let (border, tint, verdict) = match &filled.verdict {
         None => (SLOT_BORDER, Color::WHITE, None),
         Some(SlotVerdict::Wanted(note)) => (palette::AMBER_70, Color::WHITE, Some(note.clone())),
@@ -215,7 +203,7 @@ fn filled_slot(slot: u32, filled: &Filled) -> impl Scene {
         ),
     };
     let tip = TooltipText {
-        title: def.display_name.to_owned(),
+        title: def.name.to_owned(),
         lines: std::iter::once(card::overview(def))
             .chain(filled.notes.iter().cloned())
             .chain(verdict)
@@ -224,13 +212,18 @@ fn filled_slot(slot: u32, filled: &Filled) -> impl Scene {
         hint: Some(hint_pieces(&filled.hints)),
     };
     let item = filled.item;
+    let carriable = Carriable {
+        image: filled.icon.clone(),
+        payload: slot as u64,
+        input: InputAction::CarryItem.into(),
+    };
     bsn! {
-        template_value(slot_node())
+        slot_node()
         BackgroundColor({SLOT_BG})
-        component(BorderColor::all(border))
-        {tooltip(false)}
-        component(Carriable { image: filled.icon.clone(), payload: slot as u64, input: InputAction::CarryItem.into() })
-        on(move |click: On<Pointer<Click>>, input: ActionInput, actions: Option<Res<SlotActions>>, mut commands: Commands| {
+        BorderColor::all(border)
+        @{tooltip(false)}
+        template(move |_| Ok(carriable.clone()))
+        on(move |click: On<PointerClick>, input: ActionInput, actions: Option<Res<SlotActions>>, mut commands: Commands| {
             let candidates = actions
                 .iter()
                 .flat_map(|actions| actions.0.iter().map(|action| action.action))
@@ -241,24 +234,20 @@ fn filled_slot(slot: u32, filled: &Filled) -> impl Scene {
             }
         })
         Children [
-            (
-                Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-                component(ImageNode::new(filled.icon.clone()).with_color(tint))
-                Pickable { should_block_lower: false, is_hoverable: false }
-            ),
-            (
-                {tooltip_content(Side::Bottom, Align::Start, 0.0)}
-                Children [ {EntityScene(ui::tooltip_text(tip))} ]
-            ),
-            (
-                Node {
-                    position_type: PositionType::Absolute,
-                    right: Val::Px(2.0),
-                    bottom: Val::Px(0.0),
-                }
-                Pickable { should_block_lower: false, is_hoverable: false }
-                Children [ {EntityScene(text_colored(count, Color::WHITE))} ]
-            ),
+            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
+            ImageNode { image: {filled.icon.clone()}, color: tint }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            --
+            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
+            Children [ @{ui::tooltip_text(tip)} ]
+            --
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(2.0),
+                bottom: Val::Px(0.0),
+            }
+            Pickable { should_block_lower: false, is_hoverable: false }
+            Children [ @{text_colored(count, Color::WHITE)} ]
         ]
     }
 }
@@ -278,8 +267,12 @@ fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction]) {
         return;
     }
     match BUILT_IN.into_iter().find(|action| matched.contains(action)) {
-        Some(InputAction::DropItem) => session::drop_item(world, slot),
-        Some(InputAction::UseItem) => session::use_item(world, slot),
+        Some(InputAction::DropItem) => {
+            world.write_message(DropItemRequest { slot });
+        }
+        Some(InputAction::UseItem) => {
+            world.write_message(UseItemRequest { slot });
+        }
         Some(InputAction::InspectItem) => card::open(world, item),
         _ => {}
     }

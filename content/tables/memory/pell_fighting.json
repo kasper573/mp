@@ -1,0 +1,5 @@
+{
+  "label": "Fighting Pell",
+  "type": "boolean",
+  "resets": "leaving_area"
+}

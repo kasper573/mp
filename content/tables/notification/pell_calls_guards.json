@@ -1,0 +1,14 @@
+{
+  "kind": {
+    "type": "speech",
+    "speaker": "pell"
+  },
+  "text": [
+    {
+      "text": "GUARDS!",
+      "voice": "shout",
+      "motion": "shake"
+    },
+    " This one's a cheat!"
+  ]
+}

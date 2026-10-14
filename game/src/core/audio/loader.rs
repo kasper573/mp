@@ -1,4 +1,4 @@
-use std::io::{Cursor, ErrorKind};
+use std::io::Cursor;
 use std::time::Duration;
 
 use bevy::asset::io::Reader;
@@ -8,9 +8,10 @@ use bevy::reflect::TypePath;
 use bevy_kira_audio::AudioSource;
 use bevy_kira_audio::prelude::{Frame, StaticSoundData, StaticSoundSettings};
 use futures_timer::Delay;
-use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
+use symphonia::core::codecs::CodecParameters;
+use symphonia::core::codecs::audio::AudioDecoder;
 use symphonia::core::errors::Error;
-use symphonia::core::formats::{FormatReader, Packet};
+use symphonia::core::formats::{FormatReader, TrackType};
 use symphonia::core::io::MediaSourceStream;
 
 // Decoding a whole track at once holds the thread for hundreds of milliseconds, and on the web that
@@ -18,6 +19,112 @@ use symphonia::core::io::MediaSourceStream;
 // the thread back before every slice, the first included. Waiting on a timer rather than merely
 // yielding is what returns control to the browser's event loop.
 const SLICE: Duration = Duration::from_millis(4);
+
+pub struct DecodedAudio {
+    pub sample_rate: u32,
+    pub channels: usize,
+    pub samples: Vec<f32>,
+}
+
+impl DecodedAudio {
+    pub fn into_sound(self) -> Result<StaticSoundData, Error> {
+        let frames: Vec<Frame> = match self.channels {
+            1 => self
+                .samples
+                .iter()
+                .map(|&sample| Frame::from_mono(sample))
+                .collect(),
+            2 => self
+                .samples
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&[left, right]| Frame::new(left, right))
+                .collect(),
+            _ => return Err(Error::Unsupported("more than two channels")),
+        };
+        Ok(StaticSoundData {
+            sample_rate: self.sample_rate,
+            frames: frames.into(),
+            settings: StaticSoundSettings::default(),
+            slice: None,
+        })
+    }
+}
+
+pub struct Decoding {
+    format: Box<dyn FormatReader>,
+    decoder: Box<dyn AudioDecoder>,
+    track_id: u32,
+    decoded: DecodedAudio,
+}
+
+impl Decoding {
+    pub fn start(encoded: Vec<u8>) -> Result<Decoding, Error> {
+        let stream = MediaSourceStream::new(Box::new(Cursor::new(encoded)), Default::default());
+        let format = symphonia::default::get_probe().probe(
+            &Default::default(),
+            stream,
+            Default::default(),
+            Default::default(),
+        )?;
+        let track = format
+            .default_track(TrackType::Audio)
+            .ok_or(Error::Unsupported("no audio track"))?;
+        let track_id = track.id;
+        let Some(CodecParameters::Audio(params)) = track.codec_params.clone() else {
+            return Err(Error::Unsupported("unknown audio codec"));
+        };
+        let sample_rate = params
+            .sample_rate
+            .ok_or(Error::Unsupported("unknown sample rate"))?;
+        let channels = params
+            .channels
+            .as_ref()
+            .map_or(0, |channels| channels.count());
+        let codec = symphonia::default::get_codecs()
+            .get_audio_decoder(params.codec)
+            .ok_or(Error::Unsupported("no decoder for the audio codec"))?;
+        let decoder = (codec.factory)(&params, &Default::default())?;
+        let capacity = track.num_frames.unwrap_or_default() as usize * channels;
+        Ok(Decoding {
+            format,
+            decoder,
+            track_id,
+            decoded: DecodedAudio {
+                sample_rate,
+                channels,
+                samples: Vec::with_capacity(capacity),
+            },
+        })
+    }
+
+    pub fn step(&mut self) -> Result<bool, Error> {
+        let Some(packet) = self.format.next_packet()? else {
+            return Ok(false);
+        };
+        if packet.track_id == self.track_id {
+            let audio = self.decoder.decode(&packet)?;
+            self.decoded.channels = audio.spec().channels().count();
+            let start = self.decoded.samples.len();
+            self.decoded
+                .samples
+                .resize(start + audio.frames() * self.decoded.channels, 0.0);
+            audio.copy_to_slice_interleaved(&mut self.decoded.samples[start..]);
+        }
+        Ok(true)
+    }
+
+    pub fn finish(self) -> DecodedAudio {
+        self.decoded
+    }
+}
+
+pub fn decode(encoded: Vec<u8>) -> Result<DecodedAudio, Error> {
+    let mut decoding = Decoding::start(encoded)?;
+    while decoding.step()? {}
+    Ok(decoding.finish())
+}
 
 #[derive(TypePath)]
 pub struct AudioLoader;
@@ -35,79 +142,23 @@ impl AssetLoader for AudioLoader {
     ) -> Result<AudioSource, Error> {
         let mut encoded = Vec::new();
         reader.read_to_end(&mut encoded).await?;
-        let stream = MediaSourceStream::new(Box::new(Cursor::new(encoded)), Default::default());
-        let mut format = symphonia::default::get_probe()
-            .format(
-                &Default::default(),
-                stream,
-                &Default::default(),
-                &Default::default(),
-            )?
-            .format;
-        let track = format
-            .default_track()
-            .ok_or(Error::Unsupported("no default track"))?;
-        let track_id = track.id;
-        let params = &track.codec_params;
-        let sample_rate = params
-            .sample_rate
-            .ok_or(Error::Unsupported("unknown sample rate"))?;
-        let mut frames = Vec::with_capacity(params.n_frames.unwrap_or_default() as usize);
-        let mut decoder = symphonia::default::get_codecs().make(params, &Default::default())?;
+        let mut decoding = Decoding::start(encoded)?;
         let mut slice_end = Instant::now();
         loop {
             if Instant::now() >= slice_end {
                 Delay::new(Duration::ZERO).await;
                 slice_end = Instant::now() + SLICE;
             }
-            let Some(packet) = next_packet(format.as_mut())? else {
+            if !decoding.step()? {
                 break;
-            };
-            if packet.track_id() == track_id {
-                append_frames(&mut frames, decoder.decode(&packet)?)?;
             }
         }
         Ok(AudioSource {
-            sound: StaticSoundData {
-                sample_rate,
-                frames: frames.into(),
-                settings: StaticSoundSettings::default(),
-                slice: None,
-            },
+            sound: decoding.finish().into_sound()?,
         })
     }
 
     fn extensions(&self) -> &[&str] {
         &["flac", "wav"]
     }
-}
-
-fn next_packet(format: &mut dyn FormatReader) -> Result<Option<Packet>, Error> {
-    match format.next_packet() {
-        Ok(packet) => Ok(Some(packet)),
-        Err(Error::IoError(error)) if error.kind() == ErrorKind::UnexpectedEof => Ok(None),
-        Err(error) => Err(error),
-    }
-}
-
-fn append_frames(frames: &mut Vec<Frame>, decoded: AudioBufferRef) -> Result<(), Error> {
-    let spec = *decoded.spec();
-    let mut samples = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-    samples.copy_interleaved_ref(decoded);
-    match spec.channels.count() {
-        1 => frames.extend(
-            samples
-                .samples()
-                .iter()
-                .map(|&sample| Frame::from_mono(sample)),
-        ),
-        2 => frames.extend(
-            samples
-                .samples()
-                .chunks_exact(2)
-                .map(|pair| Frame::new(pair[0], pair[1])),
-        ),
-        _ => return Err(Error::Unsupported("more than two channels")),
-    }
-    Ok(())
 }

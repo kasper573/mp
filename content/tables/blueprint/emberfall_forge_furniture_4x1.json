@@ -1,0 +1,21 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "emberfall_forge_furniture",
+      "tiles": [
+        [
+          300,
+          301,
+          300,
+          301
+        ]
+      ],
+      "sort": 0.0
+    }
+  ]
+}

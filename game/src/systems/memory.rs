@@ -1,189 +1,209 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::core::content::{Content, ContentId, ContentRow};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, Value, ValueType};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::data::memory::Id;
-use crate::systems::player::conn_player;
-use crate::systems::rule::{Outcome, Requirement, RuleContext};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
 
+pub type MemoryId = ContentId<MemoryDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct MemoryDef {
-    pub label: &'static str,
-    pub kind: MemoryKind,
+    pub label: String,
+    #[serde(rename = "type")]
+    pub ty: ValueType,
     pub resets: Resets,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MemoryKind {
-    Flag,
-    Counter { step_every: Seconds },
-    Timer(Seconds),
+impl ContentRow for MemoryDef {
+    const TABLE: &'static str = "memory";
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum Resets {
     Never,
     Daily,
-    OnLeavingArea,
+    LeavingArea,
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct Memory(BTreeMap<Id, Recollection>);
+pub struct Memory(BTreeMap<MemoryId, Recollection>);
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct Recollection {
-    count: u32,
+    value: Value,
     at: UnixMillis,
     day: GameDay,
 }
 
+impl Recollection {
+    fn holds(&self, resets: Resets, clock: WallClock) -> bool {
+        resets != Resets::Daily || self.day == clock.day()
+    }
+}
+
 impl Memory {
-    pub fn recall(&self, key: Id, clock: WallClock) -> Option<u32> {
-        let recollection = self.0.get(&key)?;
-        let def = key.get();
-        let expired = match def.kind {
-            MemoryKind::Timer(lasts) => clock.now.since(recollection.at) >= lasts,
-            MemoryKind::Flag | MemoryKind::Counter { .. } => false,
-        };
-        let stale = def.resets == Resets::Daily && recollection.day != clock.day();
-        (!expired && !stale).then_some(recollection.count)
+    pub fn get(&self, content: &Content, key: MemoryId, clock: WallClock) -> Value {
+        let def = key.get(content);
+        match self.0.get(&key) {
+            Some(recollection) if recollection.holds(def.resets, clock) => {
+                recollection.value.clone()
+            }
+            _ => def.ty.zero(),
+        }
     }
 
-    pub fn remember(&mut self, key: Id, clock: WallClock) {
-        let previous = self.recall(key, clock);
-        let count = match (key.get().kind, previous) {
-            (MemoryKind::Counter { step_every }, Some(count)) => {
-                let last = self.0[&key].at;
-                if clock.now.since(last) < step_every {
-                    return;
-                }
-                count.saturating_add(1)
-            }
-            _ => 1,
-        };
+    pub fn is_set(&self, content: &Content, key: MemoryId, clock: WallClock) -> bool {
+        self.get(content, key, clock).truthy()
+    }
+
+    pub fn set(&mut self, content: &Content, key: MemoryId, value: Value, clock: WallClock) {
+        let ty = key.get(content).ty;
         self.0.insert(
             key,
             Recollection {
-                count,
+                value: value.widened(ty),
                 at: clock.now,
                 day: clock.day(),
             },
         );
     }
 
-    pub fn recalled_within(&self, key: Id, lasts: Seconds, clock: WallClock) -> bool {
-        self.recall(key, clock).is_some() && clock.now.since(self.0[&key].at) < lasts
+    pub fn set_within(
+        &self,
+        content: &Content,
+        key: MemoryId,
+        lasts: Seconds,
+        clock: WallClock,
+    ) -> bool {
+        let def = key.get(content);
+        self.0.get(&key).is_some_and(|recollection| {
+            recollection.holds(def.resets, clock) && clock.now.since(recollection.at) < lasts
+        })
     }
 
-    pub fn forget(&mut self, key: Id) {
+    pub fn forget(&mut self, key: MemoryId) {
         self.0.remove(&key);
     }
 
-    pub fn leave_area(&mut self) {
+    pub fn keys(&self) -> impl Iterator<Item = MemoryId> + '_ {
+        self.0.keys().copied()
+    }
+
+    pub fn leave_area(&mut self, content: &Content) {
         self.0
-            .retain(|key, _| key.get().resets != Resets::OnLeavingArea);
+            .retain(|key, _| key.get(content).resets != Resets::LeavingArea);
     }
 }
 
-pub fn recall(world: &World, player: Entity, key: Id) -> Option<u32> {
+pub fn get(world: &World, player: Entity, key: MemoryId) -> Value {
     let clock = *world.resource::<WallClock>();
-    world.get::<Memory>(player)?.recall(key, clock)
+    let content = world.resource::<Content>();
+    world.get::<Memory>(player).map_or_else(
+        || key.get(content).ty.zero(),
+        |memory| memory.get(content, key, clock),
+    )
 }
 
-pub struct Remembers(pub Id);
-
-impl Requirement for Remembers {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        recall(world, player, self.0).is_some()
-    }
-
-    fn describe(&self) -> String {
-        self.0.get().label.to_owned()
-    }
-}
-
-pub struct RemembersAtLeast(pub Id, pub u32);
-
-impl Requirement for RemembersAtLeast {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        recall(world, player, self.0).is_some_and(|count| count >= self.1)
-    }
-
-    fn describe(&self) -> String {
-        format!("{} {}+", self.0.get().label, self.1)
-    }
-}
-
-pub struct RememberedWithin(pub Id, pub Seconds);
-
-impl Requirement for RememberedWithin {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        let clock = *world.resource::<WallClock>();
-        world
-            .get::<Memory>(player)
-            .is_some_and(|memory| memory.recalled_within(self.0, self.1, clock))
-    }
-
-    fn describe(&self) -> String {
-        format!("{} recently", self.0.get().label)
-    }
-}
-
-pub struct Remember(pub Id);
-
-impl Outcome for Remember {
-    fn apply(&self, ctx: &mut RuleContext) {
-        let clock = *ctx.world.resource::<WallClock>();
-        if let Some(mut memory) = ctx.world.get_mut::<Memory>(ctx.player) {
-            memory.remember(self.0, clock);
-        }
-    }
-}
-
-pub struct Forget(pub Id);
-
-impl Outcome for Forget {
-    fn apply(&self, ctx: &mut RuleContext) {
-        if let Some(mut memory) = ctx.world.get_mut::<Memory>(ctx.player) {
-            memory.forget(self.0);
-        }
-    }
-}
-
-impl bevy_terminal::CommandArg for Id {
-    fn parse(name: &str, raw: Option<&str>) -> Result<Id, String> {
-        crate::core::table::parse_id(name, raw, "memory")
-    }
-}
-
-/// Make your character remember something.
-#[bevy_terminal::command(name = "remember", access = crate::systems::account::role::is_admin)]
-fn remember_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    key: Id,
-) -> Result<String, String> {
-    let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
+pub fn set_within(world: &World, player: Entity, key: MemoryId, lasts: Seconds) -> bool {
     let clock = *world.resource::<WallClock>();
-    let mut memory = world
-        .get_mut::<Memory>(player)
-        .ok_or_else(|| "your character has no memory".to_owned())?;
-    memory.remember(key, clock);
-    Ok(format!("{key:?} is now {:?}", memory.recall(key, clock)))
-}
-
-/// Make your character forget something.
-#[bevy_terminal::command(name = "forget", access = crate::systems::account::role::is_admin)]
-fn forget_command(
-    world: &mut World,
-    ctx: &bevy_terminal::CommandCtx,
-    key: Id,
-) -> Result<String, String> {
-    let player = conn_player(world, ctx.conn).ok_or_else(|| "you have no player".to_owned())?;
     world
-        .get_mut::<Memory>(player)
-        .ok_or_else(|| "your character has no memory".to_owned())?
-        .forget(key);
-    Ok(format!("{key:?} forgotten"))
+        .get::<Memory>(player)
+        .is_some_and(|memory| memory.set_within(world.resource::<Content>(), key, lasts, clock))
+}
+
+pub fn set(world: &mut World, player: Entity, key: MemoryId, value: Value) {
+    let clock = *world.resource::<WallClock>();
+    let content = *world.resource::<Content>();
+    if let Some(mut memory) = world.get_mut::<Memory>(player) {
+        memory.set(&content, key, value, clock);
+    }
+}
+
+pub fn forget(world: &mut World, player: Entity, key: MemoryId) {
+    if let Some(mut memory) = world.get_mut::<Memory>(player) {
+        memory.forget(key);
+    }
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct Remember {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Aim,
+    pub memory: MemoryId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Condition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Arrow,
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct Forget {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Aim,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memories: Vec<MemoryId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Arrow,
+}
+
+impl EffectDef<RiftScripting> for Remember {
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
+    }
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+        let who = effects::aim(cx, &self.who)?;
+        let ty = self.memory.get(cx.content).ty;
+        let to = cx.opt_expr(self.to.as_ref(), ty)?;
+        let memory = self.memory;
+        Ok(Box::new(move |world, _, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                let value = match &to {
+                    Some(to) => to(world, cx),
+                    None => Value::Bool(true).widened(ty),
+                };
+                set(world, player, memory, value);
+            }
+            EffectStep::Done
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::Remembers(self.memory)]
+    }
+}
+
+impl EffectDef<RiftScripting> for Forget {
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
+    }
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+        let who = effects::aim(cx, &self.who)?;
+        let memories = self.memories.as_slice();
+        Ok(Box::new(move |world, _, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                for &memory in memories {
+                    forget(world, player, memory);
+                }
+            }
+            EffectStep::Done
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        self.memories
+            .iter()
+            .map(|memory| Reach::Remembers(*memory))
+            .collect()
+    }
 }

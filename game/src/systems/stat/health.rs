@@ -11,9 +11,11 @@ pub fn max_health(world: &World, entity: Entity) -> f32 {
 }
 
 pub fn is_dead(world: &World, entity: Entity) -> bool {
-    world
-        .get::<Stats>(entity)
-        .is_some_and(|stats| stats.get(StatKind::Health) <= 0.0)
+    world.get::<Stats>(entity).is_some_and(dead)
+}
+
+pub fn dead(stats: &Stats) -> bool {
+    stats.get(StatKind::Health) <= 0.0
 }
 
 pub fn fraction(world: &World, entity: Entity) -> f32 {

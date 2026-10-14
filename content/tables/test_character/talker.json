@@ -1,0 +1,11 @@
+{
+  "name": "Talker",
+  "job": "adventurer",
+  "bag": [
+    {
+      "item": "gold",
+      "count": 12
+    }
+  ],
+  "start": "initial_spawn"
+}

@@ -1,0 +1,256 @@
+use std::time::Duration;
+
+use driver::{
+    Player, UiTarget, WaitBudget, content, erred, finished, holding, in_feed, marked, on_quest,
+    told_by,
+};
+use game::systems::attention::AttentionMark;
+use game::systems::input::map::InputAction;
+use game::systems::quest::QuestResult;
+
+use crate::chapters::Chapter;
+use crate::shoot::Shoot;
+
+pub const CHAPTER: Chapter = Chapter {
+    name: "quests",
+    title: "Quests",
+    summary: "Offers, a tracker and a log, deliveries, timers, and a reward that needs room",
+    play,
+};
+
+const LETTER: &str = "icons/misc/envolop.png";
+const SWORD: &str = "icons/weapon_and_tool/iron_sword.png";
+const BAIT: &str = "icons/monster_part/monster_meat.png";
+
+fn play(shoot: &mut Shoot) {
+    let player = shoot.join_as("chief_fallen", None);
+    let mut me = shoot.roll(player);
+    me.caption("A ! over a townsperson means they have work for you");
+    me.wait_until("! over Tobb", |snapshot| {
+        marked(snapshot, "tobb", AttentionMark::QuestOffered)
+    });
+    let heard_news = talk_past_news(&mut me);
+    me.caption_top("Quests join the conversation as topics");
+    me.hold();
+    me.pick("A Letter for the Captain");
+    me.on_stage("letter_offer");
+    me.caption_top(
+        "A panel above the conversation lays out objectives and rewards. Accept or decline below",
+    );
+    me.read_to_choices();
+    me.hold();
+    me.pick("I'll take it.");
+    me.wait_until("the letter quest", |snapshot| {
+        on_quest(snapshot, "letter_for_the_captain").is_some()
+    });
+    me.wait_until("the accepted quest in the feed", |snapshot| {
+        in_feed(snapshot, "Quest accepted · A Letter for the Captain")
+    });
+    me.caption_top(
+        "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
+    );
+    if !heard_news {
+        hear_out_tobb(&mut me, Duration::from_secs(12));
+    }
+
+    me.caption_top(
+        "Quest items are marked: they can't be sold or dropped, and abandoning takes them back",
+    );
+    me.act(InputAction::ToggleInventory);
+    me.hover_ui(UiTarget::image(LETTER));
+    me.hold();
+    me.act(InputAction::ToggleInventory);
+
+    me.caption("Some quests run against the clock");
+    talk_past_news(&mut me);
+    me.pick("Low Tide");
+    me.on_stage("low_tide_offer");
+    me.read_to_choices();
+    me.pick("I'll hurry.");
+    me.wait_until("Low Tide's clock", |snapshot| {
+        on_quest(snapshot, "low_tide").is_some_and(|quest| quest.left.is_some())
+    });
+    me.caption_top("The tracker counts it down");
+
+    me.caption_top("L opens the quest log, grouped by category");
+    me.act(InputAction::ToggleQuestLog);
+    me.find_ui("Active quests");
+    me.click_ui(log_row("Low Tide"));
+    me.caption_top("Right-click a reward for its item card");
+    me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
+    me.wait_until("the bait's card", |snapshot| {
+        snapshot
+            .item_card
+            .is_some_and(|card| card.item.key(content()) == "fishing_bait")
+    });
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.wait_until("the item card to close", |snapshot| {
+        snapshot.item_card.is_none()
+    });
+    me.caption_top("A quest can keep its rewards to itself: the letter's entry has none to show");
+    me.click_ui(log_row("A Letter for the Captain"));
+    me.hold();
+    me.click_ui(log_row("Low Tide"));
+    me.caption_top("Abandoning always asks, and Keep quest is the default — Enter keeps it");
+    me.click_ui("Abandon");
+    me.find_ui("Abandon Low Tide?");
+    me.hold();
+    me.act(InputAction::TakeDefault);
+    me.wait_until("Enter to keep the quest", |snapshot| {
+        UiTarget::text("Abandon Low Tide?").find(snapshot).is_none()
+    });
+    me.click_ui("Abandon");
+    me.click_ui("Abandon quest");
+    me.wait_until("Low Tide to be abandoned", |snapshot| {
+        on_quest(snapshot, "low_tide").is_none()
+    });
+    me.act(InputAction::Dismiss);
+
+    me.caption_top("Bram's next errand stays out of sight until you're ready for it");
+    me.hold();
+    me.talk_to("bram");
+    me.read_to_choices();
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.conversation_over();
+
+    me.caption("The letter is for Bram: a ? marks where a quest is handed in");
+    me.wait_until("? over Bram", |snapshot| {
+        marked(snapshot, "bram", AttentionMark::QuestReady)
+    });
+    me.talk_to("bram");
+    me.read_to_choices();
+    me.pick("A Letter for the Captain");
+    me.caption_top("Nobody named Bram's pay, so the choice keeps it to itself");
+    me.hold();
+    me.pick("Tobb asked me to bring you this.");
+    me.on_stage("letter_thanks");
+    me.wait_until("the letter delivered", |snapshot| {
+        finished(snapshot, "letter_for_the_captain") == Some(QuestResult::Completed)
+    });
+    me.wait_until("the pay in the feed", |snapshot| {
+        in_feed(snapshot, "+10 Gold")
+    });
+    me.caption_top(
+        "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
+    );
+    me.wait_until("the finished quest", |snapshot| {
+        told_by(snapshot, "Quest complete")
+    });
+    me.caption_top("The XP brought a new level, which joins it right below");
+    me.wait_until("the level up", |snapshot| told_by(snapshot, "Level up"));
+    me.hold();
+    me.pick("Never mind.");
+    me.conversation_over();
+    me.caption_top("Now at level 3, he has work for you");
+    me.wait_until("! over Bram", |snapshot| {
+        marked(snapshot, "bram", AttentionMark::QuestOffered)
+    });
+    me.talk_to("bram");
+    me.read_to_choices();
+    me.hover_choice("Bats in the Belfry");
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.conversation_over();
+
+    me.caption("Mara pays for orc tusks — and their chief. You came prepared: the chief is down, the tusks in the bag");
+    me.wait_until("the tusk quest ready", |snapshot| {
+        on_quest(snapshot, "tusks_for_the_chief").is_some_and(|quest| quest.ready)
+    });
+    me.wait_until("? over Mara", |snapshot| {
+        marked(snapshot, "mara", AttentionMark::QuestReady)
+    });
+    me.talk_to("mara");
+    me.read_to_choices();
+    me.pick("Tusks for the Chief");
+    me.caption_top("Rewards can include a pick, chosen when you hand in");
+    me.caption_top(
+        "With a full bag the pick is refused with an error — space is counted after the tusks are handed in",
+    );
+    me.pick("I'll take the Bone Shield.");
+    me.wait_until("the full bag to refuse the pick", |snapshot| {
+        erred(snapshot, "free slot")
+    });
+    me.hold();
+    me.pick("Not yet.");
+    me.conversation_over();
+
+    me.caption_top("Make some room: Ctrl-click drops");
+    me.act(InputAction::ToggleInventory);
+    for _ in 0..2 {
+        let before = holding(&me.snapshot(), "rusty_sword");
+        me.act_on_ui(InputAction::DropItem, UiTarget::image(SWORD));
+        me.wait_until("a sword to drop", |snapshot| {
+            holding(snapshot, "rusty_sword") < before
+        });
+    }
+    me.act(InputAction::ToggleInventory);
+
+    me.talk_to("mara");
+    me.read_to_choices();
+    me.pick("Tusks for the Chief");
+    me.caption_top("Now there's room for the pick");
+    me.pick("I'll take the Bone Shield.");
+    me.on_stage("tusks_thanks");
+    me.wait_until("the tusks handed in", |snapshot| {
+        finished(snapshot, "tusks_for_the_chief") == Some(QuestResult::Completed)
+    });
+
+    me.caption_top("Finished quests move to Completed in the log");
+    me.act(InputAction::ToggleQuestLog);
+    me.click_ui("Completed");
+    me.hold();
+    me.act(InputAction::Dismiss);
+}
+
+// The same title shows on the tracker and in the log's details; a row sits in the list, under its
+// header.
+fn log_row(title: &str) -> UiTarget {
+    UiTarget::text(title).and("in the quest log", |element, snapshot| {
+        UiTarget::text("Active quests")
+            .find(snapshot)
+            .is_some_and(|header| {
+                element.rect.min_y() > header.rect.min_y()
+                    && (element.rect.min_x() - header.rect.min_x()).abs() < 64.0
+            })
+    })
+}
+
+// Once a day Tobb calls over whoever comes near him after a first visit, holding his news while they
+// talk: it shows when he strolls back, or opens the next talk with him instead.
+fn hear_out_tobb(me: &mut Player, within: Duration) {
+    let budget = WaitBudget {
+        time: within,
+        frames: (within.as_secs_f32() * 60.0) as u32,
+    };
+    let news = me.try_wait_for(budget, |snapshot| {
+        snapshot
+            .stage
+            .as_ref()
+            .is_some_and(|stage| stage.node == "news")
+            .then_some(())
+    });
+    if news.is_some() {
+        answer_news(me);
+    }
+}
+
+// Says whether his news came up on the way to his topics.
+fn talk_past_news(me: &mut Player) -> bool {
+    let mut heard = false;
+    loop {
+        me.talk_to("tobb");
+        if me.read_to_choices().node != "news" {
+            return heard;
+        }
+        answer_news(me);
+        heard = true;
+    }
+}
+
+fn answer_news(me: &mut Player) {
+    me.read_to_choices();
+    me.act(InputAction::Choice1);
+    me.conversation_over();
+}

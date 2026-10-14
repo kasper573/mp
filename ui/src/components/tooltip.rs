@@ -3,12 +3,11 @@ use std::time::Duration;
 use bevy_color::Alpha;
 use bevy_ecs::hierarchy::Children;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{
     BorderRadius, FlexDirection, GlobalZIndex, Node, OverrideClip, PositionType, UiRect, Val,
 };
 
-use crate::component;
 use crate::components::rich_text::{RichPiece, RichText, rich_text};
 use crate::components::text::styled_text;
 use crate::overlay::{Open, OverlayContent, POPPER_ENTER, POPPER_EXIT, TooltipTimer};
@@ -34,7 +33,7 @@ pub struct TooltipText {
 pub fn tooltip(open: bool) -> impl Scene {
     bsn! {
         Open({open})
-        component(TooltipTimer::new(DELAY, SKIP_DELAY))
+        TooltipTimer::new(DELAY, SKIP_DELAY)
     }
 }
 
@@ -44,7 +43,7 @@ pub fn tooltip_content(side: Side, align: Align, offset: f32) -> impl Scene {
         GlobalZIndex({layer::ANCHORED})
         OverrideClip
         Placement { side: {side}, align: {align}, offset: {offset} }
-        {OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
+        @{OverlayContent::animated(POPPER_ENTER, POPPER_EXIT)}
         Pickable::IGNORE
     }
 }
@@ -79,9 +78,9 @@ pub fn tooltip_text(text: TooltipText) -> impl Scene {
         .chain(hint.map(|hint| caption(hint, 0.55)))
         .collect();
     bsn! {
-        template_value(style)
-        template_value(elevation(1))
+        style
+        elevation(1)
         Pickable::IGNORE
-        Children [ {EntityScene(styled_text(title, family.on, typography::LABEL))}, {lines} ]
+        Children [ @{styled_text(title, family.on, typography::LABEL)} -- {lines} ]
     }
 }

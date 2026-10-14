@@ -1,9 +1,11 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::math::{Offset, Pos, Rect, Size, WorldPx};
 use crate::core::time::Seconds;
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -16,6 +18,7 @@ use crate::core::time::Seconds;
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "tiles"))]
 pub struct Tiles(pub f32);
 
 pub type CellPos = euclid::default::Point2D<i32>;
@@ -33,7 +36,9 @@ pub const NEIGHBORS_8: [(i32, i32); 8] = [
     (-1, -1),
 ];
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd,
+)]
 pub struct TilesPerSec(pub Tiles);
 
 impl Tiles {
@@ -189,9 +194,5 @@ impl PixelsPerTile {
             self.point(r.origin),
             Size::new(r.size.width * self.x.get(), r.size.height * self.y.get()),
         )
-    }
-
-    pub fn tile_center(self, p: Pos<WorldPx>) -> Pos<Tiles> {
-        self.point(p).snap()
     }
 }

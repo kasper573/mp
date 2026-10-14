@@ -1,0 +1,9 @@
+{
+  "file": "audio/items/trade/blade.wav",
+  "role": "items",
+  "volume": 0.18,
+  "pitch": {
+    "min": 0.95,
+    "max": 1.05
+  }
+}

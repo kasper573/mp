@@ -22,6 +22,7 @@
 - Newtype every float/int that carries a precise unit or id (`Seconds`, `Millis`, `NpcId`) — never
   semantic type aliases. The reader must not have to guess a unit, and the type replaces a comment.
   Plain primitives are fine only for obvious-to-everyone concepts (e.g. `health: f32`).
+- Game mechanics on the server draw randomness only from their world's `Rng` resource, seeded by the server's `rng_seed` (drawn and logged when unset), so a seeded world plays out alike from run to run. All other randomness stays unseeded: secrets such as sign-in tickets come from the OS, and clients draw as they please. Benchmarks and showcases set a seed; tests run on a random one, and must hold on any.
 - Don't use #[must_use]. Only when clippy recommends it or when it's absolutely critical.
 - Use serde and envy for all json/env serialization and deserialization. No custom parsing code. And use the derive macros, not the imperative APIs.
 - Aim for single source of truth (however do not conflate this with DRY. Code duplication is allowed and is not the same thing as SSoT).
@@ -31,7 +32,7 @@
 
 ## Architecture
 
-1. The game crates `src/` is organized into `core/`, `systems/`, `data/`:
+1. The game crate's `src/` is organized into `core/` and `systems/`; its content is not code, but a game folder read at runtime:
 
 `core/`:
 - code that may be reused by all systems
@@ -44,16 +45,13 @@
 - the majority of our game mechanics goes here
 - may depend on other high level systems
 
-`src/data/`: is the content layer: one normalized table per file, each built with the `table!` macro the single source of truth for a table's `Id`, its `TABLE`, and `Id::get()`. Tables stay separate and reference each other only loosely by `data::*::Id`, never by embedding another table's rows (a row may still nest its own data). Table row structs live in core/* or systems/*, while `data/` only declares the rows. The idea is that the content layer can be swapped for a runtime loaded format in the future without too much hassle.
+The content layer is a game folder (`content/` is the example game): `game.json` for the game's settings, one row per file under `tables/<table>/<key>.json` (a row's grids beside it), and `assets/`. A row type implements `ContentRow` (its `TABLE`, and `check` for the rules a schema can't state) and is registered in `systems::registry()`. Loading resolves every key to a `ContentId`, newtyped per table (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Tables stay separate and reference each other only loosely by id, never by embedding another table's rows (a row may still nest its own data). Row types live in core/* or systems/*.
 
-Should contain no business logic, only data.
-
-Code outside `data/` must not depend on arbitrary game content, so the same server and client can run any game's data. `table!` enforces this:
-- A table's `Id` type, `TABLE`, `Id::VARIANTS` and `Id::get()` are usable everywhere, but its rows are hidden: only `data/` can name them (`data::npc::Id::Mara`).
-- Mark a row `#[expose]` when it stands for a generic system or mechanic (an input action, an interface sound, a quest marker), or put `#![expose]` at the top of a table whose rows all do. Never expose a piece of content (a character, an item, a quest). Exposed rows are the game's core data requirements: every game's data must provide them.
-- When code needs content for a role, `data/` exports a designation instead (`data::area::SPAWN_ID`).
-- Integration tests look hidden rows up by name.
-- Generic assets of systems (cursors, window icons) may be referenced directly; another game reskins them by swapping asset files.
+Code must not depend on arbitrary game content, so the same server and client can run any game's data:
+- Code never names a row. A row that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are keys every game's data must provide, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
+- When code needs content for a role, the content says which row plays it: the game's settings (`GameSettings::initial_spawn`), or a role a row picks from a list (an sfx's `role`).
+- Only rows name assets; another game reskins with its own rows and files.
+- Integration tests look rows up by key.
 
 2. The ui and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
 
@@ -72,15 +70,20 @@ Code outside `data/` must not depend on arbitrary game content, so the same serv
 - Audio is balanced for the default settings, where every volume slider sits at 50% and plays content exactly at its authored level. At those defaults every area must sound just right: music, ambience, effects and voice each fit into the mix without muddling over each other. Voice is the anchor (babble at about -23 LUFS over its loudest 100 ms). Music sits under it (about -30 LUFS integrated), ambience under the music (about -33 to -37 LUFS), and effects by importance: combat and key moments level with the voice, items and interface below it, footsteps lowest. No sound may peak above -12 dBFS at the defaults, so players can turn any slider up to 100% (+6 dB) or down without the mix clipping.
 
 
-## Demo videos
+## Showcase videos
 
-Everything you build gets shown to the user on video, from a player's point of view, against the real stack.
+Everything you build gets shown to the user on video, from a player's point of view, against the real game server.
 
-- The showcase is `e2e/demos/`: one chapter per file, played in file-name order. A chapter is a Playwright test built with `chapter()` and narrated with `caption()` (`e2e/helpers/demo.ts`). It plays the game with real mouse and keyboard input, finding what to click through the client's probe of the world and UI (`e2e/helpers/game.ts`: `travelTo`, `walkTo`, `pickUp`, `clickUi`, …). Never hardcode screen positions — monsters wander and windows move. When a chapter needs to see something the probe doesn't report, extend the probe (`game/src/bin/client/probe.rs`).
-- After every change, show it in the chapter it belongs to: extend that chapter, or add a numbered file where it fits the story. Record with `just demo <chapter>`, check the result with `just contact-sheet target/demo/<chapter>.webm`, and share the video path(s) with the user when you report back. This is not optional. When a change has nothing new to show (a refactor, a fix with no visible effect), record the chapters covering what it touched to show they still work.
+- The showcase is the `showcase` crate: one chapter per file in `showcase/src/chapters/`, played in the order of `CHAPTERS` (`showcase/src/chapters/mod.rs`) and narrated with `caption()` (`showcase/src/shoot.rs`). A chapter plays through the `driver` crate, as the gameplay tests do: real mouse and keyboard input through the game's own bindings, finding what to click through the client's probe of the world and UI (`walk_to`, `travel_to`, `talk_to`, `fight`, `click_ui`, …). Never hardcode screen positions — monsters wander and windows move. Never roam or search either: a chapter heads straight for where what it needs is (`resident_home`, `hunting_ground`, markers) and asserts it's there. When a chapter needs to see something the probe doesn't report, extend the probe (`game/src/systems/probe.rs`).
+- After every change, show it in the chapter it belongs to: extend that chapter, or add one where it fits the story. Record with `just showcase <chapter>…`, check the result with `just contact-sheet target/showcase/<NN-chapter>.mp4`, and share the video path(s) with the user when you report back. This is not optional. When a change has nothing new to show (a refactor, a fix with no visible effect), record the chapters covering what it touched to show they still work.
 - Chapters show the game's mechanics, never its content. New or changed content (maps, areas, actors, busts, items, dialogue) is reviewed in one-off recordings shared with the user, which are never committed as chapters. Content that brings no new mechanic adds nothing to the showcase.
-- A change to the `ui` crate on its own is shown in its component gallery: `just gallery-demo "<scene>" [seconds] [xdotool input]` records `target/demo/gallery-<scene>.webm`.
-- The full showcase, `just showcase` → `target/demo/showcase.webm`, is only recorded when the user explicitly asks for it. It is every chapter stitched in order, so keeping the chapters current is what keeps it complete: never demo a feature outside a chapter.
+- A change to the `ui` crate on its own is shown in its component gallery: `just gallery-showcase "<scene>" [seconds] [xdotool input]` records `target/showcase/gallery-<scene>.webm`.
+- The full showcase, `just showcase` with no chapter named → `target/showcase/showcase.mp4`, is only recorded when the user explicitly asks for it. It is every chapter stitched in order, so keeping the chapters current is what keeps it complete: never show a feature outside a chapter.
+
+## Tests
+
+- Gameplay is tested in `game/tests/gameplay/`, played through the `driver` crate like the showcase: desktop clients against a native game server, with real input on virtual displays, recorded.
+- The Playwright suite (`e2e/`) tests the whole stack from a browser: the website, and whatever else a browser is served. Gameplay gets exactly one smoke test there, that a signed-up player appears in the game; every other gameplay test belongs in `game/tests/gameplay/`.
 
 ## Verification
 
@@ -88,5 +91,5 @@ Before you start work on a task run benchmarks via `just bench` and save the res
 
 After you finish the task:
 
-- `cargo fmt` · `cargo clippy --all-targets` (no warnings) · `cargo build` · `just e2e`
+- `cargo fmt` · `cargo clippy --all-targets` (no warnings) · `cargo build` · `just test` · `just e2e`
 - Run benchmarks again and compare the results to the previous run. If there is a significant regression, investigate and fix it.

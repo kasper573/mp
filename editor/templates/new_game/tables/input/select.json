@@ -1,0 +1,10 @@
+{
+  "label": "Select a row or tick a box",
+  "bindings": [
+    {
+      "type": "click",
+      "button": "Left",
+      "times": 1
+    }
+  ]
+}

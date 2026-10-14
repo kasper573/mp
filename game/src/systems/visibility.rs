@@ -2,23 +2,24 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
 use bevy_replicon::prelude::{
-    AppVisibilityExt, Replicated, SendTargets, ToClients, VisibilityFilter,
+    AppVisibilityExt, Replicated, ScopeLifetime, SendTargets, ToClients, VisibilityFilter,
 };
 use bevy_replicon::server::visibility::client_visibility::ClientVisibility;
 use bevy_replicon::server::visibility::filters_mask::FilterBit;
 use bevy_replicon::server::visibility::registry::FilterRegistry;
 use bevy_replicon::shared::replication::registry::ReplicationRegistry;
+use fixedbitset::FixedBitSet;
 
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::attention::Attention;
 use crate::systems::dialogue::Conversation;
 use crate::systems::item::Inventory;
 use crate::systems::movement::{Position, position};
-use crate::systems::player::{ClientId, CommandLock, Owner, Players};
+use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players};
 use crate::systems::quest::QuestLog;
-use crate::systems::rule::{self, Requirement};
+use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
 use crate::systems::spectate::Spectators;
 
@@ -29,17 +30,18 @@ const VIEW_DISTANCE_SQ: f32 = VIEW_DISTANCE.0 * VIEW_DISTANCE.0;
 
 pub fn register(app: &mut App) {
     app.add_visibility_filter::<OwnedBy>();
-    app.init_resource::<RangeBit>();
-    app.init_resource::<PresenceBit>();
+    app.init_resource::<ScopeBits>();
     app.init_resource::<Sights>();
+    app.init_resource::<Slots>();
     app.add_observer(grant_own_sight);
+    app.add_observer(release_slot);
     app.add_observer(reveal_to_all);
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone)]
 pub enum Presence {
     For(ClientId),
-    When(&'static [&'static dyn Requirement]),
+    When(CompiledCondition),
 }
 
 pub fn present(world: &World, subject: Entity, viewer: Entity) -> bool {
@@ -48,7 +50,7 @@ pub fn present(world: &World, subject: Entity, viewer: Entity) -> bool {
         Some(Presence::For(client)) => world
             .get::<Owner>(viewer)
             .is_some_and(|owner| owner.client == *client),
-        Some(Presence::When(requires)) => rule::met(world, viewer, requires),
+        Some(Presence::When(shown)) => shown.holds(world, viewer),
     }
 }
 
@@ -64,12 +66,24 @@ pub struct PrivateSight {
 }
 
 type Clients = QueryState<(Entity, &'static ClientId)>;
-type Subjects = QueryState<(Entity, &'static Position, Option<&'static AreaTag>), With<Replicated>>;
-type Presences = QueryState<Entity, With<Presence>>;
+type Views = QueryState<(&'static mut ClientVisibility, &'static mut HiddenSlots)>;
+type Subjects = QueryState<
+    (
+        Entity,
+        &'static Position,
+        Option<&'static AreaTag>,
+        Option<&'static SubjectSlot>,
+    ),
+    With<Replicated>,
+>;
+type Presences = QueryState<Entity, (With<Presence>, With<Replicated>)>;
 
+/// Replicon is told only about range transitions: a client remembers which subjects it hides in a
+/// bitset over the subjects' slots, so the steady state costs no hashing per subject and client.
 pub fn update(
     world: &mut World,
     clients_query: &mut Clients,
+    views: &mut Views,
     subjects_query: &mut Subjects,
     presences: &mut Presences,
 ) {
@@ -80,17 +94,31 @@ pub fn update(
     if clients.is_empty() {
         return;
     }
-    let bit = world.resource::<RangeBit>().0;
-    let presence_bit = world.resource::<PresenceBit>().0;
+    let bits = *world.resource::<ScopeBits>();
     let conditional: Vec<Entity> = presences.iter(world).collect();
-    let subjects: Vec<Subject> = subjects_query
+    let found: Vec<(Subject, Option<SubjectSlot>)> = subjects_query
         .iter(world)
-        .map(|(entity, position, tag)| Subject {
-            entity,
-            pos: position.pos,
-            area: tag.map(|tag| tag.area),
+        .map(|(entity, position, tag, slot)| {
+            let subject = Subject {
+                entity,
+                pos: position.pos,
+                area: tag.map(|tag| tag.area),
+            };
+            (subject, slot.copied())
         })
         .collect();
+    let subjects: Vec<(Subject, usize)> = found
+        .into_iter()
+        .map(|(subject, slot)| {
+            let slot = slot.unwrap_or_else(|| {
+                let slot = SubjectSlot(world.resource_mut::<Slots>().allocate());
+                world.entity_mut(subject.entity).insert(slot);
+                slot
+            });
+            (subject, slot.0)
+        })
+        .collect();
+    let slots = world.resource::<Slots>().len();
     for (client, id) in clients {
         let sight = sight(world, id);
         let present: Vec<(Entity, bool)> = conditional
@@ -102,14 +130,21 @@ pub fn update(
                 (subject, shown)
             })
             .collect();
-        let Some(mut visibility) = world.get_mut::<ClientVisibility>(client) else {
+        let Ok((mut visibility, mut hidden)) = views.get_mut(world, client) else {
             continue;
         };
-        for subject in &subjects {
-            visibility.set(subject.entity, bit, sees(sight.as_ref(), subject));
+        let visibility = visibility.as_mut();
+        let hidden = hidden.as_mut();
+        hidden.0.grow(slots);
+        for (subject, slot) in &subjects {
+            let hide = !sight.as_ref().is_some_and(|sight| sight.sees(subject));
+            if hidden.0.contains(*slot) != hide {
+                hidden.0.set(*slot, hide);
+                visibility.set(subject.entity, bits.range, !hide);
+            }
         }
         for (subject, shown) in present {
-            visibility.set(subject, presence_bit, shown);
+            visibility.set(subject, bits.presence, shown);
         }
     }
 }
@@ -131,9 +166,8 @@ pub fn seen_by(world: &mut World, entity: Entity) -> Vec<Entity> {
     clients
         .into_iter()
         .filter(|&(_, id)| {
-            sight(world, id).is_some_and(|sight| {
-                sees(Some(&sight), &subject) && present(world, entity, sight.focus)
-            })
+            sight(world, id)
+                .is_some_and(|sight| sight.sees(&subject) && present(world, entity, sight.focus))
         })
         .map(|(client, _)| client)
         .collect()
@@ -155,11 +189,15 @@ pub fn private_viewers(world: &mut World, player: Entity) -> Vec<Entity> {
 
 pub fn send_private<M: Message + Clone>(world: &mut World, player: Entity, message: M) {
     for conn in private_viewers(world, player) {
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
-            message: message.clone(),
-        });
+        send_to(world, conn, message.clone());
     }
+}
+
+pub fn send_to<M: Message>(world: &mut World, conn: Entity, message: M) {
+    world.write_message(ToClients {
+        targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
+        message,
+    });
 }
 
 impl PrivateSight {
@@ -182,6 +220,7 @@ impl VisibilityFilter for OwnedBy {
         Inventory,
         Conversation,
         CommandLock,
+        ArrivalHold,
         Attention,
         ShopView,
         QuestLog,
@@ -192,22 +231,68 @@ impl VisibilityFilter for OwnedBy {
     }
 }
 
-fn grant_own_sight(add: On<Add, ClientId>, clients: Query<&ClientId>, mut commands: Commands) {
+fn grant_own_sight(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Commands) {
     if let Ok(&own) = clients.get(add.entity) {
-        commands.entity(add.entity).insert(PrivateSight {
-            own,
-            watching: None,
-        });
+        commands.entity(add.entity).insert((
+            PrivateSight {
+                own,
+                watching: None,
+            },
+            HiddenSlots::default(),
+        ));
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+#[component(immutable)]
+pub struct SubjectSlot(usize);
+
+#[derive(Component, Default)]
+pub struct HiddenSlots(FixedBitSet);
+
+#[derive(Resource, Default)]
+struct Slots {
+    free: Vec<usize>,
+    len: usize,
+}
+
+impl Slots {
+    fn allocate(&mut self) -> usize {
+        self.free.pop().unwrap_or_else(|| {
+            self.len += 1;
+            self.len - 1
+        })
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+fn release_slot(
+    remove: On<Remove<SubjectSlot>>,
+    subjects: Query<&SubjectSlot>,
+    mut slots: ResMut<Slots>,
+    mut clients: Query<&mut HiddenSlots>,
+) {
+    let Ok(&SubjectSlot(slot)) = subjects.get(remove.entity) else {
+        return;
+    };
+    slots.free.push(slot);
+    for mut hidden in &mut clients {
+        if slot < hidden.0.len() {
+            hidden.0.set(slot, false);
+        }
     }
 }
 
 fn reveal_to_all(
-    remove: On<Remove, Presence>,
-    bit: Res<PresenceBit>,
+    remove: On<Remove<Presence>>,
+    bits: Res<ScopeBits>,
     mut clients: Query<&mut ClientVisibility>,
 ) {
     for mut visibility in &mut clients {
-        visibility.set(remove.entity, bit.0, true);
+        visibility.set(remove.entity, bits.presence, true);
     }
 }
 
@@ -221,27 +306,24 @@ impl FromWorld for Sights {
 }
 
 #[derive(Resource, Clone, Copy)]
-struct RangeBit(FilterBit);
-
-impl FromWorld for RangeBit {
-    fn from_world(world: &mut World) -> Self {
-        RangeBit(entity_scope_bit(world))
-    }
+struct ScopeBits {
+    range: FilterBit,
+    presence: FilterBit,
 }
 
-#[derive(Resource, Clone, Copy)]
-struct PresenceBit(FilterBit);
-
-impl FromWorld for PresenceBit {
+impl FromWorld for ScopeBits {
     fn from_world(world: &mut World) -> Self {
-        PresenceBit(entity_scope_bit(world))
+        ScopeBits {
+            range: entity_scope_bit(world),
+            presence: entity_scope_bit(world),
+        }
     }
 }
 
 fn entity_scope_bit(world: &mut World) -> FilterBit {
     world.resource_scope(|world, mut filters: Mut<FilterRegistry>| {
         world.resource_scope(|world, mut registry: Mut<ReplicationRegistry>| {
-            filters.register_scope::<Entity>(world, &mut registry)
+            filters.register_scope::<Entity>(world, &mut registry, ScopeLifetime::WhileVisible)
         })
     })
 }
@@ -249,13 +331,13 @@ fn entity_scope_bit(world: &mut World) -> FilterBit {
 struct Subject {
     entity: Entity,
     pos: Pos<Tiles>,
-    area: Option<area::Id>,
+    area: Option<AreaId>,
 }
 
 struct Sight {
     focus: Entity,
     pos: Option<Pos<Tiles>>,
-    area: Option<area::Id>,
+    area: Option<AreaId>,
 }
 
 fn sight(world: &World, client: ClientId) -> Option<Sight> {
@@ -271,15 +353,14 @@ fn sight(world: &World, client: ClientId) -> Option<Sight> {
     })
 }
 
-fn sees(sight: Option<&Sight>, subject: &Subject) -> bool {
-    let Some(sight) = sight else {
-        return false;
-    };
-    if subject.entity == sight.focus {
-        return true;
+impl Sight {
+    fn sees(&self, subject: &Subject) -> bool {
+        if subject.entity == self.focus {
+            return true;
+        }
+        let (Some(pos), Some(area)) = (self.pos, self.area) else {
+            return false;
+        };
+        subject.area == Some(area) && (pos - subject.pos).square_length() <= VIEW_DISTANCE_SQ
     }
-    let (Some(pos), Some(area)) = (sight.pos, sight.area) else {
-        return false;
-    };
-    subject.area == Some(area) && (pos - subject.pos).square_length() <= VIEW_DISTANCE_SQ
 }

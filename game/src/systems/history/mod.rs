@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -26,7 +27,8 @@ pub struct HistoryRecord {
     pub entry: HistoryEntry,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct HistoryEntry {
     pub topic: HistoryTopic,
     pub by: Option<String>,
@@ -37,7 +39,7 @@ pub struct HistoryEntry {
     pub repeats: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoryTopic {
     Talk,
     Quest,
@@ -46,7 +48,7 @@ pub enum HistoryTopic {
     Error,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HistoryMark {
     You,
     Began,
@@ -54,7 +56,7 @@ pub enum HistoryMark {
     Failed,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecordTally {
     Change(i32),
     Progress { have: u32, need: u32 },
@@ -131,6 +133,13 @@ impl HistoryEntry {
 }
 
 impl RecordTally {
+    pub fn line(self, text: &str) -> String {
+        match self {
+            RecordTally::Change(change) => format!("{} {text}", signed(change)),
+            RecordTally::Progress { have, need } => format!("{text} {have}/{need}"),
+        }
+    }
+
     pub fn merged(self, newer: RecordTally) -> Option<RecordTally> {
         match (self, newer) {
             (RecordTally::Change(old), RecordTally::Change(new))
@@ -147,6 +156,14 @@ impl RecordTally {
 impl History {
     pub fn records(&self) -> impl Iterator<Item = &HistoryRecord> {
         self.records.iter()
+    }
+
+    pub fn replayed(records: impl IntoIterator<Item = (UnixMillis, HistoryEntry)>) -> History {
+        let mut history = History::default();
+        for (at, entry) in records {
+            history.write(entry, at);
+        }
+        history
     }
 
     fn write(&mut self, entry: HistoryEntry, now: UnixMillis) -> HistoryRecord {
@@ -223,11 +240,14 @@ pub fn backfill(
             .get::<History>(player)
             .map(|history| history.records().cloned().collect())
             .unwrap_or_default();
-        world.write_message(bevy_replicon::prelude::ToClients {
-            targets: bevy_replicon::prelude::SendTargets::Single(
-                bevy_replicon::prelude::ClientId::Client(conn),
-            ),
-            message: HistoryNews::Backfill { subject, records },
-        });
+        visibility::send_to(world, conn, HistoryNews::Backfill { subject, records });
+    }
+}
+
+pub fn signed(change: i32) -> String {
+    if change > 0 {
+        format!("+{change}")
+    } else {
+        format!("\u{2212}{}", change.unsigned_abs())
     }
 }

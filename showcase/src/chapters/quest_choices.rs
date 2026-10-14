@@ -1,0 +1,99 @@
+use driver::{UiTarget, finished, holding, in_feed, on_quest};
+use game::core::tiling::Tiles;
+use game::systems::input::map::InputAction;
+use game::systems::quest::QuestResult;
+
+use crate::chapters::Chapter;
+use crate::shoot::Shoot;
+
+pub const CHAPTER: Chapter = Chapter {
+    name: "quest-choices",
+    title: "Quest choices",
+    summary: "A quest found in a chest, a place to explore, and a choice you can't take back",
+    play,
+};
+
+const MAP: &str = "icons/misc/map.png";
+
+fn play(shoot: &mut Shoot) {
+    let player = shoot.join_as("tusks_midway", None);
+    let mut me = shoot.roll(player);
+    me.caption("The tide chest hides more than gold");
+    me.interact_with("tide-chest");
+    me.on_stage("map");
+    me.read_to_choices();
+    me.pick("Close the lid.");
+    me.conversation_over();
+    me.wait_until("the map in the bag", |snapshot| {
+        holding(snapshot, "tattered_map") == 1
+    });
+
+    me.caption_top("The map begins a quest — double-click it in your bag to use it");
+    me.act(InputAction::ToggleInventory);
+    me.hover_ui(UiTarget::image(MAP));
+    me.hold();
+    me.act_on_ui(InputAction::UseItem, UiTarget::image(MAP));
+    me.on_stage("offer");
+    me.caption_top("No one to talk to: just you, and the map");
+    me.read_to_choices();
+    me.hold();
+    me.pick("Accept");
+    me.wait_until("the map's quest", |snapshot| {
+        on_quest(snapshot, "x_marks_the_spot").is_some()
+    });
+    me.act(InputAction::ToggleInventory);
+
+    me.caption("The cross is in the forest");
+    me.cross("forest-road");
+
+    me.caption("Finding the standing stone completes the objective");
+    me.walk_into("standing-stone", Tiles(4.0));
+    me.interact_with("standing-stone");
+    me.wait_until("the stone found", |snapshot| {
+        on_quest(snapshot, "x_marks_the_spot").is_some_and(|quest| quest.ready)
+    });
+    me.on_stage("matches");
+    me.caption_top("A map object takes the hand-in, like any townsperson");
+    me.read_to_choices();
+    me.hold();
+    me.pick("Dig where the cross says.");
+    me.wait_until("the cross dug up", |snapshot| {
+        finished(snapshot, "x_marks_the_spot") == Some(QuestResult::Completed)
+    });
+
+    me.caption("Ugra, the clan's shaman, knows about Mara's errand");
+    me.walk_into("ugra", Tiles(3.0));
+    me.talk_to("ugra");
+    me.read_to_choices();
+    me.pick("The Shaman's Plea");
+    me.on_stage("plea_offer");
+    me.read_to_choices();
+    me.pick("I'm listening.");
+    me.on_stage("plea_answer");
+    me.caption_top(
+        "Both answers are permanent, so this one shows everything: what it needs, what it costs, and a warning",
+    );
+    me.read_to_choices();
+    me.hover_choice("Give her the tusks.");
+    me.hold();
+    me.pick("Give her the tusks.");
+    me.on_stage("grateful");
+    me.wait_until("Mara's quest to fail", |snapshot| {
+        finished(snapshot, "tusks_for_the_chief") == Some(QuestResult::Failed)
+    });
+    me.wait_until("the failed quest in the feed", |snapshot| {
+        in_feed(snapshot, "Quest failed · Tusks for the Chief")
+    });
+    me.caption_top("Mara's quest fails, in red in the corner, and the choice is remembered");
+    me.read_to_choices();
+    me.pick("Rest easy, Ugra.");
+    me.conversation_over();
+
+    me.caption("Now Ugra greets a friend of the clan, with work and remedies of her own");
+    me.talk_to("ugra");
+    me.on_stage("friend");
+    me.read_to_choices();
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.conversation_over();
+}

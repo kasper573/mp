@@ -1,0 +1,10 @@
+{
+  "name": "New Game",
+  "content_version": "ea8a6c40",
+  "initial_spawn": {
+    "area": "start",
+    "x": 8.0,
+    "y": 6.0
+  },
+  "player": "adventurer"
+}

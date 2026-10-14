@@ -1,12 +1,19 @@
 use std::f32::consts::FRAC_1_SQRT_2;
 
 use bevy_ecs::prelude::Resource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct WorldPx(pub f32);
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Default)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+pub struct WindowPx(pub f32);
+
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd, Default,
+)]
 pub struct Percent(pub f32);
 
 impl Percent {
@@ -28,16 +35,35 @@ pub type Offset<U> = euclid::Vector2D<f32, U>;
 pub type Size<U> = euclid::Size2D<f32, U>;
 pub type Rect<U> = euclid::Rect<f32, U>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Serialize,
+    Deserialize,
+    VariantArray,
+    EnumString,
+    AsRefStr,
+)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum Direction {
-    S = 0,
-    SW = 1,
-    NW = 2,
-    N = 3,
-    NE = 4,
-    SE = 5,
-    E = 6,
-    W = 7,
+    #[default]
+    S,
+    SW,
+    NW,
+    N,
+    NE,
+    SE,
+    E,
+    W,
 }
 
 impl<U> From<Offset<U>> for Direction {
@@ -78,13 +104,26 @@ impl Rng {
     }
 
     pub fn from_entropy() -> Rng {
+        Rng::new(Rng::random_seed())
+    }
+
+    // Worlds draw apart from one another, each the same way on every run with the same seed.
+    pub fn for_world(seed: u64, ordinal: u64) -> Rng {
+        Rng::new(seed.wrapping_add(ordinal))
+    }
+
+    pub fn random_seed() -> u64 {
         let mut seed = [0u8; 8];
-        getrandom::getrandom(&mut seed).expect("os entropy for rng seed");
-        Rng::new(u64::from_le_bytes(seed))
+        getrandom::fill(&mut seed).expect("os entropy for rng seed");
+        u64::from_le_bytes(seed)
     }
 
     pub fn rand_float(&mut self) -> f32 {
         self.0.rand_float()
+    }
+
+    pub fn choose<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
+        (!items.is_empty()).then(|| &items[self.rand_range(0..items.len() as u32) as usize])
     }
 
     pub fn rand_range(&mut self, range: std::ops::Range<u32>) -> u32 {

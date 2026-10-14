@@ -1,0 +1,12 @@
+{
+  "image": "tilesets/collision.png",
+  "tile": 16,
+  "tiles": {
+    "0": {
+      "walk": "walkable"
+    },
+    "1": {
+      "walk": "blocks"
+    }
+  }
+}

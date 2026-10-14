@@ -1,27 +1,116 @@
 use std::borrow::Cow;
+use std::marker::PhantomData;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use ui::{LabelledLine, RichPiece, RichText};
+use serde::{Deserialize, Serialize};
+use ui::{AlertBar, AlertClosed, Captions, LabelledLine, Milestones, RichPiece, RichText};
 
 use super::NotificationSent;
 use crate::core::time::Seconds;
 use crate::systems::input::map::{self, InputAction};
+use crate::systems::screen::ClientScreen;
 
 const COUNT_LINGERS: Seconds = Seconds(5.0);
 
+pub trait RowPlace:
+    Component<Mutability = bevy::ecs::component::Mutable> + Clone + PartialEq
+{
+    const ROWS: usize;
+    const REPLACE_AFTER: Seconds;
+    fn showing(rows: Vec<LabelledLine>, more: Option<RichText>) -> Self;
+}
+
+impl RowPlace for Captions {
+    const ROWS: usize = 3;
+    const REPLACE_AFTER: Seconds = Seconds(2.0);
+    fn showing(rows: Vec<LabelledLine>, more: Option<RichText>) -> Captions {
+        Captions { rows, more }
+    }
+}
+
+impl RowPlace for AlertBar {
+    const ROWS: usize = 2;
+    const REPLACE_AFTER: Seconds = Seconds(3.0);
+    fn showing(alerts: Vec<LabelledLine>, more: Option<RichText>) -> AlertBar {
+        AlertBar { alerts, more }
+    }
+}
+
+impl RowPlace for Milestones {
+    const ROWS: usize = 2;
+    const REPLACE_AFTER: Seconds = Seconds(2.0);
+    fn showing(rows: Vec<LabelledLine>, more: Option<RichText>) -> Milestones {
+        Milestones { rows, more }
+    }
+}
+
+pub(super) fn plugin<P: RowPlace>(app: &mut App) {
+    app.init_resource::<PlacedRows<P>>()
+        .add_systems(Update, show::<P>.run_if(in_state(ClientScreen::Area)));
+}
+
+pub(super) fn close_alert(closed: On<AlertClosed>, mut alerts: ResMut<PlacedRows<AlertBar>>) {
+    alerts.rows.close(closed.key);
+}
+
+pub(super) fn join<P: RowPlace>(
+    world: &mut World,
+    voice: Cow<'static, str>,
+    notification_sent: NotificationSent,
+) {
+    world
+        .resource_mut::<PlacedRows<P>>()
+        .rows
+        .join(voice, notification_sent);
+}
+
+pub fn shown<P: RowPlace>(world: &World) -> NotificationRows {
+    world.resource::<PlacedRows<P>>().rows.shown()
+}
+
+#[derive(Resource)]
+pub(super) struct PlacedRows<P> {
+    rows: VoiceRows,
+    place: PhantomData<fn() -> P>,
+}
+
+impl<P: RowPlace> Default for PlacedRows<P> {
+    fn default() -> PlacedRows<P> {
+        PlacedRows {
+            rows: VoiceRows::new(P::ROWS, P::REPLACE_AFTER),
+            place: PhantomData,
+        }
+    }
+}
+
+fn show<P: RowPlace>(world: &mut World) {
+    let held = held::<P>(world);
+    let delta = world.resource::<Time>().delta();
+    let mut placed = world.resource_mut::<PlacedRows<P>>();
+    placed.rows.tick(delta, held);
+    let next = P::showing(placed.rows.labelled_lines(), placed.rows.more());
+    for mut place in world.query::<&mut P>().iter_mut(world) {
+        if *place != next {
+            *place = next.clone();
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NotificationRows {
     pub rows: Vec<NotificationRow>,
     pub more: u32,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NotificationRow {
     pub label: String,
     pub text: String,
     pub replaced: u32,
 }
 
-pub(super) struct VoiceRows {
+struct VoiceRows {
     limit: usize,
     replace_after: Duration,
     rows: Vec<VoiceRow>,
@@ -46,7 +135,7 @@ struct TurnedAway {
 }
 
 impl VoiceRows {
-    pub(super) fn new(limit: usize, replace_after: Seconds) -> VoiceRows {
+    fn new(limit: usize, replace_after: Seconds) -> VoiceRows {
         VoiceRows {
             limit,
             replace_after: replace_after.into(),
@@ -57,7 +146,7 @@ impl VoiceRows {
         }
     }
 
-    pub(super) fn join(&mut self, voice: Cow<'static, str>, notification_sent: NotificationSent) {
+    fn join(&mut self, voice: Cow<'static, str>, notification_sent: NotificationSent) {
         let now = self.clock;
         let stays: Duration = notification_sent.notification.stays().into();
         if let Some(row) = self.rows.iter_mut().find(|row| row.voice == voice) {
@@ -75,7 +164,7 @@ impl VoiceRows {
                 until: now,
             });
             turned_away.more += 1;
-            turned_away.until = now + COUNT_LINGERS.into();
+            turned_away.until = now + Duration::from(COUNT_LINGERS);
             return;
         }
         let after = self.rows.last().map_or(now, |last| last.read_by.max(now));
@@ -91,7 +180,7 @@ impl VoiceRows {
         });
     }
 
-    pub(super) fn tick(&mut self, delta: Duration, held: bool) {
+    fn tick(&mut self, delta: Duration, held: bool) {
         if held {
             return;
         }
@@ -114,11 +203,11 @@ impl VoiceRows {
             .filter(|turned_away| turned_away.until > now);
     }
 
-    pub(super) fn close(&mut self, key: u64) {
+    fn close(&mut self, key: u64) {
         self.rows.retain(|row| row.key != key);
     }
 
-    pub(super) fn labelled_lines(&self) -> Vec<LabelledLine> {
+    fn labelled_lines(&self) -> Vec<LabelledLine> {
         self.rows
             .iter()
             .map(|row| LabelledLine {
@@ -130,20 +219,20 @@ impl VoiceRows {
             .collect()
     }
 
-    pub(super) fn more(&self) -> Option<RichText> {
+    fn more(&self) -> Option<RichText> {
         self.turned_away
             .as_ref()
             .map(|turned_away| more_text(turned_away.more))
     }
 
-    pub(super) fn shown(&self) -> NotificationRows {
+    fn shown(&self) -> NotificationRows {
         NotificationRows {
             rows: self
                 .rows
                 .iter()
                 .map(|row| NotificationRow {
                     label: row.voice.to_string(),
-                    text: super::plain_words(&row.shown.notification.text),
+                    text: row.shown.notification.text.plain_words(),
                     replaced: row.replaced,
                 })
                 .collect(),

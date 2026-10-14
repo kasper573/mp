@@ -1,16 +1,16 @@
-use crate::core::assets::AssetService;
-use crate::core::audio::playback::SfxId;
+use bevy::prelude::*;
+
+use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
+use crate::core::content::Content;
 use crate::core::math::{Pos, WorldPx};
+use crate::core::render::transition::WorldViewSystems;
+use crate::core::render::{ToScreen, dynamic_z, sprite_transform};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::item::{DroppedItem, ItemConsumed, ItemsDropped};
-use crate::systems::movement::Position;
-use bevy::prelude::*;
-
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{ToScreen, dynamic_z, sprite_transform};
+use crate::systems::movement::{Position, RenderPosition};
+use crate::systems::screen::ClientScreen;
 
 const DROP_SIZE: WorldPx = WorldPx(12.0);
 const DROP_STAGGER: Seconds = Seconds(0.06);
@@ -32,7 +32,7 @@ impl Plugin for ItemsPlugin {
                         .chain()
                         .in_set(WorldViewSystems),
                 )
-                    .run_if(in_state(crate::systems::scene::Scene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -57,12 +57,13 @@ struct Pending {
 }
 
 fn use_sounds(
+    content: Res<Content>,
     mut consumed: MessageReader<ItemConsumed>,
-    positions: Query<&Position>,
+    positions: Query<&RenderPosition>,
     mut play: MessageWriter<PlaySfx>,
 ) {
     for consumed in consumed.read() {
-        let Some(id) = consumed.item.get().sfx.on_use else {
+        let Some(id) = consumed.item.get(&content).sfx.on_use else {
             continue;
         };
         let Ok(position) = positions.get(consumed.actor) else {
@@ -70,21 +71,22 @@ fn use_sounds(
         };
         play.write(PlaySfx {
             id,
-            place: SfxPlace::World(position.pos),
+            place: SfxPlace::World(position.0),
         });
     }
 }
 
 fn attach_drop_sprite(
-    add: On<Add, DroppedItem>,
+    add: On<Add<DroppedItem>>,
     drops: Query<&DroppedItem>,
+    content: Res<Content>,
     assets: Res<AssetServer>,
     mut commands: Commands,
 ) {
     let Ok(dropped) = drops.get(add.entity) else {
         return;
     };
-    let image = assets.load(dropped.item.get().icon.0);
+    let image = assets.load(dropped.item.get(&content).icon.path());
     commands.entity(add.entity).insert((
         Sprite {
             image,
@@ -111,6 +113,7 @@ fn recv_drops(mut dropped: MessageReader<ItemsDropped>, mut pending: ResMut<Pend
 
 fn start_drops(
     time: Res<Time>,
+    content: Res<Content>,
     mut pending: ResMut<PendingDrops>,
     drops: Query<(&DroppedItem, &Position)>,
     mut commands: Commands,
@@ -123,7 +126,7 @@ fn start_drops(
                 to: position.pos.to_screen(),
                 delay: DROP_STAGGER * drop.index as f32,
                 elapsed: Seconds(0.0),
-                drop_sfx: dropped.item.get().sfx.drop,
+                drop_sfx: dropped.item.get(&content).sfx.drop,
             });
             false
         }
@@ -135,17 +138,17 @@ fn start_drops(
 }
 
 fn place_drops(
-    service: Res<AssetService>,
+    content: Res<Content>,
     mut drops: Query<(&Position, &AreaTag, &mut Transform), With<DroppedItem>>,
 ) {
     for (position, tag, mut transform) in &mut drops {
-        *transform = sprite_transform(position.pos, drop_z(&service, tag, position.pos));
+        *transform = sprite_transform(position.pos, drop_z(&content, tag, position.pos));
     }
 }
 
 fn animate_drops(
     time: Res<Time>,
-    service: Res<AssetService>,
+    content: Res<Content>,
     mut drops: Query<(Entity, &Position, &AreaTag, &mut DropAnim, &mut Transform)>,
     mut play: MessageWriter<PlaySfx>,
     mut commands: Commands,
@@ -161,7 +164,7 @@ fn animate_drops(
         transform.translation = Vec3::new(
             ground.x,
             ground.y + hop,
-            drop_z(&service, tag, position.pos),
+            drop_z(&content, tag, position.pos),
         );
         if anim.elapsed - anim.delay >= DROP_DURATION {
             play.write(PlaySfx {
@@ -173,9 +176,9 @@ fn animate_drops(
     }
 }
 
-fn drop_z(service: &AssetService, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
-    let area = service.resolve(tag.area.get().map, area::build_area);
-    dynamic_z(area.size.height, area.dynamic_layer() as f32, Tiles(pos.y))
+fn drop_z(content: &Content, tag: &AreaTag, pos: Pos<Tiles>) -> f32 {
+    let area = area::load(content, tag.area);
+    dynamic_z(area.size.height, area.sort_base(), Tiles(pos.y))
 }
 
 fn ease_out(t: f32) -> f32 {

@@ -6,15 +6,41 @@ mod locked;
 mod pickup;
 mod walk;
 
-use super::ActiveTileHighlight;
-use super::map::{self, InputAction};
-use crate::core::render::transition::WorldViewSystems;
 use bevy::prelude::*;
 use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage, PrimaryWindow};
+use serde::{Deserialize, Serialize};
+use strum::VariantArray;
+
+use super::ActiveTileHighlight;
+use super::map::{self, InputAction};
+use crate::core::content::{Content, Fixture};
+use crate::core::math::Pos;
+use crate::core::render::transition::WorldViewSystems;
+use crate::core::tiling::Tiles;
+use crate::systems::interface::CursorShape;
+use crate::systems::player::session;
+use crate::systems::screen::ClientScreen;
+
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+pub enum ClickClaim {
+    Interface,
+    Locked,
+    Attack(Entity),
+    Pickup(Entity),
+    Interact(Entity),
+    Walk(Pos<Tiles>),
+    Nothing,
+}
+
+pub fn claim(world: &mut World) -> ClickClaim {
+    GESTURES
+        .iter()
+        .find_map(|gesture| gesture.claim(world))
+        .unwrap_or(ClickClaim::Nothing)
+}
 
 pub trait Gesture: Send + Sync {
-    fn priority(&self) -> i32;
-    fn claims(&self, world: &mut World) -> bool;
+    fn claim(&self, world: &mut World) -> Option<ClickClaim>;
     fn drive(&self, world: &mut World, start: bool);
     fn cursor(&self, world: &mut World) -> Option<CursorIcon>;
     fn tile_highlight(&self, _world: &mut World) -> Option<ActiveTileHighlight> {
@@ -22,23 +48,32 @@ pub trait Gesture: Send + Sync {
     }
 }
 
+// The first gesture to claim a click takes it.
 static GESTURES: &[&dyn Gesture] = &[
-    &attack::AttackGesture,
-    &default::DefaultGesture,
-    &interact::InteractGesture,
     &interface::InterfaceGesture,
     &locked::LockedGesture,
+    &attack::AttackGesture,
     &pickup::PickupGesture,
+    &interact::InteractGesture,
     &walk::WalkGesture,
+    &default::DefaultGesture,
 ];
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Startup, setup)
-        .add_systems(Update, update.in_set(WorldViewSystems));
+    app.init_resource::<Latched>()
+        .init_resource::<LockSeen>()
+        .init_resource::<AppliedCursor>()
+        .add_systems(
+            Update,
+            load_cursors.run_if(resource_exists_and_changed::<Content>),
+        )
+        .add_systems(
+            Update,
+            update
+                .in_set(WorldViewSystems)
+                .run_if(in_state(ClientScreen::Area)),
+        );
 }
-
-#[derive(Resource)]
-pub(crate) struct Gestures(pub Vec<&'static dyn Gesture>);
 
 #[derive(Resource, Default)]
 struct Latched(Option<GestureIndex>);
@@ -52,17 +87,20 @@ struct GestureIndex(usize);
 #[derive(Resource, Default)]
 struct AppliedCursor(Option<CursorIcon>);
 
-fn setup(mut commands: Commands) {
-    let mut gestures: Vec<&'static dyn Gesture> = GESTURES.to_vec();
-    gestures.sort_by_key(|gesture| gesture.priority());
-    commands.insert_resource(Gestures(gestures));
-    commands.init_resource::<Latched>();
-    commands.init_resource::<LockSeen>();
-    commands.init_resource::<AppliedCursor>();
+// Held for the whole session: a cursor loaded by path on each switch is unloaded as soon as the
+// shape changes, and the next switch back finds it missing again.
+#[derive(Resource)]
+struct CursorImages(Vec<(CursorShape, Handle<Image>)>);
+
+fn load_cursors(content: Res<Content>, assets: Res<AssetServer>, mut commands: Commands) {
+    let images = CursorShape::VARIANTS
+        .iter()
+        .map(|&shape| (shape, assets.load(shape.get(&content).image.path())))
+        .collect();
+    commands.insert_resource(CursorImages(images));
 }
 
 fn update(world: &mut World) {
-    let gestures = world.resource::<Gestures>().0.clone();
     forget_clicks_across_lock(world);
 
     let mut active = world.resource::<Latched>().0;
@@ -70,23 +108,23 @@ fn update(world: &mut World) {
     let just = map::just_pressed(world, InputAction::Interact);
     // A click pressed and released between two frames arrives as `just` without `pressed`.
     if just {
-        active = gestures
+        active = GESTURES
             .iter()
-            .position(|gesture| gesture.claims(world))
+            .position(|gesture| gesture.claim(world).is_some())
             .map(GestureIndex);
     } else if !pressed {
         active = None;
     }
     if let Some(GestureIndex(index)) = active {
-        gestures[index].drive(world, just);
+        GESTURES[index].drive(world, just);
     }
     world.resource_mut::<Latched>().0 = active.filter(|_| pressed);
 
     let mut cursor = None;
     let mut highlight = None;
     let mut first_claimant = true;
-    for gesture in &gestures {
-        if !gesture.claims(world) {
+    for gesture in GESTURES {
+        if gesture.claim(world).is_none() {
             continue;
         }
         if first_claimant {
@@ -109,7 +147,7 @@ fn update(world: &mut World) {
 }
 
 fn forget_clicks_across_lock(world: &mut World) {
-    let locked = crate::systems::player::session::is_locked(world);
+    let locked = session::is_locked(world);
     if std::mem::replace(&mut world.resource_mut::<LockSeen>().0, locked) != locked {
         world.resource_mut::<ButtonInput<MouseButton>>().reset_all();
         world.resource_mut::<Latched>().0 = None;
@@ -123,6 +161,11 @@ fn apply_cursor(world: &mut World, cursor: Option<CursorIcon>) {
     if world.resource::<AppliedCursor>().0.as_ref() == Some(&cursor) {
         return;
     }
+    if let CursorIcon::Custom(CustomCursor::Image(image)) = &cursor
+        && !world.resource::<Assets<Image>>().contains(&image.handle)
+    {
+        return;
+    }
     world.resource_mut::<AppliedCursor>().0 = Some(cursor.clone());
     if let Ok(window) = world
         .query_filtered::<Entity, With<PrimaryWindow>>()
@@ -132,20 +175,19 @@ fn apply_cursor(world: &mut World, cursor: Option<CursorIcon>) {
     }
 }
 
-pub(crate) fn default_cursor(world: &mut World) -> CursorIcon {
+pub(crate) fn content_cursor(world: &World, shape: CursorShape) -> CursorIcon {
+    let cursor = shape.get(world.resource::<Content>());
     let handle = world
-        .resource::<AssetServer>()
-        .load("icons/cursors/pointer003.png");
-    image_cursor(handle, (0, 0))
-}
-
-pub(crate) fn image_cursor(handle: Handle<Image>, hotspot: (u16, u16)) -> CursorIcon {
+        .get_resource::<CursorImages>()
+        .and_then(|images| images.0.iter().find(|(known, _)| *known == shape))
+        .map(|(_, handle)| handle.clone())
+        .unwrap_or_default();
     CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
         handle,
         texture_atlas: None,
         flip_x: false,
         flip_y: false,
         rect: None,
-        hotspot,
+        hotspot: (cursor.hotspot.x, cursor.hotspot.y),
     }))
 }

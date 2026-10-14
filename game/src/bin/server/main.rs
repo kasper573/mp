@@ -3,7 +3,6 @@ mod transport;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -13,67 +12,46 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{ConnectedClient, RepliconChannels, ServerState};
+use bevy_replicon::prelude::{ConnectedClient, RepliconChannels};
 use bevy_replicon::shared::backend::server_messages::ServerMessages;
-use bevy_state::prelude::NextState;
-use game::core::assets::{AssetService, FilesystemSource};
-use game::core::net::channels::RenetChannelsExt;
+use bevy_replicon_renet2::RenetChannelsExt;
+use game::core::content::sync::{ServedContent, well_formed_hash};
+use game::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
+use game::core::math::Rng;
+use game::core::net::SessionRequest;
+use game::core::net::auth::TokenClaims;
+use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::account::Identity;
-use game::systems::area::transition;
-use game::systems::player::{ClientId, Immortal, SpawnPolicy};
+use game::systems::account::{AccountId, Identity, Role};
+use game::systems::area::{self, AreaDef, AreaId, transition};
+use game::systems::launch::{
+    AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig,
+    ServerReady, Switch, TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
+};
+use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
+use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
 use game::systems::spectate::{self, SpectatorTransfer};
+use game::systems::{
+    GameSettings, load_content, notification, server_app, start_server, step_areas,
+};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
-use rand::RngCore;
+use rand::Rng as _;
 use renet2::{ConnectionConfig, DisconnectReason, RenetServer, ServerEvent};
+use serde::Deserialize;
+
 use transport::WsTransport;
 
 service::heap_profiling!();
 
 const TOKEN_EXPIRE: Duration = Duration::from_secs(30);
 
-#[derive(serde::Deserialize)]
-struct Config {
-    port: u16,
-    ws_port: u16,
-    max_clients: usize,
-    areas: Areas,
-    assets_dir: PathBuf,
-    player_spawn_type: SpawnPolicy,
-    player_immortal: bool,
-    daily_reset_utc_hour: UtcHour,
-    allow_fake_users: bool,
-    pyroscope_enabled: bool,
-    pyroscope_sample_hz: u32,
-}
-
-#[derive(Clone, Copy)]
-enum Areas {
-    Real,
-    Bench(usize),
-}
-
-impl<'de> serde::Deserialize<'de> for Areas {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Areas, D::Error> {
-        let spec = String::deserialize(deserializer)?;
-        if spec == "real" {
-            return Ok(Areas::Real);
-        }
-        if let Some(count) = spec.strip_prefix("bench,") {
-            return count
-                .parse()
-                .map(Areas::Bench)
-                .map_err(serde::de::Error::custom);
-        }
-        Err(serde::de::Error::custom(format!(
-            "expected `real` or `bench,<n>`, got `{spec}`"
-        )))
-    }
-}
-
 fn main() {
-    let config: Config = envy::prefixed("RIFT_GAME_SERVER_")
+    if std::env::args().any(|arg| arg == BUILD_INFO_FLAG) {
+        println!("{}", build_info_line());
+        return;
+    }
+    let config: ServerConfig = envy::prefixed(SERVER_ENV_PREFIX)
         .from_env()
         .expect("RIFT_GAME_SERVER_* environment");
     let _profiler = service::profiler(
@@ -81,88 +59,124 @@ fn main() {
         config.pyroscope_enabled,
         config.pyroscope_sample_hz,
     );
-    let http_bind: SocketAddr = format!("0.0.0.0:{}", config.port)
-        .parse()
-        .expect("server bind address");
-    let ws_bind: SocketAddr = format!("0.0.0.0:{}", config.ws_port)
-        .parse()
-        .expect("websocket bind address");
+    if config.exit_on_stdin_eof {
+        exit_when_stdin_closes();
+    }
+    let http_bind = SocketAddr::new(config.bind, config.port);
+    let ws_bind = SocketAddr::new(config.bind, config.ws_port);
 
     // One multi-threaded tokio runtime backs both the HTTP API and the WebSocket transport's
     // accept/read/write tasks; it outlives `main` because `simulate` never returns.
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
+    let content = load_content(
+        Arc::new(FilesystemFolder(config.content_dir.clone())),
+        "the server did not start",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    });
+    let settings = content.built::<GameSettings>();
+    let served = ServedContent::new(
+        &content,
+        &FilesystemFolder(config.content_dir.clone()),
+        version::build(),
+        &settings.name,
+    )
+    .unwrap_or_else(|error| {
+        eprintln!("{}: {error}", config.content_dir.display());
+        std::process::exit(2);
+    });
+
     let metrics = service::recorder();
     let sessions = Sessions::default();
+    let online = Online::default();
+    let area_ids = select_areas(&content, config.areas);
     let http = Http {
         sessions: sessions.clone(),
-        verifier: verifier(),
-        allow_fake_users: config.allow_fake_users,
+        auth: match config.auth {
+            AuthMode::Oidc => Auth::Oidc(verifier()),
+            AuthMode::Fake => Auth::Fake,
+        },
+        test_characters: match config.test_characters {
+            Switch::On => Some(TestCharacters {
+                content,
+                areas: area_ids.clone(),
+                pending: Arc::default(),
+                online: online.clone(),
+            }),
+            Switch::Off => None,
+        },
+        served: Arc::new(served),
     };
-    let api = serve_http(http_bind, http, metrics);
-
-    let settings = Settings {
-        areas: config.areas,
-        max_clients: config.max_clients,
-        spawn_policy: config.player_spawn_type,
-        immortal: Immortal(config.player_immortal),
-        reset: config.daily_reset_utc_hour,
+    let listener = runtime
+        .block_on(tokio::net::TcpListener::bind(http_bind))
+        .unwrap_or_else(|error| panic!("cannot bind {http_bind}: {error}"));
+    let http_addr = listener.local_addr().expect("bound http address");
+    let lobby = Lobby {
+        spawn: area_ids
+            .iter()
+            .position(|id| *id == content.built::<GameSettings>().initial_spawn.area)
+            .unwrap_or(0),
+        area_ids,
+        policy: config.player_spawn_type,
+        online,
+        test_characters: http.test_characters.clone(),
     };
-    let assets = AssetService::new(FilesystemSource(config.assets_dir));
-    game::systems::check_content(&assets);
-    simulate(
-        ws_bind,
-        sessions,
-        runtime.handle().clone(),
-        assets,
-        settings,
-        api,
-    );
-}
+    let api = serve_http(listener, http, metrics);
 
-struct Settings {
-    areas: Areas,
-    max_clients: usize,
-    spawn_policy: SpawnPolicy,
-    immortal: Immortal,
-    reset: UtcHour,
-}
-
-fn simulate(
-    ws_bind: SocketAddr,
-    sessions: Sessions,
-    runtime: tokio::runtime::Handle,
-    assets: AssetService,
-    settings: Settings,
-    api: impl Future<Output = ()> + Send + 'static,
-) {
-    let Settings {
-        areas,
-        max_clients,
-        spawn_policy,
-        immortal,
-        reset,
-    } = settings;
-    let area_ids = select_areas(areas);
-    let spawn = area_ids
-        .iter()
-        .position(|id| *id == game::data::area::SPAWN_ID)
-        .unwrap_or(0);
-    let mut worlds: Vec<App> = area_ids
+    let rules = SpawnRules {
+        policy: config.player_spawn_type,
+        immortal: config.player_immortal,
+    };
+    let reset = config.daily_reset_utc_hour;
+    let rng_seed = seeded(config.rng_seed);
+    let worlds: Vec<App> = lobby
+        .area_ids
         .iter()
         .enumerate()
         .map(|(ordinal, &id)| {
             build_world(
                 id,
-                &assets,
-                spawn_policy,
-                immortal,
+                &content,
+                rules,
+                rng_seed,
                 ordinal as u64,
                 wall_clock(reset),
             )
         })
         .collect();
+    let transport = WsTransport::bind(
+        ws_bind,
+        sessions,
+        config.max_clients,
+        runtime.handle().clone(),
+    );
+    // Opened only once players can connect, so a passing health check means the game is playable.
+    runtime.spawn(api);
 
+    let ready = ReadyLine {
+        ready: ServerReady {
+            build: version::build().to_owned(),
+            content_version: content.built::<GameSettings>().content_version.0.clone(),
+            http: http_addr.port(),
+            ws: transport.local_addr().port(),
+        },
+    };
+    println!("{}", serde_json::to_string(&ready).expect("a ready line"));
+    simulate(worlds, transport, &lobby, reset);
+}
+
+struct Lobby {
+    area_ids: Vec<AreaId>,
+    spawn: usize,
+    policy: SpawnPolicy,
+    online: Online,
+    test_characters: Option<TestCharacters>,
+}
+
+fn simulate(mut worlds: Vec<App>, mut transport: WsTransport, lobby: &Lobby, reset: UtcHour) {
     let (connection_config, client_channels) = {
         let channels = worlds[0].world().resource::<RepliconChannels>();
         let config =
@@ -170,17 +184,7 @@ fn simulate(
         (config, channels.client_channels().len())
     };
     let mut server = RenetServer::new(connection_config);
-    let mut transport = WsTransport::bind(ws_bind, sessions, max_clients, runtime.clone());
-    // Opened only once players can connect, so a passing health check means the game is playable.
-    runtime.spawn(api);
-
-    println!(
-        "mmo server listening: websocket {ws_bind} ({} area worlds)",
-        worlds.len()
-    );
-
     let mut conns: HashMap<u64, Conn> = HashMap::new();
-    let mut accounts: HashMap<String, ClientId> = HashMap::new();
     let mut transfers: Vec<Transfer> = Vec::new();
     let mut next_client = 1u32;
     let mut next_area = 0usize;
@@ -202,6 +206,8 @@ fn simulate(
                     counter!("rift_client_connections_opened_total").increment(1);
                     let identity = transport.take_identity(client_id);
                     let account = identity.as_ref().map(|identity| identity.id.clone());
+                    let mut accounts = lobby.online.0.lock().expect("online lock");
+                    let mut join_as = None;
                     let (client, area) =
                         match account.as_ref().and_then(|account| accounts.get(account)) {
                             // Another tab of this account is already connected: share its player id and
@@ -211,27 +217,42 @@ fn simulate(
                                 let area = conns
                                     .values()
                                     .find(|conn| conn.client == client)
-                                    .map_or(spawn, |conn| conn.area);
+                                    .map_or(lobby.spawn, |conn| conn.area);
                                 (client, area)
                             }
                             None => {
                                 let client = ClientId(next_client);
                                 next_client += 1;
+                                join_as = account.as_ref().and_then(|account| {
+                                    lobby
+                                        .test_characters
+                                        .as_ref()
+                                        .and_then(|characters| characters.take(account))
+                                });
                                 if let Some(account) = account {
                                     accounts.insert(account, client);
                                 }
-                                let area = match spawn_policy {
-                                    SpawnPolicy::Dist => {
+                                let area = match (&join_as, lobby.policy) {
+                                    (Some(join_as), _) => lobby
+                                        .area_ids
+                                        .iter()
+                                        .position(|&id| id == join_as.start.area)
+                                        .unwrap_or(lobby.spawn),
+                                    (None, SpawnPolicy::Dist) => {
                                         let area = next_area % worlds.len();
                                         next_area += 1;
                                         area
                                     }
-                                    SpawnPolicy::Map => spawn,
+                                    (None, SpawnPolicy::Map) => lobby.spawn,
                                 };
                                 (client, area)
                             }
                         };
+                    drop(accounts);
                     let entity = spawn_conn(&mut worlds[area], client, client_id, identity);
+                    if let Some(join_as) = join_as {
+                        worlds[area].world_mut().entity_mut(entity).insert(join_as);
+                    }
                     conns.insert(
                         client_id,
                         Conn {
@@ -247,7 +268,12 @@ fn simulate(
                     if let Some(conn) = conns.remove(&client_id) {
                         worlds[conn.area].world_mut().despawn(conn.entity);
                         if !conns.values().any(|other| other.client == conn.client) {
-                            accounts.retain(|_, &mut client| client != conn.client);
+                            lobby
+                                .online
+                                .0
+                                .lock()
+                                .expect("online lock")
+                                .retain(|_, &mut client| client != conn.client);
                         }
                     }
                 }
@@ -267,10 +293,8 @@ fn simulate(
             }
         }
 
-        game::systems::step_areas(&mut worlds, wall_clock(reset));
-        game::systems::notification::relay(
-            &mut worlds.iter_mut().map(App::world_mut).collect::<Vec<_>>(),
-        );
+        step_areas(&mut worlds, wall_clock(reset));
+        notification::relay(&mut worlds.iter_mut().map(App::world_mut).collect::<Vec<_>>());
 
         begin_transfers(&mut worlds, &mut transfers, tick);
 
@@ -374,35 +398,35 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(areas: Areas) -> Vec<game::data::area::Id> {
-    use game::data::area::Id;
+fn select_areas(content: &Content, areas: ServedAreas) -> Vec<AreaId> {
     match areas {
-        Areas::Real => Id::VARIANTS.to_vec(),
-        // The bench area is one template instanced `count` times; the count is bounded only by the
-        // machine, not by how many area rows the content table happens to define.
-        Areas::Bench(count) => vec![game::data::area::BENCH_ID; count],
+        ServedAreas::Real => content.ids::<AreaDef>().collect(),
+        // The initial spawn's area is one template instanced `count` times; the count is bounded
+        // only by the machine, not by how many area rows the content table happens to define.
+        ServedAreas::Bench(count) => {
+            vec![content.built::<GameSettings>().initial_spawn.area; count]
+        }
     }
 }
 
+// Logged, so whatever happened can be played out again.
+fn seeded(configured: Option<u64>) -> u64 {
+    let seed = configured.unwrap_or_else(Rng::random_seed);
+    println!("rng seed {seed}");
+    seed
+}
+
 fn build_world(
-    area: game::systems::area::Id,
-    assets: &AssetService,
-    spawn_policy: SpawnPolicy,
-    immortal: Immortal,
+    area: AreaId,
+    content: &Content,
+    rules: SpawnRules,
+    rng_seed: u64,
     ordinal: u64,
     clock: WallClock,
 ) -> App {
-    let mut app = game::systems::server_app(area, ordinal, clock);
-    app.insert_resource(assets.clone());
-    app.insert_resource(game::core::math::Rng::from_entropy());
-    app.insert_resource(spawn_policy);
-    app.insert_resource(immortal);
-    app.finish();
-    app.cleanup();
-    app.world_mut()
-        .resource_mut::<NextState<ServerState>>()
-        .set(ServerState::Running);
-    app.update();
+    let mut app = server_app(area, ordinal, rng_seed, clock, content);
+    app.insert_resource(rules);
+    start_server(&mut app);
     app
 }
 
@@ -552,30 +576,87 @@ impl Sessions {
     }
 }
 
+#[derive(Clone, Default)]
+struct Online(Arc<Mutex<HashMap<AccountId, ClientId>>>);
+
+#[derive(Clone)]
+struct TestCharacters {
+    content: Content,
+    areas: Vec<AreaId>,
+    pending: Arc<Mutex<HashMap<AccountId, JoinAs>>>,
+    online: Online,
+}
+
+impl TestCharacters {
+    fn take(&self, account: &AccountId) -> Option<JoinAs> {
+        self.pending.lock().expect("pending lock").remove(account)
+    }
+}
+
+#[derive(Clone)]
+enum Auth {
+    Oidc(Arc<Mutex<auth::Verifier>>),
+    Fake,
+}
+
 #[derive(Clone)]
 struct Http {
     sessions: Sessions,
-    verifier: Arc<Mutex<auth::Verifier>>,
-    allow_fake_users: bool,
+    auth: Auth,
+    test_characters: Option<TestCharacters>,
+    served: Arc<ServedContent>,
 }
 
-async fn serve_http(addr: SocketAddr, http: Http, metrics: service::PrometheusHandle) {
-    let router = service::track(
-        axum::Router::new()
-            .route("/session", post(session))
-            .route("/health", get(health))
-            .with_state(http),
-        metrics,
-    );
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .unwrap_or_else(|error| panic!("cannot bind {addr}: {error}"));
-    println!("http listening on {addr}");
+async fn serve_http(
+    listener: tokio::net::TcpListener,
+    http: Http,
+    metrics: service::PrometheusHandle,
+) {
+    let mut router = axum::Router::new()
+        .route("/session", post(session))
+        .route("/health", get(health))
+        .route("/content/manifest", get(manifest))
+        .route("/content/files/{hash}", get(content_file));
+    if http.test_characters.is_some() {
+        router = router.route(TEST_CHARACTER_ROUTE, post(test_character));
+    }
+    let router = service::track(router.with_state(http), metrics);
     ctrlc::set_handler(|| std::process::exit(0)).expect("install stop handler");
     axum::serve(listener, router).await.expect("axum serves");
 }
 
-async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {
+async fn manifest(State(http): State<Http>) -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        serde_json::to_string(&http.served.manifest).expect("manifest serializes"),
+    )
+        .into_response()
+}
+
+async fn content_file(
+    State(http): State<Http>,
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> Response {
+    if !well_formed_hash(&hash) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    match http.served.file(&hash) {
+        Some(bytes) => (
+            [
+                (header::CONTENT_TYPE, "application/octet-stream"),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+            ],
+            bytes.to_vec(),
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {
     let authorization = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
@@ -584,6 +665,16 @@ async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {
         Ok(identity) => identity,
         Err(status) => return status.into_response(),
     };
+    let request: SessionRequest = match serde_json::from_str(&body) {
+        Ok(request) => request,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if request.build != version::build() {
+        return (StatusCode::CONFLICT, "the server runs another build").into_response();
+    }
+    if request.rows != http.served.manifest.rows.hash {
+        return (StatusCode::CONFLICT, "the server serves other content").into_response();
+    }
 
     // The ticket is the renet client id. The browser opens `wss://host/?ticket=<id>`; the WebSocket
     // handshake claims it single-use. Unguessable in 2^64, ~30s expiry, only ever sent over TLS.
@@ -599,38 +690,104 @@ async fn session(State(http): State<Http>, headers: HeaderMap) -> Response {
         .into_response()
 }
 
-fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
-    if http.allow_fake_users
-        && let Some(id) = authorization.strip_prefix("fake:")
-    {
-        return Ok(Identity {
-            id: id.to_owned(),
-            name: id.to_owned(),
-            roles: Vec::new(),
-        });
+async fn test_character(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {
+    let Some(characters) = http.test_characters.as_ref() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let authorization = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    let identity = match resolve(&http, authorization) {
+        Ok(identity) => identity,
+        Err(status) => return status.into_response(),
+    };
+    let content = characters.content;
+    let (request, scope) = with_content(ContentScope::of(&content), || {
+        serde_json::from_str::<TestCharacterRequest>(&body)
+    });
+    let request = match request {
+        Ok(request) => request,
+        Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
+    };
+    if let Some(unknown) = scope.unknown().next() {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("no {} `{}`", unknown.table, unknown.key),
+        )
+            .into_response();
     }
+    let Some(character) = content.by_key::<CharacterSnapshot>(&request.test_character) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("no test character `{}`", request.test_character),
+        )
+            .into_response();
+    };
+    let start = request
+        .start
+        .unwrap_or_else(|| snapshot::start_of(&content, character.get(&content)));
+    if let Err(problem) = area::check_place(&content, start) {
+        return (StatusCode::BAD_REQUEST, format!("bad start: {problem}")).into_response();
+    }
+    if !characters.areas.contains(&start.area) {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!(
+                "bad start: this server runs no {}",
+                start.area.key(&content)
+            ),
+        )
+            .into_response();
+    }
+    if characters
+        .online
+        .0
+        .lock()
+        .expect("online lock")
+        .contains_key(&identity.id)
+    {
+        return (StatusCode::CONFLICT, "already in a world").into_response();
+    }
+    characters.pending.lock().expect("pending lock").insert(
+        identity.id,
+        JoinAs {
+            snapshot: character.get(&content).clone(),
+            start,
+        },
+    );
+    StatusCode::NO_CONTENT.into_response()
+}
+
+fn resolve(http: &Http, authorization: &str) -> Result<Identity, StatusCode> {
     let token = authorization
         .strip_prefix("Bearer ")
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    let claims = http
-        .verifier
-        .lock()
-        .expect("verifier lock")
-        .verify(token)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+        .unwrap_or(authorization);
+    let claims = match &http.auth {
+        Auth::Oidc(verifier) => verifier.lock().expect("verifier lock").verify(token).ok(),
+        Auth::Fake => TokenClaims::read_unverified(token),
+    }
+    .filter(|claims| !claims.sub.is_empty())
+    .ok_or(StatusCode::UNAUTHORIZED)?;
     Ok(Identity {
-        id: claims.subject,
-        name: claims.name,
+        name: claims
+            .preferred_username
+            .unwrap_or_else(|| claims.sub.clone()),
+        id: AccountId(claims.sub),
         roles: claims
+            .realm_access
             .roles
             .iter()
-            .filter_map(|role| role.parse::<game::systems::account::Role>().ok())
+            .filter_map(|role| role.parse::<Role>().ok())
             .collect(),
     })
 }
 
 async fn health(State(http): State<Http>) -> Response {
-    let ready = http.verifier.lock().expect("verifier lock").ready();
+    let ready = match &http.auth {
+        Auth::Oidc(verifier) => verifier.lock().expect("verifier lock").ready(),
+        Auth::Fake => true,
+    };
     if ready {
         "ok".into_response()
     } else {
@@ -639,7 +796,7 @@ async fn health(State(http): State<Http>) -> Response {
 }
 
 fn verifier() -> Arc<Mutex<auth::Verifier>> {
-    #[derive(serde::Deserialize)]
+    #[derive(Deserialize)]
     struct AuthConfig {
         issuer: String,
         audience: String,

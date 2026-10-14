@@ -1,30 +1,30 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::palette;
 use ui::{
     CastDepth, CastMember, ChipOptions, ChoiceOptions, DialogueBoxOptions, Family, RichPiece, Side,
 };
 
 use super::{
-    ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, DialogueId,
-    RefusedPick, Speaker, SpokenLine,
+    ChoiceChip, ChoiceView, Conversation, ConversationRequest, ConversationStep, RefusedPick,
+    Speaker, SpokenLine,
 };
-use crate::core::assets::AssetRef;
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
+use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleRank, Babbler, Babbling};
+use crate::core::content::{Content, Fixture};
 use crate::systems::actor::Name;
-use crate::systems::actor::bust::{Busts, Face, GenericExpression};
+use crate::systems::actor::model::{Busts, Face, GenericExpression};
+use crate::systems::hud::{fingerprint, spawn_ui};
 use crate::systems::input::map::{self, ActionInput, InputAction, InputMap};
+use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::card;
 use crate::systems::npc::Npc;
 use crate::systems::player;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::scene::mode::Mode;
+use crate::systems::screen::mode::ClientMode;
+use crate::systems::screen::{ClientScreen, despawn_all};
 
 const READ_ALONG: Duration = Duration::from_millis(1800);
 const CHOICE_SHORTCUTS: [InputAction; 9] = [
@@ -38,21 +38,16 @@ const CHOICE_SHORTCUTS: [InputAction; 9] = [
     InputAction::Choice8,
     InputAction::Choice9,
 ];
-const CHECK: &str = "icons/misc/checkmark.png";
-const LOCK: &str = "icons/cursors/lock001.png";
 
 pub struct StagePlugin;
 
 impl Plugin for StagePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Stage>()
-            .add_systems(OnEnter(GameScene::Area), spawn_stage)
+            .add_systems(OnEnter(ClientScreen::Area), spawn_stage)
             .add_systems(
-                OnExit(GameScene::Area),
-                (
-                    crate::systems::scene::despawn_all::<StageRoot>,
-                    forget_stage,
-                ),
+                OnExit(ClientScreen::Area),
+                (despawn_all::<StageRoot>, forget_stage),
             )
             .add_systems(
                 Update,
@@ -60,12 +55,12 @@ impl Plugin for StagePlugin {
                     follow_conversation,
                     stage_keys
                         .run_if(not(ui::typing))
-                        .run_if(resource_equals(Mode::Play)),
-                    read_along.run_if(resource_equals(Mode::Spectate)),
+                        .run_if(resource_equals(ClientMode::Play)),
+                    read_along.run_if(resource_equals(ClientMode::Spectate)),
                     track_typing,
                 )
                     .chain()
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
             .add_observer(on_picked)
             .add_observer(on_refused);
@@ -73,7 +68,7 @@ impl Plugin for StagePlugin {
 }
 
 pub struct StageView {
-    pub node: DialogueId,
+    pub node: String,
     pub with: Option<Entity>,
     pub line: usize,
     pub lines: usize,
@@ -91,7 +86,7 @@ pub struct StageChoice {
 pub fn view(world: &World) -> Option<StageView> {
     let shown = world.resource::<Stage>().shown.as_ref()?;
     Some(StageView {
-        node: shown.node,
+        node: shown.node.clone(),
         with: shown.with,
         line: shown.line,
         lines: shown.lines.len(),
@@ -118,14 +113,16 @@ pub fn show_panel(world: &mut World, panel: ui::DialoguePanelOptions) -> Option<
         .query_filtered::<Entity, With<StagePanels>>()
         .iter(world)
         .next()?;
-    let mut spawned = world.spawn_scene(ui::dialogue_panel(panel)).ok()?;
-    spawned.insert(ChildOf(slot));
-    Some(spawned.id())
+    Some(
+        spawn_ui(world, ui::dialogue_panel(panel))
+            .insert(ChildOf(slot))
+            .id(),
+    )
 }
 
 pub fn box_right(world: &mut World) -> Option<f32> {
     let dialogue = stage_box(world)?;
-    let line = descendant_with::<ui::DialogueBox>(world, dialogue).unwrap_or(dialogue);
+    let line = ui::descendant_with::<ui::DialogueBox>(world, dialogue).unwrap_or(dialogue);
     Some(ui::node_rect(world, line)?.max.x)
 }
 
@@ -146,7 +143,7 @@ pub fn rects(world: &mut World) -> Vec<Rect> {
 }
 
 pub fn leave(world: &mut World) -> bool {
-    if *world.resource::<Mode>() != Mode::Play {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return false;
     }
     let Some(step) = world
@@ -168,7 +165,7 @@ struct Stage {
 
 struct Shown {
     step: ConversationStep,
-    node: DialogueId,
+    node: String,
     with: Option<Entity>,
     line: usize,
     lines: Vec<SpokenLine>,
@@ -205,30 +202,29 @@ fn spawn_stage(mut commands: Commands) {
         GlobalZIndex({ui::tokens::layer::STAGE})
         Pickable::IGNORE
         Children [
-            {EntityScene(ui::cast())},
-            (
-                StageBoxHost
+            @{ui::cast()}
+            --
+            StageBoxHost
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                right: Val::Px(0.0),
+                bottom: Val::Px(28.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+            }
+            Pickable::IGNORE
+            Children [
+                StagePanels
                 Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    right: Val::Px(0.0),
-                    bottom: Val::Px(28.0),
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
+                    width: Val::Percent(100.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::FlexEnd,
+                    column_gap: Val::Px({ui::tokens::spacing::L}),
+                    margin: {UiRect::bottom(Val::Px(ui::tokens::spacing::XL))},
                 }
                 Pickable::IGNORE
-                Children [ (
-                    StagePanels
-                    Node {
-                        width: Val::Percent(100.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::FlexEnd,
-                        column_gap: Val::Px({ui::tokens::spacing::L}),
-                        margin: {UiRect::bottom(Val::Px(ui::tokens::spacing::XL))},
-                    }
-                    Pickable::IGNORE
-                ) ]
-            ),
+            ]
         ]
     });
 }
@@ -253,15 +249,20 @@ fn follow_conversation(world: &mut World) {
     match stage.shown.as_mut() {
         None => {
             stage.shown = Some(Shown::of(now, HashMap::new()));
-            chime(world, SfxId::UiOpen);
+            InterfaceSound::UiOpen.play(world);
             show_line(world);
         }
-        Some(shown) if shown.step != now.step => {
+        Some(shown) if shown.step != now.step && shown.lines != now.lines => {
             let faces = std::mem::take(&mut shown.faces);
             stage.shown = Some(Shown::of(now, faces));
             show_line(world);
         }
         Some(shown) => {
+            if shown.step != now.step {
+                shown.step = now.step;
+                shown.node = now.node.clone();
+                shown.picked = false;
+            }
             if shown.choices != now.choices {
                 shown.stale = true;
             }
@@ -329,7 +330,7 @@ fn close(world: &mut World) {
     world.resource_mut::<Stage>().shown = None;
     despawn_box(world);
     set_cast(world, Vec::new());
-    chime(world, SfxId::UiClose);
+    InterfaceSound::UiClose.play(world);
 }
 
 fn show_line(world: &mut World) {
@@ -355,22 +356,16 @@ fn show_line(world: &mut World) {
 }
 
 fn advance(world: &mut World) {
-    let Some(shown) = world.resource_mut::<Stage>().shown.as_mut().map(|shown| {
-        let next = !shown.last_line();
-        if next {
-            shown.line += 1;
-            shown.remark = None;
-        }
-        (next, shown.choices.is_empty(), shown.step)
-    }) else {
+    let mut stage = world.resource_mut::<Stage>();
+    let Some(shown) = stage.shown.as_mut() else {
         return;
     };
-    match shown {
-        (true, ..) => show_line(world),
-        (false, true, step) if *world.resource::<Mode>() == Mode::Play => {
-            world.write_message(ConversationRequest::Leave { step });
-        }
-        _ => {}
+    if !shown.last_line() {
+        shown.line += 1;
+        shown.remark = None;
+        show_line(world);
+    } else if shown.choices.is_empty() {
+        leave(world);
     }
 }
 
@@ -391,10 +386,10 @@ fn stage_keys(world: &mut World) {
                 ui::pick_choice(world, list);
             } else if map::just_pressed(world, InputAction::ChoosePrevious) {
                 ui::step_choice(world, list, -1);
-                chime(world, SfxId::UiMove);
+                InterfaceSound::UiMove.play(world);
             } else if map::just_pressed(world, InputAction::ChooseNext) {
                 ui::step_choice(world, list, 1);
-                chime(world, SfxId::UiMove);
+                InterfaceSound::UiMove.play(world);
             } else if let Some(index) = map::just_pressed_index(world, &CHOICE_SHORTCUTS) {
                 ui::pick_choice_at(world, list, index);
             }
@@ -445,7 +440,7 @@ fn on_picked(picked: On<ui::ChoicePicked>, mut commands: Commands) {
     let index = picked.index;
     commands.queue(move |world: &mut World| {
         if request_pick(world, index) {
-            chime(world, SfxId::UiPick);
+            InterfaceSound::UiPick.play(world);
         }
     });
 }
@@ -458,20 +453,18 @@ fn on_refused(refused: On<ui::ChoiceRefused>, mut commands: Commands) {
 }
 
 fn request_pick(world: &mut World, index: usize) -> bool {
-    if *world.resource::<Mode>() != Mode::Play {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return false;
     }
-    let Some(step) = world
-        .resource_mut::<Stage>()
-        .shown
-        .as_mut()
-        .and_then(|shown| {
-            shown.choices.get(index)?;
-            (!std::mem::replace(&mut shown.picked, true)).then_some(shown.step)
-        })
-    else {
+    let mut stage = world.resource_mut::<Stage>();
+    let Some(shown) = stage.shown.as_mut() else {
         return false;
     };
+    if shown.picked || index >= shown.choices.len() {
+        return false;
+    }
+    shown.picked = true;
+    let step = shown.step;
     world.write_message(ConversationRequest::Pick {
         step,
         choice: index as u32,
@@ -492,19 +485,13 @@ fn refuse(world: &mut World, refused: RefusedPick) {
     }
 }
 
-fn advance_on_click(click: On<Pointer<Click>>, input: ActionInput, mut commands: Commands) {
+fn advance_on_click(click: On<PointerClick>, input: ActionInput, mut commands: Commands) {
     if !input.clicked(InputAction::Advance, &click) {
         return;
     }
     let target = click.original_event_target();
-    let root = click.entity;
     commands.queue(move |world: &mut World| {
-        let on_control = std::iter::successors(Some(target), |&entity| {
-            (entity != root)
-                .then(|| world.get::<ChildOf>(entity).map(ChildOf::parent))
-                .flatten()
-        })
-        .any(|entity| {
+        let on_control = ui::self_and_ancestors(world, target).any(|entity| {
             world.get::<ui::ChoiceRow>(entity).is_some()
                 || world.get::<bevy::ui_widgets::Button>(entity).is_some()
         });
@@ -513,7 +500,7 @@ fn advance_on_click(click: On<Pointer<Click>>, input: ActionInput, mut commands:
             .shown
             .as_ref()
             .is_some_and(|shown| shown.typed_since.is_some());
-        if !on_control && typed && *world.resource::<Mode>() == Mode::Play {
+        if !on_control && typed && *world.resource::<ClientMode>() == ClientMode::Play {
             advance(world);
         }
     });
@@ -534,9 +521,7 @@ fn build_box(world: &mut World, typed: bool) {
     let Some(options) = box_options(world, typed) else {
         return;
     };
-    let Ok(mut spawned) = world.spawn_scene(ui::dialogue_box(options)) else {
-        return;
-    };
+    let mut spawned = spawn_ui(world, ui::dialogue_box(options));
     spawned.insert((StageBox, ChildOf(host)));
     spawned.observe(advance_on_click);
     if typed {
@@ -553,13 +538,15 @@ fn box_options(world: &World, typed: bool) -> Option<DialogueBoxOptions> {
     let shown = world.resource::<Stage>().shown.as_ref()?;
     let line = shown.current()?;
     let assets = world.resource::<AssetServer>();
-    let playing = *world.resource::<Mode>() == Mode::Play;
+    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
     let choices = if shown.last_line() {
         shown
             .choices
             .iter()
             .enumerate()
-            .map(|(index, choice)| choice_options(assets, choice, index))
+            .map(|(index, choice)| {
+                choice_options(world.resource::<Content>(), assets, choice, index)
+            })
             .collect()
     } else {
         Vec::new()
@@ -580,6 +567,7 @@ fn box_options(world: &World, typed: bool) -> Option<DialogueBoxOptions> {
 }
 
 fn babble_along(world: &mut World) {
+    let content = *world.resource::<Content>();
     let Some(by) = world
         .resource::<Stage>()
         .shown
@@ -590,13 +578,13 @@ fn babble_along(world: &mut World) {
         return;
     };
     let babble = match by {
-        Speaker::Npc(npc) => npc.get().babble,
+        Speaker::Npc(npc) => npc.get(&content).voice(),
         Speaker::Player => world
             .resource::<Viewpoint>()
             .0
             .and_then(|seen| world.get::<Babbler>(seen))
             .map(|babbler| babbler.0),
-        Speaker::Prop(_) | Speaker::Narrator => None,
+        Speaker::Object | Speaker::Narrator => None,
     };
     if let (Some(babble), Some(line)) = (babble, typing_line(world)) {
         world.entity_mut(line).insert(Babbling {
@@ -627,14 +615,30 @@ fn spectator_hint() -> Vec<RichPiece> {
     vec![RichPiece::text("Watching")]
 }
 
-fn choice_options(assets: &AssetServer, choice: &ChoiceView, index: usize) -> ChoiceOptions {
+fn choice_options(
+    content: &Content,
+    assets: &AssetServer,
+    choice: &ChoiceView,
+    index: usize,
+) -> ChoiceOptions {
     let mut chips: Vec<ChipOptions> = choice
         .chips
         .iter()
         .map(|chip| match chip {
             ChoiceChip::Needs { what, met } => ChipOptions {
                 label: what.clone(),
-                icon: Some(assets.load(if *met { CHECK } else { LOCK })),
+                icon: Some(
+                    assets.load(
+                        if *met {
+                            InterfaceIcon::Checked
+                        } else {
+                            InterfaceIcon::Locked
+                        }
+                        .get(content)
+                        .image
+                        .path(),
+                    ),
+                ),
                 family: Family::outline(if *met {
                     palette::EMERALD_70
                 } else {
@@ -644,7 +648,7 @@ fn choice_options(assets: &AssetServer, choice: &ChoiceView, index: usize) -> Ch
             },
             ChoiceChip::Pays { item, count, have } => ChipOptions {
                 label: count.to_string(),
-                icon: Some(assets.load(item.get().icon.0)),
+                icon: Some(assets.load(item.get(content).icon.path())),
                 family: Family::outline(if have >= count {
                     palette::AMBER_70
                 } else {
@@ -654,9 +658,9 @@ fn choice_options(assets: &AssetServer, choice: &ChoiceView, index: usize) -> Ch
             },
             ChoiceChip::Gets { item, count } => ChipOptions {
                 label: format!("+{count}"),
-                icon: Some(assets.load(item.get().icon.0)),
+                icon: Some(assets.load(item.get(content).icon.path())),
                 family: Family::outline(palette::EMERALD_70),
-                inspect: Some(card::inspectable(*item)),
+                inspect: Some(card::inspectable(content, *item)),
             },
         })
         .collect();
@@ -694,9 +698,10 @@ fn cast_members(world: &World) -> Vec<CastMember> {
             speakers.push(line.by);
         }
     }
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     speakers.retain(|who| seen.insert(*who));
-    speakers.retain(|&who| busts_of(who).is_some());
+    let content = world.resource::<Content>();
+    speakers.retain(|&who| busts_of(content, who).is_some());
     let assets = world.resource::<AssetServer>();
     let fronts: Vec<Speaker> = [Side::Left, Side::Right]
         .into_iter()
@@ -712,19 +717,19 @@ fn cast_members(world: &World) -> Vec<CastMember> {
     speakers
         .into_iter()
         .filter_map(|who| {
-            let busts = busts_of(who)?;
+            let busts = busts_of(content, who)?;
             let face = shown
                 .faces
                 .get(&who)
-                .copied()
+                .cloned()
                 .unwrap_or(Face::Generic(GenericExpression::Neutral));
             let bust = busts
-                .face(face)
+                .face(&face)
                 .unwrap_or_else(|| busts.generic.of(GenericExpression::Neutral));
             let lit = who == current.by;
             Some(CastMember {
-                key: cast_key(who),
-                image: bust_image(assets, bust),
+                key: fingerprint(&who),
+                image: assets.load(bust.path()),
                 side: side_of(who),
                 depth: if fronts.contains(&who) {
                     CastDepth::Front
@@ -747,22 +752,25 @@ fn set_cast(world: &mut World, members: Vec<CastMember>) {
     }
 }
 
-fn bust_image(assets: &AssetServer, art: AssetRef) -> Handle<Image> {
-    assets.load(art.0)
-}
-
-fn busts_of(who: Speaker) -> Option<&'static Busts> {
+fn busts_of(content: &Content, who: Speaker) -> Option<&Busts> {
     match who {
-        Speaker::Npc(npc) => npc.get().model.get().busts.as_ref(),
-        Speaker::Player => player::def().model.get().busts.as_ref(),
-        Speaker::Prop(_) | Speaker::Narrator => None,
+        Speaker::Npc(npc) => npc.get(content).model.get(content).busts(),
+        Speaker::Player => player::def(content).model.get(content).busts(),
+        Speaker::Object | Speaker::Narrator => None,
     }
 }
 
 fn speaker_name(world: &World, who: Speaker) -> Option<String> {
+    let content = world.resource::<Content>();
     match who {
-        Speaker::Npc(npc) => Some(npc.get().display_name.to_owned()),
-        Speaker::Prop(prop) => Some(prop.get().display_name.to_owned()),
+        Speaker::Npc(npc) => Some(npc.get(content).name.to_owned()),
+        Speaker::Object => world
+            .resource::<Stage>()
+            .shown
+            .as_ref()
+            .and_then(|shown| shown.with)
+            .and_then(|with| world.get::<Name>(with))
+            .map(|name| name.name.clone()),
         Speaker::Player => world
             .resource::<Viewpoint>()
             .0
@@ -775,24 +783,8 @@ fn speaker_name(world: &World, who: Speaker) -> Option<String> {
 fn side_of(who: Speaker) -> Side {
     match who {
         Speaker::Player => Side::Left,
-        Speaker::Npc(_) | Speaker::Prop(_) | Speaker::Narrator => Side::Right,
+        Speaker::Npc(_) | Speaker::Object | Speaker::Narrator => Side::Right,
     }
-}
-
-fn cast_key(who: Speaker) -> u64 {
-    match who {
-        Speaker::Player => 0,
-        Speaker::Narrator => 1,
-        Speaker::Npc(npc) => 2 + npc.index() as u64,
-        Speaker::Prop(prop) => 10_000 + prop.index() as u64,
-    }
-}
-
-fn chime(world: &mut World, id: SfxId) {
-    world.write_message(PlaySfx {
-        id,
-        place: SfxPlace::Interface,
-    });
 }
 
 fn stage_box(world: &mut World) -> Option<Entity> {
@@ -825,17 +817,4 @@ fn shown_choices(world: &mut World) -> Option<Entity> {
         .get::<Children>(list)
         .is_some_and(|rows| !rows.is_empty());
     (last && rows).then_some(list)
-}
-
-fn descendant_with<C: Component>(world: &World, root: Entity) -> Option<Entity> {
-    let mut stack = vec![root];
-    while let Some(entity) = stack.pop() {
-        if world.get::<C>(entity).is_some() {
-            return Some(entity);
-        }
-        if let Some(kids) = world.get::<Children>(entity) {
-            stack.extend(kids.iter());
-        }
-    }
-    None
 }

@@ -2,11 +2,49 @@ pub mod widget;
 
 use std::collections::{HashMap, VecDeque};
 
-use crate::data::terminal::Id;
 use bevy::prelude::*;
-use bevy_terminal::{AvailableTerminals, TerminalLine};
+use bevy_terminal::{AvailableTerminals, Terminal, TerminalLine};
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
-use crate::systems::hud::{RefreshWindows, TERMINAL_WINDOW};
+use crate::systems::hud::{RefreshWindows, Window};
+
+#[derive(
+    Serialize,
+    Deserialize,
+    VariantArray,
+    IntoStaticStr,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
+pub enum TerminalKind {
+    Global,
+}
+
+impl TerminalKind {
+    fn terminal(self) -> &'static Terminal {
+        match self {
+            TerminalKind::Global => &GLOBAL,
+        }
+    }
+}
+
+static GLOBAL: Terminal = Terminal { access: None };
+
+pub fn register(app: &mut App) {
+    bevy_terminal::register(
+        app,
+        TerminalKind::VARIANTS
+            .iter()
+            .map(|&kind| (kind, kind.terminal())),
+    );
+}
 
 pub struct TerminalPlugin;
 
@@ -19,13 +57,13 @@ impl Plugin for TerminalPlugin {
 
 #[derive(Resource, Default)]
 pub struct Terminals {
-    pub tabs: Vec<Id>,
-    lines: HashMap<Id, VecDeque<(u64, String)>>,
+    pub tabs: Vec<TerminalKind>,
+    lines: HashMap<TerminalKind, VecDeque<(u64, String)>>,
     next_seq: u64,
 }
 
 impl Terminals {
-    pub fn lines(&self, terminal: Id) -> impl Iterator<Item = &(u64, String)> {
+    pub fn lines(&self, terminal: TerminalKind) -> impl Iterator<Item = &(u64, String)> {
         self.lines.get(&terminal).into_iter().flatten()
     }
 }
@@ -33,15 +71,15 @@ impl Terminals {
 const MAX_LINES: usize = 200;
 
 fn receive(
-    mut available: MessageReader<AvailableTerminals<Id>>,
-    mut lines: MessageReader<TerminalLine<Id>>,
+    mut available: MessageReader<AvailableTerminals<TerminalKind>>,
+    mut lines: MessageReader<TerminalLine<TerminalKind>>,
     mut terminals: ResMut<Terminals>,
     mut refresh: ResMut<RefreshWindows>,
 ) {
     for message in available.read() {
         if terminals.tabs != message.terminals {
             terminals.tabs = message.terminals.clone();
-            refresh.0.insert(TERMINAL_WINDOW);
+            refresh.0.insert(widget::TerminalWindow.title());
         }
     }
     for line in lines.read() {

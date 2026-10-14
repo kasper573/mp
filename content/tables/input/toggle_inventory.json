@@ -1,0 +1,9 @@
+{
+  "label": "Open or close the inventory",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyI"
+    }
+  ]
+}

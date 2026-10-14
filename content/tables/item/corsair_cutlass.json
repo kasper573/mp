@@ -1,0 +1,31 @@
+{
+  "name": "Corsair's Cutlass",
+  "icon": "icons/weapon_and_tool/golden_sword.png",
+  "sfx": {
+    "pickup": "pickup_blade",
+    "trade": "trade_blade",
+    "drop": "block01"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon",
+    "requires": {
+      "type": "at_least",
+      "a": {
+        "type": "level"
+      },
+      "b": 3
+    }
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "A gilded blade from a ship nobody remembers. Worth following the cross for."
+    },
+    {
+      "type": "stat",
+      "stat": "damage",
+      "value": 5.0
+    }
+  ]
+}

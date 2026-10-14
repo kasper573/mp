@@ -1,3 +1,4 @@
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ service::heap_profiling!();
 
 #[derive(Deserialize)]
 struct Config {
+    bind: IpAddr,
     port: u16,
     redirect_uri: RedirectUrl,
     game_server_url: String,
@@ -26,8 +28,8 @@ struct Config {
     pyroscope_sample_hz: u32,
 }
 
-pub struct App {
-    pub auth: auth::Auth,
+struct App {
+    auth: auth::Auth,
     game_server_url: String,
     game_server_ws_url: String,
 }
@@ -42,7 +44,7 @@ async fn main() {
         config.pyroscope_enabled,
         config.pyroscope_sample_hz,
     );
-    let port = config.port;
+    let at = SocketAddr::new(config.bind, config.port);
     let app = Arc::new(App {
         auth: auth::Auth::from_env(config.redirect_uri).await,
         game_server_url: config.game_server_url,
@@ -55,9 +57,10 @@ async fn main() {
         .route("/auth/sign-out", get(auth::sign_out))
         .route("/auth-callback", get(auth::callback))
         .route("/site.css", get(css))
+        .route("/favicon.png", get(favicon))
         .nest_service("/wasm", ServeDir::new(config.wasm_dir))
         .with_state(app);
-    service::serve("website", port, router).await;
+    service::serve("website", at, router).await;
 }
 
 impl App {
@@ -117,6 +120,13 @@ fn page<T: Template>(template: T) -> Response {
         Ok(html) => Html(html).into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
+}
+
+async fn favicon() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "image/png")],
+        include_bytes!("../static/favicon.png").as_slice(),
+    )
 }
 
 async fn css() -> impl IntoResponse {

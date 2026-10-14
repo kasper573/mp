@@ -1,128 +1,477 @@
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 
-use tiled::{Frame, PropertyValue, TileId};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
-use crate::core::assets::{AssetRef, AssetService};
+use super::Action;
+use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
+use crate::core::content::media::ImageSizes;
+use crate::core::content::{
+    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
+};
 use crate::core::math::{Direction, Pos, Rect, Size, WorldPx};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Millis, PlaybackRate, Seconds};
 
-use super::Action;
+pub type ModelId = ContentId<ModelDef>;
 
-pub fn build_model(svc: &AssetService, source: AssetRef) -> ActorModel {
-    let name = source.0;
-    let tileset = tiled::Loader::with_reader(|path: &Path| svc.open(path))
-        .load_tsx_tileset(source.0)
-        .unwrap_or_else(|error| panic!("actor model {name}: {error}"));
-    let sheet = tileset
-        .image
-        .as_ref()
-        .and_then(|image| image.source.to_str())
-        .unwrap_or_else(|| panic!("actor model {name} declares no sheet image"))
-        .to_owned();
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModelDef {
+    pub hitbox: HitboxSize,
+    pub sprites: Sprites,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<ModelModule>,
+}
 
-    let mut strips: HashMap<Action, [Vec<Frame>; 8]> = HashMap::new();
-    let mut sounds = HashMap::new();
-    let mut steps = HashSet::new();
-    let mut apexes = HashSet::new();
-    for (id, tile) in tileset.tiles() {
-        if let Some(PropertyValue::StringValue(sfx)) = tile.properties.get("sfx") {
-            sounds.insert(
-                id,
-                sfx.parse::<SfxId>()
-                    .unwrap_or_else(|error| panic!("actor sfx '{sfx}': {error}")),
-            );
-        }
-        if let Some(PropertyValue::BoolValue(true)) = tile.properties.get("step") {
-            steps.insert(id);
-        }
-        if let Some(PropertyValue::BoolValue(true)) = tile.properties.get("apex") {
-            apexes.insert(id);
-        }
-        if let Some(PropertyValue::StringValue(label)) = tile.properties.get("action") {
-            let action = Action::named(label).unwrap_or_else(|| {
-                panic!("actor model {name}: tile {id} has an unknown action '{label}'")
-            });
-            let dir = match tile.properties.get("dir") {
-                Some(PropertyValue::IntValue(dir)) if (0..8).contains(dir) => *dir as usize,
-                _ => panic!("actor model {name}: '{label}' tile {id} needs a dir in 0..8"),
-            };
-            let strip = tile
-                .animation
-                .clone()
-                .filter(|frames| !frames.is_empty())
-                .unwrap_or_else(|| panic!("actor model {name}: '{label}' dir {dir} is empty"));
-            strips.entry(action).or_default()[dir] = strip;
-        }
-    }
-    for action in Action::ALL {
-        let Some(dirs) = strips.get(&action) else {
-            panic!(
-                "actor model {name} must declare a '{}' action",
-                action.name()
-            );
-        };
-        if dirs.iter().any(Vec::is_empty) {
-            panic!(
-                "actor model {name}: action '{}' is missing a direction strip",
-                action.name()
-            );
-        }
-    }
+impl ContentRow for ModelDef {
+    const TABLE: &'static str = "model";
 
-    let dimension = |key: &str| match tileset.properties.get(key) {
-        Some(PropertyValue::FloatValue(value)) => *value,
-        _ => panic!("actor model {name} needs a float '{key}' tileset property"),
-    };
-    ActorModel {
-        sheet,
-        frame: Size::new(tileset.tile_width as f32, tileset.tile_height as f32),
-        columns: tileset.columns.max(1),
-        hitbox: Size::new(dimension("hitbox_width"), dimension("hitbox_height")),
-        scale: match tileset.properties.get("scale") {
-            None => 1.0,
-            Some(PropertyValue::FloatValue(scale)) if *scale > 0.0 => *scale,
-            Some(other) => {
-                panic!("actor model {name}: 'scale' must be a positive float, not {other:?}")
+    fn check(&self, cx: &mut RowCheck) {
+        cx.range("/hitbox/width", self.hitbox.width, 0.1, 8.0, "tiles");
+        cx.range("/hitbox/height", self.hitbox.height, 0.1, 8.0, "tiles");
+        let sheet = self.sheet();
+        cx.range(
+            "/sprites/frame_size/width",
+            sheet.frame_size.width,
+            1,
+            8192,
+            "pixels",
+        );
+        cx.range(
+            "/sprites/frame_size/height",
+            sheet.frame_size.height,
+            1,
+            8192,
+            "pixels",
+        );
+        for (index, module) in self.modules.iter().enumerate() {
+            if let ModelModule::Scale { factor } = module {
+                cx.range(
+                    format!("/modules/{index}/factor"),
+                    *factor,
+                    0.1,
+                    10.0,
+                    "a scale",
+                );
             }
-        },
-        airborne: matches!(
-            tileset.properties.get("airborne"),
-            Some(PropertyValue::BoolValue(true))
-        ),
-        strips,
-        sounds,
-        steps,
-        apexes,
+        }
     }
+}
+
+impl ModuleSet for ModelDef {
+    type Module = ModelModule;
+
+    fn modules(&self) -> &[ModelModule] {
+        &self.modules
+    }
+
+    fn rule(_: &ModelModule) -> ModuleRule {
+        ModuleRule::AtMostOne
+    }
+}
+
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HitboxSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl HitboxSize {
+    pub fn tiles(self) -> Size<Tiles> {
+        Size::new(self.width, self.height)
+    }
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Sprites {
+    Sheet(Sheet),
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sheet {
+    pub image: AssetRef,
+    pub frame_size: FrameSize,
+    pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
+}
+
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FrameSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SheetFrame {
+    pub frame: u32,
+    pub ms: u32,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    pub step: bool,
+    #[serde(default, skip_serializing_if = "serial::is_false")]
+    pub apex: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound: Option<SfxId>,
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ModelModule {
+    Bust(Busts),
+    Scale { factor: f32 },
+    Airborne,
+}
+
+impl ModelDef {
+    pub fn busts(&self) -> Option<&Busts> {
+        self.modules.iter().find_map(|module| match module {
+            ModelModule::Bust(busts) => Some(busts),
+            _ => None,
+        })
+    }
+
+    pub fn scale(&self) -> f32 {
+        self.modules
+            .iter()
+            .find_map(|module| match module {
+                ModelModule::Scale { factor } => Some(*factor),
+                _ => None,
+            })
+            .unwrap_or(1.0)
+    }
+
+    pub fn airborne(&self) -> bool {
+        self.modules
+            .iter()
+            .any(|module| matches!(module, ModelModule::Airborne))
+    }
+
+    pub fn sheet(&self) -> &Sheet {
+        match &self.sprites {
+            Sprites::Sheet(sheet) => sheet,
+        }
+    }
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct Busts {
+    #[serde(flatten)]
+    pub generic: GenericBusts,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub own: Vec<OwnBust>,
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OwnBust {
+    pub name: String,
+    pub file: AssetRef,
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct GenericBusts {
+    pub neutral: AssetRef,
+    pub happy: AssetRef,
+    pub sad: AssetRef,
+    pub angry: AssetRef,
+    pub surprised: AssetRef,
+    pub thinking: AssetRef,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum Face {
+    Generic(GenericExpression),
+    Own(String),
+}
+
+impl From<String> for Face {
+    fn from(name: String) -> Face {
+        match name.parse() {
+            Ok(expression) => Face::Generic(expression),
+            Err(_) => Face::Own(name),
+        }
+    }
+}
+
+impl From<Face> for String {
+    fn from(face: Face) -> String {
+        match face {
+            Face::Generic(expression) => expression.as_ref().to_owned(),
+            Face::Own(name) => name,
+        }
+    }
+}
+
+impl JsonSchema for Face {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("Face")
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        let mut schema = String::json_schema(generator);
+        schema.insert("x-face".to_owned(), true.into());
+        schema
+    }
+
+    fn inline_schema() -> bool {
+        true
+    }
+}
+
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    VariantArray,
+    AsRefStr,
+    EnumString,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum GenericExpression {
+    #[default]
+    Neutral,
+    Happy,
+    Sad,
+    Angry,
+    Surprised,
+    Thinking,
+}
+
+impl Busts {
+    pub fn all(&self) -> impl Iterator<Item = &AssetRef> {
+        GenericExpression::VARIANTS
+            .iter()
+            .map(|&expression| self.generic.of(expression))
+            .chain(self.own.iter().map(|own| &own.file))
+    }
+
+    pub fn face(&self, face: &Face) -> Option<&AssetRef> {
+        match face {
+            Face::Generic(expression) => Some(self.generic.of(*expression)),
+            Face::Own(name) => self
+                .own
+                .iter()
+                .find(|own| own.name == *name)
+                .map(|own| &own.file),
+        }
+    }
+}
+
+impl GenericBusts {
+    pub fn of(&self, expression: GenericExpression) -> &AssetRef {
+        match expression {
+            GenericExpression::Neutral => &self.neutral,
+            GenericExpression::Happy => &self.happy,
+            GenericExpression::Sad => &self.sad,
+            GenericExpression::Angry => &self.angry,
+            GenericExpression::Surprised => &self.surprised,
+            GenericExpression::Thinking => &self.thinking,
+        }
+    }
+}
+
+pub const MAX_STRIP_FRAMES: usize = 256;
+pub const MAX_FRAME_MS: u32 = 60_000;
+
+pub struct Models(pub Vec<Option<ActorModel>>);
+
+pub fn build_all(loading: &mut Loading) {
+    let content = loading.content();
+    let sizes = content.built::<ImageSizes>();
+    let mut models: Vec<Option<ActorModel>> = content.ids::<ModelDef>().map(|_| None).collect();
+    for (id, def) in loading.rows::<ModelDef>() {
+        let mut check = RowCheck::default();
+        let sheet = def.sheet();
+        let image = sizes.0.get(sheet.image.as_str()).copied();
+        if let Some((width, height)) = image
+            && (width % sheet.frame_size.width.max(1) != 0
+                || height % sheet.frame_size.height.max(1) != 0)
+        {
+            check.error(
+                "/sprites/image",
+                "image size",
+                format!(
+                    "{width} × {height}, not a multiple of {} × {}",
+                    sheet.frame_size.width, sheet.frame_size.height
+                ),
+                "an image of whole frames",
+            );
+        }
+        let frames = image.map(|(width, height)| {
+            (width / sheet.frame_size.width.max(1)) * (height / sheet.frame_size.height.max(1))
+        });
+        for &action in Action::VARIANTS {
+            let Some(strips) = sheet.actions.get(&action) else {
+                check.error(
+                    "/sprites/actions",
+                    "missing frames",
+                    format!("no {} action", action.as_ref()),
+                    "every action: idle, walk, run, attack, death",
+                );
+                continue;
+            };
+            for &direction in Direction::VARIANTS {
+                let pointer = format!(
+                    "/sprites/actions/{}/{}",
+                    action.as_ref(),
+                    direction.as_ref()
+                );
+                let Some(strip) = strips.get(&direction) else {
+                    check.error(
+                        format!("/sprites/actions/{}", action.as_ref()),
+                        "missing frames",
+                        format!("direction {} has no frames", direction.as_ref()),
+                        "1 to 256 frames in each of s, sw, nw, n, ne, se, e, w",
+                    );
+                    continue;
+                };
+                check.count(&pointer, strip.len(), 1, MAX_STRIP_FRAMES, "frames");
+                let mut apexes = Vec::new();
+                for (index, frame) in strip.iter().enumerate() {
+                    check.range(
+                        format!("{pointer}/{index}/ms"),
+                        frame.ms,
+                        1,
+                        MAX_FRAME_MS,
+                        "whole milliseconds",
+                    );
+                    if let Some(frames) = frames
+                        && frame.frame >= frames
+                    {
+                        check.error(
+                            format!("{pointer}/{index}/frame"),
+                            "tile out of range",
+                            format!("frame {} of {frames}", frame.frame),
+                            format!("0 to {}", frames.saturating_sub(1)),
+                        );
+                    }
+                    if frame.apex {
+                        apexes.push(index);
+                    }
+                }
+                if (apexes.len() > 1) || (!apexes.is_empty() && action != Action::Attack) {
+                    check.error(
+                        &pointer,
+                        "apex out of place",
+                        format!(
+                            "{} · {}: frames {}",
+                            action.as_ref(),
+                            direction.as_ref(),
+                            apexes
+                                .iter()
+                                .map(|i| i.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" and ")
+                        ),
+                        "one apex, in attack strips only",
+                    );
+                }
+            }
+        }
+        if let Some(busts) = def.busts() {
+            let mut size: Option<(u32, u32, &str)> = None;
+            for bust in busts.all() {
+                let Some(&own) = sizes.0.get(bust.as_str()) else {
+                    continue;
+                };
+                match size {
+                    None => size = Some((own.0, own.1, bust.as_str())),
+                    Some((w, h, first)) if (w, h) != own => {
+                        check.error(
+                            "/modules",
+                            "bust sizes differ",
+                            format!(
+                                "{} is {} × {}, {first} is {w} × {h}",
+                                bust.as_str(),
+                                own.0,
+                                own.1
+                            ),
+                            "every bust of one model at one size",
+                        );
+                        break;
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+        if check.is_empty() {
+            models[id.index()] = Some(ActorModel::new(def, image));
+        } else {
+            loading.row_errors(id, check);
+            loading.fail(id);
+        }
+    }
+    loading.built(Models(models));
 }
 
 pub struct ActorModel {
-    sheet: String,
-    frame: Size<WorldPx>,
+    def: &'static ModelDef,
     columns: u32,
-    hitbox: Size<Tiles>,
-    scale: f32,
-    pub airborne: bool,
-    strips: HashMap<Action, [Vec<Frame>; 8]>,
-    sounds: HashMap<TileId, SfxId>,
-    steps: HashSet<TileId>,
-    apexes: HashSet<TileId>,
+    strips: Vec<Vec<&'static [SheetFrame]>>,
 }
 
 impl ActorModel {
-    pub fn hitbox(&self) -> Size<Tiles> {
-        self.hitbox
+    pub fn get(content: &Content, model: ModelId) -> &'static ActorModel {
+        content
+            .built::<Models>()
+            .0
+            .get(model.index())
+            .and_then(Option::as_ref)
+            .unwrap_or_else(|| panic!("model {} failed to load", model.key(content)))
     }
 
-    pub fn sheet(&self) -> &str {
-        &self.sheet
+    // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
+    fn new(def: &'static ModelDef, image: Option<(u32, u32)>) -> ActorModel {
+        let sheet = def.sheet();
+        let columns = image
+            .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
+            .max(1);
+        let strips = Action::VARIANTS
+            .iter()
+            .map(|action| {
+                Direction::VARIANTS
+                    .iter()
+                    .map(|direction| sheet.actions[action][direction].as_slice())
+                    .collect()
+            })
+            .collect();
+        ActorModel {
+            def,
+            columns,
+            strips,
+        }
+    }
+
+    pub fn hitbox(&self) -> Size<Tiles> {
+        self.def.hitbox.tiles()
+    }
+
+    pub fn sheet(&self) -> &'static crate::core::assets::AssetRef {
+        &self.def.sheet().image
+    }
+
+    pub fn airborne(&self) -> bool {
+        self.def.airborne()
     }
 
     pub fn drawn_size(&self, frame: Rect<WorldPx>) -> Size<WorldPx> {
-        frame.size * self.scale
+        frame.size * self.def.scale()
     }
 
     pub fn frame(
@@ -142,12 +491,12 @@ impl ActorModel {
         };
         let mut cursor = Millis(0.0);
         for frame in strip {
-            cursor += Millis(frame.duration as f32);
+            cursor += Millis(frame.ms as f32);
             if position < cursor {
-                return self.region(frame.tile_id);
+                return self.region(frame.frame);
             }
         }
-        self.region(strip[strip.len() - 1].tile_id)
+        self.region(strip[strip.len() - 1].frame)
     }
 
     pub fn timing(&self, action: Action, dir: Direction) -> Timing {
@@ -155,10 +504,10 @@ impl ActorModel {
         let mut apex = Millis(0.0);
         let mut cursor = Millis(0.0);
         for frame in strip {
-            if self.apexes.contains(&frame.tile_id) {
+            if frame.apex {
                 apex = cursor;
             }
-            cursor += Millis(frame.duration as f32);
+            cursor += Millis(frame.ms as f32);
         }
         Timing {
             duration: cursor.seconds(),
@@ -185,32 +534,27 @@ impl ActorModel {
         let mut cursor = Millis(0.0);
         for frame in strip {
             if crossed(once, total, cursor, prev.map(authored), authored(now)) {
-                sfx.extend(self.sounds.get(&frame.tile_id));
-                stepped |= self.steps.contains(&frame.tile_id);
+                sfx.extend(frame.sound.as_ref());
+                stepped |= frame.step;
             }
-            cursor += Millis(frame.duration as f32);
+            cursor += Millis(frame.ms as f32);
         }
         (sfx, stepped)
     }
 
-    pub fn sfx_ids(&self) -> impl Iterator<Item = &SfxId> {
-        self.sounds.values()
+    fn strip(&self, action: Action, dir: Direction) -> &'static [SheetFrame] {
+        self.strips[action as usize][dir as usize]
     }
 
-    fn strip(&self, action: Action, dir: Direction) -> &[Frame] {
-        &self
-            .strips
-            .get(&action)
-            .expect("validated at load: every actor model declares every action")[dir_slot(dir)]
-    }
-
-    fn region(&self, tile: TileId) -> Rect<WorldPx> {
+    fn region(&self, frame: u32) -> Rect<WorldPx> {
+        let size = self.def.sheet().frame_size;
+        let frame_size = Size::new(size.width as f32, size.height as f32);
         Rect::new(
             Pos::new(
-                (tile % self.columns) as f32 * self.frame.width,
-                (tile / self.columns) as f32 * self.frame.height,
+                (frame % self.columns) as f32 * frame_size.width,
+                (frame / self.columns) as f32 * frame_size.height,
             ),
-            self.frame,
+            frame_size,
         )
     }
 }
@@ -221,10 +565,6 @@ pub struct Timing {
     pub apex: Seconds,
 }
 
-fn dir_slot(dir: Direction) -> usize {
-    dir as usize
-}
-
 fn rate(action: Action, attack_speed: PlaybackRate) -> PlaybackRate {
     if action == Action::Attack {
         attack_speed.at_least(0.01)
@@ -233,8 +573,8 @@ fn rate(action: Action, attack_speed: PlaybackRate) -> PlaybackRate {
     }
 }
 
-fn total_ms(strip: &[Frame]) -> Millis {
-    Millis(strip.iter().map(|frame| frame.duration as f32).sum())
+fn total_ms(strip: &[SheetFrame]) -> Millis {
+    Millis(strip.iter().map(|frame| frame.ms as f32).sum())
 }
 
 fn crossed(once: bool, total: Millis, at: Millis, prev: Option<Millis>, now: Millis) -> bool {

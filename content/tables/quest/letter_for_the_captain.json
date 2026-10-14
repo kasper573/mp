@@ -1,0 +1,43 @@
+{
+  "title": "A Letter for the Captain",
+  "category": "Harbour Errands",
+  "blurb": "Take this to Bram on his ship. I'd go myself, but my knees and that gangplank are not on speaking terms.",
+  "xp": 40,
+  "modules": [
+    {
+      "type": "grants",
+      "items": [
+        {
+          "item": "tobbs_letter"
+        }
+      ]
+    },
+    {
+      "type": "deliver",
+      "item": "tobbs_letter"
+    },
+    {
+      "type": "hand_in",
+      "items": [
+        {
+          "item": "tobbs_letter"
+        }
+      ]
+    },
+    {
+      "type": "hand_over",
+      "text": [
+        "Tobb asked me to bring you this."
+      ]
+    },
+    {
+      "type": "reward",
+      "items": [
+        {
+          "item": "gold",
+          "count": 10
+        }
+      ]
+    }
+  ]
+}

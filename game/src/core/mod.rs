@@ -1,11 +1,12 @@
 pub mod assets;
 pub mod audio;
 pub mod babble;
+pub mod content;
 pub mod interpolate;
 pub mod math;
 pub mod net;
 pub mod platform;
 pub mod render;
-pub mod table;
+pub mod script;
 pub mod tiling;
 pub mod time;

@@ -1,5 +1,5 @@
 use bevy_math::Vec2;
-use bevy_scene::{Scene, bsn, on, template_value};
+use bevy_scene::{Scene, bsn, on};
 use bevy_ui::{BorderRadius, Checkable, PositionType, UiRect, Val};
 use bevy_ui_widgets::{Checkbox, checkbox_self_update};
 
@@ -16,14 +16,14 @@ pub fn switch(checked: bool) -> impl Scene {
         Checkable
         on(checkbox_self_update)
         StartChecked({checked})
-        template_value(track_style())
+        track_style()
     }
 }
 
 pub fn switch_thumb() -> impl Scene {
     bsn! {
         InheritChecked
-        template_value(thumb_style())
+        thumb_style()
     }
 }
 

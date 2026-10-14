@@ -1,58 +1,58 @@
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::Ordering::Relaxed;
 use std::time::Instant;
 
 use bevy_app::App;
 use bevy_ecs::prelude::{Entity, With};
 use bevy_replicon::prelude::Replicated;
-use game::core::assets::AssetService;
+use game::core::content::Content;
 use game::systems::movement::Position;
 use game::systems::visibility::seen_by;
+use serde::Deserialize;
+
+use crate::sim;
 
 const AREAS: usize = 250; // near the current budget crossover: the representative heavy workload
 const MEASURE: usize = 400;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Env {
     no_clients: Option<bool>,
 }
 
-/// Profiles a fixed `AREAS`-area workload with clients connected (the replication-heavy "full"
-/// config), writing a CPU flamegraph + pprof protobuf and reporting allocation churn per tick. Uses
-/// the exact same [`crate::sim`] world construction the benchmark does, so the two never diverge.
-pub fn run(out_dir: &Path, layout: crate::sim::Layout, assets: AssetService) {
+pub fn run(out_dir: &Path, layout: sim::Layout, content: Content) {
     let env: Env = envy::prefixed("RIFT_BENCH_")
         .from_env()
         .expect("RIFT_BENCH_* environment");
-    let (mut worlds, rosters) = crate::sim::worlds(AREAS, layout, &assets);
+    let (mut worlds, rosters) = sim::worlds(AREAS, layout, &content);
     if !env.no_clients.unwrap_or(false) {
-        crate::sim::connect(&mut worlds, &rosters);
+        sim::connect(&mut worlds, &rosters);
     }
 
-    for _ in 0..crate::sim::WARMUP {
-        crate::sim::step_single_threaded(&mut worlds);
+    for _ in 0..sim::WARMUP {
+        sim::step_single_threaded(&mut worlds);
     }
 
     report_aoi(&mut worlds);
+    report_changes(&mut worlds);
 
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(999)
         .blocklist(&["libc", "libgcc", "pthread", "vdso"])
         .build()
         .expect("start pprof profiler");
-    ALLOCS.store(0, Relaxed);
-    BYTES.store(0, Relaxed);
+    crate::ALLOCS.store(0, Relaxed);
+    crate::BYTES.store(0, Relaxed);
     let started = Instant::now();
     for _ in 0..MEASURE {
-        crate::sim::step_single_threaded(&mut worlds);
+        sim::step_single_threaded(&mut worlds);
     }
     let elapsed = started.elapsed();
-    let allocs = ALLOCS.load(Relaxed);
-    let bytes = BYTES.load(Relaxed);
+    let allocs = crate::ALLOCS.load(Relaxed);
+    let bytes = crate::BYTES.load(Relaxed);
 
     let report = guard.report().build().expect("build pprof report");
     print_hotspots(&report);
@@ -141,8 +141,6 @@ fn report_aoi(worlds: &mut [App]) {
     );
 }
 
-/// Aggregates the pprof samples into self time per owning system and per leaf symbol — the CPU side
-/// of the profile in text form.
 fn print_hotspots(report: &pprof::Report) {
     let mut total = 0i64;
     let mut self_time: HashMap<String, i64> = HashMap::new();
@@ -216,30 +214,48 @@ fn peak_rss_kib() -> Option<u64> {
         })
 }
 
-#[global_allocator]
-static ALLOC: Counting = Counting;
-
-static ALLOCS: AtomicU64 = AtomicU64::new(0);
-static BYTES: AtomicU64 = AtomicU64::new(0);
-
-struct Counting;
-
-unsafe impl GlobalAlloc for Counting {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOCS.fetch_add(1, Relaxed);
-        BYTES.fetch_add(layout.size() as u64, Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        ALLOCS.fetch_add(1, Relaxed);
-        if new_size > layout.size() {
-            BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
+/// Which replicated components change in a tick: every change is serialized for each viewer, so a
+/// component written every tick without actually changing is pure replication waste.
+fn report_changes(worlds: &mut [App]) {
+    let mut counts: HashMap<String, u64> = HashMap::new();
+    let mut entities = 0u64;
+    let mut changed_entities = 0u64;
+    for app in worlds.iter_mut() {
+        let last = app.world_mut().change_tick();
+        app.update();
+        let world = app.world_mut();
+        let this = world.change_tick();
+        let replicated: Vec<Entity> = world
+            .query_filtered::<Entity, With<Replicated>>()
+            .iter(world)
+            .collect();
+        for entity in replicated {
+            entities += 1;
+            let mut any = false;
+            let entity_ref = world.entity(entity);
+            for &id in entity_ref.archetype().components() {
+                let changed = entity_ref
+                    .get_change_ticks_by_id(id)
+                    .is_some_and(|ticks| ticks.is_changed(last, this));
+                if changed {
+                    any = true;
+                    let name = world
+                        .components()
+                        .get_name(id)
+                        .map(|name| name.to_string())
+                        .unwrap_or_default();
+                    *counts.entry(name).or_default() += 1;
+                }
+            }
+            if any {
+                changed_entities += 1;
+            }
         }
-        unsafe { System.realloc(ptr, layout, new_size) }
+    }
+    let mut rows: Vec<_> = counts.into_iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    println!("[changes] replicated entities: {entities}, changed this tick: {changed_entities}");
+    for (name, count) in rows.iter().take(20) {
+        println!("[changes] {count:>8}  {name}");
     }
 }

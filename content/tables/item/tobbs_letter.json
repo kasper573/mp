@@ -1,0 +1,21 @@
+{
+  "name": "Tobb's Letter",
+  "icon": "icons/misc/envolop.png",
+  "sfx": {
+    "pickup": "pickup_paper",
+    "trade": "trade_paper",
+    "drop": "landing01"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Sealed with candle wax and a fishy thumbprint, for Captain Bram of the Gull."
+    },
+    {
+      "type": "quest_item"
+    }
+  ]
+}

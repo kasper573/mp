@@ -15,6 +15,21 @@
     }
 }
 
+# A first visit asks for thousands of content files by hash, so that path alone goes unlimited;
+# the manifest, sessions and everything else keep the per-client limit.
+(game_server_rate_limit) {
+    rate_limit {
+        zone game_server_zone {
+            match {
+                not path /content/files/*
+            }
+            key {http.request.remote_ip}
+            events {$CADDY_RATE_LIMIT_EVENTS}
+            window 5s
+        }
+    }
+}
+
 (common_cors) {
     @options {
         method OPTIONS
@@ -71,7 +86,7 @@ auth.{$RIFT_DOMAIN} {
 # `/session`/`/health` to the HTTP API — two separate listeners, split by the upgrade handshake.
 {$RIFT_GAME_SERVER_DOMAIN} {
     import access_log
-    import common_rate_limit
+    import game_server_rate_limit
     import internal_endpoints
     tracing {
         span rift_game_server
@@ -81,6 +96,7 @@ auth.{$RIFT_DOMAIN} {
         header Upgrade websocket
     }
     reverse_proxy @websocket {$RIFT_GAME_SERVER_WS_PROXY_HOST}
+    encode zstd gzip
     reverse_proxy {$RIFT_GAME_SERVER_PROXY_HOST}
     import common_cors
 }

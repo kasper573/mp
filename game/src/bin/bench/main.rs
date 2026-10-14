@@ -3,22 +3,58 @@ mod profiling;
 mod search;
 mod sim;
 
+use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::time::Instant;
 
 use bevy_app::App;
-use game::core::assets::{AssetService, FilesystemSource};
+use game::core::content::{Content, FilesystemFolder};
+use game::systems::load_content;
+use serde::Deserialize;
 
-const BUDGET_MS: f64 = 40.0;
+use crate::search::{BUDGET_MS, Search};
+
+// The server's own allocator setup, so the measured ticks allocate exactly as production does.
+service::heap_profiling!(Counting, Counting);
+
+static ALLOCS: AtomicU64 = AtomicU64::new(0);
+static BYTES: AtomicU64 = AtomicU64::new(0);
+
+struct Counting;
+
+// SAFETY: every call goes unchanged to jemalloc, which upholds GlobalAlloc's contract; counting
+// touches only atomics and never allocates.
+unsafe impl GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        BYTES.fetch_add(layout.size() as u64, Relaxed);
+        unsafe { service::Jemalloc.alloc(layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { service::Jemalloc.dealloc(ptr, layout) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        ALLOCS.fetch_add(1, Relaxed);
+        if new_size > layout.size() {
+            BYTES.fetch_add((new_size - layout.size()) as u64, Relaxed);
+        }
+        unsafe { service::Jemalloc.realloc(ptr, layout, new_size) }
+    }
+}
+
 // Must exceed the budget crossover (and the probe that overshoots it) but stay within RAM: the bench
 // holds every area world in memory at once (~3 MiB each with clients), so this caps peak use near
 // ~15 GiB. The search stops at the 40 ms crossover well before here anyway.
 const MAX_AREAS: usize = 5000;
 const MEASURE: usize = 200;
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Config {
-    assets_dir: PathBuf,
+    content_dir: PathBuf,
     a: Option<Vec<usize>>,
 }
 
@@ -41,20 +77,20 @@ fn main() {
             .find(|arg| arg != "profile" && arg != "dist")
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().expect("cwd"));
-        profiling::run(&out, layout, service(&config.assets_dir));
+        profiling::run(&out, layout, load(&config.content_dir));
         return;
     }
 
     if let Some(probes) = config.a {
         for a in probes {
-            let p = point(a, layout, &config.assets_dir);
+            let p = point(a, layout, &config.content_dir);
             println!(
                 "[bench]   A={a:<4} full={:6.2}ms sim={:6.2}ms repl={:6.2}ms p99={:6.2}ms  {}",
-                p.full,
+                p.full.mean,
                 p.sim,
-                (p.full - p.sim).max(0.0),
-                p.p99,
-                verdict(p.full),
+                (p.full.mean - p.sim).max(0.0),
+                p.full.p99,
+                verdict(p.full.mean),
             );
         }
         return;
@@ -62,36 +98,30 @@ fn main() {
 
     println!(
         "[bench] finding the highest A sustained within the {BUDGET_MS:.0}ms budget ({} players)...",
-        layout.label()
+        layout.as_ref()
     );
 
+    let mut search = Search::up_to(MAX_AREAS);
     let mut best: Option<(usize, Point)> = None;
-    let mut under: Option<(usize, f64)> = None;
-    let mut over: Option<(usize, f64)> = None;
-    let mut previous: Option<(usize, f64)> = None;
     let mut next = Some(1usize);
     while let Some(areas) = next {
-        let p = point(areas, layout, &config.assets_dir);
-        let mean = p.full;
+        let p = point(areas, layout, &config.content_dir);
+        let mean = p.full.mean;
         println!(
             "[bench]   A={areas:<4} mean={mean:6.2}ms  {}",
             verdict(mean)
         );
-        let last = (areas, mean);
-        if mean <= BUDGET_MS {
-            if under.is_none_or(|(highest, _)| areas >= highest) {
-                under = Some(last);
-                best = Some((areas, p));
-            }
-        } else if over.is_none_or(|(lowest, _)| areas <= lowest) {
-            over = Some(last);
+        next = search.next_after(areas, mean);
+        if search
+            .sustained()
+            .is_some_and(|(highest, _)| highest == areas)
+        {
+            best = Some((areas, p));
         }
-        next = search::project(BUDGET_MS, MAX_AREAS, under, over, previous, last);
-        previous = Some(last);
     }
 
-    let (areas, r) = best.unwrap_or_else(|| (1, point(1, layout, &config.assets_dir)));
-    let npcs = sim::npcs_per_area() * areas;
+    let (areas, r) = best.unwrap_or_else(|| (1, point(1, layout, &config.content_dir)));
+    let npcs = sim::npcs_per_area(&load(&config.content_dir)) * areas;
     let players = sim::PLAYERS_PER_AREA * areas;
     println!("\n[bench] areas,npcs,players,clients,mean_ms,p50_ms,p99_ms,max_ms,sim_ms,repl_ms");
     println!(
@@ -100,21 +130,28 @@ fn main() {
         npcs,
         players,
         players,
-        r.full,
-        r.p50,
-        r.p99,
-        r.max,
+        r.full.mean,
+        r.full.p50,
+        r.full.p99,
+        r.full.max,
         r.sim,
-        (r.full - r.sim).max(0.0),
+        (r.full.mean - r.sim).max(0.0),
     );
     println!(
         "[bench] capacity: {} isolated areas = {} NPCs + {} players sustained at {:.1}ms/tick (budget {:.0}ms)",
-        areas, npcs, players, r.full, BUDGET_MS,
+        areas, npcs, players, r.full.mean, BUDGET_MS,
     );
 }
 
-fn service(assets_dir: &Path) -> AssetService {
-    AssetService::new(FilesystemSource(assets_dir.to_path_buf()))
+fn load(content_dir: &Path) -> Content {
+    load_content(
+        Arc::new(FilesystemFolder(content_dir.to_path_buf())),
+        "the program stopped",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    })
 }
 
 fn verdict(mean: f64) -> &'static str {
@@ -122,31 +159,30 @@ fn verdict(mean: f64) -> &'static str {
 }
 
 struct Point {
-    full: f64,
+    full: Timings,
     sim: f64,
+}
+
+struct Timings {
+    mean: f64,
     p50: f64,
     p99: f64,
     max: f64,
 }
 
-fn point(areas: usize, layout: sim::Layout, assets_dir: &Path) -> Point {
-    let assets = service(assets_dir);
-    let (mut worlds, rosters) = sim::worlds(areas, layout, &assets);
+fn point(areas: usize, layout: sim::Layout, content_dir: &Path) -> Point {
+    let content = load(content_dir);
+    let (mut worlds, rosters) = sim::worlds(areas, layout, &content);
 
-    let baseline = measure(&mut worlds);
+    let sim = measure(&mut worlds).mean;
     sim::connect(&mut worlds, &rosters);
-    let full = measure(&mut worlds);
-
     Point {
-        full: full.0,
-        sim: baseline.0,
-        p50: full.1,
-        p99: full.2,
-        max: full.3,
+        full: measure(&mut worlds),
+        sim,
     }
 }
 
-fn measure(worlds: &mut [App]) -> (f64, f64, f64, f64) {
+fn measure(worlds: &mut [App]) -> Timings {
     for _ in 0..sim::WARMUP {
         sim::step(worlds);
     }
@@ -158,10 +194,10 @@ fn measure(worlds: &mut [App]) -> (f64, f64, f64, f64) {
     }
     samples.sort_by(f64::total_cmp);
     let n = samples.len();
-    (
-        samples.iter().sum::<f64>() / n as f64,
-        samples[n / 2],
-        samples[(n as f64 * 0.99) as usize],
-        samples[n - 1],
-    )
+    Timings {
+        mean: samples.iter().sum::<f64>() / n as f64,
+        p50: samples[n / 2],
+        p99: samples[(n as f64 * 0.99) as usize],
+        max: samples[n - 1],
+    }
 }

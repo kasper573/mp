@@ -1,0 +1,10 @@
+{
+  "name": "Swordsman",
+  "job": "adventurer",
+  "bag": [
+    {
+      "item": "rusty_sword"
+    }
+  ],
+  "start": "initial_spawn"
+}

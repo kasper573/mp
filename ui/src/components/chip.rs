@@ -2,11 +2,10 @@ use bevy::image::Image;
 use bevy_asset::Handle;
 use bevy_ecs::hierarchy::Children;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::widget::ImageNode;
 use bevy_ui::{AlignItems, BorderRadius, Node, UiRect, Val};
 
-use crate::component;
 use crate::components::inspectable::{InspectableOptions, inspectable};
 use crate::components::rich_text::{RichPiece, RichText, rich_text};
 use crate::components::text::styled_text;
@@ -67,14 +66,14 @@ fn face(
     let icon = icon.map(|image| {
         bsn! {
             Node { width: Val::Px(ICON), height: Val::Px(ICON) }
-            component(ImageNode::new(image))
+            ImageNode { image: {image} }
         }
     });
     let label = styled_text(label, family.on, typography::LABEL);
     bsn! {
-        template_value(style)
-        template_value(pickable)
-        Children [ {icon}, {EntityScene(label)} ]
+        style
+        pickable
+        Children [ {icon} -- @{label} ]
     }
 }
 
@@ -93,7 +92,7 @@ pub fn key_hint(hint: Vec<RichPiece>, family: Family) -> impl Scene {
         color: family.on,
     };
     bsn! {
-        template_value(style)
-        Children [ {EntityScene(rich_text(text, false))} ]
+        style
+        Children [ @{rich_text(text, false)} ]
     }
 }

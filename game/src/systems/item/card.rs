@@ -1,20 +1,18 @@
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
+use ui::TooltipText;
 use ui::tokens::{palette, spacing, typography};
 use ui::{
     ChipOptions, Family, InspectableOptions, OnTap, RichPiece, RichSpan, RichText, TextVoice,
 };
-use ui::{TooltipText, component};
 
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::data::item::Id as ItemId;
-use crate::systems::effect::Effect;
+use crate::core::content::Content;
 use crate::systems::hud;
 use crate::systems::input::map::{InputAction, input};
-use crate::systems::item::{ItemDef, ItemFlag, ItemKind};
+use crate::systems::interface::InterfaceSound;
+use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::script::condition;
 use crate::systems::stat::Stat;
 
 const WINDOW_ID: &str = "Item";
@@ -28,10 +26,10 @@ pub struct ItemCardPlugin;
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemCard>()
-            .add_systems(Update, show_card.run_if(in_state(GameScene::Area)))
+            .add_systems(Update, show_card.run_if(in_state(ClientScreen::Area)))
             .add_systems(
-                OnExit(GameScene::Area),
-                (crate::systems::scene::despawn_all::<ItemCardWindow>, forget),
+                OnExit(ClientScreen::Area),
+                (despawn_all::<ItemCardWindow>, forget),
             );
     }
 }
@@ -49,11 +47,11 @@ pub fn close(world: &mut World) -> bool {
     world.resource_mut::<ItemCard>().0.take().is_some()
 }
 
-pub fn inspectable(item: ItemId) -> InspectableOptions {
-    let def = item.get();
+pub fn inspectable(content: &Content, item: ItemId) -> InspectableOptions {
+    let def = item.get(content);
     InspectableOptions {
         tooltip: TooltipText {
-            title: def.display_name.to_owned(),
+            title: def.name.to_owned(),
             lines: vec![vec![RichPiece::text(overview(def))]],
             hint: Some(inspect_hint()),
         },
@@ -64,8 +62,8 @@ pub fn inspectable(item: ItemId) -> InspectableOptions {
 
 pub fn overview(def: &ItemDef) -> String {
     let category = def.category().label();
-    match def.kind {
-        ItemKind::Consumable { health_bonus, .. } if health_bonus > 0.0 => {
+    match &def.kind {
+        ItemKind::Consumable { health_bonus, .. } if *health_bonus > 0.0 => {
             format!("{category} · restores {health_bonus} health")
         }
         ItemKind::Equipment { slot, .. } => format!("{category} · {}", slot.label()),
@@ -82,15 +80,16 @@ pub fn inspect_hint() -> Vec<RichPiece> {
 
 pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     match def.kind {
-        ItemKind::Consumable { .. } | ItemKind::Usable { .. } => Some("use"),
+        ItemKind::Consumable { .. } | ItemKind::Usable => Some("use"),
         ItemKind::Equipment { .. } => Some("wear"),
         ItemKind::Resource => None,
     }
 }
 
 pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
+    let content = world.resource::<Content>();
     let assets = world.resource::<AssetServer>();
-    let def = item.get();
+    let def = item.get(content);
     let ink = ui::theme::theme().surface_floating.on;
     let tags: Vec<Box<dyn Scene>> = tags(def)
         .into_iter()
@@ -112,7 +111,7 @@ pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
     let flavor = RichText {
         pieces: vec![RichPiece::Span(RichSpan {
             voice: TextVoice::Whisper,
-            ..RichSpan::plain(def.flavor)
+            ..RichSpan::plain(def.flavor().unwrap_or_default())
         })],
         size: typography::BODY.font_size,
         color: ink,
@@ -124,25 +123,24 @@ pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
             width: Val::Percent(100.0),
         }
         Children [
-            (
-                Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
+            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
+            Children [
+                Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
+                ImageNode { image: {assets.load(def.icon.path())} }
+                --
+                Node { flex_direction: FlexDirection::Column }
                 Children [
-                    (
-                        Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                        component(ImageNode::new(assets.load(def.icon.0)))
-                    ),
-                    (
-                        Node { flex_direction: FlexDirection::Column }
-                        Children [
-                            {EntityScene(ui::styled_text(def.display_name, ink, typography::NAME))},
-                            {EntityScene(ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION))},
-                        ]
-                    ),
+                    @{ui::styled_text(def.name.as_str(), ink, typography::NAME)}
+                    --
+                    @{ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION)}
                 ]
-            ),
-            ( Node { column_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap } Children [ {tags} ] ),
-            {EntityScene(ui::rich_text(flavor, false))},
-            ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {facts} ] ),
+            ]
+            --
+            Node { column_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap } Children [ {tags} ]
+            --
+            @{ui::rich_text(flavor, false)}
+            --
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {facts} ]
         ]
     })
 }
@@ -155,6 +153,7 @@ fn forget(mut card: ResMut<ItemCard>) {
 }
 
 fn show_card(world: &mut World) {
+    let content = *world.resource::<Content>();
     let wanted = world.resource::<ItemCard>().0;
     let shown = world
         .query::<(Entity, &ItemCardWindow)>()
@@ -168,7 +167,7 @@ fn show_card(world: &mut World) {
         world.entity_mut(panel).despawn();
     }
     let Some(item) = wanted else {
-        chime(world, SfxId::UiClose);
+        InterfaceSound::UiClose.play(world);
         return;
     };
     let screen = world
@@ -187,7 +186,7 @@ fn show_card(world: &mut World) {
             close(world);
         }),
         hud::single_tab(
-            item.get().display_name,
+            item.get(&content).name.as_str(),
             ui::scrolled(Box::new(padded(sheet(world, item)))),
         ),
         0,
@@ -196,14 +195,14 @@ fn show_card(world: &mut World) {
         world.entity_mut(panel).insert(ItemCardWindow { item });
     }
     if shown.is_none() {
-        chime(world, SfxId::UiOpen);
+        InterfaceSound::UiOpen.play(world);
     }
 }
 
 fn padded(sheet: Box<dyn Scene>) -> impl Scene {
     bsn! {
         Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-        Children [ {EntityScene(sheet)} ]
+        Children [ @{sheet} ]
     }
 }
 
@@ -218,41 +217,49 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Color)> {
     .collect()
 }
 
-fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color)> {
+fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
+    let content = world.resource::<Content>();
     let ink = ui::theme::theme().surface_floating.on;
     let plain = |fact: String| (fact, ink);
     let mut facts = Vec::new();
-    match def.kind {
+    match &def.kind {
         ItemKind::Consumable {
             health_bonus,
-            duration,
+            lasts,
         } => {
-            if health_bonus > 0.0 {
+            if *health_bonus > 0.0 {
                 facts.push(plain(format!("Restores {health_bonus} health")));
             }
             facts.extend(
-                modifiers(def).map(|stat| plain(format!("{} for {}s", modifier(stat), duration.0))),
+                def.stats()
+                    .map(|stat| plain(format!("{} for {}s", modifier(stat), lasts.0))),
             );
         }
-        ItemKind::Equipment { slot, requirements } => {
+        ItemKind::Equipment { slot, requires } => {
             facts.push(plain(format!(
                 "Worn as your {}",
                 slot.label().to_lowercase()
             )));
-            facts.extend(modifiers(def).map(|stat| plain(modifier(stat))));
+            facts.extend(def.stats().map(|stat| plain(modifier(stat))));
             let viewer = world.resource::<Viewpoint>().0;
-            facts.extend(requirements.iter().map(|requirement| {
-                let color = match viewer.map(|viewer| requirement.met(world, viewer)) {
+            facts.extend(requires.iter().map(|requirement| {
+                let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
+                {
                     Some(true) => palette::EMERALD_80,
                     Some(false) => palette::CRIMSON_80,
                     None => ink,
                 };
-                (format!("Requires {}", requirement.describe()), color)
+                (
+                    format!("Requires {}", condition::describe(content, requirement)),
+                    color,
+                )
             }));
         }
-        ItemKind::Usable { .. } => facts.push(plain("Can be used".to_owned())),
-        ItemKind::Resource => facts
-            .extend(modifiers(def).map(|stat| plain(format!("{} while carried", modifier(stat))))),
+        ItemKind::Usable => facts.push(plain("Can be used".to_owned())),
+        ItemKind::Resource => facts.extend(
+            def.stats()
+                .map(|stat| plain(format!("{} while carried", modifier(stat)))),
+        ),
     }
     match def.stack_max() {
         1 => {}
@@ -265,29 +272,6 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color)> {
     facts
 }
 
-fn modifiers(def: &ItemDef) -> impl Iterator<Item = Stat> {
-    def.effects.iter().filter_map(|effect| match effect {
-        Effect::StatModifier(stat) => Some(*stat),
-        Effect::Chasing => None,
-    })
-}
-
 fn modifier(stat: Stat) -> String {
-    let words: String = stat
-        .label()
-        .chars()
-        .enumerate()
-        .flat_map(|(index, letter)| {
-            let gap = (index > 0 && letter.is_uppercase()).then_some(' ');
-            gap.into_iter().chain(std::iter::once(letter))
-        })
-        .collect();
-    format!("{:+} {words}", stat.value)
-}
-
-fn chime(world: &mut World, id: SfxId) {
-    world.write_message(PlaySfx {
-        id,
-        place: SfxPlace::Interface,
-    });
+    format!("{:+} {}", stat.value, stat.label())
 }

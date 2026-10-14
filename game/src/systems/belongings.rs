@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use strum::VariantArray;
 
-use crate::core::audio::playback::SfxId;
-use crate::data::item::Id as ItemId;
+use crate::core::content::{Content, Fixture};
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{HistoryTopic, RecordTally};
-use crate::systems::item::Inventory;
+use crate::systems::interface::InterfaceSound;
+use crate::systems::item::{Inventory, ItemId};
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::Xp;
@@ -57,13 +58,14 @@ pub fn notify_changes(
             continue;
         }
         world.entity_mut(player).insert(now.clone());
-        for notification in changes(&before, &now) {
+        let content = *world.resource::<Content>();
+        for notification in changes(&content, &before, &now) {
             notification::notify(world, player, notification);
         }
     }
 }
 
-fn changes(before: &Belongings, now: &Belongings) -> Vec<Notification> {
+fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Notification> {
     let items: Vec<(ItemId, i32)> = before
         .items
         .keys()
@@ -81,7 +83,7 @@ fn changes(before: &Belongings, now: &Belongings) -> Vec<Notification> {
     let gained = items.iter().filter(|(_, change)| *change > 0);
     let mut told: Vec<Notification> = lost
         .chain(gained)
-        .map(|&(item, change)| item_row(item, change))
+        .map(|&(item, change)| item_row(content, item, change))
         .collect();
     if now.xp > before.xp {
         told.push(Notification::new(
@@ -95,14 +97,19 @@ fn changes(before: &Belongings, now: &Belongings) -> Vec<Notification> {
             LineText::plain("XP"),
         ));
     }
-    for slot in EquipmentSlot::all() {
+    for slot in EquipmentSlot::VARIANTS {
         match (before.worn.get(slot), now.worn.get(slot)) {
             (_, Some(&on)) if before.worn.get(slot) != Some(&on) => {
-                told.push(worn_row(format!("Equipped {}", on.get().display_name), on));
+                told.push(worn_row(
+                    content,
+                    format!("Equipped {}", on.get(content).name),
+                    on,
+                ));
             }
             (Some(&off), None) => {
                 told.push(worn_row(
-                    format!("Took off {}", off.get().display_name),
+                    content,
+                    format!("Took off {}", off.get(content).name),
                     off,
                 ));
             }
@@ -114,7 +121,7 @@ fn changes(before: &Belongings, now: &Belongings) -> Vec<Notification> {
             NotificationKind::Milestone {
                 label: "Level up".into(),
                 topic: HistoryTopic::Notification,
-                sfx: Some(SfxId::RisingChime),
+                sfx: Some(InterfaceSound::RisingChime.id(content)),
             },
             LineText::plain(format!("Level {}", now.level)),
         ));
@@ -122,32 +129,33 @@ fn changes(before: &Belongings, now: &Belongings) -> Vec<Notification> {
     told
 }
 
-fn item_row(item: ItemId, change: i32) -> Notification {
-    let sounds = &item.get().sfx;
-    let sfx = match change > 0 {
-        true => sounds.pickup,
-        false => sounds.trade,
+fn item_row(content: &Content, item: ItemId, change: i32) -> Notification {
+    let sounds = &item.get(content).sfx;
+    let sfx = if change > 0 {
+        sounds.pickup
+    } else {
+        sounds.trade
     };
     Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Item,
-            icon: Some(item.get().icon.0.to_owned()),
+            icon: Some(item.get(content).icon.path()),
             tally: Some(RecordTally::Change(change)),
             failure: false,
             sfx: Some(sfx),
         },
-        LineText::plain(item.get().display_name),
+        LineText::plain(&*item.get(content).name),
     )
 }
 
-fn worn_row(text: String, item: ItemId) -> Notification {
+fn worn_row(content: &Content, text: String, item: ItemId) -> Notification {
     Notification::new(
         NotificationKind::Feed {
             topic: HistoryTopic::Item,
-            icon: Some(item.get().icon.0.to_owned()),
+            icon: Some(item.get(content).icon.path()),
             tally: None,
             failure: false,
-            sfx: Some(item.get().sfx.trade),
+            sfx: Some(item.get(content).sfx.trade),
         },
         LineText::plain(text),
     )

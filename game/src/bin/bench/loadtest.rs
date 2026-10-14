@@ -7,23 +7,30 @@
 
 mod search;
 
+use std::cell::{Cell, RefCell};
 use std::io::ErrorKind;
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
-use bevy_app::App;
+use bevy_app::{App, Update};
 use bevy_ecs::prelude::*;
-use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_replicon::prelude::*;
+use bevy_replicon_renet2::RenetChannelsExt;
 use bevy_state::prelude::*;
-use game::core::net::channels::RenetChannelsExt;
+use game::core::content::sync::Manifest;
+use game::core::net::SessionRequest;
+use game::core::net::transport::{ClientSocket, SocketClientPlugin};
+use game::core::platform::{ServerSocket, SocketState};
+use game::systems::TICK_HZ;
+use game::systems::launch::fake_token;
+use game::systems::player::JoinRequest;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
 
-const TICK: Duration = Duration::from_millis(33);
-const BUDGET_MS: f64 = 40.0;
+use crate::search::{BUDGET_MS, Search};
+
 /// Search clamp for the player root-find; the real limit is the server's client cap or its tick time.
 const MAX_PLAYERS: usize = 50_000;
 /// Open this many sockets before pumping, so already-connected clients keep draining while we connect.
@@ -70,7 +77,7 @@ fn run_fixed(http_url: &str, ws_url: &str, count: usize) {
     );
     let mut report = Instant::now();
     loop {
-        pump(&mut clients, TICK);
+        pump(&mut clients, TICK_HZ.period());
         if report.elapsed() >= Duration::from_secs(2) {
             println!(
                 "[loadtest] connected {}/{}",
@@ -89,9 +96,7 @@ fn run_dyn(http_url: &str, ws_url: &str) {
     println!("[loadtest] root-finding the {BUDGET_MS:.0}ms/tick player equilibrium ({ws_url})");
     let mut clients: Vec<App> = Vec::new();
     let mut next_id = 0usize;
-    let mut under: Option<(usize, f64)> = None;
-    let mut over: Option<(usize, f64)> = None;
-    let mut previous: Option<(usize, f64)> = None;
+    let mut search = Search::up_to(MAX_PLAYERS);
     let mut next = Some(1usize);
     while let Some(target) = next {
         set_player_count(&mut clients, http_url, ws_url, &mut next_id, target);
@@ -100,14 +105,7 @@ fn run_dyn(http_url: &str, ws_url: &str) {
         let verdict = if ms <= BUDGET_MS { "ok" } else { "over" };
         println!("[loadtest]   {live:>6} players  →  server {ms:6.2}ms/tick  {verdict}");
 
-        let last = (live, ms);
-        if ms <= BUDGET_MS {
-            if under.is_none_or(|(highest, _)| live >= highest) {
-                under = Some(last);
-            }
-        } else if over.is_none_or(|(lowest, _)| live <= lowest) {
-            over = Some(last);
-        }
+        next = search.next_after(live, ms);
         // Couldn't OPEN as many sockets as asked (not merely "not all connected yet") while still under
         // budget: the limit is the machine's or server's connection ceiling, not tick time, and that
         // count is the answer. Compare opened sockets, not `live`, so a slow handshake isn't mistaken
@@ -116,10 +114,8 @@ fn run_dyn(http_url: &str, ws_url: &str) {
             println!("[loadtest] connection ceiling at {live} players (could not open more)");
             break;
         }
-        next = search::project(BUDGET_MS, MAX_PLAYERS, under, over, previous, last);
-        previous = Some(last);
     }
-    match under {
+    match search.sustained() {
         Some((players, ms)) => println!(
             "[loadtest] equilibrium: ~{players} concurrent players sustained at {ms:.1}ms/tick (budget {BUDGET_MS:.0}ms)"
         ),
@@ -165,7 +161,7 @@ fn pump(clients: &mut [App], duration: Duration) {
         for client in clients.iter_mut() {
             client.update();
         }
-        if let Some(remaining) = TICK.checked_sub(frame.elapsed()) {
+        if let Some(remaining) = TICK_HZ.period().checked_sub(frame.elapsed()) {
             std::thread::sleep(remaining);
         }
         if Instant::now() >= deadline {
@@ -225,34 +221,48 @@ fn build_client(http_url: &str, ws_url: &str, index: usize) -> Option<App> {
     let mut app = App::new();
     app.add_plugins((bevy_time::TimePlugin, bevy_state::app::StatesPlugin));
     app.add_plugins(ClientSessionPlugin);
-    app.add_plugins(BridgePlugin);
+    app.add_plugins(SocketClientPlugin);
     app.init_resource::<Joined>();
-    app.add_systems(bevy_app::Update, announce_join);
+    app.add_systems(Update, announce_join);
 
     let config = {
         let channels = app.world().resource::<RepliconChannels>();
         ConnectionConfig::from_channels(channels.server_configs(), channels.client_configs())
     };
     // The websocket is reliable+ordered (TCP), matching the server side.
-    app.insert_resource(Client(RenetClient::new(config, true)));
-    app.insert_non_send(Socket(socket));
+    app.insert_resource(RenetClient::new(config, true));
+    app.insert_non_send(ClientSocket(Box::new(socket)));
     app.finish();
     app.cleanup();
     Some(app)
 }
 
-fn fetch_ticket(http_url: &str, fake_id: &str) -> Option<String> {
+fn fetch_ticket(http_url: &str, account: &str) -> Option<String> {
+    let manifest = ureq::get(format!("{http_url}/content/manifest"))
+        .call()
+        .ok()?
+        .body_mut()
+        .read_to_string()
+        .ok()?;
+    let manifest: Manifest = serde_json::from_str(&manifest).ok()?;
+    let request = SessionRequest {
+        build: manifest.build,
+        rows: manifest.rows.hash,
+    };
     let mut response = ureq::post(format!("{http_url}/session"))
-        .header("Authorization", format!("fake:{fake_id}"))
-        .send_empty()
+        .header(
+            "Authorization",
+            format!("Bearer {}", fake_token(account, &[])),
+        )
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&request).ok()?)
         .ok()?;
     Some(response.body_mut().read_to_string().ok()?.trim().to_owned())
 }
 
-/// A blocking-then-nonblocking WebSocket carrying opaque renet packets as binary frames.
 struct WsSocket {
-    ws: tungstenite::WebSocket<MaybeTlsStream<TcpStream>>,
-    open: bool,
+    ws: RefCell<tungstenite::WebSocket<MaybeTlsStream<TcpStream>>>,
+    state: Cell<SocketState>,
 }
 
 impl WsSocket {
@@ -263,90 +273,45 @@ impl WsSocket {
         if let MaybeTlsStream::Plain(tcp) = ws.get_ref() {
             tcp.set_nonblocking(true).ok()?;
         }
-        Some(WsSocket { ws, open: true })
+        Some(WsSocket {
+            ws: RefCell::new(ws),
+            state: Cell::new(SocketState::Open),
+        })
     }
+}
 
-    fn recv(&mut self) -> Option<Vec<u8>> {
-        match self.ws.read() {
+impl ServerSocket for WsSocket {
+    fn recv(&self) -> Option<Vec<u8>> {
+        match self.ws.borrow_mut().read() {
             Ok(Message::Binary(data)) => Some(data.to_vec()),
             Ok(Message::Close(_)) => {
-                self.open = false;
+                self.state.set(SocketState::Closed);
                 None
             }
             Ok(_) => None,
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => None,
             Err(_) => {
-                self.open = false;
+                self.state.set(SocketState::Closed);
                 None
             }
         }
     }
 
-    fn send(&mut self, packet: Vec<u8>) {
-        match self.ws.send(Message::Binary(packet.into())) {
+    fn send(&self, packet: &[u8]) {
+        match self
+            .ws
+            .borrow_mut()
+            .send(Message::Binary(packet.to_vec().into()))
+        {
             Ok(()) => {}
-            // A non-blocking write that couldn't flush fully is buffered for the next flush.
+            // A non-blocking write that couldn't flush fully is buffered for the next send.
             Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {}
-            Err(_) => self.open = false,
+            Err(_) => self.state.set(SocketState::Closed),
         }
     }
 
-    fn flush(&mut self) {
-        let _ = self.ws.flush();
-    }
-}
-
-// Mirrors the client's replicon<->renet2 bridge
-#[derive(Resource)]
-struct Client(RenetClient);
-
-struct Socket(WsSocket);
-
-struct BridgePlugin;
-
-impl bevy_app::Plugin for BridgePlugin {
-    fn build(&self, app: &mut App) {
-        use bevy_app::{PostUpdate, PreUpdate};
-        app.add_systems(
-            PreUpdate,
-            (
-                drive,
-                set_connecting.run_if(in_state(ClientState::Disconnected).and_then(connecting)),
-                promote.run_if(in_state(ClientState::Connecting).and_then(connecting)),
-                set_connected.run_if(in_state(ClientState::Connecting).and_then(connected)),
-                set_disconnected.run_if(connection_lost),
-                receive_packets.run_if(connected),
-            )
-                .chain()
-                .in_set(ClientSystems::ReceivePackets),
-        )
-        .add_systems(
-            PostUpdate,
-            send_packets
-                .run_if(connected)
-                .in_set(ClientSystems::SendPackets),
-        );
-    }
-}
-
-fn drive(mut socket: NonSendMut<Socket>, mut client: ResMut<Client>, time: Res<bevy_time::Time>) {
-    client.0.update(time.delta());
-    while let Some(packet) = socket.0.recv() {
-        client.0.process_packet(&packet);
-    }
-    // renet has no internal timeout, so a closed socket is the only liveness signal — otherwise a
-    // server-reaped client would stay "connected" and inflate the measured player count.
-    if !socket.0.open {
-        client.0.disconnect_due_to_transport();
-    }
-}
-
-// renet2's core opens in `Connecting` and stays there until told otherwise; with no netcode layer the
-// transport promotes it once the socket is up and replicon has reached `Connecting`, so the state
-// machine advances Disconnected -> Connecting -> Connected in order.
-fn promote(socket: NonSend<Socket>, mut client: ResMut<Client>) {
-    if socket.0.open {
-        client.0.set_connected();
+    fn state(&self) -> SocketState {
+        self.state.get()
     }
 }
 
@@ -360,57 +325,6 @@ fn announce_join(world: &mut World) {
     if world.resource::<Joined>().0 || session::my_id(world).is_none() {
         return;
     }
-    session::join(world);
+    world.write_message(JoinRequest);
     world.resource_mut::<Joined>().0 = true;
-}
-
-fn set_connecting(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Connecting);
-}
-
-fn set_connected(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Connected);
-}
-
-fn set_disconnected(mut state: ResMut<NextState<ClientState>>) {
-    state.set(ClientState::Disconnected);
-}
-
-fn receive_packets(
-    channels: Res<RepliconChannels>,
-    mut client: ResMut<Client>,
-    mut messages: ResMut<ClientMessages>,
-) {
-    for channel_id in 0..channels.server_channels().len() as u8 {
-        while let Some(message) = client.0.receive_message(channel_id) {
-            messages.insert_received(channel_id, message);
-        }
-    }
-}
-
-fn send_packets(
-    mut socket: NonSendMut<Socket>,
-    mut client: ResMut<Client>,
-    mut messages: ResMut<ClientMessages>,
-) {
-    for (channel_id, message) in messages.drain_sent() {
-        client.0.send_message(channel_id as u8, message);
-    }
-    for packet in client.0.get_packets_to_send() {
-        socket.0.send(packet);
-    }
-    socket.0.flush();
-}
-
-fn connecting(client: Option<Res<Client>>) -> bool {
-    client.is_some_and(|client| client.0.is_connecting())
-}
-
-fn connected(client: Option<Res<Client>>) -> bool {
-    client.is_some_and(|client| client.0.is_connected())
-}
-
-fn connection_lost(state: Res<State<ClientState>>, client: Option<Res<Client>>) -> bool {
-    !matches!(state.get(), ClientState::Disconnected)
-        && client.is_some_and(|client| client.0.is_disconnected())
 }

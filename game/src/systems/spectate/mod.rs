@@ -3,17 +3,13 @@ pub mod widget;
 use std::collections::HashMap;
 
 use bevy_app::App;
-use bevy_ecs::lifecycle::Remove;
-use bevy_ecs::message::Message;
-use bevy_ecs::observer::On;
 use bevy_ecs::prelude::*;
-use bevy_replicon::prelude::{SendTargets, ToClients};
 use serde::{Deserialize, Serialize};
 
-use crate::systems::account::identity::Identity;
-use crate::systems::account::role::Role;
-use crate::systems::player::{ClientId, Players};
-use crate::systems::visibility::PrivateSight;
+use crate::systems::account::{Identity, Role};
+use crate::systems::drain_requests;
+use crate::systems::player::{ClientId, Players, last_connection};
+use crate::systems::visibility::{self, PrivateSight};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -68,7 +64,7 @@ pub struct SpectatorTransfer {
 }
 
 pub fn requests(world: &mut World) {
-    for request in crate::systems::requests::<SpectateRequest>(world) {
+    for request in drain_requests::<SpectateRequest>(world) {
         let Some(conn) = request.client_id.entity() else {
             continue;
         };
@@ -160,20 +156,13 @@ pub fn arrive(world: &mut World, transfer: SpectatorTransfer) {
 }
 
 pub fn client_left(
-    remove: On<Remove, ClientId>,
+    remove: On<Remove<ClientId>>,
     clients: Query<(Entity, &ClientId)>,
     mut spectators: ResMut<Spectators>,
 ) {
-    let Ok((_, id)) = clients.get(remove.entity) else {
-        return;
-    };
-    if clients
-        .iter()
-        .any(|(entity, other)| entity != remove.entity && other == id)
-    {
-        return;
+    if let Some(id) = last_connection(remove.entity, &clients) {
+        spectators.0.remove(&id);
     }
-    spectators.0.remove(id);
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -265,10 +254,7 @@ fn tell(world: &mut World, client: ClientId, status: Spectating) {
             own: client,
             watching,
         });
-        world.write_message(ToClients {
-            targets: SendTargets::Single(bevy_replicon::prelude::ClientId::Client(conn)),
-            message: status,
-        });
+        visibility::send_to(world, conn, status);
     }
 }
 

@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_color::{Color, Mix};
+use bevy_curve::cubic_splines::CubicSegment;
 use bevy_ecs::prelude::*;
-use bevy_math::cubic_splines::CubicSegment;
 use bevy_math::{Rot2, Vec2};
 use bevy_text::TextColor;
 use bevy_time::Time;
@@ -189,17 +189,7 @@ impl Motion {
             Paint::Text => &mut self.text,
             Paint::Image => &mut self.image,
         };
-        match slot {
-            Some(tween) => {
-                let current = value_of(tween);
-                tween.retarget(current, target, timing);
-                current
-            }
-            None => {
-                *slot = Some(Tween::settled(target));
-                target
-            }
-        }
+        aim(slot, target, target, timing)
     }
 
     pub(crate) fn aim_transform(
@@ -208,51 +198,11 @@ impl Motion {
         target: Transform2d,
         timing: Option<Timing>,
     ) -> Transform2d {
-        match &mut self.transform {
-            Some(tween) => {
-                let current = value_of(tween);
-                tween.retarget(current, target, timing);
-                current
-            }
-            None => {
-                let tween = match timing {
-                    Some(timing) => Tween {
-                        from: enter,
-                        target,
-                        elapsed: Duration::ZERO,
-                        timing,
-                    },
-                    None => Tween::settled(target),
-                };
-                let current = value_of(&tween);
-                self.transform = Some(tween);
-                current
-            }
-        }
+        aim(&mut self.transform, enter, target, timing)
     }
 
     pub(crate) fn aim_opacity(&mut self, enter: f32, target: f32, timing: Option<Timing>) -> f32 {
-        match &mut self.opacity {
-            Some(tween) => {
-                let current = value_of(tween);
-                tween.retarget(current, target, timing);
-                current
-            }
-            None => {
-                let tween = match timing {
-                    Some(timing) => Tween {
-                        from: enter,
-                        target,
-                        elapsed: Duration::ZERO,
-                        timing,
-                    },
-                    None => Tween::settled(target),
-                };
-                let current = value_of(&tween);
-                self.opacity = Some(tween);
-                current
-            }
-        }
+        aim(&mut self.opacity, enter, target, timing)
     }
 
     pub(crate) fn set_spin(&mut self, radians_per_second: f32) {
@@ -274,19 +224,19 @@ pub(crate) fn advance_motion(time: Res<Time>, mut motions: Query<Painted>) {
     let dt = time.delta();
     for (mut motion, background, border, text, image, transform, opacity) in &mut motions {
         if let (Some(tween), Some(mut paint)) = (motion.background.as_mut(), background) {
-            paint.0 = step_color(tween, dt);
+            paint.0 = step(tween, dt);
         }
         if let (Some(tween), Some(mut paint)) = (motion.border.as_mut(), border) {
-            *paint = BorderColor::all(step_color(tween, dt));
+            *paint = BorderColor::all(step(tween, dt));
         }
         if let (Some(tween), Some(mut paint)) = (motion.text.as_mut(), text) {
-            paint.0 = step_color(tween, dt);
+            paint.0 = step(tween, dt);
         }
         if let (Some(tween), Some(mut node)) = (motion.image.as_mut(), image) {
-            node.color = step_color(tween, dt);
+            node.color = step(tween, dt);
         }
         if let (Some(tween), Some(mut opacity)) = (motion.opacity.as_mut(), opacity) {
-            opacity.0 = step_f32(tween, dt);
+            opacity.0 = step(tween, dt);
         }
 
         let spin = motion.spin.map(|speed| {
@@ -296,7 +246,7 @@ pub(crate) fn advance_motion(time: Res<Time>, mut motions: Query<Painted>) {
         });
         if let Some(mut ui_transform) = transform {
             if let Some(tween) = motion.transform.as_mut() {
-                let mut value = step_transform(tween, dt);
+                let mut value = step(tween, dt);
                 if let Some(spin) = spin {
                     value.rotation += spin;
                 }
@@ -308,20 +258,39 @@ pub(crate) fn advance_motion(time: Res<Time>, mut motions: Query<Painted>) {
     }
 }
 
-fn step_color(tween: &mut Tween<Color>, dt: Duration) -> Color {
-    tween.elapsed = tween.elapsed.saturating_add(dt);
-    tween.from.mix(&tween.target, tween.fraction())
+/// Retargets the tween, starting a fresh animated one from `enter`, and returns its current value.
+fn aim<T: Lerp + Copy + PartialEq>(
+    slot: &mut Option<Tween<T>>,
+    enter: T,
+    target: T,
+    timing: Option<Timing>,
+) -> T {
+    match slot {
+        Some(tween) => {
+            let current = value_of(tween);
+            tween.retarget(current, target, timing);
+            current
+        }
+        None => {
+            let tween = match timing {
+                Some(timing) => Tween {
+                    from: enter,
+                    target,
+                    elapsed: Duration::ZERO,
+                    timing,
+                },
+                None => Tween::settled(target),
+            };
+            let current = value_of(&tween);
+            *slot = Some(tween);
+            current
+        }
+    }
 }
 
-fn step_transform(tween: &mut Tween<Transform2d>, dt: Duration) -> Transform2d {
+fn step<T: Lerp + Copy + PartialEq>(tween: &mut Tween<T>, dt: Duration) -> T {
     tween.elapsed = tween.elapsed.saturating_add(dt);
-    tween.from.lerp(tween.target, tween.fraction())
-}
-
-fn step_f32(tween: &mut Tween<f32>, dt: Duration) -> f32 {
-    tween.elapsed = tween.elapsed.saturating_add(dt);
-    let t = tween.fraction();
-    tween.from + (tween.target - tween.from) * t
+    value_of(tween)
 }
 
 fn value_of<T: Lerp + Copy + PartialEq>(tween: &Tween<T>) -> T {

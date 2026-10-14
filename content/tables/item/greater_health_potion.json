@@ -1,0 +1,30 @@
+{
+  "name": "Greater Health Potion",
+  "icon": "icons/potion/red_potion_3.png",
+  "sfx": {
+    "pickup": "pickup_glass",
+    "trade": "trade_glass",
+    "drop": "landing01",
+    "use": "heal01"
+  },
+  "kind": {
+    "type": "consumable",
+    "health_bonus": 25.0,
+    "lasts": 30.0
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Thick as tar and twice as bitter. For a while after, your blows land harder."
+    },
+    {
+      "type": "stack",
+      "max": 10
+    },
+    {
+      "type": "stat",
+      "stat": "damage",
+      "value": 3.0
+    }
+  ]
+}

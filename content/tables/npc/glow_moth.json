@@ -1,0 +1,41 @@
+{
+  "name": "Glow Moth",
+  "model": "glow_moth",
+  "stats": {
+    "health": 14.0,
+    "max_health": 14.0,
+    "damage": 3.0,
+    "attack_speed": 1.5,
+    "attack_delay": 250.0,
+    "movement_speed": 1.3,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "respawn",
+      "after": 5.0
+    },
+    {
+      "type": "loot",
+      "xp": 10,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 2,
+          "chance": 60.0
+        },
+        {
+          "item": "health_potion",
+          "chance": 15.0
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 8.0
+      }
+    }
+  ]
+}

@@ -321,58 +321,18 @@ impl Style {
         for op in &self.ops {
             op(entity);
         }
-
-        let background = self.background;
-        let border = self.border;
-        let text = self.text;
-        let image = self.image;
-
-        if self.transition.is_none() && self.spin.is_none() {
-            if let Some(color) = image
-                && let Some(mut node) = entity.get_mut::<ImageNode>()
-            {
-                node.color = color;
-            }
-            if let Some(color) = background {
-                entity.insert(BackgroundColor(color));
-            }
-            if let Some(color) = border {
-                entity.insert(BorderColor::all(color));
-            }
-            if let Some(color) = text {
-                entity.insert(TextColor(color));
-            }
-            if let Some(transform) = self.transform {
-                entity.insert(transform.to_ui());
-            }
-            if let Some(opacity) = self.opacity {
-                entity.insert(Opacity(opacity));
-            }
-            return;
-        }
-
-        if entity.get::<Motion>().is_none() {
-            entity.insert(Motion::default());
-        }
-        let timing = self.transition;
-        let transformed = self.transform.is_some() || self.enter.is_some();
-        let (background, border, text, image, transform, opacity) = {
-            let mut motion = entity.get_mut::<Motion>().expect("just inserted");
-            let image = image.map(|color| motion.aim_color(MotionPaint::Image, color, timing));
-            let background =
-                background.map(|color| motion.aim_color(MotionPaint::Background, color, timing));
-            let border = border.map(|color| motion.aim_color(MotionPaint::Border, color, timing));
-            let text = text.map(|color| motion.aim_color(MotionPaint::Text, color, timing));
-            let target = self.transform.unwrap_or(Transform2d::IDENTITY);
-            let transform = transformed
-                .then(|| motion.aim_transform(self.enter.unwrap_or(target), target, timing));
-            let opacity = self.opacity.map(|target| {
-                motion.aim_opacity(self.enter_opacity.unwrap_or(target), target, timing)
-            });
-            if let Some(speed) = self.spin {
-                motion.set_spin(speed);
-            }
-            (background, border, text, image, transform, opacity)
+        let animated = self.transition.is_some() || self.spin.is_some();
+        let (background, border, text, image, transform, opacity) = if animated {
+            self.aim(entity)
+        } else {
+            (
+                self.background,
+                self.border,
+                self.text,
+                self.image,
+                self.transform,
+                self.opacity,
+            )
         };
         if let Some(color) = image
             && let Some(mut node) = entity.get_mut::<ImageNode>()
@@ -393,11 +353,51 @@ impl Style {
         } else if self.spin.is_some() && entity.get::<UiTransform>().is_none() {
             entity.insert(UiTransform::default());
         }
-        if let Some(value) = opacity {
-            entity.insert(Opacity(value));
+        if let Some(opacity) = opacity {
+            entity.insert(Opacity(opacity));
         }
     }
+
+    fn aim(&self, entity: &mut EntityWorldMut) -> Aimed {
+        if entity.get::<Motion>().is_none() {
+            entity.insert(Motion::default());
+        }
+        let timing = self.transition;
+        let transformed = self.transform.is_some() || self.enter.is_some();
+        let mut motion = entity.get_mut::<Motion>().expect("just inserted");
+        let image = self
+            .image
+            .map(|color| motion.aim_color(MotionPaint::Image, color, timing));
+        let background = self
+            .background
+            .map(|color| motion.aim_color(MotionPaint::Background, color, timing));
+        let border = self
+            .border
+            .map(|color| motion.aim_color(MotionPaint::Border, color, timing));
+        let text = self
+            .text
+            .map(|color| motion.aim_color(MotionPaint::Text, color, timing));
+        let target = self.transform.unwrap_or(Transform2d::IDENTITY);
+        let transform =
+            transformed.then(|| motion.aim_transform(self.enter.unwrap_or(target), target, timing));
+        let opacity = self
+            .opacity
+            .map(|target| motion.aim_opacity(self.enter_opacity.unwrap_or(target), target, timing));
+        if let Some(speed) = self.spin {
+            motion.set_spin(speed);
+        }
+        (background, border, text, image, transform, opacity)
+    }
 }
+
+type Aimed = (
+    Option<Color>,
+    Option<Color>,
+    Option<Color>,
+    Option<Color>,
+    Option<Transform2d>,
+    Option<f32>,
+);
 
 fn compose(base: Option<Box<Style>>, over: Option<Box<Style>>) -> Option<Box<Style>> {
     match (base, over) {

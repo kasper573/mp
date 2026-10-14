@@ -13,31 +13,11 @@ pub mod palette {
     pub const AZURE_20: Color = Color::srgb_u8(3, 52, 147);
     pub const AZURE_10: Color = Color::srgb_u8(1, 40, 122);
     pub const AZURE_0: Color = Color::srgb_u8(2, 27, 104);
-    pub const AZURE_ALPHA_25: Color = Color::srgba_u8(60, 156, 232, 64);
-    pub const AZURE_ALPHA_50: Color = Color::srgba_u8(27, 118, 215, 128);
-    pub const AZURE_ALPHA_75: Color = Color::srgba_u8(27, 118, 215, 191);
-    pub const AZURE_ALPHA_100: Color = Color::srgb_u8(27, 118, 215);
 
-    pub const INK_ALPHA_100: Color = Color::srgba_u8(16, 20, 20, 3);
-    pub const INK_ALPHA_95: Color = Color::srgba_u8(16, 20, 20, 13);
-    pub const INK_ALPHA_90: Color = Color::srgba_u8(16, 20, 20, 26);
-    pub const INK_ALPHA_80: Color = Color::srgba_u8(16, 20, 20, 51);
-    pub const INK_ALPHA_70: Color = Color::srgba_u8(16, 20, 20, 77);
-    pub const INK_ALPHA_65: Color = Color::srgba_u8(16, 20, 20, 102);
-    pub const INK_ALPHA_60: Color = Color::srgba_u8(16, 20, 20, 128);
-    pub const INK_ALPHA_50: Color = Color::srgba_u8(16, 20, 20, 153);
-    pub const INK_ALPHA_40: Color = Color::srgba_u8(16, 20, 20, 179);
-    pub const INK_ALPHA_30: Color = Color::srgba_u8(16, 20, 20, 204);
-    pub const INK_ALPHA_20: Color = Color::srgba_u8(16, 20, 20, 230);
-    pub const INK_ALPHA_10: Color = Color::srgba_u8(16, 20, 20, 242);
     pub const INK_ALPHA_0: Color = Color::srgb_u8(16, 20, 20);
 
-    pub const SHADE_100: Color = Color::srgb_u8(0, 0, 0);
     pub const SHADE_60: Color = Color::srgba_u8(0, 0, 0, 153);
-    pub const SHADE_40: Color = Color::srgba_u8(0, 0, 0, 102);
     pub const SHADE_20: Color = Color::srgba_u8(0, 0, 0, 51);
-    pub const SHADE_0: Color = Color::srgba_u8(0, 0, 0, 0);
-    pub const SHADE_80: Color = Color::srgba_u8(0, 0, 0, 204);
 
     pub const EMERALD_100: Color = Color::srgb_u8(230, 245, 233);
     pub const EMERALD_95: Color = Color::srgb_u8(193, 223, 190);
@@ -46,21 +26,14 @@ pub mod palette {
     pub const EMERALD_70: Color = Color::srgb_u8(72, 160, 74);
     pub const EMERALD_60: Color = Color::srgb_u8(36, 134, 39);
     pub const EMERALD_50: Color = Color::srgb_u8(28, 127, 32);
-    pub const EMERALD_40: Color = Color::srgb_u8(25, 112, 28);
-    pub const EMERALD_30: Color = Color::srgb_u8(17, 104, 27);
-    pub const EMERALD_20: Color = Color::srgb_u8(15, 88, 21);
     pub const EMERALD_10: Color = Color::srgb_u8(8, 78, 22);
-    pub const EMERALD_0: Color = Color::srgb_u8(7, 61, 19);
-    pub const EMERALD_ALPHA_25: Color = Color::srgba_u8(36, 134, 39, 64);
-    pub const EMERALD_ALPHA_50: Color = Color::srgba_u8(36, 134, 39, 128);
-    pub const EMERALD_ALPHA_75: Color = Color::srgba_u8(36, 134, 39, 191);
-    pub const EMERALD_ALPHA_100: Color = Color::srgb_u8(36, 134, 39);
 
     pub const SLATE_100: Color = Color::srgb_u8(255, 255, 255);
     pub const SLATE_95: Color = Color::srgb_u8(244, 243, 250);
     pub const SLATE_90: Color = Color::srgb_u8(228, 234, 239);
     pub const SLATE_80: Color = Color::srgb_u8(187, 192, 199);
     pub const SLATE_70: Color = Color::srgb_u8(159, 168, 176);
+    pub const SLATE_65: Color = Color::srgb_u8(144, 148, 155);
     pub const SLATE_60: Color = Color::srgb_u8(113, 121, 125);
     pub const SLATE_50: Color = Color::srgb_u8(73, 74, 80);
     pub const SLATE_40: Color = Color::srgb_u8(41, 46, 45);
@@ -68,17 +41,11 @@ pub mod palette {
     pub const SLATE_20: Color = Color::srgb_u8(23, 28, 28);
     pub const SLATE_10: Color = Color::srgb_u8(16, 20, 20);
     pub const SLATE_0: Color = Color::srgb_u8(0, 0, 0);
-    pub const SLATE_65: Color = Color::srgb_u8(144, 148, 155);
 
-    pub const AMBER_90: Color = Color::srgb_u8(250, 222, 150);
     pub const AMBER_80: Color = Color::srgb_u8(246, 201, 96);
     pub const AMBER_70: Color = Color::srgb_u8(236, 178, 52);
-    pub const AMBER_50: Color = Color::srgb_u8(196, 132, 18);
 
-    pub const VIOLET_90: Color = Color::srgb_u8(215, 196, 247);
     pub const VIOLET_80: Color = Color::srgb_u8(190, 155, 240);
-    pub const VIOLET_70: Color = Color::srgb_u8(165, 120, 230);
-    pub const VIOLET_50: Color = Color::srgb_u8(118, 70, 196);
 
     pub const CRIMSON_100: Color = Color::srgb_u8(251, 235, 232);
     pub const CRIMSON_95: Color = Color::srgb_u8(248, 192, 191);
@@ -89,9 +56,7 @@ pub mod palette {
     pub const CRIMSON_50: Color = Color::srgb_u8(194, 44, 39);
     pub const CRIMSON_40: Color = Color::srgb_u8(180, 36, 27);
     pub const CRIMSON_30: Color = Color::srgb_u8(158, 35, 23);
-    pub const CRIMSON_20: Color = Color::srgb_u8(142, 28, 13);
     pub const CRIMSON_10: Color = Color::srgb_u8(118, 27, 12);
-    pub const CRIMSON_0: Color = Color::srgb_u8(100, 20, 8);
 }
 
 pub mod size {
@@ -178,8 +143,4 @@ pub mod typography {
     pub const NAME: Typography = t(18.0, 24.0, font::WEIGHT_BOLD, font::FAMILY_DISPLAY);
 
     pub const LINE: Typography = t(19.0, 27.0, font::WEIGHT_REGULAR, font::FAMILY_TEXT);
-
-    pub fn by_name(_name: &str) -> Typography {
-        BODY
-    }
 }

@@ -1,0 +1,637 @@
+use std::collections::BTreeMap;
+
+use egui::{RichText, Ui, Vec2};
+use game::core::content::Content;
+use game::core::math::Pos;
+use game::core::tiling::Tiles;
+use game::systems::area::{self, AreaModuleKind, Flip};
+use serde_json::Value;
+
+use super::stamp::placed_part;
+use super::{AreaFrame, shapes};
+use crate::app::{Editor, ModalDialog, REFUSED};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::ui::{dialogs, theme, widgets};
+use crate::value::RowValue;
+use crate::{forms, rows, value};
+
+pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usize>) {
+    let Some(row) = editor.row_value("area", area_key) else {
+        return;
+    };
+    let modules = selected_modules(&row, &indices);
+    if modules.is_empty()
+        || modules.iter().any(|m| {
+            matches!(
+                m.module_kind(),
+                Some(AreaModuleKind::SharedScript | AreaModuleKind::InlineScript)
+            )
+        })
+    {
+        editor.toast("A blueprint takes any selection but area scripts");
+        return;
+    }
+    let (Some(project), Some(content)) = (
+        editor.project.as_ref(),
+        editor.project.as_ref().and_then(|p| p.content),
+    ) else {
+        return;
+    };
+    let name = rows::free_key(&project.files, "blueprint", "new_blueprint");
+    let matches = matching_groups(content, area_key, &modules, &indices);
+    editor
+        .dialogs
+        .push(ModalDialog::MakeBlueprint(MakeBlueprintDialog {
+            area: area_key.to_owned(),
+            indices,
+            name,
+            matches,
+            take_matches: true,
+            error: None,
+        }));
+}
+
+pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaFrame) {
+    let mut indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
+        .iter()
+        .filter_map(|p| p.strip_prefix("/modules/")?.parse().ok())
+        .collect();
+    indices.sort_unstable();
+    open_make_blueprint(editor, &frame.area_key, indices);
+}
+
+pub struct MakeBlueprintDialog {
+    pub area: String,
+    pub indices: Vec<usize>,
+    pub name: String,
+    pub matches: Vec<BlueprintMatch>,
+    pub take_matches: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BlueprintMatch {
+    pub area: String,
+    pub indices: Vec<usize>,
+    pub origin: Pos<Tiles>,
+    pub flip: Flip,
+}
+
+fn matching_groups(
+    content: Content,
+    own_area: &str,
+    modules: &[Value],
+    own_indices: &[usize],
+) -> Vec<BlueprintMatch> {
+    let Some(origin) = selection_origin(modules) else {
+        return Vec::new();
+    };
+    let mut relative: Vec<Value> = modules.to_vec();
+    for module in &mut relative {
+        shapes::shift(module, -origin.x, -origin.y);
+    }
+    let signature = |modules: &[Value]| -> Vec<String> {
+        let mut texts: Vec<String> = modules.iter().map(|m| canonical(m).to_string()).collect();
+        texts.sort();
+        texts
+    };
+    let wanted = signature(&relative);
+    let mut out = Vec::new();
+    for area_id in content.ids::<area::AreaDef>() {
+        let key = area_id.key(&content);
+        let Ok(row) = value::json(area_id.get(&content)) else {
+            continue;
+        };
+        let all: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
+        let anchors: Vec<usize> = all
+            .iter()
+            .enumerate()
+            .filter(|(index, m)| {
+                m["type"] == modules[0]["type"] && !(key == own_area && own_indices.contains(index))
+            })
+            .map(|(index, _)| index)
+            .collect();
+        let Some(first_bounds) = shapes::bounds(&modules[0], None) else {
+            continue;
+        };
+        for anchor in anchors {
+            let Some(anchor_bounds) = shapes::bounds(&all[anchor], None) else {
+                continue;
+            };
+            let candidate_origin = Pos::new(
+                anchor_bounds.min().x - (first_bounds.min().x - origin.x),
+                anchor_bounds.min().y - (first_bounds.min().y - origin.y),
+            );
+            let mut group: Vec<usize> = Vec::new();
+            let mut ok = true;
+            for wanted_module in &relative {
+                let mut target = wanted_module.clone();
+                shapes::shift(&mut target, candidate_origin.x, candidate_origin.y);
+                let target = canonical(&target);
+                match all.iter().enumerate().find(|(index, m)| {
+                    !(group.contains(index) || (key == own_area && own_indices.contains(index)))
+                        && canonical(m) == target
+                }) {
+                    Some((index, _)) => group.push(index),
+                    None => {
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+            if ok
+                && signature(
+                    &group
+                        .iter()
+                        .map(|&i| {
+                            let mut m = all[i].clone();
+                            shapes::shift(&mut m, -candidate_origin.x, -candidate_origin.y);
+                            m
+                        })
+                        .collect::<Vec<_>>(),
+                ) == wanted
+            {
+                group.sort_unstable();
+                if !out
+                    .iter()
+                    .any(|g: &BlueprintMatch| g.area == key && g.indices == group)
+                {
+                    out.push(BlueprintMatch {
+                        area: key.to_owned(),
+                        indices: group,
+                        origin: candidate_origin,
+                        flip: Flip::None,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
+
+fn canonical(module: &Value) -> Value {
+    let mut out = module.clone();
+    if let Some(map) = out.as_object_mut() {
+        map.remove("name");
+    }
+    out
+}
+
+pub fn selection_origin(modules: &[Value]) -> Option<Pos<Tiles>> {
+    modules
+        .iter()
+        .filter_map(|m| shapes::bounds(m, None))
+        .reduce(|a, b| a.union(&b))
+        .map(|r| r.min())
+}
+
+pub fn make_blueprint_dialog(
+    editor: &mut Editor,
+    ctx: &egui::Context,
+    mut dialog: MakeBlueprintDialog,
+) -> Option<MakeBlueprintDialog> {
+    let mut outcome = None;
+    let (enter, escape) = dialogs::keys(ctx);
+    let row = editor
+        .row_value("area", &dialog.area)
+        .unwrap_or(Value::Null);
+    let modules = selected_modules(&row, &dialog.indices);
+    let origin = selection_origin(&modules);
+    let holds = holds_text(&modules);
+    let placements = 1 + if dialog.take_matches {
+        dialog.matches.len()
+    } else {
+        0
+    };
+    dialogs::card(ctx, "make-blueprint", 560.0, |ui| {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("▣").color(theme::WARN).size(16.0));
+            ui.label(
+                RichText::new(format!(
+                    "Make blueprint from {} placement{}",
+                    modules.len(),
+                    widgets::plural(modules.len())
+                ))
+                .strong()
+                .size(18.0),
+            );
+        });
+        widgets::key_hint(ui, "Ctrl Alt B");
+        ui.add_space(8.0);
+        widgets::kv(ui, "name", |ui| {
+            let response = forms::boxed_input(ui, None, |ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut dialog.name)
+                        .frame(egui::Frame::NONE)
+                        .font(egui::TextStyle::Monospace)
+                        .desired_width(f32::INFINITY),
+                )
+            });
+            widgets::default_focus(ui, &response);
+        });
+        widgets::kv(ui, "holds", |ui| {
+            ui.add(egui::Label::new(theme::mono(&holds).size(13.0)).wrap());
+        });
+        ui.add_space(4.0);
+        if let Some(origin) = origin {
+            ui.label(
+                theme::muted(format!(
+                    "The selection becomes one placement at {}, {}. Nothing looks or plays differently.",
+                    forms::tiles(origin.x),
+                    forms::tiles(origin.y)
+                ))
+                .size(13.0),
+            );
+        }
+        if !dialog.matches.is_empty() {
+            ui.add_space(8.0);
+            matches_card(ui, &mut dialog);
+        }
+        ui.add_space(8.0);
+        if let Some(error) = &dialog.error {
+            ui.colored_label(theme::DANGER, error);
+        }
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if widgets::primary(
+                ui,
+                &format!(
+                    "Make blueprint · {placements} placement{}",
+                    widgets::plural(placements)
+                ),
+            )
+            .clicked()
+                || enter
+            {
+                outcome = Some(true);
+            }
+            if ui.button("Cancel").clicked() || escape {
+                outcome = Some(false);
+            }
+        });
+    });
+    match outcome {
+        Some(true) => match make_blueprint(editor, &dialog) {
+            Ok(()) => None,
+            Err(error) => {
+                dialog.error = Some(error);
+                Some(dialog)
+            }
+        },
+        Some(false) => None,
+        None => Some(dialog),
+    }
+}
+
+fn selected_modules(row: &Value, indices: &[usize]) -> Vec<Value> {
+    indices
+        .iter()
+        .filter_map(|&i| row["modules"].get(i).cloned())
+        .collect()
+}
+
+fn holds_text(modules: &[Value]) -> String {
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for module in modules {
+        let name = match module.module_kind() {
+            Some(AreaModuleKind::Blueprint) => module["blueprint"]
+                .as_str()
+                .unwrap_or("blueprint")
+                .to_owned(),
+            Some(AreaModuleKind::Scenery) => {
+                format!("scenery · {}", module.text("tileset"))
+            }
+            _ => shapes::label(module),
+        };
+        match counts.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((name, 1)),
+        }
+    }
+    counts
+        .into_iter()
+        .map(|(name, count)| {
+            if count > 1 {
+                format!("{name} × {count}")
+            } else {
+                name
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+fn matches_card(ui: &mut Ui, dialog: &mut MakeBlueprintDialog) {
+    let mut areas: Vec<&str> = dialog.matches.iter().map(|m| m.area.as_str()).collect();
+    areas.sort_unstable();
+    areas.dedup();
+    let where_ = if areas.len() == 1 {
+        format!("on {}", areas[0])
+    } else {
+        format!("in {} areas", areas.len())
+    };
+    let mut spots: Vec<String> = dialog
+        .matches
+        .iter()
+        .take(6)
+        .map(|m| format!("{}, {}", forms::tiles(m.origin.x), forms::tiles(m.origin.y)))
+        .collect();
+    if dialog.matches.len() > 6 {
+        spots.push(format!("… {} more", dialog.matches.len() - 6));
+    }
+    widgets::card_frame(false).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            widgets::toggle(ui, &mut dialog.take_matches);
+            ui.vertical(|ui| {
+                ui.label(theme::strong(format!(
+                    "{} identical arrangement{} {where_}",
+                    dialog.matches.len(),
+                    widgets::plural(dialog.matches.len())
+                )));
+                ui.label(
+                    theme::muted(format!("at {}. Replace them too.", spots.join(" · "))).size(12.5),
+                );
+            });
+        });
+        ui.add_space(4.0);
+        ui.label(theme::faint("Matched by their parts; anything else there stays.").size(12.0));
+    });
+}
+
+fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(), String> {
+    let project = editor.project.as_ref().ok_or("no folder")?;
+    let key = dialog.name.trim().to_owned();
+    if let Some(problem) = rows::key_problem(&project.files, "blueprint", &key) {
+        return Err(problem);
+    }
+    let row = project
+        .files
+        .json(&row_file("area", &dialog.area))
+        .ok_or("the area is gone")?;
+    let modules = selected_modules(&row, &dialog.indices);
+    let origin = selection_origin(&modules).ok_or("the selection has no place")?;
+    let mut parts = modules.clone();
+    for part in &mut parts {
+        shapes::shift(part, -origin.x, -origin.y);
+    }
+    let blueprint = serde_json::json!({ "parts": parts });
+    let mut edit = ContentEdit::new(format!(
+        "Make blueprint {key} from {} modules of {}",
+        modules.len(),
+        dialog.area
+    ));
+    edit.write_json(row_file("blueprint", &key), &blueprint);
+    let mut groups: Vec<BlueprintMatch> = vec![BlueprintMatch {
+        area: dialog.area.clone(),
+        indices: dialog.indices.clone(),
+        origin,
+        flip: Flip::None,
+    }];
+    if dialog.take_matches {
+        groups.extend(dialog.matches.iter().cloned());
+    }
+    let mut by_area: BTreeMap<String, Vec<BlueprintMatch>> = BTreeMap::new();
+    for group in groups {
+        by_area.entry(group.area.clone()).or_default().push(group);
+    }
+    let mut first_placement: Option<usize> = None;
+    for (area, groups) in by_area {
+        let mut row = project
+            .files
+            .json_owned(&row_file("area", &area))
+            .ok_or("an area is gone")?;
+        let mut list: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
+        let mut remove: Vec<usize> = groups
+            .iter()
+            .flat_map(|g| g.indices.iter().copied())
+            .collect();
+        remove.sort_unstable();
+        remove.dedup();
+        for group in &groups {
+            let mut placement = serde_json::json!({ "type": "blueprint", "blueprint": key, "at": { "x": group.origin.x, "y": group.origin.y } });
+            if !group.flip.is_none() {
+                placement["flip"] = serde_json::json!(group.flip);
+            }
+            let at = group.indices.iter().copied().min().unwrap_or(list.len());
+            list.insert(at, placement);
+            for index in &mut remove {
+                if *index >= at {
+                    *index += 1;
+                }
+            }
+            if area == dialog.area && first_placement.is_none() {
+                first_placement = Some(at);
+            }
+        }
+        for index in remove.iter().rev() {
+            list.remove(*index);
+        }
+        if let Some(first) = first_placement
+            && area == dialog.area
+        {
+            let before = remove.iter().filter(|&&r| r < first).count();
+            first_placement = Some(first - before);
+        }
+        row["modules"] = Value::Array(list);
+        edit.write_json(row_file("area", &area), &row);
+    }
+    if !editor.apply(edit) {
+        return Err(REFUSED.to_owned());
+    }
+    editor.selection = RowSelection {
+        table: "area".to_owned(),
+        keys: vec![dialog.area.clone()],
+        parts: first_placement
+            .map(|i| format!("/modules/{i}"))
+            .into_iter()
+            .collect(),
+    };
+    editor.toast(format!("Made blueprint {key}"));
+    Ok(())
+}
+
+pub struct DeleteBlueprintDialog {
+    pub blueprint: String,
+    pub users: Vec<BlueprintUser>,
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BlueprintUser {
+    pub file: String,
+    pub pointer: String,
+    pub label: String,
+    pub choice: BlueprintChoice,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BlueprintChoice {
+    Unpack,
+    Replace(String),
+    Remove,
+}
+
+pub fn delete_blueprint_dialog(
+    editor: &mut Editor,
+    ctx: &egui::Context,
+    mut dialog: DeleteBlueprintDialog,
+) -> Option<DeleteBlueprintDialog> {
+    let mut outcome = None;
+    let others: Vec<String> = editor
+        .project
+        .as_ref()
+        .and_then(|p| p.content)
+        .map(|c| {
+            c.table::<area::blueprint::BlueprintDef>()
+                .keys()
+                .iter()
+                .filter(|k| **k != dialog.blueprint)
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    egui::Window::new(format!("Delete blueprint {}", dialog.blueprint))
+        .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+        .show(ctx, |ui| {
+            if dialog.users.is_empty() {
+                ui.label("Nothing places it.");
+            } else {
+                ui.label(format!("{} placements. Each: unpack into scenery and modules, replace with another blueprint, or remove.", dialog.users.len()));
+            }
+            egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
+                for (index, user) in dialog.users.iter_mut().enumerate() {
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new(&user.label).monospace().small());
+                        ui.radio_value(&mut user.choice, BlueprintChoice::Unpack, "Unpack");
+                        ui.radio_value(&mut user.choice, BlueprintChoice::Remove, "Remove");
+                        let mut picked = match &user.choice {
+                            BlueprintChoice::Replace(k) => k.clone(),
+                            _ => String::new(),
+                        };
+                        egui::ComboBox::from_id_salt(("replace", index))
+                            .selected_text(if picked.is_empty() { "Replace with…".to_owned() } else { picked.clone() })
+                            .show_ui(ui, |ui| {
+                                for other in &others {
+                                    if ui.selectable_label(picked == *other, other).clicked() {
+                                        picked = other.clone();
+                                    }
+                                }
+                            });
+                        if !picked.is_empty() {
+                            user.choice = BlueprintChoice::Replace(picked);
+                        }
+                    });
+                }
+            });
+            if let Some(error) = &dialog.error {
+                ui.colored_label(theme::DANGER, error);
+            }
+            ui.horizontal(|ui| {
+                if ui.button("Delete").clicked() {
+                    outcome = Some(true);
+                }
+                if ui.button("Cancel").clicked() {
+                    outcome = Some(false);
+                }
+            });
+        });
+    match outcome {
+        Some(true) => match delete_blueprint(editor, &dialog) {
+            Ok(()) => None,
+            Err(error) => {
+                dialog.error = Some(error);
+                Some(dialog)
+            }
+        },
+        Some(false) => None,
+        None => Some(dialog),
+    }
+}
+
+fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Result<(), String> {
+    let content = editor
+        .project
+        .as_ref()
+        .and_then(|p| p.content)
+        .ok_or("the folder does not load")?;
+    let id = content
+        .by_key::<area::blueprint::BlueprintDef>(&dialog.blueprint)
+        .ok_or("the blueprint is gone")?;
+    let def = id.get(&content);
+    let project = editor.project.as_ref().ok_or("no folder")?;
+    let mut files: BTreeMap<String, Value> = BTreeMap::new();
+    let mut by_file: BTreeMap<String, Vec<&BlueprintUser>> = BTreeMap::new();
+    for user in &dialog.users {
+        by_file.entry(user.file.clone()).or_default().push(user);
+    }
+    for (file, users) in by_file {
+        let mut json = project.files.json_owned(&file).ok_or("a file is gone")?;
+        let mut users = users
+            .into_iter()
+            .map(|user| {
+                let cut = user.pointer.rfind('/').ok_or("a bad pointer")?;
+                let index = user.pointer[cut + 1..]
+                    .parse::<usize>()
+                    .map_err(|_| "a bad pointer")?;
+                Ok((user.pointer[..cut].to_owned(), index, user))
+            })
+            .collect::<Result<Vec<_>, &str>>()?;
+        users.sort_by(|a, b| (&b.0, b.1).cmp(&(&a.0, a.1)));
+        for (parent, index, user) in users {
+            let list = json
+                .pointer_mut(&parent)
+                .and_then(Value::as_array_mut)
+                .ok_or("a bad pointer")?;
+            match &user.choice {
+                BlueprintChoice::Remove => {
+                    if index >= list.len() {
+                        return Err("a bad pointer".into());
+                    }
+                    list.remove(index);
+                }
+                BlueprintChoice::Replace(other) => {
+                    let placement = list.get_mut(index).ok_or("a bad pointer")?;
+                    placement["blueprint"] = Value::String(other.clone());
+                }
+                BlueprintChoice::Unpack => {
+                    if index >= list.len() {
+                        return Err("a bad pointer".into());
+                    }
+                    let placement = list.remove(index);
+                    let at = shapes::pos_of(&placement["at"]).unwrap_or(Pos::new(0.0, 0.0));
+                    let flip =
+                        serde_json::from_value(placement["flip"].clone()).unwrap_or_default();
+                    for (offset, part) in def.parts.iter().enumerate() {
+                        let placed = placed_part(
+                            content,
+                            part,
+                            &placement["values"],
+                            &def.variables,
+                            at,
+                            flip,
+                        )
+                        .ok_or("a part the engine refuses")?;
+                        list.insert(index + offset, placed);
+                    }
+                }
+            }
+        }
+        files.insert(file, json);
+    }
+    let mut edit = ContentEdit::new(format!(
+        "Delete blueprint {} ({} placements resolved)",
+        dialog.blueprint,
+        dialog.users.len()
+    ));
+    for (file, json) in files {
+        edit.write_json(file, &json);
+    }
+    edit.remove(row_file("blueprint", &dialog.blueprint));
+    if !editor.apply(edit) {
+        return Err(REFUSED.to_owned());
+    }
+    rows::close_tabs(editor, "blueprint", &dialog.blueprint);
+    Ok(())
+}

@@ -1,18 +1,16 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{DragHandle, DragRoot, OnSettle, component};
+use ui::{DragHandle, DragRoot, OnSettle};
 
 use super::card::{Countdown, icon, live_text};
-use super::{QuestId, QuestLog, QuestResult, Repeat};
+use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
 use crate::core::assets::AssetRef;
-use crate::data::attention::Id as AttentionId;
-use crate::systems::hud::{self, HudAudience, Widget};
+use crate::core::content::{Content, Fixture};
+use crate::systems::hud::{self, HudAudience, Widget, spawn_ui};
+use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const WIDTH: f32 = 230.0;
 const MARK: f32 = 16.0;
@@ -23,7 +21,7 @@ impl Plugin for QuestTrackerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Folded>()
             .init_resource::<Built>()
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -50,13 +48,13 @@ impl Widget for QuestTrackerWidget {
             ..default()
         };
         Box::new(bsn! {
-            template_value(node)
+            node
             BackgroundColor({hud::PANEL_BG})
-            component(BorderColor::all(hud::BORDER))
+            BorderColor::all(hud::BORDER)
             DragRoot
             DragHandle
             QuestTracker
-            component(OnSettle::new(move |world, geom| hud::persist_widget(world, id, geom)))
+            ~{OnSettle::new(move |world, geom| hud::persist_widget(world, id, geom))}
         })
     }
     fn sync(&self, world: &mut World) {
@@ -84,7 +82,7 @@ enum Tone {
 #[derive(Debug, Hash)]
 struct Entry {
     quest: QuestId,
-    mark: Option<AssetRef>,
+    mark: Option<&'static AssetRef>,
     timed: bool,
     rows: Vec<(String, Count, Tone)>,
 }
@@ -115,34 +113,38 @@ fn sync_tracker(world: &mut World) {
         .cloned()
         .unwrap_or_default();
     let folded = world.resource::<Folded>().0;
-    let mut hasher = DefaultHasher::new();
-    (&entries, folded).hash(&mut hasher);
-    let key = hasher.finish();
+    let key = hud::fingerprint(&(&entries, folded));
     if world.resource::<Built>().0 == Some(key) {
         return;
     }
     world.resource_mut::<Built>().0 = Some(key);
     if let Some(mut node) = world.get_mut::<Node>(panel) {
-        node.display = match entries.is_empty() {
-            true => Display::None,
-            false => Display::Flex,
+        node.display = if entries.is_empty() {
+            Display::None
+        } else {
+            Display::Flex
         };
     }
     let header = header(entries.len(), folded);
+    let content = world.resource::<Content>();
     let assets = world.resource::<AssetServer>();
     let mut parts: Vec<Box<dyn Scene>> = vec![Box::new(header)];
     if !folded {
-        parts.extend(entries.iter().map(|entry| entry_scene(assets, &log, entry)));
+        parts.extend(
+            entries
+                .iter()
+                .map(|entry| entry_scene(content, assets, &log, entry)),
+        );
     }
     world.entity_mut(panel).despawn_related::<Children>();
     for part in parts {
-        if let Ok(mut spawned) = world.spawn_scene(part) {
-            spawned.insert(ChildOf(panel));
-        }
+        spawn_ui(world, part).insert(ChildOf(panel));
     }
 }
 
 fn entries(world: &World) -> Vec<Entry> {
+    let content = world.resource::<Content>();
+    let parties = world.resource::<Parties>();
     let seen = world.resource::<Viewpoint>().0;
     let Some(log) = seen.and_then(|seen| world.get::<QuestLog>(seen)) else {
         return Vec::new();
@@ -151,30 +153,31 @@ fn entries(world: &World) -> Vec<Entry> {
     log.tracked
         .iter()
         .filter_map(|&quest| {
-            let def = quest.get();
+            let def = quest.get(content);
             if let Some(active) = log.active(quest) {
                 let timed = active.left.is_some();
                 if active.ready && def.decision().is_none() {
-                    let mark = match def.repeat {
-                        Repeat::Once => AttentionId::QuestReady,
-                        Repeat::Daily => AttentionId::RepeatableReady,
-                    };
                     return Some(Entry {
                         quest,
-                        mark: Some(mark.get().icon),
+                        mark: Some(&ready_mark(def).get(content).icon),
                         timed,
-                        rows: vec![(def.hand_in_hint(), Count::Fixed(String::new()), Tone::Next)],
+                        rows: vec![(
+                            def.hand_in_hint(parties, quest),
+                            Count::Fixed(String::new()),
+                            Tone::Next,
+                        )],
                     });
                 }
-                let progress = def.progress(active, inventory);
+                let progress = def.progress(content, parties, active, inventory);
                 let next = progress.iter().position(|progress| !progress.done());
                 let rows = progress
                     .into_iter()
                     .enumerate()
                     .map(|(index, progress)| {
-                        let count = Count::Fixed(match progress.counted {
-                            true => format!("{}/{}", progress.have, progress.need),
-                            false => String::new(),
+                        let count = Count::Fixed(if progress.counted {
+                            format!("{}/{}", progress.have, progress.need)
+                        } else {
+                            String::new()
                         });
                         let tone = if progress.done() {
                             Tone::Done
@@ -202,7 +205,11 @@ fn entries(world: &World) -> Vec<Entry> {
                 )],
                 QuestResult::Failed => vec![
                     ("Failed".to_owned(), Count::Fixed(String::new()), Tone::Bad),
-                    (def.retry_hint(), Count::Fixed(String::new()), Tone::Plain),
+                    (
+                        def.retry_hint(parties, quest),
+                        Count::Fixed(String::new()),
+                        Tone::Plain,
+                    ),
                 ],
             };
             Some(Entry {
@@ -217,29 +224,34 @@ fn entries(world: &World) -> Vec<Entry> {
 
 fn header(count: usize, folded: bool) -> impl Scene {
     let ink = ui::theme::theme().surface_floating.on;
-    let (title, toggle) = match folded {
-        true => (format!("QUESTS ({count})"), "+"),
-        false => ("QUESTS".to_owned(), "–"),
+    let (title, toggle) = if folded {
+        (format!("QUESTS ({count})"), "+")
+    } else {
+        ("QUESTS".to_owned(), "–")
     };
     bsn! {
         Node { justify_content: JustifyContent::SpaceBetween, align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Pickable::IGNORE
         Children [
-            {EntityScene(ui::styled_text(title, ink.with_alpha(0.7), typography::LABEL))},
-            (
-                {ui::button_styled(ui::button::intent::SECONDARY, ui::ButtonSize::Sm, toggle)}
-                on(|_: On<ui::Activate>, mut commands: Commands| {
-                    commands.queue(|world: &mut World| {
-                        let mut folded = world.resource_mut::<Folded>();
-                        folded.0 = !folded.0;
-                    });
-                })
-            ),
+            @{ui::styled_text(title, ink.with_alpha(0.7), typography::LABEL)}
+            --
+            @{ui::button_styled(ui::button::intent::SECONDARY, ui::ButtonSize::Sm, toggle)}
+            on(|_: On<ui::Activate>, mut commands: Commands| {
+                commands.queue(|world: &mut World| {
+                    let mut folded = world.resource_mut::<Folded>();
+                    folded.0 = !folded.0;
+                });
+            })
         ]
     }
 }
 
-fn entry_scene(assets: &AssetServer, log: &QuestLog, entry: &Entry) -> Box<dyn Scene> {
+fn entry_scene(
+    content: &Content,
+    assets: &AssetServer,
+    log: &QuestLog,
+    entry: &Entry,
+) -> Box<dyn Scene> {
     let ink = ui::theme::theme().surface_floating.on;
     let mark: Vec<Box<dyn Scene>> = entry
         .mark
@@ -253,8 +265,9 @@ fn entry_scene(assets: &AssetServer, log: &QuestLog, entry: &Entry) -> Box<dyn S
             Box::new(bsn! {
                 Node { column_gap: Val::Px({spacing::S}), align_items: AlignItems::Center }
                 Children [
-                    {EntityScene(icon(assets, AssetRef("icons/cursors/sandclock001.png"), 12.0))},
-                    {EntityScene(live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION))},
+                    @{icon(assets, &InterfaceIcon::Timed.get(content).image, 12.0)}
+                    --
+                    @{live_text(log, quest, Countdown::Left, palette::AMBER_80, typography::CAPTION)}
                 ]
             })
         })
@@ -288,27 +301,29 @@ fn entry_scene(assets: &AssetServer, log: &QuestLog, entry: &Entry) -> Box<dyn S
                 }
                 Pickable::IGNORE
                 Children [
-                    {EntityScene(ui::styled_text(label.clone(), color, typography::CAPTION))},
-                    {count},
+                    @{ui::styled_text(label.clone(), color, typography::CAPTION)}
+                    --
+                    {count}
                 ]
             })
         })
         .collect();
-    let title = quest.get().title;
+    let title = quest.get(content).title.as_str();
     Box::new(bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(1.0), width: Val::Percent(100.0) }
         Pickable::IGNORE
         Children [
-            (
-                Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
-                Pickable::IGNORE
-                Children [
-                    {mark},
-                    ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(title, ink, typography::LABEL))} ] ),
-                    {timer},
-                ]
-            ),
-            {rows},
+            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
+            Pickable::IGNORE
+            Children [
+                {mark}
+                --
+                Node { flex_grow: 1.0 } Children [ @{ui::styled_text(title, ink, typography::LABEL)} ]
+                --
+                {timer}
+            ]
+            --
+            {rows}
         ]
     })
 }

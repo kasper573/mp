@@ -2,19 +2,20 @@ mod escape;
 pub mod gestures;
 pub mod map;
 
-use crate::core::assets::AssetService;
-use crate::core::math::Pos;
-use crate::core::tiling::Tiles;
-use crate::systems::area::{self, AreaTag};
-use crate::systems::player::session::{self, Viewpoint};
 use bevy::input::ButtonState;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
 use bevy::window::{CursorMoved, PrimaryWindow};
 
+use crate::core::content::Content;
+use crate::core::math::Pos;
 use crate::core::render::TILE;
 use crate::core::render::screen::ToScreen;
-use crate::systems::scene::Scene;
+use crate::core::tiling::Tiles;
+use crate::systems::area::{self, AreaTag};
+use crate::systems::player::RespawnRequest;
+use crate::systems::player::session::{self, Viewpoint};
+use crate::systems::screen::ClientScreen;
 
 pub struct InputPlugin;
 
@@ -31,7 +32,7 @@ impl Plugin for InputPlugin {
                     respawn_when_dead.run_if(not(ui::typing)),
                     update_tile_highlight,
                 )
-                    .run_if(in_state(Scene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -60,7 +61,7 @@ fn setup_highlight(mut commands: Commands) {
 fn update_tile_highlight(
     highlight: Option<Res<ActiveTileHighlight>>,
     viewpoint: Res<Viewpoint>,
-    service: Res<AssetService>,
+    content: Res<Content>,
     areas: Query<&AreaTag>,
     mut sprite: Query<(&mut Sprite, &mut Transform, &mut Visibility), With<TileHighlight>>,
 ) {
@@ -71,7 +72,7 @@ fn update_tile_highlight(
         *visibility = Visibility::Hidden;
         return;
     };
-    let Some(z) = highlight_z(&service, &viewpoint, &areas) else {
+    let Some(z) = highlight_z(&content, &viewpoint, &areas) else {
         *visibility = Visibility::Hidden;
         return;
     };
@@ -80,17 +81,9 @@ fn update_tile_highlight(
     transform.translation = highlight.pos.to_screen().extend(z);
 }
 
-fn highlight_z(
-    service: &AssetService,
-    viewpoint: &Viewpoint,
-    areas: &Query<&AreaTag>,
-) -> Option<f32> {
+fn highlight_z(content: &Content, viewpoint: &Viewpoint, areas: &Query<&AreaTag>) -> Option<f32> {
     let tag = areas.get(viewpoint.0?).ok()?;
-    Some(
-        service
-            .resolve(tag.area.get().map, area::build_area)
-            .dynamic_layer() as f32,
-    )
+    Some(area::load(content, tag.area).sort_base())
 }
 
 fn touch_as_mouse(
@@ -132,6 +125,6 @@ fn touch_as_mouse(
 
 fn respawn_when_dead(world: &mut World) {
     if session::is_dead(world) && map::just_pressed(world, map::InputAction::Respawn) {
-        session::respawn(world);
+        world.write_message(RespawnRequest);
     }
 }

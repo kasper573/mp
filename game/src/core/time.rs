@@ -1,7 +1,11 @@
+use std::hash::{Hash, Hasher};
+
 use bevy_ecs::prelude::Resource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -15,9 +19,11 @@ use serde::{Deserialize, Serialize};
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "s"))]
 pub struct Seconds(pub f32);
 
 #[derive(
+    JsonSchema,
     Serialize,
     Deserialize,
     Clone,
@@ -31,12 +37,16 @@ pub struct Seconds(pub f32);
     derive_more::Sub,
     derive_more::SubAssign,
 )]
+#[schemars(extend("x-unit" = "ms"))]
 pub struct Millis(pub f32);
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd,
+)]
 pub struct PlaybackRate(pub f32);
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[schemars(extend("x-unit" = "Hz"))]
 pub struct Hertz(pub f32);
 
 impl Hertz {
@@ -69,6 +79,13 @@ impl std::ops::Rem for Millis {
     type Output = Millis;
     fn rem(self, other: Millis) -> Millis {
         Millis(self.0 % other.0)
+    }
+}
+
+impl Hash for Seconds {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // -0.0 equals 0.0, so both must hash alike.
+        (self.0 + 0.0).to_bits().hash(state);
     }
 }
 
@@ -165,6 +182,10 @@ impl UnixMillis {
         UnixMillis(self.0.saturating_add(duration.millis().0.max(0.0) as u64))
     }
 
+    pub fn before(self, duration: Seconds) -> UnixMillis {
+        UnixMillis(self.0.saturating_sub(duration.millis().0.max(0.0) as u64))
+    }
+
     pub fn since(self, earlier: UnixMillis) -> Seconds {
         Millis(self.0.saturating_sub(earlier.0) as f32).seconds()
     }
@@ -189,16 +210,18 @@ impl LocalClock {
         let (today, _) = local(self.now);
         let minutes = of_day / 60_000;
         let clock = format!("{:02}:{:02}", minutes / 60, minutes % 60);
-        match day == today {
-            true => clock,
-            false => format!("{} {clock}", WEEKDAYS[day.rem_euclid(7) as usize]),
+        if day == today {
+            clock
+        } else {
+            format!("{} {clock}", WEEKDAYS[day.rem_euclid(7) as usize])
         }
     }
 }
 
+// Day 0, the Unix epoch, was a Thursday.
 const WEEKDAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
 
-#[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(try_from = "u8")]
 pub struct UtcHour(u8);
 

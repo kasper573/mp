@@ -1,14 +1,8 @@
 use std::time::{Duration, Instant};
 
+use game::core::net::auth::TokenClaims;
 use jsonwebtoken::jwk::JwkSet;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Claims {
-    pub subject: String,
-    pub name: String,
-    pub roles: Vec<String>,
-}
 
 pub struct Verifier {
     issuer: String,
@@ -58,7 +52,7 @@ impl Verifier {
         self.keys.is_some()
     }
 
-    pub fn verify(&mut self, token: &str) -> Result<Claims, String> {
+    pub fn verify(&mut self, token: &str) -> Result<TokenClaims, String> {
         let header = decode_header(token).map_err(|error| error.to_string())?;
         if header.alg != Algorithm::RS256 {
             return Err(format!("unsupported algorithm {:?}", header.alg));
@@ -71,34 +65,13 @@ impl Verifier {
         validation.set_required_spec_claims(&["exp", "iss"]);
         // Keycloak names the client in azp; aud is unreliable across client configurations.
         validation.validate_aud = false;
-        let data = decode::<serde_json::Value>(token, &key, &validation)
-            .map_err(|error| error.to_string())?;
-
-        let claim = |name: &str| {
-            data.claims
-                .get(name)
-                .and_then(|value| value.as_str())
-                .map(str::to_owned)
-        };
-        if claim("azp").as_deref() != Some(self.audience.as_str()) {
+        let claims = decode::<TokenClaims>(token, &key, &validation)
+            .map_err(|error| error.to_string())?
+            .claims;
+        if claims.azp.as_deref() != Some(self.audience.as_str()) {
             return Err("token authorized party mismatch".to_owned());
         }
-        let subject = claim("sub").ok_or("token has no subject")?;
-        let name = claim("preferred_username").unwrap_or_else(|| subject.clone());
-        let roles = data.claims["realm_access"]["roles"]
-            .as_array()
-            .map(|roles| {
-                roles
-                    .iter()
-                    .filter_map(|role| role.as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(Claims {
-            subject,
-            name,
-            roles,
-        })
+        Ok(claims)
     }
 
     fn key(&mut self, kid: &str) -> Result<DecodingKey, String> {

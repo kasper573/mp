@@ -1,9 +1,9 @@
-use crate::Family;
 use bevy_ecs::hierarchy::Children;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{AlignItems, BorderRadius, JustifyContent, Node, UiRect, Val};
 use bevy_ui_widgets::Button;
 
+use crate::Family;
 use crate::components::text::text_colored;
 use crate::motion::transition::STANDARD_ENTER;
 use crate::style::{StatefulPaint, Style};
@@ -71,8 +71,8 @@ pub fn button_styled(
     bsn! {
         Node
         Button
-        template_value(style)
-        Children [ {EntityScene(label)} ]
+        style
+        Children [ @{label} ]
     }
 }
 
@@ -96,17 +96,17 @@ fn intent_style(intent: ButtonIntent, theme: &Theme) -> Style {
 }
 
 fn sized(size: ButtonSize) -> Style {
-    if size == ButtonSize::Icon {
-        return Style::new().node(|node| {
-            node.width = Val::Px(16.0);
-            node.height = Val::Px(16.0);
-            node.padding = UiRect::ZERO;
-        });
-    }
     let (height, padding) = match size {
         ButtonSize::Sm => (32.0, spacing::L),
+        ButtonSize::Md => (40.0, spacing::XL),
         ButtonSize::Lg => (48.0, spacing::XXL),
-        ButtonSize::Md | ButtonSize::Icon => (40.0, spacing::XL),
+        ButtonSize::Icon => {
+            return Style::new().node(|node| {
+                node.width = Val::Px(16.0);
+                node.height = Val::Px(16.0);
+                node.padding = UiRect::ZERO;
+            });
+        }
     };
     Style::new().node(move |node| {
         node.height = Val::Px(height);

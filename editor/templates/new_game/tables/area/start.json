@@ -1,0 +1,14 @@
+{
+  "name": "Start",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 16,
+      "height": 12
+    },
+    "tile": 16,
+    "ground": [
+      "ground"
+    ]
+  }
+}

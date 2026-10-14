@@ -1,11 +1,10 @@
-use crate::data::terminal::Id;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use bevy_terminal::TerminalInput;
 
-use crate::systems::hud::{HudAudience, Window, reconcile_children};
+use crate::systems::hud::{HudAudience, Window, reconcile_children, single_tab};
 use crate::systems::input::map::InputAction;
-use crate::systems::terminal::Terminals;
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::terminal::{TerminalKind, Terminals};
 
 pub struct TerminalWindow;
 
@@ -19,22 +18,19 @@ impl Window for TerminalWindow {
     fn toggle(&self) -> InputAction {
         InputAction::ToggleTerminal
     }
-    fn icon(&self) -> &'static str {
-        "icons/misc/scroll.png"
-    }
-    fn order(&self) -> u32 {
-        6
+    fn icon(&self) -> InterfaceIcon {
+        InterfaceIcon::Terminal
     }
     fn contents(&self, world: &World) -> Vec<ui::WindowContent> {
         let terminals = world.resource::<Terminals>();
         if terminals.tabs.is_empty() {
-            return crate::systems::hud::single_tab("Terminal", ui::text("Waiting for server…"));
+            return single_tab(self.title(), ui::text("Waiting for server…"));
         }
         terminals
             .tabs
             .iter()
             .map(|&terminal| ui::WindowContent {
-                title: tab_title(terminal).to_owned(),
+                title: <&str>::from(terminal).to_owned(),
                 scene: Box::new(tab_scene(terminal)),
             })
             .collect()
@@ -46,17 +42,10 @@ impl Window for TerminalWindow {
 
 #[derive(Component, Clone)]
 struct TerminalLog {
-    terminal: Id,
+    terminal: TerminalKind,
 }
 
-fn tab_title(terminal: Id) -> &'static str {
-    match terminal {
-        Id::Global => "Global",
-        Id::Admin => "Admin",
-    }
-}
-
-fn tab_scene(terminal: Id) -> impl Scene {
+fn tab_scene(terminal: TerminalKind) -> impl Scene {
     bsn! {
         Node {
             width: Val::Percent(100.0),
@@ -64,41 +53,38 @@ fn tab_scene(terminal: Id) -> impl Scene {
             flex_direction: FlexDirection::Column,
         }
         Children [
-            ( Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+            Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+            Children [
+              @{ui::scroll_area()}
               Children [
-                ( {ui::scroll_area()}
-                  Children [
-                    ( {ui::scroll_viewport()}
-                      {ui::component(ui::PinToBottom::default())}
-                      Children [
-                        (
-                            Node {
-                                flex_direction: FlexDirection::Column,
-                                width: Val::Percent(100.0),
-                                padding: {UiRect::all(Val::Px(4.0))},
-                            }
-                            {ui::component(TerminalLog { terminal })}
-                        )
-                      ]
-                    ),
-                    ( {ui::scroll_bar()} Children [ {EntityScene(ui::scroll_thumb())} ] )
-                  ]
-                )
+                @{ui::scroll_viewport()}
+                ui::PinToBottom
+                Children [
+                  Node {
+                      flex_direction: FlexDirection::Column,
+                      width: Val::Percent(100.0),
+                      padding: {UiRect::all(Val::Px(4.0))},
+                  }
+                  ~{TerminalLog { terminal }}
+                ]
+                --
+                @{ui::scroll_bar()} Children [ @{ui::scroll_thumb()} ]
               ]
-            ),
-            {EntityScene(ui::text_input(ui::TextInputOptions {
+            ]
+            --
+            @{ui::text_input(ui::TextInputOptions {
                 on_submit: ui::OnSubmit::new(move |world, text| {
                     world.write_message(TerminalInput { terminal, text });
                 }),
                 submit: InputAction::SubmitText.into(),
                 blur: InputAction::Dismiss.into(),
-            }))}
+            })}
         ]
     }
 }
 
 fn sync_logs(world: &mut World) {
-    let logs: Vec<(Entity, Id)> = world
+    let logs: Vec<(Entity, TerminalKind)> = world
         .query::<(Entity, &TerminalLog)>()
         .iter(world)
         .map(|(entity, log)| (entity, log.terminal))

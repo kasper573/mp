@@ -1,0 +1,43 @@
+{
+  "name": "Orc",
+  "model": "orc",
+  "stats": {
+    "health": 25.0,
+    "max_health": 25.0,
+    "damage": 3.0,
+    "attack_speed": 1.0,
+    "attack_delay": 400.0,
+    "movement_speed": 1.0,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "respawn",
+      "after": 5.0
+    },
+    {
+      "type": "loot",
+      "xp": 12,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 3
+        },
+        {
+          "item": "health_potion"
+        },
+        {
+          "item": "orc_tusk",
+          "chance": 50.0
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_defensive",
+      "values": {
+        "aggro": 7.0
+      }
+    }
+  ]
+}

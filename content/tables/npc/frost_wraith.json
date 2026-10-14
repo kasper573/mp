@@ -1,0 +1,40 @@
+{
+  "name": "Frost Wraith",
+  "model": "frost_wraith",
+  "stats": {
+    "health": 34.0,
+    "max_health": 34.0,
+    "damage": 5.0,
+    "attack_speed": 0.9,
+    "attack_delay": 500.0,
+    "movement_speed": 0.9,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "respawn",
+      "after": 5.0
+    },
+    {
+      "type": "loot",
+      "xp": 20,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 5
+        },
+        {
+          "item": "greater_health_potion",
+          "chance": 15.0
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 9.0
+      }
+    }
+  ]
+}

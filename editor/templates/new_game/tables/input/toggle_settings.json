@@ -1,0 +1,9 @@
+{
+  "label": "Open or close the settings",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyO"
+    }
+  ]
+}

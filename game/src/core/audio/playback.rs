@@ -1,15 +1,20 @@
 use std::collections::HashMap;
 
-use crate::core::assets::AssetRef;
-use crate::core::audio::decibels;
-use crate::core::audio::loader::AudioLoader;
-use crate::core::audio::mix::{AudioCategory, AudioMix};
-use crate::core::math::{Pos, Rng, Size};
-use crate::core::tiling::Tiles;
-use crate::core::time::{PlaybackRate, Seconds};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioSource};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::core::assets::AssetRef;
+use crate::core::audio::Lufs;
+use crate::core::audio::decibels;
+use crate::core::audio::loader::AudioLoader;
+use crate::core::audio::mix::{AudioCategory, AudioMix};
+use crate::core::content::{Content, ContentId, ContentRow, RowCheck};
+use crate::core::math::{Pos, Rng, Size};
+use crate::core::tiling::Tiles;
+use crate::core::time::{PlaybackRate, Seconds};
 
 const HALF_VIEW: Size<Tiles> = Size::new(12.0, 9.0);
 const STACK_WINDOW: Seconds = Seconds(0.1);
@@ -26,23 +31,53 @@ impl Plugin for SfxPlugin {
             .init_resource::<Played>()
             .add_message::<PlaySfx>()
             .add_message::<PlayClip>()
-            .add_systems(Startup, load)
-            .add_systems(Update, (mix, play_clips));
+            .add_systems(
+                Update,
+                (
+                    load.run_if(resource_exists_and_changed::<Content>),
+                    mix,
+                    play_clips,
+                )
+                    .chain(),
+            );
     }
 }
 
-pub use crate::data::sfx::Id as SfxId;
+pub type SfxId = ContentId<SfxDef>;
 
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SfxDef {
-    pub src: AssetRef,
+    pub file: AssetRef,
+    pub role: SfxRoleId,
     pub volume: SfxScalar,
     pub pitch: SfxScalar,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+impl ContentRow for SfxDef {
+    const TABLE: &'static str = "sfx";
+}
+
+pub type SfxRoleId = ContentId<SfxRoleDef>;
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct SfxRoleDef {
+    pub name: String,
+    pub loudness: Lufs,
+}
+
+impl ContentRow for SfxRoleDef {
+    const TABLE: &'static str = "sfx_role";
+
+    fn check(&self, cx: &mut RowCheck) {
+        cx.text("/name", &self.name, 1, 40);
+    }
+}
+
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(untagged)]
 pub enum SfxScalar {
     Fixed(f32),
-    Random(f32, f32),
+    Random { min: f32, max: f32 },
 }
 
 #[derive(Resource, Default)]
@@ -90,7 +125,7 @@ impl SfxScalar {
     pub fn resolve(self, rng: &mut Rng) -> f32 {
         match self {
             SfxScalar::Fixed(value) => value,
-            SfxScalar::Random(min, max) => min + rng.rand_float() * (max - min),
+            SfxScalar::Random { min, max } => min + rng.rand_float() * (max - min),
         }
     }
 }
@@ -137,16 +172,14 @@ struct Cue {
     pitch: SfxScalar,
 }
 
-fn load(assets: Res<AssetServer>, mut catalog: ResMut<Catalog>) {
-    catalog.0 = SfxId::VARIANTS
-        .iter()
-        .map(|id| {
-            let def = id.get();
-            Sound {
-                handle: assets.load(def.src.0),
-                volume: def.volume,
-                pitch: def.pitch,
-            }
+fn load(assets: Res<AssetServer>, content: Res<Content>, mut catalog: ResMut<Catalog>) {
+    catalog.0 = content
+        .table::<SfxDef>()
+        .rows()
+        .map(|def| Sound {
+            handle: assets.load(def.file.path()),
+            volume: def.volume,
+            pitch: def.pitch,
         })
         .collect();
 }

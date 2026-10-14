@@ -3,11 +3,10 @@ use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
 use bevy_picking::hover::Hovered;
-use bevy_picking::prelude::{Click, Pickable, Pointer};
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_picking::prelude::{Pickable, PointerClick};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::{AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val};
 
-use crate::component;
 use crate::components::captions::{CountHost, LabelledLine, LineHost, PlaceParts, label_text};
 use crate::components::rich_text::{RichText, rich_text};
 use crate::components::text::styled_text;
@@ -56,16 +55,15 @@ pub fn alert_bar() -> impl Scene {
             width: Val::Px(WIDEST),
             max_width: Val::Vw(94.0),
         }
-        component(Hovered::default())
+        Hovered
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            (
-                LineHost
-                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}), width: Val::Percent(100.0) }
-                Pickable { should_block_lower: false, is_hoverable: true }
-            ),
-            ( CountHost Node Pickable { should_block_lower: false, is_hoverable: true } ),
+            LineHost
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}), width: Val::Percent(100.0) }
+            Pickable { should_block_lower: false, is_hoverable: true }
+            --
+            CountHost Node Pickable { should_block_lower: false, is_hoverable: true }
         ]
     }
 }
@@ -87,7 +85,7 @@ pub(crate) fn sync_alert_bars(
 pub(crate) struct AlertCloseButton(u64);
 
 pub(crate) fn close_alert(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     buttons: Query<&AlertCloseButton>,
     parents: Query<&ChildOf>,
     is_bar: Query<(), With<AlertBar>>,
@@ -123,24 +121,24 @@ fn alert_row(line: LabelledLine) -> impl Scene {
     };
     let close = bsn! {
         Node { padding: {UiRect::axes(Val::Px(spacing::M), Val::Px(spacing::S))} }
-        component(AlertCloseButton(line.key))
-        component(CursorStyle::Pointer)
+        ~{AlertCloseButton(line.key)}
+        CursorStyle::Pointer
         Pickable { should_block_lower: true, is_hoverable: true }
-        Children [ {EntityScene(styled_text("\u{d7}", ink.with_alpha(0.7), typography::NAME))} ]
+        Children [ @{styled_text("\u{d7}", ink.with_alpha(0.7), typography::NAME)} ]
     };
     bsn! {
-        template_value(frame)
+        frame
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            (
-                Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}), flex_shrink: 1.0, min_width: Val::Px(0.0) }
-                Pickable::IGNORE
-                Children [
-                    {EntityScene(label_text(&line.label, line.replaced, palette::AZURE_80))},
-                    {EntityScene(rich_text(text, false))},
-                ]
-            ),
-            {close},
+            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}), flex_shrink: 1.0, min_width: Val::Px(0.0) }
+            Pickable::IGNORE
+            Children [
+                @{label_text(&line.label, line.replaced, palette::AZURE_80)}
+                --
+                @{rich_text(text, false)}
+            ]
+            --
+            {close}
         ]
     }
 }

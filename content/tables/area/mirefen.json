@@ -1,0 +1,7054 @@
+{
+  "name": "Mirefen",
+  "map": {
+    "type": "tilemap",
+    "size": {
+      "width": 96,
+      "height": 58
+    },
+    "tile": 16,
+    "ground": [
+      "ground",
+      "terrain",
+      "overlay",
+      "decor"
+    ]
+  },
+  "modules": [
+    {
+      "type": "object",
+      "name": "fisher-stilt",
+      "shape": {
+        "type": "rect",
+        "x": 39.5,
+        "y": 20.5,
+        "w": 2.0,
+        "h": 1.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "mirefen_stilt",
+              "x": 7.0,
+              "y": 9.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "witch-hut",
+      "shape": {
+        "type": "rect",
+        "x": 11.5,
+        "y": 22.5,
+        "w": 1.0,
+        "h": 1.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "mirefen_witch",
+              "x": 9.0,
+              "y": 11.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "bloomvale-path",
+      "shape": {
+        "type": "rect",
+        "x": 26.5,
+        "y": -0.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "bloomvale",
+              "x": 47.5,
+              "y": 61.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "name": "jungle-path",
+      "shape": {
+        "type": "rect",
+        "x": 59.5,
+        "y": 55.5,
+        "w": 2.0,
+        "h": 2.0
+      },
+      "scripts": [
+        {
+          "type": "shared_script",
+          "script": "warp",
+          "values": {
+            "to": {
+              "area": "verdant",
+              "x": 21.5,
+              "y": 2.5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "population",
+      "npc": "bog_lurker",
+      "count": 6,
+      "roams": {
+        "x": 67.5,
+        "y": 3.5,
+        "w": 26.0,
+        "h": 50.0
+      }
+    },
+    {
+      "type": "population",
+      "npc": "swamp_slime",
+      "count": 8,
+      "roams": {
+        "x": 2.5,
+        "y": 41.5,
+        "w": 41.0,
+        "h": 12.0
+      }
+    },
+    {
+      "type": "resident",
+      "npc": "eel_fisher",
+      "at": {
+        "x": 46.0,
+        "y": 23.0
+      }
+    },
+    {
+      "type": "safe_zone",
+      "rect": {
+        "x": 3.5,
+        "y": -0.5,
+        "w": 58.0,
+        "h": 33.0
+      }
+    },
+    {
+      "type": "safe_zone",
+      "rect": {
+        "x": 45.5,
+        "y": 32.5,
+        "w": 18.0,
+        "h": 25.0
+      }
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": -0.5,
+        "y": -0.5,
+        "w": 96.0,
+        "h": 58.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 1,
+          "file": "audio/music/lagoon.flac",
+          "volume": 0.24
+        },
+        {
+          "channel": 2,
+          "file": "audio/ambient/forest_air.flac",
+          "volume": 0.3
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 33.5,
+        "y": 3.5,
+        "w": 30.0,
+        "h": 17.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 4,
+          "file": "audio/ambient/lake.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 42.5,
+        "y": 18.5,
+        "w": 7.0,
+        "h": 5.0
+      },
+      "emit": 3.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/lapping_water.flac",
+          "volume": 0.32
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 42.5,
+        "y": 25.5,
+        "w": 5.0,
+        "h": 3.0
+      },
+      "emit": 3.0,
+      "channels": [
+        {
+          "channel": 3,
+          "file": "audio/ambient/campfire.flac",
+          "volume": 0.29
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 65.5,
+        "y": 3.5,
+        "w": 28.0,
+        "h": 52.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 4,
+          "file": "audio/ambient/jungle.flac",
+          "volume": 0.32
+        }
+      ]
+    },
+    {
+      "type": "soundscape",
+      "shape": {
+        "type": "rect",
+        "x": 1.5,
+        "y": 39.5,
+        "w": 42.0,
+        "h": 16.0
+      },
+      "emit": 0.0,
+      "channels": [
+        {
+          "channel": 4,
+          "file": "audio/ambient/jungle.flac",
+          "volume": 0.3
+        }
+      ]
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 6.75,
+        "y": -2.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 12.375,
+        "y": -2.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 57.5,
+        "y": -2.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 20.875,
+        "y": -6.688
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 48.0,
+        "y": -2.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 82.188,
+        "y": -2.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.813,
+        "y": -2.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 95.938,
+        "y": -2.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 34.75,
+        "y": -2.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 42.313,
+        "y": -2.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 87.375,
+        "y": -2.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 89.938,
+        "y": -2.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 46.938,
+        "y": -2.438
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 22.125,
+        "y": -2.375
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 87.875,
+        "y": -2.375
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 13.75,
+        "y": -2.313
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 66.688,
+        "y": -2.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 73.5,
+        "y": -2.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 36.438,
+        "y": -2.188
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 47.875,
+        "y": -2.188
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 59.875,
+        "y": -2.063
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 83.063,
+        "y": -2.0
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 6.188,
+        "y": -1.875
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 38.75,
+        "y": -1.875
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 43.813,
+        "y": -1.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 50.25,
+        "y": -1.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 58.25,
+        "y": -1.688
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 15.688,
+        "y": -5.625
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 62.625,
+        "y": -1.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 20.625,
+        "y": -1.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 32.313,
+        "y": -1.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.688,
+        "y": -1.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          218,
+          219
+        ],
+        [
+          null,
+          null,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 72.75,
+        "y": -1.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 90.563,
+        "y": -1.375
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          216,
+          217,
+          218,
+          219
+        ],
+        [
+          248,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 38.813,
+        "y": -1.0
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 13.25,
+        "y": -0.938
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.375,
+        "y": -0.813
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43
+        ],
+        [
+          72,
+          73,
+          74,
+          75
+        ],
+        [
+          104,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 15.625,
+        "y": -0.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 36.125,
+        "y": -0.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 90.125,
+        "y": -0.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.688,
+        "y": -0.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          50,
+          51
+        ],
+        [
+          null,
+          null,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 18.938,
+        "y": -0.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          51
+        ],
+        [
+          80,
+          81,
+          82,
+          83
+        ],
+        [
+          112,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 90.063,
+        "y": -0.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 32.938,
+        "y": -0.438
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 10.313,
+        "y": -0.375
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.813,
+        "y": -0.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35
+        ],
+        [
+          64,
+          65,
+          66,
+          67
+        ],
+        [
+          96,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 81.875,
+        "y": -4.188
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 69.938,
+        "y": -0.125
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          68,
+          69,
+          70,
+          71
+        ],
+        [
+          100,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 12.125,
+        "y": -4.0
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 81.0,
+        "y": 0.0
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 61.0,
+        "y": -3.875
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 92.563,
+        "y": 0.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 9.063,
+        "y": 0.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 24.375,
+        "y": 0.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_79",
+      "at": {
+        "x": 45.375,
+        "y": 0.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 70.75,
+        "y": 0.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 19.438,
+        "y": 0.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 91.125,
+        "y": 0.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 1.813,
+        "y": 1.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_18",
+      "at": {
+        "x": 27.5,
+        "y": 1.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 65.438,
+        "y": 1.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.188,
+        "y": 1.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          152,
+          153,
+          154,
+          null
+        ],
+        [
+          184,
+          185,
+          186,
+          null
+        ],
+        [
+          216,
+          217,
+          218,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 67.688,
+        "y": 2.188
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 86.938,
+        "y": 2.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 92.188,
+        "y": 2.688
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 0.75,
+        "y": 3.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_80",
+      "at": {
+        "x": 10.25,
+        "y": 3.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.813,
+        "y": 3.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 84.188,
+        "y": 3.563
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 66.625,
+        "y": 3.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 70.563,
+        "y": 3.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 21.563,
+        "y": 3.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 72.0,
+        "y": 3.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_43",
+      "at": {
+        "x": 41.5,
+        "y": 4.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 93.0,
+        "y": 4.813
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 14.5,
+        "y": 5.0
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.063,
+        "y": 5.125
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          0,
+          1,
+          null,
+          null
+        ],
+        [
+          32,
+          33,
+          null,
+          null
+        ],
+        [
+          64,
+          65,
+          null,
+          null
+        ],
+        [
+          96,
+          97,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 20.0,
+        "y": 5.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 3.75,
+        "y": 5.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 22.25,
+        "y": 5.313
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 68.25,
+        "y": 5.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 1.25,
+        "y": 5.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 89.313,
+        "y": 5.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_55",
+      "at": {
+        "x": 62.938,
+        "y": 5.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_69",
+      "at": {
+        "x": 30.1,
+        "y": 5.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_80",
+      "at": {
+        "x": 8.625,
+        "y": 5.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 22.5,
+        "y": 5.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_69",
+      "at": {
+        "x": 30.9,
+        "y": 6.2
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 5.5,
+        "y": 6.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -2.688,
+        "y": 6.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 78.875,
+        "y": 6.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 86.438,
+        "y": 7.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 81.5,
+        "y": 7.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 61.688,
+        "y": 7.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 86.5,
+        "y": 3.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 12.5,
+        "y": 7.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.563,
+        "y": 8.188
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 92.688,
+        "y": 8.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 11.625,
+        "y": 8.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 5.125,
+        "y": 8.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 5.25,
+        "y": 9.063
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.563,
+        "y": 9.875
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          4,
+          5,
+          6,
+          null
+        ],
+        [
+          36,
+          37,
+          38,
+          null
+        ],
+        [
+          68,
+          69,
+          70,
+          null
+        ],
+        [
+          100,
+          101,
+          102,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_43",
+      "at": {
+        "x": 51.1,
+        "y": 9.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 10.938,
+        "y": 9.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_5",
+      "at": {
+        "x": 82.688,
+        "y": 10.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_113",
+      "at": {
+        "x": 58.063,
+        "y": 10.125
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.188,
+        "y": 10.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          154,
+          155
+        ],
+        [
+          null,
+          null,
+          186,
+          187
+        ],
+        [
+          null,
+          null,
+          218,
+          219
+        ],
+        [
+          null,
+          null,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_55",
+      "at": {
+        "x": 35.563,
+        "y": 11.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 86.0,
+        "y": 11.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 8.0,
+        "y": 11.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 36.813,
+        "y": 11.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 95.813,
+        "y": 12.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_5",
+      "at": {
+        "x": 81.9,
+        "y": 12.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.875,
+        "y": 12.938
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 13.9,
+        "y": 13.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -2.438,
+        "y": 13.813
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null,
+          35
+        ],
+        [
+          null,
+          null,
+          null,
+          67
+        ],
+        [
+          null,
+          null,
+          null,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 74.875,
+        "y": 13.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_79",
+      "at": {
+        "x": 59.5,
+        "y": 13.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 7.25,
+        "y": 14.0
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 88.125,
+        "y": 14.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 0.125,
+        "y": 14.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 92.313,
+        "y": 14.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 29.063,
+        "y": 14.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_3",
+      "at": {
+        "x": 68.1,
+        "y": 15.1
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 97.063,
+        "y": 15.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          153,
+          154,
+          155
+        ],
+        [
+          null,
+          185,
+          186,
+          187
+        ],
+        [
+          null,
+          217,
+          218,
+          219
+        ],
+        [
+          null,
+          249,
+          250,
+          251
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_140",
+      "at": {
+        "x": 42.1,
+        "y": 15.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 30.063,
+        "y": 16.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_55",
+      "at": {
+        "x": 58.0,
+        "y": 16.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.188,
+        "y": 16.563
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 5.1,
+        "y": 17.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_78",
+      "at": {
+        "x": 45.7,
+        "y": 17.4
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_94",
+      "at": {
+        "x": 40.4,
+        "y": 17.4
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 76.188,
+        "y": 17.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_21",
+      "at": {
+        "x": 44.0,
+        "y": 17.45
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_73",
+      "at": {
+        "x": 54.5,
+        "y": 17.6
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_83",
+      "at": {
+        "x": 42.5,
+        "y": 17.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 0.313,
+        "y": 17.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_69",
+      "at": {
+        "x": 52.4,
+        "y": 18.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_83",
+      "at": {
+        "x": 42.0,
+        "y": 18.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_59",
+      "at": {
+        "x": 34.9,
+        "y": 18.4
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_69",
+      "at": {
+        "x": 53.3,
+        "y": 18.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "embellishments_21",
+      "at": {
+        "x": 12.688,
+        "y": 18.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "embellishments_20",
+      "at": {
+        "x": 8.375,
+        "y": 18.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_87",
+      "at": {
+        "x": 46.3,
+        "y": 18.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_18",
+      "at": {
+        "x": 28.5,
+        "y": 18.9
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 93.125,
+        "y": 19.063
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          0,
+          1,
+          2,
+          null
+        ],
+        [
+          32,
+          33,
+          34,
+          null
+        ],
+        [
+          64,
+          65,
+          66,
+          null
+        ],
+        [
+          96,
+          97,
+          98,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_70",
+      "at": {
+        "x": 55.9,
+        "y": 19.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 94.875,
+        "y": 19.188
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.063,
+        "y": 19.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_55",
+      "at": {
+        "x": 14.25,
+        "y": 19.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_75",
+      "at": {
+        "x": 4.5,
+        "y": 19.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_60",
+      "at": {
+        "x": 68.5,
+        "y": 19.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 79.5,
+        "y": 19.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_19",
+      "at": {
+        "x": 33.1,
+        "y": 20.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_85",
+      "at": {
+        "x": 20.1,
+        "y": 20.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_57",
+      "at": {
+        "x": 62.1,
+        "y": 20.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_80",
+      "at": {
+        "x": 4.938,
+        "y": 20.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_37",
+      "at": {
+        "x": 14.4,
+        "y": 20.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_40",
+      "at": {
+        "x": 77.7,
+        "y": 20.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 4.125,
+        "y": 21.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 95.938,
+        "y": 21.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_17",
+      "at": {
+        "x": 6.7,
+        "y": 21.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_63",
+      "at": {
+        "x": 70.1,
+        "y": 21.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 2.3,
+        "y": 21.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_37",
+      "at": {
+        "x": 60.5,
+        "y": 21.7
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -3.625,
+        "y": 17.75
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          4,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          12,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          20,
+          21,
+          22,
+          23
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          28,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_20",
+      "at": {
+        "x": 33.7,
+        "y": 22.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 84.813,
+        "y": 22.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_16",
+      "at": {
+        "x": 39.3,
+        "y": 22.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_61",
+      "at": {
+        "x": 47.5,
+        "y": 22.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_138",
+      "at": {
+        "x": 72.1,
+        "y": 22.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 92.25,
+        "y": 23.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_66",
+      "at": {
+        "x": 42.5,
+        "y": 23.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_41",
+      "at": {
+        "x": 45.1,
+        "y": 23.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_59",
+      "at": {
+        "x": 7.5,
+        "y": 23.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_33",
+      "at": {
+        "x": 40.8,
+        "y": 23.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_89",
+      "at": {
+        "x": 48.5,
+        "y": 23.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_57",
+      "at": {
+        "x": 70.5,
+        "y": 23.5
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.0,
+        "y": 23.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 94.25,
+        "y": 23.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_9",
+      "at": {
+        "x": 4.9,
+        "y": 23.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_54",
+      "at": {
+        "x": 10.1,
+        "y": 24.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_28",
+      "at": {
+        "x": 20.3,
+        "y": 24.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_111",
+      "at": {
+        "x": 73.1,
+        "y": 24.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_37",
+      "at": {
+        "x": 14.4,
+        "y": 24.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 89.375,
+        "y": 24.375
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -2.938,
+        "y": 24.438
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          71
+        ],
+        [
+          null,
+          null,
+          null,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_128",
+      "at": {
+        "x": 45.1,
+        "y": 24.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_16",
+      "at": {
+        "x": 38.3,
+        "y": 25.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_22",
+      "at": {
+        "x": 50.3,
+        "y": 25.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_37",
+      "at": {
+        "x": 60.5,
+        "y": 25.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 92.0,
+        "y": 25.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_22",
+      "at": {
+        "x": 79.9,
+        "y": 25.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_39",
+      "at": {
+        "x": 69.5,
+        "y": 25.4
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 28.5,
+        "y": 25.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_22",
+      "at": {
+        "x": 85.9,
+        "y": 25.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_13",
+      "at": {
+        "x": 82.9,
+        "y": 25.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_80",
+      "at": {
+        "x": 28.5,
+        "y": 25.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_9",
+      "at": {
+        "x": 12.1,
+        "y": 25.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_42",
+      "at": {
+        "x": 43.5,
+        "y": 26.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_28",
+      "at": {
+        "x": 61.9,
+        "y": 26.1
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 96.625,
+        "y": 26.313
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.625,
+        "y": 26.375
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          69,
+          70,
+          71
+        ],
+        [
+          null,
+          101,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 5.188,
+        "y": 26.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_82",
+      "at": {
+        "x": 41.3,
+        "y": 26.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_82",
+      "at": {
+        "x": 45.7,
+        "y": 26.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_43",
+      "at": {
+        "x": 17.9,
+        "y": 27.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 94.625,
+        "y": 27.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 7.25,
+        "y": 27.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 39.813,
+        "y": 27.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 4.75,
+        "y": 27.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 92.563,
+        "y": 28.188
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.25,
+        "y": 28.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          152,
+          153,
+          null,
+          null
+        ],
+        [
+          184,
+          185,
+          null,
+          null
+        ],
+        [
+          216,
+          217,
+          null,
+          null
+        ],
+        [
+          248,
+          249,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 41.375,
+        "y": 28.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_51",
+      "at": {
+        "x": 69.7,
+        "y": 28.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_22",
+      "at": {
+        "x": 80.5,
+        "y": 29.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_22",
+      "at": {
+        "x": 85.3,
+        "y": 29.3
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 42.25,
+        "y": 29.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_80",
+      "at": {
+        "x": 7.688,
+        "y": 29.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 30.938,
+        "y": 29.563
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_113",
+      "at": {
+        "x": 20.25,
+        "y": 29.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 90.188,
+        "y": 29.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 5.313,
+        "y": 30.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 80.75,
+        "y": 30.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.063,
+        "y": 30.813
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3
+        ],
+        [
+          null,
+          33,
+          34,
+          35
+        ],
+        [
+          null,
+          65,
+          66,
+          67
+        ],
+        [
+          null,
+          97,
+          98,
+          99
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 90.813,
+        "y": 31.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 90.375,
+        "y": 31.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 62.5,
+        "y": 28.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_113",
+      "at": {
+        "x": 18.313,
+        "y": 32.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 66.125,
+        "y": 32.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 75.063,
+        "y": 32.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 0.25,
+        "y": 32.188
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -4.063,
+        "y": 28.438
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          21,
+          22,
+          23
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          53,
+          54,
+          55
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_113",
+      "at": {
+        "x": 51.563,
+        "y": 32.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 80.063,
+        "y": 33.0
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_55",
+      "at": {
+        "x": 14.188,
+        "y": 33.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 26.375,
+        "y": 33.438
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.938,
+        "y": 33.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 90.75,
+        "y": 33.688
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 1.188,
+        "y": 33.875
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_12",
+      "at": {
+        "x": 87.5,
+        "y": 34.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 68.75,
+        "y": 34.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 64.438,
+        "y": 34.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 93.0,
+        "y": 34.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          152,
+          153,
+          154,
+          null
+        ],
+        [
+          184,
+          185,
+          186,
+          null
+        ],
+        [
+          216,
+          217,
+          218,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 62.563,
+        "y": 35.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 31.938,
+        "y": 35.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 66.625,
+        "y": 31.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 73.0,
+        "y": 35.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 40.25,
+        "y": 35.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 64.938,
+        "y": 36.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_10",
+      "at": {
+        "x": 73.5,
+        "y": 36.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 90.688,
+        "y": 36.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_34",
+      "at": {
+        "x": 76.1,
+        "y": 36.7
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_79",
+      "at": {
+        "x": 13.188,
+        "y": 36.813
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 93.438,
+        "y": 36.875
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 95.313,
+        "y": 36.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_63",
+      "at": {
+        "x": 42.1,
+        "y": 37.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 68.188,
+        "y": 37.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 88.688,
+        "y": 37.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 62.75,
+        "y": 37.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_45",
+      "at": {
+        "x": 8.625,
+        "y": 37.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 60.0,
+        "y": 38.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 66.25,
+        "y": 38.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 26.313,
+        "y": 38.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 26.375,
+        "y": 38.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 65.5,
+        "y": 34.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 94.938,
+        "y": 38.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -5.063,
+        "y": 35.063
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          14,
+          15
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          22,
+          23
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          30,
+          31
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          46,
+          47
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          54,
+          55
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_50",
+      "at": {
+        "x": 36.1,
+        "y": 39.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 72.375,
+        "y": 39.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 53.0,
+        "y": 39.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 62.063,
+        "y": 39.688
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 62.188,
+        "y": 39.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 93.875,
+        "y": 39.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_49",
+      "at": {
+        "x": 4.1,
+        "y": 40.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 79.125,
+        "y": 40.313
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 19.375,
+        "y": 40.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 12.25,
+        "y": 40.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 1.688,
+        "y": 40.563
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.188,
+        "y": 40.688
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          9,
+          10,
+          11
+        ],
+        [
+          null,
+          41,
+          42,
+          43
+        ],
+        [
+          null,
+          73,
+          74,
+          75
+        ],
+        [
+          null,
+          105,
+          106,
+          107
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 63.563,
+        "y": 40.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 58.75,
+        "y": 40.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 29.5,
+        "y": 40.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_87",
+      "at": {
+        "x": 37.8,
+        "y": 41.175
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 95.0,
+        "y": 41.188
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 10.563,
+        "y": 41.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 65.875,
+        "y": 41.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 61.313,
+        "y": 41.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 46.25,
+        "y": 41.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_50",
+      "at": {
+        "x": 38.1,
+        "y": 41.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_51",
+      "at": {
+        "x": 34.9,
+        "y": 41.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_49",
+      "at": {
+        "x": 19.9,
+        "y": 42.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 18.188,
+        "y": 42.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 5.438,
+        "y": 42.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 83.438,
+        "y": 42.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 25.625,
+        "y": 42.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_50",
+      "at": {
+        "x": 32.9,
+        "y": 42.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 73.813,
+        "y": 42.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_6",
+      "at": {
+        "x": 28.9,
+        "y": 42.7
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.375,
+        "y": 42.75
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          18,
+          19
+        ],
+        [
+          null,
+          null,
+          50,
+          51
+        ],
+        [
+          null,
+          null,
+          82,
+          83
+        ],
+        [
+          null,
+          null,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 48.125,
+        "y": 42.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 65.438,
+        "y": 43.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 40.438,
+        "y": 39.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 93.813,
+        "y": 43.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 50.125,
+        "y": 43.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 44.125,
+        "y": 39.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 67.375,
+        "y": 43.563
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 96.688,
+        "y": 39.563
+      },
+      "tileset": "mirefen_large_props",
+      "tiles": [
+        [
+          null,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        [
+          null,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        [
+          null,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        [
+          null,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        [
+          null,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39
+        ],
+        [
+          null,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47
+        ],
+        [
+          null,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55
+        ],
+        [
+          null,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63
+        ]
+      ],
+      "sort": 7.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 79.938,
+        "y": 43.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 71.625,
+        "y": 43.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 82.875,
+        "y": 43.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 19.438,
+        "y": 43.75
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.063,
+        "y": 44.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 94.75,
+        "y": 44.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 38.75,
+        "y": 44.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 42.375,
+        "y": 44.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 43.313,
+        "y": 45.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 50.313,
+        "y": 45.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 62.438,
+        "y": 41.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 50.188,
+        "y": 45.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 65.5,
+        "y": 45.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 96.813,
+        "y": 45.313
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 52.313,
+        "y": 45.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 95.938,
+        "y": 45.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_6",
+      "at": {
+        "x": 16.1,
+        "y": 45.9
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 67.125,
+        "y": 41.938
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 43.75,
+        "y": 46.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 5.25,
+        "y": 46.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 16.5,
+        "y": 46.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -1.188,
+        "y": 46.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          null,
+          38,
+          39
+        ],
+        [
+          null,
+          null,
+          70,
+          71
+        ],
+        [
+          null,
+          null,
+          102,
+          103
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 52.75,
+        "y": 42.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 42.563,
+        "y": 46.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 67.563,
+        "y": 46.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 49.375,
+        "y": 46.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_49",
+      "at": {
+        "x": 27.9,
+        "y": 47.1
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 79.75,
+        "y": 47.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 24.813,
+        "y": 47.188
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 14.688,
+        "y": 47.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 88.875,
+        "y": 47.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 51.063,
+        "y": 47.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 62.25,
+        "y": 43.688
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 92.563,
+        "y": 47.688
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          18,
+          null
+        ],
+        [
+          48,
+          49,
+          50,
+          null
+        ],
+        [
+          80,
+          81,
+          82,
+          null
+        ],
+        [
+          112,
+          113,
+          114,
+          null
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 48.063,
+        "y": 48.0
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 94.875,
+        "y": 48.0
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 68.313,
+        "y": 44.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 41.063,
+        "y": 48.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_118",
+      "at": {
+        "x": 85.938,
+        "y": 48.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 31.313,
+        "y": 48.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 35.188,
+        "y": 48.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 2.5,
+        "y": 48.5
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          16,
+          17,
+          null,
+          null
+        ],
+        [
+          48,
+          49,
+          null,
+          null
+        ],
+        [
+          80,
+          81,
+          null,
+          null
+        ],
+        [
+          112,
+          113,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_27",
+      "at": {
+        "x": 18.438,
+        "y": 48.625
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 44.5,
+        "y": 48.688
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 67.688,
+        "y": 49.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 41.875,
+        "y": 49.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_6",
+      "at": {
+        "x": 4.1,
+        "y": 49.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 91.563,
+        "y": 49.5
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 49.563,
+        "y": 49.75
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 1.5,
+        "y": 49.938
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          4,
+          null,
+          null,
+          null
+        ],
+        [
+          36,
+          null,
+          null,
+          null
+        ],
+        [
+          68,
+          null,
+          null,
+          null
+        ],
+        [
+          100,
+          null,
+          null,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 44.0,
+        "y": 50.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 65.25,
+        "y": 50.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 75.813,
+        "y": 50.188
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -0.188,
+        "y": 50.25
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          17,
+          18,
+          19
+        ],
+        [
+          null,
+          49,
+          50,
+          51
+        ],
+        [
+          null,
+          81,
+          82,
+          83
+        ],
+        [
+          null,
+          113,
+          114,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 51.688,
+        "y": 50.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 16.938,
+        "y": 50.25
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 65.188,
+        "y": 46.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 11.375,
+        "y": 50.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 26.438,
+        "y": 50.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 11.875,
+        "y": 50.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 16.813,
+        "y": 50.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 93.75,
+        "y": 50.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_81",
+      "at": {
+        "x": 40.313,
+        "y": 50.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_23",
+      "at": {
+        "x": 86.25,
+        "y": 51.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 42.875,
+        "y": 51.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 74.875,
+        "y": 51.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 90.438,
+        "y": 51.563
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 3.563,
+        "y": 51.625
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          152,
+          153,
+          154,
+          null
+        ],
+        [
+          184,
+          185,
+          186,
+          null
+        ],
+        [
+          216,
+          217,
+          218,
+          null
+        ],
+        [
+          248,
+          249,
+          250,
+          null
+        ]
+      ],
+      "sort": 3.5,
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 5.25,
+        "y": 51.625
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 65.313,
+        "y": 51.688
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 17.75,
+        "y": 47.75
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 32.875,
+        "y": 51.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 38.813,
+        "y": 51.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 46.813,
+        "y": 51.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 65.563,
+        "y": 51.813
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 59.813,
+        "y": 51.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 50.563,
+        "y": 52.0
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_2",
+      "at": {
+        "x": 53.625,
+        "y": 52.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 78.625,
+        "y": 52.063
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 41.438,
+        "y": 48.125
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 41.563,
+        "y": 52.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 81.063,
+        "y": 52.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 67.375,
+        "y": 52.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 73.688,
+        "y": 52.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 17.125,
+        "y": 52.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 9.438,
+        "y": 52.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 19.25,
+        "y": 52.563
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 54.25,
+        "y": 52.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 54.063,
+        "y": 53.0
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 46.438,
+        "y": 53.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 71.438,
+        "y": 49.063
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 5.938,
+        "y": 53.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 15.75,
+        "y": 53.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 75.625,
+        "y": 53.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 26.063,
+        "y": 53.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 36.313,
+        "y": 53.313
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 86.063,
+        "y": 53.313
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_14",
+      "at": {
+        "x": 29.625,
+        "y": 53.375
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 61.5,
+        "y": 49.375
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 15.563,
+        "y": 53.438
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 71.938,
+        "y": 53.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 95.125,
+        "y": 49.438
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 88.063,
+        "y": 49.5
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 12.563,
+        "y": 53.563
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 31.438,
+        "y": 53.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 78.063,
+        "y": 53.563
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 27.688,
+        "y": 53.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 95.313,
+        "y": 53.688
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 73.938,
+        "y": 53.813
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 5.063,
+        "y": 53.875
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 28.25,
+        "y": 53.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 51.875,
+        "y": 53.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 55.688,
+        "y": 53.938
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 83.438,
+        "y": 54.0
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_0",
+      "at": {
+        "x": 44.25,
+        "y": 54.125
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 19.438,
+        "y": 54.188
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_1",
+      "at": {
+        "x": 49.313,
+        "y": 54.188
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_large_props_0",
+      "at": {
+        "x": 40.25,
+        "y": 50.25
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 47.563,
+        "y": 54.25
+      }
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": -2.75,
+        "y": 54.313
+      },
+      "tileset": "mirefen_props",
+      "tiles": [
+        [
+          null,
+          null,
+          null,
+          19
+        ],
+        [
+          null,
+          null,
+          null,
+          51
+        ],
+        [
+          null,
+          null,
+          null,
+          83
+        ],
+        [
+          null,
+          null,
+          null,
+          115
+        ]
+      ],
+      "sort": 3.5
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 13.188,
+        "y": 54.313
+      }
+    },
+    {
+      "type": "blueprint",
+      "blueprint": "mirefen_props_4",
+      "at": {
+        "x": 79.188,
+        "y": 54.313
+      },
+      "flip": "horizontal"
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 38.5,
+        "y": 16.5
+      },
+      "tileset": "buildings",
+      "tiles": [
+        [
+          68,
+          69,
+          70,
+          71,
+          72
+        ],
+        [
+          73,
+          74,
+          75,
+          76,
+          77
+        ],
+        [
+          78,
+          79,
+          80,
+          81,
+          82
+        ],
+        [
+          83,
+          84,
+          85,
+          86,
+          87
+        ],
+        [
+          88,
+          89,
+          90,
+          91,
+          92
+        ]
+      ],
+      "sort": 4.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 48.5,
+        "y": 16.5
+      },
+      "tileset": "buildings",
+      "tiles": [
+        [
+          561,
+          538,
+          539,
+          540,
+          561
+        ],
+        [
+          541,
+          542,
+          543,
+          544,
+          545
+        ],
+        [
+          546,
+          547,
+          548,
+          549,
+          550
+        ],
+        [
+          551,
+          552,
+          553,
+          554,
+          555
+        ],
+        [
+          556,
+          557,
+          558,
+          559,
+          560
+        ]
+      ],
+      "sort": 4.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 9.5,
+        "y": 17.5
+      },
+      "tileset": "buildings",
+      "tiles": [
+        [
+          860,
+          860,
+          860,
+          840,
+          860,
+          860
+        ],
+        [
+          860,
+          860,
+          841,
+          842,
+          843,
+          860
+        ],
+        [
+          860,
+          844,
+          845,
+          846,
+          847,
+          860
+        ],
+        [
+          860,
+          848,
+          849,
+          850,
+          851,
+          860
+        ],
+        [
+          860,
+          852,
+          853,
+          854,
+          855,
+          860
+        ],
+        [
+          860,
+          856,
+          857,
+          858,
+          859,
+          860
+        ]
+      ],
+      "sort": 5.0
+    },
+    {
+      "type": "scenery",
+      "at": {
+        "x": 65.5,
+        "y": 22.5
+      },
+      "tileset": "buildings",
+      "tiles": [
+        [
+          141,
+          118,
+          119,
+          120,
+          141
+        ],
+        [
+          121,
+          122,
+          123,
+          124,
+          125
+        ],
+        [
+          126,
+          127,
+          128,
+          129,
+          130
+        ],
+        [
+          131,
+          132,
+          133,
+          134,
+          135
+        ],
+        [
+          136,
+          137,
+          138,
+          139,
+          140
+        ]
+      ],
+      "sort": 4.0
+    }
+  ]
+}

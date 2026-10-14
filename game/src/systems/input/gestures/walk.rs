@@ -1,15 +1,18 @@
 use std::time::Duration;
 
-use crate::core::math::Pos;
-use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::player::session;
-use crate::systems::{area, combat};
 use bevy::prelude::*;
 use bevy::window::CursorIcon;
 
+use crate::core::content::{Content, Fixture};
+use crate::core::math::Pos;
 use crate::core::render;
-use crate::systems::input::gestures::{ActiveTileHighlight, Gesture, image_cursor};
+use crate::core::tiling::{TilePos, Tiles};
+use crate::systems::input::gestures::{ActiveTileHighlight, ClickClaim, Gesture, content_cursor};
 use crate::systems::input::map::{self, InputAction};
+use crate::systems::interface::{CursorShape, InterfaceIcon};
+use crate::systems::movement::MoveRequest;
+use crate::systems::player::session;
+use crate::systems::{area, combat};
 
 const MOVE_REPEAT: Duration = Duration::from_millis(333);
 
@@ -22,12 +25,11 @@ struct WalkState {
 }
 
 impl Gesture for WalkGesture {
-    fn priority(&self) -> i32 {
-        5
-    }
-
-    fn claims(&self, world: &mut World) -> bool {
-        session::is_alive(world) && target(world).is_some()
+    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+        if !session::is_alive(world) {
+            return None;
+        }
+        target(world).map(ClickClaim::Walk)
     }
 
     fn drive(&self, world: &mut World, start: bool) {
@@ -36,28 +38,27 @@ impl Gesture for WalkGesture {
             return;
         }
         if let Some(tile) = target(world) {
-            session::move_to(world, tile);
-            stamp(world, Some(tile));
+            world.write_message(MoveRequest { pos: tile });
+            stamp(world, tile);
         }
     }
 
     fn cursor(&self, world: &mut World) -> Option<CursorIcon> {
         target(world)?;
-        let held = map::pressed(world, InputAction::Interact);
-        let path = if held {
-            "icons/cursors/pointer011.png"
+        let shape = if map::pressed(world, InputAction::Interact) {
+            CursorShape::WalkHeld
         } else {
-            "icons/cursors/pointer010.png"
+            CursorShape::Walk
         };
-        let handle = world.resource::<AssetServer>().load(path);
-        Some(image_cursor(handle, (32, 32)))
+        Some(content_cursor(world, shape))
     }
 
     fn tile_highlight(&self, world: &mut World) -> Option<ActiveTileHighlight> {
         let pos = target(world)?;
-        let image = world
-            .resource::<AssetServer>()
-            .load("icons/crosshairs/white/crosshair026.png");
+        let target = &InterfaceIcon::WalkTarget
+            .get(world.resource::<Content>())
+            .image;
+        let image = world.resource::<AssetServer>().load(target.path());
         Some(ActiveTileHighlight { pos, image })
     }
 }
@@ -69,7 +70,9 @@ fn target(world: &mut World) -> Option<Pos<Tiles>> {
 
 fn repeat(world: &mut World) {
     let now = world.resource::<Time>().elapsed();
-    let last_sent = world.get_resource::<WalkState>().and_then(|s| s.last_sent);
+    let last_sent = world
+        .get_resource::<WalkState>()
+        .and_then(|state| state.last_sent);
     if last_sent.is_some_and(|sent| now.saturating_sub(sent) < MOVE_REPEAT) {
         return;
     }
@@ -80,17 +83,19 @@ fn repeat(world: &mut World) {
         return;
     }
     let tile = point.snap();
-    let last_tile = world.get_resource::<WalkState>().and_then(|s| s.last_tile);
+    let last_tile = world
+        .get_resource::<WalkState>()
+        .and_then(|state| state.last_tile);
     if !area::walkable(world, tile) || last_tile == Some(tile) {
         return;
     }
-    session::move_to(world, tile);
-    stamp(world, Some(tile));
+    world.write_message(MoveRequest { pos: tile });
+    stamp(world, tile);
 }
 
-fn stamp(world: &mut World, tile: Option<Pos<Tiles>>) {
+fn stamp(world: &mut World, tile: Pos<Tiles>) {
     let now = world.resource::<Time>().elapsed();
     let mut state = world.get_resource_or_insert_with(WalkState::default);
     state.last_sent = Some(now);
-    state.last_tile = tile;
+    state.last_tile = Some(tile);
 }

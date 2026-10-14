@@ -1,0 +1,22 @@
+{
+  "owner": "object",
+  "variables": {
+    "to": {
+      "type": "place"
+    }
+  },
+  "nodes": {
+    "entered": {
+      "type": "on",
+      "event": "entered",
+      "by": "characters",
+      "next": "warp"
+    },
+    "warp": {
+      "type": "warp",
+      "to": {
+        "var": "to"
+      }
+    }
+  }
+}

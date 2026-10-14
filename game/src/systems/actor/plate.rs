@@ -1,15 +1,17 @@
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
+use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
 use bevy::ui::Val2;
 use ui::tokens::{palette, typography};
 
+use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::render::transition::ScreenTransitionPhase;
-use crate::core::render::{WorldToWindow, tile_to_window};
-use crate::data::attention::Id as AttentionId;
+use crate::core::render::{WorldOverlay, WorldToWindow, tile_to_window};
+use crate::core::tiling::Tiles;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
+use crate::systems::area::AreaObject;
 use crate::systems::attention;
 use crate::systems::combat::Attitude;
 use crate::systems::hud::reconcile_children;
@@ -17,9 +19,7 @@ use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::prop::Prop;
-use crate::systems::scene::Scene as GameScene;
-use bevy::ecs::query::QueryData;
+use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
@@ -33,66 +33,9 @@ impl Plugin for PlatePlugin {
                 Update,
                 (spawn_plates, place_plates, sync_plate_icons)
                     .chain()
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), clear_plates);
-    }
-}
-
-#[derive(Component, Default, Clone)]
-struct WorldOverlay;
-
-#[derive(Resource, Default)]
-struct Plates(HashMap<Entity, Entity>);
-
-#[derive(Component, Default, Clone)]
-struct PlateIcons;
-
-type Labelled = (
-    Entity,
-    Option<&'static Name>,
-    Option<&'static Npc>,
-    Option<&'static Owner>,
-    Option<&'static Attitude>,
-    Has<Prop>,
-);
-
-type Plated = Or<(With<Actor>, With<Prop>)>;
-
-struct Label {
-    name: Option<String>,
-    role: Option<&'static str>,
-    color: Color,
-}
-
-fn label(
-    (_, name, npc, owner, attitude, prop): <Labelled as QueryData>::Item<'_, '_>,
-) -> Option<Label> {
-    if prop {
-        return Some(Label {
-            name: None,
-            role: None,
-            color: Color::WHITE,
-        });
-    }
-    match (npc, owner) {
-        (Some(npc), _) => {
-            let def = npc.def.get();
-            def.role.map(|role| Label {
-                name: Some(def.display_name.to_owned()),
-                role: Some(role),
-                color: match attitude {
-                    Some(Attitude::Hostile) => palette::CRIMSON_80,
-                    _ => Color::WHITE,
-                },
-            })
-        }
-        (None, Some(_)) => Some(Label {
-            name: Some(name?.name.clone()),
-            role: None,
-            color: palette::AZURE_80,
-        }),
-        (None, None) => None,
+            .add_systems(OnExit(ClientScreen::Area), clear_plates);
     }
 }
 
@@ -116,13 +59,68 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
                 .get::<RenderPosition>(actor)
                 .map(|rendered| rendered.0)
                 .or_else(|| world.get::<Position>(actor).map(|position| position.pos))?;
-            let height = world.get::<Hitbox>(actor)?.size.height;
-            tile_to_window(world, Pos::new(at.x, at.y + 0.5 - height))
+            tile_to_window(world, head(at, world.get::<Hitbox>(actor)?))
         }
     }
 }
 
+#[derive(Resource, Default)]
+struct Plates(HashMap<Entity, Entity>);
+
+#[derive(Component, Default, Clone)]
+struct PlateIcons;
+
+type Labelled = (
+    Entity,
+    Option<&'static Name>,
+    Option<&'static Npc>,
+    Option<&'static Owner>,
+    Option<&'static Attitude>,
+    Has<AreaObject>,
+);
+
+type Plated = Or<(With<Actor>, With<AreaObject>)>;
+
+struct Label {
+    name: Option<String>,
+    role: Option<&'static str>,
+    color: Color,
+}
+
+fn label(
+    content: &Content,
+    (_, name, npc, owner, attitude, object): <Labelled as QueryData>::Item<'_, '_>,
+) -> Option<Label> {
+    if object {
+        return Some(Label {
+            name: None,
+            role: None,
+            color: Color::WHITE,
+        });
+    }
+    match (npc, owner) {
+        (Some(npc), _) => {
+            let def = npc.def.get(content);
+            def.nameplate().map(|role| Label {
+                name: Some(def.name.to_owned()),
+                role: Some(role),
+                color: match attitude {
+                    Some(Attitude::Hostile) => palette::CRIMSON_80,
+                    _ => Color::WHITE,
+                },
+            })
+        }
+        (None, Some(_)) => Some(Label {
+            name: Some(name?.name.clone()),
+            role: None,
+            color: palette::AZURE_80,
+        }),
+        (None, None) => None,
+    }
+}
+
 fn spawn_plates(
+    content: Res<Content>,
     mut plates: ResMut<Plates>,
     viewpoint: Res<Viewpoint>,
     actors: Query<Labelled, Plated>,
@@ -140,7 +138,7 @@ fn spawn_plates(
         if plates.0.contains_key(&actor) || viewpoint.0 == Some(actor) {
             continue;
         }
-        let Some(label) = label(labelled) else {
+        let Some(label) = label(&content, labelled) else {
             continue;
         };
         let plate = commands.spawn_scene(plate(label)).id();
@@ -165,9 +163,8 @@ fn place_plates(
             .ok()
             .and_then(|(rendered, at, hitbox, body)| {
                 let at = rendered.map_or(at.pos, |rendered| rendered.0);
-                let top = Pos::new(at.x, at.y + 0.5 - hitbox.size.height);
                 (world_on_screen && body.is_none_or(|body| body.action != Action::Dead))
-                    .then(|| projector.project(top))
+                    .then(|| projector.project(head(at, hitbox)))
                     .flatten()
             });
         let shown = match head {
@@ -189,6 +186,7 @@ fn place_plates(
 }
 
 fn sync_plate_icons(world: &mut World) {
+    let content = *world.resource::<Content>();
     let viewer = world.resource::<Viewpoint>().0;
     let plates: Vec<(Entity, Entity)> = world
         .resource::<Plates>()
@@ -204,24 +202,21 @@ fn sync_plate_icons(world: &mut World) {
             continue;
         };
         let marks = attention::plate_marks(world, viewer, actor);
-        let keys: Vec<u64> = marks.iter().map(mark_key).collect();
         let icons: Vec<Handle<Image>> = {
             let assets = world.resource::<AssetServer>();
             marks
                 .iter()
-                .map(|mark| assets.load(mark.get().icon.0))
+                .map(|mark| assets.load(mark.get(&content).icon.path()))
                 .collect()
         };
-        reconcile_children(world, row, &keys, |_, index| {
+        reconcile_children(world, row, &marks, |_, index| {
             Box::new(plate_icon(icons[index].clone()))
         });
     }
 }
 
-fn mark_key(mark: &AttentionId) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    mark.hash(&mut hasher);
-    hasher.finish()
+fn head(at: Pos<Tiles>, hitbox: &Hitbox) -> Pos<Tiles> {
+    Pos::new(at.x, at.y + 0.5 - hitbox.size.height)
 }
 
 fn plate_icon(image: Handle<Image>) -> impl Scene {
@@ -245,14 +240,14 @@ fn plate(label: Label) -> impl Scene {
     };
     let name = label.name.map(|name| {
         bsn! {
-            {ui::styled_text(name, label.color, typography::LABEL)}
-            ui::component(shadow)
+            @{ui::styled_text(name, label.color, typography::LABEL)}
+            shadow
         }
     });
     let role = label.role.map(|role| {
         bsn! {
-            {ui::styled_text(format!("<{role}>"), Color::WHITE.with_alpha(0.7), typography::CAPTION)}
-            ui::component(shadow)
+            @{ui::styled_text(format!("<{role}>"), Color::WHITE.with_alpha(0.7), typography::CAPTION)}
+            shadow
         }
     });
     bsn! {
@@ -266,9 +261,11 @@ fn plate(label: Label) -> impl Scene {
         GlobalZIndex({ui::tokens::layer::BACKDROP})
         Pickable::IGNORE
         Children [
-            ( PlateIcons Node { column_gap: Val::Px(2.0) } Pickable::IGNORE ),
-            {name},
-            {role},
+            PlateIcons Node { column_gap: Val::Px(2.0) } Pickable::IGNORE
+            --
+            {name}
+            --
+            {role}
         ]
     }
 }

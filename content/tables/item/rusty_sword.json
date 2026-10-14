@@ -1,0 +1,24 @@
+{
+  "name": "Rusty Sword",
+  "icon": "icons/weapon_and_tool/iron_sword.png",
+  "sfx": {
+    "pickup": "pickup_blade",
+    "trade": "trade_blade",
+    "drop": "block01"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "More rust than sword, but the edge still bites."
+    },
+    {
+      "type": "stat",
+      "stat": "damage",
+      "value": 3.0
+    }
+  ]
+}

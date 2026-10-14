@@ -1,0 +1,22 @@
+{
+  "name": "Bone",
+  "icon": "icons/monster_part/bone.png",
+  "sfx": {
+    "pickup": "pickup_bone",
+    "trade": "trade_bone",
+    "drop": "landing01"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Bleached by sun and salt. Wren will want it."
+    },
+    {
+      "type": "stack",
+      "max": 50
+    }
+  ]
+}

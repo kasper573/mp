@@ -1,50 +1,52 @@
-pub mod alert;
 pub mod bubble;
 pub mod budget;
-pub mod caption;
 pub mod error;
 pub mod feed;
 pub mod intro;
-pub mod milestone;
 mod rows;
+
+pub use intro::IntroAppearance;
+pub use rows::{NotificationRow, NotificationRows, RowPlace, shown as shown_rows};
 
 use std::borrow::Cow;
 
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
+use crate::core::assets::AssetRef;
+use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
+use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::math::Pos;
 use crate::core::platform::ClientPlatform;
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::data;
-use crate::data::npc::Id as NpcId;
+use crate::systems::actor::Rgba;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
-use crate::systems::npc::Npc;
+use crate::systems::interface::InterfaceSound;
+use crate::systems::movement::position;
+use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::player::Players;
-use crate::systems::rule::{Outcome, RuleContext};
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::text::{self, LineText, Span, SpanText};
+use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
+use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
+use crate::systems::text::{self, LineText, Motion, Span};
 use crate::systems::visibility;
 
-pub use crate::data::notification::Id as NotificationId;
-pub use intro::IntroAppearance;
-pub use rows::{NotificationRow, NotificationRows};
+pub type NotificationId = ContentId<NotificationDef>;
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
 const LATE_AFTER: Seconds = Seconds(2.0);
-const SERVER_LABEL: &str = "Server";
-const SERVER_LASTS: Seconds = Seconds(60.0);
 const LONGEST_ROW_WORDS: usize = 30;
-const LONGEST_NOTIFY_CHARS: usize = 160;
 
-pub fn register(app: &mut bevy_app::App) {
+pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.add_mapped_server_message::<NotificationSent>(Channel::Ordered)
+        .add_server_message::<SoundPlayed>(Channel::Ordered)
         .init_resource::<Broadcasts>();
 }
 
@@ -91,9 +93,9 @@ pub enum NotificationKind {
 }
 
 impl NotificationKind {
-    pub fn error() -> NotificationKind {
+    pub fn error(content: &Content) -> NotificationKind {
         NotificationKind::Error {
-            sfx: Some(SfxId::UiRefuse),
+            sfx: Some(InterfaceSound::UiRefuse.id(content)),
         }
     }
 
@@ -122,6 +124,15 @@ pub fn notify(world: &mut World, player: Entity, notification: Notification) {
     notify_from(world, player, None, notification);
 }
 
+pub fn error(world: &mut World, player: Entity, text: impl Into<String>) {
+    let kind = NotificationKind::error(world.resource::<Content>());
+    notify(
+        world,
+        player,
+        Notification::new(kind, LineText::plain(text.into())),
+    );
+}
+
 pub fn notify_from(
     world: &mut World,
     player: Entity,
@@ -130,7 +141,9 @@ pub fn notify_from(
 ) {
     record(world, player, &notification);
     let at = world.resource::<WallClock>().now;
-    let speaker = speaker.filter(|&npc| notification.spoken_by(world, npc));
+    let speaker = speaker.filter(|&npc| {
+        notification.spoken_by(world, npc) && visibility::present(world, npc, player)
+    });
     let live = match notification.kind {
         NotificationKind::Feed { .. } | NotificationKind::Error { .. } => true,
         _ => budget::admit(world, player, &notification, speaker, at) == budget::Admit::Live,
@@ -149,7 +162,8 @@ pub fn notify_from(
 }
 
 pub fn record(world: &mut World, player: Entity, notification: &Notification) {
-    history::record(world, player, notification.history_entry());
+    let entry = notification.history_entry(world.resource::<Content>());
+    history::record(world, player, entry);
 }
 
 impl Notification {
@@ -177,14 +191,15 @@ impl Notification {
         }
     }
 
-    fn history_entry(&self) -> HistoryEntry {
+    fn history_entry(&self, content: &Content) -> HistoryEntry {
         let entry = |topic: HistoryTopic, by: Option<&str>| {
             HistoryEntry::of(topic, self.text.clone()).by(by.map(str::to_owned))
         };
         match &self.kind {
-            NotificationKind::Speech { speaker } => {
-                entry(HistoryTopic::Notification, Some(speaker.get().display_name))
-            }
+            NotificationKind::Speech { speaker } => entry(
+                HistoryTopic::Notification,
+                Some(speaker.get(content).name.as_str()),
+            ),
             NotificationKind::Narration { label, .. } | NotificationKind::Alert { label, .. } => {
                 entry(HistoryTopic::Notification, Some(label))
             }
@@ -205,63 +220,210 @@ impl Notification {
     }
 }
 
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct NotificationDef {
-    pub kind: NotificationKind,
-    pub text: &'static [Span],
+    pub kind: NotificationDefKind,
+    pub text: Vec<Span>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lasts: Option<Seconds>,
 }
 
+/// The kinds content may send; the others are raised by the game itself.
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NotificationDefKind {
+    Speech {
+        speaker: NpcId,
+    },
+    Narration {
+        label: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sfx: Option<SfxId>,
+    },
+    Intro {
+        title: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tint: Option<Rgba>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        motion: Option<Motion>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        emblem: Option<AssetRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sfx: Option<SfxId>,
+    },
+}
+
+impl ContentRow for NotificationDef {
+    const TABLE: &'static str = "notification";
+}
+
 impl NotificationDef {
-    pub fn for_player(&self, world: &World, player: Entity) -> Notification {
+    pub fn notification(&'static self, text: LineText) -> Notification {
         Notification {
-            kind: self.kind.clone(),
-            text: LineText::spoken(self.text, world, player),
+            kind: (&self.kind).into(),
+            text,
             lasts: self.lasts,
         }
     }
 
     fn speaker(&self) -> Option<NpcId> {
         match self.kind {
-            NotificationKind::Speech { speaker } => Some(speaker),
+            NotificationDefKind::Speech { speaker } => Some(speaker),
             _ => None,
         }
     }
 }
 
-pub struct Notify(pub NotificationId);
-
-impl Outcome for Notify {
-    fn apply(&self, ctx: &mut RuleContext) {
-        let notification = self.0.get().for_player(ctx.world, ctx.player);
-        notify_from(ctx.world, ctx.player, ctx.encounter.with, notification);
+impl From<&'static NotificationDefKind> for NotificationKind {
+    fn from(kind: &'static NotificationDefKind) -> NotificationKind {
+        match kind {
+            NotificationDefKind::Speech { speaker } => {
+                NotificationKind::Speech { speaker: *speaker }
+            }
+            NotificationDefKind::Narration { label, sfx } => NotificationKind::Narration {
+                label: Cow::Borrowed(label),
+                sfx: *sfx,
+            },
+            NotificationDefKind::Intro {
+                title,
+                tint,
+                motion,
+                emblem,
+                sfx,
+            } => NotificationKind::Intro {
+                title: Cow::Borrowed(title),
+                appearance: IntroAppearance {
+                    tint: *tint,
+                    motion: *motion,
+                    emblem: emblem.clone(),
+                },
+                sfx: *sfx,
+            },
+        }
     }
 }
 
-pub fn speakers() -> impl Iterator<Item = NpcId> {
-    data::notification::TABLE
-        .iter()
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct Notify {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Aim,
+    pub notification: NotificationId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Arrow,
+}
+
+impl EffectDef<RiftScripting> for Notify {
+    fn needs_subject(&self) -> bool {
+        self.who.is_none()
+    }
+    fn outputs(&'static self) -> Vec<(Name, Link)> {
+        vec![("next", self.next.as_deref())]
+    }
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+        let who = effects::aim(cx, &self.who)?;
+        let def = self.notification.get(cx.content);
+        let values = text::values(&def.text)
+            .into_iter()
+            .map(|value| cx.expr(value, ValueType::Text))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Box::new(move |world, _, cx| {
+            if let Some(player) = effects::aimed_character(world, cx, &who) {
+                let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
+                let notification = def.notification(LineText::spoken(&def.text, &spoken));
+                notify_from(world, player, cx.owner, notification);
+            }
+            EffectStep::Done
+        }))
+    }
+    fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
+        vec![Reach::Notifies(self.notification)]
+    }
+}
+
+#[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct SoundPlayed {
+    pub sfx: SfxId,
+    pub at: Option<Pos<Tiles>>,
+}
+
+pub fn play_sound(
+    world: &mut World,
+    owner: Option<Entity>,
+    subject: Option<Entity>,
+    sfx: SfxId,
+    audience: Audience,
+) {
+    let source = owner.or(subject);
+    let at = source.and_then(|source| position(world, source));
+    let played = SoundPlayed { sfx, at };
+    match audience {
+        Audience::Everyone => {
+            let Some(source) = source else {
+                return;
+            };
+            for client in visibility::seen_by(world, source) {
+                visibility::send_to(world, client, played);
+            }
+        }
+        Audience::Subject => {
+            if let Some(subject) = subject {
+                visibility::send_private(world, subject, played);
+            }
+        }
+    }
+}
+
+pub fn speakers(content: &Content) -> impl Iterator<Item = NpcId> + '_ {
+    content
+        .table::<NotificationDef>()
+        .rows()
         .filter_map(NotificationDef::speaker)
 }
 
-pub fn check() {
-    for (id, def) in NotificationId::VARIANTS
-        .iter()
-        .zip(data::notification::TABLE)
-    {
-        for fill in text::fills(def.text) {
-            fill.check();
+pub fn check_all(loading: &mut Loading) {
+    let content = loading.content();
+    for (id, def) in loading.rows::<NotificationDef>() {
+        let mut check = RowCheck::default();
+        for (index, span) in def.text.iter().enumerate() {
+            if let Span::Value { value, .. } = span
+                && let Err(fault) = condition::check_value(&content, value)
+            {
+                check.error(
+                    format!("/text/{index}/value"),
+                    fault.rule,
+                    "the value",
+                    fault.expected,
+                );
+            }
         }
         let words: usize = def
             .text
             .iter()
             .map(|span| match span {
                 Span::Text { text, .. } => text.split_whitespace().count(),
-                Span::Input(_) | Span::Fill { .. } => 1,
+                Span::Input(_) | Span::Value { .. } => 1,
             })
             .sum();
         if words > LONGEST_ROW_WORDS {
-            panic!("notification {id:?}: {words} words, more than {LONGEST_ROW_WORDS}");
+            check.error(
+                "/text",
+                "too many words",
+                format!("{words} words"),
+                format!("at most {LONGEST_ROW_WORDS} words, a value counting as one"),
+            );
         }
+        if let Some(speaker) = def.speaker()
+            && content.table::<NpcDef>().get(speaker).is_some()
+            && speaker.get(&content).voice().is_none()
+        {
+            check.error(
+                "/kind/speaker",
+                "needs a voice",
+                speaker.key(&content),
+                "an npc with a voice module",
+            );
+        }
+        loading.row_errors(id, check);
     }
 }
 
@@ -291,52 +453,21 @@ pub fn notify_everywhere(worlds: &mut [&mut World], notification: &Notification)
     }
 }
 
-pub fn server_alert(message: impl Into<String>) -> Notification {
-    Notification {
-        kind: NotificationKind::Alert {
-            label: Cow::Borrowed(SERVER_LABEL),
-            sfx: Some(SfxId::UiChime),
-        },
-        text: LineText::plain(message),
-        lasts: Some(SERVER_LASTS),
-    }
-}
-
-/// Raise an alert for every player in every area.
-#[bevy_terminal::command(name = "notify", access = crate::systems::account::role::is_admin)]
-fn notify_command(
-    world: &mut World,
-    _ctx: &bevy_terminal::CommandCtx,
-    message: bevy_terminal::RestOfLine,
-) -> Result<String, String> {
-    let length = message.0.chars().count();
-    if length > LONGEST_NOTIFY_CHARS {
-        return Err(format!(
-            "{length} characters is too long, at most {LONGEST_NOTIFY_CHARS} fit"
-        ));
-    }
-    broadcast(world, server_alert(message.0));
-    Ok("notified every area".to_owned())
-}
-
 pub struct NotificationPlugin;
 
 impl Plugin for NotificationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            bubble::BubblePlugin,
-            caption::CaptionPlugin,
-            alert::AlertPlugin,
-            milestone::MilestonePlugin,
-            intro::IntroPlugin,
-            feed::FeedPlugin,
-        ))
-        .add_systems(OnEnter(GameScene::Area), spawn_places)
-        .add_systems(
-            OnExit(GameScene::Area),
-            crate::systems::scene::despawn_all::<PlacesRoot>,
-        )
-        .add_systems(Update, deliver.run_if(in_state(GameScene::Area)));
+        rows::plugin::<ui::Captions>(app);
+        rows::plugin::<ui::AlertBar>(app);
+        rows::plugin::<ui::Milestones>(app);
+        app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
+            .add_observer(rows::close_alert)
+            .add_systems(OnEnter(ClientScreen::Area), spawn_places)
+            .add_systems(OnExit(ClientScreen::Area), despawn_all::<PlacesRoot>)
+            .add_systems(
+                Update,
+                (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
+            );
     }
 }
 
@@ -359,38 +490,36 @@ fn spawn_places(mut commands: Commands) {
         Pickable::IGNORE
         GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
         Children [
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px({ui::tokens::spacing::L}),
-                    width: Val::Percent(100.0),
-                }
-                Pickable::IGNORE
-                Children [
-                    {EntityScene(ui::alert_bar())},
-                    {EntityScene(ui::captions())},
-                    (
-                        {ui::toaster(ui::SonnerPosition::TopCenter)}
-                        error::ErrorToaster
-                        Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
-                    ),
-                ]
-            ),
-            (
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px({ui::tokens::spacing::XL}),
-                    width: Val::Percent(100.0),
-                    margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
-                }
-                Pickable::IGNORE
-                Children [
-                    ( intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE ),
-                    {EntityScene(ui::milestones())},
-                ]
-            ),
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px({ui::tokens::spacing::L}),
+                width: Val::Percent(100.0),
+            }
+            Pickable::IGNORE
+            Children [
+                @{ui::alert_bar()}
+                --
+                @{ui::captions()}
+                --
+                @{ui::toaster(ui::SonnerPosition::TopCenter)}
+                error::ErrorToaster
+                Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
+            ]
+            --
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px({ui::tokens::spacing::XL}),
+                width: Val::Percent(100.0),
+                margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
+            }
+            Pickable::IGNORE
+            Children [
+                intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE
+                --
+                @{ui::milestones()}
+            ]
         ]
     });
 }
@@ -410,6 +539,15 @@ fn deliver(world: &mut World, mut cursor: Local<MessageCursor<NotificationSent>>
     }
 }
 
+fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter<PlaySfx>) {
+    for sound in played.read() {
+        sfx.write(PlaySfx {
+            id: sound.sfx,
+            place: sound.at.map_or(SfxPlace::Interface, SfxPlace::World),
+        });
+    }
+}
+
 fn show(world: &mut World, notification_sent: NotificationSent) {
     if let Some(id) = notification_sent.notification.kind.sfx() {
         world.write_message(PlaySfx {
@@ -417,12 +555,18 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
             place: SfxPlace::Interface,
         });
     }
-    match notification_sent.notification.kind {
+    match &notification_sent.notification.kind {
         NotificationKind::Speech { .. } => bubble::say(world, notification_sent),
-        NotificationKind::Narration { .. } => caption::join(world, notification_sent),
-        NotificationKind::Alert { .. } => alert::raise(world, notification_sent),
+        NotificationKind::Narration { label, .. } => {
+            rows::join::<ui::Captions>(world, label.clone(), notification_sent)
+        }
+        NotificationKind::Alert { label, .. } => {
+            rows::join::<ui::AlertBar>(world, label.clone(), notification_sent)
+        }
         NotificationKind::Error { .. } => error::toast(world, notification_sent),
-        NotificationKind::Milestone { .. } => milestone::reach(world, notification_sent),
+        NotificationKind::Milestone { label, .. } => {
+            rows::join::<ui::Milestones>(world, label.clone(), notification_sent)
+        }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
     }
@@ -436,14 +580,4 @@ impl NotificationSent {
             (_, None) => false,
         }
     }
-}
-
-pub(crate) fn plain_words(text: &LineText) -> String {
-    text.0
-        .iter()
-        .map(|span| match span {
-            SpanText::Text { text, .. } => text.as_str(),
-            SpanText::Input(_) => "",
-        })
-        .collect()
 }

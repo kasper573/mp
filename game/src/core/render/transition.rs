@@ -1,50 +1,43 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::ShaderType;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::TILE;
 use super::camera::WorldCamera;
 use super::present::{self, SCALE};
 use super::screen::ToScreen;
 use crate::core::math::{Direction, Pos};
-use crate::core::tiling::Tiles;
+use crate::core::tiling::{Cell, CellPos, Tiles};
 use crate::core::time::Seconds;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Serialize,
+    Deserialize,
+    VariantArray,
+    AsRefStr,
+    EnumString,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+)]
 pub enum ScreenTransition {
     #[default]
     Crumble,
+    #[strum(serialize = "Tile wave")]
     TileWave,
     Sweep,
     Iris,
     Mosaic,
+    #[strum(serialize = "Dither dissolve")]
     Dither,
     Fade,
 }
 
 impl ScreenTransition {
-    pub const ALL: [ScreenTransition; 7] = [
-        ScreenTransition::Crumble,
-        ScreenTransition::TileWave,
-        ScreenTransition::Sweep,
-        ScreenTransition::Iris,
-        ScreenTransition::Mosaic,
-        ScreenTransition::Dither,
-        ScreenTransition::Fade,
-    ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            ScreenTransition::Crumble => "Crumble",
-            ScreenTransition::TileWave => "Tile wave",
-            ScreenTransition::Sweep => "Sweep",
-            ScreenTransition::Iris => "Iris",
-            ScreenTransition::Mosaic => "Mosaic",
-            ScreenTransition::Dither => "Dither dissolve",
-            ScreenTransition::Fade => "Fade",
-        }
-    }
-
     fn pace(self) -> Pace {
         let (cover, uncover) = match self {
             ScreenTransition::Crumble => (0.55, 0.65),
@@ -64,7 +57,7 @@ impl ScreenTransition {
 #[derive(Resource, Default, Clone, Copy)]
 pub struct ScreenTransitionPreference(pub ScreenTransition);
 
-#[derive(Resource, Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Resource, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScreenTransitionPhase {
     #[default]
@@ -241,13 +234,10 @@ struct Progress {
 impl Cut {
     fn progress(&self) -> Progress {
         let pace = self.style.pace();
-        let uncover_from = self.arrival.as_ref().map(|arrival| {
-            if arrival.at > pace.cover {
-                arrival.at
-            } else {
-                pace.cover
-            }
-        });
+        let uncover_from = self
+            .arrival
+            .as_ref()
+            .map(|arrival| Seconds(arrival.at.0.max(pace.cover.0)));
         let cover = fraction(self.played, pace.cover);
         let uncover = uncover_from.map_or(0.0, |from| fraction(self.played - from, pace.uncover));
         let phase = if cover < 1.0 {
@@ -295,7 +285,7 @@ fn target_marks(
     };
     Some(TargetMarks {
         viewed: project(viewed_at)?,
-        tile_origin: project(Pos::origin())?,
+        tile_origin: project(CellPos::new(0, 0).bounds().min())?,
     })
 }
 

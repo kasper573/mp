@@ -1,0 +1,702 @@
+{
+  "image": "tilesets/mirefen-overlay.png",
+  "tile": 16,
+  "tiles": {
+    "578": {
+      "surface": "sand"
+    },
+    "579": {
+      "surface": "sand"
+    },
+    "581": {
+      "surface": "sand"
+    },
+    "582": {
+      "surface": "sand"
+    },
+    "584": {
+      "surface": "sand"
+    },
+    "585": {
+      "surface": "sand"
+    },
+    "586": {
+      "surface": "sand"
+    },
+    "587": {
+      "surface": "sand"
+    },
+    "589": {
+      "surface": "sand"
+    },
+    "590": {
+      "surface": "sand"
+    },
+    "592": {
+      "surface": "sand"
+    },
+    "593": {
+      "surface": "sand"
+    },
+    "594": {
+      "surface": "sand"
+    },
+    "595": {
+      "surface": "sand"
+    },
+    "597": {
+      "surface": "sand"
+    },
+    "600": {
+      "surface": "sand"
+    },
+    "602": {
+      "surface": "sand"
+    },
+    "603": {
+      "surface": "sand"
+    },
+    "605": {
+      "surface": "sand"
+    },
+    "608": {
+      "surface": "sand"
+    },
+    "610": {
+      "surface": "sand"
+    },
+    "611": {
+      "surface": "sand"
+    },
+    "613": {
+      "surface": "sand"
+    },
+    "616": {
+      "surface": "sand"
+    },
+    "617": {
+      "surface": "sand"
+    },
+    "620": {
+      "surface": "sand"
+    },
+    "622": {
+      "surface": "sand"
+    },
+    "623": {
+      "surface": "sand"
+    },
+    "625": {
+      "surface": "sand"
+    },
+    "626": {
+      "surface": "sand"
+    },
+    "628": {
+      "surface": "sand"
+    },
+    "629": {
+      "surface": "sand"
+    },
+    "631": {
+      "surface": "sand"
+    },
+    "632": {
+      "surface": "sand"
+    },
+    "635": {
+      "surface": "sand"
+    },
+    "636": {
+      "surface": "sand"
+    },
+    "642": {
+      "surface": "sand"
+    },
+    "643": {
+      "surface": "sand"
+    },
+    "644": {
+      "surface": "sand"
+    },
+    "645": {
+      "surface": "sand"
+    },
+    "646": {
+      "surface": "sand"
+    },
+    "648": {
+      "surface": "sand"
+    },
+    "649": {
+      "surface": "sand"
+    },
+    "651": {
+      "surface": "sand"
+    },
+    "658": {
+      "surface": "sand"
+    },
+    "659": {
+      "surface": "sand"
+    },
+    "661": {
+      "surface": "sand"
+    },
+    "662": {
+      "surface": "sand"
+    },
+    "663": {
+      "surface": "sand"
+    },
+    "664": {
+      "surface": "sand"
+    },
+    "666": {
+      "surface": "sand"
+    },
+    "667": {
+      "surface": "sand"
+    },
+    "672": {
+      "surface": "sand"
+    },
+    "675": {
+      "surface": "sand"
+    },
+    "678": {
+      "surface": "sand"
+    },
+    "679": {
+      "surface": "sand"
+    },
+    "680": {
+      "surface": "sand"
+    },
+    "683": {
+      "surface": "sand"
+    },
+    "684": {
+      "surface": "sand"
+    },
+    "685": {
+      "surface": "sand"
+    },
+    "686": {
+      "surface": "sand"
+    },
+    "687": {
+      "surface": "sand"
+    },
+    "688": {
+      "surface": "sand"
+    },
+    "689": {
+      "surface": "sand"
+    },
+    "690": {
+      "surface": "sand"
+    },
+    "691": {
+      "surface": "sand"
+    },
+    "692": {
+      "surface": "sand"
+    },
+    "693": {
+      "surface": "sand"
+    },
+    "694": {
+      "surface": "sand"
+    },
+    "695": {
+      "surface": "sand"
+    },
+    "696": {
+      "surface": "sand"
+    },
+    "697": {
+      "surface": "sand"
+    },
+    "701": {
+      "surface": "sand"
+    },
+    "702": {
+      "surface": "sand"
+    },
+    "704": {
+      "surface": "sand"
+    },
+    "705": {
+      "surface": "sand"
+    },
+    "706": {
+      "surface": "sand"
+    },
+    "709": {
+      "surface": "sand"
+    },
+    "710": {
+      "surface": "sand"
+    },
+    "711": {
+      "surface": "sand"
+    },
+    "712": {
+      "surface": "sand"
+    },
+    "713": {
+      "surface": "sand"
+    },
+    "714": {
+      "surface": "sand"
+    },
+    "715": {
+      "surface": "sand"
+    },
+    "716": {
+      "surface": "sand"
+    },
+    "717": {
+      "surface": "sand"
+    },
+    "718": {
+      "surface": "sand"
+    },
+    "721": {
+      "surface": "sand"
+    },
+    "722": {
+      "surface": "sand"
+    },
+    "723": {
+      "surface": "sand"
+    },
+    "732": {
+      "surface": "sand"
+    },
+    "733": {
+      "surface": "sand"
+    },
+    "734": {
+      "surface": "sand"
+    },
+    "749": {
+      "surface": "sand"
+    },
+    "750": {
+      "surface": "sand"
+    },
+    "751": {
+      "surface": "sand"
+    },
+    "752": {
+      "surface": "sand"
+    },
+    "754": {
+      "surface": "sand"
+    },
+    "755": {
+      "surface": "sand"
+    },
+    "756": {
+      "surface": "sand"
+    },
+    "757": {
+      "surface": "sand"
+    },
+    "758": {
+      "surface": "sand"
+    },
+    "759": {
+      "surface": "sand"
+    },
+    "760": {
+      "surface": "sand"
+    },
+    "761": {
+      "surface": "sand"
+    },
+    "762": {
+      "surface": "sand"
+    },
+    "763": {
+      "surface": "sand"
+    },
+    "764": {
+      "surface": "sand"
+    },
+    "765": {
+      "surface": "sand"
+    },
+    "766": {
+      "surface": "sand"
+    },
+    "767": {
+      "surface": "sand"
+    },
+    "771": {
+      "surface": "sand"
+    },
+    "772": {
+      "surface": "sand"
+    },
+    "773": {
+      "surface": "sand"
+    },
+    "794": {
+      "surface": "sand"
+    },
+    "795": {
+      "surface": "sand"
+    },
+    "796": {
+      "surface": "sand"
+    },
+    "797": {
+      "surface": "sand"
+    },
+    "798": {
+      "surface": "sand"
+    },
+    "799": {
+      "surface": "sand"
+    },
+    "800": {
+      "surface": "sand"
+    },
+    "801": {
+      "surface": "sand"
+    },
+    "802": {
+      "surface": "sand"
+    },
+    "805": {
+      "surface": "sand"
+    },
+    "806": {
+      "surface": "sand"
+    },
+    "807": {
+      "surface": "sand"
+    },
+    "808": {
+      "surface": "sand"
+    },
+    "809": {
+      "surface": "sand"
+    },
+    "810": {
+      "surface": "sand"
+    },
+    "813": {
+      "surface": "sand"
+    },
+    "815": {
+      "surface": "sand"
+    },
+    "816": {
+      "surface": "sand"
+    },
+    "817": {
+      "surface": "sand"
+    },
+    "818": {
+      "surface": "sand"
+    },
+    "819": {
+      "surface": "sand"
+    },
+    "820": {
+      "surface": "sand"
+    },
+    "821": {
+      "surface": "sand"
+    },
+    "824": {
+      "surface": "sand"
+    },
+    "825": {
+      "surface": "sand"
+    },
+    "828": {
+      "surface": "sand"
+    },
+    "829": {
+      "surface": "sand"
+    },
+    "831": {
+      "surface": "sand"
+    },
+    "832": {
+      "surface": "sand"
+    },
+    "833": {
+      "surface": "sand"
+    },
+    "834": {
+      "surface": "sand"
+    },
+    "835": {
+      "surface": "sand"
+    },
+    "840": {
+      "surface": "sand"
+    },
+    "841": {
+      "surface": "sand"
+    },
+    "842": {
+      "surface": "sand"
+    },
+    "843": {
+      "surface": "sand"
+    },
+    "844": {
+      "surface": "sand"
+    },
+    "847": {
+      "surface": "sand"
+    },
+    "848": {
+      "surface": "sand"
+    },
+    "851": {
+      "surface": "sand"
+    },
+    "852": {
+      "surface": "sand"
+    },
+    "853": {
+      "surface": "sand"
+    },
+    "854": {
+      "surface": "sand"
+    },
+    "855": {
+      "surface": "sand"
+    },
+    "856": {
+      "surface": "sand"
+    },
+    "857": {
+      "surface": "sand"
+    },
+    "858": {
+      "surface": "sand"
+    },
+    "859": {
+      "surface": "sand"
+    },
+    "860": {
+      "surface": "sand"
+    },
+    "861": {
+      "surface": "sand"
+    },
+    "862": {
+      "surface": "sand"
+    },
+    "864": {
+      "surface": "sand"
+    },
+    "865": {
+      "surface": "sand"
+    },
+    "874": {
+      "surface": "sand"
+    },
+    "875": {
+      "surface": "sand"
+    },
+    "876": {
+      "surface": "sand"
+    },
+    "877": {
+      "surface": "sand"
+    },
+    "880": {
+      "surface": "sand"
+    },
+    "882": {
+      "surface": "sand"
+    },
+    "883": {
+      "surface": "sand"
+    },
+    "884": {
+      "surface": "sand"
+    },
+    "885": {
+      "surface": "sand"
+    },
+    "886": {
+      "surface": "sand"
+    },
+    "887": {
+      "surface": "sand"
+    },
+    "888": {
+      "surface": "sand"
+    },
+    "889": {
+      "surface": "sand"
+    },
+    "892": {
+      "surface": "sand"
+    },
+    "893": {
+      "surface": "sand"
+    },
+    "894": {
+      "surface": "sand"
+    },
+    "900": {
+      "surface": "sand"
+    },
+    "901": {
+      "surface": "sand"
+    },
+    "902": {
+      "surface": "sand"
+    },
+    "903": {
+      "surface": "sand"
+    },
+    "904": {
+      "surface": "sand"
+    },
+    "905": {
+      "surface": "sand"
+    },
+    "907": {
+      "surface": "sand"
+    },
+    "908": {
+      "surface": "sand"
+    },
+    "912": {
+      "surface": "sand"
+    },
+    "913": {
+      "surface": "sand"
+    },
+    "914": {
+      "surface": "sand"
+    },
+    "915": {
+      "surface": "sand"
+    },
+    "916": {
+      "surface": "sand"
+    },
+    "917": {
+      "surface": "sand"
+    },
+    "921": {
+      "surface": "sand"
+    },
+    "925": {
+      "surface": "sand"
+    },
+    "926": {
+      "surface": "sand"
+    },
+    "927": {
+      "surface": "sand"
+    },
+    "928": {
+      "surface": "sand"
+    },
+    "929": {
+      "surface": "sand"
+    },
+    "934": {
+      "surface": "sand"
+    },
+    "935": {
+      "surface": "sand"
+    },
+    "936": {
+      "surface": "sand"
+    },
+    "937": {
+      "surface": "sand"
+    },
+    "938": {
+      "surface": "sand"
+    },
+    "942": {
+      "surface": "sand"
+    },
+    "943": {
+      "surface": "sand"
+    },
+    "948": {
+      "surface": "sand"
+    },
+    "949": {
+      "surface": "sand"
+    },
+    "951": {
+      "surface": "sand"
+    },
+    "952": {
+      "surface": "sand"
+    },
+    "953": {
+      "surface": "sand"
+    },
+    "954": {
+      "surface": "sand"
+    },
+    "957": {
+      "surface": "sand"
+    },
+    "958": {
+      "surface": "sand"
+    },
+    "960": {
+      "surface": "sand"
+    },
+    "961": {
+      "surface": "sand"
+    },
+    "963": {
+      "surface": "sand"
+    },
+    "965": {
+      "surface": "sand"
+    },
+    "966": {
+      "surface": "sand"
+    },
+    "967": {
+      "surface": "sand"
+    },
+    "968": {
+      "surface": "sand"
+    },
+    "969": {
+      "surface": "sand"
+    },
+    "970": {
+      "surface": "sand"
+    },
+    "972": {
+      "surface": "sand"
+    },
+    "974": {
+      "surface": "sand"
+    },
+    "976": {
+      "surface": "sand"
+    },
+    "978": {
+      "surface": "sand"
+    },
+    "979": {
+      "surface": "sand"
+    }
+  }
+}

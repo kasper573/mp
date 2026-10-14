@@ -63,7 +63,7 @@ pub use dialogue::{
 pub use dropdown::{dropdown, dropdown_content, dropdown_item, dropdown_trigger};
 pub use input::{
     CatalogEntry, ClickGesture, DragGesture, InputCatalog, InputLabel, InputRef, KeyGesture,
-    KeyModifiers, input_cap,
+    KeyModifiers, input_cap, key_code_schema, mouse_button_schema,
 };
 pub use inspectable::{InspectableOptions, inspectable};
 pub use intro::{Intro, intro};

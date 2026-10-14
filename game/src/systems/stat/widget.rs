@@ -1,14 +1,15 @@
-use crate::systems::job;
-use crate::systems::player::session;
-use crate::systems::stat;
 use bevy::prelude::*;
 use ui::text_colored;
 
-use crate::systems::hud::{HudAudience, Window};
+use crate::systems::hud::{HudAudience, Window, single_tab};
 use crate::systems::input::map::InputAction;
+use crate::systems::interface::InterfaceIcon;
+use crate::systems::job;
+use crate::systems::player::session;
+use crate::systems::stat;
 
 #[derive(Component, Default, Clone)]
-pub(super) struct StatsText;
+struct StatsText;
 
 pub struct StatsWindow;
 
@@ -22,14 +23,11 @@ impl Window for StatsWindow {
     fn toggle(&self) -> InputAction {
         InputAction::ToggleStats
     }
-    fn icon(&self) -> &'static str {
-        "icons/misc/book.png"
-    }
-    fn order(&self) -> u32 {
-        2
+    fn icon(&self) -> InterfaceIcon {
+        InterfaceIcon::Stats
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        crate::systems::hud::single_tab(self.title(), ui::scrolled(content()))
+        single_tab(self.title(), ui::scrolled(content()))
     }
     fn sync(&self, world: &mut World) {
         sync_stats(world)
@@ -39,11 +37,11 @@ impl Window for StatsWindow {
 fn content() -> Box<dyn Scene> {
     Box::new(bsn! {
         Node { width: Val::Percent(100.0) }
-        Children [ ( {text_colored(String::new(), Color::WHITE)} StatsText ) ]
+        Children [ @{text_colored(String::new(), Color::WHITE)} StatsText ]
     })
 }
 
-pub(super) fn sync_stats(world: &mut World) {
+fn sync_stats(world: &mut World) {
     let text = stats_text(world);
     let mut query = world.query_filtered::<&mut Text, With<StatsText>>();
     for mut node in query.iter_mut(world) {

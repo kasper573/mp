@@ -1,0 +1,80 @@
+{
+  "title": "Tusks for the Chief",
+  "category": "Orc Trouble",
+  "blurb": "Orcs from the north shore keep raiding my crates. Bring me five of their tusks, and if you can, put that brute of a chief in the sand.",
+  "xp": 120,
+  "reveal": [
+    "locked",
+    "needs",
+    "costs",
+    "gains"
+  ],
+  "modules": [
+    {
+      "type": "shown",
+      "condition": {
+        "type": "not",
+        "of": {
+          "type": "memory",
+          "memory": "sided_with_orcs"
+        }
+      }
+    },
+    {
+      "type": "requires",
+      "condition": {
+        "type": "at_least",
+        "a": {
+          "type": "level"
+        },
+        "b": 2
+      }
+    },
+    {
+      "type": "hold",
+      "item": "orc_tusk",
+      "count": 5
+    },
+    {
+      "type": "defeat",
+      "npc": "orc_chief",
+      "count": 1
+    },
+    {
+      "type": "hand_in",
+      "items": [
+        {
+          "item": "orc_tusk",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "type": "reward",
+      "items": [
+        {
+          "item": "gold",
+          "count": 35
+        },
+        {
+          "item": "greater_health_potion",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "type": "pick_one",
+      "items": [
+        {
+          "item": "rusty_sword"
+        },
+        {
+          "item": "bone_shield"
+        },
+        {
+          "item": "tribal_helmet"
+        }
+      ]
+    }
+  ]
+}

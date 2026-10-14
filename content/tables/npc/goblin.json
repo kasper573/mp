@@ -1,0 +1,45 @@
+{
+  "name": "Goblin",
+  "model": "goblin",
+  "stats": {
+    "health": 20.0,
+    "max_health": 20.0,
+    "damage": 3.0,
+    "attack_speed": 1.2,
+    "attack_delay": 350.0,
+    "movement_speed": 1.2,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "respawn",
+      "after": 5.0
+    },
+    {
+      "type": "loot",
+      "xp": 12,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 3,
+          "chance": 80.0
+        },
+        {
+          "item": "rusty_sword",
+          "chance": 5.0
+        },
+        {
+          "item": "health_potion",
+          "chance": 20.0
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 8.0
+      }
+    }
+  ]
+}

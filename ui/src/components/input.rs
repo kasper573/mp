@@ -6,18 +6,19 @@ use bevy_ecs::system::SystemParam;
 use bevy_input::ButtonInput;
 use bevy_input::keyboard::KeyCode;
 use bevy_input::mouse::MouseButton;
-use bevy_picking::events::{Click, Pointer};
+use bevy_picking::events::PointerClick;
 use bevy_picking::pointer::PointerButton;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{Scene, bsn, template_value};
-use bevy_text::{TextColor, TextFont};
+use bevy_scene::{Scene, bsn};
+use bevy_text::{TextColor, TextFontTemplate};
 use bevy_ui::widget::Text;
 use bevy_ui::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, JustifyContent, Node, UiRect, Val,
 };
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+use serde::{Deserialize, Serialize};
 
-use crate::component;
-use crate::components::text::font;
+use crate::components::text::font_template;
 use crate::tokens::{radius, typography};
 
 const CAP_SCALE: f32 = 0.85;
@@ -56,7 +57,7 @@ impl InputCatalog {
     pub fn clicked(
         &self,
         input: InputRef,
-        click: &Pointer<Click>,
+        click: &PointerClick,
         keys: &ButtonInput<KeyCode>,
     ) -> bool {
         self.0.get(&input).is_some_and(|entry| {
@@ -93,7 +94,7 @@ impl CatalogInput<'_> {
         self.catalog.keyed(input, key, &self.keys)
     }
 
-    pub(crate) fn clicked(&self, input: InputRef, click: &Pointer<Click>) -> bool {
+    pub(crate) fn clicked(&self, input: InputRef, click: &PointerClick) -> bool {
         self.catalog.clicked(input, click, &self.keys)
     }
 
@@ -102,9 +103,11 @@ impl CatalogInput<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct KeyGesture {
+    #[schemars(schema_with = "key_code_schema")]
     pub key: KeyCode,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
@@ -122,24 +125,28 @@ impl KeyGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct ClickGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
     pub button: MouseButton,
     pub times: u8,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
 impl ClickGesture {
-    pub fn matches(&self, click: &Pointer<Click>, keys: &ButtonInput<KeyCode>) -> bool {
+    pub fn matches(&self, click: &PointerClick, keys: &ButtonInput<KeyCode>) -> bool {
         pointer_button(self.button) == Some(click.button)
             && click.count.is_multiple_of(self.times.max(1))
             && KeyModifiers::held(keys) == self.modifiers
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct DragGesture {
+    #[schemars(schema_with = "mouse_button_schema")]
     pub button: MouseButton,
+    #[serde(flatten)]
     pub modifiers: KeyModifiers,
 }
 
@@ -149,12 +156,29 @@ impl DragGesture {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
 pub struct KeyModifiers {
+    #[serde(skip_serializing_if = "is_false")]
     pub ctrl: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub shift: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub alt: bool,
+    #[serde(skip_serializing_if = "is_false")]
     pub super_key: bool,
+}
+
+pub fn key_code_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::keyboard::KeyCode", "type": ["string", "object"] })
+}
+
+pub fn mouse_button_schema(_: &mut SchemaGenerator) -> Schema {
+    json_schema!({ "$comment": "bevy_input::mouse::MouseButton", "type": ["string", "object"] })
+}
+
+fn is_false(flag: &bool) -> bool {
+    !*flag
 }
 
 impl KeyModifiers {
@@ -163,22 +187,6 @@ impl KeyModifiers {
         shift: false,
         alt: false,
         super_key: false,
-    };
-    pub const CTRL: KeyModifiers = KeyModifiers {
-        ctrl: true,
-        ..KeyModifiers::NONE
-    };
-    pub const SHIFT: KeyModifiers = KeyModifiers {
-        shift: true,
-        ..KeyModifiers::NONE
-    };
-    pub const ALT: KeyModifiers = KeyModifiers {
-        alt: true,
-        ..KeyModifiers::NONE
-    };
-    pub const SUPER: KeyModifiers = KeyModifiers {
-        super_key: true,
-        ..KeyModifiers::NONE
     };
 
     pub const fn and(self, other: KeyModifiers) -> KeyModifiers {
@@ -214,22 +222,20 @@ pub fn input_cap(input: InputRef, size: f32, color: Color) -> impl Scene {
         min_width: Val::Px(size * 1.3),
         ..Default::default()
     };
-    let label = TextFont {
+    let label = TextFontTemplate {
         font_size: (size * CAP_SCALE).into(),
-        ..font(typography::KEY)
+        ..font_template(typography::KEY)
     };
     bsn! {
-        template_value(node)
+        node
         BackgroundColor({color.with_alpha(color.alpha() * 0.12)})
-        component(BorderColor::all(color.with_alpha(color.alpha() * 0.5)))
+        BorderColor::all(color.with_alpha(color.alpha() * 0.5))
         Pickable::IGNORE
         Children [
-            (
-                component(InputLabel(input))
-                component(label)
-                component(TextColor(color))
-                Pickable::IGNORE
-            ),
+            ~{InputLabel(input)}
+            label
+            TextColor(color)
+            Pickable::IGNORE
         ]
     }
 }

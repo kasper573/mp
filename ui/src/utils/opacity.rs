@@ -12,6 +12,12 @@ use bevy_ui::{BackgroundColor, BorderColor};
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct Opacity(pub f32);
 
+impl Default for Opacity {
+    fn default() -> Self {
+        Opacity(1.0)
+    }
+}
+
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OpacitySet {
     Calculate,

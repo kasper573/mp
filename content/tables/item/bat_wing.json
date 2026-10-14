@@ -1,0 +1,27 @@
+{
+  "name": "Bat Wing",
+  "icon": "icons/monster_part/feather.png",
+  "sfx": {
+    "pickup": "pickup_flesh",
+    "trade": "trade_flesh",
+    "drop": "landing01"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Still twitches on cold nights. Carry a few and you feel oddly light on your feet."
+    },
+    {
+      "type": "stack",
+      "max": 50
+    },
+    {
+      "type": "stat",
+      "stat": "movement_speed",
+      "value": 0.5
+    }
+  ]
+}

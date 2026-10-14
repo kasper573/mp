@@ -1,0 +1,23 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "sakura_teahouse_furniture",
+      "tiles": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

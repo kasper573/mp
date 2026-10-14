@@ -1,0 +1,9 @@
+{
+  "file": "audio/items/trade/coins.wav",
+  "role": "items",
+  "volume": 0.16,
+  "pitch": {
+    "min": 0.95,
+    "max": 1.05
+  }
+}

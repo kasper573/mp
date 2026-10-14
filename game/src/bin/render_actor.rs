@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::Arc;
 
 use bevy::asset::{AssetPlugin, LoadState};
 use bevy::camera::{RenderTarget, ScalingMode};
@@ -13,13 +14,15 @@ use bevy::render::render_resource::TextureFormat;
 use bevy::render::settings::{Backends, RenderCreation, WgpuSettings};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use bevy::window::ExitCondition;
-
-use game::core::assets::{AssetService, FilesystemSource};
+use game::core::content::{Content, FilesystemFolder};
 use game::core::math::{Direction, Size, WorldPx};
 use game::core::time::{PlaybackRate, Seconds};
-use game::data::model;
+use game::systems::actor::model::{ModelDef, ModelId};
 use game::systems::actor::render::{ACTOR_ANCHOR, draw_actor_frame};
-use game::systems::actor::{Action, ActorModel, build_model};
+use game::systems::actor::{Action, ActorModel};
+use game::systems::load_content;
+use serde::Deserialize;
+use strum::VariantArray;
 
 const FPS: f32 = 30.0;
 const DEATH_HOLD: Seconds = Seconds(0.75);
@@ -28,24 +31,24 @@ const PAD: f32 = 12.0;
 const TARGET_WIDTH: f32 = 1600.0;
 const LABEL_BAND: f32 = 36.0;
 const CAPTION_BAND: f32 = 56.0;
-const COLUMNS: [(Direction, &str); 8] = [
-    (Direction::S, "S"),
-    (Direction::SW, "SW"),
-    (Direction::W, "W"),
-    (Direction::NW, "NW"),
-    (Direction::N, "N"),
-    (Direction::NE, "NE"),
-    (Direction::E, "E"),
-    (Direction::SE, "SE"),
+const COLUMNS: [Direction; 8] = [
+    Direction::S,
+    Direction::SW,
+    Direction::W,
+    Direction::NW,
+    Direction::N,
+    Direction::NE,
+    Direction::E,
+    Direction::SE,
 ];
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 struct Config {
-    assets_dir: PathBuf,
+    content_dir: PathBuf,
 }
 
 struct Clip {
-    model: model::Id,
+    model: ModelId,
     action: Action,
     frames_per_loop: usize,
     loops: usize,
@@ -60,7 +63,7 @@ impl Clip {
 #[derive(Resource)]
 struct Reel {
     clips: Vec<Clip>,
-    sheets: BTreeMap<model::Id, Handle<Image>>,
+    sheets: BTreeMap<ModelId, Handle<Image>>,
     target: Handle<Image>,
     next: usize,
     total: usize,
@@ -92,16 +95,23 @@ fn main() {
     let config: Config = envy::prefixed("RIFT_RENDER_")
         .from_env()
         .expect("RIFT_RENDER_* environment");
-    let assets_dir = std::fs::canonicalize(&config.assets_dir)
-        .unwrap_or_else(|error| fail(&format!("{}: {error}", config.assets_dir.display())));
+    let content_dir = std::fs::canonicalize(&config.content_dir)
+        .unwrap_or_else(|error| fail(&format!("{}: {error}", config.content_dir.display())));
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [names, animations, loops, out] = args.as_slice() else {
         fail("usage: render-actor <names|\"\"> <animations|\"\"> <loops> <out.mp4>");
     };
     let out = PathBuf::from(out);
 
-    let service = AssetService::new(FilesystemSource(assets_dir.clone()));
-    let models = select_models(names);
+    let content = load_content(
+        Arc::new(FilesystemFolder(content_dir.clone())),
+        "the program stopped",
+    )
+    .unwrap_or_else(|report| {
+        eprint!("{report}");
+        std::process::exit(2);
+    });
+    let models = select_models(&content, names);
     let loops: usize = loops
         .parse()
         .ok()
@@ -111,8 +121,8 @@ fn main() {
                 "loops must be a positive whole number, not `{loops}`"
             ))
         });
-    let clips = plan(&service, &models, animations, loops);
-    let layout = layout(&service, &models);
+    let clips = plan(&content, &models, animations, loops);
+    let layout = layout(&content, &models);
     let total = clips.iter().map(Clip::frames).sum();
     let seconds = total as f32 / FPS;
     eprintln!(
@@ -132,7 +142,7 @@ fn main() {
                 ..default()
             })
             .set(AssetPlugin {
-                file_path: assets_dir.to_string_lossy().into_owned(),
+                file_path: content_dir.to_string_lossy().into_owned(),
                 ..default()
             })
             .set(ImagePlugin::default_nearest())
@@ -151,7 +161,7 @@ fn main() {
             }),
     )
     .insert_resource(ClearColor(Color::srgb_u8(0x24, 0x27, 0x2e)))
-    .insert_resource(service)
+    .insert_resource(content)
     .insert_resource(Sink::spawn(&out, layout.width, layout.height))
     .add_systems(Update, advance);
 
@@ -178,36 +188,32 @@ fn main() {
     println!("{}", out.display());
 }
 
-fn select_models(names: &str) -> Vec<model::Id> {
+fn select_models(content: &Content, names: &str) -> Vec<ModelId> {
     let wanted: Vec<&str> = split(names);
+    let models = content.table::<ModelDef>();
     if wanted.is_empty() {
-        return model::Id::VARIANTS.to_vec();
+        return models.ids().collect();
     }
     wanted
         .into_iter()
         .map(|name| {
-            name.replace(['-', '_', ' '], "")
-                .parse()
-                .unwrap_or_else(|_| {
-                    let known: Vec<String> = model::Id::VARIANTS
-                        .iter()
-                        .map(|id| format!("{id:?}"))
-                        .collect();
-                    fail(&format!(
-                        "no actor named `{name}`; actors: {}",
-                        known.join(", ")
-                    ))
-                })
+            let key = name.replace(['-', ' '], "_").to_lowercase();
+            models.id_of(&key).unwrap_or_else(|| {
+                fail(&format!(
+                    "no actor named `{name}`; actors: {}",
+                    models.keys().join(", ")
+                ))
+            })
         })
         .collect()
 }
 
-fn plan(service: &AssetService, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
+fn plan(content: &Content, models: &[ModelId], animations: &str, loops: usize) -> Vec<Clip> {
     let wanted: Vec<Action> = split(animations)
         .into_iter()
         .map(|name| {
-            Action::named(name).unwrap_or_else(|| {
-                let known: Vec<&str> = Action::ALL.map(Action::name).to_vec();
+            name.parse::<Action>().unwrap_or_else(|_| {
+                let known: Vec<&str> = Action::VARIANTS.iter().map(AsRef::as_ref).collect();
                 fail(&format!(
                     "no animation named `{name}`; animations: {}",
                     known.join(", ")
@@ -217,8 +223,8 @@ fn plan(service: &AssetService, models: &[model::Id], animations: &str, loops: u
         .collect();
     let mut clips = Vec::new();
     for &id in models {
-        let model = resolve(service, id);
-        for action in Action::ALL {
+        let model = ActorModel::get(content, id);
+        for &action in Action::VARIANTS {
             if wanted.is_empty() || wanted.contains(&action) {
                 clips.push(Clip {
                     model: id,
@@ -235,7 +241,7 @@ fn plan(service: &AssetService, models: &[model::Id], animations: &str, loops: u
 fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     let longest = COLUMNS
         .iter()
-        .map(|&(dir, _)| model.timing(action, dir).duration)
+        .map(|&dir| model.timing(action, dir).duration)
         .fold(Seconds(0.0), |a, b| if b > a { b } else { a });
     let length = if action == Action::Dead {
         longest + DEATH_HOLD
@@ -245,11 +251,11 @@ fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     ((length.0 * FPS).round() as usize).max(1)
 }
 
-fn layout(service: &AssetService, models: &[model::Id]) -> Layout {
+fn layout(content: &Content, models: &[ModelId]) -> Layout {
     let drawn = models
         .iter()
         .map(|&id| {
-            let model = resolve(service, id);
+            let model = ActorModel::get(content, id);
             model.drawn_size(model.frame(Action::Idle, Direction::S, Seconds(0.0), AUTHORED_RATE))
         })
         .fold(Size::new(0.0, 0.0), |a: Size<WorldPx>, b| {
@@ -270,12 +276,12 @@ fn layout(service: &AssetService, models: &[model::Id]) -> Layout {
 }
 
 fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
-    let service = world.resource::<AssetService>().clone();
+    let content = *world.resource::<Content>();
     let assets = world.resource::<AssetServer>().clone();
-    let sheets: BTreeMap<model::Id, Handle<Image>> = clips
+    let sheets: BTreeMap<ModelId, Handle<Image>> = clips
         .iter()
         .map(|clip| {
-            let sheet = resolve(&service, clip.model).sheet().to_owned();
+            let sheet = ActorModel::get(&content, clip.model).sheet().path();
             (clip.model, assets.load(sheet))
         })
         .collect();
@@ -307,7 +313,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
 
     let band_top = height / 2.0 - LABEL_BAND / layout.zoom;
     let left = -width / 2.0;
-    for (column, &(dir, label)) in COLUMNS.iter().enumerate() {
+    for (column, &dir) in COLUMNS.iter().enumerate() {
         let x = left + layout.cell.width * (column as f32 + 0.5);
         let shade = if column % 2 == 0 { 0x4f } else { 0x48 };
         world.spawn((
@@ -335,7 +341,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
             },
             UiTargetCamera(camera),
             children![(
-                Text::new(label),
+                Text::new(dir.as_ref().to_uppercase()),
                 TextFont::from_font_size(18.0),
                 TextColor(Color::srgb_u8(0xb8, 0xbe, 0xc8)),
             )],
@@ -372,7 +378,7 @@ fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
 fn advance(
     mut commands: Commands,
     mut reel: ResMut<Reel>,
-    service: Res<AssetService>,
+    content: Res<Content>,
     assets: Res<AssetServer>,
     mut slots: Query<(&Slot, &mut Sprite, &mut Visibility)>,
     mut caption: Single<&mut Text, With<Caption>>,
@@ -383,12 +389,12 @@ fn advance(
     for (id, sheet) in &reel.sheets {
         match assets.load_state(sheet) {
             LoadState::Loaded => {}
-            LoadState::Failed(error) => fail(&format!("{id:?} sheet: {error}")),
+            LoadState::Failed(error) => fail(&format!("{} sheet: {error}", id.key(&content))),
             _ => return,
         }
     }
     let (clip, frame) = locate(&reel.clips, reel.next);
-    let model = resolve(&service, clip.model);
+    let model = ActorModel::get(&content, clip.model);
     let elapsed = Seconds((frame % clip.frames_per_loop) as f32 / FPS);
     for (slot, mut sprite, mut visibility) in &mut slots {
         sprite.image = reel.sheets[&clip.model].clone();
@@ -404,9 +410,9 @@ fn advance(
     }
     let loop_number = frame / clip.frames_per_loop + 1;
     caption.set_if_neq(Text::new(format!(
-        "{:?} - {}   loop {loop_number}/{}",
-        clip.model,
-        clip.action.name(),
+        "{} - {}   loop {loop_number}/{}",
+        clip.model.key(&content),
+        clip.action.as_ref(),
         clip.loops
     )));
     let index = reel.next;
@@ -437,10 +443,6 @@ fn locate(clips: &[Clip], mut index: usize) -> (&Clip, usize) {
     unreachable!("frame index past the last clip")
 }
 
-fn resolve(service: &AssetService, id: model::Id) -> &'static ActorModel {
-    service.resolve(id.get().sheet, build_model)
-}
-
 fn split(list: &str) -> Vec<&str> {
     list.split(',')
         .map(str::trim)
@@ -454,7 +456,7 @@ fn fail(message: &str) -> ! {
 }
 
 impl Sink {
-    fn spawn(out: &std::path::Path, width: u32, height: u32) -> Sink {
+    fn spawn(out: &Path, width: u32, height: u32) -> Sink {
         if let Some(dir) = out.parent() {
             std::fs::create_dir_all(dir)
                 .unwrap_or_else(|error| fail(&format!("{}: {error}", dir.display())));

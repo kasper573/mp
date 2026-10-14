@@ -1,0 +1,40 @@
+{
+  "name": "Magma Imp",
+  "model": "magma_imp",
+  "stats": {
+    "health": 34.0,
+    "max_health": 34.0,
+    "damage": 6.0,
+    "attack_speed": 1.3,
+    "attack_delay": 300.0,
+    "movement_speed": 1.3,
+    "range": 1.0
+  },
+  "modules": [
+    {
+      "type": "respawn",
+      "after": 5.0
+    },
+    {
+      "type": "loot",
+      "xp": 26,
+      "items": [
+        {
+          "item": "gold",
+          "amount": 6
+        },
+        {
+          "item": "greater_health_potion",
+          "chance": 20.0
+        }
+      ]
+    },
+    {
+      "type": "shared_script",
+      "script": "combat_aggressive",
+      "values": {
+        "aggro": 9.0
+      }
+    }
+  ]
+}

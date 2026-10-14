@@ -1,0 +1,9 @@
+{
+  "label": "Open or close the quest log",
+  "bindings": [
+    {
+      "type": "key",
+      "key": "KeyL"
+    }
+  ]
+}

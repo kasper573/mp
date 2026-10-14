@@ -7,12 +7,14 @@ repository = "https://github.com/kasper573/rift"
 authors = ["kasper573"]
 
 [dependencies]
+serde.workspace = true
+schemars = "1"
 bevy_app = { workspace = true }
 bevy_ecs = { workspace = true }
 bevy_ui = { workspace = true }
 bevy_ui_widgets = { workspace = true }
 bevy_picking = { workspace = true }
-bevy_input = { workspace = true }
+bevy_input = { workspace = true, features = ["serialize"] }
 bevy_input_focus = { workspace = true }
 bevy_asset = { workspace = true }
 bevy_camera = { workspace = true }
@@ -20,6 +22,7 @@ bevy_color = { workspace = true }
 bevy_text = { workspace = true }
 bevy_window = { workspace = true }
 bevy_math = { workspace = true }
+bevy_curve = { workspace = true }
 bevy_time = { workspace = true }
 bevy_scene = { workspace = true }
 # The `gallery` binary (a standalone showcase window) needs the full Bevy app — windowing, rendering,
@@ -66,3 +69,6 @@ bevy_text = { workspace = true }
 bevy_window = { workspace = true }
 bevy_math = { workspace = true }
 bevy_time = { workspace = true }
+
+[lints]
+workspace = true

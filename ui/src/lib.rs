@@ -4,17 +4,17 @@ mod utils;
 pub mod themes;
 pub mod tokens;
 
-use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup};
+use bevy_app::{App, Plugin, PostUpdate, PreUpdate, Startup, Update};
 use bevy_asset::{AssetServer, Handle};
 use bevy_camera::visibility::VisibilitySystems;
 use bevy_ecs::prelude::*;
-use bevy_ecs::template::{FnTemplate, TemplateContext};
+use bevy_input_focus::pointer_focus::PointerFocusPlugin;
 use bevy_picking::PickingSystems;
-use bevy_scene::{Scene, ScenePlugin};
-use bevy_text::{EditableText, Font};
+use bevy_scene::ScenePlugin;
+use bevy_text::{EditableText, Font, FontSource, TextFont};
 use bevy_ui::UiSystems;
 use bevy_ui_widgets::{
-    Button, ButtonPlugin, Checkbox, CheckboxPlugin, EditableTextInputPlugin, ScrollAreaPlugin,
+    Button, ButtonPlugin, Checkbox, CheckboxPlugin, ScrollAreaPlugin, TextInputPlugin,
 };
 
 use utils::motion::MotionPlugin;
@@ -36,7 +36,7 @@ pub use utils::motion::{Easing, Timing, Transform2d, transition};
 pub use utils::overlay::{Dismissable, Open, OverlayAction, set_overlay_open};
 pub use utils::place::{node_rect, place};
 pub use utils::presence::{Leaving, Presence, PresenceMove};
-pub use utils::state::{SelectionChanged, selected};
+pub use utils::state::{SelectionChanged, descendant_with, selected, self_and_ancestors};
 pub use utils::style::{StatefulPaint, Style};
 pub use utils::theme::{Family, Theme};
 
@@ -45,8 +45,12 @@ pub struct UiReactive;
 
 pub struct UiPlugin;
 
+#[derive(Resource, Default)]
+pub struct FontFiles(pub Vec<String>);
+
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<FontFiles>();
         app.add_plugins(OpacityPlugin);
         app.add_plugins(MotionPlugin);
         if !app.is_plugin_added::<ButtonPlugin>() {
@@ -58,8 +62,11 @@ impl Plugin for UiPlugin {
         if !app.is_plugin_added::<ScrollAreaPlugin>() {
             app.add_plugins(ScrollAreaPlugin);
         }
-        if !app.is_plugin_added::<EditableTextInputPlugin>() {
-            app.add_plugins(EditableTextInputPlugin);
+        if !app.is_plugin_added::<TextInputPlugin>() {
+            app.add_plugins(TextInputPlugin);
+        }
+        if !app.is_plugin_added::<PointerFocusPlugin>() {
+            app.add_plugins(PointerFocusPlugin);
         }
         if !app.is_plugin_added::<ScenePlugin>() {
             app.add_plugins(ScenePlugin);
@@ -75,7 +82,18 @@ impl Plugin for UiPlugin {
             .register_required_components_with::<Button, CursorStyle>(|| CursorStyle::Pointer)
             .register_required_components_with::<Checkbox, CursorStyle>(|| CursorStyle::Pointer)
             .register_required_components_with::<EditableText, CursorStyle>(|| CursorStyle::Text)
-            .add_systems(Startup, (load_fonts, overlay::spawn_overlay_host))
+            .add_systems(Startup, overlay::spawn_overlay_host)
+            .init_resource::<FontsLoaded>()
+            .add_systems(
+                Update,
+                (
+                    load_fonts.run_if(resource_exists_and_changed::<FontFiles>),
+                    watch_fonts,
+                    stand_in_for_fonts.run_if(not(fonts_loaded)),
+                    restore_fonts.run_if(fonts_loaded),
+                )
+                    .chain(),
+            )
             .add_systems(
                 PreUpdate,
                 cursor::track_interface_cursor.after(PickingSystems::Hover),
@@ -194,27 +212,63 @@ pub enum Orientation {
 }
 
 #[derive(Resource)]
-struct DesignFonts(#[allow(dead_code)] Vec<Handle<Font>>);
+struct DesignFonts(Vec<Handle<Font>>);
 
-pub fn component<C: Component + Clone>(value: C) -> impl Scene {
-    FnTemplate(move |_: &mut TemplateContext| Ok(value.clone()))
-}
+#[derive(Resource, Default)]
+struct FontsLoaded(bool);
 
-fn load_fonts(assets: Option<Res<AssetServer>>, mut commands: Commands) {
+/// The family a text asked for while the design fonts were still loading; the engine's built-in
+/// font stands in until then, so text before any font arrives still reads.
+#[derive(Component)]
+struct StandInFont(FontSource);
+
+fn load_fonts(assets: Option<Res<AssetServer>>, files: Res<FontFiles>, mut commands: Commands) {
     let Some(assets) = assets else {
         return;
     };
-    let handles = [
-        "fonts/circular-400-normal.ttf",
-        "fonts/circular-500-normal.ttf",
-        "fonts/circular-700-normal.ttf",
-        "fonts/lato-400-normal.ttf",
-        "fonts/lato-400-italic.ttf",
-        "fonts/lato-700-normal.ttf",
-        "fonts/lato-700-italic.ttf",
-    ]
-    .iter()
-    .map(|path| assets.load(*path))
-    .collect();
+    let handles = files
+        .0
+        .iter()
+        .map(|path| assets.load(path.clone()))
+        .collect();
     commands.insert_resource(DesignFonts(handles));
+}
+
+fn watch_fonts(
+    assets: Option<Res<AssetServer>>,
+    fonts: Option<Res<DesignFonts>>,
+    mut loaded: ResMut<FontsLoaded>,
+) {
+    let ready = match (assets, fonts) {
+        (Some(assets), Some(fonts)) => {
+            !fonts.0.is_empty() && fonts.0.iter().all(|font| assets.is_loaded(font.id()))
+        }
+        _ => false,
+    };
+    if loaded.0 != ready {
+        loaded.0 = ready;
+    }
+}
+
+fn fonts_loaded(loaded: Res<FontsLoaded>) -> bool {
+    loaded.0
+}
+
+fn stand_in_for_fonts(
+    mut texts: Query<(Entity, &mut TextFont), Added<TextFont>>,
+    mut commands: Commands,
+) {
+    for (entity, mut text) in &mut texts {
+        if let FontSource::Family(_) = text.font {
+            let asked = std::mem::replace(&mut text.font, FontSource::Handle(Handle::default()));
+            commands.entity(entity).insert(StandInFont(asked));
+        }
+    }
+}
+
+fn restore_fonts(mut texts: Query<(Entity, &mut TextFont, &StandInFont)>, mut commands: Commands) {
+    for (entity, mut text, asked) in &mut texts {
+        text.font = asked.0.clone();
+        commands.entity(entity).remove::<StandInFont>();
+    }
 }

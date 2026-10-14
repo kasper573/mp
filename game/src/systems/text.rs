@@ -1,57 +1,137 @@
 use std::time::Duration;
 
 use bevy::color::Color;
-use bevy::prelude::{Entity, World};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 use ui::tokens::palette;
 use ui::{RichPiece, RichSpan, RichText, TextMotion, TextVoice};
 
+use crate::core::script::{Expr, Value};
 use crate::core::time::Millis;
 use crate::systems::input::map::{self, InputAction, InputMap};
+use crate::systems::script::RiftScripting;
 
-#[derive(Clone, Copy)]
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+#[serde(try_from = "SpanRow", into = "SpanRow")]
+#[schemars(extend("x-span" = true))]
 pub enum Span {
     Text {
-        text: &'static str,
-        fx: &'static [Fx],
+        text: String,
+        fx: Vec<Fx>,
     },
     Input(InputAction),
-    Fill {
-        fill: &'static dyn TextFill,
-        fx: &'static [Fx],
+    Value {
+        value: Box<Expr<RiftScripting>>,
+        fx: Vec<Fx>,
     },
 }
 
-pub trait TextFill: Send + Sync {
-    fn text(&self, world: &World, player: Entity) -> String;
-
-    fn check(&self) {}
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SpanRow {
+    Plain(String),
+    Styled(StyledRow),
 }
 
-pub const fn plain(text: &'static str) -> Span {
-    Span::Text { text, fx: &[] }
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StyledRow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    value: Option<Expr<RiftScripting>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    input: Option<InputAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ink: Option<Ink>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    voice: Option<Voice>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    motion: Option<Motion>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    slow: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pause_after: Option<Millis>,
 }
 
-pub const fn styled(text: &'static str, fx: &'static [Fx]) -> Span {
-    Span::Text { text, fx }
+impl TryFrom<SpanRow> for Span {
+    type Error = &'static str;
+
+    fn try_from(row: SpanRow) -> Result<Span, &'static str> {
+        let styled = match row {
+            SpanRow::Plain(text) => return Ok(plain(text)),
+            SpanRow::Styled(styled) => styled,
+        };
+        let mut fx = Vec::new();
+        fx.extend(styled.ink.map(Fx::Ink));
+        fx.extend(styled.voice.map(Fx::Voice));
+        fx.extend(styled.motion.map(Fx::Motion));
+        if styled.slow {
+            fx.push(Fx::Slow);
+        }
+        fx.extend(styled.pause_after.map(Fx::PauseAfter));
+        match (styled.text, styled.value, styled.input) {
+            (Some(text), None, None) => Ok(Span::Text { text, fx }),
+            (None, Some(value), None) => Ok(Span::Value {
+                value: Box::new(value),
+                fx,
+            }),
+            (None, None, Some(input)) if fx.is_empty() => Ok(Span::Input(input)),
+            _ => Err("a span is a string, { text }, { value } or { input }"),
+        }
+    }
 }
 
-pub const fn input(action: InputAction) -> Span {
-    Span::Input(action)
+impl From<Span> for SpanRow {
+    fn from(span: Span) -> SpanRow {
+        let (text, value, input, fx) = match span {
+            Span::Text { text, fx } if fx.is_empty() => return SpanRow::Plain(text),
+            Span::Text { text, fx } => (Some(text), None, None, fx),
+            Span::Value { value, fx } => (None, Some(*value), None, fx),
+            Span::Input(action) => (None, None, Some(action), Vec::new()),
+        };
+        let mut row = StyledRow {
+            text,
+            value,
+            input,
+            ink: None,
+            voice: None,
+            motion: None,
+            slow: false,
+            pause_after: None,
+        };
+        for fx in fx {
+            match fx {
+                Fx::Ink(ink) => row.ink = Some(ink),
+                Fx::Voice(voice) => row.voice = Some(voice),
+                Fx::Motion(motion) => row.motion = Some(motion),
+                Fx::Slow => row.slow = true,
+                Fx::PauseAfter(millis) => row.pause_after = Some(millis),
+            }
+        }
+        SpanRow::Styled(row)
+    }
 }
 
-pub const fn fill(fill: &'static dyn TextFill) -> Span {
-    Span::Fill { fill, fx: &[] }
+pub fn plain(text: impl Into<String>) -> Span {
+    Span::Text {
+        text: text.into(),
+        fx: Vec::new(),
+    }
 }
 
-pub fn fills(spans: &[Span]) -> impl Iterator<Item = &'static dyn TextFill> + '_ {
-    spans.iter().filter_map(|span| match *span {
-        Span::Fill { fill, .. } => Some(fill),
-        Span::Text { .. } | Span::Input(_) => None,
-    })
+pub fn values(spans: &'static [Span]) -> Vec<&'static Expr<RiftScripting>> {
+    spans
+        .iter()
+        .filter_map(|span| match span {
+            Span::Value { value, .. } => Some(&**value),
+            Span::Text { .. } | Span::Input(_) => None,
+        })
+        .collect()
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum Fx {
     Ink(Ink),
     Voice(Voice),
@@ -60,7 +140,20 @@ pub enum Fx {
     PauseAfter(Millis),
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Ink {
     Danger,
     Item,
@@ -69,46 +162,77 @@ pub enum Ink {
     Magic,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Voice {
     Whisper,
     Shout,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Motion {
     Wave,
     Shake,
     Pulse,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct LineText(pub Vec<SpanText>);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum SpanText {
     Text { text: String, fx: Vec<Fx> },
     Input(InputAction),
 }
 
 impl LineText {
-    pub fn spoken(spans: &[Span], world: &World, player: Entity) -> LineText {
+    pub fn spoken(spans: &[Span], values: &[Value]) -> LineText {
+        let mut values = values.iter();
         LineText(
             spans
                 .iter()
-                .map(|span| match *span {
+                .map(|span| match span {
                     Span::Text { text, fx } => SpanText::Text {
-                        text: text.to_owned(),
-                        fx: fx.to_vec(),
+                        text: text.clone(),
+                        fx: fx.clone(),
                     },
-                    Span::Fill { fill, fx } => SpanText::Text {
-                        text: fill.text(world, player),
-                        fx: fx.to_vec(),
+                    Span::Value { fx, .. } => SpanText::Text {
+                        text: values.next().map(Value::as_text).unwrap_or_default(),
+                        fx: fx.clone(),
                     },
-                    Span::Input(action) => SpanText::Input(action),
+                    Span::Input(action) => SpanText::Input(*action),
                 })
                 .collect(),
         )
+    }
+
+    pub fn of(spans: &[Span]) -> LineText {
+        LineText::spoken(spans, &[])
     }
 
     pub fn plain(text: impl Into<String>) -> LineText {
@@ -124,6 +248,16 @@ impl LineText {
             .map(|span| match span {
                 SpanText::Text { text, .. } => text.clone(),
                 SpanText::Input(action) => inputs.name(*action).unwrap_or_default(),
+            })
+            .collect()
+    }
+
+    pub fn plain_words(&self) -> String {
+        self.0
+            .iter()
+            .map(|span| match span {
+                SpanText::Text { text, .. } => text.as_str(),
+                SpanText::Input(_) => "",
             })
             .collect()
     }

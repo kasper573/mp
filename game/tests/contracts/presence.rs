@@ -1,34 +1,22 @@
-use std::sync::LazyLock;
-
+use bevy_ecs::prelude::*;
+use game::core::script::Expr;
 use game::core::tiling::Tiles;
-use game::data;
 use game::systems::combat::{AttackRequest, Attitude};
-use game::systems::memory::Remembers;
+use game::systems::item::{ItemId, ItemKind};
 use game::systems::movement::position;
 use game::systems::npc::{self, Pack};
 use game::systems::player::ClientId;
 use game::systems::reach::{self, ReachAct};
-use game::systems::rule::Not;
+use game::systems::script::condition::{self, CompiledCondition};
+use game::systems::script::{Condition, RiftQuery};
 use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
-use crate::support::{CLOCK, Sim, row};
-
-fn orc_near(sim: &mut Sim, player: bevy_ecs::entity::Entity) -> bevy_ecs::entity::Entity {
-    let start = position(sim.world(), player).expect("position");
-    let spot = sim.walkable_near(start, Tiles(2.0), Tiles(4.0));
-    npc::spawn(
-        sim.world(),
-        row("Orc"),
-        spot,
-        data::area::SPAWN_ID,
-        Pack(u32::MAX),
-    )
-}
+use crate::support::{Sim, content, remember, row, spawn_area, townsperson};
 
 #[test]
 fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {
-    let mut sim = Sim::area(data::area::SPAWN_ID);
+    let mut sim = Sim::area(spawn_area());
     let owner = sim.join(1);
     sim.join(2);
     let orc = orc_near(&mut sim, owner);
@@ -50,22 +38,25 @@ fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {
 
 #[test]
 fn a_friendly_npc_cannot_be_attacked() {
-    let mut sim = Sim::area(data::area::SPAWN_ID);
+    let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
-    let orc = orc_near(&mut sim, player);
-    sim.world().entity_mut(orc).insert(Attitude::Friendly);
-    let full = stat::effective(sim.world(), orc, StatKind::Health);
+    let grisha = townsperson(&mut sim, row("Grisha"));
+    assert_eq!(
+        sim.world().get::<Attitude>(grisha),
+        Some(&Attitude::Friendly)
+    );
+    let full = stat::effective(sim.world(), grisha, StatKind::Health);
 
-    sim.send(1, AttackRequest { target: orc });
+    sim.send(1, AttackRequest { target: grisha });
     sim.run_until(4.0, |_| false);
 
     assert_eq!(reach::intent(sim.world(), player, ReachAct::Attack), None);
-    assert_eq!(stat::effective(sim.world(), orc, StatKind::Health), full);
+    assert_eq!(stat::effective(sim.world(), grisha, StatKind::Health), full);
 }
 
 #[test]
 fn a_monster_spawned_for_one_player_ignores_everyone_else() {
-    let mut sim = Sim::area(data::area::SPAWN_ID);
+    let mut sim = Sim::area(spawn_area());
     let owner = sim.join(1);
     let bystander = sim.join(2);
     let start = position(sim.world(), bystander).expect("position");
@@ -74,7 +65,7 @@ fn a_monster_spawned_for_one_player_ignores_everyone_else() {
         sim.world(),
         row("Skeleton"),
         spot,
-        data::area::SPAWN_ID,
+        spawn_area(),
         Pack(u32::MAX),
     );
     sim.world()
@@ -92,21 +83,47 @@ fn a_monster_spawned_for_one_player_ignores_everyone_else() {
 }
 
 #[test]
-fn presence_by_requirement_follows_the_players_memory() {
-    static PELL_DEAD: LazyLock<Remembers> = LazyLock::new(|| Remembers(row("PellDead")));
-    static PELL_ALIVE: LazyLock<Not> = LazyLock::new(|| Not(&*PELL_DEAD));
-    static SHOWN: LazyLock<[&dyn game::systems::rule::Requirement; 1]> =
-        LazyLock::new(|| [&*PELL_ALIVE]);
-    let mut sim = Sim::area(data::area::SPAWN_ID);
+fn presence_by_condition_follows_the_players_memory() {
+    let pell_dead = Expr::Query(RiftQuery::Memory {
+        of: None,
+        memory: row("PellDead"),
+    });
+    let pell_alive: &'static Condition = Box::leak(Box::new(Expr::Not(Box::new(pell_dead))));
+    let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let orc = orc_near(&mut sim, player);
-    sim.world().entity_mut(orc).insert(Presence::When(&*SHOWN));
+    sim.world()
+        .entity_mut(orc)
+        .insert(Presence::When(CompiledCondition::new(
+            content(),
+            pell_alive,
+        )));
     assert!(visibility::present(sim.world(), orc, player));
 
-    sim.world()
-        .get_mut::<game::systems::memory::Memory>(player)
-        .expect("memory")
-        .remember(row("PellDead"), CLOCK);
+    remember(&mut sim, player, row("PellDead"));
 
     assert!(!visibility::present(sim.world(), orc, player));
+}
+
+#[test]
+fn a_world_that_serves_no_area_judges_an_items_requirements() {
+    let shield: ItemId = row("BoneShield");
+    let ItemKind::Equipment {
+        requires: Some(requirement),
+        ..
+    } = &shield.get(content()).kind
+    else {
+        panic!("the bone shield asks something of its wearer");
+    };
+    let mut world = World::new();
+    world.insert_resource(*content());
+    let viewer = world.spawn_empty().id();
+
+    assert!(!condition::holds(&world, viewer, requirement));
+}
+
+fn orc_near(sim: &mut Sim, player: Entity) -> Entity {
+    let start = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_near(start, Tiles(2.0), Tiles(4.0));
+    npc::spawn(sim.world(), row("Orc"), spot, spawn_area(), Pack(u32::MAX))
 }

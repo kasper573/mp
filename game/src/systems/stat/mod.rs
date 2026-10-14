@@ -1,20 +1,35 @@
+pub mod effects;
+mod health;
 pub mod widget;
 
-mod health;
+pub use health::{apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill};
 
-pub use health::{apply_damage, current_health, fraction, heal, is_dead, max_health, refill};
+use std::collections::BTreeMap;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::systems::effect::{self, EffectContext};
-use crate::systems::rule::{Outcome, Requirement, RuleContext};
+use crate::systems::effect;
 
 #[derive(
-    Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, VariantArray, IntoStaticStr,
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    VariantArray,
+    IntoStaticStr,
 )]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "title_case")]
 pub enum StatKind {
     Health,
     MaxHealth,
@@ -29,38 +44,60 @@ impl StatKind {
     pub const fn of(self, value: f32) -> Stat {
         Stat { kind: self, value }
     }
+
+    pub const fn unit(self) -> Option<&'static str> {
+        match self {
+            StatKind::AttackDelay => Some("ms"),
+            StatKind::MovementSpeed => Some("tiles/s"),
+            StatKind::Range => Some("tiles"),
+            StatKind::Health | StatKind::MaxHealth | StatKind::Damage | StatKind::AttackSpeed => {
+                None
+            }
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Stat {
+    #[serde(rename = "stat")]
     pub kind: StatKind,
     pub value: f32,
 }
 
 impl Stat {
     pub fn label(self) -> &'static str {
-        // Future proofing. Replace with i18n system
         self.kind.into()
+    }
+}
+
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(transparent)]
+#[schemars(transform = schema_with_units)]
+pub struct StatMap(pub BTreeMap<StatKind, f32>);
+
+impl StatMap {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn get(&self, kind: StatKind) -> f32 {
+        self.0.get(&kind).copied().unwrap_or(0.0)
+    }
+
+    pub fn listed(&self) -> impl Iterator<Item = Stat> + '_ {
+        self.0.iter().map(|(&kind, &value)| kind.of(value))
     }
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Stats(pub Vec<Stat>);
 
-pub fn value(stats: &[Stat], kind: StatKind) -> f32 {
-    stats
-        .iter()
-        .find(|stat| stat.kind == kind)
-        .map_or(0.0, |stat| stat.value)
-}
-
 impl Stats {
     pub fn get(&self, kind: StatKind) -> f32 {
-        value(&self.0, kind)
-    }
-
-    pub fn apply(&self, world: &mut World, entity: Entity) {
-        world.entity_mut(entity).insert(self.clone());
+        self.0
+            .iter()
+            .find(|stat| stat.kind == kind)
+            .map_or(0.0, |stat| stat.value)
     }
 }
 
@@ -80,14 +117,9 @@ pub fn base(world: &World, entity: Entity, kind: StatKind) -> f32 {
 }
 
 pub fn effective(world: &World, entity: Entity, kind: StatKind) -> f32 {
-    let ctx = EffectContext {
-        world,
-        source: entity,
-        target: entity,
-    };
     let delta: f32 = effect::active_effects(world, entity)
-        .iter()
-        .flat_map(|effect| effect.compute(&ctx))
+        .into_iter()
+        .map(|effect| effect.modifier(world, entity))
         .filter(|stat| stat.kind == kind)
         .map(|stat| stat.value)
         .sum();
@@ -103,31 +135,23 @@ pub fn effective_all(world: &World, entity: Entity) -> Stats {
     )
 }
 
-pub struct MinStat {
-    pub stat: StatKind,
-    pub min: f32,
-}
-
-impl Requirement for MinStat {
-    fn met(&self, world: &World, player: Entity) -> bool {
-        effective(world, player, self.stat) >= self.min
-    }
-
-    fn describe(&self) -> String {
-        format!("{} {}", self.min, self.stat.of(self.min).label())
-    }
-}
-
-pub enum Heal {
-    By(f32),
-    Fully,
-}
-
-impl Outcome for Heal {
-    fn apply(&self, ctx: &mut RuleContext) {
-        match self {
-            Heal::By(amount) => heal(ctx.world, ctx.player, *amount),
-            Heal::Fully => refill(ctx.world, ctx.player),
+fn schema_with_units(schema: &mut schemars::Schema) {
+    let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) else {
+        return;
+    };
+    for &kind in StatKind::VARIANTS {
+        let name = serde_json::to_value(kind)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default();
+        if let (Some(unit), Some(property)) = (
+            kind.unit(),
+            properties.get_mut(&name).and_then(|v| v.as_object_mut()),
+        ) {
+            property.insert(
+                "x-unit".to_owned(),
+                serde_json::Value::String(unit.to_owned()),
+            );
         }
     }
 }

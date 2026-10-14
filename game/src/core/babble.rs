@@ -1,16 +1,21 @@
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::AudioSource;
+use bevy_replicon::prelude::AppRuleExt;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ui::{RichPiece, RichText, TextVoice, Typewriter, TypewriterReveal};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::{PlayClip, SfxPlace, SfxTune};
+use crate::core::content::{
+    Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
+};
 use crate::core::math::Rng;
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
-pub use crate::data::babble::Id as BabbleId;
-pub use crate::data::babble_bank::Id as BabbleBankId;
+pub type BabbleId = ContentId<BabbleDef>;
+pub type BabbleBankId = ContentId<BabbleBankDef>;
 
 const LETTERS: &str = "abcdefghijklmnopqrstuvwxyz";
 const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
@@ -27,6 +32,7 @@ const EXCLAIMED_LOUDNESS: f32 = 1.2;
 const SHOUT_LOUDNESS: f32 = 1.35;
 const WHISPER_LOUDNESS: f32 = 0.6;
 
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct BabbleDef {
     pub babble_bank: BabbleBankId,
     pub pitch: PlaybackRate,
@@ -34,12 +40,52 @@ pub struct BabbleDef {
     pub pace: Hertz,
 }
 
+impl ContentRow for BabbleDef {
+    const TABLE: &'static str = "babble";
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct BabbleBankDef {
-    pub letters: AssetRef,
+    pub letters: String,
     pub volume: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add)]
+impl ContentRow for BabbleBankDef {
+    const TABLE: &'static str = "babble_bank";
+}
+
+pub fn content(registry: &mut ContentRegistry) {
+    registry
+        .row::<BabbleDef>()
+        .row::<BabbleBankDef>()
+        .hook(LoadStep::Files, check_banks);
+}
+
+fn check_banks(loading: &mut Loading) {
+    for (id, bank) in loading.rows::<BabbleBankDef>() {
+        let mut check = RowCheck::default();
+        check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
+        for letter in letter_files(bank) {
+            if !loading.has_asset(letter.as_str()) {
+                check.error(
+                    "/letters",
+                    "missing file",
+                    format!("{:?}", letter.as_str()),
+                    "a folder under assets/ with a.wav to z.wav",
+                );
+                break;
+            }
+        }
+        if !check.is_empty() {
+            loading.row_errors(id, check);
+            loading.fail(id);
+        }
+    }
+}
+
+#[derive(
+    JsonSchema, Clone, Copy, Debug, PartialEq, PartialOrd, derive_more::Add, Serialize, Deserialize,
+)]
 pub struct Semitones(pub f32);
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -59,25 +105,29 @@ impl BabbleRank {
     pub const DIALOGUE_BOX: BabbleRank = BabbleRank(u32::MAX);
 }
 
-pub fn register(app: &mut bevy_app::App) {
-    use bevy_replicon::prelude::*;
-    app.replicate::<Babbler>();
+pub fn register(app: &mut App) {
+    app.replicate_once::<Babbler>();
 }
 
 pub struct BabblePlugin;
 
 impl Plugin for BabblePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BabbleClips>()
-            .add_systems(Startup, load_clips)
-            .add_systems(Update, babble);
+        app.init_resource::<BabbleClips>().add_systems(
+            Update,
+            (
+                load_clips.run_if(resource_exists_and_changed::<Content>),
+                babble.run_if(resource_exists::<Content>),
+            )
+                .chain(),
+        );
     }
 }
 
-pub fn letter_clips(bank: &BabbleBankDef) -> impl Iterator<Item = String> + '_ {
+pub fn letter_files(bank: &BabbleBankDef) -> impl Iterator<Item = AssetRef> + '_ {
     LETTERS
         .chars()
-        .map(move |letter| format!("{}/{letter}.wav", bank.letters.0))
+        .map(move |letter| AssetRef::new(format!("{}/{letter}.wav", bank.letters)))
 }
 
 #[derive(Resource, Default)]
@@ -90,18 +140,20 @@ impl BabbleClips {
     }
 }
 
-fn load_clips(assets: Res<AssetServer>, mut clips: ResMut<BabbleClips>) {
-    clips.0 = BabbleBankId::VARIANTS
-        .iter()
+fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut<BabbleClips>) {
+    clips.0 = content
+        .table::<BabbleBankDef>()
+        .rows()
         .map(|bank| {
-            letter_clips(bank.get())
-                .map(|path| assets.load(path))
+            letter_files(bank)
+                .map(|file| assets.load(file.path()))
                 .collect()
         })
         .collect();
 }
 
 fn babble(
+    content: Res<Content>,
     mut revealed: MessageReader<TypewriterReveal>,
     typing: Query<(Entity, &Babbling, &Typewriter, &RichText)>,
     clips: Res<BabbleClips>,
@@ -119,8 +171,8 @@ fn babble(
     let Some((speaker, babbling, _, text)) = heard else {
         return;
     };
-    let babble = babbling.babble.get();
-    let babble_bank = babble.babble_bank.get();
+    let babble = babbling.babble.get(&content);
+    let babble_bank = babble.babble_bank.get(&content);
     let now = Seconds(time.elapsed_secs());
     for reveal in reveals.iter().filter(|reveal| reveal.entity == speaker) {
         if now < *free_at {

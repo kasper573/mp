@@ -2,15 +2,15 @@ use bevy::image::Image;
 use bevy_asset::Handle;
 use bevy_color::{Alpha, Color};
 use bevy_ecs::prelude::*;
+use bevy_ecs::template::template;
 use bevy_math::Vec2;
 use bevy_picking::hover::Hovered;
 use bevy_picking::prelude::Pickable;
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::widget::{ImageNode, TextShadow};
 use bevy_ui::{AlignItems, BorderRadius, FlexDirection, Node, UiRect, UiTransform, Val, Val2};
 
-use crate::component;
 use crate::components::rich_text::{MotionPreference, RichText, TextMotion, rich_text};
 use crate::components::text::styled_text;
 use crate::cursor::ClickThrough;
@@ -75,7 +75,7 @@ pub fn intro(intro: Intro) -> impl Scene {
     let rule = move || {
         bsn! {
             Node { width: Val::Px(RULE), height: Val::Px(1.0) }
-            template_value(Style::new().background(tint.with_alpha(0.6)))
+            Style::new().background(tint.with_alpha(0.6))
             Pickable::IGNORE
         }
     };
@@ -85,31 +85,34 @@ pub fn intro(intro: Intro) -> impl Scene {
             node.padding = UiRect::axes(Val::Px(spacing::XXXL), Val::Px(spacing::XL));
             node.border_radius = BorderRadius::all(Val::Px(radius::L));
         });
+    let title = intro.title.clone();
     bsn! {
-        component(intro.clone())
+        template(move |_| Ok(intro.clone()))
         Node {
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             row_gap: Val::Px({spacing::L}),
             max_width: Val::Px(WIDEST),
         }
-        template_value(backdrop)
-        component(INTRO_PRESENCE)
-        component(Hovered::default())
+        backdrop
+        INTRO_PRESENCE
+        Hovered
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
         Children [
-            {emblem},
-            (
-                Node { align_items: AlignItems::Center, column_gap: Val::Px({spacing::XL}) }
-                Pickable::IGNORE
-                Children [
-                    {rule()},
-                    ( {styled_text(intro.title.clone(), tint, TITLE)} IntroTitle component(shadow) UiTransform ),
-                    {rule()},
-                ]
-            ),
-            ( {rich_text(text, false)} ),
+            {emblem}
+            --
+            Node { align_items: AlignItems::Center, column_gap: Val::Px({spacing::XL}) }
+            Pickable::IGNORE
+            Children [
+                {rule()}
+                --
+                @{styled_text(title, tint, TITLE)} IntroTitle shadow UiTransform
+                --
+                {rule()}
+            ]
+            --
+            @{rich_text(text, false)}
         ]
     }
 }
@@ -138,7 +141,7 @@ pub(crate) fn move_intro_titles(
         let title_rows = kids.iter().filter_map(|kid| rows.get(kid).ok());
         for row in title_rows {
             let mut found = titles.iter_many_mut(row.iter());
-            while let Some(mut transform) = found.fetch_next() {
+            while let Some(Ok(mut transform)) = found.fetch_next() {
                 let next = UiTransform {
                     translation: Val2::px(offset.x, offset.y),
                     scale: Vec2::splat(scale),

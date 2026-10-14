@@ -1,83 +1,96 @@
-pub mod bust;
-mod model;
+pub mod model;
 pub mod plate;
 pub mod render;
 
-use std::path::Path;
+pub use model::{ActorModel, ModelDef, Timing};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
-use crate::core::assets::AssetService;
+use crate::core::content::{ContentRegistry, LoadStep};
 use crate::core::math::{Direction, Pos, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
-use crate::data;
-use crate::systems::movement::Position;
-use crate::systems::stat::{self, StatKind, Stats};
-
-pub use model::{ActorModel, Timing, build_model};
+use crate::systems::actor::model::ModelId;
+use crate::systems::combat::Swing;
+use crate::systems::movement::{Path, Position};
+use crate::systems::stat::{self, Stats};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
     app.replicate::<Actor>()
-        .replicate::<Hitbox>()
-        .replicate::<Name>();
+        .replicate_once::<Hitbox>()
+        .replicate_once::<Name>();
 }
 
-pub fn check(assets: &AssetService) {
-    assets.resolve_all(data::model::TABLE.iter().map(|def| def.sheet), build_model);
-    for def in data::model::TABLE {
-        for bust in def.busts.iter().flat_map(bust::Busts::all) {
-            if let Err(error) = assets.open(Path::new(bust.0)) {
-                panic!("bust {}: {error}", bust.0);
-            }
-        }
-    }
+pub fn content(registry: &mut ContentRegistry) {
+    registry
+        .row::<ModelDef>()
+        .modules::<ModelDef>()
+        .hook(LoadStep::Files, model::build_all);
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
+    VariantArray,
+    EnumString,
+    AsRefStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Action {
     #[default]
     Idle,
     Walk,
     Run,
     Attack,
+    #[serde(rename = "death")]
+    #[strum(serialize = "death")]
     Dead,
 }
 
-impl Action {
-    pub const ALL: [Action; 5] = [
-        Action::Idle,
-        Action::Walk,
-        Action::Run,
-        Action::Attack,
-        Action::Dead,
-    ];
-
-    pub fn named(name: &str) -> Option<Action> {
-        Action::ALL.into_iter().find(|action| action.name() == name)
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Action::Idle => "idle",
-            Action::Walk => "walk",
-            Action::Run => "run",
-            Action::Attack => "attack",
-            Action::Dead => "death",
-        }
-    }
-}
-
 #[derive(
-    Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default,
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
 )]
+#[serde(from = "[u8; 4]", into = "[u8; 4]")]
+#[schemars(extend("x-color" = true))]
 pub struct Rgba(pub u32);
 
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tint {
+    pub rgba: Rgba,
+}
+
 impl Rgba {
+    pub const WHITE: Rgba = Rgba(0xffff_ffff);
+
     pub fn color(self) -> bevy::color::Color {
         let [r, g, b, a] = self.0.to_be_bytes();
         bevy::color::Color::srgba_u8(r, g, b, a)
@@ -89,7 +102,7 @@ pub struct Actor {
     pub color: Rgba,
     pub dir: Direction,
     pub action: Action,
-    pub model: data::model::Id,
+    pub model: ModelId,
     pub attack_rate: PlaybackRate,
 }
 
@@ -123,12 +136,6 @@ pub struct Name {
     pub name: String,
 }
 
-pub fn set_action(actor: &mut Mut<Actor>, action: Action) {
-    if actor.action != action {
-        actor.action = action;
-    }
-}
-
 pub fn set_facing(actor: &mut Mut<Actor>, dir: Direction, action: Action) {
     if actor.dir != dir || actor.action != action {
         actor.dir = dir;
@@ -136,9 +143,45 @@ pub fn set_facing(actor: &mut Mut<Actor>, dir: Direction, action: Action) {
     }
 }
 
-pub fn reset(mut actors: Query<(&mut Actor, Option<&Stats>)>) {
-    for (mut actor, stats) in &mut actors {
-        let dead = stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0);
-        set_action(&mut actor, if dead { Action::Dead } else { Action::Idle });
+type Situation = (
+    &'static mut Actor,
+    Option<&'static Stats>,
+    Has<Swing>,
+    Has<Path>,
+);
+
+pub fn settle(mut actors: Query<Situation>) {
+    for (mut actor, stats, swinging, walking) in &mut actors {
+        let action = if stats.is_some_and(stat::dead) {
+            Action::Dead
+        } else if swinging {
+            Action::Attack
+        } else if walking {
+            match actor.action {
+                Action::Walk | Action::Run => actor.action,
+                _ => Action::Walk,
+            }
+        } else {
+            Action::Idle
+        };
+        set_action(&mut actor, action);
+    }
+}
+
+fn set_action(actor: &mut Mut<Actor>, action: Action) {
+    if actor.action != action {
+        actor.action = action;
+    }
+}
+
+impl From<[u8; 4]> for Rgba {
+    fn from(bytes: [u8; 4]) -> Rgba {
+        Rgba(u32::from_be_bytes(bytes))
+    }
+}
+
+impl From<Rgba> for [u8; 4] {
+    fn from(rgba: Rgba) -> [u8; 4] {
+        rgba.0.to_be_bytes()
     }
 }

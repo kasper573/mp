@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use bevy::ecs::template::template;
 use bevy::prelude::*;
-use bevy_scene::{CommandsSceneExt, EntityScene, Scene, bsn, on, template_value};
+use bevy_scene::{CommandsSceneExt, Scene, bsn, on};
 use ui::button::intent as button_intent;
 use ui::card::intent as card_intent;
 use ui::theme::theme;
@@ -17,13 +18,13 @@ use ui::{
     accordion_trigger, alert_bar, alert_dialog, alert_dialog_action, alert_dialog_cancel, avatar,
     avatar_fallback, button, button_styled, captions, card, cast, checkbox, checkbox_indicator,
     chip, choice_list, collapsible, collapsible_content, collapsible_trigger, compact_toast,
-    compact_toaster, component, confirm_dialog, dialog, dialog_close, dialogue_box, dialogue_panel,
-    dropdown, dropdown_content, dropdown_item, dropdown_trigger, intro, key_hint, list_header,
-    milestones, popover, popover_content, popover_trigger, progress, progress_indicator,
-    radio_circle, radio_group, radio_indicator, radio_item, rich_text, scroll_area, scroll_bar,
-    scroll_thumb, scroll_viewport, separator, slider, slider_range, slider_thumb, slider_track,
-    sonner_close, speech_bubble, split_view, switch, switch_thumb, tabs, tabs_list, tabs_trigger,
-    text, text_colored, toast, toaster, tooltip, tooltip_content, widget, window,
+    compact_toaster, confirm_dialog, dialog, dialog_close, dialogue_box, dialogue_panel, dropdown,
+    dropdown_content, dropdown_item, dropdown_trigger, intro, key_hint, list_header, milestones,
+    popover, popover_content, popover_trigger, progress, progress_indicator, radio_circle,
+    radio_group, radio_indicator, radio_item, rich_text, scroll_area, scroll_bar, scroll_thumb,
+    scroll_viewport, separator, slider, slider_range, slider_thumb, slider_track, sonner_close,
+    speech_bubble, split_view, switch, switch_thumb, tabs, tabs_list, tabs_trigger, text,
+    text_colored, toast, toaster, tooltip, tooltip_content, widget, window,
 };
 
 const WINDOW: Vec2 = Vec2::new(1600.0, 900.0);
@@ -81,6 +82,19 @@ fn main() {
         .insert_resource(ClearColor(theme().surface_inset.base))
         .insert_resource(CurrentScene(opened))
         .add_plugins(ui::UiPlugin)
+        .insert_resource(ui::FontFiles(
+            [
+                "fonts/circular-400-normal.ttf",
+                "fonts/circular-500-normal.ttf",
+                "fonts/circular-700-normal.ttf",
+                "fonts/lato-400-normal.ttf",
+                "fonts/lato-400-italic.ttf",
+                "fonts/lato-700-normal.ttf",
+                "fonts/lato-700-italic.ttf",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+        ))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -221,8 +235,7 @@ fn scene_index(name: &str) -> usize {
         })
 }
 
-fn setup(current: Res<CurrentScene>, assets: Res<AssetServer>, mut commands: Commands) {
-    let _ = GALLERY_ASSETS.set(assets.clone());
+fn setup(current: Res<CurrentScene>, mut commands: Commands) {
     commands.spawn((Camera2d, IsDefaultUiCamera));
     commands.insert_resource(sample_inputs());
     let tab_buttons: Vec<Box<dyn Scene>> = SCENES
@@ -230,10 +243,10 @@ fn setup(current: Res<CurrentScene>, assets: Res<AssetServer>, mut commands: Com
         .enumerate()
         .map(|(index, (name, _))| {
             boxed(bsn! {
-                {tabs_trigger(index.to_string())}
+                @{tabs_trigger(index.to_string())}
                 SceneTab({index})
                 on(on_tab)
-                Children [ {EntityScene(text(*name))} ]
+                Children [ @{text(*name)} ]
             })
         })
         .collect();
@@ -241,20 +254,18 @@ fn setup(current: Res<CurrentScene>, assets: Res<AssetServer>, mut commands: Com
         GalleryRoot
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), flex_direction: FlexDirection::Column }
         Children [
-            ( {tabs(Some(current.0.to_string()))}
-              Children [
-                ( Node {
-                      flex_direction: FlexDirection::Row,
-                      flex_wrap: FlexWrap::Wrap,
-                      width: Val::Percent(100.0),
-                      column_gap: Val::Px(4.0),
-                      row_gap: Val::Px(4.0),
-                      padding: {UiRect::all(Val::Px(12.0))},
-                  }
-                  Children [ {tab_buttons} ]
-                )
-              ]
-            )
+            @{tabs(Some(current.0.to_string()))}
+            Children [
+              Node {
+                  flex_direction: FlexDirection::Row,
+                  flex_wrap: FlexWrap::Wrap,
+                  width: Val::Percent(100.0),
+                  column_gap: Val::Px(4.0),
+                  row_gap: Val::Px(4.0),
+                  padding: {UiRect::all(Val::Px(12.0))},
+              }
+              Children [ {tab_buttons} ]
+            ]
         ]
     });
 }
@@ -274,6 +285,7 @@ fn on_tab(event: On<ui::Activate>, tabs: Query<&SceneTab>, mut current: ResMut<C
 
 fn rebuild_scene(
     current: Res<CurrentScene>,
+    assets: Res<AssetServer>,
     root: Query<Entity, With<GalleryRoot>>,
     scenes: Query<Entity, With<SceneRoot>>,
     mut shown: Local<Option<usize>>,
@@ -289,7 +301,7 @@ fn rebuild_scene(
     for scene in &scenes {
         commands.entity(scene).despawn();
     }
-    let content = (SCENES[current.0].1)();
+    let content = (SCENES[current.0].1)(&assets);
     commands
         .spawn_scene(bsn! {
             SceneRoot
@@ -300,7 +312,7 @@ fn rebuild_scene(
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
             }
-            Children [ {EntityScene(content)} ]
+            Children [ @{content} ]
         })
         .insert(ChildOf(root));
 }
@@ -318,28 +330,28 @@ fn show_toast(
     *next += 1;
     commands
         .spawn_scene(bsn! {
-            {toast(Duration::from_secs(4))}
+            @{toast(Duration::from_secs(4))}
             Children [
-                ( Node {
-                      flex_direction: FlexDirection::Row,
-                      justify_content: JustifyContent::SpaceBetween,
-                      align_items: AlignItems::Center,
-                      column_gap: Val::Px(12.0),
-                  }
-                  Children [
-                    {EntityScene(text(title))},
-                    ( {sonner_close()}
-                      Children [ {EntityScene(button_styled(button_intent::SECONDARY, ButtonSize::Sm, "close"))} ]
-                    )
-                  ]
-                ),
-                {EntityScene(text_colored(body, theme().surface_canvas.on))}
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(12.0),
+                }
+                Children [
+                  @{text(title)}
+                  --
+                  @{sonner_close()}
+                  Children [ @{button_styled(button_intent::SECONDARY, ButtonSize::Sm, "close")} ]
+                ]
+                --
+                @{text_colored(body, theme().surface_canvas.on)}
             ]
         })
         .insert(ChildOf(toaster));
 }
 
-type SceneBuilder = fn() -> Box<dyn Scene>;
+type SceneBuilder = fn(&AssetServer) -> Box<dyn Scene>;
 
 const SCENES: &[(&str, SceneBuilder)] = &[
     ("Button intents", button_intents_scene),
@@ -422,19 +434,19 @@ fn col(width: f32, kids: Vec<Box<dyn Scene>>) -> Box<dyn Scene> {
     })
 }
 
-fn button_intents_scene() -> Box<dyn Scene> {
+fn button_intents_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let mut buttons: Vec<Box<dyn Scene>> = BUTTON_INTENTS
         .iter()
         .map(|&(intent, label)| boxed(button_styled(intent, ButtonSize::Md, label)))
         .collect();
     buttons.push(boxed(bsn! {
-        {button_styled(button_intent::PRIMARY, ButtonSize::Md, "disabled")}
+        @{button_styled(button_intent::PRIMARY, ButtonSize::Md, "disabled")}
         bevy::ui::InteractionDisabled
     }));
     wrap(buttons)
 }
 
-fn button_sizes_scene() -> Box<dyn Scene> {
+fn button_sizes_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(
         BUTTON_SIZES
             .iter()
@@ -443,67 +455,68 @@ fn button_sizes_scene() -> Box<dyn Scene> {
     )
 }
 
-fn tabs_scene() -> Box<dyn Scene> {
+fn tabs_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         520.0,
         vec![boxed(bsn! {
-            {tabs(Some("overview".to_owned()))}
+            @{tabs(Some("overview".to_owned()))}
             Children [
-                ( {tabs_list()}
-                  Children [
-                    ( {tabs_trigger("overview")} Children [ {EntityScene(text("Overview"))} ] ),
-                    ( {tabs_trigger("activity")} Children [ {EntityScene(text("Activity"))} ] ),
-                    ( {tabs_trigger("settings")} Children [ {EntityScene(text("Settings"))} ] ),
-                  ]
-                )
+                @{tabs_list()}
+                Children [
+                  @{tabs_trigger("overview")} Children [ @{text("Overview")} ]
+                  --
+                  @{tabs_trigger("activity")} Children [ @{text("Activity")} ]
+                  --
+                  @{tabs_trigger("settings")} Children [ @{text("Settings")} ]
+                ]
             ]
         })],
     )
 }
 
-fn checkbox_scene() -> Box<dyn Scene> {
+fn checkbox_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(vec![
-        boxed(bsn! { {checkbox(Check::Off)} Children [ {EntityScene(checkbox_indicator())} ] }),
-        boxed(bsn! { {checkbox(Check::On)} Children [ {EntityScene(checkbox_indicator())} ] }),
+        boxed(bsn! { @{checkbox(Check::Off)} Children [ @{checkbox_indicator()} ] }),
+        boxed(bsn! { @{checkbox(Check::On)} Children [ @{checkbox_indicator()} ] }),
         boxed(bsn! {
-            {checkbox(Check::Indeterminate)}
+            @{checkbox(Check::Indeterminate)}
             Children [
-                ( Node { width: Val::Px(10.0), height: Val::Px(2.0), border_radius: {BorderRadius::all(Val::Px(999.0))} }
-                  template_value(ui::Style::new().background(theme().primary.on))
-                )
+                Node { width: Val::Px(10.0), height: Val::Px(2.0), border_radius: {BorderRadius::all(Val::Px(999.0))} }
+                ui::Style::new().background(theme().primary.on)
             ]
         }),
     ])
 }
 
-fn switch_scene() -> Box<dyn Scene> {
+fn switch_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     wrap(vec![
-        boxed(bsn! { {switch(false)} Children [ {EntityScene(switch_thumb())} ] }),
-        boxed(bsn! { {switch(true)} Children [ {EntityScene(switch_thumb())} ] }),
+        boxed(bsn! { @{switch(false)} Children [ @{switch_thumb()} ] }),
+        boxed(bsn! { @{switch(true)} Children [ @{switch_thumb()} ] }),
     ])
 }
 
-fn radio_scene() -> Box<dyn Scene> {
+fn radio_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items = ["apple", "banana", "cherry"].map(|name| {
         let label = format!("{}{}", name[..1].to_uppercase(), &name[1..]);
         boxed(bsn! {
-            {radio_item(name)}
+            @{radio_item(name)}
             Children [
-                ( {radio_circle()} Children [ {EntityScene(radio_indicator())} ] ),
-                {EntityScene(text(label))}
+                @{radio_circle()} Children [ @{radio_indicator()} ]
+                --
+                @{text(label)}
             ]
         })
     });
     col(
         240.0,
         vec![boxed(bsn! {
-            {radio_group(Some("apple".to_owned()))}
+            @{radio_group(Some("apple".to_owned()))}
             Children [ {items.into_iter().collect::<Vec<_>>()} ]
         })],
     )
 }
 
-fn dropdown_scene() -> Box<dyn Scene> {
+fn dropdown_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = ["Apple", "Banana", "Cherry", "Durian"]
         .into_iter()
         .map(|name| boxed(dropdown_item(name, name)))
@@ -511,52 +524,52 @@ fn dropdown_scene() -> Box<dyn Scene> {
     col(
         240.0,
         vec![boxed(bsn! {
-            {dropdown("Banana")}
+            @{dropdown("Banana")}
             Children [
-                {EntityScene(dropdown_trigger())},
-                ( {dropdown_content()} Children [ {items} ] )
+                @{dropdown_trigger()}
+                --
+                @{dropdown_content()} Children [ {items} ]
             ]
         })],
     )
 }
 
-fn slider_scene() -> Box<dyn Scene> {
+fn slider_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
-            {slider(35.0, 0.0, 100.0)}
+            @{slider(35.0, 0.0, 100.0)}
             Children [
-                ( {slider_track()}
-                  Children [ {EntityScene(slider_range())}, {EntityScene(slider_thumb())} ]
-                )
+                @{slider_track()}
+                Children [ @{slider_range()} -- @{slider_thumb()} ]
             ]
         })],
     )
 }
 
-fn progress_scene() -> Box<dyn Scene> {
+fn progress_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
-            {progress(0.0, 100.0)}
-            Children [ {EntityScene(progress_indicator())} ]
+            @{progress(0.0, 100.0)}
+            Children [ @{progress_indicator()} ]
         })],
     )
 }
 
-fn avatar_scene() -> Box<dyn Scene> {
+fn avatar_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let one = |initials: &'static str| {
         boxed(bsn! {
-            {avatar()}
+            @{avatar()}
             Children [
-                ( {avatar_fallback()} Children [ {EntityScene(text_colored(initials, theme().primary.on))} ] )
+                @{avatar_fallback()} Children [ @{text_colored(initials, theme().primary.on)} ]
             ]
         })
     };
     wrap(vec![one("KS"), one("AB")])
 }
 
-fn separator_scene() -> Box<dyn Scene> {
+fn separator_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![
@@ -567,43 +580,44 @@ fn separator_scene() -> Box<dyn Scene> {
     )
 }
 
-fn accordion_scene() -> Box<dyn Scene> {
+fn accordion_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let item = |value: &'static str, q: &'static str, a: &'static str| {
         boxed(bsn! {
-            {accordion_item()}
+            @{accordion_item()}
             Children [
-                ( {accordion_header()}
-                  Children [ ( {accordion_trigger(value)} Children [ {EntityScene(text(q))} ] ) ]
-                ),
-                ( {accordion_content(value)}
-                  Children [ ( {accordion_body()} Children [ {EntityScene(text_colored(a, theme().surface_canvas.on))} ] ) ]
-                )
+                @{accordion_header()}
+                Children [ @{accordion_trigger(value)} Children [ @{text(q)} ] ]
+                --
+                @{accordion_content(value)}
+                Children [ @{accordion_body()} Children [ @{text_colored(a, theme().surface_canvas.on)} ] ]
             ]
         })
     };
     col(
         440.0,
         vec![boxed(bsn! {
-            {accordion(HashSet::from(["shipping".to_owned()]), false)}
+            @{accordion(HashSet::from(["shipping".to_owned()]), false)}
             Children [
-                {EntityScene(item("shipping", "Is shipping free?", "Yes, on orders over $50."))},
-                {EntityScene(item("returns", "Can I return it?", "Within 30 days, no questions."))},
-                {EntityScene(item("styled", "Is it themed?", "Every color comes from the theme."))}
+                @{item("shipping", "Is shipping free?", "Yes, on orders over $50.")}
+                --
+                @{item("returns", "Can I return it?", "Within 30 days, no questions.")}
+                --
+                @{item("styled", "Is it themed?", "Every color comes from the theme.")}
             ]
         })],
     )
 }
 
-fn collapsible_scene() -> Box<dyn Scene> {
+fn collapsible_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
-            {collapsible(false)}
+            @{collapsible(false)}
             Children [
-                ( {collapsible_trigger()} Children [ {EntityScene(text("Notification settings"))} ] ),
-                ( {collapsible_content()}
-                  Children [ {EntityScene(text_colored("Email me about replies and mentions.", theme().surface_canvas.on))} ]
-                )
+                @{collapsible_trigger()} Children [ @{text("Notification settings")} ]
+                --
+                @{collapsible_content()}
+                Children [ @{text_colored("Email me about replies and mentions.", theme().surface_canvas.on)} ]
             ]
         })],
     )
@@ -624,50 +638,54 @@ fn dialog_actions(kids: Vec<Box<dyn Scene>>) -> Box<dyn Scene> {
     })
 }
 
-fn dialog_scene() -> Box<dyn Scene> {
+fn dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(dialog(
         false,
         button_styled(button_intent::PRIMARY, ButtonSize::Md, "Delete project"),
         bsn! {
             Children [
-                {EntityScene(text("Delete project?"))},
-                {EntityScene(text_colored("This permanently removes the project and its data.", theme().surface_canvas.on))},
-                {EntityScene(dialog_actions(vec![
+                @{text("Delete project?")}
+                --
+                @{text_colored("This permanently removes the project and its data.", theme().surface_canvas.on)}
+                --
+                @{dialog_actions(vec![
                     boxed(bsn! {
-                        {dialog_close()}
-                        Children [ {EntityScene(button_styled(button_intent::PLAIN, ButtonSize::Md, "Cancel"))} ]
+                        @{dialog_close()}
+                        Children [ @{button_styled(button_intent::PLAIN, ButtonSize::Md, "Cancel")} ]
                     }),
                     boxed(button_styled(button_intent::DANGER, ButtonSize::Md, "Delete")),
-                ]))}
+                ])}
             ]
         },
     ))
 }
 
-fn alert_dialog_scene() -> Box<dyn Scene> {
+fn alert_dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(alert_dialog(
         false,
         button_styled(button_intent::DANGER, ButtonSize::Md, "Reset everything"),
         bsn! {
             Children [
-                {EntityScene(text("Are you absolutely sure?"))},
-                {EntityScene(text_colored("This action cannot be undone.", theme().surface_canvas.on))},
-                {EntityScene(dialog_actions(vec![
+                @{text("Are you absolutely sure?")}
+                --
+                @{text_colored("This action cannot be undone.", theme().surface_canvas.on)}
+                --
+                @{dialog_actions(vec![
                     boxed(bsn! {
-                        {alert_dialog_cancel()}
-                        Children [ {EntityScene(button_styled(button_intent::PLAIN, ButtonSize::Md, "Cancel"))} ]
+                        @{alert_dialog_cancel()}
+                        Children [ @{button_styled(button_intent::PLAIN, ButtonSize::Md, "Cancel")} ]
                     }),
                     boxed(bsn! {
-                        {alert_dialog_action()}
-                        Children [ {EntityScene(button_styled(button_intent::PRIMARY, ButtonSize::Md, "Continue"))} ]
+                        @{alert_dialog_action()}
+                        Children [ @{button_styled(button_intent::PRIMARY, ButtonSize::Md, "Continue")} ]
                     }),
-                ]))}
+                ])}
             ]
         },
     ))
 }
 
-fn card_scene() -> Box<dyn Scene> {
+fn card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let variants: [(&str, &str, Color, CardOptions); 8] = [
         (
             "Surface",
@@ -744,14 +762,14 @@ fn card_scene() -> Box<dyn Scene> {
         .into_iter()
         .map(|(title, desc, on, opts)| {
             boxed(bsn! {
-                {card(opts)}
+                @{card(opts)}
                 Children [
-                    ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(4.0), width: Val::Px(150.0) }
-                      Children [
-                        {EntityScene(text_colored(title, on))},
-                        {EntityScene(text_colored(desc, on))}
-                      ]
-                    )
+                    Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(4.0), width: Val::Px(150.0) }
+                    Children [
+                      @{text_colored(title, on)}
+                      --
+                      @{text_colored(desc, on)}
+                    ]
                 ]
             })
         })
@@ -766,7 +784,7 @@ fn floating(make: impl Fn(Side) -> Box<dyn Scene>) -> Box<dyn Scene> {
             let top = (fy - 0.5) * WINDOW.y;
             boxed(bsn! {
                 Node { position_type: PositionType::Absolute, left: Val::Px({left}), top: Val::Px({top}) }
-                Children [ ( Node Children [ {EntityScene(make(side))} ] ) ]
+                Children [ Node Children [ @{make(side)} ] ]
             })
         })
         .collect();
@@ -778,20 +796,22 @@ fn floating(make: impl Fn(Side) -> Box<dyn Scene>) -> Box<dyn Scene> {
 
 fn tooltip_overlay(side: Side, panel: Box<dyn Scene>) -> Box<dyn Scene> {
     boxed(bsn! {
-        {tooltip(false)}
+        @{tooltip(false)}
         Children [
-            {EntityScene(button_styled(button_intent::PRIMARY, ButtonSize::Md, "Hover me"))},
-            ( {tooltip_content(side, Align::Center, 8.0)} Children [ {EntityScene(panel)} ] )
+            @{button_styled(button_intent::PRIMARY, ButtonSize::Md, "Hover me")}
+            --
+            @{tooltip_content(side, Align::Center, 8.0)} Children [ @{panel} ]
         ]
     })
 }
 
 fn popover_overlay(side: Side, panel: Box<dyn Scene>) -> Box<dyn Scene> {
     boxed(bsn! {
-        {popover(false)}
+        @{popover(false)}
         Children [
-            ( {popover_trigger()} Children [ {EntityScene(button("Open"))} ] ),
-            ( {popover_content(side, Align::Center, 8.0)} Children [ {EntityScene(panel)} ] )
+            @{popover_trigger()} Children [ @{button("Open")} ]
+            --
+            @{popover_content(side, Align::Center, 8.0)} Children [ @{panel} ]
         ]
     })
 }
@@ -799,7 +819,7 @@ fn popover_overlay(side: Side, panel: Box<dyn Scene>) -> Box<dyn Scene> {
 fn note_panel() -> Box<dyn Scene> {
     boxed(bsn! {
         Node { width: Val::Px(220.0), padding: {UiRect::all(Val::Px(12.0))} }
-        Children [ {EntityScene(text(FLIP_NOTE))} ]
+        Children [ @{text(FLIP_NOTE)} ]
     })
 }
 
@@ -807,36 +827,45 @@ fn dimensions_panel() -> Box<dyn Scene> {
     boxed(bsn! {
         Node { width: Val::Px(220.0), flex_direction: FlexDirection::Column, row_gap: Val::Px(8.0), padding: {UiRect::all(Val::Px(12.0))} }
         Children [
-            {EntityScene(text("Dimensions"))},
-            {EntityScene(text_colored(FLIP_NOTE, theme().surface_canvas.on))}
+            @{text("Dimensions")}
+            --
+            @{text_colored(FLIP_NOTE, theme().surface_canvas.on)}
         ]
     })
 }
 
 fn in_card(panel: Box<dyn Scene>) -> Box<dyn Scene> {
     boxed(bsn! {
-        {card(CardOptions { floating: true, ..default() })}
-        Children [ {EntityScene(panel)} ]
+        @{card(CardOptions { floating: true, ..default() })}
+        Children [ @{panel} ]
     })
 }
 
-fn tooltip_scene() -> Box<dyn Scene> {
+fn tooltip_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| tooltip_overlay(side, note_panel()))
 }
 
-fn popover_scene() -> Box<dyn Scene> {
+fn popover_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| popover_overlay(side, dimensions_panel()))
 }
 
-fn tooltip_card_scene() -> Box<dyn Scene> {
+fn tooltip_card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| tooltip_overlay(side, in_card(note_panel())))
 }
 
-fn popover_card_scene() -> Box<dyn Scene> {
+fn popover_card_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     floating(|side| popover_overlay(side, in_card(dimensions_panel())))
 }
 
-fn toasts_scene() -> Box<dyn Scene> {
+fn toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
+    toaster_scene(SonnerPosition::BottomRight)
+}
+
+fn top_toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
+    toaster_scene(SonnerPosition::TopCenter)
+}
+
+fn toaster_scene(position: SonnerPosition) -> Box<dyn Scene> {
     boxed(bsn! {
         Node {
             width: Val::Percent(100.0),
@@ -845,28 +874,14 @@ fn toasts_scene() -> Box<dyn Scene> {
             justify_content: JustifyContent::Center,
         }
         Children [
-            ( {button("Show toast")} on(show_toast) ),
-            ( {toaster(SonnerPosition::BottomRight)} ToasterEntity )
+            @{button("Show toast")} on(show_toast)
+            --
+            @{toaster(position)} ToasterEntity
         ]
     })
 }
 
-fn top_toasts_scene() -> Box<dyn Scene> {
-    boxed(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-        }
-        Children [
-            ( {button("Show toast")} on(show_toast) ),
-            ( {toaster(SonnerPosition::TopCenter)} ToasterEntity )
-        ]
-    })
-}
-
-fn widget_scene() -> Box<dyn Scene> {
+fn widget_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         160.0,
         vec![boxed(bsn! {
@@ -876,14 +891,14 @@ fn widget_scene() -> Box<dyn Scene> {
                 position_type: PositionType::Relative,
             }
             Children [
-                {EntityScene(widget(WidgetOptions {
+                @{widget(WidgetOptions {
                     pos: Vec2::new(56.0, 36.0),
                     icon: Handle::default(),
                     badge: Some(INVENTORY),
                     tooltip: "Inventory".into(),
                     on_tap: OnTap::new(|_| {}),
                     on_settle: OnSettle::new(|_, geom| geom),
-                }))}
+                })}
             ]
         })],
     )
@@ -895,7 +910,7 @@ struct PinnedLog;
 #[derive(Component, Default, Clone)]
 struct SubmittedText;
 
-fn pinned_scroll_scene() -> Box<dyn Scene> {
+fn pinned_scroll_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let mut items: Vec<Box<dyn Scene>> = (1..=30)
         .map(|n| {
             boxed(text_colored(
@@ -914,24 +929,22 @@ fn pinned_scroll_scene() -> Box<dyn Scene> {
             boxed(bsn! {
                 Node { width: Val::Px(300.0), height: Val::Px(200.0) }
                 Children [
-                    ( {scroll_area()}
+                    @{scroll_area()}
+                    Children [
+                      @{scroll_viewport()}
+                      ui::PinToBottom
                       Children [
-                        ( {scroll_viewport()}
-                          {ui::component(ui::PinToBottom::default())}
-                          Children [
-                            ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(8.0))} }
-                              PinnedLog
-                              Children [ {items} ]
-                            )
-                          ]
-                        ),
-                        ( {scroll_bar()} Children [ {EntityScene(scroll_thumb())} ] )
+                        Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(6.0), width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(8.0))} }
+                        PinnedLog
+                        Children [ {items} ]
                       ]
-                    )
+                      --
+                      @{scroll_bar()} Children [ @{scroll_thumb()} ]
+                    ]
                 ]
             }),
             boxed(bsn! {
-                {button_styled(button_intent::PRIMARY, ButtonSize::Md, "append line")}
+                @{button_styled(button_intent::PRIMARY, ButtonSize::Md, "append line")}
                 on(|_: On<ui::Activate>, logs: Query<(Entity, Option<&Children>), With<PinnedLog>>, mut commands: Commands| {
                     for (log, children) in &logs {
                         let line = children.map_or(0, Children::len) + 1;
@@ -948,7 +961,7 @@ fn pinned_scroll_scene() -> Box<dyn Scene> {
     )
 }
 
-fn text_input_scene() -> Box<dyn Scene> {
+fn text_input_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -958,7 +971,7 @@ fn text_input_scene() -> Box<dyn Scene> {
                 row_gap: Val::Px(8.0),
             }
             Children [
-                {EntityScene(ui::text_input(ui::TextInputOptions {
+                @{ui::text_input(ui::TextInputOptions {
                     on_submit: ui::OnSubmit::new(|world, submitted| {
                         let mut labels = world.query_filtered::<&mut Text, With<SubmittedText>>();
                         for mut label in labels.iter_mut(world) {
@@ -967,14 +980,15 @@ fn text_input_scene() -> Box<dyn Scene> {
                     }),
                     submit: SUBMIT,
                     blur: LEAVE,
-                }))},
-                ( {text("submitted: —")} SubmittedText )
+                })}
+                --
+                @{text("submitted: —")} SubmittedText
             ]
         })],
     )
 }
 
-fn window_scene() -> Box<dyn Scene> {
+fn window_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     col(
         360.0,
         vec![boxed(bsn! {
@@ -984,7 +998,7 @@ fn window_scene() -> Box<dyn Scene> {
                 position_type: PositionType::Relative,
             }
             Children [
-                {EntityScene(window(ui::WindowOptions {
+                @{window(ui::WindowOptions {
                     pos: Vec2::ZERO,
                     size: Vec2::new(520.0, 300.0),
                     on_close: OnTap::new(|_| {}),
@@ -995,7 +1009,7 @@ fn window_scene() -> Box<dyn Scene> {
                         log_tab(),
                     ],
                     tab: 0,
-                }))}
+                })}
             ]
         })],
     )
@@ -1045,39 +1059,36 @@ fn log_tab() -> ui::WindowContent {
                 flex_direction: FlexDirection::Column,
             }
             Children [
-                ( Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+                Node { flex_grow: 1.0, min_height: Val::Px(0.0), width: Val::Percent(100.0) }
+                Children [
+                  @{scroll_area()}
                   Children [
-                    ( {scroll_area()}
-                      Children [
-                        ( {scroll_viewport()}
-                          {ui::component(ui::PinToBottom::default())}
-                          Children [
-                            (
-                                Node {
-                                    flex_direction: FlexDirection::Column,
-                                    width: Val::Percent(100.0),
-                                    padding: {UiRect::all(Val::Px(4.0))},
-                                }
-                                Children [ {items} ]
-                            )
-                          ]
-                        ),
-                        ( {scroll_bar()} Children [ {EntityScene(scroll_thumb())} ] )
-                      ]
-                    )
+                    @{scroll_viewport()}
+                    ui::PinToBottom
+                    Children [
+                      Node {
+                          flex_direction: FlexDirection::Column,
+                          width: Val::Percent(100.0),
+                          padding: {UiRect::all(Val::Px(4.0))},
+                      }
+                      Children [ {items} ]
+                    ]
+                    --
+                    @{scroll_bar()} Children [ @{scroll_thumb()} ]
                   ]
-                ),
-                {EntityScene(ui::text_input(ui::TextInputOptions {
+                ]
+                --
+                @{ui::text_input(ui::TextInputOptions {
                     on_submit: ui::OnSubmit::new(|_, _| {}),
                     submit: SUBMIT,
                     blur: LEAVE,
-                }))}
+                })}
             ]
         }),
     }
 }
 
-fn scroll_area_scene() -> Box<dyn Scene> {
+fn scroll_area_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = (1..=16)
         .map(|n| boxed(text_colored(format!("Item {n}"), theme().surface_canvas.on)))
         .collect();
@@ -1086,18 +1097,16 @@ fn scroll_area_scene() -> Box<dyn Scene> {
         vec![boxed(bsn! {
             Node { width: Val::Px(300.0), height: Val::Px(220.0) }
             Children [
-                ( {scroll_area()}
+                @{scroll_area()}
+                Children [
+                  @{scroll_viewport()}
                   Children [
-                    ( {scroll_viewport()}
-                      Children [
-                        ( Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(10.0), width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(8.0))} }
-                          Children [ {items} ]
-                        )
-                      ]
-                    ),
-                    ( {scroll_bar()} Children [ {EntityScene(scroll_thumb())} ] )
+                    Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(10.0), width: Val::Percent(100.0), padding: {UiRect::all(Val::Px(8.0))} }
+                    Children [ {items} ]
                   ]
-                )
+                  --
+                  @{scroll_bar()} Children [ @{scroll_thumb()} ]
+                ]
             ]
         })],
     )
@@ -1215,15 +1224,16 @@ fn pell_line() -> Vec<RichPiece> {
     ]
 }
 
-fn rich_text_scene() -> Box<dyn Scene> {
+fn rich_text_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let rows: Vec<Box<dyn Scene>> = effect_rows()
         .into_iter()
         .map(|(label, pieces)| {
             boxed(bsn! {
                 Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(16.0), align_items: AlignItems::Center }
                 Children [
-                    ( Node { width: Val::Px(110.0) } Children [ {EntityScene(text(label))} ] ),
-                    {EntityScene(rich_text(RichText::new(pieces), false))},
+                    Node { width: Val::Px(110.0) } Children [ @{text(label)} ]
+                    --
+                    @{rich_text(RichText::new(pieces), false)}
                 ]
             })
         })
@@ -1237,12 +1247,12 @@ fn rich_text_scene() -> Box<dyn Scene> {
             }),
             boxed(bsn! {
                 Node { margin: {UiRect::top(Val::Px(24.0))} }
-                Children [ (
-                    {button_styled(button_intent::SECONDARY, ButtonSize::Sm, "toggle reduced motion")}
+                Children [
+                    @{button_styled(button_intent::SECONDARY, ButtonSize::Sm, "toggle reduced motion")}
                     on(|_: On<ui::Activate>, mut preference: ResMut<MotionPreference>| {
                         preference.reduced = !preference.reduced;
                     })
-                ) ]
+                ]
             }),
         ],
     )
@@ -1251,7 +1261,7 @@ fn rich_text_scene() -> Box<dyn Scene> {
 #[derive(Component, Default, Clone)]
 struct ReplayLine;
 
-fn typewriter_scene() -> Box<dyn Scene> {
+fn typewriter_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText {
         size: 20.0,
         ..RichText::new(pell_line())
@@ -1266,27 +1276,24 @@ fn typewriter_scene() -> Box<dyn Scene> {
                     padding: {UiRect::all(Val::Px(18.0))},
                 }
                 BackgroundColor({theme().surface_floating.base})
-                Children [ ( {rich_text(line, true)} ReplayLine ) ]
+                Children [ @{rich_text(line, true)} ReplayLine ]
             }),
             boxed(bsn! {
                 Node { margin: {UiRect::top(Val::Px(18.0))}, column_gap: Val::Px(12.0) }
                 Children [
-                    (
-                        {button_styled(button_intent::PRIMARY, ButtonSize::Sm, "replay")}
-                        on(|_: On<ui::Activate>, mut lines: Query<&mut RichText, With<ReplayLine>>| {
-                            for mut line in &mut lines {
-                                line.set_changed();
-                            }
-                        })
-                    ),
-                    (
-                        {button_styled(button_intent::SECONDARY, ButtonSize::Sm, "skip")}
-                        on(|_: On<ui::Activate>, mut typewriters: Query<&mut Typewriter, With<ReplayLine>>| {
-                            for mut typewriter in &mut typewriters {
-                                typewriter.finish();
-                            }
-                        })
-                    ),
+                    @{button_styled(button_intent::PRIMARY, ButtonSize::Sm, "replay")}
+                    on(|_: On<ui::Activate>, mut lines: Query<&mut RichText, With<ReplayLine>>| {
+                        for mut line in &mut lines {
+                            line.set_changed();
+                        }
+                    })
+                    --
+                    @{button_styled(button_intent::SECONDARY, ButtonSize::Sm, "skip")}
+                    on(|_: On<ui::Activate>, mut typewriters: Query<&mut Typewriter, With<ReplayLine>>| {
+                        for mut typewriter in &mut typewriters {
+                            typewriter.finish();
+                        }
+                    })
                 ]
             }),
         ],
@@ -1384,16 +1391,7 @@ fn sample_choices(assets: &AssetServer) -> Vec<ChoiceOptions> {
     .collect()
 }
 
-static GALLERY_ASSETS: std::sync::OnceLock<AssetServer> = std::sync::OnceLock::new();
-
-fn assets() -> &'static AssetServer {
-    GALLERY_ASSETS
-        .get()
-        .expect("gallery assets are ready before scenes are built")
-}
-
-fn chips_scene() -> Box<dyn Scene> {
-    let assets = assets();
+fn chips_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let chips: Vec<Box<dyn Scene>> = [
         tag("QUEST", palette::AMBER_70),
         tag("SHOP", palette::AMBER_80),
@@ -1414,14 +1412,14 @@ fn chips_scene() -> Box<dyn Scene> {
     wrap(chips)
 }
 
-fn choices_scene() -> Box<dyn Scene> {
+fn choices_scene(assets: &AssetServer) -> Box<dyn Scene> {
     col(
         720.0,
-        vec![boxed(choice_list(sample_choices(assets()), PICK))],
+        vec![boxed(choice_list(sample_choices(assets), PICK))],
     )
 }
 
-fn dialogue_box_scene() -> Box<dyn Scene> {
+fn dialogue_box_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText::new(vec![
         plain("The forest road is "),
         ink("closed", palette::CRIMSON_80),
@@ -1433,29 +1431,30 @@ fn dialogue_box_scene() -> Box<dyn Scene> {
         height: Val::Auto,
         content: boxed(bsn! {
             Node { padding: {UiRect::all(Val::Px(12.0))} }
-            Children [ {EntityScene(text_colored("Panels hold any content, centered above the box", theme().surface_floating.on))} ]
+            Children [ @{text_colored("Panels hold any content, centered above the box", theme().surface_floating.on)} ]
         }),
     });
     boxed(bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), flex_direction: FlexDirection::Column, align_items: AlignItems::Center, justify_content: JustifyContent::End, row_gap: Val::Px(24.0), padding: {UiRect::bottom(Val::Px(40.0))} }
         Children [
-            {EntityScene(panel)},
-            {EntityScene(dialogue_box(DialogueBoxOptions {
+            @{panel}
+            --
+            @{dialogue_box(DialogueBoxOptions {
                 speaker: Some(("Ilsa".to_owned(), Side::Right)),
                 line,
                 typed: true,
-                choices: sample_choices(assets()),
+                choices: sample_choices(assets),
                 hint: choice_hint(),
                 advance: NEXT,
                 pick: PICK,
-            }))},
+            })}
         ]
     })
 }
 
 const CAST_SECONDS: f32 = 3.0;
 
-fn cast_scene() -> Box<dyn Scene> {
+fn cast_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let line = RichText::new(vec![
         plain("Do you know what a crate of silk costs? I do. "),
         RichSpan::plain("To the copper.").slow().into(),
@@ -1463,8 +1462,9 @@ fn cast_scene() -> Box<dyn Scene> {
     boxed(bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), align_items: AlignItems::End, justify_content: JustifyContent::Center, padding: {UiRect::bottom(Val::Px(40.0))} }
         Children [
-            {EntityScene(cast())},
-            {EntityScene(dialogue_box(DialogueBoxOptions {
+            @{cast()}
+            --
+            @{dialogue_box(DialogueBoxOptions {
                 speaker: Some(("Mara".to_owned(), Side::Right)),
                 line,
                 typed: false,
@@ -1472,7 +1472,7 @@ fn cast_scene() -> Box<dyn Scene> {
                 hint: vec![RichPiece::Input(NEXT), RichPiece::text(" next")],
                 advance: NEXT,
                 pick: PICK,
-            }))},
+            })}
         ]
     })
 }
@@ -1525,15 +1525,15 @@ fn notification_round(time: &Time, rounds: u64) -> u64 {
     (time.elapsed_secs() / NOTIFICATION_SECONDS) as u64 % rounds
 }
 
-fn bubbles_scene() -> Box<dyn Scene> {
+fn bubbles_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let anchors: Vec<Box<dyn Scene>> = bubble_round(0)
         .into_iter()
         .enumerate()
         .map(|(index, (left, top, bubble))| -> Box<dyn Scene> {
             boxed(bsn! {
-                {speech_bubble(bubble)}
+                @{speech_bubble(bubble)}
                 Node { left: Val::Percent({left}), top: Val::Percent({top}) }
-                component(GalleryBubble(index))
+                GalleryBubble(index)
             })
         })
         .collect();
@@ -1576,7 +1576,7 @@ fn visit_bubbles(
             };
             commands
                 .spawn_scene(bsn! {
-                    {speech_bubble(bubble)}
+                    @{speech_bubble(bubble)}
                     Node { left: Val::Percent(50.0), top: Val::Percent(88.0) }
                     GalleryVisitor
                 })
@@ -1674,7 +1674,7 @@ fn notification_column(place: Box<dyn Scene>) -> Box<dyn Scene> {
             align_items: AlignItems::Center,
             padding: {UiRect::top(Val::Px(ui::tokens::spacing::XL))},
         }
-        Children [ {EntityScene(place)} ]
+        Children [ @{place} ]
     })
 }
 
@@ -1683,12 +1683,8 @@ fn labelled(key: u64, label: &str, replaced: u32, text: &str) -> LabelledLine {
         key,
         label: label.to_owned(),
         replaced,
-        text: RichText::new(vec![plain_owned(text)]),
+        text: RichText::new(vec![RichPiece::text(text.to_owned())]),
     }
-}
-
-fn plain_owned(text: &str) -> RichPiece {
-    RichPiece::text(text.to_owned())
 }
 
 fn more(count: u32) -> Option<RichText> {
@@ -1699,7 +1695,7 @@ fn more(count: u32) -> Option<RichText> {
     ]))
 }
 
-fn captions_scene() -> Box<dyn Scene> {
+fn captions_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(captions()))
 }
 
@@ -1755,7 +1751,7 @@ fn cycle_captions(time: Res<Time>, mut captions: Query<&mut Captions>) {
     }
 }
 
-fn alert_bar_scene() -> Box<dyn Scene> {
+fn alert_bar_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(alert_bar()))
 }
 
@@ -1798,7 +1794,7 @@ fn cycle_alerts(time: Res<Time>, mut bars: Query<&mut AlertBar>) {
     }
 }
 
-fn milestones_scene() -> Box<dyn Scene> {
+fn milestones_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(milestones()))
 }
 
@@ -1830,7 +1826,7 @@ fn cycle_milestones(time: Res<Time>, mut milestones: Query<&mut Milestones>) {
     }
 }
 
-fn intro_scene() -> Box<dyn Scene> {
+fn intro_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(bsn! {
         GalleryIntroHost
         Node { display: Display::Grid, justify_items: JustifyItems::Center }
@@ -1863,7 +1859,7 @@ fn cycle_intro(
             };
             commands
                 .spawn_scene(bsn! {
-                    {intro(shown)}
+                    @{intro(shown)}
                     Node { grid_row: {GridPlacement::start(1)}, grid_column: {GridPlacement::start(1)} }
                 })
                 .insert(ChildOf(host));
@@ -1875,16 +1871,15 @@ fn cycle_intro(
     }
 }
 
-fn notification_toasts_scene() -> Box<dyn Scene> {
+fn notification_toasts_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     notification_column(boxed(bsn! {
         Node { width: Val::Percent(100.0), height: Val::Percent(100.0), justify_content: JustifyContent::Center }
         Children [
-            (
-                {toaster(SonnerPosition::TopCenter)}
-                GalleryCardToaster
-                Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
-            ),
-            ( {compact_toaster(320.0)} GalleryFeedToaster ),
+            @{toaster(SonnerPosition::TopCenter)}
+            GalleryCardToaster
+            Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
+            --
+            @{compact_toaster(320.0)} GalleryFeedToaster
         ]
     }))
 }
@@ -1924,33 +1919,33 @@ fn feed_toasts(
     let line = FEED_LINES[tick as usize % FEED_LINES.len()];
     commands
         .spawn_scene(bsn! {
-            {compact_toast(Duration::from_secs(3))}
-            Children [ {EntityScene(text(line))} ]
+            @{compact_toast(Duration::from_secs(3))}
+            Children [ @{text(line)} ]
         })
         .insert(ChildOf(feed));
     if tick.is_multiple_of(2) {
         let mut replaced = shown.iter_many_mut(errors.into_iter().flatten());
-        while let Some(mut toast) = replaced.fetch_next() {
+        while let Some(Ok(mut toast)) = replaced.fetch_next() {
             toast.leaving = true;
         }
         let error = ERROR_LINES[(tick / 2) as usize % ERROR_LINES.len()];
         commands
             .spawn_scene(bsn! {
-                {toast(Duration::from_secs(4))}
-                Children [ {EntityScene(text_colored(error, palette::CRIMSON_80))} ]
+                @{toast(Duration::from_secs(4))}
+                Children [ @{text_colored(error, palette::CRIMSON_80)} ]
             })
             .insert(ChildOf(card));
     }
 }
 
-fn list_detail_scene() -> Box<dyn Scene> {
+fn list_detail_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     let rows = |titles: &[&str]| -> Vec<Box<dyn Scene>> {
         titles
             .iter()
             .map(|title| {
                 boxed(bsn! {
                     Node { padding: {UiRect::axes(Val::Px(16.0), Val::Px(4.0))} }
-                    Children [ {EntityScene(text(*title))} ]
+                    Children [ @{text(*title)} ]
                 })
             })
             .collect()
@@ -1958,35 +1953,39 @@ fn list_detail_scene() -> Box<dyn Scene> {
     let list = boxed(bsn! {
         Node { flex_direction: FlexDirection::Column, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(list_header("Orc Trouble", "1"))},
-            {rows(&["Tusks for the Chief"])},
-            {EntityScene(list_header("Harbour Errands", "2"))},
-            {rows(&["A Letter for the Captain", "Low Tide"])},
+            @{list_header("Orc Trouble", "1")}
+            --
+            {rows(&["Tusks for the Chief"])}
+            --
+            @{list_header("Harbour Errands", "2")}
+            --
+            {rows(&["A Letter for the Captain", "Low Tide"])}
         ]
     });
     let detail = boxed(bsn! {
         Node { flex_direction: FlexDirection::Column, row_gap: Val::Px(8.0), padding: {UiRect::all(Val::Px(12.0))} }
         Children [
-            {EntityScene(text("Low Tide"))},
-            {EntityScene(text("Bring Tobb three Fish Steaks before the tide turns."))},
+            @{text("Low Tide")}
+            --
+            @{text("Bring Tobb three Fish Steaks before the tide turns.")}
         ]
     });
     boxed(bsn! {
         Node { width: Val::Px(640.0), height: Val::Px(360.0) }
         BackgroundColor({theme().surface_floating.base})
-        Children [ {EntityScene(split_view(list, boxed(ui::scrolled(detail))))} ]
+        Children [ @{split_view(list, boxed(ui::scrolled(detail)))} ]
     })
 }
 
 #[derive(Component, Default, Clone)]
 struct ConfirmHost;
 
-fn confirm_dialog_scene() -> Box<dyn Scene> {
+fn confirm_dialog_scene(_assets: &AssetServer) -> Box<dyn Scene> {
     boxed(bsn! {
         ConfirmHost
         Node { flex_direction: FlexDirection::Column, align_items: AlignItems::Center }
-        Children [ (
-            {button("Abandon quest")}
+        Children [
+            @{button("Abandon quest")}
             on(|_: On<ui::Activate>, hosts: Query<Entity, With<ConfirmHost>>, mut commands: Commands| {
                 let Ok(host) = hosts.single() else { return };
                 commands
@@ -2004,15 +2003,14 @@ fn confirm_dialog_scene() -> Box<dyn Scene> {
                     }))
                     .insert(ChildOf(host));
             })
-        ) ]
+        ]
     })
 }
 
 #[derive(Component, Default, Clone)]
 struct DropLog;
 
-fn drag_and_drop_scene() -> Box<dyn Scene> {
-    let assets = assets();
+fn drag_and_drop_scene(assets: &AssetServer) -> Box<dyn Scene> {
     let items: Vec<Box<dyn Scene>> = [
         ("icons/monster_part/bone.png", 1),
         ("icons/monster_part/feather.png", 2),
@@ -2021,31 +2019,31 @@ fn drag_and_drop_scene() -> Box<dyn Scene> {
     .into_iter()
     .map(|(icon, payload)| {
         let image = assets.load(icon);
+        let carriable = Carriable { image: image.clone(), payload, input: CARRY };
         boxed(bsn! {
             Node { width: Val::Px(48.0), height: Val::Px(48.0) }
             BackgroundColor({theme().surface_floating.base})
-            component(Carriable { image: image.clone(), payload, input: CARRY })
-            Children [ ( Node { width: Val::Percent(100.0), height: Val::Percent(100.0) } component(ImageNode::new(image)) Pickable::IGNORE ) ]
+            template(move |_| Ok(carriable.clone()))
+            Children [ Node { width: Val::Percent(100.0), height: Val::Percent(100.0) } ImageNode { image: {image} } Pickable::IGNORE ]
         })
     })
     .collect();
     boxed(bsn! {
         Node { flex_direction: FlexDirection::Row, column_gap: Val::Px(80.0), align_items: AlignItems::Center }
         Children [
-            ( Node { column_gap: Val::Px(8.0) } Children [ {items} ] ),
-            (
-                CarryTarget
-                Node { width: Val::Px(240.0), height: Val::Px(160.0), align_items: AlignItems::Center, justify_content: JustifyContent::Center }
-                BackgroundColor({theme().surface_floating.base})
-                on(|carried: On<Carried>, logs: Query<Entity, With<DropLog>>, mut texts: Query<&mut Text>| {
-                    for log in &logs {
-                        if let Ok(mut text) = texts.get_mut(log) {
-                            text.0 = format!("received item {}", carried.payload);
-                        }
+            Node { column_gap: Val::Px(8.0) } Children [ {items} ]
+            --
+            CarryTarget
+            Node { width: Val::Px(240.0), height: Val::Px(160.0), align_items: AlignItems::Center, justify_content: JustifyContent::Center }
+            BackgroundColor({theme().surface_floating.base})
+            on(|carried: On<Carried>, logs: Query<Entity, With<DropLog>>, mut texts: Query<&mut Text>| {
+                for log in &logs {
+                    if let Ok(mut text) = texts.get_mut(log) {
+                        text.0 = format!("received item {}", carried.payload);
                     }
-                })
-                Children [ ( {text("Drop items here")} DropLog ) ]
-            ),
+                }
+            })
+            Children [ @{text("Drop items here")} DropLog ]
         ]
     })
 }

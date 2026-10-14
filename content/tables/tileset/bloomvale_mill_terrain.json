@@ -1,0 +1,449 @@
+{
+  "image": "tilesets/bloomvale-mill-terrain.png",
+  "tile": 16,
+  "terrains": {
+    "rug": [
+      "floor",
+      "rug"
+    ],
+    "walls": [
+      "floor",
+      "wall",
+      "face"
+    ]
+  },
+  "tiles": {
+    "0": {
+      "surface": "rock"
+    },
+    "1": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "floor",
+          "wall",
+          "floor"
+        ]
+      }
+    },
+    "2": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "floor",
+          "wall",
+          "wall"
+        ]
+      }
+    },
+    "3": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "floor",
+          "floor",
+          "wall"
+        ]
+      }
+    },
+    "4": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "wall",
+          "wall",
+          "floor"
+        ]
+      }
+    },
+    "5": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "wall",
+          "wall",
+          "floor"
+        ]
+      }
+    },
+    "6": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "wall",
+          "wall",
+          "wall"
+        ]
+      }
+    },
+    "7": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "floor",
+          "floor",
+          "wall"
+        ]
+      }
+    },
+    "8": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "floor",
+          "floor",
+          "wall"
+        ]
+      }
+    },
+    "9": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "floor",
+          "wall",
+          "wall"
+        ]
+      }
+    },
+    "10": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "wall",
+          "wall",
+          "wall"
+        ]
+      }
+    },
+    "11": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "wall",
+          "face",
+          "wall"
+        ]
+      }
+    },
+    "12": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "wall",
+          "face",
+          "face"
+        ]
+      }
+    },
+    "13": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "floor",
+          "floor",
+          "face"
+        ]
+      }
+    },
+    "14": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "face",
+          "floor",
+          "wall"
+        ]
+      }
+    },
+    "15": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "face",
+          "face",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "16": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "face",
+          "floor",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "17": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "wall",
+          "face",
+          "floor"
+        ]
+      }
+    },
+    "18": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "wall",
+          "wall",
+          "face"
+        ]
+      }
+    },
+    "19": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "floor",
+          "wall",
+          "face"
+        ]
+      }
+    },
+    "20": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "face",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "21": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "face",
+          "wall",
+          "wall",
+          "floor"
+        ]
+      }
+    },
+    "22": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "face",
+          "wall",
+          "wall",
+          "floor"
+        ]
+      }
+    },
+    "23": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "floor",
+          "wall",
+          "face",
+          "wall"
+        ]
+      }
+    },
+    "24": {
+      "surface": "rock",
+      "corners": {
+        "walls": [
+          "wall",
+          "face",
+          "floor",
+          "wall"
+        ]
+      }
+    },
+    "25": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "rug",
+          "rug",
+          "floor"
+        ]
+      }
+    },
+    "26": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "floor",
+          "floor",
+          "rug"
+        ]
+      }
+    },
+    "27": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "rug",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "28": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "rug",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "29": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "rug",
+          "floor",
+          "rug"
+        ]
+      }
+    },
+    "30": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "floor",
+          "floor",
+          "floor"
+        ]
+      }
+    },
+    "31": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "floor",
+          "rug",
+          "floor"
+        ]
+      }
+    },
+    "32": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "floor",
+          "rug",
+          "rug"
+        ]
+      }
+    },
+    "33": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "floor",
+          "rug",
+          "rug"
+        ]
+      }
+    },
+    "34": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "floor",
+          "floor",
+          "rug"
+        ]
+      }
+    },
+    "35": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "rug",
+          "rug",
+          "floor"
+        ]
+      }
+    },
+    "36": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "rug",
+          "rug",
+          "rug"
+        ]
+      }
+    },
+    "37": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "rug",
+          "floor",
+          "rug"
+        ]
+      }
+    },
+    "38": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "rug",
+          "floor",
+          "rug",
+          "floor"
+        ]
+      }
+    },
+    "39": {
+      "surface": "rock",
+      "corners": {
+        "rug": [
+          "floor",
+          "rug",
+          "rug",
+          "rug"
+        ]
+      }
+    }
+  }
+}

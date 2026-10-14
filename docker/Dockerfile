@@ -5,7 +5,7 @@
 # Shared runtime: ubuntu plus the system CA bundle that rustls' verifier reads. Every service runs
 # the pyroscope agent, whose reqwest client loads the CA store at startup and panics without one;
 # the game-server additionally reaches keycloak.
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:26.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,8 +18,6 @@ ENTRYPOINT ["website"]
 FROM runtime AS game-server
 # A static busybox supplies wget for the compose healthcheck without an apt layer.
 COPY --from=busybox:1.36-musl /bin/busybox /usr/bin/wget
-COPY target/release/server /usr/local/bin/game-server
-# The server reads maps/models off disk (RIFT_GAME_SERVER_ASSETS_DIR=/assets); unlike the wasm
-# client it does not embed them.
-COPY assets /assets
+COPY target/release/game-server /usr/local/bin/game-server
+COPY content /content
 ENTRYPOINT ["game-server"]

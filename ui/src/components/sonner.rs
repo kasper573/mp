@@ -4,14 +4,13 @@ use bevy_color::Alpha;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
 use bevy_math::Vec2;
-use bevy_picking::prelude::{Click, Out, Over, Pickable, Pointer};
-use bevy_scene::{Scene, bsn, template_value};
+use bevy_picking::prelude::{Pickable, PointerClick, PointerOut, PointerOver};
+use bevy_scene::{Scene, bsn};
 use bevy_time::Time;
 use bevy_ui::{
-    AlignItems, BorderRadius, FlexDirection, Node, PositionType, UiRect, UiTransform, Val,
+    AlignItems, BorderRadius, Display, FlexDirection, Node, PositionType, UiRect, UiTransform, Val,
 };
 
-use crate::component;
 use crate::components::rich_text::MotionPreference;
 use crate::cursor::{ClickThrough, CursorStyle};
 use crate::motion::transition::{STANDARD_ENTER, STANDARD_EXIT};
@@ -130,19 +129,19 @@ pub fn toaster(position: SonnerPosition) -> impl Scene {
     };
     position.place_toaster(&mut node);
     bsn! {
-        template_value(node)
+        node
         Toaster { position: {position} }
     }
 }
 
 pub fn toast(lasts: Duration) -> impl Scene {
     bsn! {
-        component(card_node())
+        card_node()
         Toast { lasts: {Some(lasts)} }
         Motion
-        component(Opacity(0.0))
+        Opacity(0.0)
         UiTransform
-        template_value(card_style())
+        card_style()
     }
 }
 
@@ -158,7 +157,7 @@ pub fn compact_toaster(max_width: f32) -> impl Scene {
         ..Node::default()
     };
     bsn! {
-        template_value(node)
+        node
         Toaster { position: {SonnerPosition::BottomRight}, look: {SonnerLook::Compact} }
         Pickable::IGNORE
     }
@@ -166,12 +165,12 @@ pub fn compact_toaster(max_width: f32) -> impl Scene {
 
 pub fn compact_toast(lasts: Duration) -> impl Scene {
     bsn! {
-        component(compact_node())
+        compact_node()
         Toast { lasts: {Some(lasts)} }
         Motion
-        component(Opacity(0.0))
+        Opacity(0.0)
         UiTransform
-        template_value(compact_style())
+        compact_style()
         ClickThrough
         Pickable { should_block_lower: false, is_hoverable: true }
     }
@@ -196,7 +195,7 @@ pub fn sonner_close() -> impl Scene {
 }
 
 pub(crate) fn on_close(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     is_close: Query<(), With<ToastClose>>,
     parents: Query<&ChildOf>,
     has_toast: Query<(), With<Toast>>,
@@ -268,7 +267,7 @@ pub(crate) fn size_toaster(
 }
 
 pub(crate) fn toaster_hover(
-    over: On<Pointer<Over>>,
+    over: On<PointerOver>,
     parents: Query<&ChildOf>,
     is_toaster: Query<(), With<Toaster>>,
     mut toasters: Query<&mut Toaster>,
@@ -281,7 +280,7 @@ pub(crate) fn toaster_hover(
 }
 
 pub(crate) fn toaster_leave(
-    out: On<Pointer<Out>>,
+    out: On<PointerOut>,
     parents: Query<&ChildOf>,
     is_toaster: Query<(), With<Toaster>>,
     mut toasters: Query<&mut Toaster>,
@@ -307,7 +306,7 @@ pub(crate) fn layout_toasts(
             continue;
         }
         let mut depth = 0usize;
-        for &entity in children.iter().rev().collect::<Vec<_>>().iter() {
+        for entity in children.iter().rev() {
             let Ok((toast, mut node, mut motion)) = cards.get_mut(entity) else {
                 continue;
             };
@@ -319,9 +318,9 @@ pub(crate) fn layout_toasts(
             }
             let visible = here < MAX_VISIBLE || toast.leaving || toaster.expanded;
             node.display = if visible {
-                bevy_ui::Display::Flex
+                Display::Flex
             } else {
-                bevy_ui::Display::None
+                Display::None
             };
 
             let grow = toaster.position.grow();
@@ -342,13 +341,14 @@ pub(crate) fn layout_toasts(
                 1.0 - here * PEEK_SCALE
             };
             let enter = Transform2d::new(rest + off, 0.9);
-            let (target, opacity, timing) = match toast.leaving {
-                true => (
+            let (target, opacity, timing) = if toast.leaving {
+                (
                     Transform2d::new(rest + away, scale * LEAVE_SCALE),
                     0.0,
                     STANDARD_EXIT,
-                ),
-                false => (Transform2d::new(rest, scale), 1.0, STANDARD_ENTER),
+                )
+            } else {
+                (Transform2d::new(rest, scale), 1.0, STANDARD_ENTER)
             };
             motion.aim_transform(enter, target, Some(timing));
             motion.aim_opacity(0.0, opacity, Some(timing));
@@ -383,12 +383,13 @@ fn layout_compact(
     cards: &mut Query<(&mut Toast, &mut Node, &mut Motion)>,
     reduced: bool,
 ) -> usize {
-    let limit = match toaster.expanded {
-        true => COMPACT_HELD,
-        false => COMPACT_SHOWN,
+    let limit = if toaster.expanded {
+        COMPACT_HELD
+    } else {
+        COMPACT_SHOWN
     };
     let mut live = 0usize;
-    for &entity in children.iter().rev().collect::<Vec<_>>().iter() {
+    for entity in children.iter().rev() {
         let Ok((mut toast, mut node, mut motion)) = cards.get_mut(entity) else {
             continue;
         };
@@ -396,16 +397,18 @@ fn layout_compact(
         if !toast.leaving {
             live += 1;
         }
-        let display = match here < limit || toast.leaving {
-            true => bevy_ui::Display::Flex,
-            false => bevy_ui::Display::None,
+        let display = if here < limit || toast.leaving {
+            Display::Flex
+        } else {
+            Display::None
         };
         if node.display != display {
             node.display = display;
         }
-        let slide = match reduced {
-            true => Vec2::ZERO,
-            false => Vec2::new(COMPACT_SLIDE, 0.0),
+        let slide = if reduced {
+            Vec2::ZERO
+        } else {
+            Vec2::new(COMPACT_SLIDE, 0.0)
         };
         let enter = Transform2d::new(slide, 1.0);
         let rest = Transform2d::IDENTITY;
@@ -413,13 +416,15 @@ fn layout_compact(
             let swell = Transform2d::new(Vec2::ZERO, BUMP_SCALE);
             motion.aim_transform(swell, swell, None);
         }
-        let gone = match reduced {
-            true => rest,
-            false => Transform2d::new(slide * COMPACT_LEAVE_SLIDE, COMPACT_LEAVE_SCALE),
+        let gone = if reduced {
+            rest
+        } else {
+            Transform2d::new(slide * COMPACT_LEAVE_SLIDE, COMPACT_LEAVE_SCALE)
         };
-        let (target, opacity, timing) = match toast.leaving {
-            true => (gone, 0.0, STANDARD_EXIT),
-            false => (rest, 1.0, STANDARD_ENTER),
+        let (target, opacity, timing) = if toast.leaving {
+            (gone, 0.0, STANDARD_EXIT)
+        } else {
+            (rest, 1.0, STANDARD_ENTER)
         };
         motion.aim_transform(enter, target, Some(timing));
         motion.aim_opacity(0.0, opacity, Some(timing));

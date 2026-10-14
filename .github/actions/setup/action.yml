@@ -7,7 +7,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: extractions/setup-just@v2
+    - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
     - name: Install the pinned toolchain
       shell: bash
       run: rustup show
@@ -27,24 +27,28 @@ runs:
       # `-sys` crates link system C libraries cargo can't supply (the one platform-specific place, per
       # the repo's platform rule): the x11/gl libs, cmake/g++ for the native `ui` gallery and
       # `bevy_render`, and alsa for kira's cpal backend (the client audio code compiles natively too).
-      # xvfb + the Mesa DRI driver are for the e2e's headed browsers (software WebGL). Drop the
-      # runner's microsoft/azure apt sources first — unused, and they 403 intermittently.
+      # xvfb + the Mesa DRI driver are for the e2e's headed browsers (software WebGL). The gameplay
+      # tests run the desktop client on Xwayland in a headless weston through Mesa's software Vulkan,
+      # drive it with xdotool, and record its picture with ffmpeg and its sound with parecord, from a
+      # PulseAudio sink it plays into through ALSA's pulse plugin. Drop the runner's microsoft/azure apt
+      # sources first — unused, and they 403 intermittently.
       run: |
         sudo rm -f /etc/apt/sources.list.d/microsoft* /etc/apt/sources.list.d/azure*
         sudo apt-get update
         sudo apt-get install -y cmake g++ libx11-dev libxext-dev libxft-dev libxinerama-dev \
           libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev \
-          xvfb libgl1-mesa-dri libasound2-dev
+          xvfb libgl1-mesa-dri libasound2-dev mesa-vulkan-drivers weston xwayland xdotool ffmpeg \
+          pulseaudio pulseaudio-utils libasound2-plugins
     - name: Set up Node for the e2e
       if: inputs.deps == 'all'
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: lts/*
     # Cache the engines Playwright downloads (Firefox/WebKit, ~180MB) keyed on the lockfile, which
     # pins their versions; `playwright install` then skips them on a hit. Chrome/Edge are apt channels.
     - name: Cache Playwright browsers
       if: runner.os == 'Linux' && inputs.deps == 'all'
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
@@ -54,4 +58,4 @@ runs:
       working-directory: e2e
       run: |
         npm ci
-        npx playwright install --with-deps chrome firefox webkit
+        npx playwright install --with-deps chrome firefox webkit ffmpeg

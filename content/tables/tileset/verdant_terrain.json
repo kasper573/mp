@@ -1,0 +1,180 @@
+{
+  "image": "tilesets/verdant-terrain.png",
+  "tile": 16,
+  "terrains": {
+    "water": [
+      "water",
+      "ground"
+    ]
+  },
+  "tiles": {
+    "0": {
+      "surface": "grass"
+    },
+    "1": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "ground",
+          "ground",
+          "water"
+        ]
+      }
+    },
+    "2": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "water",
+          "water",
+          "ground"
+        ]
+      }
+    },
+    "3": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "ground",
+          "water",
+          "water"
+        ]
+      }
+    },
+    "4": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "ground",
+          "water",
+          "water"
+        ]
+      }
+    },
+    "5": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "ground",
+          "water",
+          "ground"
+        ]
+      }
+    },
+    "6": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "water",
+          "water",
+          "water"
+        ]
+      }
+    },
+    "7": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "water",
+          "water",
+          "water"
+        ]
+      }
+    },
+    "8": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "water",
+          "ground",
+          "water"
+        ]
+      }
+    },
+    "9": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "water",
+          "ground",
+          "ground"
+        ]
+      }
+    },
+    "10": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "water",
+          "ground",
+          "ground"
+        ]
+      }
+    },
+    "11": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "water",
+          "water",
+          "ground"
+        ]
+      }
+    },
+    "12": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "ground",
+          "ground",
+          "water"
+        ]
+      }
+    },
+    "13": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "ground",
+          "water",
+          "ground"
+        ]
+      }
+    },
+    "14": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "ground",
+          "water",
+          "ground",
+          "water"
+        ]
+      }
+    },
+    "15": {
+      "surface": "grass",
+      "corners": {
+        "water": [
+          "water",
+          "ground",
+          "ground",
+          "ground"
+        ]
+      }
+    }
+  }
+}

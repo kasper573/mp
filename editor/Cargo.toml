@@ -1,0 +1,46 @@
+[package]
+name = "editor"
+version.workspace = true
+edition.workspace = true
+description = "The content editor: opens a content folder, edits it through the game's loader and writer, and play-tests it with the game's own binaries"
+
+[[bin]]
+name = "editor"
+path = "src/main.rs"
+
+[dependencies]
+game = { path = "../game" }
+ui = { path = "../ui" }
+bevy_tilemap = { path = "../bevy/tilemap" }
+bevy_kira_audio = { version = "0.27", default-features = false }
+bevy = { workspace = true, features = ["x11", "multi_threaded"] }
+bevy_egui = "0.43"
+egui = "0.36"
+egui_dock = "0.21"
+egui-snarl = "0.12"
+bevy_replicon = { workspace = true, features = ["server"] }
+serde.workspace = true
+serde_json.workspace = true
+schemars = "1"
+strum = { workspace = true }
+strip-ansi-escapes = "0.2"
+opener = "0.9"
+blake3 = "1"
+notify = "8"
+rfd = "0.17"
+process-wrap = { version = "10", features = ["std"] }
+ebur128 = "0.1"
+include_dir = "0.7"
+image = { version = "0.25", default-features = false, features = ["png", "gif"] }
+png = "0.18"
+dirs = "7"
+ureq = { workspace = true }
+rayon.workspace = true
+base64 = "0.23"
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

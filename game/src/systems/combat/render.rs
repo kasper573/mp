@@ -1,13 +1,14 @@
-use crate::core::math::{Size, WorldPx};
-use crate::systems::player::session;
-use crate::systems::stat;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
+use crate::core::math::{Size, WorldPx};
 use crate::core::render::present::ScreenTint;
 use crate::core::render::screen::ToScreen;
 use crate::core::render::snap_to_screen;
 use crate::systems::movement::RenderPosition;
+use crate::systems::player::session;
+use crate::systems::screen::ClientScreen;
+use crate::systems::stat;
 
 pub struct CombatPlugin;
 
@@ -15,7 +16,7 @@ impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_bar).add_systems(
             Update,
-            (healthbar, death_tint).run_if(in_state(crate::systems::scene::Scene::Area)),
+            (healthbar, death_tint).run_if(in_state(ClientScreen::Area)),
         );
     }
 }

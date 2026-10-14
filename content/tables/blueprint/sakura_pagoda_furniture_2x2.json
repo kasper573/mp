@@ -1,0 +1,23 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "sakura_pagoda_furniture",
+      "tiles": [
+        [
+          212,
+          213
+        ],
+        [
+          214,
+          215
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

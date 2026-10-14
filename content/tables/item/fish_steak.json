@@ -1,0 +1,25 @@
+{
+  "name": "Fish Steak",
+  "icon": "icons/food/fish_steak.png",
+  "sfx": {
+    "pickup": "pickup_flesh",
+    "trade": "trade_flesh",
+    "drop": "landing01",
+    "use": "heal01"
+  },
+  "kind": {
+    "type": "consumable",
+    "health_bonus": 15.0,
+    "lasts": 0.0
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Grilled over driftwood on Tobb's pier. Even a road warden can be swayed by one."
+    },
+    {
+      "type": "stack",
+      "max": 10
+    }
+  ]
+}

@@ -9,6 +9,7 @@
   data-game-server-url="{{ game_server_url }}"
   data-game-server-ws-url="{{ game_server_ws_url }}"
 ></canvas>
+<p id="sync-status" class="sr-only" role="status" aria-live="polite"></p>
 <pre id="error-log" hidden></pre>
 <script>
   // A fatal crash leaves only a blank canvas, invisible on mobile where there's no console — so

@@ -2,7 +2,7 @@ use bevy_color::Color;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
 use bevy_math::Rot2;
-use bevy_scene::{EntityScene, Scene, bsn, template_value};
+use bevy_scene::{Scene, bsn};
 use bevy_ui::widget::Text;
 use bevy_ui::{
     AlignItems, BorderColor, BorderRadius, Checkable, Checked, FlexDirection, JustifyContent, Node,
@@ -18,7 +18,7 @@ use crate::state::{Gated, InheritChecked, SelectGroup, SelectItem, SelectTrigger
 use crate::style::{StatefulPaint, Style};
 use crate::theme::theme;
 use crate::tokens::{radius, size, spacing};
-use crate::{Align, Side, component};
+use crate::{Align, Side};
 
 #[derive(Component, Default, Clone)]
 #[require(Node)]
@@ -48,29 +48,28 @@ pub fn dropdown_trigger() -> impl Scene {
     let chevron = theme().surface_canvas.on;
     bsn! {
         Button
-        component(OverlayAction::Toggle)
-        template_value(trigger_style())
+        ~{OverlayAction::Toggle}
+        trigger_style()
         Children [
-            ( {text(String::new())} DropdownValue ),
-            (
-                Node {
-                    width: Val::Px(7.0),
-                    height: Val::Px(7.0),
-                    margin: {UiRect::bottom(Val::Px(spacing::M))},
-                    border: {UiRect::new(Val::Px(0.0), Val::Px(2.0), Val::Px(0.0), Val::Px(2.0))},
-                }
-                UiTransform { rotation: {Rot2::degrees(45.0)} }
-                component(BorderColor::all(chevron))
-            ),
+            @{text(String::new())} DropdownValue
+            --
+            Node {
+                width: Val::Px(7.0),
+                height: Val::Px(7.0),
+                margin: {UiRect::bottom(Val::Px(spacing::M))},
+                border: {UiRect::new(Val::Px(0.0), Val::Px(2.0), Val::Px(0.0), Val::Px(2.0))},
+            }
+            UiTransform { rotation: {Rot2::degrees(45.0)} }
+            BorderColor::all(chevron)
         ]
     }
 }
 
 pub fn dropdown_content() -> impl Scene {
     bsn! {
-        {popover_content(Side::Bottom, Align::Start, spacing::M)}
-        template_value(content_style())
-        component(crate::surface::elevation(1))
+        @{popover_content(Side::Bottom, Align::Start, spacing::M)}
+        content_style()
+        crate::surface::elevation(1)
     }
 }
 
@@ -82,20 +81,19 @@ pub fn dropdown_item(value: impl Into<String>, label: impl Into<String>) -> impl
         SelectItem { value: {value.into()} }
         SelectTrigger
         DropdownChoice { label: {label.clone()} }
-        component(OverlayAction::Close)
-        template_value(item_style())
+        ~{OverlayAction::Close}
+        item_style()
         Children [
-            {EntityScene(text(label))},
-            (
-                Node {
-                    width: Val::Px(size::STEP_200),
-                    height: Val::Px(size::STEP_200),
-                    border_radius: {BorderRadius::all(Val::Px(radius::PILL))},
-                }
-                InheritChecked
-                Gated
-                template_value(Style::new().background(theme().primary.base))
-            ),
+            @{text(label)}
+            --
+            Node {
+                width: Val::Px(size::STEP_200),
+                height: Val::Px(size::STEP_200),
+                border_radius: {BorderRadius::all(Val::Px(radius::PILL))},
+            }
+            InheritChecked
+            Gated
+            Style::new().background(theme().primary.base)
         ]
     }
 }

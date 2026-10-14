@@ -21,6 +21,13 @@ jobs:
   # after the e2e. The images only package the host-built crates, so the deploy reuses the e2e build —
   # no second compile, no artifact hand-off between jobs, and the e2e always ran on what we deploy.
   ci:
+    # Not the newest image: ubuntu-26.04 ships GStreamer 1.28, whose device monitor starts its
+    # providers on a thread (gstdevicemonitor.c, since 1.28.0) and, when stopped while a provider is
+    # still failing to start, frees the provider list the stopping side is about to walk. A runner has
+    # no audio devices, so providers fail every time, and WebKit stops its capture device monitor from
+    # within that very start, so Playwright's WebKit web process dies with "double free or corruption"
+    # on any page that touches audio. Back to the newest image once Ubuntu ships a GStreamer with the
+    # fix; https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/12396 tracks that code.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -35,14 +42,14 @@ jobs:
       DOCKER_REGISTRY_URL: ghcr.io/${{ github.repository_owner }}
       DOCKER_IMAGE_VERSION: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
           deps: all
       # The sole build cache. A per-object compiler cache (sccache) is deliberately absent: on the GitHub
       # Actions backend it writes thousands of tiny entries that exhaust the repo's 10 GB cache quota and
       # evict this one, so the whole dependency graph recompiled from cold every run.
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # main builds optimized and branches don't, so they keep separate caches to avoid rebuilding
           # dependencies at the other's opt-level on every run.
@@ -54,9 +61,20 @@ jobs:
         # Unoptimized: lint and unit tests don't ship, so build them fast regardless of branch.
         env:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
+        # The gameplay tests record each client from a sound server sink. The sound server stops with
+        # them, so the e2e below still runs on a runner without audio devices.
         run: |
           just lint
+          pulseaudio --start --exit-idle-time=-1
           just test
+          pulseaudio --kill
+      - name: Save gameplay test artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gameplay-artifacts
+          path: target/tmp/gameplay/
+          if-no-files-found: ignore
       - name: Build
         # main deploys the server at the release default and the wasm shrunk with z + LTO + strip
         # (~44MB) for mobile Safari's per-tab memory. Branches build the server unoptimized (not the
@@ -89,7 +107,7 @@ jobs:
         run: just e2e-run
       - name: Save e2e artifacts
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-artifacts
           path: |
@@ -100,7 +118,7 @@ jobs:
         run: just logs > /tmp/stack.log 2>&1 || true
       - name: Upload stack logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: stack-logs
           path: /tmp/stack.log
@@ -113,7 +131,7 @@ jobs:
           just push-images
       - name: Upload docker runtime dependencies
         if: ${{ env.DEPLOY == 'true' }}
-        uses: burnett01/rsync-deployments@796cf0d5e4b535745ce49d7429f77cf39e25ef39 # 7.0.1
+        uses: burnett01/rsync-deployments@155b6d6c1219ab2224c20c58d423a3f1b850395f # v9
         with:
           switches: -avz --delete
           path: docker/
@@ -124,7 +142,7 @@ jobs:
       - name: Deploy via SSH action
         if: ${{ env.DEPLOY == 'true' }}
         id: deploy
-        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         continue-on-error: true
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
@@ -167,7 +185,7 @@ jobs:
           insecure_ignore_fingerprint: true
       - name: Save deployment logs
         if: ${{ env.DEPLOY == 'true' && steps.deploy.outcome == 'failure' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deploy-failure-logs
           path: ./deploy-failure-logs.tar.gz
@@ -176,3 +194,38 @@ jobs:
         run: |
           echo "🚨 Deployment failed — see deploy-failure-logs artifact for details."
           exit 1
+
+  # The archive a release ships, per platform from the same commit: editor, game-server,
+  # desktop-client and the example content (`just archive`). Attached to the run of every main push.
+  archive:
+    needs: ci
+    if: ${{ github.ref == 'refs/heads/main' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-26.04
+            platform: linux-x86_64
+          - os: windows-2022
+            platform: windows-x86_64
+          - os: macos-15
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          deps: build
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: archive-${{ matrix.platform }}
+      - name: Build the archive
+        shell: bash
+        run: just archive target/archive
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rift-${{ matrix.platform }}-${{ github.sha }}
+          path: target/archive/

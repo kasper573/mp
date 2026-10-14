@@ -1,16 +1,21 @@
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
-use std::future::Future;
-use std::pin::Pin;
 use std::rc::Rc;
 
 use bevy::prelude::*;
-use game::core::platform::{Platform, ServerSocket, StartParams};
+use game::core::content::store::ContentStore;
+use game::core::platform::{
+    FetchFailure, LocalFuture, Platform, ServerSocket, SocketState, StartParams,
+};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
+use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsCast, JsValue};
+
+use crate::store::WebStore;
 
 const CANVAS: &str = "#glcanvas";
+const STATUS: &str = "sync-status";
+const RELOADED_FOR: &str = "rift.reloaded-for";
 
 pub struct WebPlatform;
 
@@ -60,22 +65,73 @@ impl Platform for WebPlatform {
         }
     }
 
-    fn fetch(
+    fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
+        Box::pin(async move {
+            let response = gloo_net::http::Request::get(&url)
+                .send()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?;
+            refused(&response).await?;
+            response
+                .binary()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))
+        })
+    }
+
+    fn post(
         &self,
         url: String,
         authorization: String,
-    ) -> Pin<Box<dyn Future<Output = Result<String, String>>>> {
+        body: String,
+    ) -> LocalFuture<Result<String, FetchFailure>> {
         Box::pin(async move {
             let response = gloo_net::http::Request::post(&url)
                 .header("Authorization", &authorization)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?
                 .send()
                 .await
-                .map_err(|error| error.to_string())?;
-            if !response.ok() {
-                return Err(format!("session request failed: {}", response.status()));
-            }
-            response.text().await.map_err(|error| error.to_string())
+                .map_err(|error| FetchFailure::Transport(error.to_string()))?;
+            refused(&response).await?;
+            response
+                .text()
+                .await
+                .map_err(|error| FetchFailure::Transport(error.to_string()))
         })
+    }
+
+    fn content_store(&self) -> Box<dyn ContentStore> {
+        Box::new(WebStore)
+    }
+
+    fn announce(&self, status: &str) {
+        if let Some(element) = web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.get_element_by_id(STATUS))
+        {
+            element.set_text_content(Some(status));
+        }
+    }
+
+    fn relaunch(&self, build: &str) -> Result<(), String> {
+        let reloading = web_sys::window().is_some_and(|window| {
+            window
+                .session_storage()
+                .ok()
+                .flatten()
+                .is_some_and(|session| {
+                    session.get_item(RELOADED_FOR).ok().flatten().as_deref() != Some(build)
+                        && session.set_item(RELOADED_FOR, build).is_ok()
+                        && window.location().reload().is_ok()
+                })
+        });
+        if reloading {
+            Ok(())
+        } else {
+            Err("A new version of the game is live. Reload the page to play.".to_owned())
+        }
     }
 
     fn local_clock(&self) -> LocalClock {
@@ -93,7 +149,6 @@ impl Platform for WebPlatform {
 
 pub fn primary_window() -> Window {
     Window {
-        title: "rift mmo".to_owned(),
         canvas: Some(CANVAS.to_owned()),
         ..default()
     }
@@ -118,15 +173,18 @@ pub fn read_start_params() -> StartParams {
     }
 }
 
-pub fn expose_global_fn(name: &str, hook: impl Fn() -> Option<String> + 'static) {
-    let hook = Closure::<dyn Fn() -> Option<String>>::new(hook);
-    js_sys::Reflect::set(&js_sys::global(), &JsValue::from_str(name), hook.as_ref())
-        .unwrap_or_else(|_| panic!("expose {name} on the JS global"));
-    hook.forget(); // hand the closure to JS for the page's lifetime
-}
-
 fn storage() -> Option<web_sys::Storage> {
     web_sys::window()?.local_storage().ok()?
+}
+
+async fn refused(response: &gloo_net::http::Response) -> Result<(), FetchFailure> {
+    if response.ok() {
+        return Ok(());
+    }
+    Err(FetchFailure::Status {
+        status: response.status(),
+        body: response.text().await.unwrap_or_default(),
+    })
 }
 
 struct WsSocket {
@@ -135,13 +193,6 @@ struct WsSocket {
     state: Rc<Cell<SocketState>>,
     _handlers: [Closure<dyn FnMut()>; 3],
     _on_message: Closure<dyn FnMut(web_sys::MessageEvent)>,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum SocketState {
-    Connecting,
-    Open,
-    Closed,
 }
 
 impl WsSocket {
@@ -192,12 +243,8 @@ impl ServerSocket for WsSocket {
         }
     }
 
-    fn is_open(&self) -> bool {
-        self.state.get() == SocketState::Open
-    }
-
-    fn is_closed(&self) -> bool {
-        self.state.get() == SocketState::Closed
+    fn state(&self) -> SocketState {
+        self.state.get()
     }
 }
 

@@ -1,18 +1,20 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
-use bevy::scene::EntityScene;
 use ui::tokens::{palette, spacing, typography};
-use ui::{ChipOptions, Family, component};
+use ui::{ChipOptions, Family};
 
 use super::{
-    ActiveQuest, Objective, Progress, QuestDef, QuestId, QuestLog, clock_label, resets_label,
+    ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
+    resets_label,
 };
 use crate::core::assets::AssetRef;
-use crate::systems::dialogue::{ChoiceReveal, Conversation, stage};
+use crate::core::content::Content;
+use crate::core::script::ChoiceReveal;
+use crate::core::time::Seconds;
+use crate::systems::dialogue::{Conversation, ConversationPanel, stage};
+use crate::systems::hud::{SLOT_BG, SLOT_BORDER, reconcile_children, slot_node};
 use crate::systems::item::{self, Inventory, ItemStack};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const WIDTH: f32 = 480.0;
 const ICON: f32 = 20.0;
@@ -25,9 +27,9 @@ impl Plugin for QuestCardPlugin {
         app.init_resource::<ShownCard>()
             .add_systems(
                 Update,
-                (show_card, tick_clocks).run_if(in_state(GameScene::Area)),
+                (show_card, tick_clocks).run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -55,7 +57,8 @@ fn show_card(world: &mut World) {
     let seen = world.resource::<Viewpoint>().0;
     let moment = seen
         .and_then(|seen| world.get::<Conversation>(seen))
-        .and_then(|conversation| moment_of(conversation.node));
+        .and_then(|conversation| conversation.panel.as_ref())
+        .map(moment_of);
     if world.resource::<ShownCard>().0 != moment {
         world.resource_mut::<ShownCard>().0 = moment;
         let shown: Vec<Entity> = world
@@ -93,14 +96,19 @@ fn show_card(world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    let mut hasher = DefaultHasher::new();
-    format!("{:?}", inventory.slots).hash(&mut hasher);
-    crate::systems::hud::reconcile_children(world, body, &[hasher.finish()], |world, _| {
+    reconcile_children(world, body, &[&inventory.slots], |world, _| {
+        let content = world.resource::<Content>();
         let assets = world.resource::<AssetServer>();
         let parts = match moment {
-            Moment::Offer => offer(assets, quest, &inventory),
-            Moment::TurnIn => turn_in(assets, quest, &inventory),
-            Moment::Decision => decision(quest),
+            Moment::Offer => offer(
+                content,
+                world.resource::<Parties>(),
+                assets,
+                quest,
+                &inventory,
+            ),
+            Moment::TurnIn => turn_in(content, assets, quest, &inventory),
+            Moment::Decision => decision(content, quest),
         };
         Box::new(bsn! {
             Node { width: Val::Percent(100.0), flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::L}) }
@@ -119,75 +127,97 @@ impl Moment {
     }
 }
 
-fn moment_of(node: crate::data::dialogue::Id) -> Option<(QuestId, Moment)> {
-    QuestId::VARIANTS.iter().find_map(|&quest| {
-        let def = quest.get();
-        if node == def.offer {
-            Some((quest, Moment::Offer))
-        } else if node == def.thanks && def.decision().is_some() {
-            Some((quest, Moment::Decision))
-        } else if node == def.thanks {
-            Some((quest, Moment::TurnIn))
-        } else {
-            None
-        }
-    })
+fn moment_of(panel: &ConversationPanel) -> (QuestId, Moment) {
+    match *panel {
+        ConversationPanel::QuestOffer(quest) => (quest, Moment::Offer),
+        ConversationPanel::QuestTurnIn(quest) => (quest, Moment::TurnIn),
+        ConversationPanel::QuestDecision(quest) => (quest, Moment::Decision),
+    }
 }
 
-fn offer(assets: &AssetServer, quest: QuestId, inventory: &Inventory) -> Vec<Box<dyn Scene>> {
-    let def = quest.get();
+fn offer(
+    content: &Content,
+    parties: &Parties,
+    assets: &AssetServer,
+    quest: QuestId,
+    inventory: &Inventory,
+) -> Vec<Box<dyn Scene>> {
+    let def = quest.get(content);
     let ink = ui::theme::theme().surface_floating.on;
-    let progress = def.progress(&ActiveQuest::fresh(quest), Some(inventory));
+    let progress = def.progress(
+        content,
+        parties,
+        &ActiveQuest::fresh(content, quest),
+        Some(inventory),
+    );
     let mut parts: Vec<Box<dyn Scene>> = vec![
-        Box::new(head(assets, def)),
-        Box::new(caption(format!("{} · {}", def.kinds(), def.meta()))),
+        Box::new(head(content, assets, def)),
+        Box::new(caption(format!(
+            "{} · {}",
+            def.kinds(),
+            def.meta(parties, quest)
+        ))),
         Box::new(section("Objectives")),
     ];
-    parts.extend(def.objectives.iter().zip(&progress).map(
-        |(objective, progress)| -> Box<dyn Scene> {
-            Box::new(objective_row(assets, objective, progress, ink))
-        },
-    ));
+    parts.extend(
+        def.objectives()
+            .zip(&progress)
+            .map(|(objective, progress)| -> Box<dyn Scene> {
+                Box::new(objective_row(content, assets, objective, progress, ink))
+            }),
+    );
     if def.reveals(ChoiceReveal::Gains) {
         parts.push(Box::new(section("Rewards")));
-        parts.push(Box::new(reward_chips(assets, def)));
-        if !def.pick_one.is_empty() {
+        parts.push(Box::new(reward_chips(content, assets, def)));
+        if !def.pick_one().is_empty() {
             parts.push(Box::new(section("Pick one when you return")));
-            parts.push(Box::new(picks(assets, def)));
+            parts.push(Box::new(picks(content, assets, def)));
         }
     }
     parts.push(Box::new(caption("Accept or decline in the conversation")));
     parts
 }
 
-fn turn_in(assets: &AssetServer, quest: QuestId, inventory: &Inventory) -> Vec<Box<dyn Scene>> {
-    let def = quest.get();
-    let mut parts: Vec<Box<dyn Scene>> = vec![Box::new(head(assets, def))];
+fn turn_in(
+    content: &Content,
+    assets: &AssetServer,
+    quest: QuestId,
+    inventory: &Inventory,
+) -> Vec<Box<dyn Scene>> {
+    let def = quest.get(content);
+    let mut parts: Vec<Box<dyn Scene>> = vec![Box::new(head(content, assets, def))];
     if def.reveals(ChoiceReveal::Costs) {
-        parts.extend(def.hand_in.iter().map(|&stack| -> Box<dyn Scene> {
-            Box::new(hand_in_row(assets, stack, inventory.count(stack.item)))
+        parts.extend(def.hand_in().iter().map(|&stack| -> Box<dyn Scene> {
+            Box::new(hand_in_row(
+                content,
+                assets,
+                stack,
+                inventory.count(stack.item),
+            ))
         }));
     }
     if !def.reveals(ChoiceReveal::Gains) {
         return parts;
     }
-    let pick_note: Vec<Box<dyn Scene>> = (!def.pick_one.is_empty())
+    let pick_note: Vec<Box<dyn Scene>> = (!def.pick_one().is_empty())
         .then(|| -> Box<dyn Scene> { Box::new(caption("+ your pick below")) })
         .into_iter()
         .collect();
     parts.push(Box::new(bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, flex_wrap: FlexWrap::Wrap }
         Children [
-            {EntityScene(caption("Rewards"))},
-            {EntityScene(reward_chips(assets, def))},
-            {pick_note},
+            @{caption("Rewards")}
+            --
+            @{reward_chips(content, assets, def)}
+            --
+            {pick_note}
         ]
     }));
     parts
 }
 
-fn decision(quest: QuestId) -> Vec<Box<dyn Scene>> {
-    let def = quest.get();
+fn decision(content: &Content, quest: QuestId) -> Vec<Box<dyn Scene>> {
+    let def = quest.get(content);
     let ink = ui::theme::theme().surface_floating.on;
     let paths: Vec<Box<dyn Scene>> = def
         .decision()
@@ -204,14 +234,15 @@ fn decision(quest: QuestId) -> Vec<Box<dyn Scene>> {
             Box::new(bsn! {
                 Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::M}), flex_basis: Val::Px(0.0), flex_grow: 1.0 }
                 Children [
-                    {EntityScene(ui::styled_text(path.choice, ink, typography::LABEL))},
-                    {means},
+                    @{ui::styled_text(path.choice.as_str(), ink, typography::LABEL)}
+                    --
+                    {means}
                 ]
             })
         })
         .collect();
     vec![
-        Box::new(ui::styled_text(def.title, ink, typography::NAME)),
+        Box::new(ui::styled_text(def.title.as_str(), ink, typography::NAME)),
         Box::new(bsn! {
             Node { column_gap: Val::Px({spacing::XL}), width: Val::Percent(100.0) }
             Children [ {paths} ]
@@ -219,18 +250,24 @@ fn decision(quest: QuestId) -> Vec<Box<dyn Scene>> {
     ]
 }
 
-fn head(assets: &AssetServer, def: &QuestDef) -> impl Scene + use<> {
+fn head(content: &Content, assets: &AssetServer, def: &'static QuestDef) -> impl Scene + use<> {
     let ink = ui::theme::theme().surface_floating.on;
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
         Children [
-            {EntityScene(icon(assets, def.icon(), PICK))},
-            {EntityScene(ui::styled_text(def.title, ink, typography::NAME))},
+            @{icon(assets, def.icon(content), PICK)}
+            --
+            @{ui::styled_text(def.title.as_str(), ink, typography::NAME)}
         ]
     }
 }
 
-fn hand_in_row(assets: &AssetServer, stack: ItemStack, held: u32) -> impl Scene + use<> {
+fn hand_in_row(
+    content: &Content,
+    assets: &AssetServer,
+    stack: ItemStack,
+    held: u32,
+) -> impl Scene + use<> {
     let ink = ui::theme::theme().surface_floating.on;
     let held_color = if held >= stack.count {
         ink.with_alpha(0.6)
@@ -240,17 +277,21 @@ fn hand_in_row(assets: &AssetServer, stack: ItemStack, held: u32) -> impl Scene 
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(caption("Hand in"))},
-            {EntityScene(icon(assets, stack.item.get().icon, ICON))},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(counted(stack), ink, typography::BODY))} ] ),
-            {EntityScene(ui::styled_text(format!("{held} in your bag"), held_color, typography::CAPTION))},
+            @{caption("Hand in")}
+            --
+            @{icon(assets, &stack.item.get(content).icon, ICON)}
+            --
+            Node { flex_grow: 1.0 } Children [ @{ui::styled_text(counted(content, stack), ink, typography::BODY)} ]
+            --
+            @{ui::styled_text(format!("{held} in your bag"), held_color, typography::CAPTION)}
         ]
     }
 }
 
 pub(super) fn objective_row(
+    content: &Content,
     assets: &AssetServer,
-    objective: &Objective,
+    objective: &'static Objective,
     progress: &Progress,
     color: Color,
 ) -> impl Scene + use<> {
@@ -262,14 +303,20 @@ pub(super) fn objective_row(
     bsn! {
         Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0) }
         Children [
-            {EntityScene(icon(assets, objective.icon(), ICON))},
-            ( Node { flex_grow: 1.0 } Children [ {EntityScene(ui::styled_text(progress.label.clone(), color, typography::BODY))} ] ),
-            {EntityScene(ui::styled_text(count, color, typography::LABEL))},
+            @{icon(assets, objective.icon(content), ICON)}
+            --
+            Node { flex_grow: 1.0 } Children [ @{ui::styled_text(progress.label.clone(), color, typography::BODY)} ]
+            --
+            @{ui::styled_text(count, color, typography::LABEL)}
         ]
     }
 }
 
-pub(super) fn reward_chips(assets: &AssetServer, def: &QuestDef) -> impl Scene + use<> {
+pub(super) fn reward_chips(
+    content: &Content,
+    assets: &AssetServer,
+    def: &QuestDef,
+) -> impl Scene + use<> {
     let ink = ui::theme::theme().surface_floating.on;
     let xp: Vec<Box<dyn Scene>> = (def.xp > 0)
         .then(|| -> Box<dyn Scene> {
@@ -283,35 +330,38 @@ pub(super) fn reward_chips(assets: &AssetServer, def: &QuestDef) -> impl Scene +
         .into_iter()
         .collect();
     let items: Vec<Box<dyn Scene>> = def
-        .rewards
+        .rewards()
         .iter()
         .map(|&stack| -> Box<dyn Scene> {
             ui::chip(ChipOptions {
-                label: counted(stack),
-                icon: Some(assets.load(stack.item.get().icon.0)),
+                label: counted(content, stack),
+                icon: Some(assets.load(stack.item.get(content).icon.path())),
                 family: Family::outline(ink),
-                inspect: Some(item::card::inspectable(stack.item)),
+                inspect: Some(item::card::inspectable(content, stack.item)),
             })
         })
         .collect();
     bsn! {
         Node { column_gap: Val::Px({spacing::M}), row_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap }
-        Children [ {xp}, {items} ]
+        Children [ {xp} -- {items} ]
     }
 }
 
-pub(super) fn picks(assets: &AssetServer, def: &QuestDef) -> impl Scene + use<> {
+pub(super) fn picks(content: &Content, assets: &AssetServer, def: &QuestDef) -> impl Scene + use<> {
     let slots: Vec<Box<dyn Scene>> = def
-        .pick_one
+        .pick_one()
         .iter()
         .map(|stack| -> Box<dyn Scene> {
             let slot = bsn! {
-                template_value(crate::systems::hud::slot_node())
-                BackgroundColor({crate::systems::hud::SLOT_BG})
-                component(BorderColor::all(crate::systems::hud::SLOT_BORDER))
-                Children [ {EntityScene(icon(assets, stack.item.get().icon, PICK))} ]
+                slot_node()
+                BackgroundColor({SLOT_BG})
+                BorderColor::all(SLOT_BORDER)
+                Children [ @{icon(assets, &stack.item.get(content).icon, PICK)} ]
             };
-            Box::new(ui::inspectable(item::card::inspectable(stack.item), slot))
+            Box::new(ui::inspectable(
+                item::card::inspectable(content, stack.item),
+                slot,
+            ))
         })
         .collect();
     bsn! {
@@ -339,16 +389,16 @@ pub(super) fn caption(text: impl Into<String>) -> impl Scene {
     ui::styled_text(text.into(), ink.with_alpha(0.6), typography::CAPTION)
 }
 
-pub(super) fn icon(assets: &AssetServer, icon: AssetRef, size: f32) -> impl Scene + use<> {
+pub(super) fn icon(assets: &AssetServer, icon: &AssetRef, size: f32) -> impl Scene + use<> {
     bsn! {
         Node { width: Val::Px({size}), height: Val::Px({size}), flex_shrink: 0.0 }
-        component(ImageNode::new(assets.load(icon.0)))
+        ImageNode { image: {assets.load(icon.path())} }
         Pickable::IGNORE
     }
 }
 
-pub(super) fn counted(stack: ItemStack) -> String {
-    let name = stack.item.get().display_name;
+pub(super) fn counted(content: &Content, stack: ItemStack) -> String {
+    let name = &stack.item.get(content).name;
     match stack.count {
         1 => name.to_owned(),
         count => format!("{name} ×{count}"),
@@ -397,45 +447,46 @@ pub(super) fn live_text(
     quest: QuestId,
     shows: Countdown,
     color: Color,
-    typography: ui::tokens::typography::Typography,
+    style: typography::Typography,
 ) -> impl Scene + use<> {
     let now = shows.label(log, quest).unwrap_or_default();
     bsn! {
-        {ui::styled_text(now, color, typography)}
+        @{ui::styled_text(now, color, style)}
         QuestClock { quest: {Some(quest)}, shows: {shows} }
     }
 }
 
-pub(super) fn live_bar(log: &QuestLog, quest: QuestId) -> impl Scene + use<> {
-    let (left, limit) = remaining(log, quest);
+pub(super) fn live_bar(content: &Content, log: &QuestLog, quest: QuestId) -> impl Scene + use<> {
+    let (left, limit) = remaining(content, log, quest);
     bsn! {
-        {ui::progress(left, limit)}
+        @{ui::progress(left, limit)}
         QuestClockBar { quest: {Some(quest)} }
-        Children [ {EntityScene(ui::progress_indicator())} ]
+        Children [ @{ui::progress_indicator()} ]
     }
 }
 
 pub(super) fn steady(log: &QuestLog) -> QuestLog {
     let mut log = log.clone();
     for active in &mut log.active {
-        active.left = active.left.map(|_| crate::core::time::Seconds(0.0));
+        active.left = active.left.map(|_| Seconds(0.0));
     }
     for finished in &mut log.finished {
-        finished.resets_in = finished.resets_in.map(|_| crate::core::time::Seconds(0.0));
+        finished.resets_in = finished.resets_in.map(|_| Seconds(0.0));
     }
     log
 }
 
-fn remaining(log: &QuestLog, quest: QuestId) -> (f32, f32) {
+fn remaining(content: &Content, log: &QuestLog, quest: QuestId) -> (f32, f32) {
     let left = log
         .active(quest)
         .and_then(|active| active.left)
         .map_or(0.0, |left| left.0);
-    let limit = quest.get().time_limit.map_or(1.0, |limit| limit.0);
+    let limit = quest.get(content).time_limit().map_or(1.0, |limit| limit.0);
     (left, limit)
 }
 
 fn tick_clocks(world: &mut World) {
+    let content = *world.resource::<Content>();
     let Some(log) = world
         .resource::<Viewpoint>()
         .0
@@ -455,7 +506,7 @@ fn tick_clocks(world: &mut World) {
     let mut bars = world.query::<(&QuestClockBar, &mut ui::ProgressFraction)>();
     for (bar, mut fraction) in bars.iter_mut(world) {
         if let Some(quest) = bar.quest {
-            let (left, limit) = remaining(&log, quest);
+            let (left, limit) = remaining(&content, &log, quest);
             let now = (left / limit).clamp(0.0, 1.0);
             if fraction.0 != now {
                 fraction.0 = now;

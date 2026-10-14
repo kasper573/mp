@@ -1,0 +1,5 @@
+{
+  "label": "Visits to Tobb",
+  "type": "integer",
+  "resets": "never"
+}

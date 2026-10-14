@@ -1,0 +1,25 @@
+{
+  "name": "Gold",
+  "icon": "icons/misc/golden_coin.png",
+  "sfx": {
+    "pickup": "pickup_coins",
+    "trade": "trade_coins",
+    "drop": "landing01"
+  },
+  "kind": {
+    "type": "resource"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Minted somewhere across the sea. Nobody on the island asks where."
+    },
+    {
+      "type": "stack",
+      "max": 4294967295
+    },
+    {
+      "type": "currency"
+    }
+  ]
+}

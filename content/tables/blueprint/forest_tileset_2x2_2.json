@@ -1,0 +1,23 @@
+{
+  "parts": [
+    {
+      "type": "scenery",
+      "at": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "tileset": "forest_tileset",
+      "tiles": [
+        [
+          261,
+          262
+        ],
+        [
+          285,
+          286
+        ]
+      ],
+      "sort": 1.0
+    }
+  ]
+}

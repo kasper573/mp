@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
 use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioInstance, AudioSource, AudioTween};
-use serde::Deserialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
+use crate::core::assets::AssetRef;
 use crate::core::audio::decibels;
 use crate::core::audio::mix::{AudioCategory, AudioMix};
 use crate::core::audio::playback::{Listener, PositionalAudio};
@@ -13,7 +14,7 @@ use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 
-const EDGE_FALLOFF: Tiles = Tiles(4.0);
+pub const EDGE_FALLOFF: Tiles = Tiles(4.0);
 // The quickest the mix may swing from silence to full. Proximity drives every change, and this only
 // catches the jumps, like travelling between areas, so they glide instead of cutting.
 const SLEW: Seconds = Seconds(0.75);
@@ -36,13 +37,13 @@ pub struct Soundscape(pub &'static [SoundscapeZone]);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeZone {
-    pub name: String,
     pub shape: SoundscapeShape,
     pub emit: Tiles,
     pub channels: BTreeMap<SoundscapeChannel, SoundscapeLayer>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(from = "ShapeRow", into = "ShapeRow")]
 pub enum SoundscapeShape {
     Rect(Rect<Tiles>),
     Ellipse(Rect<Tiles>),
@@ -51,13 +52,10 @@ pub enum SoundscapeShape {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SoundscapeChannel(pub u32);
 
-/// Maps write a layer as comma separated values in field order, and may leave off those after `src`.
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeLayer {
-    pub src: String,
-    #[serde(default = "full_volume")]
+    pub src: AssetRef,
     pub volume: f32,
-    #[serde(default)]
     pub pan: f32,
 }
 
@@ -107,7 +105,7 @@ impl SoundscapeShape {
         }
     }
 
-    fn nearest(self, at: Pos<Tiles>) -> Pos<Tiles> {
+    pub fn nearest(self, at: Pos<Tiles>) -> Pos<Tiles> {
         match self {
             SoundscapeShape::Rect(bounds) => at.clamp(bounds.min(), bounds.max()),
             SoundscapeShape::Ellipse(bounds) => {
@@ -116,28 +114,6 @@ impl SoundscapeShape {
                 bounds.center() + edge.component_mul(bounds.size.to_vector() / 2.0)
             }
         }
-    }
-}
-
-impl FromStr for SoundscapeLayer {
-    type Err = String;
-
-    fn from_str(values: &str) -> Result<SoundscapeLayer, String> {
-        let layer: SoundscapeLayer = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .trim(csv::Trim::All)
-            .from_reader(values.as_bytes())
-            .deserialize()
-            .next()
-            .ok_or("has no values")?
-            .map_err(|error| error.to_string())?;
-        if layer.volume < 0.0 {
-            return Err(format!("volume {} is below 0", layer.volume));
-        }
-        if !(-1.0..=1.0).contains(&layer.pan) {
-            return Err(format!("pan {} is outside -1..1", layer.pan));
-        }
-        Ok(layer)
     }
 }
 
@@ -176,7 +152,7 @@ impl SoundscapeVoice {
             return;
         }
         let tween = AudioTween::linear(elapsed.into());
-        instance.set_decibels(decibels(mixed.0), tween.clone());
+        instance.set_decibels(decibels(mixed.0), tween);
         instance.set_panning(mixed.1, tween);
         self.applied = Some(mixed);
     }
@@ -210,7 +186,7 @@ fn load_sources(
         .0
         .iter()
         .flat_map(|zone| zone.channels.values())
-        .map(|layer| (layer.src.as_str(), assets.load(layer.src.as_str())))
+        .map(|layer| (layer.src.as_str(), assets.load(layer.src.path())))
         .collect();
 }
 
@@ -289,12 +265,12 @@ fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
             let pan = (layer.pan + heard.pan).clamp(-1.0, 1.0);
             match wanted
                 .iter_mut()
-                .find(|wanted| wanted.channel == channel && wanted.src == layer.src)
+                .find(|wanted| wanted.channel == channel && wanted.src == layer.src.as_str())
             {
                 Some(wanted) => wanted.blend(power, layer, pan),
                 None => wanted.push(WantedLayer {
                     channel,
-                    src: &layer.src,
+                    src: layer.src.as_str(),
                     share: power,
                     volume: layer.volume,
                     pan,
@@ -321,6 +297,41 @@ fn toward(from: f32, to: f32, step: f32) -> f32 {
     from + (to - from).clamp(-step, step)
 }
 
-fn full_volume() -> f32 {
-    1.0
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum ShapeRow {
+    Rect { x: f32, y: f32, w: f32, h: f32 },
+    Ellipse { x: f32, y: f32, w: f32, h: f32 },
+}
+
+impl From<ShapeRow> for SoundscapeShape {
+    fn from(row: ShapeRow) -> SoundscapeShape {
+        match row {
+            ShapeRow::Rect { x, y, w, h } => {
+                SoundscapeShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
+            }
+            ShapeRow::Ellipse { x, y, w, h } => {
+                SoundscapeShape::Ellipse(Rect::new(Pos::new(x, y), Size::new(w, h)))
+            }
+        }
+    }
+}
+
+impl From<SoundscapeShape> for ShapeRow {
+    fn from(shape: SoundscapeShape) -> ShapeRow {
+        match shape {
+            SoundscapeShape::Rect(r) => ShapeRow::Rect {
+                x: r.origin.x,
+                y: r.origin.y,
+                w: r.size.width,
+                h: r.size.height,
+            },
+            SoundscapeShape::Ellipse(r) => ShapeRow::Ellipse {
+                x: r.origin.x,
+                y: r.origin.y,
+                w: r.size.width,
+                h: r.size.height,
+            },
+        }
+    }
 }

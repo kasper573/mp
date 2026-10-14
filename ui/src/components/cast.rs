@@ -3,11 +3,10 @@ use bevy_asset::{Assets, Handle};
 use bevy_color::Color;
 use bevy_ecs::hierarchy::{ChildOf, Children};
 use bevy_ecs::prelude::*;
+use bevy_ecs::template::template;
 use bevy_math::Vec2;
 use bevy_picking::prelude::Pickable;
 use bevy_scene::{Scene, bsn};
-
-use crate::component;
 use bevy_ui::widget::ImageNode;
 use bevy_ui::{Node, PositionType, Val, ZIndex};
 
@@ -55,7 +54,7 @@ pub(crate) struct Bust {
 
 pub fn cast() -> impl Scene {
     bsn! {
-        component(Cast::default())
+        template(|_| Ok(Cast::default()))
         Node {
             position_type: PositionType::Absolute,
             left: Val::Px(0.0),

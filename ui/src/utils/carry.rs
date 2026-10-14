@@ -2,7 +2,9 @@ use bevy::image::Image;
 use bevy_asset::Handle;
 use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::*;
-use bevy_picking::prelude::{Drag, DragDrop, DragEnd, DragStart, Pickable, Pointer};
+use bevy_picking::prelude::{
+    Pickable, PointerDrag, PointerDragDrop, PointerDragEnd, PointerDragStart,
+};
 use bevy_ui::widget::ImageNode;
 use bevy_ui::{GlobalZIndex, Node, PositionType, Val};
 
@@ -38,7 +40,7 @@ pub struct Carried {
 pub(crate) struct Ghost;
 
 pub(crate) fn lift(
-    start: On<Pointer<DragStart>>,
+    start: On<PointerDragStart>,
     carriables: Query<&Carriable>,
     parents: Query<&ChildOf>,
     is_carriable: Query<(), With<Carriable>>,
@@ -57,7 +59,7 @@ pub(crate) fn lift(
     if !gestures.dragged(carriable.input, start.button) {
         return;
     }
-    let at = start.pointer_location.position;
+    let at = start.pointer.position;
     commands.spawn((
         Ghost,
         Node {
@@ -75,8 +77,11 @@ pub(crate) fn lift(
     ));
 }
 
-pub(crate) fn follow(drag: On<Pointer<Drag>>, mut ghosts: Query<&mut Node, With<Ghost>>) {
-    let at = drag.pointer_location.position;
+pub(crate) fn follow(drag: On<PointerDrag>, mut ghosts: Query<&mut Node, With<Ghost>>) {
+    if drag.entity != drag.original_event_target() {
+        return;
+    }
+    let at = drag.pointer.position;
     for mut node in &mut ghosts {
         node.left = Val::Px(at.x - GHOST / 2.0);
         node.top = Val::Px(at.y - GHOST / 2.0);
@@ -84,17 +89,20 @@ pub(crate) fn follow(drag: On<Pointer<Drag>>, mut ghosts: Query<&mut Node, With<
 }
 
 pub(crate) fn set_down(
-    _: On<Pointer<DragEnd>>,
+    end: On<PointerDragEnd>,
     ghosts: Query<Entity, With<Ghost>>,
     mut commands: Commands,
 ) {
+    if end.entity != end.original_event_target() {
+        return;
+    }
     for ghost in &ghosts {
         commands.entity(ghost).despawn();
     }
 }
 
 pub(crate) fn deliver(
-    drop: On<Pointer<DragDrop>>,
+    drop: On<PointerDragDrop>,
     carriables: Query<&Carriable>,
     parents: Query<&ChildOf>,
     is_carriable: Query<(), With<Carriable>>,

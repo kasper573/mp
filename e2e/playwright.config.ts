@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const domain = process.env.RIFT_DOMAIN ?? "rift.lan";
+const domain = required("RIFT_DOMAIN");
 export const baseURL = process.env.RIFT_E2E_URL ?? `https://${domain}`;
 
 // rift.lan only resolves on the LAN; map it to loopback in-browser (a Chromium-only flag — headed
@@ -77,12 +77,14 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // Every wait follows the game's frames, so a slow machine takes longer instead of failing: a
+  // failure is a bug to fix, never a flake to retry.
+  retries: 0,
   // Half the cores, so the suite scales with the runner — the slow software-WebGL browsers need real
   // cores per worker. LP_NUM_THREADS in `just e2e-run` keeps total render threads near the core count.
   workers: process.env.E2E_WORKERS ?? "50%",
-  // Unoptimized software WebGL is slow to bring up a canvas and spawn the player.
-  timeout: 240_000,
+  // A backstop only: the helpers' own budgets stretch with the frame rate and fail first.
+  timeout: 600_000,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : [["list"]],
   use: {
     baseURL,
@@ -100,3 +102,9 @@ export default defineConfig({
     use: { ...browsers[browser], viewport: resolutions[resolution], deviceScaleFactor: 1 },
   })),
 });
+
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
+}

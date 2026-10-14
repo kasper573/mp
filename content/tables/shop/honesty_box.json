@@ -1,0 +1,21 @@
+{
+  "title": "Tobb's honesty box",
+  "mark": "merchant",
+  "modules": [
+    {
+      "type": "sells",
+      "item": "fish_steak",
+      "price": [
+        {
+          "item": "gold",
+          "count": 3
+        }
+      ],
+      "stock": {
+        "type": "limited",
+        "count": 5,
+        "restock": 1800.0
+      }
+    }
+  ]
+}

@@ -1,18 +1,19 @@
-use crate::core::assets::AssetService;
-use crate::core::math::Pos;
-use crate::core::tiling::{TilePos, TileSize, Tiles};
-use crate::core::time::Seconds;
-use crate::systems::area::{self, AreaTag};
-use crate::systems::player::session::Viewpoint;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::core::audio::playback::Listener;
+use crate::core::content::Content;
+use crate::core::math::Pos;
 use crate::core::render::camera::WorldCamera;
 use crate::core::render::present::{SCALE, target_size};
 use crate::core::render::screen::ToScreen;
 use crate::core::render::{TILE, snap_to_screen};
+use crate::core::tiling::{TilePos, TileSize, Tiles};
+use crate::core::time::Seconds;
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::movement::RenderPosition;
+use crate::systems::player::session::Viewpoint;
+use crate::systems::screen::ClientScreen;
 
 /// Time the follow camera takes to close half the gap to the player. Smaller is snappier, larger
 /// floatier; this is what makes the camera glide after the actor rather than rigidly lock to it.
@@ -26,10 +27,8 @@ pub struct ViewPlugin;
 
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<FollowCenter>().add_systems(
-            Update,
-            track_player.run_if(in_state(crate::systems::scene::Scene::Area)),
-        );
+        app.init_resource::<FollowCenter>()
+            .add_systems(Update, track_player.run_if(in_state(ClientScreen::Area)));
     }
 }
 
@@ -43,7 +42,7 @@ struct FollowCenter(Option<Pos<Tiles>>);
 fn track_player(
     time: Res<Time>,
     viewpoint: Res<Viewpoint>,
-    service: Res<AssetService>,
+    content: Res<Content>,
     characters: Query<(&RenderPosition, &AreaTag)>,
     window: Single<&Window, With<PrimaryWindow>>,
     mut camera: Query<&mut Transform, With<WorldCamera>>,
@@ -55,7 +54,7 @@ fn track_player(
     };
     let at = render.0;
     listener.0 = Some(at);
-    let Some(target) = camera_center(&service, at, tag.area, view_half(&window)) else {
+    let Some(target) = camera_center(&content, at, tag.area, view_half(&window)) else {
         return;
     };
     let center = match follow.0 {
@@ -74,12 +73,12 @@ fn track_player(
 }
 
 fn camera_center(
-    service: &AssetService,
+    content: &Content,
     at: Pos<Tiles>,
-    area_id: crate::systems::area::Id,
+    area_id: AreaId,
     half: Vec2,
 ) -> Option<Pos<Tiles>> {
-    let area = service.resolve(area_id.get().map, area::build_area);
+    let area = area::load(content, area_id);
     let bounds = area.size.bounds();
     let lo = Pos::new(bounds.min().x + half.x, bounds.min().y + half.y);
     let hi = Pos::new(

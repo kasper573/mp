@@ -1,26 +1,91 @@
 use std::collections::HashMap;
 
 use bevy::ecs::system::SystemParam;
-use bevy::picking::events::{Click, Pointer};
+use bevy::picking::events::PointerClick;
 use bevy::prelude::*;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 use ui::{
     CatalogEntry, ClickGesture, DragGesture, InputCatalog, InputRef, KeyGesture, KeyModifiers,
     RichPiece,
 };
 
-pub use crate::data::input::Id as InputAction;
+use crate::core::content::{Content, ContentRow, Fixture};
 
-pub struct InputDef {
-    pub label: &'static str,
-    pub bindings: &'static [InputBinding],
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[strum(serialize_all = "snake_case")]
+pub enum InputAction {
+    Interact,
+    Select,
+    InspectItem,
+    UseItem,
+    DropItem,
+    SellItem,
+    CarryItem,
+    ToggleInventory,
+    ToggleEquipment,
+    ToggleStats,
+    ToggleQuestLog,
+    ToggleSettings,
+    ToggleTerminal,
+    Dismiss,
+    SubmitText,
+    TakeDefault,
+    Respawn,
+    ChoosePrevious,
+    ChooseNext,
+    PickChoice,
+    Advance,
+    Choice1,
+    Choice2,
+    Choice3,
+    Choice4,
+    Choice5,
+    Choice6,
+    Choice7,
+    Choice8,
+    Choice9,
+    ToggleHistory,
+    SpectatePrevious,
+    SpectateNext,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+impl Fixture for InputAction {
+    type Row = InputDef;
+}
+
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
+pub struct InputDef {
+    pub label: String,
+    pub bindings: Vec<InputBinding>,
+}
+
+impl ContentRow for InputDef {
+    const TABLE: &'static str = "input";
+}
+
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputBinding {
     Key(KeyGesture),
     AnyKey,
     Mouse {
+        #[schemars(schema_with = "ui::mouse_button_schema")]
         button: MouseButton,
+        #[serde(flatten)]
         modifiers: KeyModifiers,
     },
     Click(ClickGesture),
@@ -46,14 +111,6 @@ impl InputBinding {
         InputBinding::Click(ClickGesture {
             button,
             times: 1,
-            modifiers: KeyModifiers::NONE,
-        })
-    }
-
-    pub const fn double_click(button: MouseButton) -> InputBinding {
-        InputBinding::Click(ClickGesture {
-            button,
-            times: 2,
             modifiers: KeyModifiers::NONE,
         })
     }
@@ -104,18 +161,16 @@ impl InputBinding {
 #[derive(Resource, Clone, Debug, PartialEq)]
 pub struct InputMap(HashMap<InputAction, Vec<InputBinding>>);
 
-impl Default for InputMap {
-    fn default() -> InputMap {
+impl InputMap {
+    pub fn new(content: &Content) -> InputMap {
         InputMap(
             InputAction::VARIANTS
                 .iter()
-                .map(|&action| (action, action.get().bindings.to_vec()))
+                .map(|&action| (action, action.get(content).bindings.to_vec()))
                 .collect(),
         )
     }
-}
 
-impl InputMap {
     pub fn bindings(&self, action: InputAction) -> &[InputBinding] {
         self.0.get(&action).map_or(&[], Vec::as_slice)
     }
@@ -159,7 +214,7 @@ impl InputMap {
     pub fn clicked(
         &self,
         action: InputAction,
-        click: &Pointer<Click>,
+        click: &PointerClick,
         keys: &ButtonInput<KeyCode>,
     ) -> bool {
         self.bindings(action).iter().any(|binding| match binding {
@@ -228,7 +283,7 @@ impl ActionInput<'_> {
         self.map.just_pressed(action, &self.keys, &self.mouse)
     }
 
-    pub fn clicked(&self, action: InputAction, click: &Pointer<Click>) -> bool {
+    pub fn clicked(&self, action: InputAction, click: &PointerClick) -> bool {
         self.map.clicked(action, click, &self.keys)
     }
 }
@@ -263,13 +318,15 @@ pub fn input(action: InputAction) -> RichPiece {
 
 impl From<InputAction> for InputRef {
     fn from(action: InputAction) -> InputRef {
-        InputRef(action.index() as u16)
+        InputRef(action as u16)
     }
 }
 
 pub(super) fn plugin(app: &mut App) {
-    app.init_resource::<InputMap>()
-        .add_systems(PreUpdate, publish.run_if(resource_changed::<InputMap>));
+    app.add_systems(
+        PreUpdate,
+        publish.run_if(resource_exists_and_changed::<InputMap>),
+    );
 }
 
 fn publish(map: Res<InputMap>, mut catalog: ResMut<InputCatalog>) {

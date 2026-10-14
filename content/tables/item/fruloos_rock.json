@@ -1,0 +1,24 @@
+{
+  "name": "Just a rock",
+  "icon": "icons/misc/rune_stone.png",
+  "sfx": {
+    "pickup": "pickup_stone",
+    "trade": "trade_stone",
+    "drop": "block01"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "head"
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "It's a rock. Wearing it on your head was your idea."
+    },
+    {
+      "type": "stat",
+      "stat": "max_health",
+      "value": -10.0
+    }
+  ]
+}

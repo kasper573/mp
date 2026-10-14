@@ -2,20 +2,13 @@
 resolver = "3"
 members = [
     "ui",
-    "bevy/tiled",
+    "bevy/tilemap",
     "bevy/terminal",
     "bevy/terminal/macros",
     "game",
-    "service",
-    "website",
-]
-# bevy/tiled is a workspace member but excluded from the default build: its bench bin
-# would otherwise collide with the bench bin in game (shared target dir).
-default-members = [
-    "ui",
-    "bevy/terminal",
-    "bevy/terminal/macros",
-    "game",
+    "driver",
+    "showcase",
+    "editor",
     "service",
     "website",
 ]
@@ -24,46 +17,55 @@ default-members = [
 version = "0.1.0"
 edition = "2024"
 
+[workspace.lints.clippy]
+match_bool = "warn"
+
 [workspace.dependencies]
-askama = "0.14"
+askama = "0.16"
 axum-prometheus = "0.10"
 inventory = "0.3"
 typetag = "0.2"
 ctrlc = { version = "3", features = ["termination"] }
 pyroscope = { version = "2", features = ["backend-pprof-rs"] }
-tikv-jemallocator = { version = "0.6", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
-jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
-bevy_app = { version = "0.19.1", default-features = false }
-bevy_ecs = { version = "0.19.1", default-features = false, features = ["std", "serialize"] }
-bevy_ui = { version = "0.19.1", default-features = false, features = ["bevy_picking"] }
-bevy_ui_widgets = { version = "0.19.1", default-features = false }
-bevy_picking = { version = "0.19.1", default-features = false }
-bevy_input = { version = "0.19.1", default-features = false }
-bevy_input_focus = { version = "0.19.1" }
-bevy_asset = { version = "0.19.1", default-features = false }
-bevy_color = { version = "0.19.1", default-features = false }
-bevy_text = { version = "0.19.1", default-features = false }
-bevy_window = { version = "0.19.1", default-features = false }
-bevy_math = { version = "0.19.1", default-features = false }
-bevy_time = { version = "0.19.1", default-features = false }
-bevy_camera = "0.19.1"
-bevy_scene = { version = "0.19.1", default-features = false }
-bevy = { version = "0.19.1", default-features = false }
-syn = { version = "2", features = ["full"] }
+tikv-jemallocator = { version = "0.7", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }
+jemalloc_pprof = { version = "0.9", features = ["symbolize"] }
+bevy_app = { version = "0.20.0", default-features = false }
+bevy_ecs = { version = "0.20.0", default-features = false, features = ["std", "serialize"] }
+bevy_platform = { version = "0.20.0", default-features = false, features = ["std"] }
+slotmap = "1.1"
+smallvec = "1.16"
+bevy_ui = { version = "0.20.0", default-features = false, features = ["bevy_picking"] }
+bevy_ui_widgets = { version = "0.20.0", default-features = false }
+bevy_picking = { version = "0.20.0", default-features = false }
+bevy_input = { version = "0.20.0", default-features = false }
+bevy_input_focus = { version = "0.20.0" }
+bevy_asset = { version = "0.20.0", default-features = false }
+bevy_color = { version = "0.20.0", default-features = false }
+bevy_text = { version = "0.20.0", default-features = false }
+bevy_window = { version = "0.20.0", default-features = false }
+bevy_math = { version = "0.20.0", default-features = false }
+bevy_curve = { version = "0.20.0", default-features = false, features = ["alloc"] }
+bevy_time = { version = "0.20.0", default-features = false }
+bevy_camera = "0.20.0"
+bevy_scene = { version = "0.20.0", default-features = false }
+bevy = { version = "0.20.0", default-features = false }
+syn = { version = "3", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
-bevy_replicon = { version = "0.41.0-rc.1", default-features = false }
-renet2 = { version = "0.15", default-features = false }
+bevy_replicon = { version = "0.45", default-features = false }
+renet2 = { version = "0.19", default-features = false }
+bevy_replicon_renet2 = { version = "0.21", default-features = false, features = ["client"] }
 rayon = "1"
-bevy_state = { version = "0.19.1", default-features = false, features = ["bevy_app"] }
+bevy_state = { version = "0.20.0", default-features = false, features = ["bevy_app"] }
 axum = "0.8"
 envy = "0.4"
 metrics-process = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-strum = { version = "0.27" }
+serde_json = { version = "1", features = ["preserve_order"] }
+strum = { version = "0.28" }
+strsim = "0.11"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
-tower-http = { version = "0.6", features = ["fs", "set-header"] }
+tower-http = { version = "0.7", features = ["fs", "set-header"] }
 ureq = { version = "3", default-features = false }
 
 [profile.release]
