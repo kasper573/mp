@@ -263,7 +263,7 @@ jobs:
   # desktop-client and the example content (`just archive`). Attached to the run of every main push.
   archive:
     needs: [lint, test, e2e]
-    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     strategy:
       fail-fast: false
       matrix:
