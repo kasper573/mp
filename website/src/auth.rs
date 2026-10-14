@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -35,10 +34,10 @@ pub async fn identity(app: &App, jar: &CookieJar) -> Option<Identity> {
 
 pub async fn sign_in(
     State(app): State<Arc<App>>,
-    Query(params): Query<HashMap<String, String>>,
+    Query(asked): Query<SignInQuery>,
     jar: CookieJar,
 ) -> Response {
-    let return_path = sanitize_return(params.get("return"));
+    let return_to = sanitize_return(asked.return_to.as_deref());
     let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
     let (authorize, state, nonce) = app
         .auth
@@ -51,14 +50,15 @@ pub async fn sign_in(
         .add_scope(Scope::new("profile".to_owned()))
         .set_pkce_challenge(challenge)
         .url();
-    let session = format!(
-        "{}.{}.{}.{return_path}",
-        state.secret(),
-        nonce.secret(),
-        verifier.secret()
-    );
+    let pending = serde_urlencoded::to_string(PendingSignIn {
+        state: state.secret().clone(),
+        nonce: nonce.secret().clone(),
+        verifier: verifier.secret().clone(),
+        return_to,
+    })
+    .expect("a pending sign-in encodes");
     (
-        jar.add(cookie("oidc", &session)),
+        jar.add(cookie("oidc", &pending)),
         Redirect::to(authorize.as_str()),
     )
         .into_response()
@@ -66,34 +66,27 @@ pub async fn sign_in(
 
 pub async fn callback(
     State(app): State<Arc<App>>,
-    Query(params): Query<HashMap<String, String>>,
+    Query(answer): Query<CallbackQuery>,
     jar: CookieJar,
 ) -> Response {
     let home = || Redirect::to("/").into_response();
-    let Some((state, nonce, verifier, return_path)) =
-        jar.get("oidc").map(Cookie::value).and_then(|value| {
-            let mut parts = value.splitn(4, '.');
-            Some((
-                parts.next()?.to_owned(),
-                parts.next()?.to_owned(),
-                parts.next()?.to_owned(),
-                parts.next()?.to_owned(),
-            ))
-        })
+    let Some(pending) = jar
+        .get("oidc")
+        .and_then(|cookie| serde_urlencoded::from_str::<PendingSignIn>(cookie.value()).ok())
     else {
         return home();
     };
-    if params.get("state").map(String::as_str) != Some(state.as_str()) {
+    if answer.state.as_deref() != Some(pending.state.as_str()) {
         return home();
     }
-    let Some(code) = params.get("code") else {
+    let Some(code) = answer.code else {
         return home();
     };
 
     let client = app.auth.client();
     let Ok(tokens) = client
-        .exchange_code(AuthorizationCode::new(code.clone()))
-        .set_pkce_verifier(PkceCodeVerifier::new(verifier))
+        .exchange_code(AuthorizationCode::new(code))
+        .set_pkce_verifier(PkceCodeVerifier::new(pending.verifier))
         .request_async(&app.auth.http)
         .await
     else {
@@ -107,7 +100,7 @@ pub async fn callback(
     };
     if app
         .auth
-        .verified_claims(&parsed, &Nonce::new(nonce))
+        .verified_claims(&parsed, &Nonce::new(pending.nonce))
         .await
         .is_none()
     {
@@ -118,7 +111,7 @@ pub async fn callback(
         .add(cookie("token", tokens.access_token().secret()))
         .add(cookie("idt", &id_token))
         .remove(Cookie::build(("oidc", "")).path("/"));
-    (jar, Redirect::to(&return_path)).into_response()
+    (jar, Redirect::to(&pending.return_to)).into_response()
 }
 
 pub async fn sign_out(State(app): State<Arc<App>>, jar: CookieJar) -> Response {
@@ -254,6 +247,26 @@ impl Auth {
     }
 }
 
+#[derive(Deserialize)]
+pub struct SignInQuery {
+    #[serde(rename = "return")]
+    return_to: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CallbackQuery {
+    state: Option<String>,
+    code: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PendingSignIn {
+    state: String,
+    nonce: String,
+    verifier: String,
+    return_to: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct RealmClaims {
     #[serde(default)]
@@ -293,8 +306,8 @@ fn cookie(name: &'static str, value: &str) -> Cookie<'static> {
         .build()
 }
 
-fn sanitize_return(raw: Option<&String>) -> String {
-    match raw.map(String::as_str) {
+fn sanitize_return(raw: Option<&str>) -> String {
+    match raw {
         Some(path) if path.starts_with('/') && !path.starts_with("//") && !path.contains('\\') => {
             path.to_owned()
         }

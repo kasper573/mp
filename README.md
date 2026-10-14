@@ -56,7 +56,7 @@ recording, logs, input steps and last snapshot in `target/tmp/gameplay/`, and CI
 
 `just e2e` is the browser suite, run against the docker stack: the website and the game as a browser
 gets them. Gameplay has a single smoke test there, a new player signing up and appearing in the game
-at the spawn location (compared against the reference in [`e2e/snapshots/`](e2e/snapshots)); the rest
+at the spawn location (compared against the reference image beside it in [`e2e/tests/`](e2e/tests)); the rest
 of gameplay is the gameplay tests' job.
 
 ## Content

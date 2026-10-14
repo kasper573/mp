@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { PNG } from "pngjs";
 
@@ -15,8 +14,8 @@ export interface Image {
 // is a wide margin.
 export const MAP_MATCH = 0.5;
 
-export function loadReference(name: string): Image {
-  return decode(readFileSync(join(__dirname, "..", "snapshots", name)));
+export function loadReference(path: string): Image {
+  return decode(readFileSync(path));
 }
 
 // What the canvas shows: the frames drawn while the game is still loading look like nothing yet. The

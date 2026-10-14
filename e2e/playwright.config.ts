@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-const domain = process.env.RIFT_DOMAIN ?? "rift.lan";
+const domain = required("RIFT_DOMAIN");
 export const baseURL = process.env.RIFT_E2E_URL ?? `https://${domain}`;
 
 // rift.lan only resolves on the LAN; map it to loopback in-browser (a Chromium-only flag — headed
@@ -102,3 +102,9 @@ export default defineConfig({
     use: { ...browsers[browser], viewport: resolutions[resolution], deviceScaleFactor: 1 },
   })),
 });
+
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
+}
