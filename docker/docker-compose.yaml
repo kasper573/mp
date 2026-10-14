@@ -59,7 +59,7 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
-      keycloak-healthcheck:
+      keycloak:
         condition: service_healthy
 
   keycloak:
@@ -76,22 +76,23 @@ services:
       # start. Mounted, not baked, so the image is independent of the roles and can be built before
       # the file is generated.
       - ./keycloak/roles.conf:/opt/keycloak/roles.conf
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # the keycloak image doesn't have curl so we healthcheck it externally
-  keycloak-healthcheck:
-    env_file: *env_files
-    logging: *logging
-    image: curlimages/curl
-    command: ["sh", "-c", "sleep infinity"]
+    # The image has neither curl nor wget, so bash speaks the readiness endpoint's HTTP itself.
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://$$KEYCLOAK_MGMT_TARGET/health/live"]
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          && grep -q '^HTTP/1.1 200' <&3
       interval: 3s
       timeout: 5s
       retries: 20
       start_period: 5m
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     env_file: *env_files

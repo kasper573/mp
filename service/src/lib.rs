@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
@@ -33,12 +34,12 @@ macro_rules! heap_profiling {
     };
 }
 
-pub async fn serve(name: &str, port: u16, router: Router) {
+pub async fn serve(name: &str, at: SocketAddr, router: Router) {
     let app = track(router, recorder());
-    let listener = TcpListener::bind(format!("0.0.0.0:{port}"))
+    let listener = TcpListener::bind(at)
         .await
-        .unwrap_or_else(|error| panic!("could not bind 0.0.0.0:{port}: {error}"));
-    println!("{name} listening on 0.0.0.0:{port}");
+        .unwrap_or_else(|error| panic!("could not bind {at}: {error}"));
+    println!("{name} listening on {at}");
     let stop = Arc::new(Notify::new());
     let signal = stop.clone();
     ctrlc::set_handler(move || signal.notify_one()).expect("install stop handler");

@@ -1,3 +1,4 @@
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ service::heap_profiling!();
 
 #[derive(Deserialize)]
 struct Config {
+    bind: IpAddr,
     port: u16,
     redirect_uri: RedirectUrl,
     game_server_url: String,
@@ -42,7 +44,7 @@ async fn main() {
         config.pyroscope_enabled,
         config.pyroscope_sample_hz,
     );
-    let port = config.port;
+    let at = SocketAddr::new(config.bind, config.port);
     let app = Arc::new(App {
         auth: auth::Auth::from_env(config.redirect_uri).await,
         game_server_url: config.game_server_url,
@@ -58,7 +60,7 @@ async fn main() {
         .route("/favicon.png", get(favicon))
         .nest_service("/wasm", ServeDir::new(config.wasm_dir))
         .with_state(app);
-    service::serve("website", port, router).await;
+    service::serve("website", at, router).await;
 }
 
 impl App {

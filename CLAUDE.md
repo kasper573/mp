@@ -32,7 +32,7 @@
 
 ## Architecture
 
-1. The game crates `src/` is organized into `core/`, `systems/`, `data/`:
+1. The game crate's `src/` is organized into `core/` and `systems/`; its content is not code, but a game folder read at runtime:
 
 `core/`:
 - code that may be reused by all systems
@@ -45,16 +45,13 @@
 - the majority of our game mechanics goes here
 - may depend on other high level systems
 
-`src/data/`: is the content layer: one normalized table per file, each built with the `table!` macro the single source of truth for a table's `Id`, its `TABLE`, and `Id::get()`. Tables stay separate and reference each other only loosely by `data::*::Id`, never by embedding another table's rows (a row may still nest its own data). Table row structs live in core/* or systems/*, while `data/` only declares the rows. The idea is that the content layer can be swapped for a runtime loaded format in the future without too much hassle.
+The content layer is a game folder (`content/` is the example game): `game.json` for the game's settings, one row per file under `tables/<table>/<key>.json` (a row's grids beside it), and `assets/`. A row type implements `ContentRow` (its `TABLE`, and `check` for the rules a schema can't state) and is registered in `systems::registry()`. Loading resolves every key to a `ContentId`, newtyped per table (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Tables stay separate and reference each other only loosely by id, never by embedding another table's rows (a row may still nest its own data). Row types live in core/* or systems/*.
 
-Should contain no business logic, only data.
-
-Code outside `data/` must not depend on arbitrary game content, so the same server and client can run any game's data. `table!` enforces this:
-- A table's `Id` type, `TABLE`, `Id::VARIANTS` and `Id::get()` are usable everywhere, but its rows are hidden: only `data/` can name them (`data::npc::Id::Mara`).
-- Mark a row `#[expose]` when it stands for a generic system or mechanic (an input action, an interface sound, a quest marker), or put `#![expose]` at the top of a table whose rows all do. Never expose a piece of content (a character, an item, a quest). Exposed rows are the game's core data requirements: every game's data must provide them.
-- When code needs content for a role, `data/` exports a designation instead (`data::area::SPAWN_ID`).
-- Integration tests look hidden rows up by name.
-- Generic assets of systems (cursors, window icons) may be referenced directly; another game reskins them by swapping asset files.
+Code must not depend on arbitrary game content, so the same server and client can run any game's data:
+- Code never names a row. A row that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are keys every game's data must provide, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
+- When code needs content for a role, the content says which row plays it: the game's settings (`GameSettings::initial_spawn`), or a role a row picks from a list (an sfx's `role`).
+- Only rows name assets; another game reskins with its own rows and files.
+- Integration tests look rows up by key.
 
 2. The ui and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
 
