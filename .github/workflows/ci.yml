@@ -36,7 +36,7 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
       - name: Lint
         # Unoptimized: lint doesn't ship.
         env:
@@ -53,7 +53,7 @@ jobs:
           deps: test
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
       - name: Test
         # Unoptimized: the tests don't ship. The gameplay tests record each client from a sound server sink.
         env:
@@ -87,7 +87,7 @@ jobs:
         # fast: what branches e2e, skipping the minutes LTO takes even on a warm cache: the server
         # unoptimized (not the e2e bottleneck), the wasm at opt-3 so the software-rendered browsers keep
         # up. main e2es it too, so that its cache, like every other, is main's.
-        build: ${{ github.ref == 'refs/heads/main' && fromJSON('["fast", "deploy"]') || fromJSON('["fast"]') }}
+        build: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt') && fromJSON('["fast", "deploy"]') || fromJSON('["fast"]') }}
     env:
       BUILD: ${{ matrix.build }}
       DOCKER_REGISTRY: ghcr.io
@@ -103,7 +103,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: ${{ matrix.build }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
       - name: Build
         # The suite's browsers and the stack's images that don't package the build mostly download, so
         # they come alongside the compiler.
