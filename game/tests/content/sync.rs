@@ -10,6 +10,7 @@ use game::core::content::sync::{
 };
 use game::core::content::version;
 use game::core::platform::{FetchFailure, LocalFuture};
+use game::core::time::{Backoff, Seconds};
 
 use crate::support::{TempFolder, load};
 
@@ -239,8 +240,10 @@ fn served(folder: &TempFolder) -> ServedContent {
 fn quickly() -> SyncPolicy {
     SyncPolicy {
         timeout: Duration::from_secs(5),
-        first_backoff: Duration::from_millis(1),
-        longest_backoff: Duration::from_millis(2),
+        backoff: Backoff {
+            first: Seconds(0.001),
+            longest: Seconds(0.002),
+        },
         ..SyncPolicy::default()
     }
 }

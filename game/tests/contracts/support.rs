@@ -383,7 +383,7 @@ pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
 }
 
 // Tests hold on any seed: the one drawn shows in a failing test's output, to play it out again.
-fn drawn_seed() -> u64 {
+pub fn drawn_seed() -> u64 {
     let seed = Rng::random_seed();
     eprintln!("rng seed {seed}");
     seed

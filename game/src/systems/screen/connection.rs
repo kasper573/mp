@@ -6,7 +6,7 @@ use renet2::{ConnectionConfig, RenetClient};
 use ui::{Activate, button, text_colored};
 
 use super::mode::ClientMode;
-use super::{ClientScreen, despawn_all};
+use super::{ClientScreen, SERVER_RETRY, despawn_all};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
 use crate::core::math::Rng;
@@ -19,9 +19,6 @@ use crate::core::time::Seconds;
 use crate::systems::hud::spawn_ui;
 
 pub(super) const OVERLAY_BG: Color = Color::srgb(0.07, 0.07, 0.07);
-
-const FIRST_RETRY: Seconds = Seconds(1.0);
-const LONGEST_RETRY: Seconds = Seconds(30.0);
 
 pub struct ConnectionPlugin;
 
@@ -56,7 +53,7 @@ pub struct PendingSession {
 
 #[derive(Resource, Default)]
 struct Reconnect {
-    attempt: u32,
+    failures: u32,
     due: Option<Seconds>,
 }
 
@@ -140,12 +137,11 @@ fn connecting(mut commands: Commands, phase: Res<ScreenTransitionPhase>) {
 
 fn lost(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let attempt = world.resource::<Reconnect>().attempt;
-    let base = Seconds((FIRST_RETRY.0 * 2f32.powi(attempt.min(16) as i32)).min(LONGEST_RETRY.0));
-    let jitter = 0.5 + world.resource_mut::<Rng>().rand_float();
+    let failures = world.resource::<Reconnect>().failures + 1;
+    let wait = SERVER_RETRY.after(failures, &mut world.resource_mut::<Rng>());
     *world.resource_mut::<Reconnect>() = Reconnect {
-        attempt: attempt + 1,
-        due: Some(now + Seconds(base.0 * jitter)),
+        failures,
+        due: Some(now + wait),
     };
     world
         .resource::<ClientPlatform>()
