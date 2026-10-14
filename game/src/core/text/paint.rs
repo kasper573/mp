@@ -25,8 +25,7 @@ pub struct TextLook {
     pub color: Color32,
 }
 
-/// Paints a line wrapped to the available width, with only its first `shown` letters visible
-/// (all of them for `None`). The line is laid out whole, so revealing letters never reflows it.
+/// The line is laid out whole, so revealing letters never reflows it.
 pub fn show(
     ui: &mut Ui,
     world: &World,
@@ -76,7 +75,6 @@ pub fn show(
     response
 }
 
-/// The size `show` takes for a line wrapped at `wrap`, for placing it before it is drawn.
 pub fn measure(
     gui: &egui::Context,
     world: &World,
@@ -95,8 +93,8 @@ pub struct TextShadow {
     pub color: Color32,
 }
 
-/// Plain text in one face over its shadow. `shift` moves and scales the drawing about the text's
-/// centre while the space it takes stays put, so a moving title never reflows what is around it.
+/// `shift` moves and scales the drawing about the text's centre while the space it takes stays put,
+/// so a moving title never reflows what is around it.
 pub fn show_shadowed(
     ui: &mut Ui,
     text: &str,
@@ -149,7 +147,6 @@ struct Cap {
     color: Color32,
 }
 
-/// Where a letter's glyph sits once the whole line is laid out.
 #[derive(Clone, Copy)]
 struct Placed {
     baseline: Pos2,

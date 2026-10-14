@@ -70,14 +70,12 @@ impl HudAudience {
     }
 }
 
-/// A piece of the HUD that is always up: the player moves it where they like.
 pub trait Widget: Send + Sync {
     fn audience(&self) -> HudAudience;
     fn fallback(&self, screen: Rect) -> Pos2;
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
-/// A window the player opens from its launcher or its key.
 pub trait Window: Send + Sync {
     fn audience(&self) -> HudAudience;
     fn title(&self) -> &'static str;
@@ -89,7 +87,6 @@ pub trait Window: Send + Sync {
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
-/// What asks the player to be sure before it goes ahead. Cancelling does nothing.
 pub(crate) struct Confirm {
     pub title: String,
     pub body: Vec<String>,
@@ -98,7 +95,6 @@ pub(crate) struct Confirm {
     pub on_confirm: Box<dyn FnOnce(&mut World) + Send + Sync>,
 }
 
-/// A window's title bar as last drawn, for whoever needs to find it on screen.
 #[derive(Clone, Debug)]
 pub struct WindowTitle {
     pub title: String,
@@ -114,7 +110,6 @@ pub(crate) fn panel() -> egui::Frame {
         .inner_margin(MARGIN)
 }
 
-/// An icon from the content at a square size, or the space it will take while it loads.
 pub(crate) fn icon(ui: &mut Ui, world: &mut World, asset: &AssetRef, size: f32) -> egui::Response {
     sized(ui, gui::image(world, asset), size)
 }
@@ -142,7 +137,6 @@ pub(crate) fn window_open(world: &World, window: &'static str) -> bool {
     world.resource::<Open>().0.contains(&window)
 }
 
-/// Whether this frame is the first the window draws in since it last opened.
 pub(crate) fn just_opened(world: &World, window: &'static str) -> bool {
     !world.resource::<WindowsDrawn>().last.contains(window)
 }
@@ -168,7 +162,6 @@ pub(crate) fn close_topmost_window(world: &mut World) -> bool {
     topmost.is_some_and(|title| close_window(world, title))
 }
 
-/// What the HUD covered on its last draw, which what floats over the world keeps clear of.
 pub(crate) fn pieces(world: &World) -> Vec<Rect> {
     world.resource::<HudDrawn>().0.clone()
 }
@@ -177,7 +170,6 @@ pub fn window_titles(world: &World) -> Vec<WindowTitle> {
     world.resource::<WindowsDrawn>().titles.clone()
 }
 
-/// A movable piece of the HUD at the place the player last left it, kept there between sessions.
 pub(crate) fn movable<R>(
     world: &mut World,
     gui: &egui::Context,
@@ -209,7 +201,6 @@ pub(crate) fn movable<R>(
     shown
 }
 
-/// An egui window at the placement the player last gave it, snapped to the grid when they let go.
 pub(crate) fn placed_window<R>(
     world: &mut World,
     gui: &egui::Context,
@@ -226,7 +217,6 @@ pub(crate) fn placed_window<R>(
     keyed_window(world, gui, title, title, centered, open, add)
 }
 
-/// A window placed and kept under `key` whatever title it shows, first opened at `fallback`.
 pub(crate) fn keyed_window<R>(
     world: &mut World,
     gui: &egui::Context,
@@ -268,7 +258,6 @@ pub(crate) fn keyed_window<R>(
     Some(shown)
 }
 
-/// A tooltip's body: a title, plain lines, and a dimmer hint at what the pointer can do here.
 pub(crate) fn tooltip(
     ui: &mut Ui,
     world: &World,
@@ -298,7 +287,6 @@ pub(crate) fn tooltip(
     }
 }
 
-/// An icon named by its loader path, the way replicated records carry it.
 pub(crate) fn file_icon(ui: &mut Ui, world: &mut World, file: &str, size: f32) -> egui::Response {
     sized(ui, gui::image_file(world, file), size)
 }

@@ -127,7 +127,6 @@ fn age(world: &mut World) {
     feed.toasts.retain(|toast| toast.age < toast.lasts);
 }
 
-// Newest at the bottom right, older ones stacked above it, and a count of what doesn't fit on top.
 fn draw(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;

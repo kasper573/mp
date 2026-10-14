@@ -94,8 +94,6 @@ fn announce(world: &mut World) {
     world.remove_resource::<Announce>();
 }
 
-/// A screen of the system's own between play: centred above everything but modals, over a
-/// backdrop that hides the world when there is one.
 pub(crate) fn system_screen<R>(
     gui: &egui::Context,
     id: &str,

@@ -62,7 +62,6 @@ pub fn slot_action(app: &mut App, slot_action: SlotAction) {
         .push(slot_action);
 }
 
-/// What a bag slot carries while it is dragged: the slot it was lifted from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CarriedSlot(pub u32);
 
@@ -89,7 +88,7 @@ impl Window for InventoryWindow {
                 ui.spacing_mut().item_spacing = Vec2::splat(SLOT_GAP);
                 ui.horizontal_wrapped(|ui| {
                     for cell in &cells {
-                        ui.push_id(("bag slot", cell.slot), |ui| bag_slot(ui, world, cell));
+                        bag_slot(ui, world, cell);
                     }
                 });
             });
@@ -97,7 +96,6 @@ impl Window for InventoryWindow {
     }
 }
 
-/// How a slot shows what it holds.
 pub(crate) struct SlotLook<'a> {
     pub icon: Option<&'a AssetRef>,
     pub count: u32,
@@ -114,7 +112,6 @@ impl SlotLook<'_> {
     };
 }
 
-/// A framed square holding an icon and its count, the way the bag and the equipment show items.
 pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
     let stroke = match look.outline {
@@ -230,7 +227,6 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         .on_hover_ui(|ui| hud::tooltip(ui, world, &def.name, &lines, Some(&hint)));
 }
 
-// The lifted item follows the pointer over everything, and takes no part in what lies below it.
 fn carried_ghost(gui: &egui::Context, world: &mut World) {
     let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(gui) else {
         return;

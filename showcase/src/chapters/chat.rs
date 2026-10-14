@@ -23,24 +23,20 @@ fn play(shoot: &mut Shoot) {
     me.caption("Every player's name floats over their head");
     me.find_ui(name.as_str());
     me.caption("Press C for the terminal, where everyone can chat: type, and Enter sends");
-    say(&mut me, "hello! anyone around?");
-    say(&mut friend, "hi! let's go hunt some orcs");
+    me.act(InputAction::ToggleTerminal);
+    submit(&mut me, "hello! anyone around?");
+    friend.act(InputAction::ToggleTerminal);
+    submit(&mut friend, "hi! let's go hunt some orcs");
     me.find_ui(UiTarget::containing("let's go hunt some orcs"));
     me.caption("It also takes commands — /commands lists them");
-    me.act(InputAction::ToggleTerminal);
     submit(&mut me, "/commands");
-}
-
-// Esc hands the keys back to the game, so the C that follows closes the terminal.
-fn say(player: &mut Player, text: &str) {
-    player.act(InputAction::ToggleTerminal);
-    submit(player, text);
-    player.act(InputAction::Dismiss);
-    player.wait_until("the field to let go of the keys", |snapshot| {
+    me.caption("Esc hands the keys back to the game, and C closes the terminal");
+    me.act(InputAction::Dismiss);
+    me.wait_until("the field to let go of the keys", |snapshot| {
         typing_field().find(snapshot).is_none()
     });
-    player.act(InputAction::ToggleTerminal);
-    player.wait_until("the terminal to close", |snapshot| {
+    me.act(InputAction::ToggleTerminal);
+    me.wait_until("the terminal to close", |snapshot| {
         text_field().find(snapshot).is_none()
     });
 }

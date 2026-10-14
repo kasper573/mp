@@ -49,7 +49,6 @@ impl Plugin for PlatePlugin {
     }
 }
 
-/// Where the top of an actor's plate is on screen, or the top of its head when it shows none.
 pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
     let plate = world
         .resource::<Plates>()
@@ -69,7 +68,6 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
     }
 }
 
-/// Each plate as last drawn, by the actor it names.
 #[derive(Resource, Default)]
 struct Plates(HashMap<Entity, egui::Rect>);
 

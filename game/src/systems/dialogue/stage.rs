@@ -108,8 +108,6 @@ pub struct StageChoice {
     pub locked: bool,
 }
 
-/// A panel docked above the dialogue box while its system has something to show, such as a
-/// shop's counter. The stage draws its frame and title.
 #[derive(Clone, Copy)]
 pub struct DockedPanel {
     pub head: fn(&World) -> Option<PanelHead>,
@@ -154,7 +152,6 @@ pub fn view(world: &World) -> Option<StageView> {
     })
 }
 
-/// The dialogue box as last drawn.
 pub fn dialogue_rect(world: &World) -> Option<Rect> {
     world.resource::<StageDrawn>().dialogue
 }
@@ -163,7 +160,6 @@ pub fn box_right(world: &World) -> Option<f32> {
     dialogue_rect(world).map(|dialogue| dialogue.right())
 }
 
-/// The box and its docked panels as last drawn.
 pub fn rects(world: &World) -> Vec<Rect> {
     let drawn = world.resource::<StageDrawn>();
     drawn
@@ -173,7 +169,6 @@ pub fn rects(world: &World) -> Vec<Rect> {
         .collect()
 }
 
-/// Each shown choice's row as last drawn, by its index.
 pub fn choice_rects(world: &World) -> HashMap<usize, Rect> {
     world.resource::<StageDrawn>().choices.clone()
 }
@@ -667,10 +662,12 @@ fn docked_panels(
                         .fill(color::BG)
                         .inner_margin(egui::Margin::symmetric(10, 6))
                         .show(ui, |ui| {
-                            ui.set_min_width(width - 20.0);
-                            ui.label(
-                                RichText::new(&head.title).text_style(egui::TextStyle::Heading),
-                            );
+                            ui.set_width(width - 20.0);
+                            ui.vertical_centered(|ui| {
+                                ui.label(
+                                    RichText::new(&head.title).text_style(egui::TextStyle::Heading),
+                                );
+                            });
                         });
                     ui.add(egui::Separator::default().spacing(0.0));
                     (panel.show)(ui, world);
@@ -982,7 +979,7 @@ fn name_tag(ui: &mut Ui, world: &World, dialogue: Rect) {
             .stroke(HAIRLINE)
             .corner_radius(4.0)
             .inner_margin(egui::Margin::symmetric(12, 4))
-            .show(ui, |ui| ui.label(text))
+            .show(ui, |ui| ui.add(egui::Label::new(text).extend()))
             .response
     });
 }
@@ -1051,8 +1048,6 @@ fn player_hint() -> Vec<TextPiece> {
     ]
 }
 
-/// Each bust stands by its figure: the near edge tucks `BUST_TUCK` behind the box's edge, and
-/// moves further in only as far as keeps the figure on screen.
 fn busts(ui: &mut Ui, world: &mut World, dialogue: Rect, screen: Rect) {
     let Some(cast) = world
         .resource::<Stage>()

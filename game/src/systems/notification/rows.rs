@@ -115,7 +115,6 @@ pub(super) fn shown<P: RowPlace>(world: &World) -> NotificationRows {
     world.resource::<PlacedRows<P>>().rows.shown()
 }
 
-/// The alerts, each an anchored window under the last; returns where they end.
 pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let (lines, more) = lines_of::<Alerts>(world);
     let width = ALERTS_WIDEST.min(gui.content_rect().width() * SCREEN_SHARE);
@@ -152,7 +151,6 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
     bottom
 }
 
-/// The narrator's captions on their scrim; returns where the next notice goes.
 pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let (now, still) = clock(world, gui);
     let (lines, more) = lines_of::<Captions>(world);
@@ -229,7 +227,6 @@ pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) ->
     shown.inner.bottom()
 }
 
-/// The milestones, large and gold in the middle of the screen; returns where they end.
 pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let (now, still) = clock(world, gui);
     let (lines, more) = lines_of::<Milestones>(world);
@@ -273,7 +270,6 @@ pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) 
     bottom
 }
 
-/// A small dim chip saying how many more notices waited than fit, and where to read them.
 pub(super) fn count_chip(ui: &mut Ui, world: &World, more: u32) -> egui::Response {
     egui::Frame::new()
         .fill(SLATE_40.gamma_multiply(0.55))
@@ -307,13 +303,11 @@ pub(super) fn more_text(more: u32) -> StyledLine {
     ])
 }
 
-/// Whether the pointer rests on any of these rects, as last drawn.
 pub(super) fn hovered(world: &World, rects: &[Rect]) -> bool {
     let pointer = gui::context(world).and_then(|gui| gui.pointer_latest_pos());
     pointer.is_some_and(|at| rects.iter().any(|rect| rect.contains(at)))
 }
 
-/// The time the interface eases by, and whether the player asked it to keep still.
 pub(super) fn clock(world: &World, gui: &egui::Context) -> (f64, bool) {
     (
         gui.input(|input| input.time),
@@ -329,7 +323,6 @@ pub(super) fn label_font() -> FontId {
     FontId::new(LABEL, family::prose_bold())
 }
 
-/// An area for a piece of the notice column, which never takes the pointer.
 pub(super) fn column_area(gui: &egui::Context, id: &str, top: f32) -> egui::Area {
     egui::Area::new(Id::new(("notice", id)))
         .order(Band::Notices.order())
@@ -338,7 +331,6 @@ pub(super) fn column_area(gui: &egui::Context, id: &str, top: f32) -> egui::Area
         .fixed_pos(egui::pos2(gui.content_rect().left(), top))
 }
 
-/// What a place shows, kept a moment after it goes so it can ease out.
 pub(super) struct Fades<T> {
     items: Vec<Fading<T>>,
 }
@@ -402,7 +394,6 @@ pub(super) struct Presence {
     pub exit: Move,
 }
 
-/// Where an item comes from or goes to: displaced and scaled, over so many seconds.
 #[derive(Clone, Copy)]
 pub(super) struct Move {
     offset: Vec2,
@@ -420,7 +411,6 @@ impl Move {
     }
 }
 
-/// How present an item is this frame: its opacity, and how far it is displaced and scaled.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Look {
     pub opacity: f32,

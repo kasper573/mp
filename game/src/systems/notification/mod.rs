@@ -493,8 +493,6 @@ impl Plugin for NotificationPlugin {
     }
 }
 
-/// The notices down the middle of the screen: alerts, captions and the error at the top, and an
-/// area's intro and the milestones further down.
 fn draw_column(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;

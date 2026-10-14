@@ -53,7 +53,6 @@ pub(super) fn plugin(app: &mut App) {
         .add_systems(OnExit(ClientScreen::Area), forget);
 }
 
-/// The error in egui's popup frame, coloured as egui colours errors; returns where it ends.
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let (now, still) = rows::clock(world, gui);
     let mut errors = world.resource_mut::<Errors>();

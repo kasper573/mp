@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
 use bevy_egui::{
     EguiContext, EguiGlobalSettings, EguiOutput, EguiPlugin, EguiPostUpdateSet,
     EguiPrimaryContextPass, EguiTextureHandle, EguiUserTextures, PrimaryEguiContext,
@@ -14,8 +13,7 @@ use crate::core::assets::AssetRef;
 use crate::core::content::asset_of;
 use crate::core::text::MotionPreference;
 
-/// The stacks the interface draws in, from the world's labels up to the pointer. Each band draws
-/// in its own egui order, so it stacks the same however the frame's systems run.
+/// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Band {
     Stage,
@@ -39,11 +37,9 @@ impl Band {
     }
 }
 
-/// The game's egui context, once the screen's camera has one.
 #[derive(Resource, Clone)]
 pub struct GuiContext(pub egui::Context);
 
-/// The layers drawn over the world this frame, which take no clicks of their own.
 #[derive(Resource, Default)]
 pub struct WorldLayers(HashSet<LayerId>);
 
@@ -53,7 +49,6 @@ impl WorldLayers {
     }
 }
 
-/// The faces the content brings; egui's built-in ones stand in until then.
 #[derive(Resource, Clone)]
 pub struct GuiFonts(pub FontDefinitions);
 
@@ -120,8 +115,6 @@ pub fn context(world: &World) -> Option<egui::Context> {
     world.get_resource::<GuiContext>().map(|gui| gui.0.clone())
 }
 
-/// An area that floats over the world: it never takes the pointer, and the probe reports what it
-/// shows as part of the world.
 pub fn world_area(world: &mut World, id: impl Hash + std::fmt::Debug) -> egui::Area {
     let id = egui::Id::new(id);
     world
@@ -134,13 +127,11 @@ pub fn world_area(world: &mut World, id: impl Hash + std::fmt::Debug) -> egui::A
         .constrain(false)
 }
 
-/// An image egui can draw, once it has loaded. The handle is held from the first ask on, so an
-/// image shown again never waits on a fresh load.
+/// The handle is held from the first ask on, so an image shown again never waits on a fresh load.
 pub fn image(world: &mut World, asset: &AssetRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
 }
 
-/// `image` for a file the content already resolved to its loader path.
 pub fn image_file(world: &mut World, file: &str) -> Option<GuiImage> {
     let known = world.resource::<GuiImages>().0.get(file).cloned();
     let (handle, texture) = match known {
@@ -165,30 +156,22 @@ pub fn image_file(world: &mut World, file: &str) -> Option<GuiImage> {
     })
 }
 
-/// Whether the pointer is over a piece of the interface, or busy with one, so the world must not
-/// take it.
-pub fn pointer_claimed(world: &mut World) -> bool {
+pub fn pointer_claimed(world: &World) -> bool {
     let Some(gui) = context(world) else {
         return false;
     };
-    let pointer = world
-        .query_filtered::<&Window, With<PrimaryWindow>>()
-        .single(world)
-        .ok()
-        .and_then(Window::cursor_position);
     gui.egui_is_using_pointer()
         || gui.dragged_id().is_some()
-        || pointer.is_some_and(|at| layer_at(&gui, egui::pos2(at.x, at.y)).is_some())
+        || gui.viewport(|viewport| viewport.hits.click.is_some() || viewport.hits.drag.is_some())
 }
 
-/// The interface's layer that takes the pointer at `at`. egui keeps a root layer under the whole
-/// screen for panels to catch clicks on, which this interface never draws on.
+/// egui keeps a root layer under the whole screen for panels to catch clicks on, which this
+/// interface never draws on.
 pub fn layer_at(gui: &egui::Context, at: egui::Pos2) -> Option<LayerId> {
     gui.layer_id_at(at)
         .filter(|&layer| layer != LayerId::background())
 }
 
-/// The cursor the interface asked for on its last frame.
 pub fn cursor(world: &World) -> egui::CursorIcon {
     world.resource::<GuiCursor>().0
 }

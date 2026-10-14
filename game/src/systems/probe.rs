@@ -330,7 +330,6 @@ pub struct ProbeVoice {
 
 struct Probe(Box<dyn ProbeChannel>);
 
-/// The interface as egui's accessibility tree described it on the last frame drawn.
 #[derive(Resource, Default)]
 struct DrawnUi(Option<accesskit::TreeUpdate>);
 
@@ -806,8 +805,6 @@ fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
     exits
 }
 
-/// What the interface shows that a player can read or work: text, images, fields and controls,
-/// less what is scrolled or clipped out of sight.
 fn ui(world: &mut World) -> Vec<ProbeUiElement> {
     let Some(gui) = gui::context(world) else {
         return Vec::new();
@@ -933,7 +930,6 @@ fn window_rect(rect: egui::Rect) -> Rect<WindowPx> {
     )
 }
 
-/// Where the interface takes the pointer from the world: every area drawn that takes clicks.
 fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
     let Some(gui) = gui::context(world) else {
         return Vec::new();

@@ -113,7 +113,6 @@ impl Fixture for FontFace {
     type Row = FontDef;
 }
 
-/// The theme's faces from the content's font rows, once every one of their files is at hand.
 pub fn theme_fonts(
     content: &Content,
     files: &HashMap<String, Arc<[u8]>>,

@@ -108,7 +108,6 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
     }
 }
 
-/// How many speakers each fold at the screen's edge stands for, as last drawn.
 pub fn edge_folds(world: &World) -> Vec<u32> {
     world.resource::<Bubbles>().edge_folds.clone()
 }
@@ -168,14 +167,13 @@ struct Drawn {
     folded: bool,
 }
 
-/// A line the speaker said, typed out by its own entity once the bubble shows it.
 struct SpokenLine {
     notification: Notification,
     read_by: Option<Duration>,
     typing: Option<Entity>,
 }
 
-/// What one bubble shows, kept as drawn so it can ease out after its speaker goes.
+/// Kept as drawn so it can ease out after its speaker goes.
 #[derive(Clone)]
 struct BubbleDraw {
     key: u64,
@@ -362,8 +360,6 @@ fn tick(world: &mut World) {
     *world.resource_mut::<Bubbles>() = bubbles;
 }
 
-// The speakers that matter most to the player get full bubbles; the rest fold to a sign that
-// someone speaks, at their head or, off screen, at the edge toward them.
 fn place(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
@@ -572,8 +568,6 @@ fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) 
     gui.set_transform_layer(shown.response.layer_id, look.around(draw.rect));
 }
 
-// The tail is the outer half of a square turned on its corner, its base laid over the body's
-// outline so the two read as one shape.
 fn paint_tail(ui: &egui::Ui, body: egui::Rect, tail: Tail, offset: f32) {
     let out = tail.axis();
     let along = egui::vec2(out.y.abs(), out.x.abs());
@@ -644,7 +638,6 @@ fn fold_text(speakers: u32) -> String {
     }
 }
 
-/// The body's size, laid out as `paint` will lay it out.
 fn body_size(gui: &egui::Context, world: &World, draw: &BubbleDraw) -> egui::Vec2 {
     let label = |text: &str| {
         gui.fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), rows::label_font(), INK))
@@ -675,7 +668,6 @@ fn stacked(parts: &[egui::Vec2], gap: f32) -> egui::Vec2 {
     egui::vec2(width, height)
 }
 
-/// A body's size with its tail, which reaches half its length past the body's edge.
 fn framed(body: egui::Vec2, tail: Option<Tail>) -> Vec2 {
     let tail = match tail {
         Some(Tail::Down | Tail::Up) => egui::vec2(0.0, TAIL_OUT),
@@ -864,7 +856,6 @@ impl Perch {
     }
 }
 
-/// How far the tail may slide from the middle of the body's side and still meet it squarely.
 fn tail_reach(body_extent: f32) -> f32 {
     (body_extent / 2.0 - RADIUS - TAIL).max(0.0)
 }

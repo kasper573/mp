@@ -9,7 +9,7 @@ use strum::{AsRefStr, EnumString, VariantArray};
 use super::Action;
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::media::{ImageSizes, visible_columns};
+use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
     Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
 };
@@ -430,9 +430,8 @@ pub struct ActorModel {
     figure: Option<BustFigure>,
 }
 
-/// The span of a model's bust images that its figure covers, as fractions of the image's width,
-/// over every expression it has. Busts carry wide transparent margins, so a bust is placed by its
-/// figure; taking the span over all expressions keeps a new face from moving it.
+/// Busts carry wide transparent margins, so a bust is placed by its figure; taking the span over
+/// all expressions keeps a new face from moving it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BustFigure {
     pub left: f32,
@@ -619,7 +618,7 @@ fn bust_figures(
     let folder = loading.folder();
     rows.par_iter()
         .map(|(_, def)| {
-            let spans: Vec<(u32, u32, u32)> = def
+            let spans: Vec<VisiblePixelColumns> = def
                 .busts()?
                 .all()
                 .filter_map(|bust| folder.read(&bust.path()).ok())
@@ -627,10 +626,10 @@ fn bust_figures(
                 .collect();
             let left = spans
                 .iter()
-                .map(|&(first, _, width)| first as f32 / width as f32);
+                .map(|span| span.first as f32 / span.image_width as f32);
             let right = spans
                 .iter()
-                .map(|&(_, last, width)| (last + 1) as f32 / width as f32);
+                .map(|span| (span.last + 1) as f32 / span.image_width as f32);
             Some(BustFigure {
                 left: left.reduce(f32::min)?,
                 right: right.reduce(f32::max)?,

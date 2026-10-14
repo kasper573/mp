@@ -60,7 +60,6 @@ fn moment(world: &World) -> Option<(QuestId, Moment)> {
     })
 }
 
-// The card is as tall as what it lays out.
 fn card_head(world: &World) -> Option<PanelHead> {
     let (_, moment) = moment(world)?;
     Some(PanelHead {
@@ -216,11 +215,9 @@ pub(super) fn reward_chips(ui: &mut Ui, world: &mut World, def: &QuestDef) {
         if def.xp > 0 {
             widgets::chip(ui, &format!("{} XP", def.xp));
         }
-        for (index, &stack) in def.rewards().iter().enumerate() {
-            ui.push_id(("reward", index), |ui| {
-                let chip = item_chip(ui, world, &content, stack);
-                item::card::inspect(world, chip, stack.item);
-            });
+        for &stack in def.rewards() {
+            let chip = item_chip(ui, world, &content, stack);
+            item::card::inspect(world, chip, stack.item);
         }
     });
 }
@@ -298,7 +295,6 @@ impl Countdown {
     }
 }
 
-/// How much of the quest's time limit is left, out of all of it.
 pub(super) fn time_left(content: &Content, log: &QuestLog, quest: QuestId) -> f32 {
     let left = log
         .active(quest)

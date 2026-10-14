@@ -85,9 +85,13 @@ pub fn measure_png(bytes: &[u8]) -> Result<(u32, u32), String> {
     Ok((info.width, info.height))
 }
 
-/// The first and last columns of a PNG that hold any visible pixel, and its width, or `None` for an
-/// image with nothing visible.
-pub fn visible_columns(bytes: &[u8]) -> Result<Option<(u32, u32, u32)>, String> {
+pub struct VisiblePixelColumns {
+    pub first: u32,
+    pub last: u32,
+    pub image_width: u32,
+}
+
+pub fn visible_columns(bytes: &[u8]) -> Result<Option<VisiblePixelColumns>, String> {
     let mut decoder = png::Decoder::new(Cursor::new(bytes));
     decoder.set_transformations(
         png::Transformations::normalize_to_color8() | png::Transformations::ALPHA,
@@ -117,5 +121,9 @@ pub fn visible_columns(bytes: &[u8]) -> Result<Option<(u32, u32, u32)>, String> 
             (left.min(first), right.max(last))
         }));
     }
-    Ok(covered.map(|(first, last)| (first, last, frame.width)))
+    Ok(covered.map(|(first, last)| VisiblePixelColumns {
+        first,
+        last,
+        image_width: frame.width,
+    }))
 }

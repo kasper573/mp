@@ -50,7 +50,6 @@ impl Window for TerminalWindow {
     }
 }
 
-/// The tab the terminal shows, and what was typed into each tab but not yet sent.
 #[derive(Resource, Default)]
 pub(crate) struct TerminalView {
     tab: Option<TerminalKind>,

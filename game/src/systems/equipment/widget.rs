@@ -35,10 +35,10 @@ impl Window for EquipmentWindow {
                 ui.spacing_mut().item_spacing = Vec2::splat(2.0);
                 ui.horizontal_wrapped(|ui| {
                     for &(kind, item) in &worn {
-                        ui.push_id(("equipment slot", kind.label()), |ui| match item {
+                        match item {
                             Some(item) => worn_slot(ui, world, kind, item),
                             None => empty_slot(ui, world, kind),
-                        });
+                        }
                     }
                 });
             });

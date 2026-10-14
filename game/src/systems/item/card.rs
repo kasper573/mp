@@ -45,13 +45,11 @@ pub fn close(world: &mut World) -> bool {
     world.resource_mut::<ItemCard>().wanted.take().is_some()
 }
 
-/// The card's item and its window's rect, as last drawn.
 pub fn shown(world: &World) -> Option<(ItemId, Rect)> {
     world.resource::<ItemCard>().drawn
 }
 
-/// Shows the item's tooltip while the pointer is over `response`, and opens its card on the inspect
-/// click. `response` must sense clicks.
+/// `response` must sense clicks.
 pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response {
     if map::clicked(world, InputAction::InspectItem, &response) {
         open(world, item);
@@ -91,7 +89,6 @@ pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     }
 }
 
-/// Everything the card tells about an item: what it is, what it does and what it asks.
 pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
     let content = *world.resource::<Content>();
     let def = item.get(&content);

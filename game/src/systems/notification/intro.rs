@@ -70,7 +70,6 @@ pub fn shown(world: &World) -> Option<(String, String)> {
     Some((title.to_string(), notification.text.plain_words()))
 }
 
-/// The area's intro on its dark backdrop; returns where it ends.
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
     let (now, still) = rows::clock(world, gui);
     let mut shown = world.resource_mut::<ShownIntro>();

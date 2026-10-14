@@ -208,7 +208,6 @@ impl InputMap {
         })
     }
 
-    /// Whether egui saw this action's click on a widget, with the binding's keys held.
     pub fn clicked(
         &self,
         action: InputAction,
@@ -233,7 +232,6 @@ impl InputMap {
         })
     }
 
-    /// The action's first key binding, as egui names it.
     pub fn shortcut(&self, action: InputAction) -> Option<egui::KeyboardShortcut> {
         self.bindings(action)
             .iter()

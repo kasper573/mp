@@ -11,7 +11,6 @@ pub use paint::{TextLook, TextShadow, measure, show, show_shadowed};
 
 const SLOW_PACE: f32 = 2.5;
 
-/// A line as the typewriter reveals it: one letter per character of a span, one per key.
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub struct StyledLine {
     pub pieces: Vec<TextPiece>,
@@ -51,7 +50,6 @@ pub enum TextMotion {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputRef(pub u16);
 
-/// What each key reference reads as, published by whoever owns the input bindings.
 #[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub struct KeyNames(pub HashMap<InputRef, String>);
 
@@ -75,7 +73,6 @@ pub struct MotionPreference {
     pub reduced: bool,
 }
 
-/// Reveals its entity's `StyledLine` letter by letter, starting over whenever the line changes.
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub struct Typewriter {
     elapsed: Duration,
@@ -98,7 +95,6 @@ impl Typewriter {
         self.finished
     }
 
-    /// How many letters are out, or `None` once the whole line is.
     pub fn shown(&self) -> Option<usize> {
         (!self.finished).then_some(self.shown)
     }
