@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use design_tokens::{TextRole, color, family, widgets};
-use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
+use egui::{Align, Color32, Label, Layout, RichText, Sense, Ui, Vec2};
 use strum::IntoStaticStr;
 
 use super::card::{
@@ -250,8 +250,6 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
-                hud::icon(ui, world, def.icon(&content), ROW_ICON);
-                ui.label(RichText::new(def.title.as_str()).family(family::medium()));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if page.log.tracked.contains(&quest) {
                         hud::icon(ui, world, &InterfaceIcon::Tracked.get(&content).image, 14.0);
@@ -262,6 +260,13 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
                             .size(TextRole::Small.size())
                             .color(colour),
                     );
+                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                        hud::icon(ui, world, def.icon(&content), ROW_ICON);
+                        ui.add(
+                            Label::new(RichText::new(def.title.as_str()).family(family::medium()))
+                                .truncate(),
+                        );
+                    });
                 });
             });
         })

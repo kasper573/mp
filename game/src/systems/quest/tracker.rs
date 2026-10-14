@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use design_tokens::{TextRole, color, family};
-use egui::{Align, Color32, Layout, Pos2, Rect, RichText, Ui};
+use egui::{Align, Color32, Label, Layout, Pos2, Rect, RichText, Ui};
 
 use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
@@ -121,21 +121,26 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
     let content = *world.resource::<Content>();
     let small = TextRole::Small.size();
     ui.horizontal(|ui| {
-        if let Some(mark) = entry.mark {
-            hud::icon(ui, world, mark, MARK);
-        }
-        ui.label(
-            RichText::new(entry.quest.get(&content).title.as_str())
-                .family(family::medium())
-                .color(color::TEXT),
-        );
-        if entry.timed {
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if entry.timed {
                 let left = Countdown::Left.label(log, entry.quest).unwrap_or_default();
                 ui.label(RichText::new(left).size(small).color(color::WARN));
                 hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 12.0);
+            }
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                if let Some(mark) = entry.mark {
+                    hud::icon(ui, world, mark, MARK);
+                }
+                ui.add(
+                    Label::new(
+                        RichText::new(entry.quest.get(&content).title.as_str())
+                            .family(family::medium())
+                            .color(color::TEXT),
+                    )
+                    .truncate(),
+                );
             });
-        }
+        });
     });
     for (label, count, tone) in &entry.rows {
         let colour = tone.colour();
@@ -145,12 +150,16 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
         };
         ui.horizontal(|ui| {
             ui.add_space(8.0);
-            ui.label(RichText::new(label.as_str()).size(small).color(colour));
-            if !count.is_empty() {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if !count.is_empty() {
                     ui.label(RichText::new(count).size(small).color(colour));
+                }
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    ui.add(
+                        Label::new(RichText::new(label.as_str()).size(small).color(colour)).wrap(),
+                    );
                 });
-            }
+            });
         });
     }
     ui.add_space(2.0);

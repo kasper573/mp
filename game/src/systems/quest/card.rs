@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use design_tokens::{CHIP_RADIUS, HAIRLINE, TextRole, color, family, widgets};
-use egui::{Align, Color32, Layout, Margin, Response, RichText, Sense, Ui};
+use egui::{Align, Color32, Label, Layout, Margin, Response, RichText, Sense, Ui};
 
 use super::{
     ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
@@ -173,15 +173,17 @@ fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
         color::DANGER
     };
     ui.horizontal(|ui| {
-        caption(ui, "Hand in");
-        hud::icon(ui, world, &stack.item.get(&content).icon, ICON);
-        ui.label(counted(&content, stack));
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             ui.label(
                 RichText::new(format!("{held} in your bag"))
                     .size(TextRole::Small.size())
                     .color(held_colour),
             );
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                caption(ui, "Hand in");
+                hud::icon(ui, world, &stack.item.get(&content).icon, ICON);
+                ui.add(Label::new(counted(&content, stack)).wrap());
+            });
         });
     });
 }
@@ -195,17 +197,19 @@ pub(super) fn objective_row(
 ) {
     let content = *world.resource::<Content>();
     ui.horizontal(|ui| {
-        hud::icon(ui, world, objective.icon(&content), ICON);
-        ui.label(RichText::new(progress.label.as_str()).color(colour));
-        if progress.counted {
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            if progress.counted {
                 ui.label(
                     RichText::new(format!("{} / {}", progress.have, progress.need))
                         .family(family::medium())
                         .color(colour),
                 );
+            }
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                hud::icon(ui, world, objective.icon(&content), ICON);
+                ui.add(Label::new(RichText::new(progress.label.as_str()).color(colour)).wrap());
             });
-        }
+        });
     });
 }
 
