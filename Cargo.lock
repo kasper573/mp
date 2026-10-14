@@ -3256,6 +3256,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "design_tokens"
+version = "0.1.0"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "deterministic-hash"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3483,6 +3490,7 @@ dependencies = [
  "bevy_replicon",
  "bevy_tilemap",
  "blake3",
+ "design_tokens",
  "dirs",
  "ebur128",
  "egui",
@@ -3503,7 +3511,6 @@ dependencies = [
  "strip-ansi-escapes",
  "strum",
  "tempfile",
- "ui",
  "ureq",
  "walkdir",
 ]

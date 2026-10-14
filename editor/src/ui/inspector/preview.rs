@@ -239,7 +239,7 @@ pub(super) fn draw_preview(
     painter.image(thumb.texture.id(), sprite, uv, tint);
     if let Some(name) = value["name"].as_str() {
         let colour = match attitude(content, table, key, value) {
-            Some(true) => game_colour(ui::tokens::palette::CRIMSON_80),
+            Some(true) => design_tokens::ink::DANGER,
             _ => Color32::WHITE,
         };
         painter.text(
@@ -250,16 +250,6 @@ pub(super) fn draw_preview(
             colour,
         );
     }
-}
-
-pub(super) fn game_colour(colour: bevy::prelude::Color) -> Color32 {
-    let srgba = colour.to_srgba();
-    Color32::from_rgba_unmultiplied(
-        (srgba.red * 255.0) as u8,
-        (srgba.green * 255.0) as u8,
-        (srgba.blue * 255.0) as u8,
-        (srgba.alpha * 255.0) as u8,
-    )
 }
 
 pub(super) fn quest_card(

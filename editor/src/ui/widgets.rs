@@ -1,21 +1,12 @@
 use std::fmt::Display;
 
-use egui::{
-    Align, Color32, CornerRadius, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2,
-};
+use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::theme;
 
-pub fn section(ui: &mut Ui, text: &str) {
-    ui.add_space(6.0);
-    ui.label(
-        RichText::new(text.to_uppercase())
-            .size(11.0)
-            .color(theme::MUTED)
-            .family(theme::medium()),
-    );
-    ui.add_space(1.0);
-}
+pub use design_tokens::widgets::{
+    card_frame, chip, chip_coloured, danger, key_hint, pill, primary, section, tab_strip, toggle,
+};
 
 pub fn section_count(ui: &mut Ui, text: &str, count: impl Display) {
     section(ui, &format!("{text} · {count}"));
@@ -41,73 +32,6 @@ pub fn kv_code(ui: &mut Ui, key: &str, value: impl Into<String>) {
     kv(ui, key, |ui| {
         ui.label(theme::mono(value.into()));
     });
-}
-
-pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        for (tab, label) in tabs {
-            let selected = *tab == *active;
-            let text = RichText::new(label.to_uppercase())
-                .size(11.5)
-                .family(theme::medium())
-                .color(if selected { theme::TEXT } else { theme::MUTED });
-            let galley = ui.painter().layout_no_wrap(
-                text.text().to_owned(),
-                FontId::new(11.5, theme::medium()),
-                Color32::WHITE,
-            );
-            let size = Vec2::new(galley.size().x + 24.0, 30.0);
-            let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-            if response.hovered() && !selected {
-                ui.painter().rect_filled(
-                    rect,
-                    CornerRadius::ZERO,
-                    Color32::from_rgba_unmultiplied(255, 255, 255, 8),
-                );
-            }
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                text.text(),
-                FontId::new(11.5, theme::medium()),
-                if selected { theme::TEXT } else { theme::MUTED },
-            );
-            if selected {
-                ui.painter().line_segment(
-                    [
-                        rect.left_bottom() + Vec2::new(0.0, -1.0),
-                        rect.right_bottom() + Vec2::new(0.0, -1.0),
-                    ],
-                    Stroke::new(2.0, theme::ACCENT),
-                );
-            }
-            if response.clicked() {
-                *active = *tab;
-            }
-        }
-    });
-    let rect = ui.max_rect();
-    let y = ui.cursor().min.y - 1.0;
-    ui.painter().line_segment(
-        [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-        Stroke::new(1.0, theme::BORDER),
-    );
-}
-
-pub fn key_hint(ui: &mut Ui, keys: &str) {
-    let text = RichText::new(keys)
-        .monospace()
-        .size(11.0)
-        .color(theme::MUTED);
-    egui::Frame::new()
-        .fill(theme::INPUT)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(3.0)
-        .inner_margin(egui::Margin::symmetric(5, 1))
-        .show(ui, |ui| {
-            ui.label(text);
-        });
 }
 
 pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Response {
@@ -184,44 +108,6 @@ pub fn key_hint_text(ui: &mut Ui, keys: &str, text: &str) {
     });
 }
 
-pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
-    let size = Vec2::new(30.0, 16.0);
-    let (rect, mut response) = ui.allocate_exact_size(size, Sense::click());
-    if response.clicked() {
-        *on = !*on;
-        response.mark_changed();
-    }
-    let t = ui.ctx().animate_bool(response.id, *on);
-    let fill = if *on { theme::ACCENT } else { theme::INPUT };
-    ui.painter().rect(
-        rect,
-        8.0,
-        fill,
-        Stroke::new(1.0, if *on { theme::ACCENT } else { theme::BORDER }),
-        egui::StrokeKind::Inside,
-    );
-    let knob = egui::pos2(rect.min.x + 8.0 + t * (size.x - 16.0), rect.center().y);
-    ui.painter().circle_filled(knob, 5.5, Color32::WHITE);
-    response
-}
-
-pub fn chip(ui: &mut Ui, text: &str) -> Response {
-    chip_coloured(ui, text, theme::RAISED, theme::TEXT)
-}
-
-pub fn chip_coloured(ui: &mut Ui, text: &str, fill: Color32, ink: Color32) -> Response {
-    let response = egui::Frame::new()
-        .fill(fill)
-        .stroke(Stroke::new(1.0, theme::BORDER))
-        .corner_radius(10.0)
-        .inner_margin(egui::Margin::symmetric(8, 2))
-        .show(ui, |ui| {
-            ui.label(RichText::new(text).size(12.5).color(ink));
-        })
-        .response;
-    response.interact(Sense::click())
-}
-
 pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
     let mut closed = false;
     let response = egui::Frame::new()
@@ -248,26 +134,6 @@ pub fn chip_closable(ui: &mut Ui, text: &str) -> (Response, bool) {
     (response.interact(Sense::click()), closed)
 }
 
-pub fn pill(ui: &mut Ui, text: &str, colour: Color32) -> Response {
-    egui::Frame::new()
-        .fill(Color32::from_rgba_unmultiplied(
-            colour.r(),
-            colour.g(),
-            colour.b(),
-            40,
-        ))
-        .stroke(Stroke::new(
-            1.0,
-            Color32::from_rgba_unmultiplied(colour.r(), colour.g(), colour.b(), 120),
-        ))
-        .corner_radius(12.0)
-        .inner_margin(egui::Margin::symmetric(10, 3))
-        .show(ui, |ui| {
-            ui.label(RichText::new(text).size(13.0).color(colour).monospace());
-        })
-        .response
-}
-
 pub const BADGE_SIZE: f32 = 16.0;
 
 pub fn badge(ui: &mut Ui, kind: &str) {
@@ -282,40 +148,6 @@ pub fn badge(ui: &mut Ui, kind: &str) {
         FontId::monospace(11.0),
         Color32::BLACK,
     );
-}
-
-pub fn primary(ui: &mut Ui, text: &str) -> Response {
-    ui.add(
-        egui::Button::new(
-            RichText::new(text)
-                .color(Color32::WHITE)
-                .family(theme::medium()),
-        )
-        .fill(theme::ACCENT)
-        .stroke(Stroke::NONE),
-    )
-}
-
-pub fn danger(ui: &mut Ui, text: &str) -> Response {
-    ui.add(
-        egui::Button::new(RichText::new(text).color(theme::DANGER))
-            .stroke(Stroke::new(1.0, theme::DANGER)),
-    )
-}
-
-pub fn card_frame(selected: bool) -> egui::Frame {
-    egui::Frame::new()
-        .fill(theme::RAISED)
-        .stroke(Stroke::new(
-            1.0,
-            if selected {
-                theme::ACCENT
-            } else {
-                theme::BORDER
-            },
-        ))
-        .corner_radius(6.0)
-        .inner_margin(egui::Margin::symmetric(10, 8))
 }
 
 pub fn card_header(

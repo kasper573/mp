@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "ui",
+    "design_tokens",
     "bevy/tilemap",
     "bevy/terminal",
     "bevy/terminal/macros",
@@ -56,6 +57,8 @@ bevy_replicon = { version = "0.45", default-features = false }
 renet2 = { version = "0.19", default-features = false }
 bevy_replicon_renet2 = { version = "0.21", default-features = false, features = ["client"] }
 rayon = "1"
+egui = "0.36"
+bevy_egui = "0.43.1"
 bevy_state = { version = "0.20.0", default-features = false, features = ["bevy_app"] }
 axum = "0.8"
 envy = "0.4"
