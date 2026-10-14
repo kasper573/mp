@@ -100,6 +100,16 @@ jobs:
       DOCKER_IMAGE_VERSION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The stack's images that don't package the build need minutes of a compiler of their own
+      # (Caddy's), so they're made from the start, while the rest sets up and compiles.
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Make the stack's images
+        run: |
+          {
+            status=0
+            just e2e-stack-images || status=$?
+            echo "$status" > "$RUNNER_TEMP/images.status"
+          } > "$RUNNER_TEMP/images.log" 2>&1 &
       - uses: ./.github/actions/setup
         with:
           deps: e2e
@@ -109,26 +119,34 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
           cache-on-failure: "true"
       - name: Build
-        # The suite's browsers and the stack's images that don't package the build mostly download, so
-        # they come alongside the compiler.
+        # While the client compiles, the browsers download and, once the server is built, the services
+        # the website waits on start. Starting them ahead is only a head start: the next step starts
+        # the stack for real.
         run: |
-          {
-            (cd e2e && npm ci && npx playwright install --with-deps chrome firefox webkit ffmpeg)
-            just e2e-stack-images
-          } > "$RUNNER_TEMP/prepare.log" 2>&1 &
-          prepare=$!
           if [ "$BUILD" = deploy ]; then
-            just build
-            CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols just wasm
+            server=()
+            client=(CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols)
           else
-            CARGO_PROFILE_RELEASE_OPT_LEVEL=0 just build
-            CARGO_PROFILE_RELEASE_OPT_LEVEL=3 just wasm
+            server=(CARGO_PROFILE_RELEASE_OPT_LEVEL=0)
+            client=(CARGO_PROFILE_RELEASE_OPT_LEVEL=3)
           fi
-          echo "::group::Browsers and stack images"
+          (cd e2e && npm ci && npx playwright install --with-deps chrome firefox webkit ffmpeg) > "$RUNNER_TEMP/browsers.log" 2>&1 &
+          browsers=$!
+          env "${server[@]}" just build
+          {
+            until [ -s "$RUNNER_TEMP/images.status" ]; do sleep 1; done
+            just e2e-stack-ahead
+          } > "$RUNNER_TEMP/ahead.log" 2>&1 &
+          ahead=$!
+          env "${client[@]}" just wasm
           status=0
-          wait "$prepare" || status=$?
-          cat "$RUNNER_TEMP/prepare.log"
-          echo "::endgroup::"
+          wait "$browsers" || status=$?
+          wait "$ahead" || echo "::warning::the stack's head start failed; starting it is up to the next step"
+          for log in images browsers ahead; do
+            echo "::group::$log"
+            cat "$RUNNER_TEMP/$log.log"
+            echo "::endgroup::"
+          done
           exit "$status"
       - name: Start the stack
         # rift.lan only resolves on a LAN; map it to loopback for the browsers that take no

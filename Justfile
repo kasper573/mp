@@ -65,6 +65,9 @@ e2e filter="": build wasm e2e-stack-up (e2e-run filter)
 # The stack without its observability services, which the e2e doesn't exercise and which start slowest.
 e2e-stack-up: (up "")
 
+# The e2e stack but the website, which packages the wasm: all it waits on can start while that compiles.
+e2e-stack-ahead: (up "" "rift-game-server reverse-proxy")
+
 # The e2e stack's images that don't package the build, so they can be made while it compiles.
 e2e-stack-images:
     {{compose}} build keycloak reverse-proxy
@@ -126,11 +129,12 @@ loadtest count="dyn":
 
 loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
 
+# The content copy is synced in place, never replaced, so a running game server keeps the folder it mounted.
 [private]
-up flags:
-    rm -rf target/stack/content && mkdir -p target/stack && cp -r content target/stack/content
+up flags services="":
+    mkdir -p target/stack/content && rsync -a --delete content/ target/stack/content/
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
-    {{compose}} {{flags}} up -d --build --wait
+    {{compose}} {{flags}} up -d --build --wait {{services}}
 
 # Films COMMAND's window titled TITLE on a private virtual display to OUT, playing INPUT (an xdotool
 # command chain in window pixels) and running HOOK (a shell line) while it records.
