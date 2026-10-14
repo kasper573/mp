@@ -24,3 +24,6 @@ bevy = { workspace = true, features = [
     "bevy_log",
     "png",
 ] }
+
+[lints]
+workspace = true

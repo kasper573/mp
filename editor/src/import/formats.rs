@@ -217,9 +217,10 @@ pub fn sort_out(files: &[PathBuf]) -> Result<DroppedFiles, String> {
         (0, 0, 1) => Ok(DroppedFiles::Gif(gifs.remove(0))),
         (0, 1, 0) => {
             let png = pngs.remove(0);
-            match is_apng(&png) {
-                true => Ok(DroppedFiles::Apng(png)),
-                false => Ok(DroppedFiles::Png(png)),
+            if is_apng(&png) {
+                Ok(DroppedFiles::Apng(png))
+            } else {
+                Ok(DroppedFiles::Png(png))
             }
         }
         (0, n, 0) if n > 1 => {
@@ -433,9 +434,10 @@ fn decode_sheet(image_file: &Path, json_file: &Path) -> Result<AnimationExport, 
     let mut decoded = Vec::new();
     for frame in &frames {
         trimmed |= frame.trimmed || frame.rotated;
-        let (region_w, region_h) = match frame.rotated {
-            true => (frame.frame.h, frame.frame.w),
-            false => (frame.frame.w, frame.frame.h),
+        let (region_w, region_h) = if frame.rotated {
+            (frame.frame.h, frame.frame.w)
+        } else {
+            (frame.frame.w, frame.frame.h)
         };
         if frame.frame.x + region_w > image.width() || frame.frame.y + region_h > image.height() {
             return Err(format!(

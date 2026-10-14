@@ -1,6 +1,7 @@
 use egui::{Key, Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
 use game::core::tiling::TilePos;
 use game::systems::area;
+use game::systems::area::AreaId;
 use game::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
 use game::systems::script::Place;
 
@@ -84,9 +85,10 @@ impl MapDrag {
             } => {
                 *moved |= (p - *from).length() > DRAG_SLOP;
                 let delta = (p - *from) / scale;
-                (*offset, *snap) = match modifiers.alt {
-                    true => (delta, None),
-                    false => snapped(map, cards, delta, scale),
+                (*offset, *snap) = if modifiers.alt {
+                    (delta, None)
+                } else {
+                    snapped(map, cards, delta, scale)
                 };
             }
             MapDrag::Note { from, offset, .. } => *offset = (p - *from) / scale,
@@ -99,9 +101,10 @@ impl MapDrag {
             } => {
                 let raw = *start_size as f32 * (p - *center).length()
                     / (*from - *center).length().max(1.0);
-                let stepped = match modifiers.shift {
-                    true => raw.round(),
-                    false => (raw / SIZE_STEP).round() * SIZE_STEP,
+                let stepped = if modifiers.shift {
+                    raw.round()
+                } else {
+                    (raw / SIZE_STEP).round() * SIZE_STEP
                 };
                 *size = (stepped as u32).clamp(MIN_SIZE, MAX_SIZE);
             }
@@ -298,10 +301,7 @@ fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers:
     });
     match part {
         Some(part) => {
-            let mut next = match extend {
-                true => selected(editor),
-                false => Vec::new(),
-            };
+            let mut next = if extend { selected(editor) } else { Vec::new() };
             if modifiers.command && next.contains(&part) {
                 next.retain(|known| *known != part);
             } else if !next.contains(&part) {
@@ -647,8 +647,8 @@ fn snapped(
 ) -> (Vec2, Option<String>) {
     let threshold = SNAP_PX / scale;
     let atlas = &map.atlas;
-    let moving: Vec<area::Id> = moving.iter().filter_map(|key| atlas.id(key)).collect();
-    let rect = |area: &area::Id| map.card_rect(*area, &map.layout.cards[area]);
+    let moving: Vec<AreaId> = moving.iter().filter_map(|key| atlas.id(key)).collect();
+    let rect = |area: &AreaId| map.card_rect(*area, &map.layout.cards[area]);
     let mut best: [Option<Snap>; 2] = [None, None];
     for mover in moving
         .iter()

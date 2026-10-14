@@ -4,16 +4,17 @@ use game::core::content::id::LeafKind;
 use game::core::content::{Content, ContentRow};
 use game::core::math::{Pos, Size};
 use game::core::script::Expr;
-use game::core::script::{OwnerKind, OwnerRow};
 use game::core::tiling::Tiles;
 use game::systems::GameSettings;
 use game::systems::area::blueprint::BlueprintDef;
-use game::systems::area::{self, AreaDef, AreaModule, AreaModuleKind, ObjectShape};
+use game::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, ObjectShape};
 use game::systems::item::ItemDef;
 use game::systems::memory::MemoryDef;
-use game::systems::npc::{self, NpcDef};
-use game::systems::quest::{self, Objective, QuestDef};
-use game::systems::script::{Condition, Reach, RiftQuery, RiftScripts, ScriptDef, condition};
+use game::systems::npc::{self, NpcDef, NpcId};
+use game::systems::quest::{Objective, QuestDef, QuestId};
+use game::systems::script::{
+    Condition, OwnerKind, OwnerRow, Reach, RiftQuery, RiftScripts, ScriptDef, condition,
+};
 use game::systems::shop::ShopDef;
 use strum::VariantArray;
 
@@ -22,16 +23,16 @@ use crate::usages::ContentUsages;
 
 pub struct WorldAtlas {
     pub generation: u64,
-    pub areas: BTreeMap<area::Id, AtlasArea>,
+    pub areas: BTreeMap<AreaId, AtlasArea>,
     pub warps: Vec<AtlasWarp>,
     pub owners: Vec<AtlasOwner>,
-    pub initial_spawn: area::Id,
-    pub distances: BTreeMap<area::Id, u32>,
+    pub initial_spawn: AreaId,
+    pub distances: BTreeMap<AreaId, u32>,
     pub quests: Vec<AtlasQuest>,
     pub lines: Vec<QuestLine>,
     pub module_kinds: Vec<AreaModuleKind>,
-    exits: BTreeMap<area::Id, Vec<area::Id>>,
-    fought: BTreeSet<npc::Id>,
+    exits: BTreeMap<AreaId, Vec<AreaId>>,
+    fought: BTreeSet<NpcId>,
 }
 
 pub struct AtlasArea {
@@ -48,7 +49,7 @@ pub struct AtlasArea {
 
 #[derive(Clone)]
 pub struct PlacedNpc {
-    pub npc: npc::Id,
+    pub npc: NpcId,
     pub key: String,
     pub at: Pos<Tiles>,
     pub count: u32,
@@ -56,24 +57,24 @@ pub struct PlacedNpc {
 
 pub struct AtlasDoor {
     pub at: Pos<Tiles>,
-    pub to: area::Id,
+    pub to: AreaId,
     pub owner: usize,
 }
 
 pub struct AtlasWarp {
-    pub from: area::Id,
-    pub to: area::Id,
+    pub from: AreaId,
+    pub to: AreaId,
     pub at: Option<Pos<Tiles>>,
     pub landing: Pos<Tiles>,
     pub owner: usize,
 }
 
 pub struct AtlasOwner {
-    pub area: area::Id,
+    pub area: AreaId,
     pub kind: OwnerKind,
     pub name: String,
     pub label: String,
-    pub npc: Option<npc::Id>,
+    pub npc: Option<NpcId>,
     pub at: Option<Pos<Tiles>>,
     pub reaches: Vec<Reach>,
     pub opens: OpenTarget,
@@ -200,7 +201,7 @@ pub struct AtlasQuest {
 
 pub struct AtlasQuestStep {
     pub kind: QuestStepKind,
-    pub areas: Vec<area::Id>,
+    pub areas: Vec<AreaId>,
     pub who: Option<String>,
 }
 
@@ -234,7 +235,7 @@ pub struct QuestLine {
 pub struct QuestLineStep {
     pub badge: String,
     pub label: String,
-    pub areas: Vec<area::Id>,
+    pub areas: Vec<AreaId>,
     pub branch: bool,
 }
 
@@ -292,26 +293,26 @@ impl WorldAtlas {
         atlas
     }
 
-    pub fn id(&self, key: &str) -> Option<area::Id> {
+    pub fn id(&self, key: &str) -> Option<AreaId> {
         self.areas
             .iter()
             .find(|(_, info)| info.key == key)
             .map(|(id, _)| *id)
     }
 
-    pub fn key(&self, id: area::Id) -> &str {
+    pub fn key(&self, id: AreaId) -> &str {
         &self.areas[&id].key
     }
 
-    pub fn size(&self, id: area::Id) -> Size<Tiles> {
+    pub fn size(&self, id: AreaId) -> Size<Tiles> {
         self.areas[&id].size
     }
 
-    pub fn exits(&self, from: area::Id) -> &[area::Id] {
+    pub fn exits(&self, from: AreaId) -> &[AreaId] {
         self.exits.get(&from).map_or(&[], Vec::as_slice)
     }
 
-    pub fn distances_from(&self, start: area::Id) -> BTreeMap<area::Id, u32> {
+    pub fn distances_from(&self, start: AreaId) -> BTreeMap<AreaId, u32> {
         let mut distances = BTreeMap::new();
         if !self.areas.contains_key(&start) {
             return distances;
@@ -330,8 +331,8 @@ impl WorldAtlas {
         distances
     }
 
-    pub fn route(&self, from: area::Id, to: area::Id) -> Option<Vec<&AtlasWarp>> {
-        let mut previous: HashMap<area::Id, area::Id> = HashMap::new();
+    pub fn route(&self, from: AreaId, to: AreaId) -> Option<Vec<&AtlasWarp>> {
+        let mut previous: HashMap<AreaId, AreaId> = HashMap::new();
         let mut queue = VecDeque::from([from]);
         while let Some(current) = queue.pop_front() {
             if current == to {
@@ -355,7 +356,7 @@ impl WorldAtlas {
         None
     }
 
-    pub fn warps_between(&self, from: area::Id, to: area::Id) -> impl Iterator<Item = &AtlasWarp> {
+    pub fn warps_between(&self, from: AreaId, to: AreaId) -> impl Iterator<Item = &AtlasWarp> {
         self.warps
             .iter()
             .filter(move |warp| warp.from == from && warp.to == to)
@@ -365,11 +366,11 @@ impl WorldAtlas {
         self.exits(warp.to).contains(&warp.from)
     }
 
-    pub fn hostile(&self, npc: npc::Id) -> bool {
+    pub fn hostile(&self, npc: NpcId) -> bool {
         self.fought.contains(&npc)
     }
 
-    pub fn givers(&self, area: area::Id) -> impl Iterator<Item = &AtlasOwner> {
+    pub fn givers(&self, area: AreaId) -> impl Iterator<Item = &AtlasOwner> {
         self.owners.iter().filter(move |owner| {
             owner.area == area
                 && owner
@@ -379,7 +380,7 @@ impl WorldAtlas {
         })
     }
 
-    pub fn sources(&self, area: area::Id, table: &str, key: &str) -> &[RowSource] {
+    pub fn sources(&self, area: AreaId, table: &str, key: &str) -> &[RowSource] {
         self.areas
             .get(&area)
             .and_then(|info| info.found.get(&(table.to_owned(), key.to_owned())))
@@ -465,19 +466,19 @@ impl WorldAtlas {
         out
     }
 
-    pub fn line_areas(&self, category: &str) -> BTreeSet<area::Id> {
+    pub fn line_areas(&self, category: &str) -> BTreeSet<AreaId> {
         self.line_steps(category)
             .into_iter()
             .flat_map(|step| step.areas)
             .collect()
     }
 
-    fn warp_between(&self, from: area::Id, to: area::Id) -> Option<&AtlasWarp> {
+    fn warp_between(&self, from: AreaId, to: AreaId) -> Option<&AtlasWarp> {
         self.warps_between(from, to)
             .min_by(|a, b| self.owners[a.owner].label.cmp(&self.owners[b.owner].label))
     }
 
-    fn add_owners(&mut self, content: Content, scripts: &RiftScripts, id: area::Id) {
+    fn add_owners(&mut self, content: Content, scripts: &RiftScripts, id: AreaId) {
         let key = id.key(&content);
         let placed = area::placed(&content, id);
         let mut seeds = vec![AtlasOwner {
@@ -550,7 +551,7 @@ impl WorldAtlas {
                 object: Some(ordinal as u32),
             });
         }
-        let mut seen: HashSet<npc::Id> = HashSet::new();
+        let mut seen: HashSet<NpcId> = HashSet::new();
         for flattened in placed {
             let (npc, at) = match &flattened.module {
                 AreaModule::Resident(resident) => (resident.npc, Some(resident.at)),
@@ -608,7 +609,7 @@ impl WorldAtlas {
         }
     }
 
-    fn find_sources(&mut self, content: Content, usages: &ContentUsages, id: area::Id) {
+    fn find_sources(&mut self, content: Content, usages: &ContentUsages, id: AreaId) {
         let mut found: Vec<(&'static str, String, RowSource)> = Vec::new();
         let Some(info) = self.areas.get(&id) else {
             return;
@@ -627,7 +628,7 @@ impl WorldAtlas {
             info.key.clone(),
             source(RowSourceKind::Area, &info.key, &here),
         ));
-        let mut placed: BTreeMap<npc::Id, (String, u32)> = BTreeMap::new();
+        let mut placed: BTreeMap<NpcId, (String, u32)> = BTreeMap::new();
         for npc in info.residents.iter().chain(&info.populations) {
             placed.entry(npc.npc).or_insert((npc.key.clone(), 0)).1 += npc.count;
         }
@@ -902,14 +903,14 @@ impl WorldAtlas {
         self.quests = quests;
     }
 
-    fn links_of(&self, content: Content, id: quest::Id) -> Vec<QuestLink> {
+    fn links_of(&self, content: Content, id: QuestId) -> Vec<QuestLink> {
         let def = id.get(&content);
         let mut queries = Vec::new();
         for condition in [def.shown(), def.requires()].into_iter().flatten() {
             positive_queries(condition, &mut queries);
         }
         let mut after: Vec<QuestLink> = Vec::new();
-        let mut link = |quest: quest::Id, how: QuestLinkHow| {
+        let mut link = |quest: QuestId, how: QuestLinkHow| {
             let quest = quest.key(&content).to_owned();
             if !after.iter().any(|known| known.quest == quest) {
                 after.push(QuestLink { quest, how });
@@ -964,8 +965,8 @@ impl WorldAtlas {
         after
     }
 
-    fn areas_where(&self, pick: &dyn Fn(&Reach) -> bool) -> Vec<area::Id> {
-        let areas: BTreeSet<area::Id> = self
+    fn areas_where(&self, pick: &dyn Fn(&Reach) -> bool) -> Vec<AreaId> {
+        let areas: BTreeSet<AreaId> = self
             .owners
             .iter()
             .filter(|owner| owner.reaches.iter().any(pick))
@@ -981,7 +982,7 @@ impl WorldAtlas {
             .map(|owner| owner.name.clone())
     }
 
-    fn areas_finding(&self, table: &str, key: &str) -> Vec<area::Id> {
+    fn areas_finding(&self, table: &str, key: &str) -> Vec<AreaId> {
         self.areas
             .keys()
             .copied()
@@ -1005,7 +1006,7 @@ impl AtlasArea {
 
 type RowName = (String, String);
 
-fn area_info(content: Content, files: &ProjectFiles, id: area::Id) -> AtlasArea {
+fn area_info(content: Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
     let key = id.key(&content).to_owned();
     let def = id.get(&content);
     let loaded = area::load(&content, id);

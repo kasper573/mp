@@ -1,10 +1,8 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
 use game::core::content::Content;
 use game::core::math::Pos;
-use game::core::script::{OwnerKind, OwnerRow};
 use game::core::tiling::Tiles;
-use game::systems::area::{self, ObjectShape};
-use game::systems::script::{Reach, RiftScripts};
+use game::systems::area::{self, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};
@@ -56,23 +54,9 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
     out
 }
 
-pub fn warp_objects(content: Content, area_id: area::Id) -> Vec<ObjectShape> {
-    if !content.has_built::<RiftScripts>() {
-        return Vec::new();
-    }
-    let scripts = content.built::<RiftScripts>();
-    area::objects(area::placed(&content, area_id))
-        .filter(|(index, _)| {
-            scripts
-                .may_do(OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: area_id.raw(),
-                    object: Some(*index),
-                })
-                .reaches
-                .iter()
-                .any(|reach| matches!(reach, Reach::Warp(_)))
-        })
+pub fn warp_objects(content: Content, area_id: AreaId) -> Vec<ObjectShape> {
+    area::warp_objects(&content, area_id)
+        .into_iter()
         .map(|(_, object)| object.shape)
         .collect()
 }

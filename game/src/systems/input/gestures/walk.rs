@@ -10,6 +10,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::input::gestures::{ActiveTileHighlight, ClickClaim, Gesture, content_cursor};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::{CursorShape, InterfaceIcon};
+use crate::systems::movement::MoveRequest;
 use crate::systems::player::session;
 use crate::systems::{area, combat};
 
@@ -24,10 +25,6 @@ struct WalkState {
 }
 
 impl Gesture for WalkGesture {
-    fn priority(&self) -> i32 {
-        5
-    }
-
     fn claim(&self, world: &mut World) -> Option<ClickClaim> {
         if !session::is_alive(world) {
             return None;
@@ -41,8 +38,8 @@ impl Gesture for WalkGesture {
             return;
         }
         if let Some(tile) = target(world) {
-            session::move_to(world, tile);
-            stamp(world, Some(tile));
+            world.write_message(MoveRequest { pos: tile });
+            stamp(world, tile);
         }
     }
 
@@ -73,7 +70,9 @@ fn target(world: &mut World) -> Option<Pos<Tiles>> {
 
 fn repeat(world: &mut World) {
     let now = world.resource::<Time>().elapsed();
-    let last_sent = world.get_resource::<WalkState>().and_then(|s| s.last_sent);
+    let last_sent = world
+        .get_resource::<WalkState>()
+        .and_then(|state| state.last_sent);
     if last_sent.is_some_and(|sent| now.saturating_sub(sent) < MOVE_REPEAT) {
         return;
     }
@@ -84,17 +83,19 @@ fn repeat(world: &mut World) {
         return;
     }
     let tile = point.snap();
-    let last_tile = world.get_resource::<WalkState>().and_then(|s| s.last_tile);
+    let last_tile = world
+        .get_resource::<WalkState>()
+        .and_then(|state| state.last_tile);
     if !area::walkable(world, tile) || last_tile == Some(tile) {
         return;
     }
-    session::move_to(world, tile);
-    stamp(world, Some(tile));
+    world.write_message(MoveRequest { pos: tile });
+    stamp(world, tile);
 }
 
-fn stamp(world: &mut World, tile: Option<Pos<Tiles>>) {
+fn stamp(world: &mut World, tile: Pos<Tiles>) {
     let now = world.resource::<Time>().elapsed();
     let mut state = world.get_resource_or_insert_with(WalkState::default);
     state.last_sent = Some(now);
-    state.last_tile = tile;
+    state.last_tile = Some(tile);
 }

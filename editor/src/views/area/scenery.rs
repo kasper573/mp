@@ -23,7 +23,7 @@ pub struct PlacedTile {
 }
 
 pub fn tiles_of(module: &Value) -> Vec<PlacedTile> {
-    let flip = Flip::parse(module.text("flip")).unwrap_or(Flip::None);
+    let flip: Flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
     let rows: Vec<&Vec<Value>> = module["tiles"]
         .as_array()
         .into_iter()
@@ -101,7 +101,7 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
         let Some(rect) = shapes::scenery_rect(scenery) else {
             continue;
         };
-        let flip = Flip::parse(scenery.text("flip")).unwrap_or(Flip::None);
+        let flip: Flip = serde_json::from_value(scenery["flip"].clone()).unwrap_or_default();
         for placed in tiles_of(scenery) {
             let x = (rect.min().x - bounds.min().x).round() as usize + placed.offset.0;
             let y = (rect.min().y - bounds.min().y).round() as usize + placed.offset.1;

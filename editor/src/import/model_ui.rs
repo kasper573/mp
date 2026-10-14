@@ -308,9 +308,10 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new("🗋").size(16.0).color(theme::MUTED));
             ui.label(
-                theme::strong(match dialog.new_row {
-                    true => "Import a model".to_owned(),
-                    false => format!("Import into model/{}", dialog.key),
+                theme::strong(if dialog.new_row {
+                    "Import a model".to_owned()
+                } else {
+                    format!("Import into model/{}", dialog.key)
                 })
                 .size(17.0),
             );
@@ -456,9 +457,10 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, mut dialog: ModelDialog) -> Op
                 .clone()
                 .or(key_problem)
                 .or_else(|| ready.err())
-                .unwrap_or_else(|| match dialog.export.timed() {
-                    true => "plays the tag with its lengths".to_owned(),
-                    false => {
+                .unwrap_or_else(|| {
+                    if dialog.export.timed() {
+                        "plays the tag with its lengths".to_owned()
+                    } else {
                         "grids and sequences carry no lengths, so each strip asks one".to_owned()
                     }
                 });
@@ -768,8 +770,8 @@ fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 });
             }
         });
-    ui.horizontal(|ui| match dialog.export.timed() {
-        true => {
+    ui.horizontal(|ui| {
+        if dialog.export.timed() {
             for frame in strip.frames.iter().take(per_row) {
                 ui.allocate_ui(Vec2::new(32.0, 14.0), |ui| {
                     ui.centered_and_justified(|ui| {
@@ -784,8 +786,7 @@ fn preview(ctx: &Context, ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
             if strip.frames.len() > per_row {
                 ui.label(theme::faint("…"));
             }
-        }
-        false => {
+        } else {
             let text = dialog
                 .asked
                 .entry(tag.clone())
@@ -829,17 +830,18 @@ fn checklist(ui: &mut Ui, dialog: &ModelDialog) {
             format!("Frames lie on a {fw} × {fh} grid, one per cell."),
         );
     }
-    match dialog.new_row {
-        true => line(
+    if dialog.new_row {
+        line(
             ui,
             true,
             "A new row with the sheet, the hitbox and cues set after.".to_owned(),
-        ),
-        false => line(
+        )
+    } else {
+        line(
             ui,
             true,
             "Pixels and frame lengths replace the current ones.".to_owned(),
-        ),
+        )
     }
     if !dialog.new_row {
         let kept = plan.cues_kept();
@@ -935,25 +937,25 @@ pub fn apply_now(editor: &mut Editor, mut dialog: ModelDialog) -> Option<ModelDi
 
 fn apply_dialog(editor: &mut Editor, dialog: &ModelDialog) -> Result<(), String> {
     let key = dialog.key.trim().to_owned();
-    let row = match dialog.new_row {
-        true => {
-            let project = editor.project.as_ref().ok_or("no folder is open")?;
-            if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
-                return Err(problem);
-            }
-            let shape = editor
-                .shapes
-                .table(TABLE)
-                .ok_or("the model table has no shape")?;
-            Some(schema::template(&shape.shape, &shape.shape))
+    let row = if dialog.new_row {
+        let project = editor.project.as_ref().ok_or("no folder is open")?;
+        if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
+            return Err(problem);
         }
-        false => editor.row_value(TABLE, &key),
+        let shape = editor
+            .shapes
+            .table(TABLE)
+            .ok_or("the model table has no shape")?;
+        Some(schema::template(&shape.shape, &shape.shape))
+    } else {
+        editor.row_value(TABLE, &key)
     };
     let built = model::build(&dialog.plan, &dialog.export, row.as_ref(), &key)?;
     let names = ImportRecord::of_files(&dialog.export.files, TABLE, &key).names();
-    let label = match dialog.new_row {
-        true => format!("Imported {names} as model/{key}"),
-        false => format!("Imported {names} into {key}"),
+    let label = if dialog.new_row {
+        format!("Imported {names} as model/{key}")
+    } else {
+        format!("Imported {names} into {key}")
     };
     let record = model::record(&dialog.export, &key, &dialog.mapping, built.lengths.clone());
     write(editor, &key, built, label, record)?;
@@ -1009,12 +1011,13 @@ pub fn apply_reimport(editor: &mut Editor, key: &str, auto: bool) {
     };
     let names = ImportRecord::of_files(&draft.export.files, TABLE, key).names();
     let changed = draft.plan.changed().len();
-    let label = match auto {
-        true => format!("Imported {names} into {key} again · nothing to decide"),
-        false => format!(
+    let label = if auto {
+        format!("Imported {names} into {key} again · nothing to decide")
+    } else {
+        format!(
             "Imported {names} into {key} again · {changed} strip{}, cues followed",
             widgets::plural(changed)
-        ),
+        )
     };
     let record = model::record(&draft.export, key, &draft.mapping, built.lengths.clone());
     if let Err(error) = write(editor, key, built, label, record) {

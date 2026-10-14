@@ -1,5 +1,3 @@
-use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use bevy_color::{Alpha, Color};
@@ -17,6 +15,8 @@ use bevy_ui::widget::Text;
 use bevy_ui::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, JustifyContent, Node, UiRect, Val,
 };
+use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
+use serde::{Deserialize, Serialize};
 
 use crate::components::text::font_template;
 use crate::tokens::{radius, typography};
@@ -187,22 +187,6 @@ impl KeyModifiers {
         shift: false,
         alt: false,
         super_key: false,
-    };
-    pub const CTRL: KeyModifiers = KeyModifiers {
-        ctrl: true,
-        ..KeyModifiers::NONE
-    };
-    pub const SHIFT: KeyModifiers = KeyModifiers {
-        shift: true,
-        ..KeyModifiers::NONE
-    };
-    pub const ALT: KeyModifiers = KeyModifiers {
-        alt: true,
-        ..KeyModifiers::NONE
-    };
-    pub const SUPER: KeyModifiers = KeyModifiers {
-        super_key: true,
-        ..KeyModifiers::NONE
     };
 
     pub const fn and(self, other: KeyModifiers) -> KeyModifiers {

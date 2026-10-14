@@ -8,7 +8,7 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Hitbox;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::Position;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 pub struct ObjectPlugin;
 
@@ -17,7 +17,7 @@ impl Plugin for ObjectPlugin {
         app.add_observer(attach_look).add_systems(
             Update,
             place_objects
-                .run_if(in_state(GameScene::Area))
+                .run_if(in_state(ClientScreen::Area))
                 .in_set(WorldViewSystems),
         );
     }

@@ -11,7 +11,6 @@ pub use blueprint::{Flattened, PlacedBlueprint, Placement};
 pub use grid::{AreaGrids, Flip, PaletteEntry};
 pub use object::{AreaObject, ObjectDef, ObjectShape};
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io;
 
@@ -19,7 +18,7 @@ use bevy_app::App;
 use bevy_ecs::component::Component;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::world::World;
-use schemars::{JsonSchema, Schema, SchemaGenerator};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
@@ -28,19 +27,22 @@ use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::{
     SoundscapeChannel, SoundscapeLayer, SoundscapeShape, SoundscapeZone,
 };
+use crate::core::content::id::nearest;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{
-    Content, ContentId, ContentRegistry, ContentRow, ErrorPlace, FileWriter, LoadError, LoadStep,
-    Loading, ModuleRule, ModuleSet, RowCheck, serial, valid_key,
+    Content, ContentId, ContentProblem, ContentRegistry, ContentRow, ErrorPlace, FileWriter,
+    LoadError, LoadStep, Loading, ModuleRule, ModuleSet, RowCheck, serial, valid_key,
 };
 use crate::core::math::{Pos, Rect, Size};
-use crate::core::script::{OwnerKind, OwnerRow};
 use crate::core::tiling::{Cell, CellPos, GridSize, TilePos, TileRect, TileSize, Tiles};
+use crate::systems::area::tileset::TilesetId;
 use crate::systems::movement;
-use crate::systems::npc::Id as NpcId;
-use crate::systems::script::{self, Condition, Reach, RiftScripts, ScriptModule};
+use crate::systems::npc::NpcId;
+use crate::systems::script::{
+    self, Condition, OwnerKind, OwnerRow, Reach, RiftScripts, ScriptModule, ScriptedRow,
+};
 
-pub type Id = ContentId<AreaDef>;
+pub type AreaId = ContentId<AreaDef>;
 
 pub const MAX_SIDE: u32 = 256;
 pub const MIN_SIDE: u32 = 4;
@@ -72,7 +74,7 @@ pub fn content(registry: &mut ContentRegistry) {
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AreaTag {
-    pub area: Id,
+    pub area: AreaId,
 }
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +82,11 @@ pub struct Wild;
 
 pub fn wild(world: &World, entity: Entity) -> bool {
     world.get::<Wild>(entity).is_some()
+}
+
+pub fn same_area(world: &World, a: Entity, b: Entity) -> bool {
+    let area = |entity| world.get::<AreaTag>(entity).map(|tag| tag.area);
+    area(a).is_some() && area(a) == area(b)
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -96,7 +103,7 @@ impl ContentRow for AreaDef {
 
     fn check(&self, cx: &mut RowCheck) {
         cx.text("/name", &self.name, 1, 60);
-        let AreaMap::Tilemap(map) = &self.map;
+        let map = self.map();
         cx.range(
             "/map/size/width",
             map.size.width,
@@ -173,6 +180,17 @@ impl ModuleSet for AreaDef {
     }
 }
 
+impl ScriptedRow for AreaDef {
+    const OWNER: OwnerKind = OwnerKind::Area;
+
+    fn script(module: &AreaModule) -> Option<&ScriptModule> {
+        match module {
+            AreaModule::Script(script) => Some(script),
+            _ => None,
+        }
+    }
+}
+
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AreaMap {
@@ -208,17 +226,6 @@ impl AreaDef {
     pub fn map(&self) -> &Tilemap {
         let AreaMap::Tilemap(map) = &self.map;
         map
-    }
-
-    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
-        self.modules
-            .iter()
-            .enumerate()
-            .filter_map(|(index, module)| match module {
-                AreaModule::Script(script) => Some((index, script)),
-                _ => None,
-            })
-            .collect()
     }
 }
 
@@ -301,55 +308,9 @@ pub struct SafeZone {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SoundscapeDef {
-    pub shape: ZoneShape,
+    pub shape: SoundscapeShape,
     pub emit: f32,
     pub channels: Vec<SoundChannel>,
-}
-
-#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
-#[serde(from = "ZoneShapeRow", into = "ZoneShapeRow")]
-pub enum ZoneShape {
-    Rect(Rect<Tiles>),
-    Ellipse(Rect<Tiles>),
-}
-
-#[derive(JsonSchema, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum ZoneShapeRow {
-    Rect { x: f32, y: f32, w: f32, h: f32 },
-    Ellipse { x: f32, y: f32, w: f32, h: f32 },
-}
-
-impl From<ZoneShapeRow> for ZoneShape {
-    fn from(row: ZoneShapeRow) -> ZoneShape {
-        match row {
-            ZoneShapeRow::Rect { x, y, w, h } => {
-                ZoneShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-            ZoneShapeRow::Ellipse { x, y, w, h } => {
-                ZoneShape::Ellipse(Rect::new(Pos::new(x, y), Size::new(w, h)))
-            }
-        }
-    }
-}
-
-impl From<ZoneShape> for ZoneShapeRow {
-    fn from(shape: ZoneShape) -> ZoneShapeRow {
-        match shape {
-            ZoneShape::Rect(r) => ZoneShapeRow::Rect {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-            ZoneShape::Ellipse(r) => ZoneShapeRow::Ellipse {
-                x: r.origin.x,
-                y: r.origin.y,
-                w: r.size.width,
-                h: r.size.height,
-            },
-        }
-    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -404,10 +365,7 @@ impl SoundscapeDef {
 
     pub fn zone(&self) -> SoundscapeZone {
         SoundscapeZone {
-            shape: match self.shape {
-                ZoneShape::Rect(r) => SoundscapeShape::Rect(r),
-                ZoneShape::Ellipse(r) => SoundscapeShape::Ellipse(r),
-            },
+            shape: self.shape,
             emit: Tiles(self.emit),
             channels: self
                 .channels
@@ -433,7 +391,7 @@ pub struct Scenery {
     #[schemars(with = "serial::PosRow")]
     #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<Tiles>,
-    pub tileset: tileset::Id,
+    pub tileset: TilesetId,
     pub tiles: Vec<Vec<Option<SceneryTile>>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<f32>,
@@ -484,42 +442,25 @@ impl Scenery {
     }
 
     pub fn bounds(&self) -> Rect<Tiles> {
-        Rect::new(
+        self.flip.anchored(
             self.at,
             Size::new(self.width() as f32, self.height() as f32),
         )
     }
 
     pub fn sort_line(&self) -> Option<Tiles> {
-        let sort = self.sort?;
-        Some(Tiles(if self.flip.vertical() {
-            self.at.y - self.height() as f32 + sort
-        } else {
-            self.at.y + sort
-        }))
+        Some(Tiles(self.bounds().min().y + self.sort?))
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "SceneryTileRow", into = "SceneryTileRow")]
 pub struct SceneryTile {
     pub tile: u32,
     pub flip: Flip,
 }
 
-impl Serialize for SceneryTile {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        if self.flip.is_none() {
-            return serializer.serialize_u32(self.tile);
-        }
-        let mut map = serializer.serialize_map(Some(2))?;
-        map.serialize_entry("tile", &self.tile)?;
-        map.serialize_entry("flip", &self.flip)?;
-        map.end()
-    }
-}
-
-#[derive(Deserialize, JsonSchema)]
+#[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(untagged)]
 enum SceneryTileRow {
     Tile(u32),
@@ -530,29 +471,28 @@ enum SceneryTileRow {
     },
 }
 
-impl<'de> Deserialize<'de> for SceneryTile {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<SceneryTile, D::Error> {
-        Ok(match SceneryTileRow::deserialize(deserializer)? {
+impl From<SceneryTileRow> for SceneryTile {
+    fn from(row: SceneryTileRow) -> SceneryTile {
+        match row {
             SceneryTileRow::Tile(tile) => SceneryTile {
                 tile,
                 flip: Flip::None,
             },
             SceneryTileRow::Flipped { tile, flip } => SceneryTile { tile, flip },
-        })
+        }
     }
 }
 
-impl JsonSchema for SceneryTile {
-    fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("SceneryTile")
-    }
-
-    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
-        SceneryTileRow::json_schema(generator)
-    }
-
-    fn inline_schema() -> bool {
-        true
+impl From<SceneryTile> for SceneryTileRow {
+    fn from(tile: SceneryTile) -> SceneryTileRow {
+        if tile.flip.is_none() {
+            SceneryTileRow::Tile(tile.tile)
+        } else {
+            SceneryTileRow::Flipped {
+                tile: tile.tile,
+                flip: tile.flip,
+            }
+        }
     }
 }
 
@@ -586,7 +526,7 @@ pub struct PlacedModules(pub Vec<Vec<Flattened>>);
 
 pub struct PlacedBlueprints(pub Vec<Vec<PlacedBlueprint>>);
 
-pub fn placed(content: &Content, area: Id) -> &'static [Flattened] {
+pub fn placed(content: &Content, area: AreaId) -> &'static [Flattened] {
     content
         .built::<PlacedModules>()
         .0
@@ -594,7 +534,7 @@ pub fn placed(content: &Content, area: Id) -> &'static [Flattened] {
         .map_or(&[], Vec::as_slice)
 }
 
-pub fn placements(content: &Content, area: Id) -> &'static [PlacedBlueprint] {
+pub fn placements(content: &Content, area: AreaId) -> &'static [PlacedBlueprint] {
     content
         .built::<PlacedBlueprints>()
         .0
@@ -602,7 +542,7 @@ pub fn placements(content: &Content, area: Id) -> &'static [PlacedBlueprint] {
         .map_or(&[], Vec::as_slice)
 }
 
-pub fn modules(content: &Content, area: Id) -> impl Iterator<Item = &'static AreaModule> {
+pub fn modules(content: &Content, area: AreaId) -> impl Iterator<Item = &'static AreaModule> {
     placed(content, area).iter().map(|placed| &placed.module)
 }
 
@@ -629,6 +569,26 @@ pub fn residents(modules: &[Flattened]) -> impl Iterator<Item = NpcId> + '_ {
         AreaModule::Resident(resident) => Some(resident.npc),
         _ => None,
     })
+}
+
+pub fn warp_objects(content: &Content, area: AreaId) -> Vec<(u32, &'static ObjectDef)> {
+    if !content.has_built::<RiftScripts>() {
+        return Vec::new();
+    }
+    let scripts = content.built::<RiftScripts>();
+    objects(placed(content, area))
+        .filter(|(index, _)| {
+            scripts
+                .may_do(OwnerRow {
+                    kind: OwnerKind::Object,
+                    row: area.raw(),
+                    object: Some(*index),
+                })
+                .reaches
+                .iter()
+                .any(|reach| matches!(reach, Reach::Warp(_)))
+        })
+        .collect()
 }
 
 pub fn walkable(world: &World, tile: Pos<Tiles>) -> bool {
@@ -699,7 +659,7 @@ pub struct Areas(Vec<Option<Area>>);
 
 pub struct AreaGridSet(Vec<Option<AreaGrids>>);
 
-pub fn load(content: &Content, area: Id) -> &'static Area {
+pub fn load(content: &Content, area: AreaId) -> &'static Area {
     content
         .built::<Areas>()
         .0
@@ -729,10 +689,11 @@ fn read_grids(loading: &mut Loading) {
                 loading.file_error(
                     format!("{folder}/{file}"),
                     ErrorPlace::WholeFile,
-                    "unknown entry",
-                    format!("file {file}"),
-                    format!("only {}", expected.join(", ")),
-                    None,
+                    ContentProblem::new(
+                        "unknown entry",
+                        format!("file {file}"),
+                        format!("only {}", expected.join(", ")),
+                    ),
                 );
             }
         }
@@ -743,10 +704,11 @@ fn read_grids(loading: &mut Loading) {
                 loading.row_error(
                     id,
                     pointer,
-                    "missing file",
-                    format!("no {name} in {folder}/"),
-                    format!("{file} beside the row"),
-                    None,
+                    ContentProblem::new(
+                        "missing file",
+                        format!("no {name} in {folder}/"),
+                        format!("{file} beside the row"),
+                    ),
                 );
                 return None;
             }
@@ -756,10 +718,7 @@ fn read_grids(loading: &mut Loading) {
                     loading.file_error(
                         file,
                         ErrorPlace::WholeFile,
-                        "unreadable file",
-                        error,
-                        "a UTF-8 CSV file",
-                        None,
+                        ContentProblem::new("unreadable file", error, "a UTF-8 CSV file"),
                     );
                     None
                 }
@@ -773,7 +732,7 @@ fn read_grids(loading: &mut Loading) {
             .enumerate()
             .map(|(index, layer)| {
                 read(
-                    &format!("{layer}.csv"),
+                    &grid::layer_file(layer),
                     &format!("/map/ground/{index}"),
                     loading,
                 )
@@ -813,11 +772,12 @@ fn read_grids(loading: &mut Loading) {
                 errors.push(LoadError {
                     file: palette_file.clone(),
                     at,
-                    rule: "unknown row",
-                    found: format!("{:?}", row.tileset),
-                    expected: "the key of a tileset row".to_owned(),
-                    nearest: crate::core::content::id::nearest(tilesets.keys(), &row.tileset)
-                        .map(|n| format!("{n:?}")),
+                    problem: ContentProblem::new(
+                        "unknown row",
+                        format!("{:?}", row.tileset),
+                        "the key of a tileset row",
+                    )
+                    .near(nearest(tilesets.keys(), &row.tileset).map(|n| format!("{n:?}"))),
                 });
                 ok = false;
                 continue;
@@ -827,10 +787,11 @@ fn read_grids(loading: &mut Loading) {
                     errors.push(LoadError {
                         file: palette_file.clone(),
                         at: at.clone(),
-                        rule: "tile size mismatch",
-                        found: format!("{} against {}", map.tile, tileset.tile),
-                        expected: format!("tilesets of {} px tiles, the area's", map.tile),
-                        nearest: None,
+                        problem: ContentProblem::new(
+                            "tile size mismatch",
+                            format!("{} against {}", map.tile, tileset.tile),
+                            format!("tilesets of {} px tiles, the area's", map.tile),
+                        ),
                     });
                     ok = false;
                 }
@@ -843,10 +804,11 @@ fn read_grids(loading: &mut Loading) {
                                 row: index + 2,
                                 column: 2,
                             },
-                            rule: "tile out of range",
-                            found: format!("tile {} of {count}", row.tile),
-                            expected: format!("0 to {}", count.saturating_sub(1)),
-                            nearest: None,
+                            problem: ContentProblem::new(
+                                "tile out of range",
+                                format!("tile {} of {count}", row.tile),
+                                format!("0 to {}", count.saturating_sub(1)),
+                            ),
                         });
                         ok = false;
                     }
@@ -872,14 +834,18 @@ fn read_grids(loading: &mut Loading) {
                     if field.is_empty() {
                         return Ok(None);
                     }
-                    let index: u32 = field
-                        .parse()
-                        .map_err(|_| "empty or a palette index".to_owned())?;
+                    let index: u32 = field.parse().map_err(|_| grid::BadCell {
+                        rule: "bad cell",
+                        expected: "empty or a palette index".to_owned(),
+                    })?;
                     if index as usize >= entries {
-                        return Err(format!(
-                            "0 to {}, an index into the area's {entries} palette entries",
-                            entries.saturating_sub(1)
-                        ));
+                        return Err(grid::BadCell {
+                            rule: "palette out of range",
+                            expected: format!(
+                                "0 to {}, an index into the area's {entries} palette entries",
+                                entries.saturating_sub(1)
+                            ),
+                        });
                     }
                     Ok(Some(index))
                 },
@@ -904,7 +870,10 @@ fn read_grids(loading: &mut Loading) {
                 "" => Ok(None),
                 "1" => Ok(Some(true)),
                 "0" => Ok(Some(false)),
-                _ => Err("empty, 1 or 0".to_owned()),
+                _ => Err(grid::BadCell {
+                    rule: "bad cell",
+                    expected: "empty, 1 or 0".to_owned(),
+                }),
             },
             &mut errors,
         );
@@ -941,22 +910,12 @@ fn flatten_all(loading: &mut Loading) {
         }
         for error in errors {
             match error.at {
-                blueprint::FlattenAt::Area(pointer) => loading.row_error(
-                    id,
-                    &pointer,
-                    error.rule,
-                    error.found,
-                    error.expected,
-                    error.nearest,
-                ),
-                blueprint::FlattenAt::Blueprint(blueprint, pointer) => loading.row_error(
-                    blueprint,
-                    &pointer,
-                    error.rule,
-                    error.found,
-                    error.expected,
-                    error.nearest,
-                ),
+                blueprint::FlattenAt::Area(pointer) => {
+                    loading.row_error(id, &pointer, error.problem)
+                }
+                blueprint::FlattenAt::Blueprint(blueprint, pointer) => {
+                    loading.row_error(blueprint, &pointer, error.problem)
+                }
             }
         }
         placed[id.index()] = flattening.modules;
@@ -986,8 +945,14 @@ fn build_all(loading: &mut Loading) {
                 _ => None,
             })
             .collect();
-        let flat: Vec<AreaModule> = modules.iter().map(|placed| placed.module.clone()).collect();
-        let walk = walk::grids(&content, grids, &flat, &safe_zones);
+        let scenery: Vec<&Scenery> = modules
+            .iter()
+            .filter_map(|placed| match &placed.module {
+                AreaModule::Scenery(scenery) => Some(scenery),
+                _ => None,
+            })
+            .collect();
+        let walk = walk::grids(&content, grids, &scenery, &safe_zones);
         let size = map.size.grid();
         let area = Area {
             size: map.size.tiles(),
@@ -1007,13 +972,7 @@ fn build_all(loading: &mut Loading) {
                 })
                 .collect(),
             grids,
-            scenery: modules
-                .iter()
-                .filter_map(|placed| match &placed.module {
-                    AreaModule::Scenery(scenery) => Some(scenery),
-                    _ => None,
-                })
-                .collect(),
+            scenery,
         };
         check_placed(&content, id, &area, modules, &mut check);
         loading.row_errors(id, check);
@@ -1109,39 +1068,14 @@ fn check_bounds(
 
 fn check_placed(
     content: &Content,
-    id: Id,
+    id: AreaId,
     area: &Area,
     modules: &[Flattened],
     check: &mut RowCheck,
 ) {
-    let scripts = content
-        .has_built::<RiftScripts>()
-        .then(|| content.built::<RiftScripts>());
-    let warps: Vec<(u32, &ObjectDef, String)> = objects(modules)
-        .filter(|(index, _)| {
-            scripts.is_some_and(|scripts| {
-                scripts
-                    .may_do(OwnerRow {
-                        kind: OwnerKind::Object,
-                        row: id.raw(),
-                        object: Some(*index),
-                    })
-                    .reaches
-                    .iter()
-                    .any(|reach| matches!(reach, Reach::Warp(_)))
-            })
-        })
-        .map(|(index, object)| {
-            (
-                index,
-                object,
-                object
-                    .name
-                    .clone()
-                    .or_else(|| object.label.clone())
-                    .unwrap_or_else(|| format!("object {index}")),
-            )
-        })
+    let warps: Vec<(u32, &ObjectDef, String)> = warp_objects(content, id)
+        .into_iter()
+        .map(|(index, object)| (index, object, object.title(index)))
         .collect();
     let in_warp = |at: Pos<Tiles>| {
         warps
@@ -1177,12 +1111,14 @@ fn check_placed(
                 if let ObjectShape::Point(at) = object.shape
                     && !area.grid.walkable(at)
                 {
-                    check.nearest(
+                    check.problem(
                         format!("{pointer}/shape"),
-                        "not walkable",
-                        format!("{}, {}", at.x, at.y),
-                        "a point object on a walkable cell",
-                        nearest_cell(at),
+                        ContentProblem::new(
+                            "not walkable",
+                            format!("{}, {}", at.x, at.y),
+                            "a point object on a walkable cell",
+                        )
+                        .near(nearest_cell(at)),
                     );
                 }
             }
@@ -1198,12 +1134,14 @@ fn check_placed(
                 }
                 seen_residents.push(resident.npc);
                 if !area.grid.walkable(resident.at) {
-                    check.nearest(
+                    check.problem(
                         format!("{pointer}/at"),
-                        "not walkable",
-                        format!("{} {}, {}", key, resident.at.x, resident.at.y),
-                        "a resident on a walkable cell",
-                        nearest_cell(resident.at),
+                        ContentProblem::new(
+                            "not walkable",
+                            format!("{} {}, {}", key, resident.at.x, resident.at.y),
+                            "a resident on a walkable cell",
+                        )
+                        .near(nearest_cell(resident.at)),
                     );
                 } else if let Some(door) = in_warp(resident.at) {
                     check.error(
@@ -1263,14 +1201,7 @@ fn check_placed(
     }
 }
 
-pub struct PlaceProblem {
-    pub rule: &'static str,
-    pub found: String,
-    pub expected: String,
-    pub nearest: Option<String>,
-}
-
-pub fn check_place(content: &Content, place: script::Place) -> Result<(), PlaceProblem> {
+pub fn check_place(content: &Content, place: script::Place) -> Result<(), ContentProblem> {
     let Some(area) = content
         .built::<Areas>()
         .0
@@ -1280,56 +1211,38 @@ pub fn check_place(content: &Content, place: script::Place) -> Result<(), PlaceP
         return Ok(());
     };
     let key = place.area.key(content);
-    let modules = placed(content, place.area);
-    let scripts = content.built::<RiftScripts>();
-    let warp_objects: Vec<(u32, &ObjectDef)> = objects(modules)
-        .filter(|(index, _)| {
-            scripts
-                .may_do(OwnerRow {
-                    kind: OwnerKind::Object,
-                    row: place.area.raw(),
-                    object: Some(*index),
-                })
-                .reaches
-                .iter()
-                .any(|reach| matches!(reach, Reach::Warp(_)))
-        })
-        .collect();
+    let warps = warp_objects(content, place.area);
     let problem = |rule: &'static str, found: String| {
         let nearest = area
             .grid
             .nodes()
             .iter()
-            .filter(|cell| {
-                !warp_objects
-                    .iter()
-                    .any(|(_, object)| object.shape.covers(**cell))
-            })
+            .filter(|cell| !warps.iter().any(|(_, object)| object.shape.covers(**cell)))
             .min_by(|a, b| a.distance(place.at).0.total_cmp(&b.distance(place.at).0))
             .map(|cell| format!("{}, {}", cell.x, cell.y));
-        PlaceProblem {
+        ContentProblem::new(
             rule,
             found,
-            expected: format!("a place on a walkable cell of {key}, outside every warp object"),
-            nearest,
-        }
+            format!("a place on a walkable cell of {key}, outside every warp object"),
+        )
+        .near(nearest)
     };
-    if !walk::in_map(area.size.grid(), place.at) || !area.grid.walkable(place.at) {
+    if !area.grid.walkable(place.at) {
         return Err(problem(
             "not walkable",
             format!("{key} {}, {}", place.at.x, place.at.y),
         ));
     }
-    for (index, object) in &warp_objects {
+    for &(index, object) in &warps {
         if object.shape.covers(place.at) {
-            let name = object
-                .name
-                .clone()
-                .or_else(|| object.label.clone())
-                .unwrap_or_else(|| format!("object {index}"));
             return Err(problem(
                 "in a warp object",
-                format!("{key} {}, {} inside object {name}", place.at.x, place.at.y),
+                format!(
+                    "{key} {}, {} inside object {}",
+                    place.at.x,
+                    place.at.y,
+                    object.title(index)
+                ),
             ));
         }
     }

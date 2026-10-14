@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
 use bevy_platform::collections::HashMap;
+use thread_local::ThreadLocal;
 
 use super::{Condition, RiftQuery, RiftScripting};
 use crate::core::content::Content;
-use crate::core::script::run::FlowKey;
-use crate::core::script::{Compiler, Eval, Expr, FlowCx, Locals, Owner, Value, ValueType};
+use crate::core::script::{Compiler, Eval, Expr, FlowCx, ScriptFault, Value, ValueType};
 use crate::systems::stat::StatKind;
 use crate::systems::text::{self, LineText, Span};
 
@@ -25,55 +25,48 @@ impl CompiledCondition {
 }
 
 pub fn holds(world: &World, subject: Entity, condition: &'static Condition) -> bool {
-    eval(world, subject, condition).truthy()
+    eval(world, subject, condition, ValueType::Boolean).truthy()
 }
 
-pub fn eval(world: &World, subject: Entity, condition: &'static Condition) -> Value {
-    let compiled = compiled(world.resource::<Content>(), condition, ValueType::Boolean);
-    run(world, subject, &compiled)
-}
-
-fn eval_value(world: &World, subject: Entity, value: &'static Condition) -> Value {
-    let compiled = compiled(world.resource::<Content>(), value, ValueType::Text);
-    run(world, subject, &compiled)
-}
-
-fn run(world: &World, subject: Entity, compiled: &Eval) -> Value {
-    let cx = FlowCx {
-        key: FlowKey {
-            owner: Owner::Area,
-            flow: 0,
-        },
-        owner: Owner::Area,
-        subject: Some(subject),
-        locals: Locals::new(),
-        state: Vec::new(),
-        event: Vec::new(),
-    };
-    compiled(world, &cx)
+pub fn first_unmet(
+    world: &World,
+    subject: Entity,
+    conditions: impl IntoIterator<Item = &'static Condition>,
+) -> Option<String> {
+    conditions
+        .into_iter()
+        .flat_map(parts)
+        .find(|part| !holds(world, subject, part))
+        .map(|part| describe(world.resource::<Content>(), part))
 }
 
 pub fn spoken(world: &World, subject: Entity, spans: &'static [Span]) -> LineText {
     let values: Vec<Value> = text::values(spans)
         .into_iter()
-        .map(|value| eval_value(world, subject, value))
+        .map(|value| eval(world, subject, value, ValueType::Text))
         .collect();
     LineText::spoken(spans, &values)
 }
 
-pub fn check(
-    content: &Content,
-    condition: &'static Condition,
-) -> Result<(), (&'static str, String)> {
+fn eval(world: &World, subject: Entity, expr: &'static Condition, want: ValueType) -> Value {
+    run(
+        world,
+        subject,
+        &compiled(world.resource::<Content>(), expr, want),
+    )
+}
+
+fn run(world: &World, subject: Entity, compiled: &Eval) -> Value {
+    compiled(world, &FlowCx::standalone(subject))
+}
+
+pub fn check(content: &Content, condition: &'static Condition) -> Result<(), ScriptFault> {
     Compiler::<RiftScripting>::standalone(content)
         .expr(condition, ValueType::Boolean)
         .map(|_| ())
 }
 
-pub fn check_value(
-    content: &Content,
-    value: &'static Condition,
-) -> Result<(), (&'static str, String)> {
+pub fn check_value(content: &Content, value: &'static Condition) -> Result<(), ScriptFault> {
     Compiler::<RiftScripting>::standalone(content)
         .expr(value, ValueType::Text)
         .map(|_| ())
@@ -181,29 +174,24 @@ fn stat_label(stat: StatKind) -> &'static str {
     stat.into()
 }
 
-type Compiled = HashMap<usize, Arc<Eval>>;
+// Keyed by address, which only stays unique while the content lives, so the cache is built into it.
+#[derive(Default)]
+pub(super) struct CompiledConditions(ThreadLocal<RefCell<ByAddress>>);
 
-thread_local! {
-    static CACHE: RefCell<Compiled> = RefCell::new(HashMap::new());
-}
-
-/// Drops this thread's compiled conditions, which are keyed by their row's address: a process that
-/// releases a content and loads another must call it before the addresses are reused.
-pub fn forget_compiled() {
-    CACHE.with(|cache| cache.borrow_mut().clear());
-}
+type ByAddress = HashMap<(usize, ValueType), Arc<Eval>>;
 
 fn compiled(content: &Content, condition: &'static Condition, want: ValueType) -> Arc<Eval> {
-    let key = condition as *const Condition as usize;
-    if let Some(found) = CACHE.with(|cache| cache.borrow().get(&key).cloned()) {
-        return found;
+    let key = (condition as *const Condition as usize, want);
+    let cache = content.built::<CompiledConditions>().0.get_or_default();
+    if let Some(found) = cache.borrow().get(&key) {
+        return found.clone();
     }
     let eval = Compiler::<RiftScripting>::standalone(content)
         .expr(condition, want)
-        .unwrap_or_else(|(rule, expected)| {
-            panic!("condition does not compile ({rule}: {expected}); check_content should have refused it")
+        .unwrap_or_else(|fault| {
+            panic!("condition does not compile ({fault}); check_content should have refused it")
         });
     let eval = Arc::new(eval);
-    CACHE.with(|cache| cache.borrow_mut().insert(key, eval.clone()));
+    cache.borrow_mut().insert(key, eval.clone());
     eval
 }

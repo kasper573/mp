@@ -13,7 +13,11 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
+use game::core::math::Direction;
+use game::systems::actor::Action;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
@@ -21,9 +25,6 @@ use crate::thumbs::Thumbnail;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{import, thumbs, value};
-use game::systems::actor::model::{ActionName, DirectionName};
-use serde::{Deserialize, Serialize};
-use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub const TABLE: &str = "model";
 pub const MAX_FRAMES: usize = 256;
@@ -64,8 +65,8 @@ impl FrameCueKind {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct ModelStrip {
-    pub action: ActionName,
-    pub direction: DirectionName,
+    pub action: Action,
+    pub direction: Direction,
 }
 
 impl ModelStrip {
@@ -77,27 +78,27 @@ impl ModelStrip {
     }
 
     pub fn all() -> impl Iterator<Item = ModelStrip> {
-        ActionName::VARIANTS.iter().flat_map(|&action| {
-            DirectionName::VARIANTS
+        Action::VARIANTS.iter().flat_map(|&action| {
+            Direction::VARIANTS
                 .iter()
                 .map(move |&direction| ModelStrip { action, direction })
         })
     }
 
     pub fn name(self) -> String {
-        format!("{} · {}", self.action.key(), self.direction.key())
+        format!("{} · {}", self.action.as_ref(), self.direction.as_ref())
     }
 
     pub fn pointer(self) -> String {
         format!(
             "/sprites/actions/{}/{}",
-            self.action.key(),
-            self.direction.key()
+            self.action.as_ref(),
+            self.direction.as_ref()
         )
     }
 
     pub fn record_key(self) -> String {
-        format!("{}_{}", self.action.key(), self.direction.key())
+        format!("{}_{}", self.action.as_ref(), self.direction.as_ref())
     }
 }
 
@@ -345,7 +346,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
 }
 
 pub fn strip_of(row: &Value, strip: ModelStrip) -> Vec<StripFrame> {
-    row["sprites"]["actions"][strip.action.key()][strip.direction.key()]
+    row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()]
         .as_array()
         .map(|frames| {
             frames
@@ -384,16 +385,16 @@ pub fn lengths(frames: &[StripFrame]) -> Vec<u32> {
 
 pub struct ActionTiming {
     pub common: Vec<u32>,
-    pub differing: Vec<DirectionName>,
+    pub differing: Vec<Direction>,
 }
 
 impl ActionTiming {
-    pub fn out_of_step(&self, direction: DirectionName) -> bool {
-        self.differing.contains(&direction) && self.differing.len() < DirectionName::VARIANTS.len()
+    pub fn out_of_step(&self, direction: Direction) -> bool {
+        self.differing.contains(&direction) && self.differing.len() < Direction::VARIANTS.len()
     }
 
     pub fn stragglers(&self) -> usize {
-        if self.differing.len() < DirectionName::VARIANTS.len() {
+        if self.differing.len() < Direction::VARIANTS.len() {
             self.differing.len()
         } else {
             0
@@ -401,8 +402,8 @@ impl ActionTiming {
     }
 }
 
-pub fn action_timing(row: &Value, action: ActionName) -> ActionTiming {
-    let strips: Vec<Vec<u32>> = DirectionName::VARIANTS
+pub fn action_timing(row: &Value, action: Action) -> ActionTiming {
+    let strips: Vec<Vec<u32>> = Direction::VARIANTS
         .iter()
         .map(|&direction| lengths(&strip_of(row, ModelStrip { action, direction })))
         .collect();
@@ -418,7 +419,7 @@ pub fn action_timing(row: &Value, action: ActionName) -> ActionTiming {
         .max_by_key(|(_, count)| *count)
         .map(|(strip, _)| strip.clone())
         .unwrap_or_default();
-    let differing = DirectionName::VARIANTS
+    let differing = Direction::VARIANTS
         .iter()
         .zip(&strips)
         .filter(|(_, strip)| **strip != common)
@@ -427,18 +428,18 @@ pub fn action_timing(row: &Value, action: ActionName) -> ActionTiming {
     ActionTiming { common, differing }
 }
 
-pub fn play_rule(action: ActionName) -> &'static str {
+pub fn play_rule(action: Action) -> &'static str {
     match action {
-        ActionName::Attack => "once per swing",
-        ActionName::Death => "once, then holds",
+        Action::Attack => "once per swing",
+        Action::Dead => "once, then holds",
         _ => "loops",
     }
 }
 
-pub fn play_rule_long(action: ActionName) -> &'static str {
+pub fn play_rule_long(action: Action) -> &'static str {
     match action {
-        ActionName::Attack => "once per swing · at attack speed · the hit lands at the apex",
-        ActionName::Death => "once, then holds · cues fire once",
+        Action::Attack => "once per swing · at attack speed · the hit lands at the apex",
+        Action::Dead => "once, then holds · cues fire once",
         _ => "loops",
     }
 }
@@ -483,7 +484,8 @@ pub fn write_strip(
     let Some(mut row) = editor.row_value(TABLE, key) else {
         return false;
     };
-    row["sprites"]["actions"][strip.action.key()][strip.direction.key()] = frames_json(frames);
+    row["sprites"]["actions"][strip.action.as_ref()][strip.direction.as_ref()] =
+        frames_json(frames);
     write_row(editor, key, &row, edit)
 }
 

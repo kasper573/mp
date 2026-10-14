@@ -3,6 +3,8 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioInstance, AudioSource, AudioTween};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::decibels;
@@ -40,7 +42,8 @@ pub struct SoundscapeZone {
     pub channels: BTreeMap<SoundscapeChannel, SoundscapeLayer>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(from = "ShapeRow", into = "ShapeRow")]
 pub enum SoundscapeShape {
     Rect(Rect<Tiles>),
     Ellipse(Rect<Tiles>),
@@ -292,4 +295,43 @@ fn unit_circle(bounds: Rect<Tiles>, at: Pos<Tiles>) -> euclid::Vector2D<f32, Til
 
 fn toward(from: f32, to: f32, step: f32) -> f32 {
     from + (to - from).clamp(-step, step)
+}
+
+#[derive(JsonSchema, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+enum ShapeRow {
+    Rect { x: f32, y: f32, w: f32, h: f32 },
+    Ellipse { x: f32, y: f32, w: f32, h: f32 },
+}
+
+impl From<ShapeRow> for SoundscapeShape {
+    fn from(row: ShapeRow) -> SoundscapeShape {
+        match row {
+            ShapeRow::Rect { x, y, w, h } => {
+                SoundscapeShape::Rect(Rect::new(Pos::new(x, y), Size::new(w, h)))
+            }
+            ShapeRow::Ellipse { x, y, w, h } => {
+                SoundscapeShape::Ellipse(Rect::new(Pos::new(x, y), Size::new(w, h)))
+            }
+        }
+    }
+}
+
+impl From<SoundscapeShape> for ShapeRow {
+    fn from(shape: SoundscapeShape) -> ShapeRow {
+        match shape {
+            SoundscapeShape::Rect(r) => ShapeRow::Rect {
+                x: r.origin.x,
+                y: r.origin.y,
+                w: r.size.width,
+                h: r.size.height,
+            },
+            SoundscapeShape::Ellipse(r) => ShapeRow::Ellipse {
+                x: r.origin.x,
+                y: r.origin.y,
+                w: r.size.width,
+                h: r.size.height,
+            },
+        }
+    }
 }

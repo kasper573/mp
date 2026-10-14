@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
 use forms::FormCx;
+use game::systems::actor::Action;
 use serde_json::Value;
 
 use super::{
@@ -13,7 +14,6 @@ use crate::project::{ContentEdit, RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, inspector, theme, widgets};
 use crate::{forms, picker};
-use game::systems::actor::model::ActionName;
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let Some(key) = selection.keys.first().cloned() else {
@@ -216,7 +216,7 @@ fn frame_card(
                     )
                 });
             }
-            ui.label(theme::muted(if strip.action == ActionName::Attack {
+            ui.label(theme::muted(if strip.action == Action::Attack {
                 "the hit lands here"
             } else {
                 "only attack strips land a hit"
@@ -508,7 +508,7 @@ fn cue_card(
                 widgets::kv_text(ui, "on frame", on_frame);
                 let lands = "the hit, on server and client, when the swing reaches this frame";
                 widgets::kv_text(ui, "lands", lands);
-                if strip.action != ActionName::Attack {
+                if strip.action != Action::Attack {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("!").color(theme::WARN).strong());
                         let why = "an apex belongs in attack strips only; the folder will not load with it here";

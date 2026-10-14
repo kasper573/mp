@@ -5,18 +5,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::grid::Flip;
-use super::{AreaDef, AreaModule, ObjectShape, ZoneShape};
+use super::{AreaDef, AreaModule, ObjectShape};
+use crate::core::audio::soundscape::SoundscapeShape;
 use crate::core::content::id::{LeafKind, LeafProblem, nearest};
+use crate::core::content::locate::escape;
 use crate::core::content::{
-    Content, ContentId, ContentRow, ContentScope, RowCheck, pointer_of, row_file, serial,
-    valid_key, with_content,
+    Content, ContentId, ContentProblem, ContentRow, ContentScope, RowCheck, pointer_of, row_file,
+    serial, valid_key, with_content,
 };
 use crate::core::math::{Pos, Rect};
 use crate::core::script::{VarValue, Variable, VariableType, Vocabulary};
 use crate::core::tiling::Tiles;
 use crate::systems::script::{RiftScripting, ScriptModule};
 
-pub type Id = ContentId<BlueprintDef>;
+pub type BlueprintId = ContentId<BlueprintDef>;
 
 pub const MAX_DEPTH: usize = 8;
 pub const MAX_PARTS: usize = 4096;
@@ -47,7 +49,7 @@ impl ContentRow for BlueprintDef {
         for name in self.variables.keys() {
             if !(1..=40).contains(&name.len()) || !valid_key(name) {
                 cx.error(
-                    format!("/variables/{}", crate::core::content::locate::escape(name)),
+                    format!("/variables/{}", escape(name)),
                     "out of range",
                     format!("{name:?}"),
                     "a variable name of 1 to 40 key characters",
@@ -61,7 +63,7 @@ impl ContentRow for BlueprintDef {
         for name in self.variables.keys() {
             if !used.contains(name) {
                 cx.error(
-                    format!("/variables/{}", crate::core::content::locate::escape(name)),
+                    format!("/variables/{}", escape(name)),
                     "unused variable",
                     name,
                     "a variable some hole in the parts names",
@@ -74,7 +76,7 @@ impl ContentRow for BlueprintDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Placement {
-    pub blueprint: Id,
+    pub blueprint: BlueprintId,
     #[schemars(with = "serial::PosRow")]
     #[serde(serialize_with = "serial::pos", deserialize_with = "serial::pos_from")]
     pub at: Pos<Tiles>,
@@ -88,11 +90,11 @@ pub struct Placement {
 pub struct Flattened {
     pub module: AreaModule,
     pub origin: usize,
-    pub chain: Vec<(Id, usize)>,
+    pub chain: Vec<(BlueprintId, usize)>,
 }
 
 impl Flattened {
-    pub fn site(&self, content: &Content, area: super::Id) -> (String, String) {
+    pub fn site(&self, content: &Content, area: super::AreaId) -> (String, String) {
         match self.chain.last() {
             None => (
                 row_file(AreaDef::TABLE, area.key(content)),
@@ -124,9 +126,9 @@ impl Flattened {
 }
 
 pub struct PlacedBlueprint {
-    pub blueprint: Id,
+    pub blueprint: BlueprintId,
     pub origin: usize,
-    pub chain: Vec<(Id, usize)>,
+    pub chain: Vec<(BlueprintId, usize)>,
     pub at: Pos<Tiles>,
     pub flip: Flip,
     pub values: BTreeMap<String, Value>,
@@ -141,16 +143,13 @@ pub struct Flattening {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FlattenAt {
     Area(String),
-    Blueprint(Id, String),
+    Blueprint(BlueprintId, String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FlattenError {
     pub at: FlattenAt,
-    pub rule: &'static str,
-    pub found: String,
-    pub expected: String,
-    pub nearest: Option<String>,
+    pub problem: ContentProblem,
 }
 
 pub fn flatten(
@@ -184,10 +183,11 @@ pub fn flatten(
     if out.len() > MAX_AREA_PARTS {
         errors.push(FlattenError {
             at: FlattenAt::Area("/modules".to_owned()),
-            rule: "too many parts",
-            found: format!("{} modules after flattening", out.len()),
-            expected: format!("at most {MAX_AREA_PARTS} per area"),
-            nearest: None,
+            problem: ContentProblem::new(
+                "too many parts",
+                format!("{} modules after flattening", out.len()),
+                format!("at most {MAX_AREA_PARTS} per area"),
+            ),
         });
     }
     Flattening {
@@ -203,17 +203,14 @@ struct Expansion<'a> {
     placements: &'a mut Vec<PlacedBlueprint>,
     origin: usize,
     pointer: String,
-    chain: Vec<(Id, usize)>,
+    chain: Vec<(BlueprintId, usize)>,
 }
 
 impl Expansion<'_> {
     fn error(&mut self, at: FlattenAt, rule: &'static str, found: String, expected: String) {
         self.errors.push(FlattenError {
             at,
-            rule,
-            found,
-            expected,
-            nearest: None,
+            problem: ContentProblem::new(rule, found, expected),
         });
     }
 
@@ -259,30 +256,21 @@ impl Expansion<'_> {
             self.pointer.clone()
         };
         let mut filled: BTreeMap<String, Value> = BTreeMap::new();
+        let mut missing = false;
         for name in values.keys() {
             if !def.variables.contains_key(name) {
-                self.errors.push(FlattenError {
-                    at: FlattenAt::Area(format!(
-                        "{values_pointer}/{}",
-                        crate::core::content::locate::escape(name)
-                    )),
-                    rule: "unknown variable",
-                    found: format!("{name:?}"),
-                    expected: format!("a variable {key} declares"),
-                    nearest: nearest(def.variables.keys(), name).map(|n| format!("{n:?}")),
-                });
+                let at = FlattenAt::Area(format!("{values_pointer}/{}", escape(name)));
+                self.unknown_variable(at, placement.blueprint, def, name);
             }
         }
         for (name, variable) in &def.variables {
-            let pointer = format!(
-                "{values_pointer}/{}",
-                crate::core::content::locate::escape(name)
-            );
+            let pointer = format!("{values_pointer}/{}", escape(name));
             let (value, own) = match values.get(name) {
                 Some(value) => (value, true),
                 None => match &variable.default {
                     Some(default) => (default, false),
                     None => {
+                        missing = true;
                         self.error(
                             FlattenAt::Area(values_pointer.clone()),
                             "missing value",
@@ -300,33 +288,20 @@ impl Expansion<'_> {
                 Ok(json) => {
                     filled.insert(name.clone(), json);
                 }
-                Err((rule, found, expected, near)) => {
+                Err(problem) => {
                     let at = if own {
                         FlattenAt::Area(pointer)
                     } else {
                         FlattenAt::Blueprint(
                             placement.blueprint,
-                            format!(
-                                "/variables/{}/default",
-                                crate::core::content::locate::escape(name)
-                            ),
+                            format!("/variables/{}/default", escape(name)),
                         )
                     };
-                    self.errors.push(FlattenError {
-                        at,
-                        rule,
-                        found,
-                        expected,
-                        nearest: near,
-                    });
+                    self.errors.push(FlattenError { at, problem });
                 }
             }
         }
-        if self
-            .errors
-            .iter()
-            .any(|error| error.rule == "missing value")
-        {
+        if missing {
             return;
         }
         let scripts = self.filled_scripts(placement.blueprint, def, &filled);
@@ -352,13 +327,8 @@ impl Expansion<'_> {
                 &mut unknown,
             );
             for (pointer, name) in unknown {
-                self.errors.push(FlattenError {
-                    at: FlattenAt::Blueprint(placement.blueprint, pointer),
-                    rule: "unknown variable",
-                    found: format!("{name:?}"),
-                    expected: format!("a variable {key} declares"),
-                    nearest: nearest(def.variables.keys(), &name).map(|n| format!("{n:?}")),
-                });
+                let at = FlattenAt::Blueprint(placement.blueprint, pointer);
+                self.unknown_variable(at, placement.blueprint, def, &name);
             }
             let module = {
                 let (result, scope) = with_content(ContentScope::of(&content), || {
@@ -385,10 +355,8 @@ impl Expansion<'_> {
                     };
                     self.errors.push(FlattenError {
                         at: FlattenAt::Blueprint(placement.blueprint, part_pointer.clone()),
-                        rule,
-                        found: format!("{:?}", leaf.value),
-                        expected,
-                        nearest: near.map(|n| format!("{n:?}")),
+                        problem: ContentProblem::new(rule, format!("{:?}", leaf.value), expected)
+                            .near(near.map(|n| format!("{n:?}"))),
                     });
                 }
                 match result {
@@ -450,7 +418,7 @@ impl Expansion<'_> {
 
     fn filled_scripts(
         &mut self,
-        blueprint: Id,
+        blueprint: BlueprintId,
         def: &BlueprintDef,
         filled: &BTreeMap<String, Value>,
     ) -> Vec<ScriptModule> {
@@ -466,13 +434,12 @@ impl Expansion<'_> {
             let mut unknown: Vec<(String, String)> = Vec::new();
             fill(&mut json, filled, &def.variables, &pointer, &mut unknown);
             for (pointer, name) in unknown {
-                self.errors.push(FlattenError {
-                    at: FlattenAt::Blueprint(blueprint, pointer),
-                    rule: "unknown variable",
-                    found: format!("{name:?}"),
-                    expected: format!("a variable {} declares", blueprint.key(&content)),
-                    nearest: nearest(def.variables.keys(), &name).map(|n| format!("{n:?}")),
-                });
+                self.unknown_variable(
+                    FlattenAt::Blueprint(blueprint, pointer),
+                    blueprint,
+                    def,
+                    &name,
+                );
             }
             let (result, _) = with_content(ContentScope::of(&content), || {
                 serde_json::from_value::<ScriptModule>(json)
@@ -490,7 +457,25 @@ impl Expansion<'_> {
         scripts
     }
 
-    fn chain_text(&self, last: Option<Id>) -> String {
+    fn unknown_variable(
+        &mut self,
+        at: FlattenAt,
+        blueprint: BlueprintId,
+        def: &BlueprintDef,
+        name: &str,
+    ) {
+        self.errors.push(FlattenError {
+            at,
+            problem: ContentProblem::new(
+                "unknown variable",
+                format!("{name:?}"),
+                format!("a variable {} declares", blueprint.key(self.content)),
+            )
+            .near(nearest(def.variables.keys(), name).map(|n| format!("{n:?}"))),
+        });
+    }
+
+    fn chain_text(&self, last: Option<BlueprintId>) -> String {
         let content = self.content;
         let mut names: Vec<&str> = self
             .chain
@@ -504,32 +489,22 @@ impl Expansion<'_> {
     }
 }
 
-type ValueError = (&'static str, String, String, Option<String>);
-
 fn typed_value(
     content: &Content,
     variable: &Variable<RiftScripting>,
     value: &VarValue<RiftScripting>,
-) -> Result<Value, ValueError> {
+) -> Result<Value, ContentProblem> {
     let wrong = |expected: &str| {
-        (
+        ContentProblem::new(
             "wrong type",
             format!("a {} value", value.kind()),
             format!("a {expected} value"),
-            None,
         )
     };
     let json = |value: &VarValue<RiftScripting>| {
         with_content(ContentScope::of(content), || serde_json::to_value(value))
             .0
-            .map_err(|error| {
-                (
-                    "wrong type",
-                    error.to_string(),
-                    "a JSON value".to_owned(),
-                    None,
-                )
-            })
+            .map_err(|error| ContentProblem::new("wrong type", error, "a JSON value"))
     };
     match (variable.ty, value) {
         (VariableType::Integer, VarValue::Integer(_))
@@ -542,10 +517,12 @@ fn typed_value(
             let table = variable.table.as_deref().unwrap_or("");
             match RiftScripting::row_value(content, table, key) {
                 Some(_) => json(value),
-                None => Err((
+                None => Err(ContentProblem::new(
                     "unknown row",
                     format!("{key:?}"),
                     format!("the key of a {table} row"),
+                )
+                .near(
                     content
                         .table_named(table)
                         .and_then(|rows| nearest(rows.keys(), key))
@@ -564,24 +541,18 @@ fn fill(
     pointer: &str,
     unknown: &mut Vec<(String, String)>,
 ) {
+    if let Some(name) = hole_name(json).map(str::to_owned) {
+        match values.get(&name) {
+            Some(value) => *json = value.clone(),
+            None if !declared.contains_key(&name) => unknown.push((format!("{pointer}/var"), name)),
+            None => {}
+        }
+        return;
+    }
     match json {
         Value::Object(map) => {
-            if map.len() == 1
-                && let Some(Value::String(name)) = map.get("var")
-            {
-                let name = name.clone();
-                match values.get(&name) {
-                    Some(value) => *json = value.clone(),
-                    None => {
-                        if !declared.contains_key(&name) {
-                            unknown.push((format!("{pointer}/var"), name));
-                        }
-                    }
-                }
-                return;
-            }
             for (key, value) in map.iter_mut() {
-                let pointer = format!("{pointer}/{}", crate::core::content::locate::escape(key));
+                let pointer = format!("{pointer}/{}", escape(key));
                 fill(value, values, declared, &pointer, unknown);
             }
         }
@@ -643,8 +614,8 @@ pub fn place(module: &mut AreaModule, at: Pos<Tiles>, flip: Flip) {
         AreaModule::SafeZone(zone) => zone.rect = rect(zone.rect),
         AreaModule::Soundscape(soundscape) => {
             soundscape.shape = match soundscape.shape {
-                ZoneShape::Rect(r) => ZoneShape::Rect(rect(r)),
-                ZoneShape::Ellipse(r) => ZoneShape::Ellipse(rect(r)),
+                SoundscapeShape::Rect(r) => SoundscapeShape::Rect(rect(r)),
+                SoundscapeShape::Ellipse(r) => SoundscapeShape::Ellipse(rect(r)),
             };
         }
         AreaModule::Scenery(scenery) => {

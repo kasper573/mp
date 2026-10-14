@@ -1,15 +1,12 @@
-pub mod alert;
 pub mod bubble;
 pub mod budget;
-pub mod caption;
 pub mod error;
 pub mod feed;
 pub mod intro;
-pub mod milestone;
 mod rows;
 
 pub use intro::IntroAppearance;
-pub use rows::{NotificationRow, NotificationRows};
+pub use rows::{NotificationRow, NotificationRows, RowPlace, shown as shown_rows};
 
 use std::borrow::Cow;
 
@@ -24,25 +21,22 @@ use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::math::Pos;
 use crate::core::platform::ClientPlatform;
-use crate::core::script::{
-    Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
-};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
 use crate::systems::actor::Rgba;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
-use crate::systems::npc::{Id as NpcId, Npc, NpcDef};
+use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::player::Players;
-use crate::systems::scene::{Scene as GameScene, despawn_all};
-use crate::systems::script::condition;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Audience, Link};
-use crate::systems::script::{Reach, RiftScripting};
-use crate::systems::text::{self, LineText, Motion, Span, SpanText};
+use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
+use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
+use crate::systems::text::{self, LineText, Motion, Span};
 use crate::systems::visibility;
 
-pub type Id = ContentId<NotificationDef>;
+pub type NotificationId = ContentId<NotificationDef>;
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
@@ -128,6 +122,15 @@ pub struct NotificationSent {
 
 pub fn notify(world: &mut World, player: Entity, notification: Notification) {
     notify_from(world, player, None, notification);
+}
+
+pub fn error(world: &mut World, player: Entity, text: impl Into<String>) {
+    let kind = NotificationKind::error(world.resource::<Content>());
+    notify(
+        world,
+        player,
+        Notification::new(kind, LineText::plain(text.into())),
+    );
 }
 
 pub fn notify_from(
@@ -219,20 +222,16 @@ impl Notification {
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct NotificationDef {
-    #[schemars(with = "NotificationKindRow")]
-    #[serde(
-        serialize_with = "notification_kind",
-        deserialize_with = "notification_kind_from"
-    )]
-    pub kind: NotificationKind,
+    pub kind: NotificationDefKind,
     pub text: Vec<Span>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lasts: Option<Seconds>,
 }
 
-#[derive(JsonSchema, Serialize, Deserialize)]
+/// The kinds content may send; the others are raised by the game itself.
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-enum NotificationKindRow {
+pub enum NotificationDefKind {
     Speech {
         speaker: NpcId,
     },
@@ -244,7 +243,7 @@ enum NotificationKindRow {
     Intro {
         title: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        tint: Option<[u8; 4]>,
+        tint: Option<Rgba>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         motion: Option<Motion>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -254,83 +253,52 @@ enum NotificationKindRow {
     },
 }
 
-fn notification_kind<S: serde::Serializer>(
-    kind: &NotificationKind,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let row = match kind {
-        NotificationKind::Speech { speaker } => NotificationKindRow::Speech { speaker: *speaker },
-        NotificationKind::Narration { label, sfx } => NotificationKindRow::Narration {
-            label: label.to_string(),
-            sfx: *sfx,
-        },
-        NotificationKind::Intro {
-            title,
-            appearance,
-            sfx,
-        } => NotificationKindRow::Intro {
-            title: title.to_string(),
-            tint: appearance.tint.map(|tint| tint.0.to_be_bytes()),
-            motion: appearance.motion,
-            emblem: appearance.emblem.clone(),
-            sfx: *sfx,
-        },
-        NotificationKind::Alert { .. }
-        | NotificationKind::Error { .. }
-        | NotificationKind::Milestone { .. }
-        | NotificationKind::Feed { .. } => {
-            return Err(serde::ser::Error::custom(
-                "only speech, narration and intro notifications are content",
-            ));
-        }
-    };
-    row.serialize(serializer)
-}
-
-fn notification_kind_from<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<NotificationKind, D::Error> {
-    Ok(match NotificationKindRow::deserialize(deserializer)? {
-        NotificationKindRow::Speech { speaker } => NotificationKind::Speech { speaker },
-        NotificationKindRow::Narration { label, sfx } => NotificationKind::Narration {
-            label: Cow::Owned(label),
-            sfx,
-        },
-        NotificationKindRow::Intro {
-            title,
-            tint,
-            motion,
-            emblem,
-            sfx,
-        } => NotificationKind::Intro {
-            title: Cow::Owned(title),
-            appearance: IntroAppearance {
-                tint: tint.map(|bytes| Rgba(u32::from_be_bytes(bytes))),
-                motion,
-                emblem,
-            },
-            sfx,
-        },
-    })
-}
-
 impl ContentRow for NotificationDef {
     const TABLE: &'static str = "notification";
 }
 
 impl NotificationDef {
-    pub fn for_player(&'static self, world: &World, player: Entity) -> Notification {
+    pub fn notification(&'static self, text: LineText) -> Notification {
         Notification {
-            kind: self.kind.clone(),
-            text: condition::spoken(world, player, &self.text),
+            kind: (&self.kind).into(),
+            text,
             lasts: self.lasts,
         }
     }
 
     fn speaker(&self) -> Option<NpcId> {
         match self.kind {
-            NotificationKind::Speech { speaker } => Some(speaker),
+            NotificationDefKind::Speech { speaker } => Some(speaker),
             _ => None,
+        }
+    }
+}
+
+impl From<&'static NotificationDefKind> for NotificationKind {
+    fn from(kind: &'static NotificationDefKind) -> NotificationKind {
+        match kind {
+            NotificationDefKind::Speech { speaker } => {
+                NotificationKind::Speech { speaker: *speaker }
+            }
+            NotificationDefKind::Narration { label, sfx } => NotificationKind::Narration {
+                label: Cow::Borrowed(label),
+                sfx: *sfx,
+            },
+            NotificationDefKind::Intro {
+                title,
+                tint,
+                motion,
+                emblem,
+                sfx,
+            } => NotificationKind::Intro {
+                title: Cow::Borrowed(title),
+                appearance: IntroAppearance {
+                    tint: *tint,
+                    motion: *motion,
+                    emblem: emblem.clone(),
+                },
+                sfx: *sfx,
+            },
         }
     }
 }
@@ -339,42 +307,32 @@ impl NotificationDef {
 pub struct Notify {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub notification: Id,
+    pub notification: NotificationId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
 impl EffectDef<RiftScripting> for Notify {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let def = self.notification.get(cx.content);
         let values = text::values(&def.text)
             .into_iter()
-            .map(|value| cx.expr(value, ValueType::Text).map_err(effects::bad))
+            .map(|value| cx.expr(value, ValueType::Text))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
-                let notification = Notification {
-                    kind: def.kind.clone(),
-                    text: LineText::spoken(&def.text, &spoken),
-                    lasts: def.lasts,
-                };
-                notify_from(world, player, cx.owner.entity(), notification);
+                let notification = def.notification(LineText::spoken(&def.text, &spoken));
+                notify_from(world, player, cx.owner, notification);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -428,9 +386,14 @@ pub fn check_all(loading: &mut Loading) {
         let mut check = RowCheck::default();
         for (index, span) in def.text.iter().enumerate() {
             if let Span::Value { value, .. } = span
-                && let Err((rule, expected)) = condition::check_value(&content, value)
+                && let Err(fault) = condition::check_value(&content, value)
             {
-                check.error(format!("/text/{index}/value"), rule, "the value", expected);
+                check.error(
+                    format!("/text/{index}/value"),
+                    fault.rule,
+                    "the value",
+                    fault.expected,
+                );
             }
         }
         let words: usize = def
@@ -494,20 +457,17 @@ pub struct NotificationPlugin;
 
 impl Plugin for NotificationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            bubble::BubblePlugin,
-            caption::CaptionPlugin,
-            alert::AlertPlugin,
-            milestone::MilestonePlugin,
-            intro::IntroPlugin,
-            feed::FeedPlugin,
-        ))
-        .add_systems(OnEnter(GameScene::Area), spawn_places)
-        .add_systems(OnExit(GameScene::Area), despawn_all::<PlacesRoot>)
-        .add_systems(
-            Update,
-            (deliver, deliver_sounds).run_if(in_state(GameScene::Area)),
-        );
+        rows::plugin::<ui::Captions>(app);
+        rows::plugin::<ui::AlertBar>(app);
+        rows::plugin::<ui::Milestones>(app);
+        app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
+            .add_observer(rows::close_alert)
+            .add_systems(OnEnter(ClientScreen::Area), spawn_places)
+            .add_systems(OnExit(ClientScreen::Area), despawn_all::<PlacesRoot>)
+            .add_systems(
+                Update,
+                (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
+            );
     }
 }
 
@@ -595,12 +555,18 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
             place: SfxPlace::Interface,
         });
     }
-    match notification_sent.notification.kind {
+    match &notification_sent.notification.kind {
         NotificationKind::Speech { .. } => bubble::say(world, notification_sent),
-        NotificationKind::Narration { .. } => caption::join(world, notification_sent),
-        NotificationKind::Alert { .. } => alert::raise(world, notification_sent),
+        NotificationKind::Narration { label, .. } => {
+            rows::join::<ui::Captions>(world, label.clone(), notification_sent)
+        }
+        NotificationKind::Alert { label, .. } => {
+            rows::join::<ui::AlertBar>(world, label.clone(), notification_sent)
+        }
         NotificationKind::Error { .. } => error::toast(world, notification_sent),
-        NotificationKind::Milestone { .. } => milestone::reach(world, notification_sent),
+        NotificationKind::Milestone { label, .. } => {
+            rows::join::<ui::Milestones>(world, label.clone(), notification_sent)
+        }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
     }
@@ -614,14 +580,4 @@ impl NotificationSent {
             (_, None) => false,
         }
     }
-}
-
-pub(crate) fn plain_words(text: &LineText) -> String {
-    text.0
-        .iter()
-        .map(|span| match span {
-            SpanText::Text { text, .. } => text.as_str(),
-            SpanText::Input(_) => "",
-        })
-        .collect()
 }

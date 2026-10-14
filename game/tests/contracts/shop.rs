@@ -2,12 +2,11 @@ use bevy_ecs::prelude::*;
 use game::core::tiling::Tiles;
 use game::systems::dialogue::ConversationRequest;
 use game::systems::interact::InteractRequest;
-use game::systems::item::Id as ItemId;
-use game::systems::item::{Inventory, ItemStack};
+use game::systems::item::{Inventory, ItemId, ItemStack};
 use game::systems::movement::{Position, position};
-use game::systems::npc::Id as NpcId;
+use game::systems::npc::NpcId;
 use game::systems::script::Speaker;
-use game::systems::shop::{Id as ShopId, ShopRequest, ShopView};
+use game::systems::shop::{ShopId, ShopRequest, ShopView};
 
 use crate::support::{
     Sim, content, conversation, count, give, later, object, pick, row, spawn_area, talk,

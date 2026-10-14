@@ -47,9 +47,10 @@ impl ImportRecord {
     }
 
     pub fn files(&self) -> Vec<PathBuf> {
-        match self.files.is_empty() {
-            true => vec![self.export.clone()],
-            false => self.files.clone(),
+        if self.files.is_empty() {
+            vec![self.export.clone()]
+        } else {
+            self.files.clone()
         }
     }
 

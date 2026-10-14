@@ -4,13 +4,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, ContentId, ContentRow, serial};
-use crate::core::script::{
-    Compiler, EffectCall, EffectDef, EffectStep, Name, Owner, OwnerKind, ValueType,
-};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::systems::effect::{self, Effect};
 use crate::systems::player::Xp;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
-use crate::systems::script::{Condition, EventKind, Reach, RiftInstances, RiftScripting};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::{
+    Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
+};
 use crate::systems::stat::StatMap;
 
 pub fn register(app: &mut App) {
@@ -21,10 +21,10 @@ pub fn register(app: &mut App) {
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Job {
-    pub def: Id,
+    pub def: JobId,
 }
 
-pub type Id = ContentId<JobDef>;
+pub type JobId = ContentId<JobDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct JobDef {
@@ -39,7 +39,6 @@ impl ContentRow for JobDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct JobLevel {
     pub xp: u32,
-    #[schemars(transform = crate::systems::stat::schema_with_units)]
     pub stats: StatMap,
     #[serde(default, skip_serializing_if = "serial::is_false")]
     pub chasing: bool,
@@ -47,7 +46,8 @@ pub struct JobLevel {
 
 impl JobLevel {
     pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
-        crate::systems::stat::listed(&self.stats)
+        self.stats
+            .listed()
             .map(Effect::StatModifier)
             .chain(self.chasing.then_some(Effect::Chasing))
     }
@@ -88,8 +88,9 @@ pub fn grant_xp(world: &mut World, entity: Entity, amount: u32) {
         xp.gain(amount);
     }
     if level(world, entity) > before {
+        let owner = area_owner(world);
         world.resource_mut::<RiftInstances>().raise(
-            Owner::Area,
+            owner,
             EventKind::LeveledUp,
             Some(entity),
             Vec::new(),
@@ -111,35 +112,27 @@ pub struct GrantXp {
 pub struct SetJob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub job: Id,
+    pub job: JobId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,
 }
 
 impl EffectDef<RiftScripting> for GrantXp {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let xp = cx
-            .expr(&self.xp, ValueType::Integer)
-            .map_err(effects::bad)?;
-        Ok(Box::new(move |world, cx| {
+        let xp = cx.expr(&self.xp, ValueType::Integer)?;
+        Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 let amount = xp(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
                 grant_xp(world, player, amount);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -148,26 +141,20 @@ impl EffectDef<RiftScripting> for GrantXp {
 }
 
 impl EffectDef<RiftScripting> for SetJob {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let job = self.job;
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 world.entity_mut(player).insert(Job { def: job });
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {

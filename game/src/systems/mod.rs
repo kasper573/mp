@@ -25,7 +25,7 @@ pub mod probe;
 pub mod quest;
 pub mod reach;
 pub mod rewards;
-pub mod scene;
+pub mod screen;
 pub mod script;
 pub mod settings;
 pub mod shop;
@@ -36,43 +36,34 @@ pub mod text;
 pub mod view;
 pub mod visibility;
 
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
 use bevy_app::App;
 use bevy_ecs::message::{Message, Messages};
 use bevy_ecs::prelude::{Bundle, Entity, Res, ResMut, Resource, World};
 use bevy_replicon::prelude::{FromClient, Replicated};
-use bevy_terminal::Terminal;
 use schemars::JsonSchema;
 
 use crate::core::assets::SyncedFiles;
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::{
-    Content, ContentFolder, ContentRegistry, ContentVersion, GAME_FILE, LoadReport, Loading,
-    Settings,
+    Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
+    Loading, Settings,
 };
 use crate::core::platform::{ClientPlatform, Platform, StartParams};
+use crate::core::time::{Hertz, Seconds, WallClock};
+use crate::systems::area::AreaId;
+use crate::systems::player::PlayerDefId;
 use actor::{Actor, Hitbox};
 use area::AreaTag;
 use movement::Position;
 use terminal::TerminalKind;
 
-pub const TICK_HZ: crate::core::time::Hertz = crate::core::time::Hertz(30.0);
+pub const TICK_HZ: Hertz = Hertz(30.0);
 
 /// Replication serialization is the dominant server cost and scales with its rate, so state goes out
 /// every Nth tick (clients interpolate between the sparser snapshots) rather than every tick.
 pub const REPLICATION_INTERVAL: u64 = 3;
 
-pub const REPLICATION_PERIOD: crate::core::time::Seconds =
-    crate::core::time::Seconds(REPLICATION_INTERVAL as f32 / TICK_HZ.0);
-
-static TERMINALS: LazyLock<HashMap<TerminalKind, &'static Terminal>> = LazyLock::new(|| {
-    TerminalKind::ALL
-        .into_iter()
-        .map(|kind| (kind, kind.terminal()))
-        .collect()
-});
+pub const REPLICATION_PERIOD: Seconds = Seconds(REPLICATION_INTERVAL as f32 / TICK_HZ.0);
 
 pub fn protocol(app: &mut App) {
     actor::register(app);
@@ -95,11 +86,11 @@ pub fn protocol(app: &mut App) {
     quest::register(app);
     player::register(app);
     spectate::register(app);
-    bevy_terminal::register(app, &TERMINALS);
+    terminal::register(app);
 }
 
 #[derive(Resource, Clone, Copy)]
-pub struct WorldArea(pub area::Id);
+pub struct WorldArea(pub AreaId);
 
 #[derive(JsonSchema, Resource, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -107,7 +98,7 @@ pub struct GameSettings {
     pub name: String,
     pub content_version: ContentVersion,
     pub initial_spawn: script::Place,
-    pub player: player::Id,
+    pub player: PlayerDefId,
 }
 
 #[derive(Bundle)]
@@ -120,10 +111,10 @@ pub struct Character {
 }
 
 pub fn server_app(
-    area: area::Id,
+    area: AreaId,
     ordinal: u64,
     rng_seed: u64,
-    clock: crate::core::time::WallClock,
+    clock: WallClock,
     assets: &Content,
 ) -> App {
     use bevy_app::{First, PostUpdate, Startup, Update};
@@ -290,12 +281,12 @@ pub fn client_app(
 ) -> App {
     use bevy::prelude::*;
 
-    let session = params
+    let credentials = params
         .access_token
         .as_deref()
         .map(crate::core::net::auth::Credentials::from_access_token);
-    let spectator = session.as_ref().is_some_and(|session| {
-        session
+    let spectator = credentials.as_ref().is_some_and(|credentials| {
+        credentials
             .roles
             .iter()
             .any(|role| role.parse() == Ok(account::Role::Spectate))
@@ -322,8 +313,8 @@ pub fn client_app(
             })
             .set(ImagePlugin::default_nearest()),
     );
-    if let Some(session) = session {
-        app.insert_resource(session);
+    if let Some(credentials) = credentials {
+        app.insert_resource(credentials);
     }
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
@@ -339,7 +330,7 @@ pub fn client_app(
             crate::core::babble::BabblePlugin,
         ))
         .add_plugins((
-            scene::ScenePlugin { spectator },
+            screen::ClientScreenPlugin { spectator },
             actor::render::ActorPlugin,
             actor::plate::PlatePlugin,
             movement::MovementPlugin,
@@ -370,7 +361,7 @@ pub fn client_app(
 /// The worlds, not the owning `App`s, are stepped because `App` is `!Send` while `World` is `Send`;
 /// for these single-schedule headless apps `run_schedule(Main)` + `clear_trackers` is what
 /// `App::update` does.
-pub fn step_areas(apps: &mut [App], clock: crate::core::time::WallClock) {
+pub fn step_areas(apps: &mut [App], clock: WallClock) {
     use bevy_app::Main;
     use rayon::prelude::*;
 
@@ -490,10 +481,8 @@ fn check_settings(loading: &mut Loading) {
         loading.json_error(
             GAME_FILE,
             "/initial_spawn",
-            problem.rule,
-            problem.found,
-            problem.expected,
-            problem.nearest,
+            ContentProblem::new(problem.rule, problem.found, problem.expected)
+                .near(problem.nearest),
         );
     }
 }

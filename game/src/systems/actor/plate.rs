@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
@@ -10,17 +9,17 @@ use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::render::{WorldToWindow, tile_to_window};
+use crate::core::tiling::Tiles;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
 use crate::systems::area::AreaObject;
 use crate::systems::attention;
-use crate::systems::attention::Id as AttentionId;
 use crate::systems::combat::Attitude;
 use crate::systems::hud::reconcile_children;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
@@ -34,9 +33,34 @@ impl Plugin for PlatePlugin {
                 Update,
                 (spawn_plates, place_plates, sync_plate_icons)
                     .chain()
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), clear_plates);
+            .add_systems(OnExit(ClientScreen::Area), clear_plates);
+    }
+}
+
+pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
+    let plate = world
+        .resource::<Plates>()
+        .0
+        .get(&actor)
+        .copied()
+        .filter(|&plate| {
+            world
+                .get::<InheritedVisibility>(plate)
+                .is_some_and(|visibility| visibility.get())
+        })
+        .and_then(|plate| ui::node_rect(world, plate))
+        .filter(|rect| rect.height() > 0.0);
+    match plate {
+        Some(rect) => Some(Vec2::new(rect.center().x, rect.min.y)),
+        None => {
+            let at = world
+                .get::<RenderPosition>(actor)
+                .map(|rendered| rendered.0)
+                .or_else(|| world.get::<Position>(actor).map(|position| position.pos))?;
+            tile_to_window(world, head(at, world.get::<Hitbox>(actor)?))
+        }
     }
 }
 
@@ -98,32 +122,6 @@ fn label(
     }
 }
 
-pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
-    let plate = world
-        .resource::<Plates>()
-        .0
-        .get(&actor)
-        .copied()
-        .filter(|&plate| {
-            world
-                .get::<InheritedVisibility>(plate)
-                .is_some_and(|visibility| visibility.get())
-        })
-        .and_then(|plate| ui::node_rect(world, plate))
-        .filter(|rect| rect.height() > 0.0);
-    match plate {
-        Some(rect) => Some(Vec2::new(rect.center().x, rect.min.y)),
-        None => {
-            let at = world
-                .get::<RenderPosition>(actor)
-                .map(|rendered| rendered.0)
-                .or_else(|| world.get::<Position>(actor).map(|position| position.pos))?;
-            let height = world.get::<Hitbox>(actor)?.size.height;
-            tile_to_window(world, Pos::new(at.x, at.y + 0.5 - height))
-        }
-    }
-}
-
 fn spawn_plates(
     content: Res<Content>,
     mut plates: ResMut<Plates>,
@@ -168,9 +166,8 @@ fn place_plates(
             .ok()
             .and_then(|(rendered, at, hitbox, body)| {
                 let at = rendered.map_or(at.pos, |rendered| rendered.0);
-                let top = Pos::new(at.x, at.y + 0.5 - hitbox.size.height);
                 (world_on_screen && body.is_none_or(|body| body.action != Action::Dead))
-                    .then(|| projector.project(top))
+                    .then(|| projector.project(head(at, hitbox)))
                     .flatten()
             });
         let shown = match head {
@@ -208,7 +205,6 @@ fn sync_plate_icons(world: &mut World) {
             continue;
         };
         let marks = attention::plate_marks(world, viewer, actor);
-        let keys: Vec<u64> = marks.iter().map(mark_key).collect();
         let icons: Vec<Handle<Image>> = {
             let assets = world.resource::<AssetServer>();
             marks
@@ -216,16 +212,14 @@ fn sync_plate_icons(world: &mut World) {
                 .map(|mark| assets.load(mark.get(&content).icon.path()))
                 .collect()
         };
-        reconcile_children(world, row, &keys, |_, index| {
+        reconcile_children(world, row, &marks, |_, index| {
             Box::new(plate_icon(icons[index].clone()))
         });
     }
 }
 
-fn mark_key(mark: &AttentionId) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    mark.hash(&mut hasher);
-    hasher.finish()
+fn head(at: Pos<Tiles>, hitbox: &Hitbox) -> Pos<Tiles> {
+    Pos::new(at.x, at.y + 0.5 - hitbox.size.height)
 }
 
 fn plate_icon(image: Handle<Image>) -> impl Scene {

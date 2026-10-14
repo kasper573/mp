@@ -20,7 +20,7 @@ pub use load::{
     ContentFolder, ContentRegistry, FileHashes, FileWriter, FilesystemFolder, FolderEntry,
     LoadStep, Loading, MemoryFolder, Reference, Settings, load, pointer_of, valid_key, write,
 };
-pub use report::{ErrorPlace, LoadError, LoadReport};
+pub use report::{ContentProblem, ErrorPlace, LoadError, LoadReport};
 pub use table::{AnyTable, Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 pub use version::ContentVersion;
 

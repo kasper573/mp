@@ -1,6 +1,5 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
+use strum::IntoStaticStr;
 use ui::tokens::{palette, spacing, typography};
 use ui::{Check, ConfirmOptions, OnTap};
 
@@ -13,16 +12,16 @@ use super::{
     QuestResult,
 };
 use crate::core::content::{Content, Fixture};
-use crate::systems::dialogue::ChoiceReveal;
-use crate::systems::hud::{HudAudience, Window};
+use crate::core::script::ChoiceReveal;
+use crate::systems::hud::{self, HudAudience, Window, spawn_ui};
 use crate::systems::input::map::{ActionInput, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
 use crate::systems::item::{Inventory, ItemFlag, ItemStack};
 use crate::systems::player::session::Viewpoint;
 use crate::systems::quest::QuestDef;
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::scene::mode::Mode;
+use crate::systems::screen::ClientScreen;
+use crate::systems::screen::mode::ClientMode;
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
 const ROW_ICON: f32 = 20.0;
@@ -33,7 +32,7 @@ impl Plugin for QuestLogPlugin {
     fn build(&self, app: &mut App) {
         slot_note_source(app, quest_note);
         app.init_resource::<Browse>()
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -51,9 +50,6 @@ impl Window for QuestLogWindow {
     }
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::QuestLog
-    }
-    fn order(&self) -> u32 {
-        3
     }
     fn size(&self) -> Vec2 {
         SIZE
@@ -83,7 +79,7 @@ pub fn select(world: &mut World, tab: LogTab, quest: QuestId) {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, IntoStaticStr)]
 pub enum LogTab {
     #[default]
     Active,
@@ -92,10 +88,7 @@ pub enum LogTab {
 
 impl LogTab {
     fn title(self) -> &'static str {
-        match self {
-            LogTab::Active => "Active",
-            LogTab::Completed => "Completed",
-        }
+        self.into()
     }
 }
 
@@ -151,7 +144,7 @@ fn sync_bodies(world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    let playing = *world.resource::<Mode>() == Mode::Play;
+    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
     for (entity, body) in bodies {
         let page = Page {
             parties: world.resource::<Parties>().clone(),
@@ -161,16 +154,13 @@ fn sync_bodies(world: &mut World) {
             inventory: inventory.clone(),
             playing,
         };
-        let mut hasher = DefaultHasher::new();
-        format!(
-            "{:?}{:?}{:?}{:?}{playing}",
+        let key = hud::fingerprint(&(
             page.tab,
             steady(&page.log),
-            page.inventory.slots,
-            page.selected
-        )
-        .hash(&mut hasher);
-        let key = hasher.finish();
+            &page.inventory.slots,
+            page.selected,
+            playing,
+        ));
         if body.built == Some(key) {
             continue;
         }
@@ -179,9 +169,7 @@ fn sync_bodies(world: &mut World) {
         }
         let scene = contents(world, &page);
         world.entity_mut(entity).despawn_related::<Children>();
-        if let Ok(mut spawned) = world.spawn_scene(scene) {
-            spawned.insert(ChildOf(entity));
-        }
+        spawn_ui(world, scene).insert(ChildOf(entity));
     }
 }
 
@@ -590,7 +578,7 @@ fn confirm_abandon(world: &mut World, quest: QuestId) {
         on_cancel: OnTap::new(|_| {}),
         keep: InputAction::TakeDefault.into(),
     });
-    world.spawn_scene(dialog).ok();
+    spawn_ui(world, dialog);
 }
 
 fn quest_note(world: &World, stack: ItemStack) -> Option<String> {

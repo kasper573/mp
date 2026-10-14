@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use egui::{Color32, Stroke as EStroke, Vec2};
 use game::core::math::{Pos, Rect, Rng, Size};
 use game::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
+use game::systems::area::tileset::TilesetDef;
 use game::systems::area::{self, Flip};
 use game::systems::script::Place;
 
@@ -13,7 +14,6 @@ use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
 use crate::{thumbs, user};
-use game::systems::area::tileset::TilesetDef;
 
 #[derive(Clone, Default, Debug)]
 pub struct TilePick {

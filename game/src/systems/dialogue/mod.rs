@@ -1,7 +1,5 @@
 pub mod stage;
 
-pub use crate::core::script::Reveal as ChoiceReveal;
-
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -12,23 +10,23 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::script::{
-    self, Answer, BoxEnding, ChoiceOffer, ChoiceState, DialogueView, FlowKey, Reveal,
+    self, Answer, BoxEnding, ChoiceOffer, ChoiceReveal, ChoiceState, DialogueView, ScriptFault,
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
 use crate::systems::actor::model::Face;
-use crate::systems::attention::{AttentionMark, Id as AttentionId};
+use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::{Id as ItemId, Inventory, ItemStack};
+use crate::systems::item::{Inventory, ItemId, ItemStack};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::{CommandLock, sender_player};
-use crate::systems::quest::Id as QuestId;
-use crate::systems::reach::Tether;
-use crate::systems::script::condition;
+use crate::systems::quest::QuestId;
+use crate::systems::reach::{self, Tether};
 use crate::systems::script::{
-    Condition, EventKind, Line, RiftEffect, RiftEvent, RiftInstances, RiftScripting, Speaker,
+    Condition, EventKind, FlowKey, Line, RiftEffect, RiftEvent, RiftInstances, RiftScripting,
+    Speaker, condition,
 };
 use crate::systems::stat;
 use crate::systems::text::LineText;
@@ -153,30 +151,21 @@ pub struct Revealable {
     pub gains: bool,
 }
 
-pub fn check_reveal(
-    reveal: &[Reveal],
-    revealable: Revealable,
-) -> Result<(), (&'static str, String)> {
+pub fn check_reveal(reveal: &[ChoiceReveal], revealable: Revealable) -> Result<(), ScriptFault> {
     for kind in reveal {
         let (present, what) = match kind {
-            Reveal::Locked | Reveal::Needs => (revealable.needs, "needs"),
-            Reveal::Costs => (revealable.costs, "costs"),
-            Reveal::Gains => (revealable.gains, "gains"),
+            ChoiceReveal::Locked | ChoiceReveal::Needs => (revealable.needs, "needs"),
+            ChoiceReveal::Costs => (revealable.costs, "costs"),
+            ChoiceReveal::Gains => (revealable.gains, "gains"),
         };
         if !present {
-            return Err((
+            return Err(ScriptFault::new(
                 "nothing to reveal",
                 format!("reveals {}, {what} nothing", kind.name()),
             ));
         }
     }
-    let mut seen = HashSet::new();
-    for kind in reveal {
-        if !seen.insert(*kind) {
-            return Err(("revealed twice", format!("{} twice", kind.name())));
-        }
-    }
-    Ok(())
+    ChoiceReveal::check_unique(reveal)
 }
 
 pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<RiftScripting>) {
@@ -189,8 +178,7 @@ pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueVie
         .entry::<Heard>()
         .or_default()
         .into_mut()
-        .0
-        .insert(heard_key(&script, view.node));
+        .hear(&script, view.node);
     let lines: Vec<SpokenLine> = view
         .lines
         .iter()
@@ -470,7 +458,7 @@ fn begin(world: &mut World, flow: FlowKey, subject: Entity) -> bool {
         })
         .map_or(DEFAULT_REACH, Tiles);
     let tether = with.and_then(|with| Tether::around(world, subject, reach, Some(with)));
-    crate::systems::reach::forget(world, subject);
+    reach::forget(world, subject);
     let step = next_step(world);
     world.entity_mut(subject).insert((
         ConversationSession {
@@ -549,7 +537,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
     let inventory = world.get::<Inventory>(player);
     let have = |item| inventory.map_or(0, |inventory| inventory.count(item));
     let mut chips = Vec::new();
-    if choice.reveal.contains(&Reveal::Needs)
+    if choice.reveal.contains(&ChoiceReveal::Needs)
         && let Some(requires) = choice.requires
     {
         for part in condition::parts(requires) {
@@ -564,7 +552,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
         _ => None,
     });
     if let Some(items) = items {
-        if choice.reveal.contains(&Reveal::Costs) {
+        if choice.reveal.contains(&ChoiceReveal::Costs) {
             for stack in &items.take {
                 chips.push(ChoiceChip::Pays {
                     item: stack.item,
@@ -573,7 +561,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
                 });
             }
         }
-        if choice.reveal.contains(&Reveal::Gains) {
+        if choice.reveal.contains(&ChoiceReveal::Gains) {
             for stack in &items.give {
                 chips.push(ChoiceChip::Gets {
                     item: stack.item,
@@ -664,7 +652,7 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
 }
 
 fn revealed_costs(choice: &ChoiceOffer<RiftScripting>) -> Vec<ItemStack> {
-    if !choice.reveal.contains(&Reveal::Costs) {
+    if !choice.reveal.contains(&ChoiceReveal::Costs) {
         return Vec::new();
     }
     choice
@@ -691,26 +679,12 @@ fn affordable(world: &World, player: Entity, costs: &[ItemStack]) -> Result<(), 
 }
 
 fn unmet(world: &World, player: Entity, requires: Option<&'static Condition>) -> String {
-    let content = world.resource::<Content>();
-    requires
-        .into_iter()
-        .flat_map(condition::parts)
-        .find(|part| !condition::holds(world, player, part))
-        .map_or_else(
-            || LOCKED.to_owned(),
-            |part| format!("Needs {}", condition::describe(content, part)),
-        )
+    condition::first_unmet(world, player, requires)
+        .map_or_else(|| LOCKED.to_owned(), |unmet| format!("Needs {unmet}"))
 }
 
 fn refuse(world: &mut World, player: Entity, choice: u32, reason: String) {
-    notification::notify(
-        world,
-        player,
-        Notification::new(
-            NotificationKind::error(world.resource::<Content>()),
-            LineText::plain(reason),
-        ),
-    );
+    notification::error(world, player, reason);
     if let Some(mut session) = world.get_mut::<ConversationSession>(player) {
         session.refusals += 1;
         session.refused = Some(RefusedPick {

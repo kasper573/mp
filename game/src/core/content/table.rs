@@ -1,13 +1,14 @@
 use std::any::{Any, TypeId};
 
-use super::check::RowCheck;
-use super::id::ContentId;
 use bevy_ecs::prelude::Resource;
 use bevy_platform::collections::HashMap;
 use bevy_platform::hash::NoOpHash;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+
+use super::check::RowCheck;
+use super::id::ContentId;
 
 pub trait ContentRow: DeserializeOwned + Serialize + JsonSchema + Send + Sync + 'static {
     const TABLE: &'static str;

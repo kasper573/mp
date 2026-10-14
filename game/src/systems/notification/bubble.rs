@@ -17,10 +17,11 @@ use crate::systems::actor::{Action, Actor, plate};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
 use crate::systems::hud;
+use crate::systems::hud::spawn_ui;
 use crate::systems::movement::{Position, RenderPosition};
-use crate::systems::npc::Id as NpcId;
+use crate::systems::npc::NpcId;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const LINES: usize = 2;
 const FULL: usize = 3;
@@ -37,8 +38,8 @@ pub struct BubblePlugin;
 impl Plugin for BubblePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Bubbles>()
-            .add_systems(Update, place_bubbles.run_if(in_state(GameScene::Area)))
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(Update, place_bubbles.run_if(in_state(ClientScreen::Area)))
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -103,7 +104,7 @@ pub fn shown(world: &World) -> Vec<NotificationBubble> {
             lines: speaking
                 .lines
                 .iter()
-                .map(|line| super::plain_words(&line.notification.text))
+                .map(|line| line.notification.text.plain_words())
                 .collect(),
             folded: speaking.drawn.is_some_and(|drawn| drawn.folded),
         })
@@ -307,9 +308,10 @@ fn place_bubbles(world: &mut World) {
         let (a, b) = (rank(a), rank(b));
         a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.cmp(&b.2))
     });
-    let full = match window.x <= SMALL_WINDOW {
-        true => FULL_IN_SMALL_WINDOW,
-        false => FULL,
+    let full = if window.x <= SMALL_WINDOW {
+        FULL_IN_SMALL_WINDOW
+    } else {
+        FULL
     };
     let mut folded_off: Vec<(Edge, Vec2, u32)> = Vec::new();
     for (place, &index) in order.iter().enumerate() {
@@ -348,8 +350,8 @@ fn place_bubbles(world: &mut World) {
             perch.root(),
             !is_full,
         );
-        let babbling = match is_full {
-            true => babble_of(world, &bubbles.speakers[index]).map(|babble| Babbling {
+        let babbling = if is_full {
+            babble_of(world, &bubbles.speakers[index]).map(|babble| Babbling {
                 babble,
                 place: match bubbles.speakers[index]
                     .body
@@ -359,8 +361,9 @@ fn place_bubbles(world: &mut World) {
                     None => SfxPlace::Interface,
                 },
                 rank: BabbleRank((FULL - place.min(FULL)) as u32),
-            }),
-            false => None,
+            })
+        } else {
+            None
         };
         let keys: Vec<u64> = bubbles.speakers[index]
             .lines
@@ -392,23 +395,7 @@ fn draw(
     anchor: Vec2,
     folded: bool,
 ) -> Entity {
-    let entity = match speaking.drawn {
-        Some(drawn) => {
-            if let Some(mut shown) = world.get_mut::<SpeechBubble>(drawn.entity)
-                && *shown != bubble
-            {
-                *shown = bubble;
-            }
-            drawn.entity
-        }
-        None => world
-            .spawn_scene(bsn! {
-                @{ui::speech_bubble(bubble)}
-                GlobalZIndex({ui::tokens::layer::BUBBLES})
-            })
-            .map(|spawned| spawned.id())
-            .unwrap_or(Entity::PLACEHOLDER),
-    };
+    let entity = bubble_at(world, speaking.drawn.map(|drawn| drawn.entity), bubble);
     speaking.drawn = Some(Drawn { entity, folded });
     position(world, entity, anchor);
     entity
@@ -445,28 +432,32 @@ fn draw_edge_folds(
             tail_offset: perch.tail_offset,
             folded_speakers: Some(FoldedSpeakers(count)),
         };
-        let entity = match drawn {
-            Some(entity) => {
-                if let Some(mut shown) = world.get_mut::<SpeechBubble>(entity)
-                    && *shown != bubble
-                {
-                    *shown = bubble;
-                }
-                entity
-            }
-            None => {
-                let Ok(spawned) = world.spawn_scene(bsn! {
-                    @{ui::speech_bubble(bubble)}
-                    GlobalZIndex({ui::tokens::layer::BUBBLES})
-                }) else {
-                    continue;
-                };
-                let entity = spawned.id();
-                bubbles.edge_folds.push((edge, entity));
-                entity
-            }
-        };
+        let entity = bubble_at(world, drawn, bubble);
+        if drawn.is_none() {
+            bubbles.edge_folds.push((edge, entity));
+        }
         position(world, entity, perch.root());
+    }
+}
+
+fn bubble_at(world: &mut World, drawn: Option<Entity>, bubble: SpeechBubble) -> Entity {
+    match drawn {
+        Some(entity) => {
+            if let Some(mut shown) = world.get_mut::<SpeechBubble>(entity)
+                && *shown != bubble
+            {
+                *shown = bubble;
+            }
+            entity
+        }
+        None => spawn_ui(
+            world,
+            bsn! {
+                @{ui::speech_bubble(bubble)}
+                GlobalZIndex({ui::tokens::layer::BUBBLES})
+            },
+        )
+        .id(),
     }
 }
 
@@ -563,9 +554,10 @@ impl Room {
 impl Perch {
     fn over_head(crown: Vec2, feet: Vec2, size: Vec2, bounds: Rect) -> Perch {
         let above = Vec2::new(crown.x, crown.y - CROWN_GAP);
-        let (tip, tail) = match above.y - size.y < bounds.min.y {
-            true => (feet, BubbleTail::Up),
-            false => (above, BubbleTail::Down),
+        let (tip, tail) = if above.y - size.y < bounds.min.y {
+            (feet, BubbleTail::Up)
+        } else {
+            (above, BubbleTail::Down)
         };
         Perch {
             tip,
@@ -639,15 +631,13 @@ fn push_out(rect: Rect, taken: Rect) -> Option<Vec2> {
     if rect.intersect(taken).is_empty() {
         return None;
     }
-    let shortest = |back: f32, forth: f32| match forth < -back {
-        true => forth,
-        false => back,
-    };
+    let shortest = |back: f32, forth: f32| if forth < -back { forth } else { back };
     let x = shortest(taken.min.x - rect.max.x, taken.max.x - rect.min.x);
     let y = shortest(taken.min.y - rect.max.y, taken.max.y - rect.min.y);
-    Some(match x.abs() < y.abs() {
-        true => Vec2::new(x, 0.0),
-        false => Vec2::new(0.0, y),
+    Some(if x.abs() < y.abs() {
+        Vec2::new(x, 0.0)
+    } else {
+        Vec2::new(0.0, y)
     })
 }
 

@@ -3,8 +3,7 @@ use ui::{DragHandle, DragRoot, OnSettle, text_colored};
 
 use crate::systems::actor::Name;
 use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget};
-use crate::systems::player::Xp;
-use crate::systems::player::session;
+use crate::systems::player::{Xp, session};
 use crate::systems::stat;
 
 #[derive(Component, Default, Clone)]

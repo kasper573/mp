@@ -7,10 +7,10 @@ use ui::{
 
 use super::{SpectateRequest, Spectating};
 use crate::systems::actor::Name;
-use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget};
+use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget, spawn_ui};
 use crate::systems::input::map::{self, InputAction};
-use crate::systems::player::session::{self, SpectateStatus, Viewpoint};
-use crate::systems::scene::{Scene as GameScene, despawn_all, mode::Mode};
+use crate::systems::player::session::{SpectateStatus, Viewpoint};
+use crate::systems::screen::{ClientScreen, despawn_all, mode::ClientMode};
 
 const BLANK_BG: Color = Color::srgb(0.07, 0.07, 0.07);
 const HINT: Color = Color::srgb(0.6, 0.6, 0.6);
@@ -22,10 +22,10 @@ impl Plugin for SpectatorPlugin {
         app.add_systems(
             Update,
             (step_keys.run_if(not(ui::typing)), show_nobody_playing)
-                .run_if(in_state(GameScene::Area))
-                .run_if(resource_equals(Mode::Spectate)),
+                .run_if(in_state(ClientScreen::Area))
+                .run_if(resource_equals(ClientMode::Spectate)),
         )
-        .add_systems(OnExit(GameScene::Area), despawn_all::<NobodyPlaying>);
+        .add_systems(OnExit(ClientScreen::Area), despawn_all::<NobodyPlaying>);
     }
 }
 
@@ -101,7 +101,7 @@ fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
 
 fn step(request: SpectateRequest) -> impl Fn(On<Activate>, Commands) + Clone {
     move |_, mut commands| {
-        commands.queue(move |world: &mut World| session::spectate(world, request));
+        commands.write_message(request);
     }
 }
 
@@ -124,7 +124,7 @@ fn step_keys(world: &mut World) {
     } else {
         return;
     };
-    session::spectate(world, request);
+    world.write_message(request);
 }
 
 fn panel_text(world: &World) -> (String, String) {
@@ -165,7 +165,7 @@ fn show_nobody_playing(world: &mut World) {
         .next();
     match (nobody, shown) {
         (true, None) => {
-            let _ = world.spawn_scene(nobody_playing());
+            spawn_ui(world, nobody_playing());
         }
         (false, Some(screen)) => world.entity_mut(screen).despawn(),
         _ => {}
@@ -175,7 +175,7 @@ fn show_nobody_playing(world: &mut World) {
 fn nobody_playing() -> impl Scene {
     bsn! {
         NobodyPlaying
-        crate::systems::scene::screen_node()
+        crate::systems::screen::screen_node()
         BackgroundColor({BLANK_BG})
         GlobalZIndex({ui::tokens::layer::BACKDROP})
         Children [

@@ -36,7 +36,7 @@ pub use utils::motion::{Easing, Timing, Transform2d, transition};
 pub use utils::overlay::{Dismissable, Open, OverlayAction, set_overlay_open};
 pub use utils::place::{node_rect, place};
 pub use utils::presence::{Leaving, Presence, PresenceMove};
-pub use utils::state::{SelectionChanged, selected};
+pub use utils::state::{SelectionChanged, descendant_with, selected, self_and_ancestors};
 pub use utils::style::{StatefulPaint, Style};
 pub use utils::theme::{Family, Theme};
 

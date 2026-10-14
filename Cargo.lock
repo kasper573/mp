@@ -4129,6 +4129,7 @@ dependencies = [
  "symphonia",
  "syn 3.0.9",
  "tar",
+ "thread_local",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",

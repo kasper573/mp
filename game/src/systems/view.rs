@@ -10,10 +10,10 @@ use crate::core::render::screen::ToScreen;
 use crate::core::render::{TILE, snap_to_screen};
 use crate::core::tiling::{TilePos, TileSize, Tiles};
 use crate::core::time::Seconds;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 /// Time the follow camera takes to close half the gap to the player. Smaller is snappier, larger
 /// floatier; this is what makes the camera glide after the actor rather than rigidly lock to it.
@@ -28,7 +28,7 @@ pub struct ViewPlugin;
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FollowCenter>()
-            .add_systems(Update, track_player.run_if(in_state(GameScene::Area)));
+            .add_systems(Update, track_player.run_if(in_state(ClientScreen::Area)));
     }
 }
 
@@ -75,7 +75,7 @@ fn track_player(
 fn camera_center(
     content: &Content,
     at: Pos<Tiles>,
-    area_id: area::Id,
+    area_id: AreaId,
     half: Vec2,
 ) -> Option<Pos<Tiles>> {
     let area = area::load(content, area_id);

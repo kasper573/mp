@@ -1,11 +1,13 @@
+use bevy_ecs::world::World;
 use game::core::script::Expr;
 use game::core::tiling::Tiles;
 use game::systems::combat::{AttackRequest, Attitude};
+use game::systems::item::{ItemId, ItemKind};
 use game::systems::movement::position;
 use game::systems::npc::{self, Pack};
 use game::systems::player::ClientId;
 use game::systems::reach::{self, ReachAct};
-use game::systems::script::condition::CompiledCondition;
+use game::systems::script::condition::{self, CompiledCondition};
 use game::systems::script::{Condition, RiftQuery};
 use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
@@ -108,4 +110,21 @@ fn presence_by_condition_follows_the_players_memory() {
     remember(&mut sim, player, row("PellDead"));
 
     assert!(!visibility::present(sim.world(), orc, player));
+}
+
+#[test]
+fn a_world_that_serves_no_area_judges_an_items_requirements() {
+    let shield: ItemId = row("BoneShield");
+    let ItemKind::Equipment {
+        requires: Some(requirement),
+        ..
+    } = &shield.get(content()).kind
+    else {
+        panic!("the bone shield asks something of its wearer");
+    };
+    let mut world = World::new();
+    world.insert_resource(*content());
+    let viewer = world.spawn_empty().id();
+
+    assert!(!condition::holds(&world, viewer, requirement));
 }

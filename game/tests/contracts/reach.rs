@@ -3,7 +3,7 @@ use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::core::time::Seconds;
 use game::systems::area::AreaTag;
-use game::systems::item::{DroppedItem, Inventory, PickupRequest, Reservation, ReservedBy};
+use game::systems::item::{DroppedItem, Inventory, PickupRequest, Reservation};
 use game::systems::movement::{MoveRequest, Position, position};
 use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct, Tether};
@@ -20,7 +20,7 @@ fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
                 count: 2,
             },
             Reservation {
-                by: ReservedBy::None,
+                by: None,
                 at: Seconds(0.0),
             },
         ))

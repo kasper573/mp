@@ -45,9 +45,10 @@ pub fn aseprite(
     for (tag, strip) in strips {
         let from = index;
         for (image, ms) in strip {
-            let (bx, by, bw, bh) = match trimmed {
-                true => bbox(image),
-                false => (0, 0, image.width(), image.height()),
+            let (bx, by, bw, bh) = if trimmed {
+                bbox(image)
+            } else {
+                (0, 0, image.width(), image.height())
             };
             if x + bw > sheet.width() {
                 x = 0;
@@ -103,9 +104,10 @@ pub fn texturepacker(
             let (bx, by, bw, bh) = bbox(image);
             let cut = image::imageops::crop_imm(image, bx, by, bw, bh).to_image();
             let rotated = index % 2 == 1;
-            let placed = match rotated {
-                true => image::imageops::rotate90(&cut),
-                false => cut,
+            let placed = if rotated {
+                image::imageops::rotate90(&cut)
+            } else {
+                cut
             };
             if x + placed.width() > sheet.width() {
                 x = 0;

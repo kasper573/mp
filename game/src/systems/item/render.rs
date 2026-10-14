@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
-use crate::core::audio::playback::SfxId;
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
+use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::Content;
 use crate::core::math::{Pos, WorldPx};
 use crate::core::render::transition::WorldViewSystems;
@@ -10,8 +9,8 @@ use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaTag};
 use crate::systems::item::{DroppedItem, ItemConsumed, ItemsDropped};
-use crate::systems::movement::Position;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::movement::{Position, RenderPosition};
+use crate::systems::screen::ClientScreen;
 
 const DROP_SIZE: WorldPx = WorldPx(12.0);
 const DROP_STAGGER: Seconds = Seconds(0.06);
@@ -33,7 +32,7 @@ impl Plugin for ItemsPlugin {
                         .chain()
                         .in_set(WorldViewSystems),
                 )
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -60,7 +59,7 @@ struct Pending {
 fn use_sounds(
     content: Res<Content>,
     mut consumed: MessageReader<ItemConsumed>,
-    positions: Query<&Position>,
+    positions: Query<&RenderPosition>,
     mut play: MessageWriter<PlaySfx>,
 ) {
     for consumed in consumed.read() {
@@ -72,7 +71,7 @@ fn use_sounds(
         };
         play.write(PlaySfx {
             id,
-            place: SfxPlace::World(position.pos),
+            place: SfxPlace::World(position.0),
         });
     }
 }

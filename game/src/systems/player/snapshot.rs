@@ -4,43 +4,43 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, key_of};
+use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, key_of, serial};
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::GameSettings;
-use crate::systems::area::{self, transition::Discovered};
+use crate::systems::area::{self, AreaId, transition::Discovered};
 use crate::systems::dialogue::Heard;
 use crate::systems::effect::{Effect, TimedEffect, TimedEffects};
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{History, HistoryEntry};
-use crate::systems::item::{self, INVENTORY_MAX, Inventory, ItemKind, ItemStack};
-use crate::systems::job::{self, Job};
-use crate::systems::memory::{self, Memory};
+use crate::systems::item::{INVENTORY_MAX, Inventory, ItemId, ItemKind, ItemStack};
+use crate::systems::job::{Job, JobId};
+use crate::systems::memory::{Memory, MemoryId};
 use crate::systems::player::{CharacterState, Xp, def, player_stats};
-use crate::systems::quest::{self, ActiveQuest, FinishedQuest, Parties, QuestLog, QuestResult};
+use crate::systems::quest::{ActiveQuest, FinishedQuest, Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::Place;
-use crate::systems::shop::{self, Sale, ShopLedger};
+use crate::systems::shop::{Sale, ShopId, ShopLedger};
 use crate::systems::stat::StatMap;
 
-pub type Id = ContentId<CharacterSnapshot>;
+pub type TestCharacterId = ContentId<CharacterSnapshot>;
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CharacterSnapshot {
     pub name: String,
-    pub job: job::Id,
-    #[serde(default, skip_serializing_if = "is_zero")]
+    pub job: JobId,
+    #[serde(default, skip_serializing_if = "serial::is_zero")]
     pub xp: u32,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "StatMap::is_empty")]
     pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub effects: Vec<SnapshotEffect>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bag: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub equipment: BTreeMap<EquipmentSlot, item::Id>,
+    pub equipment: BTreeMap<EquipmentSlot, ItemId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub known_areas: Vec<area::Id>,
+    pub known_areas: Vec<AreaId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub quests: Vec<SnapshotQuest>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -59,7 +59,7 @@ impl ContentRow for CharacterSnapshot {
 }
 
 impl CharacterSnapshot {
-    pub fn fresh(name: &str, job: job::Id) -> CharacterSnapshot {
+    pub fn fresh(name: &str, job: JobId) -> CharacterSnapshot {
         CharacterSnapshot {
             name: name.to_owned(),
             job,
@@ -102,7 +102,7 @@ pub struct SnapshotEffect {
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotQuest {
-    pub quest: quest::Id,
+    pub quest: QuestId,
     pub state: QuestState,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub progress: Vec<u32>,
@@ -123,7 +123,7 @@ pub enum QuestState {
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotMemory {
-    pub memory: memory::Id,
+    pub memory: MemoryId,
     pub value: MemoryValue,
     pub ago: Seconds,
 }
@@ -147,7 +147,7 @@ pub struct HeardLine {
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotShop {
-    pub shop: shop::Id,
+    pub shop: ShopId,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stock: Vec<ShopStock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -190,7 +190,7 @@ pub fn materialize(
     immortal: bool,
 ) -> CharacterState {
     let mut stats = def(content).stats.clone();
-    stats.extend(snapshot.stats.iter().map(|(&kind, &value)| (kind, value)));
+    stats.0.extend(&snapshot.stats.0);
     let mut discovered = Discovered::starting_in(start.area);
     for &known in &snapshot.known_areas {
         discovered.discover(known);
@@ -313,7 +313,7 @@ impl MemoryValue {
 fn quest_log(content: &Content, snapshot: &CharacterSnapshot, clock: WallClock) -> QuestLog {
     let mut log = QuestLog::default();
     for entry in &snapshot.quests {
-        match entry.state {
+        let result = match entry.state {
             QuestState::Active => {
                 let mut active = ActiveQuest::fresh(content, entry.quest);
                 for (count, given) in active.counts.iter_mut().zip(&entry.progress) {
@@ -324,16 +324,13 @@ fn quest_log(content: &Content, snapshot: &CharacterSnapshot, clock: WallClock) 
                 active.decided = entry.decided.clone();
                 log.active.push(active);
                 log.tracked.push(entry.quest);
+                continue;
             }
-            QuestState::Completed | QuestState::Failed => {
-                let result = match entry.state {
-                    QuestState::Failed => QuestResult::Failed,
-                    _ => QuestResult::Completed,
-                };
-                log.finished
-                    .push(FinishedQuest::new(entry.quest, result, clock.day()));
-            }
-        }
+            QuestState::Completed => QuestResult::Completed,
+            QuestState::Failed => QuestResult::Failed,
+        };
+        log.finished
+            .push(FinishedQuest::new(entry.quest, result, clock.day()));
     }
     log
 }
@@ -343,13 +340,7 @@ fn check_start(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowC
     if let CharacterStart::At(place) = snapshot.start
         && let Err(problem) = area::check_place(content, place)
     {
-        check.nearest(
-            "/start",
-            problem.rule,
-            problem.found,
-            problem.expected,
-            problem.nearest,
-        );
+        check.problem("/start", problem);
     }
     if !snapshot.known_areas.is_empty() && !snapshot.known_areas.contains(&start.area) {
         check.error(
@@ -491,8 +482,4 @@ fn check_shops(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowC
             }
         }
     }
-}
-
-fn is_zero(value: &u32) -> bool {
-    *value == 0
 }

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
-pub use dialogue::{Choice, ChoiceOffer, DialogueNode, DialogueView, Reveal, SpokenValues};
+pub use dialogue::{Choice, ChoiceOffer, ChoiceReveal, DialogueNode, DialogueView, SpokenValues};
 pub use expr::Expr;
 pub use may_do::{MayDo, Reach};
 pub use node::{Assignment, Node, Target};
@@ -32,52 +32,40 @@ pub type Name = &'static str;
 pub type Arrow = Option<String>;
 pub type Link = Option<Name>;
 
-#[derive(
-    JsonSchema,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    Hash,
-    EnumString,
-    IntoStaticStr,
-    VariantArray,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum OwnerKind {
-    Object,
-    Npc,
-    Item,
-    Area,
-    Quest,
-    Shop,
-    Blueprint,
-    Any,
+/// What kind of thing owns a script, which decides the events raised for it and the effects it
+/// may use.
+pub trait OwnerKindDef:
+    Copy
+    + Eq
+    + std::hash::Hash
+    + fmt::Debug
+    + Serialize
+    + DeserializeOwned
+    + JsonSchema
+    + VariantArray
+    + Send
+    + Sync
+    + 'static
+{
+    /// The owner of a script any other may run.
+    const ANY: Self;
+
+    fn keeps_state(self) -> bool;
+    fn name(self) -> &'static str;
 }
 
-impl OwnerKind {
-    pub const PLACED: [OwnerKind; 4] = [
-        OwnerKind::Object,
-        OwnerKind::Npc,
-        OwnerKind::Area,
-        OwnerKind::Blueprint,
-    ];
-
-    pub fn keeps_state(self) -> bool {
-        !matches!(self, OwnerKind::Item | OwnerKind::Quest | OwnerKind::Shop)
-    }
-
-    pub fn name(self) -> &'static str {
-        self.into()
-    }
-}
-
-pub trait Vocabulary: Sized + Send + Sync + 'static {
-    type Event: EventDef + Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
+pub trait Vocabulary:
+    Copy + Eq + std::hash::Hash + fmt::Debug + Sized + Send + Sync + 'static
+{
+    type OwnerKind: OwnerKindDef;
+    type Event: EventDef<Self>
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + JsonSchema
+        + Send
+        + Sync
+        + 'static;
     type Query: QueryDef<Self>
         + Clone
         + Serialize
@@ -110,16 +98,21 @@ pub trait Vocabulary: Sized + Send + Sync + 'static {
 
     fn row_value(content: &Content, table: &str, key: &str) -> Option<Self::Row>;
     fn audio_value(content: &Content, key: &str) -> Option<Self::Audio>;
-    fn show_dialogue(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<Self>);
-    fn close_dialogue(world: &mut World, flow: FlowKey, subject: Entity, ending: BoxEnding);
-    fn log_dropped_flow(world: &World, owner: &Owner, why: &str);
+    fn show_dialogue(
+        world: &mut World,
+        flow: FlowKey<Self>,
+        subject: Entity,
+        view: DialogueView<Self>,
+    );
+    fn close_dialogue(world: &mut World, flow: FlowKey<Self>, subject: Entity, ending: BoxEnding);
+    fn log_dropped_flow(world: &World, owner: &Owner<Self>, why: &str);
 }
 
-pub trait EventDef: Clone {
+pub trait EventDef<V: Vocabulary>: Clone {
     type Kind: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 'static;
 
     fn kind(&self) -> Self::Kind;
-    fn owners(&self) -> &'static [OwnerKind];
+    fn owners(&self) -> &'static [V::OwnerKind];
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
     fn fields(&self) -> &'static [(Name, ValueType)];
@@ -130,20 +123,24 @@ pub trait LineDef<V: Vocabulary> {
 }
 
 pub trait QueryDef<V: Vocabulary> {
-    fn value_type(&self, cx: &Compiler<V>) -> Result<ValueType, String>;
+    fn value_type(&self, cx: &Compiler<V>) -> ValueType;
     fn reads_subject(&self) -> bool;
-    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<Eval, String>;
+    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<Eval, ScriptFault>;
 }
 
 pub trait EffectDef<V: Vocabulary> {
-    fn owners(&self) -> &'static [OwnerKind];
+    fn owners(&self) -> &'static [V::OwnerKind] {
+        V::OwnerKind::VARIANTS
+    }
     fn needs_subject(&self) -> bool;
     fn outputs(&'static self) -> Vec<(Name, Link)>;
-    fn pauses(&self) -> bool;
+    fn pauses(&self) -> bool {
+        false
+    }
     fn keeps_box(&self) -> bool {
         false
     }
-    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<EffectCall, String>;
+    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<EffectCall<V>, ScriptFault>;
     fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
 }
 
@@ -151,7 +148,7 @@ pub trait EffectDef<V: Vocabulary> {
 #[serde(bound = "", deny_unknown_fields)]
 #[schemars(bound = "")]
 pub struct ScriptDef<V: Vocabulary> {
-    pub owner: OwnerKind,
+    pub owner: V::OwnerKind,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variables: BTreeMap<String, Variable<V>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -268,6 +265,27 @@ impl<V: Vocabulary> VarValue<V> {
 pub enum Fill<T> {
     Var { var: String },
     Const(T),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScriptFault {
+    pub rule: &'static str,
+    pub expected: String,
+}
+
+impl ScriptFault {
+    pub fn new(rule: &'static str, expected: impl fmt::Display) -> ScriptFault {
+        ScriptFault {
+            rule,
+            expected: expected.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ScriptFault {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.rule, self.expected)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

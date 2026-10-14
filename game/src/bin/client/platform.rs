@@ -113,18 +113,23 @@ impl Platform for WebPlatform {
         }
     }
 
-    fn relaunch(&self, build: &str) -> bool {
-        let Some(window) = web_sys::window() else {
-            return false;
-        };
-        let Some(session) = window.session_storage().ok().flatten() else {
-            return false;
-        };
-        if session.get_item(RELOADED_FOR).ok().flatten().as_deref() == Some(build) {
-            return false;
+    fn relaunch(&self, build: &str) -> Result<(), String> {
+        let reloading = web_sys::window().is_some_and(|window| {
+            window
+                .session_storage()
+                .ok()
+                .flatten()
+                .is_some_and(|session| {
+                    session.get_item(RELOADED_FOR).ok().flatten().as_deref() != Some(build)
+                        && session.set_item(RELOADED_FOR, build).is_ok()
+                        && window.location().reload().is_ok()
+                })
+        });
+        if reloading {
+            Ok(())
+        } else {
+            Err("A new version of the game is live. Reload the page to play.".to_owned())
         }
-        let _ = session.set_item(RELOADED_FOR, build);
-        window.location().reload().is_ok()
     }
 
     fn local_clock(&self) -> LocalClock {

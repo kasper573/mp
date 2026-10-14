@@ -1,10 +1,15 @@
 use std::collections::BTreeMap;
-use std::fmt;
+use std::fmt::{self, Display};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadError {
     pub file: String,
     pub at: ErrorPlace,
+    pub problem: ContentProblem,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContentProblem {
     pub rule: &'static str,
     pub found: String,
     pub expected: String,
@@ -65,6 +70,35 @@ impl LoadReport {
     }
 }
 
+impl ContentProblem {
+    pub fn new(rule: &'static str, found: impl Display, expected: impl Display) -> ContentProblem {
+        ContentProblem {
+            rule,
+            found: found.to_string(),
+            expected: expected.to_string(),
+            nearest: None,
+        }
+    }
+
+    pub fn near(self, nearest: Option<String>) -> ContentProblem {
+        ContentProblem { nearest, ..self }
+    }
+}
+
+impl Display for ContentProblem {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}; expected {}",
+            self.rule, self.found, self.expected
+        )?;
+        if let Some(nearest) = &self.nearest {
+            write!(f, " (nearest {nearest})")?;
+        }
+        Ok(())
+    }
+}
+
 impl ErrorPlace {
     pub fn location(&self, file: &str) -> String {
         match self {
@@ -96,12 +130,15 @@ fn sort_key(error: &LoadError) -> SortKey<'_> {
         } => (*line, *column, pointer.clone()),
         ErrorPlace::Csv { row, column } => (*row, *column, String::new()),
     };
-    let rank = match (error.rule == VERSION_RULE, error.file == super::GAME_FILE) {
+    let rank = match (
+        error.problem.rule == VERSION_RULE,
+        error.file == super::GAME_FILE,
+    ) {
         (true, _) => 2,
         (false, true) => 0,
         (false, false) => 1,
     };
-    (rank, &error.file, line, column, within, error.rule)
+    (rank, &error.file, line, column, within, error.problem.rule)
 }
 
 impl fmt::Display for LoadReport {
@@ -123,7 +160,7 @@ impl fmt::Display for LoadReport {
         writeln!(f, "## Errors by rule")?;
         let mut by_rule: BTreeMap<&str, usize> = BTreeMap::new();
         for error in &self.errors {
-            *by_rule.entry(error.rule).or_default() += 1;
+            *by_rule.entry(error.problem.rule).or_default() += 1;
         }
         let mut rules: Vec<(&str, usize)> = by_rule.into_iter().collect();
         rules.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
@@ -151,10 +188,10 @@ impl fmt::Display for LoadReport {
                 error.at.location(&error.file),
                 error.at.within()
             )?;
-            writeln!(f, "  rule      {}", error.rule)?;
-            writeln!(f, "  found     {}", error.found)?;
-            writeln!(f, "  expected  {}", error.expected)?;
-            if let Some(nearest) = &error.nearest {
+            writeln!(f, "  rule      {}", error.problem.rule)?;
+            writeln!(f, "  found     {}", error.problem.found)?;
+            writeln!(f, "  expected  {}", error.problem.expected)?;
+            if let Some(nearest) = &error.problem.nearest {
                 writeln!(f, "  nearest   {nearest}")?;
             }
             if !same.is_empty() {
@@ -168,10 +205,10 @@ impl fmt::Display for LoadReport {
 }
 
 fn repeats(a: &LoadError, b: &LoadError) -> bool {
-    a.rule == b.rule
-        && a.at.within() == b.at.within()
-        && a.found == b.found
-        && a.expected == b.expected
+    a.at.within() == b.at.within()
+        && a.problem.rule == b.problem.rule
+        && a.problem.found == b.problem.found
+        && a.problem.expected == b.problem.expected
         && a.file != b.file
 }
 

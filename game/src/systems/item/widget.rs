@@ -1,5 +1,3 @@
-use std::hash::{Hash, Hasher};
-
 use bevy::ecs::template::template;
 use bevy::prelude::*;
 use ui::RichPiece;
@@ -13,12 +11,13 @@ use crate::systems::hud::{
 use crate::systems::input::map::{ActionInput, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
-    INVENTORY_MAX, Id as ItemId, Inventory, ItemDef, ItemFlag, ItemStack, card,
+    DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack,
+    UseItemRequest, card,
 };
 use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
-pub(super) struct InventoryGrid;
+struct InventoryGrid;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SlotVerdict {
@@ -83,9 +82,6 @@ impl Window for InventoryWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Bag
     }
-    fn order(&self) -> u32 {
-        0
-    }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
         single_tab(self.title(), ui::scrolled(content()))
     }
@@ -105,11 +101,13 @@ fn content() -> Box<dyn Scene> {
     })
 }
 
+#[derive(Hash)]
 struct CellData {
     slot: u32,
     filled: Option<Filled>,
 }
 
+#[derive(Hash)]
 struct Filled {
     item: ItemId,
     hints: Vec<(InputAction, String)>,
@@ -119,14 +117,13 @@ struct Filled {
     verdict: Option<SlotVerdict>,
 }
 
-pub(super) fn sync_inventory(world: &mut World) {
+fn sync_inventory(world: &mut World) {
     let cells = inventory_cells(world);
     let mut grids = world.query_filtered::<Entity, With<InventoryGrid>>();
     let Some(grid) = grids.iter(world).next() else {
         return;
     };
-    let keys: Vec<u64> = cells.iter().map(cell_key).collect();
-    reconcile_children(world, grid, &keys, |world, index| {
+    reconcile_children(world, grid, &cells, |world, index| {
         slot(world.resource::<Content>(), &cells[index])
     });
 }
@@ -172,22 +169,6 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
 fn bound_note(def: &ItemDef) -> Option<String> {
     def.has(ItemFlag::Bound)
         .then(|| "bound · can't be sold or dropped".to_owned())
-}
-
-fn cell_key(cell: &CellData) -> u64 {
-    let mut hasher = std::hash::DefaultHasher::new();
-    cell.slot.hash(&mut hasher);
-    if let Some(filled) = &cell.filled {
-        (
-            filled.item,
-            &filled.hints,
-            filled.count,
-            &filled.notes,
-            &filled.verdict,
-        )
-            .hash(&mut hasher);
-    }
-    hasher.finish()
 }
 
 fn slot(content: &Content, cell: &CellData) -> Box<dyn Scene> {
@@ -286,8 +267,12 @@ fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction]) {
         return;
     }
     match BUILT_IN.into_iter().find(|action| matched.contains(action)) {
-        Some(InputAction::DropItem) => session::drop_item(world, slot),
-        Some(InputAction::UseItem) => session::use_item(world, slot),
+        Some(InputAction::DropItem) => {
+            world.write_message(DropItemRequest { slot });
+        }
+        Some(InputAction::UseItem) => {
+            world.write_message(UseItemRequest { slot });
+        }
         Some(InputAction::InspectItem) => card::open(world, item),
         _ => {}
     }

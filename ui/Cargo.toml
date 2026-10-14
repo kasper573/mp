@@ -69,3 +69,6 @@ bevy_text = { workspace = true }
 bevy_window = { workspace = true }
 bevy_math = { workspace = true }
 bevy_time = { workspace = true }
+
+[lints]
+workspace = true

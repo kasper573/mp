@@ -1,7 +1,5 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
-use strum::VariantArray;
+use strum::{IntoStaticStr, VariantArray};
 use ui::tokens::{palette, spacing, typography};
 use ui::{RichSpan, RichText};
 
@@ -15,15 +13,12 @@ use crate::core::time::LocalClock;
 use crate::systems::actor::Name;
 use crate::systems::hud::{self, HudAudience, Window, reconcile_children};
 use crate::systems::input::map::InputAction;
-use crate::systems::interface::InterfaceIcon;
-use crate::systems::interface::InterfaceSound;
+use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::scene::mode::Mode;
-use crate::systems::text::{LineText, SpanText};
+use crate::systems::screen::ClientScreen;
+use crate::systems::screen::mode::ClientMode;
 
-pub const HISTORY_WINDOW: &str = "History";
 const SIZE: Vec2 = Vec2::new(780.0, 460.0);
 const TIME_WIDTH: f32 = 72.0;
 const ICON: f32 = 16.0;
@@ -35,12 +30,12 @@ impl Plugin for HistoryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HistoryBook>()
             .add_systems(Update, receive_news)
-            .add_systems(OnExit(GameScene::Area), forget)
+            .add_systems(OnExit(ClientScreen::Area), forget)
             .add_observer(remember_tab);
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, VariantArray)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, VariantArray, IntoStaticStr)]
 pub enum HistoryTab {
     #[default]
     All,
@@ -53,14 +48,7 @@ pub enum HistoryTab {
 
 impl HistoryTab {
     pub fn title(self) -> &'static str {
-        match self {
-            HistoryTab::All => "All",
-            HistoryTab::Talk => "Talk",
-            HistoryTab::Quests => "Quests",
-            HistoryTab::Items => "Items",
-            HistoryTab::Notifications => "Notifications",
-            HistoryTab::Errors => "Errors",
-        }
+        self.into()
     }
 
     fn shows(self, entry: &HistoryEntry) -> bool {
@@ -76,10 +64,7 @@ impl HistoryTab {
     }
 
     fn index(self) -> usize {
-        HistoryTab::VARIANTS
-            .iter()
-            .position(|&tab| tab == self)
-            .unwrap_or(0)
+        self as usize
     }
 }
 
@@ -110,11 +95,11 @@ impl HistoryBook {
 }
 
 pub fn close(world: &mut World) -> bool {
-    hud::close_window(world, HISTORY_WINDOW)
+    hud::close_window(world, HistoryWindow.title())
 }
 
 pub fn shown_tab(world: &World) -> Option<HistoryTab> {
-    hud::window_open(world, HISTORY_WINDOW).then(|| world.resource::<HistoryBook>().tab)
+    hud::window_open(world, HistoryWindow.title()).then(|| world.resource::<HistoryBook>().tab)
 }
 
 pub struct HistoryWindow;
@@ -124,16 +109,13 @@ impl Window for HistoryWindow {
         HudAudience::Everyone
     }
     fn title(&self) -> &'static str {
-        HISTORY_WINDOW
+        "History"
     }
     fn toggle(&self) -> InputAction {
         InputAction::ToggleHistory
     }
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::History
-    }
-    fn order(&self) -> u32 {
-        4
     }
     fn size(&self) -> Vec2 {
         SIZE
@@ -246,23 +228,16 @@ enum Row {
 }
 
 impl Row {
-    fn key(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+    fn key(&self) -> String {
         match self {
-            Row::Watching { name, count } => ("watching", name, count).hash(&mut hasher),
-            Row::Trimmed => "trimmed".hash(&mut hasher),
-            Row::Empty(tab) => ("empty", tab.index()).hash(&mut hasher),
-            Row::Record(record) => {
-                (
-                    "record",
-                    record.nth,
-                    format!("{:?}", record.entry.tally),
-                    record.entry.repeats,
-                )
-                    .hash(&mut hasher);
-            }
+            Row::Watching { name, count } => format!("watching {name} {count}"),
+            Row::Trimmed => "trimmed".to_owned(),
+            Row::Empty(tab) => format!("empty {}", tab.index()),
+            Row::Record(record) => format!(
+                "record {} {:?} {}",
+                record.nth, record.entry.tally, record.entry.repeats
+            ),
         }
-        hasher.finish()
     }
 }
 
@@ -274,21 +249,19 @@ fn sync_bodies(world: &mut World) {
         .collect();
     let version = world.resource::<HistoryBook>().version;
     let watched = watched_name(world);
-    let mut built_key = DefaultHasher::new();
-    (version, &watched).hash(&mut built_key);
-    let built_key = built_key.finish();
+    let built_key = hud::fingerprint(&(version, &watched));
     for (entity, body) in bodies {
         if body.built == Some(built_key) {
             continue;
         }
-        let Some(list) = descendant_with::<HistoryList>(world, entity) else {
+        let Some(list) = ui::descendant_with::<HistoryList>(world, entity) else {
             continue;
         };
         if let Some(mut body) = world.get_mut::<HistoryBody>(entity) {
             body.built = Some(built_key);
         }
         let rows = rows(world, body.tab, watched.clone());
-        let keys: Vec<u64> = rows.iter().map(Row::key).collect();
+        let keys: Vec<String> = rows.iter().map(Row::key).collect();
         let clock = world.resource::<ClientPlatform>().0.local_clock();
         reconcile_children(world, list, &keys, |world, index| {
             row(world.resource::<AssetServer>(), &rows[index], clock)
@@ -323,7 +296,7 @@ fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {
 }
 
 fn watched_name(world: &World) -> Option<String> {
-    if *world.resource::<Mode>() != Mode::Spectate {
+    if *world.resource::<ClientMode>() != ClientMode::Spectate {
         return None;
     }
     world
@@ -394,30 +367,15 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
             return Box::new(header(format!("{who} · {time}"), ink));
         }
         Some(HistoryMark::Arrived) => {
-            return Box::new(divider(format!("{} · {time}", words(&entry.text)), ink));
+            return Box::new(divider(
+                format!("{} · {time}", entry.text.plain_words()),
+                ink,
+            ));
         }
         _ => {}
     }
     let mut text = entry.text.rich();
-    let prefix = |text: &mut RichText, label: String, color: Color| {
-        text.pieces
-            .insert(0, RichSpan::plain(label).color(color).into());
-    };
-    match entry.tally {
-        Some(RecordTally::Change(change)) => {
-            let color = match (change > 0, entry.icon.is_some()) {
-                (true, true) => palette::EMERALD_80,
-                (true, false) => palette::AMBER_80,
-                (false, _) => ink.with_alpha(0.6),
-            };
-            prefix(&mut text, format!("{} ", signed(change)), color);
-        }
-        Some(RecordTally::Progress { have, need }) => {
-            text.pieces
-                .push(RichSpan::plain(format!(" {have}/{need}")).into());
-        }
-        None => {}
-    }
+    tallied(&mut text, entry.tally, entry.icon.is_some(), ink);
     if entry.repeats > 1 {
         text.pieces.push(
             RichSpan::plain(format!(" \u{d7}{}", entry.repeats))
@@ -475,6 +433,29 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
     })
 }
 
+pub(crate) fn tallied(text: &mut RichText, tally: Option<RecordTally>, icon: bool, ink: Color) {
+    match tally {
+        Some(RecordTally::Change(change)) => {
+            let color = match (change > 0, icon) {
+                (true, true) => palette::EMERALD_80,
+                (true, false) => palette::AMBER_80,
+                (false, _) => ink.with_alpha(0.6),
+            };
+            prefix(text, format!("{} ", signed(change)), color);
+        }
+        Some(RecordTally::Progress { have, need }) => {
+            text.pieces
+                .push(RichSpan::plain(format!(" {have}/{need}")).into());
+        }
+        None => {}
+    }
+}
+
+fn prefix(text: &mut RichText, label: String, color: Color) {
+    text.pieces
+        .insert(0, RichSpan::plain(label).color(color).into());
+}
+
 fn header(text: String, ink: Color) -> impl Scene {
     bsn! {
         Node { margin: {UiRect::top(Val::Px(spacing::M))}, width: Val::Percent(100.0) }
@@ -509,27 +490,4 @@ fn icon_image(image: Handle<Image>) -> impl Scene {
         ImageNode { image: {image} }
         Pickable::IGNORE
     }
-}
-
-fn words(text: &LineText) -> String {
-    text.0
-        .iter()
-        .map(|span| match span {
-            SpanText::Text { text, .. } => text.as_str(),
-            SpanText::Input(_) => "",
-        })
-        .collect()
-}
-
-fn descendant_with<C: Component>(world: &World, root: Entity) -> Option<Entity> {
-    let mut stack = vec![root];
-    while let Some(entity) = stack.pop() {
-        if world.get::<C>(entity).is_some() {
-            return Some(entity);
-        }
-        if let Some(kids) = world.get::<Children>(entity) {
-            stack.extend(kids.iter());
-        }
-    }
-    None
 }

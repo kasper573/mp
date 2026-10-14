@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use super::report::ContentProblem;
+
 #[derive(Default)]
 pub struct RowCheck {
     errors: Vec<RowError>,
@@ -8,10 +10,7 @@ pub struct RowCheck {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RowError {
     pub pointer: String,
-    pub rule: &'static str,
-    pub found: String,
-    pub expected: String,
-    pub nearest: Option<String>,
+    pub problem: ContentProblem,
 }
 
 impl RowCheck {
@@ -22,23 +21,13 @@ impl RowCheck {
         found: impl Display,
         expected: impl Display,
     ) {
-        self.nearest(pointer, rule, found, expected, None);
+        self.problem(pointer, ContentProblem::new(rule, found, expected));
     }
 
-    pub fn nearest(
-        &mut self,
-        pointer: impl Into<String>,
-        rule: &'static str,
-        found: impl Display,
-        expected: impl Display,
-        nearest: Option<String>,
-    ) {
+    pub fn problem(&mut self, pointer: impl Into<String>, problem: ContentProblem) {
         self.errors.push(RowError {
             pointer: pointer.into(),
-            rule,
-            found: found.to_string(),
-            expected: expected.to_string(),
-            nearest,
+            problem,
         });
     }
 

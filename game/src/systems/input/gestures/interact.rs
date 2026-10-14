@@ -3,16 +3,12 @@ use bevy::window::CursorIcon;
 
 use crate::core::render;
 use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
-use crate::systems::interact;
+use crate::systems::interact::{self, InteractRequest};
 use crate::systems::player::session;
 
 pub struct InteractGesture;
 
 impl Gesture for InteractGesture {
-    fn priority(&self) -> i32 {
-        4
-    }
-
     fn claim(&self, world: &mut World) -> Option<ClickClaim> {
         if !session::is_alive(world) {
             return None;
@@ -22,7 +18,7 @@ impl Gesture for InteractGesture {
 
     fn drive(&self, world: &mut World, start: bool) {
         if start && let Some(target) = target(world) {
-            session::interact(world, target);
+            world.write_message(InteractRequest { target });
         }
     }
 

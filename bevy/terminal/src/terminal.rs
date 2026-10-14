@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -71,13 +70,13 @@ impl<K> Default for TerminalInbox<K> {
     }
 }
 
-pub fn register<K: TerminalKey>(app: &mut App, terminals: &HashMap<K, &'static Terminal>) {
+pub fn register<K: TerminalKey>(
+    app: &mut App,
+    terminals: impl IntoIterator<Item = (K, &'static Terminal)>,
+) {
     use bevy_replicon::prelude::{ClientMessageAppExt, ServerMessageAppExt};
 
-    let mut table: Vec<(K, &'static Terminal)> = terminals
-        .iter()
-        .map(|(&key, &terminal)| (key, terminal))
-        .collect();
+    let mut table: Vec<(K, &'static Terminal)> = terminals.into_iter().collect();
     table.sort_unstable_by_key(|&(key, _)| key);
     app.insert_resource(TerminalTable(table))
         .init_resource::<TerminalInbox<K>>()

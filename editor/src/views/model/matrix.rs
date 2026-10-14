@@ -1,13 +1,15 @@
+use std::collections::BTreeMap;
+
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use game::core::math::Direction;
+use game::systems::actor::Action;
 use serde_json::Value;
+use strum::VariantArray;
 
 use super::{ModelPage, ModelStrip, StripFrame, action_timing, play_rule, shifted, strip_of};
 use crate::app::Editor;
 use crate::import;
 use crate::ui::{theme, widgets};
-use game::systems::actor::model::{ActionName, DirectionName};
-use std::collections::BTreeMap;
-use strum::VariantArray;
 
 const CELL: f32 = 58.0;
 const LABEL_W: f32 = 120.0;
@@ -16,7 +18,7 @@ const PREVIEW: Vec2 = Vec2::new(180.0, 350.0);
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let ctx = ui.ctx().clone();
     let sheet = super::sheet_info(editor, &ctx, row);
-    let timings: BTreeMap<ActionName, super::ActionTiming> = ActionName::VARIANTS
+    let timings: BTreeMap<Action, super::ActionTiming> = Action::VARIANTS
         .iter()
         .map(|&action| (action, action_timing(row, action)))
         .collect();
@@ -40,11 +42,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
     let mut pick = None;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
-            ui.set_width(LABEL_W + DirectionName::VARIANTS.len() as f32 * (CELL + 8.0));
+            ui.set_width(LABEL_W + Direction::VARIANTS.len() as f32 * (CELL + 8.0));
             header(ui);
             let mut strips = 0;
             let mut frames_total = 0;
-            for &action in ActionName::VARIANTS {
+            for &action in Action::VARIANTS {
                 let timing = &timings[&action];
                 ui.horizontal(|ui| {
                     let first = strip_of(row, ModelStrip { action, ..ModelStrip::default() });
@@ -57,10 +59,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                             .layout(egui::Layout::top_down(egui::Align::Min)),
                     );
                     column.add_space(6.0);
-                    column.label(theme::mono(action.key()).color(theme::CODE).size(13.0));
+                    column.label(theme::mono(action.as_ref()).color(theme::CODE).size(13.0));
                     column.label(theme::muted(format!("{} · {total} ms", first.len())).size(12.0));
                     column.label(theme::faint(play_rule(action)).size(11.5));
-                    for &direction in DirectionName::VARIANTS {
+                    for &direction in Direction::VARIANTS {
                         let this = ModelStrip { action, direction };
                         let frames = strip_of(row, this);
                         strips += 1;
@@ -76,7 +78,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
                         if badged {
                             response.on_hover_text(format!(
                                 "{}: {} frames · {} ms · the other directions last {} ms over {} frames",
-                                direction.key(),
+                                direction.as_ref(),
                                 frames.len(),
                                 super::total_ms(&frames),
                                 timing.common.iter().sum::<u32>(),
@@ -109,18 +111,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             if let Some(record) = editor.imports.record_for(super::TABLE, key).cloned() {
                 ui.horizontal(|ui| {
                     let export = import::show_path(editor, &record.export);
-                    match record.missing() {
-                        true => {
-                            ui.label(theme::warn("⚠"));
-                            ui.label(theme::muted(format!(
-                                "imported from {export}, which is missing now"
-                            )));
-                        }
-                        false => {
-                            ui.label(theme::faint(format!(
-                                "imported from {export} · watched for changes"
-                            )));
-                        }
+                    if record.missing() {
+                        ui.label(theme::warn("⚠"));
+                        ui.label(theme::muted(format!(
+                            "imported from {export}, which is missing now"
+                        )));
+                    } else {
+                        ui.label(theme::faint(format!(
+                            "imported from {export} · watched for changes"
+                        )));
                     }
                 });
             }
@@ -187,12 +186,12 @@ pub fn open_strip(editor: &mut Editor, key: &str, strip: ModelStrip) {
 fn header(ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_space(LABEL_W);
-        for direction in DirectionName::VARIANTS {
+        for direction in Direction::VARIANTS {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(CELL, 18.0), Sense::hover());
             ui.painter().text(
                 rect.center(),
                 egui::Align2::CENTER_CENTER,
-                direction.key(),
+                direction.as_ref(),
                 egui::FontId::monospace(12.5),
                 theme::MUTED,
             );
@@ -267,8 +266,8 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
     let turn = i32::from(right) - i32::from(left);
     let step = i32::from(down) - i32::from(up);
     view.strip = ModelStrip {
-        action: shifted(ActionName::VARIANTS, was.action, step as isize),
-        direction: shifted(DirectionName::VARIANTS, was.direction, turn as isize),
+        action: shifted(Action::VARIANTS, was.action, step as isize),
+        direction: shifted(Direction::VARIANTS, was.direction, turn as isize),
     };
     if view.strip != was {
         view.frames.clear();

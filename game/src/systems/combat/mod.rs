@@ -12,8 +12,8 @@ use crate::core::math::{Direction, Pos};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Millis, PlaybackRate, Seconds};
 use crate::systems::actor::{self, Action, Actor, ActorModel, Timing, set_facing};
-use crate::systems::area::AreaTag;
-use crate::systems::movement::{MoveTarget, Path, halt, on_tile, position};
+use crate::systems::area;
+use crate::systems::movement::{halt, moving, on_tile, position};
 use crate::systems::player::{self, Owner, commands_locked, sender_player, session};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::stat::{self, StatKind};
@@ -211,10 +211,7 @@ fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
 fn progress_swings(world: &mut World, time: Seconds, swings: &mut QueryState<Entity, With<Swing>>) {
     let ids: Vec<Entity> = swings.iter(world).collect();
     for id in ids {
-        if stat::is_dead(world, id)
-            || world.get::<MoveTarget>(id).is_some()
-            || world.get::<Path>(id).is_some()
-        {
+        if stat::is_dead(world, id) || moving(world, id) {
             world
                 .entity_mut(id)
                 .remove::<Swing>()
@@ -240,9 +237,7 @@ fn progress_swings(world: &mut World, time: Seconds, swings: &mut QueryState<Ent
 }
 
 fn strike(world: &mut World, attacker: Entity, target: Entity) {
-    let same_area = world.get::<AreaTag>(attacker).map(|t| t.area)
-        == world.get::<AreaTag>(target).map(|t| t.area);
-    if !same_area {
+    if !area::same_area(world, attacker, target) {
         return;
     }
     let damage = stat::effective(world, attacker, StatKind::Damage);

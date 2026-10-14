@@ -36,7 +36,7 @@ use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::{CellPos, TilePos, TileSize, Tiles};
-use game::systems::area::{self, AreaModuleKind};
+use game::systems::area::{self, AreaId, AreaModuleKind};
 use serde_json::Value;
 
 use self::overlays::{
@@ -236,13 +236,6 @@ impl AreaViewState {
                 | AreaTool::Erase
                 | AreaTool::Eyedropper
         ))
-    }
-
-    pub fn editing_blueprint(&self) -> Option<&str> {
-        self.in_place
-            .last()
-            .map(|place| place.blueprint.as_str())
-            .or(self.blueprint.as_deref())
     }
 
     pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
@@ -656,7 +649,7 @@ fn canvas(
     ui: &mut Ui,
     view_key: &str,
     content: Content,
-    area_id: area::Id,
+    area_id: AreaId,
     generation: u64,
 ) {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
@@ -785,7 +778,7 @@ fn canvas(
 pub struct AreaFrame<'a> {
     pub canvas: AreaCanvas,
     pub content: Content,
-    pub area_id: area::Id,
+    pub area_id: AreaId,
     pub area_key: String,
     pub modules: Vec<Value>,
     pub placement_bounds: HashMap<usize, Rect<Tiles>>,

@@ -14,20 +14,20 @@ use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::{Action, Actor, ActorModel};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::movement::RenderPosition;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 pub struct ActorPlugin;
 
 impl Plugin for ActorPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Seen>()
+        app.init_resource::<CuePlayheads>()
             .add_plugins(InterpolatePlugin::<RenderActor>::default())
             .add_systems(
                 Update,
                 (attach_sprites, sync_actors, actor_cues)
                     .chain()
                     .in_set(WorldViewSystems)
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -132,22 +132,22 @@ fn sync_actors(
 }
 
 #[derive(Resource, Default)]
-struct Seen(HashMap<Entity, (Action, Seconds)>);
+struct CuePlayheads(HashMap<Entity, (Action, Seconds)>);
 
 fn actor_cues(
     time: Res<Time>,
     content: Res<Content>,
     mut animator: ResMut<Animator>,
-    mut seen: ResMut<Seen>,
+    mut playheads: ResMut<CuePlayheads>,
     actors: Query<(Entity, &Actor, &RenderPosition, &RenderActor, &AreaTag)>,
     mut play: MessageWriter<PlaySfx>,
 ) {
     let clock = Seconds(time.elapsed_secs());
-    seen.0.retain(|entity, _| actors.contains(*entity));
+    playheads.0.retain(|entity, _| actors.contains(*entity));
     for (entity, actor, render, pose, tag) in &actors {
         let at = render.0;
         let now = animator.elapsed(entity, pose.action as u64, clock);
-        let Some((was, then)) = seen.0.insert(entity, (pose.action, now)) else {
+        let Some((was, then)) = playheads.0.insert(entity, (pose.action, now)) else {
             continue;
         };
         let since = (was == pose.action).then_some(then);

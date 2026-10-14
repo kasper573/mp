@@ -7,7 +7,7 @@ use bevy_picking::pointer::PointerId;
 use bevy_ui::{ComputedNode, InteractionDisabled};
 
 use crate::carry::Ghost;
-use crate::state::ancestry;
+use crate::state::{ancestry, self_and_ancestors};
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CursorStyle {
@@ -24,16 +24,14 @@ pub enum CursorStyle {
 pub struct ClickThrough;
 
 pub fn clicks_through(world: &World, hit: Entity) -> bool {
-    std::iter::successors(Some(hit), |&entity| {
-        world.get::<ChildOf>(entity).map(ChildOf::parent)
-    })
-    .find_map(|entity| {
-        passes_at(
-            world.get::<ClickThrough>(entity).is_some(),
-            world.get::<CursorStyle>(entity).is_some(),
-        )
-    })
-    .unwrap_or(false)
+    self_and_ancestors(world, hit)
+        .find_map(|entity| {
+            passes_at(
+                world.get::<ClickThrough>(entity).is_some(),
+                world.get::<CursorStyle>(entity).is_some(),
+            )
+        })
+        .unwrap_or(false)
 }
 
 #[derive(Resource, Default)]

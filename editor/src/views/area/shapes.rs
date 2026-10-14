@@ -1,15 +1,18 @@
+use game::core::audio::soundscape::SoundscapeShape;
+use game::core::content::serial;
 use game::core::math::{Offset, Pos, Rect, Size};
 use game::core::tiling::Tiles;
-use game::systems::area::{AreaModuleKind, ObjectShape};
+use game::systems::area::{AreaModuleKind, Flip, ObjectShape};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::value::RowValue;
 
 pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<Rect<Tiles>> {
     match module.module_kind()? {
-        AreaModuleKind::Object => shape_rect(&module["shape"]),
+        AreaModuleKind::Object => object_shape(module).map(|shape| shape.bounds()),
         AreaModuleKind::SafeZone => rect_of(&module["rect"]),
-        AreaModuleKind::Soundscape => rect_of(&module["shape"]),
+        AreaModuleKind::Soundscape => soundscape_shape(module).map(SoundscapeShape::bounds),
         AreaModuleKind::Scenery => scenery_rect(module),
         AreaModuleKind::Blueprint => {
             placement_bounds.or_else(|| pos_of(&module["at"]).map(cell_rect))
@@ -21,29 +24,21 @@ pub fn bounds(module: &Value, placement_bounds: Option<Rect<Tiles>>) -> Option<R
 }
 
 pub fn is_ellipse(module: &Value) -> bool {
-    module["shape"]["type"] == "ellipse"
+    matches!(soundscape_shape(module), Some(SoundscapeShape::Ellipse(_)))
 }
 
 pub fn is_point(module: &Value) -> bool {
     match module.module_kind() {
-        Some(AreaModuleKind::Object) => module["shape"]["type"] == "point",
+        Some(AreaModuleKind::Object) => {
+            matches!(object_shape(module), Some(ObjectShape::Point(_)))
+        }
         Some(AreaModuleKind::Resident) => true,
         _ => false,
     }
 }
 
-pub fn shape_rect(shape: &Value) -> Option<Rect<Tiles>> {
-    match serde_json::from_value::<ObjectShape>(shape.clone()).ok()? {
-        ObjectShape::Point(at) => Some(cell_rect(at)),
-        ObjectShape::Rect(rect) => Some(rect),
-    }
-}
-
 pub fn rect_of(value: &Value) -> Option<Rect<Tiles>> {
-    Some(Rect::new(
-        Pos::new(value["x"].as_f64()? as f32, value["y"].as_f64()? as f32),
-        Size::new(value["w"].as_f64()? as f32, value["h"].as_f64()? as f32),
-    ))
+    serial::rect_from(value).ok()
 }
 
 pub fn cell_rect(at: Pos<Tiles>) -> Rect<Tiles> {
@@ -51,73 +46,39 @@ pub fn cell_rect(at: Pos<Tiles>) -> Rect<Tiles> {
 }
 
 pub fn pos_of(value: &Value) -> Option<Pos<Tiles>> {
-    Some(Pos::new(
-        value["x"].as_f64()? as f32,
-        value["y"].as_f64()? as f32,
-    ))
+    serial::pos_from(value).ok()
 }
 
 pub fn scenery_rect(module: &Value) -> Option<Rect<Tiles>> {
     let at = pos_of(&module["at"])?;
     let rows = module["tiles"].as_array()?;
-    let height = rows.len() as f32;
-    let width = rows.first().and_then(Value::as_array).map_or(0, Vec::len) as f32;
-    let flip = module.text_or("flip", "none");
-    let x = if matches!(flip, "horizontal" | "both") {
-        at.x - width
-    } else {
-        at.x
-    };
-    let y = if matches!(flip, "vertical" | "both") {
-        at.y - height
-    } else {
-        at.y
-    };
-    Some(Rect::new(Pos::new(x, y), Size::new(width, height)))
+    let width = rows.first().and_then(Value::as_array).map_or(0, Vec::len);
+    Some(flip_of(module).anchored(at, Size::new(width as f32, rows.len() as f32)))
 }
 
 pub fn shift(module: &mut Value, dx: f32, dy: f32) {
-    let shift_xy = |value: &mut Value| {
-        if let Some(x) = value.get("x").and_then(Value::as_f64) {
-            value["x"] = sixteenth_json(x as f32 + dx);
-        }
-        if let Some(y) = value.get("y").and_then(Value::as_f64) {
-            value["y"] = sixteenth_json(y as f32 + dy);
-        }
+    let Some(field) = placed_field(module) else {
+        return;
     };
-    match module.module_kind() {
-        Some(AreaModuleKind::Object) => shift_xy(&mut module["shape"]),
-        Some(AreaModuleKind::SafeZone) => shift_xy(&mut module["rect"]),
-        Some(AreaModuleKind::Soundscape) => shift_xy(&mut module["shape"]),
-        Some(AreaModuleKind::Scenery)
-        | Some(AreaModuleKind::Blueprint)
-        | Some(AreaModuleKind::Resident) => shift_xy(&mut module["at"]),
-        Some(AreaModuleKind::Population) if module["roams"].is_object() => {
-            shift_xy(&mut module["roams"])
-        }
-        _ => {}
+    let at = &mut module[field];
+    if let Some(x) = at.get("x").and_then(Value::as_f64) {
+        at["x"] = sixteenth_json(x as f32 + dx);
+    }
+    if let Some(y) = at.get("y").and_then(Value::as_f64) {
+        at["y"] = sixteenth_json(y as f32 + dy);
     }
 }
 
 pub fn resize(module: &mut Value, w: f32, h: f32) {
-    let target = match module.module_kind() {
-        Some(AreaModuleKind::Object) if module["shape"]["type"] == "rect" => &mut module["shape"],
-        Some(AreaModuleKind::SafeZone) => &mut module["rect"],
-        Some(AreaModuleKind::Soundscape) => &mut module["shape"],
-        Some(AreaModuleKind::Population) if module["roams"].is_object() => &mut module["roams"],
-        _ => return,
+    let Some(field) = sized_field(module) else {
+        return;
     };
-    target["w"] = sixteenth_json(w.max(0.0625));
-    target["h"] = sixteenth_json(h.max(0.0625));
+    module[field]["w"] = sixteenth_json(w.max(0.0625));
+    module[field]["h"] = sixteenth_json(h.max(0.0625));
 }
 
 pub fn has_size(module: &Value) -> bool {
-    match module.module_kind() {
-        Some(AreaModuleKind::Object) => module["shape"]["type"] == "rect",
-        Some(AreaModuleKind::SafeZone) | Some(AreaModuleKind::Soundscape) => true,
-        Some(AreaModuleKind::Population) => module["roams"].is_object(),
-        _ => false,
-    }
+    sized_field(module).is_some()
 }
 
 pub fn flip_field(module: &mut Value, horizontal: bool) {
@@ -127,29 +88,11 @@ pub fn flip_field(module: &mut Value, horizontal: bool) {
     ) {
         return;
     }
-    let current = module.text_or("flip", "none");
-    let (mut h, mut v) = match current {
-        "horizontal" => (true, false),
-        "vertical" => (false, true),
-        "both" => (true, true),
-        _ => (false, false),
-    };
-    if horizontal {
-        h = !h;
+    let flip = flip_of(module).compose(Flip::of(horizontal, !horizontal));
+    if flip.is_none() {
+        module.remove_field("flip");
     } else {
-        v = !v;
-    }
-    let next = match (h, v) {
-        (false, false) => None,
-        (true, false) => Some("horizontal"),
-        (false, true) => Some("vertical"),
-        (true, true) => Some("both"),
-    };
-    match next {
-        Some(flip) => module["flip"] = Value::String(flip.to_owned()),
-        None => {
-            module.remove_field("flip");
-        }
+        module["flip"] = Value::String(flip.as_ref().to_owned());
     }
 }
 
@@ -178,5 +121,41 @@ pub fn label(module: &Value) -> String {
         Some(AreaModuleKind::InlineScript) => "inline script".to_owned(),
         Some(other) => other.tag().replace('_', " "),
         None => module.kind_or("module").replace('_', " "),
+    }
+}
+
+fn object_shape(module: &Value) -> Option<ObjectShape> {
+    ObjectShape::deserialize(&module["shape"]).ok()
+}
+
+fn soundscape_shape(module: &Value) -> Option<SoundscapeShape> {
+    SoundscapeShape::deserialize(&module["shape"]).ok()
+}
+
+fn flip_of(module: &Value) -> Flip {
+    Flip::deserialize(&module["flip"]).unwrap_or_default()
+}
+
+fn placed_field(module: &Value) -> Option<&'static str> {
+    match module.module_kind()? {
+        AreaModuleKind::Object | AreaModuleKind::Soundscape => Some("shape"),
+        AreaModuleKind::SafeZone => Some("rect"),
+        AreaModuleKind::Scenery | AreaModuleKind::Blueprint | AreaModuleKind::Resident => {
+            Some("at")
+        }
+        AreaModuleKind::Population if module["roams"].is_object() => Some("roams"),
+        _ => None,
+    }
+}
+
+fn sized_field(module: &Value) -> Option<&'static str> {
+    match module.module_kind()? {
+        AreaModuleKind::Object => {
+            matches!(object_shape(module), Some(ObjectShape::Rect(_))).then_some("shape")
+        }
+        AreaModuleKind::Soundscape => Some("shape"),
+        AreaModuleKind::SafeZone => Some("rect"),
+        AreaModuleKind::Population if module["roams"].is_object() => Some("roams"),
+        _ => None,
     }
 }

@@ -126,9 +126,12 @@ pub(crate) fn advance_presence(
     mut nodes: Query<(&mut Node, &ComputedNode)>,
 ) {
     let now = time.elapsed();
-    let pose = |movement: PresenceMove| match preference.reduced {
-        true => Transform2d::IDENTITY,
-        false => movement.away,
+    let pose = |movement: PresenceMove| {
+        if preference.reduced {
+            Transform2d::IDENTITY
+        } else {
+            movement.away
+        }
     };
     for (entity, mut presence, mut motion, parent) in &mut presences {
         let Presence {
@@ -174,13 +177,12 @@ pub(crate) fn advance_presence(
                     // Squared so the space closes behind the fade instead of clipping visible content.
                     fold.apply(&mut node, eased(exit.timing, elapsed).powi(2));
                 }
-                match done {
-                    true => {
-                        let display = node.display;
-                        node.display = Display::None;
-                        Stage::Hidden { display, fold }
-                    }
-                    false => stage,
+                if done {
+                    let display = node.display;
+                    node.display = Display::None;
+                    Stage::Hidden { display, fold }
+                } else {
+                    stage
                 }
             }
             (false, Stage::Fresh) => {
@@ -217,9 +219,10 @@ impl Fold {
             FlexDirection::Row | FlexDirection::RowReverse
         );
         let size = computed.size() * computed.inverse_scale_factor;
-        let (extent, gap) = match across {
-            true => (size.x, parent.column_gap),
-            false => (size.y, parent.row_gap),
+        let (extent, gap) = if across {
+            (size.x, parent.column_gap)
+        } else {
+            (size.y, parent.row_gap)
         };
         Fold {
             across,
@@ -236,15 +239,12 @@ impl Fold {
         let extent = Val::Px(self.extent * (1.0 - folded));
         let pull = Val::Px(-self.gap * folded);
         node.overflow = Overflow::clip();
-        match self.across {
-            true => {
-                node.width = extent;
-                node.margin.right = pull;
-            }
-            false => {
-                node.height = extent;
-                node.margin.bottom = pull;
-            }
+        if self.across {
+            node.width = extent;
+            node.margin.right = pull;
+        } else {
+            node.height = extent;
+            node.margin.bottom = pull;
         }
     }
 }

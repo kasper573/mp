@@ -5,7 +5,8 @@ use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
 use game::core::script::VariableType;
 use game::core::tiling::{TilePos, Tiles};
-use game::systems::area::{self, Flip};
+use game::systems::area::{self, AreaId, Flip};
+use game::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::fill_holes;
@@ -15,12 +16,11 @@ use crate::app::Editor;
 use crate::project::{ContentEdit, EditViewpoint, RowSelection, row_file};
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs, value};
-use game::systems::script::Variable;
 
 pub fn placement_json(blueprint: &str, at: Pos<Tiles>, flip: Flip, values: &Value) -> Value {
     let mut module = serde_json::json!({ "type": "blueprint", "blueprint": blueprint, "at": { "x": at.x, "y": at.y } });
     if !flip.is_none() {
-        module["flip"] = Value::String(flip.csv().to_owned());
+        module["flip"] = serde_json::json!(flip);
     }
     if values.as_object().is_some_and(|values| !values.is_empty()) {
         module["values"] = values.clone();
@@ -58,7 +58,7 @@ pub fn stamp_panel(
     ui: &mut Ui,
     view_key: &str,
     content: Content,
-    area_id: area::Id,
+    area_id: AreaId,
 ) {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for placement in area::placements(&content, area_id) {
@@ -506,7 +506,7 @@ pub(super) fn place_stamps(
     }
 }
 
-pub fn object_names(content: Content, area_id: area::Id) -> HashSet<String> {
+pub fn object_names(content: Content, area_id: AreaId) -> HashSet<String> {
     area::objects(area::placed(&content, area_id))
         .filter_map(|(_, object)| object.name.clone())
         .collect()

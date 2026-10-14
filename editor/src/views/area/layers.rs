@@ -1,6 +1,7 @@
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
 use game::core::content::{Content, load};
 use game::systems::area;
+use game::systems::area::AreaId;
 use serde_json::Value;
 
 use super::grid;
@@ -18,7 +19,7 @@ pub fn popover(
     ui: &mut Ui,
     view_key: &str,
     content: Content,
-    area_id: area::Id,
+    area_id: AreaId,
     canvas: ERect,
 ) {
     let area_key = area_id.key(&content).to_owned();

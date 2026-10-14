@@ -17,11 +17,12 @@ use bevy::window::ExitCondition;
 use game::core::content::{Content, FilesystemFolder};
 use game::core::math::{Direction, Size, WorldPx};
 use game::core::time::{PlaybackRate, Seconds};
-use game::systems::actor::model::{self, ModelDef};
+use game::systems::actor::model::{ModelDef, ModelId};
 use game::systems::actor::render::{ACTOR_ANCHOR, draw_actor_frame};
 use game::systems::actor::{Action, ActorModel};
 use game::systems::load_content;
 use serde::Deserialize;
+use strum::VariantArray;
 
 const FPS: f32 = 30.0;
 const DEATH_HOLD: Seconds = Seconds(0.75);
@@ -47,7 +48,7 @@ struct Config {
 }
 
 struct Clip {
-    model: model::Id,
+    model: ModelId,
     action: Action,
     frames_per_loop: usize,
     loops: usize,
@@ -62,7 +63,7 @@ impl Clip {
 #[derive(Resource)]
 struct Reel {
     clips: Vec<Clip>,
-    sheets: BTreeMap<model::Id, Handle<Image>>,
+    sheets: BTreeMap<ModelId, Handle<Image>>,
     target: Handle<Image>,
     next: usize,
     total: usize,
@@ -187,7 +188,7 @@ fn main() {
     println!("{}", out.display());
 }
 
-fn select_models(content: &Content, names: &str) -> Vec<model::Id> {
+fn select_models(content: &Content, names: &str) -> Vec<ModelId> {
     let wanted: Vec<&str> = split(names);
     let models = content.table::<ModelDef>();
     if wanted.is_empty() {
@@ -207,12 +208,12 @@ fn select_models(content: &Content, names: &str) -> Vec<model::Id> {
         .collect()
 }
 
-fn plan(content: &Content, models: &[model::Id], animations: &str, loops: usize) -> Vec<Clip> {
+fn plan(content: &Content, models: &[ModelId], animations: &str, loops: usize) -> Vec<Clip> {
     let wanted: Vec<Action> = split(animations)
         .into_iter()
         .map(|name| {
-            Action::named(name).unwrap_or_else(|| {
-                let known: Vec<&str> = Action::ALL.map(Action::name).to_vec();
+            name.parse::<Action>().unwrap_or_else(|_| {
+                let known: Vec<&str> = Action::VARIANTS.iter().map(AsRef::as_ref).collect();
                 fail(&format!(
                     "no animation named `{name}`; animations: {}",
                     known.join(", ")
@@ -223,7 +224,7 @@ fn plan(content: &Content, models: &[model::Id], animations: &str, loops: usize)
     let mut clips = Vec::new();
     for &id in models {
         let model = ActorModel::get(content, id);
-        for action in Action::ALL {
+        for &action in Action::VARIANTS {
             if wanted.is_empty() || wanted.contains(&action) {
                 clips.push(Clip {
                     model: id,
@@ -250,7 +251,7 @@ fn frames_per_loop(model: &ActorModel, action: Action) -> usize {
     ((length.0 * FPS).round() as usize).max(1)
 }
 
-fn layout(content: &Content, models: &[model::Id]) -> Layout {
+fn layout(content: &Content, models: &[ModelId]) -> Layout {
     let drawn = models
         .iter()
         .map(|&id| {
@@ -277,7 +278,7 @@ fn layout(content: &Content, models: &[model::Id]) -> Layout {
 fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
     let content = *world.resource::<Content>();
     let assets = world.resource::<AssetServer>().clone();
-    let sheets: BTreeMap<model::Id, Handle<Image>> = clips
+    let sheets: BTreeMap<ModelId, Handle<Image>> = clips
         .iter()
         .map(|clip| {
             let sheet = ActorModel::get(&content, clip.model).sheet().path();
@@ -411,7 +412,7 @@ fn advance(
     caption.set_if_neq(Text::new(format!(
         "{:?} - {}   loop {loop_number}/{}",
         clip.model,
-        clip.action.name(),
+        clip.action.as_ref(),
         clip.loops
     )));
     let index = reel.next;

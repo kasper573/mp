@@ -3,9 +3,7 @@ use bevy_terminal::TerminalInbox;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::script::{
-    Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind, ValueType,
-};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Name as ActorName;
 use crate::systems::area::AreaTag;
@@ -14,8 +12,8 @@ use crate::systems::movement::position;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Players};
-use crate::systems::script::effect::{self as effects, Arrow, Link};
-use crate::systems::script::{Condition, Reach, RiftScripting};
+use crate::systems::script::effect::{Arrow, Link};
+use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::terminal::TerminalKind;
 use crate::systems::text::{self, LineText, Span};
 use crate::systems::visibility::{self, VIEW_DISTANCE};
@@ -58,28 +56,23 @@ impl EffectDef<RiftScripting> for Say {
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let values = text::values(&self.text)
             .into_iter()
-            .map(|value| cx.expr(value, ValueType::Text).map_err(effects::bad))
+            .map(|value| cx.expr(value, ValueType::Text))
             .collect::<Result<Vec<_>, _>>()?;
-        let within = cx
-            .opt_expr(self.within.as_ref(), ValueType::Number)
-            .map_err(effects::bad)?;
+        let within = cx.opt_expr(self.within.as_ref(), ValueType::Number)?;
         let spans = self.text.as_slice();
-        Ok(Box::new(move |world, cx| {
-            let Some(speaker) = cx.owner.entity() else {
-                return EffectStep::Output(0);
+        Ok(Box::new(move |world, _, cx| {
+            let Some(speaker) = cx.owner else {
+                return EffectStep::Done;
             };
             let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
             let within = within.as_ref().map_or(VIEW_DISTANCE, |within| {
                 Tiles(within(world, cx).as_num() as f32)
             });
             say(world, speaker, LineText::spoken(spans, &spoken), within);
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {

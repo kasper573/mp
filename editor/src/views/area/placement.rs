@@ -5,7 +5,7 @@ use game::core::content::Content;
 use game::core::math::{Pos, Rect};
 use game::core::script::VariableType;
 use game::core::tiling::Tiles;
-use game::systems::area::{self, AreaModuleKind, Flip};
+use game::systems::area::{self, AreaId, AreaModuleKind};
 use game::systems::script::Variable;
 use serde_json::Value;
 
@@ -23,7 +23,7 @@ use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema, value};
 
-pub fn placement_bounds(content: Content, area_id: area::Id) -> HashMap<usize, Rect<Tiles>> {
+pub fn placement_bounds(content: Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
     let mut out: HashMap<usize, Rect<Tiles>> = HashMap::new();
     for placed in area::placed(&content, area_id) {
         if placed.chain.is_empty() {
@@ -60,7 +60,7 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
         return String::new();
     };
     let mut direct = 0;
-    let mut areas: Vec<area::Id> = Vec::new();
+    let mut areas: Vec<AreaId> = Vec::new();
     let mut nested = 0;
     for area_id in content.ids::<area::AreaDef>() {
         for placement in area::placements(&content, area_id) {
@@ -420,7 +420,7 @@ pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index
     let Some(at) = shapes::pos_of(&module["at"]) else {
         return;
     };
-    let flip = Flip::parse(module.text("flip")).unwrap_or(Flip::None);
+    let flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
     let blueprint = module.text("blueprint").to_owned();
     let view = editor.views.area.ensure_view(view_key, area_key);
     view.in_place = vec![InPlaceBlueprint {
@@ -445,7 +445,7 @@ pub fn enter_nested(editor: &mut Editor, view_key: &str, part: &PartView) {
     let Some(at) = shapes::pos_of(&part.module["at"]) else {
         return;
     };
-    let flip = Flip::parse(part.module.text("flip")).unwrap_or(Flip::None);
+    let flip = serde_json::from_value(part.module["flip"].clone()).unwrap_or_default();
     let view = editor.views.area.view_mut(view_key);
     let module = view.in_place.last().map_or(0, |p| p.module);
     view.in_place.push(InPlaceBlueprint {
@@ -702,7 +702,7 @@ pub fn unpacked(content: Content, module: &Value) -> Vec<Value> {
     let Some(at) = shapes::pos_of(&module["at"]) else {
         return Vec::new();
     };
-    let flip = Flip::parse(module.text("flip")).unwrap_or(Flip::None);
+    let flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
     def.parts
         .iter()
         .filter_map(|part| placed_part(content, part, &module["values"], &def.variables, at, flip))

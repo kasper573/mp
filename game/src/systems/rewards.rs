@@ -6,9 +6,8 @@ use crate::core::content::Content;
 use crate::core::math::Rng;
 use crate::core::time::Seconds;
 use crate::systems::combat::Died;
-use crate::systems::item::{Id as ItemId, Reservation, ReservedBy, scatter_drop};
-use crate::systems::npc::{Id as NpcId, Npc};
-use crate::systems::player::Players;
+use crate::systems::item::{ItemId, Reservation, credited, scatter_drop};
+use crate::systems::npc::{Npc, NpcId};
 use crate::systems::visibility::Presence;
 
 #[derive(Message, Clone, Copy, Debug, PartialEq)]
@@ -30,14 +29,10 @@ pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
             let Some(npc) = world.get::<Npc>(died.entity).map(|npc| npc.def) else {
                 continue;
             };
-            let reserved_by = match world.get::<Reservation>(died.entity) {
-                Some(reservation) if !reservation.expired(now) => reservation.by,
-                _ => ReservedBy::None,
-            };
-            let rewardee = match reserved_by {
-                ReservedBy::Account(client) => world.resource::<Players>().0.get(&client).copied(),
-                ReservedBy::None => None,
-            };
+            let reserved_by = world
+                .get::<Reservation>(died.entity)
+                .and_then(|reservation| reservation.holder(now));
+            let rewardee = credited(world, died.entity, now);
             if let Some(credited) = rewardee {
                 world.write_message(KillCredited {
                     npc,
@@ -54,10 +49,7 @@ pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
             let drops: Vec<(ItemId, u32)> = loot
                 .items
                 .iter()
-                .filter(|drop| {
-                    drop.chance
-                        .is_none_or(|percent| rng.rand_float() * 100.0 < percent)
-                })
+                .filter(|drop| drop.chance.is_none_or(|chance| chance.rolled(&mut rng)))
                 .map(|drop| (drop.item, drop.amount))
                 .collect();
             let presence = world.get::<Presence>(died.entity).cloned();

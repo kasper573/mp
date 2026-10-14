@@ -352,19 +352,16 @@ pub fn dialog(
                 ui.horizontal(|ui| {
                     ui.label(theme::muted("into"));
                     ui.label(theme::mono("tileset/").color(theme::CODE));
-                    match dialog.existing {
-                        true => {
-                            ui.label(theme::mono(&dialog.key));
-                            ui.label(theme::faint("this row, no image yet"));
-                        }
-                        false => {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut dialog.key)
-                                    .desired_width(160.0)
-                                    .font(egui::TextStyle::Monospace),
-                            );
-                            ui.label(theme::faint("a new row"));
-                        }
+                    if dialog.existing {
+                        ui.label(theme::mono(&dialog.key));
+                        ui.label(theme::faint("this row, no image yet"));
+                    } else {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut dialog.key)
+                                .desired_width(160.0)
+                                .font(egui::TextStyle::Monospace),
+                        );
+                        ui.label(theme::faint("a new row"));
                     }
                 });
                 widgets::section(ui, "Grid");
@@ -430,12 +427,13 @@ pub fn dialog(
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             let key = dialog.key.trim().to_owned();
-            let problem = match dialog.existing {
-                true => None,
-                false => editor
+            let problem = if dialog.existing {
+                None
+            } else {
+                editor
                     .project
                     .as_ref()
-                    .and_then(|project| rows::key_problem(&project.files, TABLE, &key)),
+                    .and_then(|project| rows::key_problem(&project.files, TABLE, &key))
             };
             let enabled = dialog.cut.is_ok() && problem.is_none();
             if ui
@@ -506,18 +504,17 @@ fn create_tileset(editor: &mut Editor, dialog: &TilesetDialog) -> Result<(), Str
     let key = dialog.key.trim().to_owned();
     let cut = dialog.cut.as_ref().map_err(|error| error.clone())?;
     let project = editor.project.as_ref().ok_or("no folder is open")?;
-    let mut row = match dialog.existing {
-        true => editor.row_value(TABLE, &key).ok_or("the row is gone")?,
-        false => {
-            if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
-                return Err(problem);
-            }
-            let shape = editor
-                .shapes
-                .table(TABLE)
-                .ok_or("the tileset table has no shape")?;
-            schema::template(&shape.shape, &shape.shape)
+    let mut row = if dialog.existing {
+        editor.row_value(TABLE, &key).ok_or("the row is gone")?
+    } else {
+        if let Some(problem) = rows::key_problem(&project.files, TABLE, &key) {
+            return Err(problem);
         }
+        let shape = editor
+            .shapes
+            .table(TABLE)
+            .ok_or("the tileset table has no shape")?;
+        schema::template(&shape.shape, &shape.shape)
     };
     let image = image_path(&key);
     row["image"] = Value::String(image.clone());
@@ -573,13 +570,14 @@ pub fn show_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 example.map(|(old, new)| {
                     let same = old % plan.old_columns.max(1) == new % plan.new_columns.max(1)
                         && old / plan.old_columns.max(1) == new / plan.new_columns.max(1);
-                    match same {
-                        true => format!("tile {new} · same column and row"),
-                        false => format!(
+                    if same {
+                        format!("tile {new} · same column and row")
+                    } else {
+                        format!(
                             "tile {new} · column {}, row {}",
                             new % plan.new_columns.max(1),
                             new / plan.new_columns.max(1)
-                        ),
+                        )
                     }
                 }),
             ),

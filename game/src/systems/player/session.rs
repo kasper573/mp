@@ -1,22 +1,14 @@
 use bevy_app::{App, Plugin, PreUpdate, Update};
-use bevy_ecs::message::MessageReader;
 use bevy_ecs::prelude::*;
-use bevy_ecs::world::EntityRef;
 use bevy_replicon::client::ClientSystems;
 use bevy_replicon::prelude::{AuthMethod, ClientState, RepliconPlugins, RepliconSharedPlugin};
 use bevy_replicon::shared::server_entity_map::ServerEntityMap;
 use bevy_state::prelude::{OnEnter, OnExit};
 
-use super::{ClientId, JoinRequest, Owner, RespawnRequest, Welcome};
-use crate::core::math::Pos;
+use super::{ClientId, Owner, Welcome};
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::tiling::Tiles;
-use crate::systems::combat::AttackRequest;
-use crate::systems::equipment::{EquipmentSlot, UnequipRequest};
-use crate::systems::interact::InteractRequest;
-use crate::systems::item::{DropItemRequest, PickupRequest, UseItemRequest};
-use crate::systems::movement::MoveRequest;
-use crate::systems::spectate::{SpectateRequest, Spectating};
+use crate::systems::spectate::Spectating;
+use crate::systems::stat;
 
 pub struct ClientSessionPlugin;
 
@@ -74,7 +66,7 @@ pub fn my_character(world: &World) -> Option<EntityRef<'_>> {
 }
 
 pub fn is_dead(world: &World) -> bool {
-    my_character(world).is_some_and(|entity| crate::systems::stat::is_dead(world, entity.id()))
+    my_character(world).is_some_and(|entity| stat::is_dead(world, entity.id()))
 }
 
 pub fn is_locked(world: &World) -> bool {
@@ -82,7 +74,7 @@ pub fn is_locked(world: &World) -> bool {
 }
 
 pub fn is_alive(world: &World) -> bool {
-    my_character(world).is_some_and(|entity| !crate::systems::stat::is_dead(world, entity.id()))
+    my_character(world).is_some_and(|entity| !stat::is_dead(world, entity.id()))
 }
 
 pub fn followed(world: &World) -> Option<ClientId> {
@@ -90,46 +82,6 @@ pub fn followed(world: &World) -> Option<ClientId> {
         world.resource::<MyClient>(),
         world.resource::<SpectateStatus>(),
     )
-}
-
-pub fn join(world: &mut World) {
-    world.write_message(JoinRequest);
-}
-
-pub fn spectate(world: &mut World, request: SpectateRequest) {
-    world.write_message(request);
-}
-
-pub fn attack(world: &mut World, target: Entity) {
-    world.write_message(AttackRequest { target });
-}
-
-pub fn interact(world: &mut World, target: Entity) {
-    world.write_message(InteractRequest { target });
-}
-
-pub fn respawn(world: &mut World) {
-    world.write_message(RespawnRequest);
-}
-
-pub fn use_item(world: &mut World, slot: u32) {
-    world.write_message(UseItemRequest { slot });
-}
-
-pub fn drop_item(world: &mut World, slot: u32) {
-    world.write_message(DropItemRequest { slot });
-}
-
-pub fn pickup(world: &mut World, target: Entity) {
-    world.write_message(PickupRequest { target });
-}
-
-pub fn unequip(world: &mut World, slot: EquipmentSlot) {
-    world.write_message(UnequipRequest { slot });
-}
-
-pub fn move_to(world: &mut World, pos: Pos<Tiles>) {
-    world.write_message(MoveRequest { pos });
 }
 
 fn record_welcome(mut welcomes: MessageReader<Welcome>, mut me: ResMut<MyClient>) {

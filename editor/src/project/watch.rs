@@ -38,11 +38,6 @@ impl FolderWatcher {
         }
     }
 
-    pub fn rescan(&mut self) {
-        self.lost = true;
-        self.quiet_since = Some(Instant::now());
-    }
-
     pub fn poll(&mut self) -> Option<Option<Vec<String>>> {
         for event in self.events.drain() {
             match event {

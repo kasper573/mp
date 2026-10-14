@@ -3,6 +3,7 @@ use std::f32::consts::FRAC_1_SQRT_2;
 use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct WorldPx(pub f32);
@@ -34,29 +35,35 @@ pub type Offset<U> = euclid::Vector2D<f32, U>;
 pub type Size<U> = euclid::Size2D<f32, U>;
 pub type Rect<U> = euclid::Rect<f32, U>;
 
-#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Serialize,
+    Deserialize,
+    VariantArray,
+    EnumString,
+    AsRefStr,
+)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum Direction {
-    S = 0,
-    SW = 1,
-    NW = 2,
-    N = 3,
-    NE = 4,
-    SE = 5,
-    E = 6,
-    W = 7,
-}
-
-impl Direction {
-    pub const ALL: [Direction; 8] = [
-        Direction::S,
-        Direction::SW,
-        Direction::W,
-        Direction::NW,
-        Direction::N,
-        Direction::NE,
-        Direction::E,
-        Direction::SE,
-    ];
+    #[default]
+    S,
+    SW,
+    NW,
+    N,
+    NE,
+    SE,
+    E,
+    W,
 }
 
 impl<U> From<Offset<U>> for Direction {

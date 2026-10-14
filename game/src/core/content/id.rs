@@ -1,5 +1,3 @@
-use bevy_platform::collections::HashMap;
-use bevy_platform::hash::NoOpHash;
 use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -8,6 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use bevy_platform::collections::HashMap;
+use bevy_platform::hash::NoOpHash;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};

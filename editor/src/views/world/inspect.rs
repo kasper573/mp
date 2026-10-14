@@ -4,6 +4,7 @@ use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
 use game::core::content::{ContentRow, Fixture};
 use game::core::tiling::TilePos;
 use game::systems::area;
+use game::systems::area::AreaId;
 use game::systems::area::world_map::{
     MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColour, WorldMap, WorldMapDef,
 };
@@ -94,7 +95,7 @@ fn open(editor: &mut Editor, opens: &OpenTarget) {
     }
 }
 
-fn go_to(editor: &mut Editor, map: &OpenWorldMap, area: area::Id) {
+fn go_to(editor: &mut Editor, map: &OpenWorldMap, area: AreaId) {
     let zoom = editor.views.world.zoom;
     editor.views.world.look_at(map, area, zoom);
 }
@@ -183,9 +184,10 @@ fn lens_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     }
     let mut opened: Option<OpenTarget> = None;
     for (kind, sources) in &by_kind {
-        let count = match kind.per_area() {
-            true => sources.values().flatten().collect::<BTreeSet<_>>().len(),
-            false => sources.len(),
+        let count = if kind.per_area() {
+            sources.values().flatten().collect::<BTreeSet<_>>().len()
+        } else {
+            sources.len()
         };
         widgets::section(
             ui,
@@ -372,7 +374,7 @@ fn line_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
         .find(|line| line.category == category)
         .map_or(0, |line| line.quests.len());
     widgets::section(ui, &format!("{category} · {quests} quests"));
-    let mut go: Option<area::Id> = None;
+    let mut go: Option<AreaId> = None;
     for step in atlas.line_steps(&category) {
         ui.horizontal_top(|ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::splat(18.0), Sense::hover());
@@ -453,16 +455,17 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     check(
         ui,
         unreached.is_empty(),
-        &match unreached.is_empty() {
-            true => format!(
+        &if unreached.is_empty() {
+            format!(
                 "all {} areas can be reached from the initial spawn",
                 atlas.areas.len()
-            ),
-            false => format!(
+            )
+        } else {
+            format!(
                 "{} areas no warp reaches: {}",
                 unreached.len(),
                 unreached.join(", ")
-            ),
+            )
         },
     );
     let one_way: Vec<String> = atlas
@@ -474,9 +477,10 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     check(
         ui,
         one_way.is_empty(),
-        &match one_way.is_empty() {
-            true => "no one-way warps".to_owned(),
-            false => format!("{} one-way warps: {}", one_way.len(), one_way.join(", ")),
+        &if one_way.is_empty() {
+            "no one-way warps".to_owned()
+        } else {
+            format!("{} one-way warps: {}", one_way.len(), one_way.join(", "))
         },
     );
     ui.add_space(8.0);
@@ -484,9 +488,10 @@ fn route_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
 
 fn check(ui: &mut Ui, ok: bool, text: &str) {
     ui.horizontal_wrapped(|ui| {
-        match ok {
-            true => ui.label(RichText::new("✓").color(theme::OK)),
-            false => ui.label(RichText::new("·").color(theme::WARN)),
+        if ok {
+            ui.label(RichText::new("✓").color(theme::OK))
+        } else {
+            ui.label(RichText::new("·").color(theme::WARN))
         };
         ui.label(RichText::new(text).size(12.5));
     });
@@ -616,7 +621,7 @@ fn inspect_edge(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas, a: &str, b
     }
 }
 
-fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[area::Id]) {
+fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[AreaId]) {
     let atlas = &map.atlas;
     let first = cards[0];
     let first_key = atlas.key(first);

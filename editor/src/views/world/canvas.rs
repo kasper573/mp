@@ -7,7 +7,7 @@ use egui::{
 };
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
-use game::systems::area;
+use game::systems::area::AreaId;
 use game::systems::area::world_map::WorldMapDef;
 
 use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
@@ -62,7 +62,7 @@ impl MapViewport {
 }
 
 pub struct MapCard {
-    pub area: area::Id,
+    pub area: AreaId,
     pub frame: Rect,
     pub art: Rect,
     pub compact: bool,
@@ -70,8 +70,8 @@ pub struct MapCard {
 }
 
 pub struct MapEdge {
-    pub from: area::Id,
-    pub to: area::Id,
+    pub from: AreaId,
+    pub to: AreaId,
     pub a: Pos2,
     pub b: Pos2,
     pub out: usize,
@@ -85,16 +85,16 @@ pub struct MapCanvas {
     pub edges: Vec<MapEdge>,
     pub region_labels: Vec<(usize, Rect)>,
     pub notes: Vec<Rect>,
-    pub hovered: Option<area::Id>,
+    pub hovered: Option<AreaId>,
     pub typing: bool,
 }
 
 impl MapCanvas {
-    pub fn card(&self, area: area::Id) -> Option<&MapCard> {
+    pub fn card(&self, area: AreaId) -> Option<&MapCard> {
         self.cards.iter().find(|card| card.area == area)
     }
 
-    pub fn card_at(&self, p: Pos2) -> Option<area::Id> {
+    pub fn card_at(&self, p: Pos2) -> Option<AreaId> {
         self.cards
             .iter()
             .filter(|card| card.frame.contains(p))
@@ -200,12 +200,13 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
     if let Some(line) = &editor.views.world.quest_line {
         draw_quest_line(&painter, atlas, &cards, line);
     }
-    let (notes, region_labels) = match drawing.layers.regions {
-        true => (
+    let (notes, region_labels) = if drawing.layers.regions {
+        (
             draw_notes(&painter, &viewport, &drawing),
             draw_region_labels(&painter, &viewport, &drawing),
-        ),
-        false => (Vec::new(), Vec::new()),
+        )
+    } else {
+        (Vec::new(), Vec::new())
     };
     if drawing.zoomed {
         draw_edge_tags(&painter, atlas, &cards, rect);
@@ -269,7 +270,7 @@ pub fn viridis(t: f32) -> Color32 {
 }
 
 struct Overlays<'a> {
-    lit: Option<BTreeMap<area::Id, Vec<RowSource>>>,
+    lit: Option<BTreeMap<AreaId, Vec<RowSource>>>,
     colours: Option<ColourRanges>,
     route: Option<Vec<&'a AtlasWarp>>,
 }
@@ -298,7 +299,7 @@ struct Drawing<'a> {
     shown: &'a WorldMapDef,
     overlays: Overlays<'a>,
     selected: HashSet<MapPart>,
-    hovered: Option<area::Id>,
+    hovered: Option<AreaId>,
     layers: MapLayers,
     zoomed: bool,
     ppp: f32,
@@ -638,8 +639,8 @@ fn caption_width(card: &MapCard, cards: &[MapCard]) -> f32 {
 }
 
 fn edges(atlas: &WorldAtlas, cards: &[MapCard]) -> Vec<MapEdge> {
-    let card = |area: area::Id| cards.iter().find(|card| card.area == area);
-    let mut drawn: HashSet<(area::Id, area::Id)> = HashSet::new();
+    let card = |area: AreaId| cards.iter().find(|card| card.area == area);
+    let mut drawn: HashSet<(AreaId, AreaId)> = HashSet::new();
     let mut out = Vec::new();
     for warp in &atlas.warps {
         if warp.from == warp.to
@@ -841,9 +842,12 @@ fn edge_point(rect: Rect, toward: Pos2) -> Pos2 {
     if d == Vec2::ZERO {
         return c;
     }
-    let reach = |half: f32, along: f32| match along.abs() > 1e-6 {
-        true => half / along.abs(),
-        false => f32::INFINITY,
+    let reach = |half: f32, along: f32| {
+        if along.abs() > 1e-6 {
+            half / along.abs()
+        } else {
+            f32::INFINITY
+        }
     };
     c + d * reach(rect.width() / 2.0, d.x).min(reach(rect.height() / 2.0, d.y))
 }
@@ -868,9 +872,10 @@ fn draw_regions(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) {
         let lit = drawing.selected.contains(&MapPart::Region(index));
         let colour = region_colour(region.colour);
         painter.rect_filled(screen, 6.0, theme::alpha(colour, 14));
-        let stroke = match lit {
-            true => Stroke::new(2.0, theme::SELECTION),
-            false => Stroke::new(1.0, colour),
+        let stroke = if lit {
+            Stroke::new(2.0, theme::SELECTION)
+        } else {
+            Stroke::new(1.0, colour)
         };
         widgets::dashed_rect(painter, screen, stroke, 6.0, 4.0);
     }
@@ -905,7 +910,7 @@ fn draw_region_labels(
 fn draw_edges(painter: &Painter, edges: &[MapEdge], drawing: &Drawing) {
     let atlas = &drawing.map.atlas;
     let route = &drawing.overlays.route;
-    let joins = |from: area::Id, to: area::Id, a: area::Id, b: area::Id| {
+    let joins = |from: AreaId, to: AreaId, a: AreaId, b: AreaId| {
         (from == a && to == b) || (from == b && to == a)
     };
     for edge in edges {
@@ -935,9 +940,10 @@ fn draw_edges(painter: &Painter, edges: &[MapEdge], drawing: &Drawing) {
         }
         arrow_head(painter, b, b - a, stroke);
         if (a - b).length() >= 70.0 {
-            let (fill, ink) = match is_selected {
-                true => (theme::ACCENT_SOFT, theme::TEXT),
-                false => (theme::PANEL, theme::MUTED),
+            let (fill, ink) = if is_selected {
+                (theme::ACCENT_SOFT, theme::TEXT)
+            } else {
+                (theme::PANEL, theme::MUTED)
             };
             widgets::floating_chip(
                 painter,
@@ -953,7 +959,7 @@ fn draw_edges(painter: &Painter, edges: &[MapEdge], drawing: &Drawing) {
 }
 
 fn draw_route(painter: &Painter, cards: &[MapCard], route: &[&AtlasWarp]) {
-    let card = |area: area::Id| cards.iter().find(|card| card.area == area);
+    let card = |area: AreaId| cards.iter().find(|card| card.area == area);
     let stroke = Stroke::new(3.0, ROUTE);
     for hop in route {
         let (Some(from), Some(to)) = (card(hop.from), card(hop.to)) else {
@@ -978,9 +984,9 @@ fn arrow_head(painter: &Painter, tip: Pos2, direction: Vec2, stroke: Stroke) {
 }
 
 fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], category: &str) {
-    let card = |area: area::Id| cards.iter().find(|card| card.area == area);
+    let card = |area: AreaId| cards.iter().find(|card| card.area == area);
     let stroke = Stroke::new(2.0, theme::WARN);
-    let mut used: BTreeMap<area::Id, usize> = BTreeMap::new();
+    let mut used: BTreeMap<AreaId, usize> = BTreeMap::new();
     let mut previous: Vec<Pos2> = Vec::new();
     for step in atlas.line_steps(category) {
         let mut here = Vec::new();
@@ -1022,9 +1028,10 @@ fn draw_quest_line(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], cat
 }
 
 pub fn line_badge(painter: &Painter, at: Pos2, badge: &str, branch: bool) {
-    let (fill, ink) = match branch {
-        true => (theme::DANGER, Color32::WHITE),
-        false => (theme::WARN, Color32::BLACK),
+    let (fill, ink) = if branch {
+        (theme::DANGER, Color32::WHITE)
+    } else {
+        (theme::WARN, Color32::BLACK)
     };
     painter.circle(at, 9.0, fill, Stroke::new(1.0, Color32::BLACK));
     painter.text(
@@ -1051,9 +1058,10 @@ fn draw_notes(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) -> V
             );
             let at = viewport.to_screen(Pos2::new(note.x, note.y));
             let paper = Rect::from_min_size(at, galley.size() + Vec2::splat(2.0 * NOTE_PAD));
-            let stroke = match drawing.selected.contains(&MapPart::Note(index)) {
-                true => Stroke::new(2.0, theme::SELECTION),
-                false => Stroke::new(1.0, NOTE_EDGE),
+            let stroke = if drawing.selected.contains(&MapPart::Note(index)) {
+                Stroke::new(2.0, theme::SELECTION)
+            } else {
+                Stroke::new(1.0, NOTE_EDGE)
             };
             painter.rect_filled(paper, 3.0, NOTE_PAPER);
             painter.rect_stroke(paper, 3.0, stroke, StrokeKind::Outside);
@@ -1095,23 +1103,28 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
             continue;
         }
         let d = other.frame.center() - origin;
-        let reach = |along: f32, low: f32, high: f32, from: f32| match along.abs() > 1e-3 {
-            true => ((if along > 0.0 { high } else { low }) - from) / along,
-            false => f32::INFINITY,
+        let reach = |along: f32, low: f32, high: f32, from: f32| {
+            if along.abs() > 1e-3 {
+                ((if along > 0.0 { high } else { low }) - from) / along
+            } else {
+                f32::INFINITY
+            }
         };
         let tx = reach(d.x, inset.min.x, inset.max.x, origin.x);
         let ty = reach(d.y, inset.min.y, inset.max.y, origin.y);
         let at = (origin + d * tx.min(ty).max(0.0)).clamp(inset.min, inset.max);
         let name = atlas.key(to);
         let (text, anchor) = if tx < ty {
-            match d.x > 0.0 {
-                true => (format!("{name} →"), Align2::RIGHT_CENTER),
-                false => (format!("← {name}"), Align2::LEFT_CENTER),
+            if d.x > 0.0 {
+                (format!("{name} →"), Align2::RIGHT_CENTER)
+            } else {
+                (format!("← {name}"), Align2::LEFT_CENTER)
             }
         } else {
-            match d.y > 0.0 {
-                true => (format!("↓ {name}"), Align2::CENTER_BOTTOM),
-                false => (format!("↑ {name}"), Align2::CENTER_TOP),
+            if d.y > 0.0 {
+                (format!("↓ {name}"), Align2::CENTER_BOTTOM)
+            } else {
+                (format!("↑ {name}"), Align2::CENTER_TOP)
             }
         };
         widgets::floating_chip(painter, at, anchor, &text, theme::PANEL, theme::TEXT, 11.0);

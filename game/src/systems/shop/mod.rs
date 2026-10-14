@@ -8,29 +8,23 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{
-    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, serial,
+    Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, serial,
 };
-use crate::core::script::{
-    Answer, Compiler, EffectCall, EffectDef, EffectStep, FlowKey, Name, Owner as ScriptOwner,
-    OwnerKind, Value,
-};
+use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault, Value};
 use crate::core::time::{Seconds, UnixMillis, WallClock};
-use crate::systems::attention::Id as AttentionId;
+use crate::systems::attention::AttentionId;
 use crate::systems::dialogue;
-use crate::systems::item::{
-    ExchangeRefusal, Id as ItemId, Inventory, ItemCategory, ItemFlag, ItemStack,
-};
-use crate::systems::notification::{self, Notification, NotificationKind};
+use crate::systems::item::{ExchangeRefusal, Inventory, ItemCategory, ItemFlag, ItemId, ItemStack};
+use crate::systems::notification;
 use crate::systems::player::sender_player;
-use crate::systems::script::condition;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
-    self, Condition, EventKind, Line, Reach, RiftEvent, RiftInstances, RiftScripting,
+    self, Condition, EffectCall, EventKind, FlowKey, Line, Owner as ScriptOwner, OwnerKind, Reach,
+    RiftEvent, RiftInstances, RiftScripting, ScriptModule, ScriptedRow, condition,
 };
-use crate::systems::text::LineText;
 use crate::systems::{attention, drain_requests};
 
-pub type Id = ContentId<ShopDef>;
+pub type ShopId = ContentId<ShopDef>;
 
 const BUYBACK_KEPT: usize = 12;
 const MINUTE: f32 = 60.0;
@@ -71,6 +65,17 @@ impl ModuleSet for ShopDef {
     }
 }
 
+impl ScriptedRow for ShopDef {
+    const OWNER: OwnerKind = OwnerKind::Shop;
+
+    fn script(module: &ShopModule) -> Option<&ScriptModule> {
+        match module {
+            ShopModule::Script(script) => Some(script),
+            _ => None,
+        }
+    }
+}
+
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ShopModule {
@@ -78,7 +83,7 @@ pub enum ShopModule {
     Buys(ShopBuys),
     Reactions(ShopReactions),
     #[serde(untagged)]
-    Script(script::ScriptModule),
+    Script(ScriptModule),
 }
 
 impl ShopDef {
@@ -103,13 +108,38 @@ impl ShopDef {
         })
     }
 
-    pub fn scripts(&self) -> Vec<(usize, &script::ScriptModule)> {
-        self.modules
-            .iter()
+    pub fn pays_for(
+        &self,
+        content: &Content,
+        item: ItemId,
+        declined: &[u32],
+    ) -> Result<&[ItemStack], String> {
+        let def = item.get(content);
+        if def.has(ItemFlag::Quest) {
+            return Err("Quest items never sell".to_owned());
+        }
+        if def.bound() {
+            return Err("Bound items never sell".to_owned());
+        }
+        let (index, rule) = self
+            .buys()
             .enumerate()
-            .filter_map(|(index, module)| match module {
-                ShopModule::Script(script) => Some((index, script)),
-                _ => None,
+            .find(|(_, rule)| match rule.what {
+                Buys::Item { item: wanted } => wanted == item,
+                Buys::Category { category } => def.category() == category,
+            })
+            .ok_or_else(|| format!("{} won't buy {}", self.title, def.name))?;
+        if declined.contains(&(index as u32)) {
+            return Err(format!("{} won't buy {} from you", self.title, def.name));
+        }
+        Ok(&rule.pays)
+    }
+
+    pub fn wants(&self, content: &Content) -> Vec<String> {
+        self.buys()
+            .map(|rule| match rule.what {
+                Buys::Item { item } => item.get(content).name.to_owned(),
+                Buys::Category { category } => category.plural().to_owned(),
             })
             .collect()
     }
@@ -161,15 +191,12 @@ pub struct ShopReactions {
 pub struct OpenShop {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub shop: Id,
+    pub shop: ShopId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Arrow,
 }
 
 impl EffectDef<RiftScripting> for OpenShop {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -182,17 +209,17 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn keeps_box(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let shop = self.shop;
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, flow, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return EffectStep::Output(0);
+                return EffectStep::Done;
             };
-            if open(world, player, shop, cx.key) {
+            if open(world, player, shop, flow) {
                 EffectStep::Pause
             } else {
-                EffectStep::Output(0)
+                EffectStep::Done
             }
         }))
     }
@@ -201,22 +228,22 @@ impl EffectDef<RiftScripting> for OpenShop {
     }
 }
 
-#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct ShopView {
-    pub shop: Id,
+    pub shop: ShopId,
     pub offers: Vec<OfferView>,
     pub buyback: Vec<Sale>,
     pub declined: Vec<u32>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct OfferView {
     pub left: Option<u32>,
     pub restocks_in: Option<Seconds>,
     pub refusal: Option<WareRefusal>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub enum WareRefusal {
     Unaffordable(ItemStack),
     Unavailable(String),
@@ -238,7 +265,7 @@ impl WareRefusal {
     }
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 #[serde(deny_unknown_fields)]
 pub struct Sale {
     pub item: ItemId,
@@ -248,8 +275,8 @@ pub struct Sale {
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub struct ShopLedger {
-    stock: HashMap<(Id, u32), Restock>,
-    sales: HashMap<Id, VecDeque<Sale>>,
+    stock: HashMap<(ShopId, u32), Restock>,
+    sales: HashMap<ShopId, VecDeque<Sale>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -259,11 +286,11 @@ struct Restock {
 }
 
 impl ShopLedger {
-    pub fn stocked(&mut self, shop: Id, offer: u32, left: u32, full_at: UnixMillis) {
+    pub fn stocked(&mut self, shop: ShopId, offer: u32, left: u32, full_at: UnixMillis) {
         self.stock.insert((shop, offer), Restock { left, full_at });
     }
 
-    pub fn record_sale(&mut self, shop: Id, sale: Sale) {
+    pub fn record_sale(&mut self, shop: ShopId, sale: Sale) {
         let sales = self.sales.entry(shop).or_default();
         sales.push_front(sale);
         sales.truncate(BUYBACK_KEPT);
@@ -279,50 +306,12 @@ pub enum ShopRequest {
 
 #[derive(Component)]
 pub struct ShopVisit {
-    shop: Id,
+    shop: ShopId,
     flow: FlowKey,
     reactions: u32,
 }
 
-impl ShopDef {
-    pub fn pays_for(
-        &self,
-        content: &Content,
-        item: ItemId,
-        declined: &[u32],
-    ) -> Result<&[ItemStack], String> {
-        let def = item.get(content);
-        if def.has(ItemFlag::Quest) {
-            return Err("Quest items never sell".to_owned());
-        }
-        if def.bound() {
-            return Err("Bound items never sell".to_owned());
-        }
-        let (index, rule) = self
-            .buys()
-            .enumerate()
-            .find(|(_, rule)| match rule.what {
-                Buys::Item { item: wanted } => wanted == item,
-                Buys::Category { category } => def.category() == category,
-            })
-            .ok_or_else(|| format!("{} won't buy {}", self.title, def.name))?;
-        if declined.contains(&(index as u32)) {
-            return Err(format!("{} won't buy {} from you", self.title, def.name));
-        }
-        Ok(&rule.pays)
-    }
-
-    pub fn wants(&self, content: &Content) -> Vec<String> {
-        self.buys()
-            .map(|rule| match rule.what {
-                Buys::Item { item } => item.get(content).name.to_owned(),
-                Buys::Category { category } => category.plural().to_owned(),
-            })
-            .collect()
-    }
-}
-
-fn open(world: &mut World, player: Entity, shop: Id, flow: FlowKey) -> bool {
+fn open(world: &mut World, player: Entity, shop: ShopId, flow: FlowKey) -> bool {
     if !dialogue::card(
         world,
         flow,
@@ -346,7 +335,7 @@ fn close(world: &mut World, player: Entity) {
     world.entity_mut(player).remove::<(ShopVisit, ShopView)>();
 }
 
-pub fn visiting(world: &World, player: Entity) -> Option<Id> {
+pub fn visiting(world: &World, player: Entity) -> Option<ShopId> {
     world.get::<ShopVisit>(player).map(|visit| visit.shop)
 }
 
@@ -397,15 +386,12 @@ pub fn check_all(loading: &mut Loading) {
                 _ => None,
             };
             if let Some(requires) = requires
-                && let Err((rule, expected)) = condition::check(&content, requires)
+                && let Err(fault) = condition::check(&content, requires)
             {
                 loading.row_error(
                     id,
                     &format!("/modules/{index}/requires"),
-                    rule,
-                    "the condition",
-                    expected,
-                    None,
+                    ContentProblem::new(fault.rule, "the condition", fault.expected),
                 );
             }
             let ShopModule::Sells(offer) = module else {
@@ -418,17 +404,18 @@ pub fn check_all(loading: &mut Loading) {
                     loading.row_error(
                         id,
                         &format!("/modules/{index}"),
-                        "shop loses money",
-                        format!(
-                            "{}: {} buys {} for {}, sold for {}",
-                            offer.item.key(&content),
-                            buyer.key(&content),
-                            offer.count,
-                            stacks_text(&content, pays, offer.count),
-                            stacks_text(&content, &offer.price, 1)
+                        ContentProblem::new(
+                            "shop loses money",
+                            format!(
+                                "{}: {} buys {} for {}, sold for {}",
+                                offer.item.key(&content),
+                                buyer.key(&content),
+                                offer.count,
+                                stacks_text(&content, pays, offer.count),
+                                stacks_text(&content, &offer.price, 1)
+                            ),
+                            "every shop sells an item for at least what any shop pays for it",
                         ),
-                        "every shop sells an item for at least what any shop pays for it",
-                        None,
                     );
                 }
             }
@@ -503,7 +490,7 @@ fn marks(
     }
 }
 
-fn traded(world: &mut World, player: Entity, shop: Id, kind: EventKind, stack: ItemStack) {
+fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stack: ItemStack) {
     world.resource_mut::<RiftInstances>().raise(
         ScriptOwner::Row(OwnerKind::Shop, shop.raw()),
         kind,
@@ -540,14 +527,7 @@ fn buy(world: &mut World, player: Entity, index: u32) {
         ),
     };
     if let Err(refusal) = bought {
-        notification::notify(
-            world,
-            player,
-            Notification::new(
-                NotificationKind::error(world.resource::<Content>()),
-                LineText::plain(refusal),
-            ),
-        );
+        notification::error(world, player, refusal);
         react(world, player, |reactions| &reactions.cant_afford);
         return;
     }
@@ -595,26 +575,12 @@ fn sell(world: &mut World, player: Entity, slot: u32, stack: ItemStack) {
             .map(|pay| ItemStack::new(pay.item, pay.count.saturating_mul(stack.count)))
             .collect(),
         Err(refusal) => {
-            notification::notify(
-                world,
-                player,
-                Notification::new(
-                    NotificationKind::error(world.resource::<Content>()),
-                    LineText::plain(refusal),
-                ),
-            );
+            notification::error(world, player, refusal);
             return;
         }
     };
     if let Err(refusal) = trade(world, player, &[stack], &paid) {
-        notification::notify(
-            world,
-            player,
-            Notification::new(
-                NotificationKind::error(world.resource::<Content>()),
-                LineText::plain(refusal),
-            ),
-        );
+        notification::error(world, player, refusal);
         return;
     }
     let mut ledger = world.entity_mut(player);
@@ -651,14 +617,7 @@ fn buy_back(world: &mut World, player: Entity, index: u32) {
         &[ItemStack::new(sale.item, sale.count)],
     );
     if let Err(refusal) = bought {
-        notification::notify(
-            world,
-            player,
-            Notification::new(
-                NotificationKind::error(world.resource::<Content>()),
-                LineText::plain(refusal),
-            ),
-        );
+        notification::error(world, player, refusal);
         return;
     }
     if let Some(mut ledger) = world.get_mut::<ShopLedger>(player)
@@ -687,22 +646,14 @@ fn trade(
 fn offer_refusal(
     world: &World,
     player: Entity,
-    shop: Id,
+    shop: ShopId,
     index: u32,
     now: UnixMillis,
 ) -> Option<WareRefusal> {
     let content = world.resource::<Content>();
     let offer = shop.get(content).sells().nth(index as usize)?;
-    if let Some(unmet) = offer
-        .requires
-        .iter()
-        .flat_map(condition::parts)
-        .find(|part| !condition::holds(world, player, part))
-    {
-        return Some(WareRefusal::Unavailable(format!(
-            "Needs {}",
-            condition::describe(content, unmet)
-        )));
+    if let Some(unmet) = condition::first_unmet(world, player, &offer.requires) {
+        return Some(WareRefusal::Unavailable(format!("Needs {unmet}")));
     }
     if stock(world, player, shop, index, now).is_some_and(|(left, _)| left == 0) {
         return Some(WareRefusal::Unavailable("Sold out for now".to_owned()));
@@ -721,7 +672,7 @@ fn offer_refusal(
 fn stock(
     world: &World,
     player: Entity,
-    shop: Id,
+    shop: ShopId,
     index: u32,
     now: UnixMillis,
 ) -> Option<(u32, Option<Seconds>)> {
@@ -774,7 +725,7 @@ fn refresh_view(world: &mut World, player: Entity) {
     }
 }
 
-fn declined(world: &World, player: Entity, shop: Id) -> Vec<u32> {
+fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {
     let content = world.resource::<Content>();
     (0..)
         .zip(shop.get(content).buys())

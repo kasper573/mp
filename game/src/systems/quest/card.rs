@@ -1,5 +1,3 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
 use ui::tokens::{palette, spacing, typography};
 use ui::{ChipOptions, Family};
@@ -10,11 +8,13 @@ use super::{
 };
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
-use crate::systems::dialogue::{ChoiceReveal, Conversation, ConversationPanel, stage};
+use crate::core::script::ChoiceReveal;
+use crate::core::time::Seconds;
+use crate::systems::dialogue::{Conversation, ConversationPanel, stage};
 use crate::systems::hud::{SLOT_BG, SLOT_BORDER, reconcile_children, slot_node};
 use crate::systems::item::{self, Inventory, ItemStack};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const WIDTH: f32 = 480.0;
 const ICON: f32 = 20.0;
@@ -27,9 +27,9 @@ impl Plugin for QuestCardPlugin {
         app.init_resource::<ShownCard>()
             .add_systems(
                 Update,
-                (show_card, tick_clocks).run_if(in_state(GameScene::Area)),
+                (show_card, tick_clocks).run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -96,9 +96,7 @@ fn show_card(world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    let mut hasher = DefaultHasher::new();
-    format!("{:?}", inventory.slots).hash(&mut hasher);
-    reconcile_children(world, body, &[hasher.finish()], |world, _| {
+    reconcile_children(world, body, &[&inventory.slots], |world, _| {
         let content = world.resource::<Content>();
         let assets = world.resource::<AssetServer>();
         let parts = match moment {
@@ -449,11 +447,11 @@ pub(super) fn live_text(
     quest: QuestId,
     shows: Countdown,
     color: Color,
-    typography: ui::tokens::typography::Typography,
+    style: typography::Typography,
 ) -> impl Scene + use<> {
     let now = shows.label(log, quest).unwrap_or_default();
     bsn! {
-        @{ui::styled_text(now, color, typography)}
+        @{ui::styled_text(now, color, style)}
         QuestClock { quest: {Some(quest)}, shows: {shows} }
     }
 }
@@ -470,10 +468,10 @@ pub(super) fn live_bar(content: &Content, log: &QuestLog, quest: QuestId) -> imp
 pub(super) fn steady(log: &QuestLog) -> QuestLog {
     let mut log = log.clone();
     for active in &mut log.active {
-        active.left = active.left.map(|_| crate::core::time::Seconds(0.0));
+        active.left = active.left.map(|_| Seconds(0.0));
     }
     for finished in &mut log.finished {
-        finished.resets_in = finished.resets_in.map(|_| crate::core::time::Seconds(0.0));
+        finished.resets_in = finished.resets_in.map(|_| Seconds(0.0));
     }
     log
 }

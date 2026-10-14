@@ -21,7 +21,7 @@ use crate::components::rich_text::{RichPiece, RichText, Typewriter, rich_text};
 use crate::components::text::styled_text;
 use crate::cursor::CursorStyle;
 use crate::motion::transition::STANDARD_ENTER;
-use crate::state::{ancestor_with, descendants};
+use crate::state::{ancestor_with, descendant_with};
 use crate::style::Style;
 use crate::theme::theme;
 use crate::tokens::{palette, radius, spacing, typography};
@@ -526,8 +526,4 @@ fn rows(world: &World, list: Entity) -> Vec<Entity> {
 
 fn row_count(world: &World, list: Entity) -> usize {
     rows(world, list).len()
-}
-
-fn descendant_with<C: Component>(world: &World, root: Entity) -> Option<Entity> {
-    descendants(world, root).find(|&entity| world.get::<C>(entity).is_some())
 }

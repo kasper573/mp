@@ -8,7 +8,7 @@ use crate::core::assets::AssetRef;
 use crate::core::content::{ContentId, ContentRow, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::interact::{self, Interactive};
 use crate::systems::movement::Position;
 use crate::systems::player::Players;
@@ -26,7 +26,7 @@ pub fn register(app: &mut App) {
         .init_resource::<BadgeSources>();
 }
 
-pub type Id = ContentId<AttentionDef>;
+pub type AttentionId = ContentId<AttentionDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct AttentionDef {
@@ -57,7 +57,7 @@ impl Fixture for AttentionMark {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MarkedTarget {
     pub target: Entity,
-    pub marks: Vec<Id>,
+    pub marks: Vec<AttentionId>,
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -73,7 +73,7 @@ impl MapEntities for Attention {
 }
 
 impl Attention {
-    pub fn of(&self, target: Entity) -> &[Id] {
+    pub fn of(&self, target: Entity) -> &[AttentionId] {
         self.0
             .iter()
             .find(|marked| marked.target == target)
@@ -82,9 +82,9 @@ impl Attention {
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct StatusBadges(pub Vec<Id>);
+pub struct StatusBadges(pub Vec<AttentionId>);
 
-pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<Id> {
+pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<AttentionId> {
     if let Some(badges) = world.get::<StatusBadges>(actor) {
         return badges.0.clone();
     }
@@ -95,9 +95,9 @@ pub fn plate_marks(world: &World, viewer: Option<Entity>, actor: Entity) -> Vec<
         .collect()
 }
 
-pub type MarkSource = fn(&World, Entity, &[Entity], &mut dyn FnMut(Entity, Id));
+pub type MarkSource = fn(&World, Entity, &[Entity], &mut dyn FnMut(Entity, AttentionId));
 
-pub type BadgeSource = fn(&World, Entity) -> Option<Id>;
+pub type BadgeSource = fn(&World, Entity) -> Option<AttentionId>;
 
 #[derive(Resource, Default)]
 pub struct MarkSources(Vec<MarkSource>);
@@ -121,12 +121,12 @@ pub fn update(
     targets: &mut QueryState<(Entity, &'static AreaTag, &'static Position), With<Interactive>>,
     mut turn: Local<u32>,
     mut viewers: Local<Vec<Entity>>,
-    mut found: Local<Vec<(Entity, Entity, Id)>>,
+    mut found: Local<Vec<(Entity, Entity, AttentionId)>>,
 ) {
     *turn = (*turn + 1) % REFRESH_ROUNDS;
     let marking = world.resource::<MarkSources>().0.clone();
     let badging = world.resource::<BadgeSources>().0.clone();
-    let players: Vec<(Entity, Option<area::Id>, Option<Pos<Tiles>>)> = world
+    let players: Vec<(Entity, Option<AreaId>, Option<Pos<Tiles>>)> = world
         .resource::<Players>()
         .0
         .values()

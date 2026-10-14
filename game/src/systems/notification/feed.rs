@@ -1,17 +1,17 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use ui::RichText;
 use ui::tokens::{palette, spacing, typography};
-use ui::{RichSpan, RichText};
 
-use super::{Notification, NotificationKind, NotificationSent};
+use super::{Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD};
 use crate::core::time::Seconds;
 use crate::systems::dialogue::stage;
-use crate::systems::history::{RecordTally, signed};
-use crate::systems::scene::{Scene as GameScene, despawn_all};
+use crate::systems::history::RecordTally;
+use crate::systems::history::widget::tallied;
+use crate::systems::hud::spawn_ui;
+use crate::systems::screen::{ClientScreen, despawn_all};
 
-const READING_BASE: Seconds = Seconds(2.0);
-const READING_PER_WORD: Seconds = Seconds(0.3);
 const READING_MIN: Seconds = Seconds(3.0);
 const READING_MAX: Seconds = Seconds(6.0);
 const EDGE: f32 = 24.0;
@@ -34,11 +34,11 @@ pub struct FeedPlugin;
 
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameScene::Area), spawn_feed)
-            .add_systems(OnExit(GameScene::Area), despawn_all::<FeedRoot>)
+        app.add_systems(OnEnter(ClientScreen::Area), spawn_feed)
+            .add_systems(OnExit(ClientScreen::Area), despawn_all::<FeedRoot>)
             .add_systems(
                 Update,
-                (count_more, fit_beside_box).run_if(in_state(GameScene::Area)),
+                (count_more, fit_beside_box).run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -110,9 +110,7 @@ fn show_in(world: &mut World, toaster: Entity, notification: Notification) {
         world.entity_mut(row).despawn_related::<Children>();
         world.entity_mut(row).insert(FeedRow(merged.clone()));
         let assets = world.resource::<AssetServer>().clone();
-        if let Ok(mut content) = world.spawn_scene(content(&assets, &merged)) {
-            content.insert(ChildOf(row));
-        }
+        spawn_ui(world, content(&assets, &merged)).insert(ChildOf(row));
         ui::bump_toast(world, row);
         return;
     }
@@ -121,9 +119,10 @@ fn show_in(world: &mut World, toaster: Entity, notification: Notification) {
         notification.kind,
         NotificationKind::Feed { failure: true, .. }
     );
-    let border = match failure {
-        true => palette::CRIMSON_70,
-        false => ui::theme::theme().surface_elevated.border.with_alpha(0.6),
+    let border = if failure {
+        palette::CRIMSON_70
+    } else {
+        ui::theme::theme().surface_elevated.border.with_alpha(0.6)
     };
     let body = content(world.resource::<AssetServer>(), &notification);
     let row = bsn! {
@@ -132,9 +131,7 @@ fn show_in(world: &mut World, toaster: Entity, notification: Notification) {
         BorderColor::all(border)
         Children [ @{body} ]
     };
-    if let Ok(mut spawned) = world.spawn_scene(row) {
-        spawned.insert(ChildOf(toaster));
-    }
+    spawn_ui(world, row).insert(ChildOf(toaster));
 }
 
 fn merged(shown: &Notification, newer: &Notification) -> Option<Notification> {
@@ -178,7 +175,7 @@ fn reading_time(notification: &Notification) -> Seconds {
 }
 
 fn label(notification: &Notification) -> String {
-    let text = super::plain_words(&notification.text);
+    let text = notification.text.plain_words();
     tally_of(notification).map_or_else(|| text.clone(), |tally| tally.line(&text))
 }
 
@@ -196,23 +193,7 @@ fn content(assets: &AssetServer, notification: &Notification) -> impl Scene + us
         _ => None,
     };
     let mut text = notification.text.rich();
-    match tally_of(notification) {
-        Some(RecordTally::Change(change)) => {
-            let color = match (change > 0, icon.is_some()) {
-                (true, true) => palette::EMERALD_80,
-                (true, false) => palette::AMBER_80,
-                (false, _) => ink.with_alpha(0.65),
-            };
-            let sign = format!("{} ", signed(change));
-            text.pieces
-                .insert(0, RichSpan::plain(sign).color(color).into());
-        }
-        Some(RecordTally::Progress { have, need }) => {
-            text.pieces
-                .push(RichSpan::plain(format!(" {have}/{need}")).into());
-        }
-        None => {}
-    }
+    tallied(&mut text, tally_of(notification), icon.is_some(), ink);
     let line = ui::rich_text(
         RichText {
             size: typography::CAPTION.font_size,
@@ -291,9 +272,7 @@ fn count_more(world: &mut World) {
         },
         false,
     );
-    if let Ok(mut spawned) = world.spawn_scene(text) {
-        spawned.insert(ChildOf(chip));
-    }
+    spawn_ui(world, text).insert(ChildOf(chip));
 }
 
 #[derive(Component)]

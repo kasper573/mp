@@ -1,9 +1,9 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, VariantArray};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::Action;
 use crate::core::assets::AssetRef;
@@ -16,7 +16,7 @@ use crate::core::math::{Direction, Pos, Rect, Size, WorldPx};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Millis, PlaybackRate, Seconds};
 
-pub type Id = ContentId<ModelDef>;
+pub type ModelId = ContentId<ModelDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -62,46 +62,6 @@ impl ContentRow for ModelDef {
     }
 }
 
-impl ActionName {
-    pub fn key(self) -> &'static str {
-        match self {
-            ActionName::Idle => "idle",
-            ActionName::Walk => "walk",
-            ActionName::Run => "run",
-            ActionName::Attack => "attack",
-            ActionName::Death => "death",
-        }
-    }
-}
-
-impl DirectionName {
-    pub fn of(dir: Direction) -> DirectionName {
-        match dir {
-            Direction::S => DirectionName::S,
-            Direction::SW => DirectionName::Sw,
-            Direction::NW => DirectionName::Nw,
-            Direction::N => DirectionName::N,
-            Direction::NE => DirectionName::Ne,
-            Direction::SE => DirectionName::Se,
-            Direction::E => DirectionName::E,
-            Direction::W => DirectionName::W,
-        }
-    }
-
-    pub fn key(self) -> &'static str {
-        match self {
-            DirectionName::S => "s",
-            DirectionName::Sw => "sw",
-            DirectionName::Nw => "nw",
-            DirectionName::N => "n",
-            DirectionName::Ne => "ne",
-            DirectionName::Se => "se",
-            DirectionName::E => "e",
-            DirectionName::W => "w",
-        }
-    }
-}
-
 impl ModuleSet for ModelDef {
     type Module = ModelModule;
 
@@ -138,7 +98,7 @@ pub enum Sprites {
 pub struct Sheet {
     pub image: AssetRef,
     pub frame_size: FrameSize,
-    pub actions: BTreeMap<ActionName, BTreeMap<DirectionName, Vec<SheetFrame>>>,
+    pub actions: BTreeMap<Action, BTreeMap<Direction, Vec<SheetFrame>>>,
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,63 +106,6 @@ pub struct Sheet {
 pub struct FrameSize {
     pub width: u32,
     pub height: u32,
-}
-
-#[derive(
-    JsonSchema,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    VariantArray,
-    EnumString,
-    Default,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum ActionName {
-    #[default]
-    Idle,
-    Walk,
-    Run,
-    Attack,
-    Death,
-}
-
-#[derive(
-    JsonSchema,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    VariantArray,
-    EnumString,
-    Default,
-)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum DirectionName {
-    #[default]
-    S,
-    Sw,
-    Nw,
-    N,
-    Ne,
-    Se,
-    E,
-    W,
 }
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -282,17 +185,27 @@ pub struct GenericBusts {
     pub thinking: AssetRef,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
 pub enum Face {
     Generic(GenericExpression),
     Own(String),
 }
 
-impl Serialize for Face {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Face::Generic(expression) => serializer.serialize_str(expression.key()),
-            Face::Own(name) => serializer.serialize_str(name),
+impl From<String> for Face {
+    fn from(name: String) -> Face {
+        match name.parse() {
+            Ok(expression) => Face::Generic(expression),
+            Err(_) => Face::Own(name),
+        }
+    }
+}
+
+impl From<Face> for String {
+    fn from(face: Face) -> String {
+        match face {
+            Face::Generic(expression) => expression.as_ref().to_owned(),
+            Face::Own(name) => name,
         }
     }
 }
@@ -313,21 +226,6 @@ impl JsonSchema for Face {
     }
 }
 
-impl<'de> Deserialize<'de> for Face {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Face, D::Error> {
-        let name = String::deserialize(deserializer)?;
-        Ok(
-            match GenericExpression::VARIANTS
-                .iter()
-                .find(|expression| expression.key() == name)
-            {
-                Some(expression) => Face::Generic(*expression),
-                None => Face::Own(name),
-            },
-        )
-    }
-}
-
 #[derive(
     JsonSchema,
     Serialize,
@@ -340,8 +238,11 @@ impl<'de> Deserialize<'de> for Face {
     Eq,
     Hash,
     VariantArray,
+    AsRefStr,
+    EnumString,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum GenericExpression {
     #[default]
     Neutral,
@@ -350,19 +251,6 @@ pub enum GenericExpression {
     Angry,
     Surprised,
     Thinking,
-}
-
-impl GenericExpression {
-    pub fn key(self) -> &'static str {
-        match self {
-            GenericExpression::Neutral => "neutral",
-            GenericExpression::Happy => "happy",
-            GenericExpression::Sad => "sad",
-            GenericExpression::Angry => "angry",
-            GenericExpression::Surprised => "surprised",
-            GenericExpression::Thinking => "thinking",
-        }
-    }
 }
 
 impl Busts {
@@ -428,23 +316,27 @@ pub fn build_all(loading: &mut Loading) {
         let frames = image.map(|(width, height)| {
             (width / sheet.frame_size.width.max(1)) * (height / sheet.frame_size.height.max(1))
         });
-        for action in ActionName::VARIANTS {
-            let Some(strips) = sheet.actions.get(action) else {
+        for &action in Action::VARIANTS {
+            let Some(strips) = sheet.actions.get(&action) else {
                 check.error(
                     "/sprites/actions",
                     "missing frames",
-                    format!("no {} action", action.key()),
+                    format!("no {} action", action.as_ref()),
                     "every action: idle, walk, run, attack, death",
                 );
                 continue;
             };
-            for direction in DirectionName::VARIANTS {
-                let pointer = format!("/sprites/actions/{}/{}", action.key(), direction.key());
-                let Some(strip) = strips.get(direction) else {
+            for &direction in Direction::VARIANTS {
+                let pointer = format!(
+                    "/sprites/actions/{}/{}",
+                    action.as_ref(),
+                    direction.as_ref()
+                );
+                let Some(strip) = strips.get(&direction) else {
                     check.error(
-                        format!("/sprites/actions/{}", action.key()),
+                        format!("/sprites/actions/{}", action.as_ref()),
                         "missing frames",
-                        format!("direction {} has no frames", direction.key()),
+                        format!("direction {} has no frames", direction.as_ref()),
                         "1 to 256 frames in each of s, sw, nw, n, ne, se, e, w",
                     );
                     continue;
@@ -473,14 +365,14 @@ pub fn build_all(loading: &mut Loading) {
                         apexes.push(index);
                     }
                 }
-                if (apexes.len() > 1) || (!apexes.is_empty() && *action != ActionName::Attack) {
+                if (apexes.len() > 1) || (!apexes.is_empty() && action != Action::Attack) {
                     check.error(
                         &pointer,
                         "apex out of place",
                         format!(
                             "{} · {}: frames {}",
-                            action.key(),
-                            direction.key(),
+                            action.as_ref(),
+                            direction.as_ref(),
                             apexes
                                 .iter()
                                 .map(|i| i.to_string())
@@ -531,11 +423,11 @@ pub fn build_all(loading: &mut Loading) {
 pub struct ActorModel {
     def: &'static ModelDef,
     columns: u32,
-    strips: HashMap<Action, [&'static [SheetFrame]; 8]>,
+    strips: Vec<Vec<&'static [SheetFrame]>>,
 }
 
 impl ActorModel {
-    pub fn get(content: &Content, model: Id) -> &'static ActorModel {
+    pub fn get(content: &Content, model: ModelId) -> &'static ActorModel {
         content
             .built::<Models>()
             .0
@@ -544,25 +436,21 @@ impl ActorModel {
             .unwrap_or_else(|| panic!("model {} failed to load", model.key(content)))
     }
 
+    // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
     fn new(def: &'static ModelDef, image: Option<(u32, u32)>) -> ActorModel {
         let sheet = def.sheet();
         let columns = image
             .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
             .max(1);
-        let mut strips = HashMap::new();
-        for action in Action::ALL {
-            let name = action_name(action);
-            let Some(directions) = sheet.actions.get(&name) else {
-                continue;
-            };
-            let mut slots: [&'static [SheetFrame]; 8] = [&[]; 8];
-            for direction in DirectionName::VARIANTS {
-                if let Some(strip) = directions.get(direction) {
-                    slots[*direction as usize] = strip.as_slice();
-                }
-            }
-            strips.insert(action, slots);
-        }
+        let strips = Action::VARIANTS
+            .iter()
+            .map(|action| {
+                Direction::VARIANTS
+                    .iter()
+                    .map(|direction| sheet.actions[action][direction].as_slice())
+                    .collect()
+            })
+            .collect();
         ActorModel {
             def,
             columns,
@@ -655,10 +543,7 @@ impl ActorModel {
     }
 
     fn strip(&self, action: Action, dir: Direction) -> &'static [SheetFrame] {
-        self.strips
-            .get(&action)
-            .expect("checked at load: every actor model declares every action")
-            [DirectionName::of(dir) as usize]
+        self.strips[action as usize][dir as usize]
     }
 
     fn region(&self, frame: u32) -> Rect<WorldPx> {
@@ -678,16 +563,6 @@ impl ActorModel {
 pub struct Timing {
     pub duration: Seconds,
     pub apex: Seconds,
-}
-
-fn action_name(action: Action) -> ActionName {
-    match action {
-        Action::Idle => ActionName::Idle,
-        Action::Walk => ActionName::Walk,
-        Action::Run => ActionName::Run,
-        Action::Attack => ActionName::Attack,
-        Action::Dead => ActionName::Death,
-    }
 }
 
 fn rate(action: Action, attack_speed: PlaybackRate) -> PlaybackRate {

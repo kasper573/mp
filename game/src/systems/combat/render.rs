@@ -7,7 +7,7 @@ use crate::core::render::screen::ToScreen;
 use crate::core::render::snap_to_screen;
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::session;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 use crate::systems::stat;
 
 pub struct CombatPlugin;
@@ -16,7 +16,7 @@ impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_bar).add_systems(
             Update,
-            (healthbar, death_tint).run_if(in_state(GameScene::Area)),
+            (healthbar, death_tint).run_if(in_state(ClientScreen::Area)),
         );
     }
 }

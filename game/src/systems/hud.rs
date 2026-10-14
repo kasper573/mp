@@ -1,21 +1,18 @@
 use std::collections::HashSet;
+use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher, Hash};
 
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
-use ui::{Geom, OnSettle, OnTap, SnapGrid, text_colored, widget};
+use ui::{Geom, OnSettle, OnTap, text_colored, widget};
 
-use crate::core::audio::mix::{AudioFader, AudioMix, AudioVolume};
 use crate::core::content::{Content, Fixture};
-use crate::core::platform::{ClientPlatform, Platform};
-use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
+use crate::core::math::{Pos, Size, WindowPx};
 use crate::systems::input::map::{ActionInput, InputAction};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::scene::{Scene as GameScene, despawn_all, mode::Mode};
-use crate::systems::{
-    effect, equipment, history, item, player, quest, settings, spectate, stat, terminal,
-};
+use crate::systems::screen::{ClientScreen, despawn_all, mode::ClientMode};
+use crate::systems::settings::{self, Placement, UserSettings};
+use crate::systems::{equipment, history, item, player, quest, spectate, stat, terminal};
 
-pub(crate) const WIDGET: ScreenPx = ScreenPx(48.0);
+pub(crate) const WIDGET: WindowPx = WindowPx(48.0);
 const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 200.0);
 
 pub(crate) const PANEL_BG: Color = Color::srgb(0.1, 0.1, 0.1);
@@ -26,12 +23,11 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Settings>()
-            .init_resource::<Open>()
+        settings::plugin(app);
+        app.init_resource::<Open>()
             .init_resource::<RefreshWindows>()
-            .add_systems(Update, (persist_settings, sync_preferences))
-            .add_systems(OnEnter(GameScene::Area), spawn_hud)
-            .add_systems(OnExit(GameScene::Area), despawn_all::<Hud>)
+            .add_systems(OnEnter(ClientScreen::Area), spawn_hud)
+            .add_systems(OnExit(ClientScreen::Area), despawn_all::<Hud>)
             .add_systems(
                 Update,
                 (
@@ -40,15 +36,13 @@ impl Plugin for HudPlugin {
                     sync_widgets,
                     sync_windows,
                 )
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
 
 #[derive(Resource, Default)]
 pub(crate) struct RefreshWindows(pub HashSet<&'static str>);
-
-pub(crate) const TERMINAL_WINDOW: &str = "Terminal";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum HudAudience {
@@ -58,10 +52,10 @@ pub enum HudAudience {
 }
 
 impl HudAudience {
-    fn includes(self, mode: Mode) -> bool {
+    fn includes(self, mode: ClientMode) -> bool {
         match self {
-            HudAudience::Players => mode == Mode::Play,
-            HudAudience::Spectators => mode == Mode::Spectate,
+            HudAudience::Players => mode == ClientMode::Play,
+            HudAudience::Spectators => mode == ClientMode::Spectate,
             HudAudience::Everyone => true,
         }
     }
@@ -79,7 +73,6 @@ pub trait Window: Send + Sync {
     fn title(&self) -> &'static str;
     fn toggle(&self) -> InputAction;
     fn icon(&self) -> InterfaceIcon;
-    fn order(&self) -> u32;
     fn size(&self) -> Vec2 {
         WINDOW_SIZE
     }
@@ -120,12 +113,24 @@ pub(crate) fn tooltip_label(text: impl Into<String>) -> impl Scene {
     }
 }
 
+// Scenes built in code wait on no assets, so only a bug in one can keep it from spawning.
+pub(crate) fn spawn_ui(world: &mut World, scene: impl Scene) -> EntityWorldMut<'_> {
+    world
+        .spawn_scene(scene)
+        .unwrap_or_else(|error| panic!("{error}"))
+}
+
+pub(crate) fn fingerprint(value: &impl Hash) -> u64 {
+    BuildHasherDefault::<DefaultHasher>::default().hash_one(value)
+}
+
 pub(crate) fn reconcile_children(
     world: &mut World,
     container: Entity,
-    keys: &[u64],
+    keys: &[impl Hash],
     build: impl Fn(&World, usize) -> Box<dyn Scene>,
 ) {
+    let keys: Vec<u64> = keys.iter().map(fingerprint).collect();
     let current: Vec<(Entity, u64)> = world
         .get::<Children>(container)
         .map(|children| {
@@ -144,11 +149,8 @@ pub(crate) fn reconcile_children(
             world.entity_mut(stale).despawn();
         }
         let scene = build(world, index);
-        if let Ok(mut spawned) = world.spawn_scene(scene) {
-            spawned.insert(Keyed(key));
-            let child = spawned.id();
-            world.entity_mut(container).insert_children(index, &[child]);
-        }
+        let child = spawn_ui(world, scene).insert(Keyed(key)).id();
+        world.entity_mut(container).insert_children(index, &[child]);
     }
     for &(extra, _) in current.iter().skip(keys.len()) {
         world.entity_mut(extra).despawn();
@@ -160,265 +162,41 @@ struct Keyed(u64);
 
 static WIDGETS: &[(&str, &dyn Widget)] = &[
     ("character", &player::widget::CharacterWidget),
-    ("effects", &effect::widget::EffectsWidget),
     ("quests", &quest::tracker::QuestTrackerWidget),
     ("spectator", &spectate::widget::SpectatorWidget),
 ];
 
-static WINDOWS: &[(&str, &dyn Window)] = &[
-    ("Inventory", &item::widget::InventoryWindow),
-    ("Equipment", &equipment::widget::EquipmentWindow),
-    ("Stats", &stat::widget::StatsWindow),
-    ("Quests", &quest::log::QuestLogWindow),
-    (
-        history::widget::HISTORY_WINDOW,
-        &history::widget::HistoryWindow,
-    ),
-    ("Settings", &settings::SettingsWindow),
-    (TERMINAL_WINDOW, &terminal::widget::TerminalWindow),
+// Their launchers line up in this order.
+static WINDOWS: &[&dyn Window] = &[
+    &item::widget::InventoryWindow,
+    &equipment::widget::EquipmentWindow,
+    &stat::widget::StatsWindow,
+    &quest::log::QuestLogWindow,
+    &history::widget::HistoryWindow,
+    &settings::SettingsWindow,
+    &terminal::widget::TerminalWindow,
 ];
 
-fn widgets(mode: Mode) -> impl Iterator<Item = (&'static str, &'static dyn Widget)> {
+fn widgets(mode: ClientMode) -> impl Iterator<Item = (&'static str, &'static dyn Widget)> {
     WIDGETS
         .iter()
         .copied()
         .filter(move |(_, widget)| widget.audience().includes(mode))
 }
 
-fn windows(mode: Mode) -> impl Iterator<Item = (&'static str, &'static dyn Window)> {
+fn windows(mode: ClientMode) -> impl Iterator<Item = &'static dyn Window> {
     WINDOWS
         .iter()
         .copied()
-        .filter(move |(_, window)| window.audience().includes(mode))
+        .filter(move |window| window.audience().includes(mode))
 }
 
-fn window_def(id: &str) -> &'static dyn Window {
+fn window_def(title: &str) -> &'static dyn Window {
     WINDOWS
         .iter()
-        .find(|(name, _)| *name == id)
-        .map(|(_, window)| *window)
+        .copied()
+        .find(|window| window.title() == title)
         .expect("a registered window")
-}
-
-#[derive(Resource)]
-pub(crate) struct Settings(UserSettings);
-
-impl FromWorld for Settings {
-    fn from_world(world: &mut World) -> Settings {
-        Settings(UserSettings::load(&*world.resource::<ClientPlatform>().0))
-    }
-}
-
-impl Settings {
-    pub(crate) fn snapping_enabled(&self) -> bool {
-        self.0.snapping_enabled()
-    }
-
-    pub(crate) fn toggle_snapping(&mut self) {
-        self.0.toggle_snapping();
-    }
-
-    pub(crate) fn letters_per_second(&self) -> LettersPerSecond {
-        self.0.text.letters_per_second
-    }
-
-    pub(crate) fn set_letters_per_second(&mut self, letters_per_second: LettersPerSecond) {
-        self.0.text.letters_per_second = letters_per_second.clamped();
-    }
-
-    pub(crate) fn reduced_motion(&self) -> bool {
-        self.0.text.reduced_motion
-    }
-
-    pub(crate) fn toggle_reduced_motion(&mut self) {
-        self.0.text.reduced_motion = !self.0.text.reduced_motion;
-    }
-
-    pub(crate) fn volume(&self, fader: AudioFader) -> AudioVolume {
-        self.0.sound.level(fader)
-    }
-
-    pub(crate) fn set_volume(&mut self, fader: AudioFader, volume: AudioVolume) {
-        self.0.sound.set(fader, volume);
-    }
-
-    pub(crate) fn screen_transition(&self) -> ScreenTransition {
-        self.0.screen.transition
-    }
-
-    pub(crate) fn set_screen_transition(&mut self, transition: ScreenTransition) {
-        self.0.screen.transition = transition;
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub(crate) struct LettersPerSecond(pub f32);
-
-impl LettersPerSecond {
-    pub(crate) const SLOWEST: LettersPerSecond = LettersPerSecond(15.0);
-    pub(crate) const FASTEST: LettersPerSecond = LettersPerSecond(120.0);
-
-    fn clamped(self) -> LettersPerSecond {
-        LettersPerSecond(self.0.clamp(Self::SLOWEST.0, Self::FASTEST.0))
-    }
-}
-
-impl Default for LettersPerSecond {
-    fn default() -> LettersPerSecond {
-        LettersPerSecond(45.0)
-    }
-}
-
-/// Persists settings on change instead of at each mutation site. The initial load also registers as
-/// a change, harmlessly rewriting what was just read.
-fn persist_settings(settings: Res<Settings>, platform: Res<ClientPlatform>) {
-    if settings.is_changed() {
-        settings.0.save(&*platform.0);
-    }
-}
-
-const KEY: &str = "rift.user_settings";
-const DEFAULT_SNAP: ScreenPx = ScreenPx(16.0);
-
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
-pub(crate) struct ScreenPx(pub(crate) f32);
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-struct ScreenVec {
-    x: ScreenPx,
-    y: ScreenPx,
-}
-
-impl ScreenVec {
-    fn to_vec2(self) -> Vec2 {
-        Vec2::new(self.x.0, self.y.0)
-    }
-
-    fn from_vec2(v: Vec2) -> ScreenVec {
-        ScreenVec {
-            x: ScreenPx(v.x),
-            y: ScreenPx(v.y),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-struct Placement {
-    pos: ScreenVec,
-    size: ScreenVec,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct UserSettings {
-    #[serde(default)]
-    ui: UiSettings,
-    #[serde(default)]
-    text: TextSettings,
-    #[serde(default)]
-    sound: AudioMix,
-    #[serde(default)]
-    screen: ScreenSettings,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct ScreenSettings {
-    #[serde(default)]
-    transition: ScreenTransition,
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct TextSettings {
-    #[serde(default)]
-    letters_per_second: LettersPerSecond,
-    #[serde(default)]
-    reduced_motion: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct UiSettings {
-    #[serde(default = "default_snap")]
-    snap: Option<ScreenPx>,
-    #[serde(default)]
-    widgets: Vec<(String, ScreenVec)>,
-    #[serde(default)]
-    windows: Vec<(String, Placement)>,
-}
-
-impl UserSettings {
-    fn load(platform: &dyn Platform) -> UserSettings {
-        let mut settings: UserSettings = platform
-            .load(KEY)
-            .and_then(|json| serde_json::from_str(&json).ok())
-            .unwrap_or_default();
-        settings.ui.snap = settings.ui.snap.filter(|snap| snap.0 > 0.0);
-        settings.text.letters_per_second = settings.text.letters_per_second.clamped();
-        settings
-    }
-
-    fn save(&self, platform: &dyn Platform) {
-        if let Ok(json) = serde_json::to_string_pretty(self) {
-            platform.save(KEY, &json);
-        }
-    }
-
-    fn snap_grid(&self) -> Option<f32> {
-        self.ui.snap.map(|snap| snap.0)
-    }
-
-    fn widget_pos(&self, id: &str) -> Option<ScreenVec> {
-        self.ui
-            .widgets
-            .iter()
-            .find(|(key, _)| key == id)
-            .map(|(_, pos)| *pos)
-    }
-
-    fn set_widget_pos(&mut self, id: &str, pos: ScreenVec) {
-        match self.ui.widgets.iter_mut().find(|(key, _)| key == id) {
-            Some(entry) => entry.1 = pos,
-            None => self.ui.widgets.push((id.to_owned(), pos)),
-        }
-    }
-
-    fn window_placement(&self, id: &str) -> Option<Placement> {
-        self.ui
-            .windows
-            .iter()
-            .find(|(key, _)| key == id)
-            .map(|(_, placement)| *placement)
-    }
-
-    fn set_window_placement(&mut self, id: &str, placement: Placement) {
-        match self.ui.windows.iter_mut().find(|(key, _)| key == id) {
-            Some(entry) => entry.1 = placement,
-            None => self.ui.windows.push((id.to_owned(), placement)),
-        }
-    }
-
-    fn snapping_enabled(&self) -> bool {
-        self.ui.snap.is_some()
-    }
-
-    fn toggle_snapping(&mut self) {
-        self.ui.snap = match self.ui.snap {
-            Some(_) => None,
-            None => Some(DEFAULT_SNAP),
-        };
-    }
-}
-
-impl Default for UiSettings {
-    fn default() -> UiSettings {
-        UiSettings {
-            snap: default_snap(),
-            widgets: Vec::new(),
-            windows: Vec::new(),
-        }
-    }
-}
-
-fn default_snap() -> Option<ScreenPx> {
-    Some(DEFAULT_SNAP)
 }
 
 #[derive(Resource, Default)]
@@ -438,8 +216,8 @@ struct WindowView {
 
 fn spawn_hud(
     mut commands: Commands,
-    mode: Res<Mode>,
-    settings: Res<Settings>,
+    mode: Res<ClientMode>,
+    settings: Res<UserSettings>,
     assets: Res<AssetServer>,
     content: Res<Content>,
     screen: Single<&bevy::window::Window>,
@@ -451,9 +229,14 @@ fn spawn_hud(
         let built = widget.build(pos, name);
         scenes.push(Box::new(bsn! { @{built} HudPiece }));
     }
-    for (window, _) in windows(*mode) {
+    for window in windows(*mode) {
         scenes.push(Box::new(launcher(
-            window, *mode, screen_w, &settings, &assets, &content,
+            window.title(),
+            *mode,
+            screen_w,
+            &settings,
+            &assets,
+            &content,
         )));
     }
     commands.spawn_scene(bsn! {
@@ -465,9 +248,10 @@ fn spawn_hud(
 }
 
 fn rebuild_windows(world: &mut World) {
-    let refresh = match world.resource::<RefreshWindows>().0.is_empty() {
-        true => HashSet::new(),
-        false => std::mem::take(&mut world.resource_mut::<RefreshWindows>().0),
+    let refresh = if world.resource::<RefreshWindows>().0.is_empty() {
+        HashSet::new()
+    } else {
+        std::mem::take(&mut world.resource_mut::<RefreshWindows>().0)
     };
     if !world.is_resource_changed::<Open>() && refresh.is_empty() {
         return;
@@ -493,30 +277,28 @@ fn rebuild_windows(world: &mut World) {
         let panel: Box<dyn Scene> = if should_open {
             Box::new(window_scene(world, window, screen))
         } else {
-            let mode = *world.resource::<Mode>();
-            let settings = world.resource::<Settings>();
+            let mode = *world.resource::<ClientMode>();
+            let settings = world.resource::<UserSettings>();
             let assets = world.resource::<AssetServer>();
             let content = world.resource::<Content>();
             Box::new(launcher(window, mode, screen.x, settings, assets, content))
         };
         world.entity_mut(entity).despawn();
-        if let Ok(mut spawned) = world.spawn_scene(panel) {
-            spawned.insert(ChildOf(hud));
-        }
+        spawn_ui(world, panel).insert(ChildOf(hud));
     }
 }
 
 fn sync_widgets(world: &mut World) {
-    for (_, widget) in widgets(*world.resource::<Mode>()) {
+    for (_, widget) in widgets(*world.resource::<ClientMode>()) {
         widget.sync(world);
     }
 }
 
 fn launcher(
     window: &'static str,
-    mode: Mode,
+    mode: ClientMode,
     screen_w: f32,
-    settings: &Settings,
+    settings: &UserSettings,
     assets: &AssetServer,
     content: &Content,
 ) -> impl Scene {
@@ -573,9 +355,7 @@ pub(crate) fn spawn_in_hud(world: &mut World, scene: impl Scene) -> Option<Entit
         .query_filtered::<Entity, With<Hud>>()
         .iter(world)
         .next()?;
-    let mut spawned = world.spawn_scene(scene).ok()?;
-    spawned.insert(ChildOf(hud));
-    Some(spawned.id())
+    Some(spawn_ui(world, scene).insert(ChildOf(hud)).id())
 }
 
 pub(crate) fn placed_window(
@@ -586,7 +366,7 @@ pub(crate) fn placed_window(
     content: Vec<ui::WindowContent>,
     tab: usize,
 ) -> impl Scene + use<> {
-    let settings = world.resource::<Settings>();
+    let settings = world.resource::<UserSettings>();
     let (pos, size) = window_geom(settings, id, fallback_pos, fallback_size);
     ui::window(ui::WindowOptions {
         pos,
@@ -624,70 +404,55 @@ pub(crate) fn close_topmost_window(world: &mut World) -> bool {
 }
 
 fn sync_windows(world: &mut World) {
-    for (_, window) in windows(*world.resource::<Mode>()) {
+    for window in windows(*world.resource::<ClientMode>()) {
         window.sync(world);
     }
 }
 
-fn widget_pos(settings: &Settings, id: &str, fallback: Vec2) -> Vec2 {
-    settings.0.widget_pos(id).map_or(fallback, |p| p.to_vec2())
+fn widget_pos(settings: &UserSettings, id: &str, fallback: Vec2) -> Vec2 {
+    settings
+        .widget_pos(id)
+        .map_or(fallback, |pos| Vec2::new(pos.x, pos.y))
 }
 
 fn window_geom(
-    settings: &Settings,
+    settings: &UserSettings,
     id: &str,
     fallback_pos: Vec2,
     fallback_size: Vec2,
 ) -> (Vec2, Vec2) {
-    let placement = settings.0.window_placement(id);
-    let pos = placement.map_or(fallback_pos, |p| p.pos.to_vec2());
-    let size = placement.map_or(fallback_size, |p| p.size.to_vec2());
-    (pos, size)
+    settings
+        .window_placement(id)
+        .map_or((fallback_pos, fallback_size), |placement| {
+            (
+                Vec2::new(placement.pos.x, placement.pos.y),
+                Vec2::new(placement.size.width, placement.size.height),
+            )
+        })
 }
 
 pub(crate) fn persist_widget(world: &mut World, id: &str, geom: Geom) -> Geom {
-    let mut settings = world.resource_mut::<Settings>();
-    settings
-        .0
-        .set_widget_pos(id, ScreenVec::from_vec2(geom.pos));
+    world
+        .resource_mut::<UserSettings>()
+        .set_widget_pos(id, Pos::new(geom.pos.x, geom.pos.y));
     geom
 }
 
 fn persist_window(world: &mut World, id: &str, geom: Geom) -> Geom {
-    let mut settings = world.resource_mut::<Settings>();
-    settings.0.set_window_placement(
+    world.resource_mut::<UserSettings>().set_window_placement(
         id,
         Placement {
-            pos: ScreenVec::from_vec2(geom.pos),
-            size: ScreenVec::from_vec2(geom.size),
+            pos: Pos::new(geom.pos.x, geom.pos.y),
+            size: Size::new(geom.size.x, geom.size.y),
         },
     );
     geom
 }
 
-fn sync_preferences(
-    settings: Res<Settings>,
-    mut grid: ResMut<SnapGrid>,
-    mut speed: ResMut<ui::TypewriterSpeed>,
-    mut motion: ResMut<ui::MotionPreference>,
-    mut audio_mix: ResMut<AudioMix>,
-    mut transition: ResMut<ScreenTransitionPreference>,
-) {
-    if !settings.is_changed() {
-        return;
-    }
-    grid.0 = settings.0.snap_grid();
-    *speed = ui::TypewriterSpeed(Some(settings.0.text.letters_per_second.0));
-    motion.reduced = settings.0.text.reduced_motion;
-    *audio_mix = settings.0.sound;
-    transition.0 = settings.0.screen.transition;
-}
-
-fn launcher_pos(window: &'static str, mode: Mode, screen_w: f32) -> Vec2 {
-    let order = window_def(window).order();
+fn launcher_pos(window: &'static str, mode: ClientMode, screen_w: f32) -> Vec2 {
     let slot = windows(mode)
-        .filter(|(_, other)| other.order() < order)
-        .count();
+        .position(|other| other.title() == window)
+        .expect("a window shown in this mode");
     Vec2::new(
         screen_w - 8.0 - WIDGET.0,
         8.0 + slot as f32 * (WIDGET.0 + 8.0),
@@ -698,10 +463,11 @@ fn open_window(world: &mut World, window: &'static str) {
     world.resource_mut::<Open>().0.insert(window);
 }
 
-fn toggle_keys(input: ActionInput, mode: Res<Mode>, mut open: ResMut<Open>) {
-    for (window, def) in windows(*mode) {
-        if input.just_pressed(def.toggle()) && !open.0.remove(&window) {
-            open.0.insert(window);
+fn toggle_keys(input: ActionInput, mode: Res<ClientMode>, mut open: ResMut<Open>) {
+    for window in windows(*mode) {
+        let title = window.title();
+        if input.just_pressed(window.toggle()) && !open.0.remove(title) {
+            open.0.insert(title);
         }
     }
 }

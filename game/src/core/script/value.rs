@@ -19,15 +19,12 @@ pub enum ValueType {
     Number,
     Text,
     Actor,
-    Character,
 }
 
 impl ValueType {
     pub fn accepts(self, given: ValueType) -> bool {
         match (self, given) {
-            (ValueType::Number, ValueType::Integer) | (ValueType::Actor, ValueType::Character) => {
-                true
-            }
+            (ValueType::Number, ValueType::Integer) => true,
             _ => self == given,
         }
     }
@@ -38,7 +35,7 @@ impl ValueType {
             ValueType::Integer => Value::Int(0),
             ValueType::Number => Value::Num(0.0),
             ValueType::Text => Value::Text(String::new()),
-            ValueType::Actor | ValueType::Character => Value::Actor(None),
+            ValueType::Actor => Value::Actor(None),
         }
     }
 
@@ -49,7 +46,6 @@ impl ValueType {
             ValueType::Number => "number",
             ValueType::Text => "text",
             ValueType::Actor => "actor",
-            ValueType::Character => "character",
         }
     }
 }

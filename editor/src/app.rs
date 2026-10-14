@@ -9,6 +9,8 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContext, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
 use egui_dock::DockState;
 use game::core::content::{Content, ContentRegistry, version};
+use game::core::math::Pos;
+use game::core::tiling::Tiles;
 use game::systems;
 use game::systems::script::Place;
 use serde_json::Value;
@@ -31,8 +33,6 @@ use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, scenes, ui, views};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
@@ -735,15 +735,16 @@ impl Editor {
         let outcome = project.outside_changes(changed);
         if !outcome.taken.is_empty() {
             let loads = project.loads();
-            let text = match loads {
-                true => format!(
+            let text = if loads {
+                format!(
                     "↻ {} rows changed on disk and were reloaded",
                     outcome.taken.len()
-                ),
-                false => format!(
+                )
+            } else {
+                format!(
                     "{} files changed on disk and the folder no longer loads: read-only until it does",
                     outcome.taken.len()
-                ),
+                )
             };
             self.toast(text);
             self.views.content_changed();

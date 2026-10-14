@@ -11,7 +11,9 @@ pub mod theme;
 pub mod tree;
 pub mod widgets;
 
+use std::mem;
 use std::path::Path;
+use std::time::Duration;
 
 use egui::{Align, Context, Key, Layout, Modifiers, RichText};
 use egui_dock::{DockArea, DockState, TabViewer};
@@ -22,8 +24,6 @@ use crate::tabs::EditorTab;
 use crate::views::script::ScriptKeys;
 use crate::views::{area, character, model, script, spreadsheet, tileset, world};
 use crate::{import, play, views};
-use std::mem;
-use std::time::Duration;
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
     if !editor.themed {

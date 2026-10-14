@@ -3,16 +3,13 @@ pub mod widget;
 use std::collections::HashMap;
 
 use bevy_app::App;
-use bevy_ecs::lifecycle::Remove;
-use bevy_ecs::message::Message;
-use bevy_ecs::observer::On;
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::systems::account::role::Role;
-use crate::systems::player::{ClientId, Players};
+use crate::systems::account::{Identity, Role};
+use crate::systems::drain_requests;
+use crate::systems::player::{ClientId, Players, last_connection};
 use crate::systems::visibility::{self, PrivateSight};
-use crate::systems::{account::identity::Identity, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -163,16 +160,9 @@ pub fn client_left(
     clients: Query<(Entity, &ClientId)>,
     mut spectators: ResMut<Spectators>,
 ) {
-    let Ok((_, id)) = clients.get(remove.entity) else {
-        return;
-    };
-    if clients
-        .iter()
-        .any(|(entity, other)| entity != remove.entity && other == id)
-    {
-        return;
+    if let Some(id) = last_connection(remove.entity, &clients) {
+        spectators.0.remove(&id);
     }
-    spectators.0.remove(id);
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -411,7 +411,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         for group in &groups {
             let mut placement = serde_json::json!({ "type": "blueprint", "blueprint": key, "at": { "x": group.origin.x, "y": group.origin.y } });
             if !group.flip.is_none() {
-                placement["flip"] = Value::String(group.flip.csv().to_owned());
+                placement["flip"] = serde_json::json!(group.flip);
             }
             let at = group.indices.iter().copied().min().unwrap_or(list.len());
             list.insert(at, placement);
@@ -601,7 +601,8 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
                     }
                     let placement = list.remove(index);
                     let at = shapes::pos_of(&placement["at"]).unwrap_or(Pos::new(0.0, 0.0));
-                    let flip = Flip::parse(placement.text("flip")).unwrap_or(Flip::None);
+                    let flip =
+                        serde_json::from_value(placement["flip"].clone()).unwrap_or_default();
                     for (offset, part) in def.parts.iter().enumerate() {
                         let placed = placed_part(
                             content,

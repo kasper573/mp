@@ -6,35 +6,35 @@ pub mod mode;
 use bevy::prelude::*;
 use renet2::RenetClient;
 
-use crate::systems::player::session;
+use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Scene {
+pub enum ClientScreen {
     #[default]
     Loading,
-    Mode,
+    ChoosingMode,
     Connecting,
     Lost,
     Area,
 }
 
-pub struct ScenePlugin {
+pub struct ClientScreenPlugin {
     pub spectator: bool,
 }
 
-impl Plugin for ScenePlugin {
+impl Plugin for ClientScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.init_state::<Scene>()
+        app.init_state::<ClientScreen>()
             .insert_resource(loading::AfterLoading(if self.spectator {
-                Scene::Mode
+                ClientScreen::ChoosingMode
             } else {
-                Scene::Connecting
+                ClientScreen::Connecting
             }))
             .add_plugins((
                 loading::LoadingPlugin,
-                mode::ModePlugin,
+                mode::ClientModePlugin,
                 connection::ConnectionPlugin,
                 area::AreaPlugin,
             ))
@@ -45,10 +45,13 @@ impl Plugin for ScenePlugin {
 fn drive(
     pending: Option<Res<PendingSession>>,
     client: Option<Res<RenetClient>>,
-    scene: Res<State<Scene>>,
-    mut next: ResMut<NextState<Scene>>,
+    scene: Res<State<ClientScreen>>,
+    mut next: ResMut<NextState<ClientScreen>>,
 ) {
-    if matches!(scene.get(), Scene::Mode | Scene::Loading) || !matches!(*next, NextState::Unchanged)
+    if matches!(
+        scene.get(),
+        ClientScreen::ChoosingMode | ClientScreen::Loading
+    ) || !matches!(*next, NextState::Unchanged)
     {
         return;
     }
@@ -56,11 +59,11 @@ fn drive(
     let attempting =
         pending.is_some() || client.as_ref().is_some_and(|client| client.is_connecting());
     let target = if connected {
-        Scene::Area
+        ClientScreen::Area
     } else if attempting {
-        Scene::Connecting
+        ClientScreen::Connecting
     } else {
-        Scene::Lost
+        ClientScreen::Lost
     };
     if *scene.get() != target {
         next.set(target);
@@ -77,9 +80,9 @@ fn announce(world: &mut World) {
         if spectate { "spectate" } else { "join" }
     );
     if spectate {
-        session::spectate(world, SpectateRequest::Start);
+        world.write_message(SpectateRequest::Start);
     } else {
-        session::join(world);
+        world.write_message(JoinRequest);
     }
     world.remove_resource::<Announce>();
 }

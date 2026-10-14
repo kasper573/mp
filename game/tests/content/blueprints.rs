@@ -1,7 +1,8 @@
+use game::core::content::ContentId;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems::area::grid::Flip;
-use game::systems::area::{self, AreaDef, AreaModule};
+use game::systems::area::{self, AreaDef, AreaModule, Scenery, SceneryTile, walk};
 use serde_json::json;
 
 use crate::support::{TempFolder, load};
@@ -85,7 +86,11 @@ fn a_blueprint_holding_itself_is_refused() {
 
     let report = load(&folder.0).err().expect("refused");
 
-    let rules: Vec<&str> = report.errors.iter().map(|error| error.rule).collect();
+    let rules: Vec<&str> = report
+        .errors
+        .iter()
+        .map(|error| error.problem.rule)
+        .collect();
     assert!(rules.contains(&"blueprint holds itself"), "{report}");
 }
 
@@ -110,7 +115,11 @@ fn nesting_past_eight_levels_is_refused() {
 
     let report = load(&folder.0).err().expect("refused");
 
-    let rules: Vec<&str> = report.errors.iter().map(|error| error.rule).collect();
+    let rules: Vec<&str> = report
+        .errors
+        .iter()
+        .map(|error| error.problem.rule)
+        .collect();
     assert!(rules.contains(&"nested too deep"), "{report}");
     assert!(!rules.contains(&"blueprint holds itself"), "{report}");
 }
@@ -137,4 +146,29 @@ fn nesting_up_to_eight_levels_loads() {
     let content = load(&folder.0).unwrap_or_else(|report| panic!("{report}"));
     let start = content.table::<AreaDef>().id_of("start").expect("start");
     assert_eq!(area::placed(&content, start).len(), 1);
+}
+
+#[test]
+fn a_scenerys_bounds_cover_exactly_its_tiles_however_it_is_flipped() {
+    for flip in [Flip::None, Flip::Horizontal, Flip::Vertical, Flip::Both] {
+        let tile = SceneryTile {
+            tile: 338,
+            flip: Flip::None,
+        };
+        let scenery = Scenery {
+            at: Pos::new(5.0, 7.0),
+            tileset: ContentId::new(0),
+            tiles: vec![vec![Some(tile); 3]; 2],
+            sort: None,
+            flip,
+            blocks: Vec::new(),
+        };
+
+        let covered = (0..2)
+            .flat_map(|row| (0..3).map(move |column| (column, row)))
+            .map(|(column, row)| walk::tile_square(&scenery, column, row))
+            .reduce(|a, b| a.union(&b));
+
+        assert_eq!(covered, Some(scenery.bounds()), "{flip:?}");
+    }
 }

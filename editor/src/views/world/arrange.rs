@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
-use game::systems::area;
+use game::systems::area::AreaId;
 use game::systems::area::world_map::WorldMapDef;
 
 use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
@@ -243,7 +243,7 @@ pub fn solve(
     keep_regions: bool,
     doors_hint: bool,
 ) -> WorldMapDef {
-    let areas: Vec<area::Id> = layout.cards.keys().copied().collect();
+    let areas: Vec<AreaId> = layout.cards.keys().copied().collect();
     let graph = Graph::of(map, layout, &areas, keep_regions, doors_hint);
     let start: Vec<Vec2> = areas
         .iter()
@@ -285,11 +285,11 @@ impl Graph {
     fn of(
         map: &OpenWorldMap,
         layout: &WorldMapDef,
-        areas: &[area::Id],
+        areas: &[AreaId],
         keep_regions: bool,
         doors_hint: bool,
     ) -> Graph {
-        let index: HashMap<area::Id, usize> = areas
+        let index: HashMap<AreaId, usize> = areas
             .iter()
             .enumerate()
             .map(|(i, area)| (*area, i))

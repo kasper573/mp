@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
+use strum::VariantArray;
 
 use crate::core::content::{Content, Fixture};
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::{Id as ItemId, Inventory};
+use crate::systems::item::{Inventory, ItemId};
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::Xp;
@@ -96,7 +97,7 @@ fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Noti
             LineText::plain("XP"),
         ));
     }
-    for slot in EquipmentSlot::all() {
+    for slot in EquipmentSlot::VARIANTS {
         match (before.worn.get(slot), now.worn.get(slot)) {
             (_, Some(&on)) if before.worn.get(slot) != Some(&on) => {
                 told.push(worn_row(
@@ -130,9 +131,10 @@ fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Noti
 
 fn item_row(content: &Content, item: ItemId, change: i32) -> Notification {
     let sounds = &item.get(content).sfx;
-    let sfx = match change > 0 {
-        true => sounds.pickup,
-        false => sounds.trade,
+    let sfx = if change > 0 {
+        sounds.pickup
+    } else {
+        sounds.trade
     };
     Notification::new(
         NotificationKind::Feed {

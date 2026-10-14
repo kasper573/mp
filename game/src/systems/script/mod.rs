@@ -13,30 +13,70 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{Content, ContentId, ContentRow, Loading, row_file};
+use crate::core::content::{Content, ContentProblem, ContentRow, Loading, ModuleSet, row_file};
 use crate::core::math::Pos;
 use crate::core::script::{
-    self, BoxEnding, DialogueView, Expr, FlowKey, Instances, LineDef, Owner, OwnerKind, OwnerRow,
-    ScriptError, Scripts, Vocabulary, compile::compile_owner,
+    self, BoxEnding, DialogueView, Expr, Instances, LineDef, OwnerKindDef, ScriptError, Scripts,
+    Vocabulary, compile::compile_owner,
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::model::Face;
 use crate::systems::area::blueprint::BlueprintDef;
-use crate::systems::area::{self, AreaDef, AreaObject};
-use crate::systems::item::{Id as ItemId, ItemDef, ItemKind};
-use crate::systems::job::{Id as JobId, JobDef};
-use crate::systems::memory::{Id as MemoryId, MemoryDef};
-use crate::systems::notification::{Id as NotificationId, NotificationDef};
-use crate::systems::npc::{Id as NpcId, Npc, NpcDef};
-use crate::systems::quest::{Id as QuestId, Parties, QuestDef};
-use crate::systems::shop::{Id as ShopId, ShopDef};
+use crate::systems::area::{self, AreaDef, AreaId, AreaObject};
+use crate::systems::item::{ItemDef, ItemId, ItemKind};
+use crate::systems::job::{JobDef, JobId};
+use crate::systems::memory::{MemoryDef, MemoryId};
+use crate::systems::notification::{NotificationDef, NotificationId};
+use crate::systems::npc::{Npc, NpcDef, NpcId};
+use crate::systems::quest::{Parties, QuestDef, QuestId};
+use crate::systems::shop::{ShopDef, ShopId};
 use crate::systems::text::Span;
 use crate::systems::{WorldArea, dialogue};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RiftScripting;
+
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    IntoStaticStr,
+    VariantArray,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum OwnerKind {
+    Object,
+    Npc,
+    Item,
+    Area,
+    Quest,
+    Shop,
+    Blueprint,
+    Any,
+}
+
+impl OwnerKindDef for OwnerKind {
+    const ANY: OwnerKind = OwnerKind::Any;
+
+    fn keeps_state(self) -> bool {
+        !matches!(self, OwnerKind::Item | OwnerKind::Quest | OwnerKind::Shop)
+    }
+
+    fn name(self) -> &'static str {
+        self.into()
+    }
+}
 
 pub type ScriptDef = script::ScriptDef<RiftScripting>;
 pub type ScriptId = script::ScriptId<RiftScripting>;
@@ -51,33 +91,26 @@ pub type Choice = script::Choice<RiftScripting>;
 pub type Procedure = script::Procedure<RiftScripting>;
 pub type MayDo = script::MayDo<RiftScripting>;
 pub type Fill<T> = script::Fill<T>;
+pub type Owner = script::Owner<RiftScripting>;
+pub type OwnerRow = script::OwnerRow<RiftScripting>;
+pub type FlowKey = script::FlowKey<RiftScripting>;
+pub type FlowTrace = script::FlowTrace<RiftScripting>;
+pub type TraceStep = script::TraceStep<RiftScripting>;
+pub type EffectCall = script::EffectCall<RiftScripting>;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 #[serde(from = "PlaceRow", into = "PlaceRow")]
+#[schemars(inline)]
 pub struct Place {
-    pub area: area::Id,
+    pub area: AreaId,
     pub at: Pos<Tiles>,
-}
-
-impl JsonSchema for Place {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        std::borrow::Cow::Borrowed("Place")
-    }
-
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        PlaceRow::json_schema(generator)
-    }
-
-    fn inline_schema() -> bool {
-        true
-    }
 }
 
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[schemars(extend("x-place" = true))]
+#[schemars(inline, extend("x-place" = true))]
 struct PlaceRow {
-    area: area::Id,
+    area: AreaId,
     x: f32,
     y: f32,
 }
@@ -103,7 +136,7 @@ impl From<Place> for PlaceRow {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RowRef {
-    Area(area::Id),
+    Area(AreaId),
     Item(ItemId),
     Npc(NpcId),
     Quest(QuestId),
@@ -225,6 +258,7 @@ pub enum Reach {
 }
 
 impl Vocabulary for RiftScripting {
+    type OwnerKind = OwnerKind;
     type Event = RiftEvent;
     type Query = RiftQuery;
     type Effect = RiftEffect;
@@ -261,7 +295,7 @@ impl Vocabulary for RiftScripting {
         dialogue::close(world, flow, subject, ending);
     }
 
-    fn log_dropped_flow(_world: &World, owner: &script::Owner, why: &str) {
+    fn log_dropped_flow(_world: &World, owner: &Owner, why: &str) {
         bevy::log::warn!("{owner:?}: flow dropped: {why}");
     }
 }
@@ -299,6 +333,12 @@ pub fn owner_of(world: &World, entity: Entity) -> Option<Owner> {
     None
 }
 
+pub trait ScriptedRow: ModuleSet {
+    const OWNER: OwnerKind;
+
+    fn script(module: &Self::Module) -> Option<&ScriptModule>;
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScriptSite {
     pub file: String,
@@ -327,32 +367,13 @@ pub fn build_all(loading: &mut Loading) {
                 ),
             }
         };
-    let row_sites =
-        |table: &'static str, key: &str, modules: Vec<(usize, &'static ScriptModule)>| {
-            modules
-                .into_iter()
-                .map(|(index, module)| {
-                    (
-                        ScriptSite {
-                            file: row_file(table, key),
-                            pointer: format!("/modules/{index}"),
-                        },
-                        module,
-                    )
-                })
-                .collect::<Vec<_>>()
-        };
-    for (id, def) in loading.rows::<AreaDef>() {
+    bind_table::<AreaDef>(loading, &mut bind);
+    bind_table::<NpcDef>(loading, &mut bind);
+    bind_table::<ItemDef>(loading, &mut bind);
+    bind_table::<QuestDef>(loading, &mut bind);
+    bind_table::<ShopDef>(loading, &mut bind);
+    for (id, _) in loading.rows::<AreaDef>() {
         let key = id.key(&content);
-        bind(
-            OwnerRow {
-                kind: OwnerKind::Area,
-                row: id.raw(),
-                object: None,
-            },
-            owner_label(OwnerKind::Area, key, None),
-            row_sites(AreaDef::TABLE, key, def.scripts()),
-        );
         let placed = area::placed(&content, id);
         for (index, object) in area::objects(placed) {
             let name = object
@@ -385,13 +406,7 @@ pub fn build_all(loading: &mut Loading) {
                 modules,
             );
         }
-    }
-    for (id, _) in loading.rows::<AreaDef>() {
-        let key = id.key(&content);
         for (ordinal, placement) in area::placements(&content, id).iter().enumerate() {
-            if placement.scripts.is_empty() {
-                continue;
-            }
             let blueprint = placement.blueprint.key(&content);
             let modules = placement
                 .scripts
@@ -422,54 +437,6 @@ pub fn build_all(loading: &mut Loading) {
             );
         }
     }
-    for (id, def) in loading.rows::<NpcDef>() {
-        let key = id.key(&content);
-        bind(
-            OwnerRow {
-                kind: OwnerKind::Npc,
-                row: id.raw(),
-                object: None,
-            },
-            owner_label(OwnerKind::Npc, key, None),
-            row_sites(NpcDef::TABLE, key, def.scripts()),
-        );
-    }
-    for (id, def) in loading.rows::<ItemDef>() {
-        let key = id.key(&content);
-        bind(
-            OwnerRow {
-                kind: OwnerKind::Item,
-                row: id.raw(),
-                object: None,
-            },
-            owner_label(OwnerKind::Item, key, None),
-            row_sites(ItemDef::TABLE, key, def.scripts()),
-        );
-    }
-    for (id, def) in loading.rows::<QuestDef>() {
-        let key = id.key(&content);
-        bind(
-            OwnerRow {
-                kind: OwnerKind::Quest,
-                row: id.raw(),
-                object: None,
-            },
-            owner_label(OwnerKind::Quest, key, None),
-            row_sites(QuestDef::TABLE, key, def.scripts()),
-        );
-    }
-    for (id, def) in loading.rows::<ShopDef>() {
-        let key = id.key(&content);
-        bind(
-            OwnerRow {
-                kind: OwnerKind::Shop,
-                row: id.raw(),
-                object: None,
-            },
-            owner_label(OwnerKind::Shop, key, None),
-            row_sites(ShopDef::TABLE, key, def.scripts()),
-        );
-    }
     for (site, error) in errors {
         let (file, pointer) = match (&error.script, &error.node) {
             (Some(script), Some(node)) => {
@@ -483,15 +450,48 @@ pub fn build_all(loading: &mut Loading) {
             Some(node) => format!("{node} in {}", error.owner),
             None => error.owner.clone(),
         };
-        loading.json_error(file, &pointer, error.rule, found, error.expected, None);
+        loading.json_error(
+            file,
+            &pointer,
+            ContentProblem::new(error.rule, found, error.expected),
+        );
     }
     loading.built(Scripts(Arc::new(all)));
+    loading.built(condition::CompiledConditions::default());
+}
+
+fn bind_table<Row: ScriptedRow>(
+    loading: &mut Loading,
+    bind: &mut impl FnMut(OwnerRow, String, Vec<(ScriptSite, &'static ScriptModule)>),
+) {
+    let content = loading.content();
+    for (id, def) in loading.rows::<Row>() {
+        let key = id.key(&content);
+        let modules = def
+            .modules()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, module)| {
+                let site = ScriptSite {
+                    file: row_file(Row::TABLE, key),
+                    pointer: format!("/modules/{index}"),
+                };
+                Some((site, Row::script(module)?))
+            })
+            .collect();
+        let row = OwnerRow {
+            kind: Row::OWNER,
+            row: id.raw(),
+            object: None,
+        };
+        bind(row, owner_label(Row::OWNER, key, None), modules);
+    }
 }
 
 fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
     let (table, key) = match row.kind {
         OwnerKind::Area | OwnerKind::Object => {
-            let area: ContentId<AreaDef> = ContentId::new(row.row);
+            let area: AreaId = row.id();
             if let Some(index) = row.object {
                 let (file, pointer) =
                     area::placed(content, area)[index as usize].site(content, area);
@@ -499,24 +499,12 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
             }
             (AreaDef::TABLE, area.key(content))
         }
-        OwnerKind::Npc => (
-            NpcDef::TABLE,
-            ContentId::<NpcDef>::new(row.row).key(content),
-        ),
-        OwnerKind::Item => (
-            ItemDef::TABLE,
-            ContentId::<ItemDef>::new(row.row).key(content),
-        ),
-        OwnerKind::Quest => (
-            QuestDef::TABLE,
-            ContentId::<QuestDef>::new(row.row).key(content),
-        ),
-        OwnerKind::Shop => (
-            ShopDef::TABLE,
-            ContentId::<ShopDef>::new(row.row).key(content),
-        ),
+        OwnerKind::Npc => (NpcDef::TABLE, row.id::<NpcDef>().key(content)),
+        OwnerKind::Item => (ItemDef::TABLE, row.id::<ItemDef>().key(content)),
+        OwnerKind::Quest => (QuestDef::TABLE, row.id::<QuestDef>().key(content)),
+        OwnerKind::Shop => (ShopDef::TABLE, row.id::<ShopDef>().key(content)),
         OwnerKind::Blueprint => {
-            let area: ContentId<AreaDef> = ContentId::new(row.row);
+            let area: AreaId = row.id();
             let placement = row
                 .object
                 .and_then(|ordinal| area::placements(content, area).get(ordinal as usize));
@@ -533,6 +521,11 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
     }
 }
 
+/// The owner of the scripts of the area this world serves.
+pub fn area_owner(world: &World) -> Owner {
+    Owner::Row(OwnerKind::Area, world.resource::<WorldArea>().0.raw())
+}
+
 pub fn run_tick(world: &mut World) {
     script::run::tick::<RiftScripting>(world);
 }
@@ -543,7 +536,7 @@ pub fn spawn_stateless(world: &mut World) {
     let mut instances = world.resource_mut::<RiftInstances>();
     for (row, procedures) in scripts.owners() {
         let owner = match row.kind {
-            OwnerKind::Area if row.row == area.raw() => Owner::Area,
+            OwnerKind::Area if row.row == area.raw() => Owner::Row(OwnerKind::Area, row.row),
             OwnerKind::Blueprint if row.row == area.raw() => {
                 Owner::Row(OwnerKind::Blueprint, row.object.unwrap_or_default())
             }
@@ -551,7 +544,7 @@ pub fn spawn_stateless(world: &mut World) {
             _ => continue,
         };
         instances.spawn_owner(owner, procedures.clone());
-        if matches!(owner, Owner::Area | Owner::Row(OwnerKind::Blueprint, _)) {
+        if matches!(owner, Owner::Row(OwnerKind::Area | OwnerKind::Blueprint, _)) {
             instances.raise(owner, EventKind::Started, None, Vec::new(), |_| true);
         }
     }
@@ -574,10 +567,12 @@ pub fn check_all(loading: &mut Loading) {
                         loading.json_error(
                             &site.file,
                             &site.pointer,
-                            problem.rule,
-                            format!("{label} warps to {}", problem.found),
-                            problem.expected,
-                            problem.nearest,
+                            ContentProblem::new(
+                                problem.rule,
+                                format!("{label} warps to {}", problem.found),
+                                problem.expected,
+                            )
+                            .near(problem.nearest),
                         );
                     }
                 }
@@ -590,16 +585,17 @@ pub fn check_all(loading: &mut Loading) {
                         loading.json_error(
                             &site.file,
                             &site.pointer,
-                            "needs a voice",
-                            format!("{} speaks in {label}", npc.key(&content)),
-                            "an npc with a voice module",
-                            None,
+                            ContentProblem::new(
+                                "needs a voice",
+                                format!("{} speaks in {label}", npc.key(&content)),
+                                "an npc with a voice module",
+                            ),
                         );
                     }
                     let placed = match row.kind {
                         OwnerKind::Npc => row.row == npc.raw(),
                         OwnerKind::Object | OwnerKind::Area | OwnerKind::Blueprint => {
-                            let area: ContentId<AreaDef> = ContentId::new(row.row);
+                            let area: AreaId = row.id();
                             area::residents(area::placed(&content, area))
                                 .any(|resident| resident == *npc)
                         }
@@ -609,10 +605,11 @@ pub fn check_all(loading: &mut Loading) {
                         loading.json_error(
                             &site.file,
                             &site.pointer,
-                            "speaker not here",
-                            format!("{} in {label}", npc.key(&content)),
-                            "a line by the owner itself or a resident of its area",
-                            None,
+                            ContentProblem::new(
+                                "speaker not here",
+                                format!("{} in {label}", npc.key(&content)),
+                                "a line by the owner itself or a resident of its area",
+                            ),
                         );
                     }
                 }
@@ -620,7 +617,7 @@ pub fn check_all(loading: &mut Loading) {
             }
         }
         if row.kind == OwnerKind::Npc {
-            let npc: ContentId<NpcDef> = ContentId::new(row.row);
+            let npc: NpcId = row.id();
             let watched = procedures
                 .iter()
                 .flat_map(|procedure| procedure.entry(EventKind::StoodOn));
@@ -638,26 +635,28 @@ pub fn check_all(loading: &mut Loading) {
                     loading.json_error(
                         &site.file,
                         &site.pointer,
-                        "watched object not here",
-                        format!("{label} watches {object}"),
-                        "an object of that name in an area the npc is placed in",
-                        None,
+                        ContentProblem::new(
+                            "watched object not here",
+                            format!("{label} watches {object}"),
+                            "an object of that name in an area the npc is placed in",
+                        ),
                     );
                 }
             }
         }
         if row.kind == OwnerKind::Object && may_do.answers(EventKind::Interacted) {
-            let area: ContentId<AreaDef> = ContentId::new(row.row);
+            let area: AreaId = row.id();
             let labelled = area::objects(area::placed(&content, area))
                 .any(|(index, object)| Some(index) == row.object && object.label.is_some());
             if !labelled {
                 loading.json_error(
                     &site.file,
                     &site.pointer,
-                    "interactive without label",
-                    label.clone(),
-                    "a label on every object a script of which answers interacted",
-                    None,
+                    ContentProblem::new(
+                        "interactive without label",
+                        label.clone(),
+                        "a label on every object a script of which answers interacted",
+                    ),
                 );
             }
         }
@@ -675,10 +674,11 @@ pub fn check_all(loading: &mut Loading) {
             loading.row_error(
                 id,
                 "/modules",
-                "usable without used",
-                format!("item/{}", id.key(&content)),
-                "a script answering used on every usable item",
-                None,
+                ContentProblem::new(
+                    "usable without used",
+                    format!("item/{}", id.key(&content)),
+                    "a script answering used on every usable item",
+                ),
             );
         }
     }
@@ -694,10 +694,11 @@ pub fn check_all(loading: &mut Loading) {
             loading.row_error(
                 id,
                 "",
-                "never opened",
-                format!("shop/{}", id.key(&content)),
-                "a script that may reach open_shop for it",
-                None,
+                ContentProblem::new(
+                    "never opened",
+                    format!("shop/{}", id.key(&content)),
+                    "a script that may reach open_shop for it",
+                ),
             );
         }
     }

@@ -92,12 +92,8 @@ pub fn move_request(world: &mut World) {
     }
 }
 
-pub fn forget(world: &mut World, entity: Entity) {
-    halt(world, entity);
-}
-
 pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
-    forget(world, entity);
+    world.entity_mut(entity).remove::<(MoveTarget, Path)>();
     if let Some(mut position) = world.get_mut::<Position>(entity) {
         position.pos = pos;
     }
@@ -125,14 +121,15 @@ pub fn on_tile(world: &World, entity: Entity) -> bool {
     position(world, entity).is_some_and(|p| p.on_center())
 }
 
-fn retarget(world: &mut World, sender: Sender, pos: Pos<Tiles>) -> Option<Entity> {
-    let entity = sender_player(world, sender)?;
+fn retarget(world: &mut World, sender: Sender, pos: Pos<Tiles>) {
+    let Some(entity) = sender_player(world, sender) else {
+        return;
+    };
     if stat::is_dead(world, entity) || commands_locked(world, entity) {
-        return None;
+        return;
     }
     reach::forget(world, entity);
     goto(world, entity, pos);
-    Some(entity)
 }
 
 pub fn goto(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
@@ -204,10 +201,8 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     let dt = Seconds(world.resource::<Time>().delta_secs());
     let movers: Vec<Entity> = movers_query.iter(world).collect();
     for id in movers {
-        if world.get_entity(id).is_err() || stat::is_dead(world, id) {
-            if world.get_entity(id).is_ok() {
-                world.entity_mut(id).remove::<(MoveTarget, Path)>();
-            }
+        if stat::is_dead(world, id) {
+            world.entity_mut(id).remove::<(MoveTarget, Path)>();
             continue;
         }
         if world.get::<Path>(id).is_none() {

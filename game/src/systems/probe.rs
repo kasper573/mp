@@ -1,38 +1,5 @@
 use std::collections::HashMap;
 
-use crate::core::audio::mix::AudioCategory;
-use crate::core::audio::playback::Listener;
-use crate::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
-use crate::core::content::{Content, ContentScope, with_content};
-use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
-use crate::core::render::tile_to_window;
-use crate::core::render::transition::ScreenTransitionPhase;
-use crate::core::script::{OwnerKind, OwnerRow};
-use crate::core::tiling::{TilePos, Tiles};
-use crate::core::time::Seconds;
-use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, model};
-use crate::systems::area::{self, AreaObject, AreaTag};
-use crate::systems::attention::{Attention, Id as AttentionId, StatusBadges};
-use crate::systems::combat::{self, Attitude};
-use crate::systems::dialogue::stage;
-use crate::systems::history::widget::{self as history, HistoryBook};
-use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
-use crate::systems::input::gestures::{self, ClickClaim};
-use crate::systems::input::map::InputMap;
-use crate::systems::interact;
-use crate::systems::item::card::ItemCardWindow;
-use crate::systems::item::{self, DroppedItem, Id as ItemId, Inventory};
-use crate::systems::movement::Position;
-use crate::systems::notification::{
-    NotificationRows, alert, bubble, caption, error, feed, intro, milestone,
-};
-use crate::systems::npc::{Id as NpcId, Npc};
-use crate::systems::player::{Owner, commands_locked, session};
-use crate::systems::quest::{Id as QuestId, Parties, QuestLog, QuestResult};
-use crate::systems::script::{Reach, RiftScripts};
-use crate::systems::shop;
-use crate::systems::shop::Id as ShopId;
-use crate::systems::stat::{StatKind, Stats};
 use bevy::diagnostic::FrameCount;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
@@ -45,6 +12,38 @@ use bevy::text::EditableText;
 use bevy::ui::ComputedNode;
 use bevy::window::PrimaryWindow;
 use serde::{Deserialize, Serialize};
+
+use crate::core::audio::mix::AudioCategory;
+use crate::core::audio::playback::Listener;
+use crate::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
+use crate::core::content::{Content, ContentScope, with_content};
+use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
+use crate::core::render::tile_to_window;
+use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::tiling::{TilePos, Tiles};
+use crate::core::time::Seconds;
+use crate::systems::actor::model::ModelId;
+use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
+use crate::systems::area::{self, AreaId, AreaObject, AreaTag};
+use crate::systems::attention::{Attention, AttentionId, StatusBadges};
+use crate::systems::combat::{self, Attitude};
+use crate::systems::dialogue::stage;
+use crate::systems::history::widget::{self as history, HistoryBook};
+use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
+use crate::systems::input::gestures::{self, ClickClaim};
+use crate::systems::input::map::InputMap;
+use crate::systems::interact;
+use crate::systems::item::card::ItemCardWindow;
+use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
+use crate::systems::movement::Position;
+use crate::systems::notification::{NotificationRows, bubble, error, feed, intro, shown_rows};
+use crate::systems::npc::{Npc, NpcId};
+use crate::systems::player::{Owner, commands_locked, session};
+use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
+use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
+use crate::systems::shop;
+use crate::systems::shop::ShopId;
+use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
 pub trait ProbeChannel {
@@ -70,7 +69,7 @@ pub struct ProbeSnapshot {
     pub claim: ClickClaim,
     pub screen: Option<Size<WindowPx>>,
     pub view: Option<ProbeView>,
-    pub area: Option<area::Id>,
+    pub area: Option<AreaId>,
     pub me: Option<ProbeBody>,
     pub viewpoint: Option<ProbeBody>,
     pub actors: Vec<ProbeBody>,
@@ -129,7 +128,7 @@ impl ProbeView {
 pub struct ProbeBody {
     pub id: Entity,
     pub name: String,
-    pub model: model::Id,
+    pub model: ModelId,
     pub flies: bool,
     pub player: bool,
     pub at: Pos<Tiles>,
@@ -169,7 +168,7 @@ pub struct ProbeGroundItem {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProbeExit {
     pub name: String,
-    pub to: area::Id,
+    pub to: AreaId,
     pub at: Pos<Tiles>,
     pub rect: Rect<Tiles>,
 }
@@ -208,10 +207,10 @@ pub struct ProbeChoice {
 pub struct ProbeNotifications {
     pub bubbles: Vec<ProbeBubble>,
     pub edge_folds: Vec<u32>,
-    pub captions: ProbeRows,
-    pub alerts: ProbeRows,
+    pub captions: NotificationRows,
+    pub alerts: NotificationRows,
     pub error: Option<String>,
-    pub milestones: ProbeRows,
+    pub milestones: NotificationRows,
     pub intro: Option<ProbeIntro>,
 }
 
@@ -224,19 +223,6 @@ pub struct ProbeBubble {
     pub lines: Vec<String>,
     pub folded: bool,
     pub rect: Option<Rect<WindowPx>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeRows {
-    pub rows: Vec<ProbeRow>,
-    pub more: u32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ProbeRow {
-    pub label: String,
-    pub text: String,
-    pub replaced: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -387,6 +373,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
     let view = view(world);
     let rows = choice_rows(world);
     let input_map = world.resource::<InputMap>().clone();
+    let history_tab = history::shown_tab(world);
     let window = world
         .query_filtered::<&Window, With<PrimaryWindow>>()
         .single(world)
@@ -427,8 +414,8 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         notifications: notifications(world),
         feed: feed::rows(world),
         history: ProbeHistory {
-            open: history::shown_tab(world).is_some(),
-            tab: history::shown_tab(world).map(|tab| tab.title().to_owned()),
+            open: history_tab.is_some(),
+            tab: history_tab.map(|tab| tab.title().to_owned()),
             records: world
                 .resource::<HistoryBook>()
                 .records()
@@ -640,7 +627,7 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
     })
 }
 
-fn actors(world: &mut World, me: Option<Entity>, area: Option<area::Id>) -> Vec<ProbeBody> {
+fn actors(world: &mut World, me: Option<Entity>, area: Option<AreaId>) -> Vec<ProbeBody> {
     let others: Vec<Entity> = world
         .query_filtered::<(Entity, &AreaTag), With<Actor>>()
         .iter(world)
@@ -660,7 +647,7 @@ fn actors(world: &mut World, me: Option<Entity>, area: Option<area::Id>) -> Vec<
         .collect()
 }
 
-fn props(world: &mut World, area: Option<area::Id>) -> Vec<ProbeFixture> {
+fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
     let viewer = world.resource::<session::Viewpoint>().0;
     let attention = viewer
         .and_then(|viewer| world.get::<Attention>(viewer))
@@ -726,7 +713,7 @@ fn clicked(world: &mut World, spot: Pos<Tiles>) -> Option<Entity> {
     interact::interactable_at(world, spot)
 }
 
-fn items(world: &mut World, area: Option<area::Id>) -> Vec<ProbeGroundItem> {
+fn items(world: &mut World, area: Option<AreaId>) -> Vec<ProbeGroundItem> {
     world
         .query::<(Entity, &DroppedItem, &Position, &AreaTag)>()
         .iter(world)
@@ -740,7 +727,7 @@ fn items(world: &mut World, area: Option<area::Id>) -> Vec<ProbeGroundItem> {
         .collect()
 }
 
-fn portals(world: &World, area: Option<area::Id>) -> Vec<ProbeExit> {
+fn portals(world: &World, area: Option<AreaId>) -> Vec<ProbeExit> {
     let Some(area) = area else {
         return Vec::new();
     };
@@ -825,10 +812,8 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                     });
                 let slider = thumb
                     .then(|| {
-                        std::iter::successors(Some(entity), |&up| {
-                            world.get::<ChildOf>(up).map(ChildOf::parent)
-                        })
-                        .find_map(|up| world.get::<ui::SliderState>(up))
+                        ui::self_and_ancestors(world, entity)
+                            .find_map(|up| world.get::<ui::SliderState>(up))
                     })
                     .flatten()
                     .map(|state| state.value);
@@ -884,19 +869,16 @@ fn notifications(world: &mut World) -> ProbeNotifications {
     ProbeNotifications {
         bubbles,
         edge_folds,
-        captions: rows(caption::shown(world)),
-        alerts: rows(alert::shown(world)),
+        captions: shown_rows::<ui::Captions>(world),
+        alerts: shown_rows::<ui::AlertBar>(world),
         error: error::shown(world),
-        milestones: rows(milestone::shown(world)),
+        milestones: shown_rows::<ui::Milestones>(world),
         intro: intro::shown(world).map(|(title, text)| ProbeIntro { title, text }),
     }
 }
 
 fn leaving(world: &World, entity: Entity) -> bool {
-    std::iter::successors(Some(entity), |&up| {
-        world.get::<ChildOf>(up).map(ChildOf::parent)
-    })
-    .any(|up| world.get::<ui::Leaving>(up).is_some())
+    ui::self_and_ancestors(world, entity).any(|up| world.get::<ui::Leaving>(up).is_some())
 }
 
 fn window_rect(rect: bevy::math::Rect) -> Rect<WindowPx> {
@@ -904,21 +886,6 @@ fn window_rect(rect: bevy::math::Rect) -> Rect<WindowPx> {
         Pos::new(rect.min.x, rect.min.y),
         Size::new(rect.width(), rect.height()),
     )
-}
-
-fn rows(shown: NotificationRows) -> ProbeRows {
-    ProbeRows {
-        rows: shown
-            .rows
-            .into_iter()
-            .map(|row| ProbeRow {
-                label: row.label,
-                text: row.text,
-                replaced: row.replaced,
-            })
-            .collect(),
-        more: shown.more,
-    }
 }
 
 fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
@@ -941,14 +908,13 @@ fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
         .into_iter()
         .filter_map(|entity| Some((entity, window_rect(ui::node_rect(world, entity)?))))
         .collect();
-    let ancestors = |entity: Entity| {
-        std::iter::successors(world.get::<ChildOf>(entity).map(ChildOf::parent), |&up| {
-            world.get::<ChildOf>(up).map(ChildOf::parent)
-        })
-    };
     blocking
         .iter()
-        .filter(|&(&entity, _)| ancestors(entity).all(|up| !blocking.contains_key(&up)))
+        .filter(|&(&entity, _)| {
+            ui::self_and_ancestors(world, entity)
+                .skip(1)
+                .all(|up| !blocking.contains_key(&up))
+        })
         .map(|(_, rect)| *rect)
         .collect()
 }

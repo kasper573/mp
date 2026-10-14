@@ -3,8 +3,7 @@ use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::{self, Area, Wild};
 use game::systems::movement::{self, MoveRequest, Position, position};
-use game::systems::npc::Id as NpcId;
-use game::systems::npc::{self, Pack};
+use game::systems::npc::{self, NpcId, Pack};
 use game::systems::reach::{self, ReachAct};
 
 use crate::support::{Sim, content, row, spawn_area};

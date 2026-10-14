@@ -2,12 +2,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy::scene::Scene as UiScene;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy::winit::{UpdateMode, WinitSettings};
 use ui::{Activate, CardOptions, button, card, styled_text, text_colored};
 
-use super::{Scene, despawn_all};
+use super::{ClientScreen, despawn_all};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
@@ -16,27 +15,30 @@ use crate::core::content::version;
 use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform, StartParams};
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::time::Seconds;
+use crate::systems::hud::spawn_ui;
 use crate::systems::install_content;
 
 #[derive(Resource)]
-pub struct AfterLoading(pub Scene);
+pub struct AfterLoading(pub ClientScreen);
 
 pub struct LoadingPlugin;
 
 impl Plugin for LoadingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Shown>()
-            .add_systems(OnEnter(Scene::Loading), begin)
+            .add_systems(OnEnter(ClientScreen::Loading), begin)
             .add_systems(
                 Update,
-                (poll, show).chain().run_if(in_state(Scene::Loading)),
+                (poll, show).chain().run_if(in_state(ClientScreen::Loading)),
             )
-            .add_systems(OnExit(Scene::Loading), (despawn_all::<LoadingUi>, forget));
+            .add_systems(
+                OnExit(ClientScreen::Loading),
+                (despawn_all::<LoadingUi>, forget),
+            );
     }
 }
 
 const RETRY_EVERY: Seconds = Seconds(30.0);
-const UPDATED: &str = "A new version of the game is live. Reload the page to play.";
 
 #[derive(Resource)]
 struct Syncing {
@@ -144,16 +146,16 @@ fn poll(world: &mut World) {
             match install_content(world, synced) {
                 Ok(()) => {
                     let next = world.resource::<AfterLoading>().0.clone();
-                    world.resource_mut::<NextState<Scene>>().set(next);
+                    world.resource_mut::<NextState<ClientScreen>>().set(next);
                 }
                 Err(report) => fail(world, report.to_string(), now),
             }
         }
         Some(Err(SyncError::OtherBuild { server })) => {
             world.resource_mut::<Shown>().progress = syncing.status.latest();
-            if !world.resource::<ClientPlatform>().0.relaunch(&server) {
+            if let Err(reason) = world.resource::<ClientPlatform>().0.relaunch(&server) {
                 world.insert_resource(LoadingFailure {
-                    reason: UPDATED.to_owned(),
+                    reason,
                     retry_at: None,
                 });
             }
@@ -193,7 +195,7 @@ fn show(world: &mut World) {
     for entity in ui {
         world.entity_mut(entity).despawn();
     }
-    let _ = world.spawn_scene(loading_card(&model));
+    spawn_ui(world, loading_card(&model));
     if let Ok(mut window) = world
         .query_filtered::<&mut Window, With<bevy::window::PrimaryWindow>>()
         .single_mut(world)
@@ -307,7 +309,7 @@ fn card_model(
             if failure.retry_at.is_some() {
                 notes.push("Retrying every 30 seconds".to_owned());
             }
-            true
+            failure.retry_at.is_some()
         }
         None => false,
     };
@@ -348,7 +350,7 @@ fn announcement(model: &CardModel, progress: &SyncProgress) -> String {
     parts.join(". ")
 }
 
-fn loading_card(model: &CardModel) -> impl UiScene + use<> {
+fn loading_card(model: &CardModel) -> impl Scene + use<> {
     let theme = ui::theme::theme();
     let color = theme.surface_elevated.on;
     let background = if model.veiled {
@@ -356,7 +358,7 @@ fn loading_card(model: &CardModel) -> impl UiScene + use<> {
     } else {
         super::connection::OVERLAY_BG
     };
-    let mut body: Vec<Box<dyn UiScene>> = vec![Box::new(styled_text(
+    let mut body: Vec<Box<dyn Scene>> = vec![Box::new(styled_text(
         model.title.clone(),
         color,
         ui::tokens::typography::NAME,
@@ -394,23 +396,10 @@ fn loading_card(model: &CardModel) -> impl UiScene + use<> {
 
 fn retry(_: On<Activate>, mut commands: Commands) {
     commands.queue(|world: &mut World| {
-        if world.get_resource::<Syncing>().is_some() {
-            return;
+        if world.get_resource::<Syncing>().is_none() {
+            world.remove_resource::<LoadingFailure>();
+            start(world);
         }
-        let updated = world
-            .get_resource::<LoadingFailure>()
-            .is_some_and(|failure| failure.retry_at.is_none());
-        world.remove_resource::<LoadingFailure>();
-        if updated {
-            let build = world
-                .resource::<Shown>()
-                .progress
-                .name
-                .clone()
-                .unwrap_or_default();
-            world.resource::<ClientPlatform>().0.relaunch(&build);
-        }
-        start(world);
     });
 }
 

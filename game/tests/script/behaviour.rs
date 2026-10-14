@@ -3,14 +3,11 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use game::core::math::{Pos, Rng};
 use game::core::script::compile::compile_owner;
-use game::core::script::{Owner, OwnerKind};
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::combat::{AttackRequest, Attitude};
 use game::systems::movement::{Position, position};
-use game::systems::npc::Id as NpcId;
-use game::systems::npc::body;
-use game::systems::npc::{self, Pack};
-use game::systems::script::{EventKind, Procedure, RiftInstances};
+use game::systems::npc::{self, NpcId, Pack, body};
+use game::systems::script::{EventKind, Owner, OwnerKind, Procedure, RiftInstances};
 use game::systems::stat::{self, StatKind};
 use serde_json::json;
 

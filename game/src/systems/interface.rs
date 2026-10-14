@@ -1,9 +1,10 @@
+use bevy_ecs::world::World;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
 use crate::core::assets::AssetRef;
-use crate::core::audio::playback::SfxDef;
+use crate::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
 use crate::core::content::{Content, ContentRow, Fixture};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -135,4 +136,14 @@ pub enum InterfaceSound {
 
 impl Fixture for InterfaceSound {
     type Row = SfxDef;
+}
+
+impl InterfaceSound {
+    pub fn play(self, world: &mut World) {
+        let id = self.id(world.resource::<Content>());
+        world.write_message(PlaySfx {
+            id,
+            place: SfxPlace::Interface,
+        });
+    }
 }

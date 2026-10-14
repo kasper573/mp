@@ -17,7 +17,7 @@ use super::check::RowCheck;
 use super::fixture::Fixture;
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
 use super::locate::{IndexedValue, JsonIndex, escape};
-use super::report::{ErrorPlace, LoadError, LoadReport, VERSION_RULE};
+use super::report::{ContentProblem, ErrorPlace, LoadError, LoadReport, VERSION_RULE};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
 
@@ -386,62 +386,33 @@ impl Loading {
         self.errors.extend(errors);
     }
 
-    pub fn file_error(
-        &mut self,
-        file: impl Into<String>,
-        at: ErrorPlace,
-        rule: &'static str,
-        found: impl Display,
-        expected: impl Display,
-        nearest: Option<String>,
-    ) {
+    pub fn file_error(&mut self, file: impl Into<String>, at: ErrorPlace, problem: ContentProblem) {
         self.errors.push(LoadError {
             file: file.into(),
             at,
-            rule,
-            found: found.to_string(),
-            expected: expected.to_string(),
-            nearest,
+            problem,
         });
     }
 
-    pub fn json_error(
-        &mut self,
-        file: impl Into<String>,
-        pointer: &str,
-        rule: &'static str,
-        found: impl Display,
-        expected: impl Display,
-        nearest: Option<String>,
-    ) {
+    pub fn json_error(&mut self, file: impl Into<String>, pointer: &str, problem: ContentProblem) {
         let file = file.into();
         let at = self.place(&file, pointer);
-        self.file_error(file, at, rule, found, expected, nearest);
+        self.file_error(file, at, problem);
     }
 
     pub fn row_error<Row: ContentRow>(
         &mut self,
         id: ContentId<Row>,
         pointer: &str,
-        rule: &'static str,
-        found: impl Display,
-        expected: impl Display,
-        nearest: Option<String>,
+        problem: ContentProblem,
     ) {
         let file = self.row_file(id);
-        self.json_error(file, pointer, rule, found, expected, nearest);
+        self.json_error(file, pointer, problem);
     }
 
     pub fn row_errors<Row: ContentRow>(&mut self, id: ContentId<Row>, check: RowCheck) {
         for error in check.into_errors() {
-            self.row_error(
-                id,
-                &error.pointer,
-                error.rule,
-                error.found,
-                error.expected,
-                error.nearest,
-            );
+            self.row_error(id, &error.pointer, error.problem);
         }
     }
 
@@ -602,10 +573,11 @@ impl Loading {
             None if !self.listing.game_json => self.file_error(
                 GAME_FILE,
                 ErrorPlace::WholeFile,
-                "missing file",
-                "no such file",
-                "game.json at the root of the folder",
-                None,
+                ContentProblem::new(
+                    "missing file",
+                    "no such file",
+                    "game.json at the root of the folder",
+                ),
             ),
             None => {}
         }
@@ -622,14 +594,7 @@ impl Loading {
             let file = super::row_file(table, &key);
             self.failed.insert((table, key));
             for error in check.into_errors() {
-                self.json_error(
-                    file.clone(),
-                    &error.pointer,
-                    error.rule,
-                    error.found,
-                    error.expected,
-                    error.nearest,
-                );
+                self.json_error(file.clone(), &error.pointer, error.problem);
             }
         }
     }
@@ -674,10 +639,7 @@ impl Loading {
                 Err(error) => self.file_error(
                     file,
                     ErrorPlace::WholeFile,
-                    "unreadable file",
-                    error,
-                    "a readable file",
-                    None,
+                    ContentProblem::new("unreadable file", error, "a readable file"),
                 ),
             }
         }
@@ -698,10 +660,11 @@ impl Loading {
                 self.file_error(
                     super::row_file(table, key),
                     ErrorPlace::WholeFile,
-                    "missing fixture",
-                    "no such file",
-                    format!("one row for every {table} fixture the engine requires"),
-                    None,
+                    ContentProblem::new(
+                        "missing fixture",
+                        "no such file",
+                        format!("one row for every {table} fixture the engine requires"),
+                    ),
                 );
             }
         }
@@ -719,10 +682,11 @@ impl Loading {
             self.json_error(
                 GAME_FILE,
                 "/content_version",
-                VERSION_RULE,
-                format!("{:?}", found.0),
-                format!("{:?}", version.0),
-                None,
+                ContentProblem::new(
+                    VERSION_RULE,
+                    format!("{:?}", found.0),
+                    format!("{:?}", version.0),
+                ),
             );
         }
     }
@@ -818,17 +782,14 @@ fn whole_file(
     LoadError {
         file: file.to_owned(),
         at: ErrorPlace::WholeFile,
-        rule,
-        found: found.to_string(),
-        expected: expected.to_string(),
-        nearest: None,
+        problem: ContentProblem::new(rule, found, expected),
     }
 }
 
 pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<LoadError> {
     let mut errors = Vec::new();
     for (leaf, found) in placed(leaves, index) {
-        let Some(problem) = &leaf.problem else {
+        let Some(leaf_problem) = &leaf.problem else {
             continue;
         };
         let at = match found {
@@ -839,7 +800,7 @@ pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<L
             },
             None => ErrorPlace::WholeFile,
         };
-        let (rule, expected, nearest) = match (&leaf.kind, problem) {
+        let (rule, expected, nearest) = match (&leaf.kind, leaf_problem) {
             (LeafKind::Row(table), LeafProblem::Unknown { nearest }) => (
                 "unknown row",
                 format!("the key of {} {table} row", article(table)),
@@ -859,10 +820,7 @@ pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<L
         errors.push(LoadError {
             file: file.to_owned(),
             at,
-            rule,
-            found: format!("{:?}", leaf.value),
-            expected,
-            nearest,
+            problem: ContentProblem::new(rule, format!("{:?}", leaf.value), expected).near(nearest),
         });
     }
     errors
@@ -929,10 +887,11 @@ fn shape_error(file: &str, error: &ParseError, index: &JsonIndex) -> LoadError {
                 column: inner.column().max(1),
                 pointer: pointer.clone(),
             },
-            rule: "invalid json",
-            found: message,
-            expected: "one JSON object: no comments, no trailing commas".to_owned(),
-            nearest: None,
+            problem: ContentProblem::new(
+                "invalid json",
+                message,
+                "one JSON object: no comments, no trailing commas",
+            ),
         };
     }
     let (line, column) = index
@@ -943,45 +902,39 @@ fn shape_error(file: &str, error: &ParseError, index: &JsonIndex) -> LoadError {
         column,
         pointer: pointer.clone(),
     };
-    let (rule, found, expected, nearest) = classify_shape(&message, &pointer);
     LoadError {
         file: file.to_owned(),
         at,
-        rule,
-        found,
-        expected,
-        nearest,
+        problem: classify_shape(&message, &pointer),
     }
 }
 
-fn classify_shape(message: &str, pointer: &str) -> (&'static str, String, String, Option<String>) {
+fn classify_shape(message: &str, pointer: &str) -> ContentProblem {
     if let Some(rest) = message.strip_prefix("missing field `") {
         let field = rest.trim_end_matches('`');
-        return (
+        return ContentProblem::new(
             "missing field",
             format!("no field {field}"),
             format!("a {field} field"),
-            None,
         );
     }
     if let Some(rest) = message.strip_prefix("duplicate field `") {
         let field = rest.trim_end_matches('`');
-        return (
+        return ContentProblem::new(
             "duplicate field",
             format!("{field} twice"),
             format!("{field} once"),
-            None,
         );
     }
     if let Some(rest) = message.strip_prefix("unknown field `") {
         let (field, options) = split_options(rest);
         let nearest = nearest(&options, field);
-        return (
+        return ContentProblem::new(
             "unknown field",
             format!("{field:?}"),
             expected_options("a field", &options),
-            nearest.map(|f| format!("{f:?}")),
-        );
+        )
+        .near(nearest.map(|f| format!("{f:?}")));
     }
     if let Some(rest) = message.strip_prefix("unknown variant `") {
         let (variant, options) = split_options(rest);
@@ -995,7 +948,7 @@ fn classify_shape(message: &str, pointer: &str) -> (&'static str, String, String
         } else {
             "unknown variant"
         };
-        return (
+        return ContentProblem::new(
             rule,
             format!("{variant:?}"),
             expected_options(
@@ -1006,8 +959,8 @@ fn classify_shape(message: &str, pointer: &str) -> (&'static str, String, String
                 },
                 &options,
             ),
-            nearest.map(|v| format!("{v:?}")),
-        );
+        )
+        .near(nearest.map(|v| format!("{v:?}")));
     }
     if let Some(rest) = message
         .strip_prefix("invalid type: ")
@@ -1017,22 +970,16 @@ fn classify_shape(message: &str, pointer: &str) -> (&'static str, String, String
         let (found, expected) = rest
             .split_once(", expected ")
             .unwrap_or((rest, "another value"));
-        return ("wrong type", found.to_owned(), expected.to_owned(), None);
+        return ContentProblem::new("wrong type", found, expected);
     }
     if let Some(rest) = message.strip_prefix("data did not match any variant of untagged enum ") {
-        return (
+        return ContentProblem::new(
             "wrong type",
-            "a value of another shape".to_owned(),
+            "a value of another shape",
             format!("a {rest} value"),
-            None,
         );
     }
-    (
-        "wrong type",
-        message.to_owned(),
-        "a value of the field's type".to_owned(),
-        None,
-    )
+    ContentProblem::new("wrong type", message, "a value of the field's type")
 }
 
 fn split_options(rest: &str) -> (&str, Vec<String>) {
@@ -1216,14 +1163,15 @@ fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
         loading.row_error(
             id,
             &format!("/modules/{index}"),
-            "too many",
-            format!("a second {tag} module"),
-            format!(
-                "at most one {tag} module on {} {} row",
-                article(Row::TABLE),
-                Row::TABLE
+            ContentProblem::new(
+                "too many",
+                format!("a second {tag} module"),
+                format!(
+                    "at most one {tag} module on {} {} row",
+                    article(Row::TABLE),
+                    Row::TABLE
+                ),
             ),
-            None,
         );
     }
 }

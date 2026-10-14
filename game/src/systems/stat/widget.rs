@@ -9,7 +9,7 @@ use crate::systems::player::session;
 use crate::systems::stat;
 
 #[derive(Component, Default, Clone)]
-pub(super) struct StatsText;
+struct StatsText;
 
 pub struct StatsWindow;
 
@@ -26,9 +26,6 @@ impl Window for StatsWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Stats
     }
-    fn order(&self) -> u32 {
-        2
-    }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
         single_tab(self.title(), ui::scrolled(content()))
     }
@@ -44,7 +41,7 @@ fn content() -> Box<dyn Scene> {
     })
 }
 
-pub(super) fn sync_stats(world: &mut World) {
+fn sync_stats(world: &mut World) {
     let text = stats_text(world);
     let mut query = world.query_filtered::<&mut Text, With<StatsText>>();
     for mut node in query.iter_mut(world) {

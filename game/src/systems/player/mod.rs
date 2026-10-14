@@ -5,10 +5,6 @@ pub mod widget;
 use std::collections::HashMap;
 
 use bevy_app::App;
-use bevy_ecs::component::Component;
-use bevy_ecs::lifecycle::{Add, Remove};
-use bevy_ecs::message::Message;
-use bevy_ecs::observer::On;
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ClientId as Sender, Replicated};
 use bevy_time::Time;
@@ -20,10 +16,11 @@ use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, WallClock};
 use crate::systems::GameSettings;
-use crate::systems::account::identity::Identity;
-use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint, model};
-use crate::systems::area::transition::Discovered;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::account::Identity;
+use crate::systems::actor::model::ModelId;
+use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint};
+use crate::systems::area::transition::{self, Discovered};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::belongings;
 use crate::systems::combat::HealthRegen;
 use crate::systems::dialogue::Heard;
@@ -31,12 +28,13 @@ use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
 use crate::systems::item::Inventory;
-use crate::systems::job::{Id as JobId, Job};
+use crate::systems::job::{Job, JobId};
 use crate::systems::memory::Memory;
-use crate::systems::movement::Position;
+use crate::systems::movement::{self, Position};
 use crate::systems::quest::QuestLog;
+use crate::systems::reach;
 use crate::systems::script::EventKind;
-use crate::systems::shop::ShopLedger;
+use crate::systems::shop::{self, ShopLedger};
 use crate::systems::spectate::Spectators;
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
@@ -116,13 +114,12 @@ pub struct Welcome {
 /// High enough that nothing in the world can grind it down.
 const IMMORTAL_HEALTH: f32 = 9999.0;
 
-pub type Id = ContentId<PlayerDef>;
+pub type PlayerDefId = ContentId<PlayerDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
-    pub model: model::Id,
+    pub model: ModelId,
     pub job: JobId,
-    #[schemars(transform = crate::systems::stat::schema_with_units)]
     pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<PlayerModule>,
@@ -228,18 +225,23 @@ pub fn client_left(
     mut players: ResMut<Players>,
     mut commands: Commands,
 ) {
-    let Ok((_, id)) = clients.get(remove.entity) else {
-        return;
-    };
-    if clients
-        .iter()
-        .any(|(entity, other)| entity != remove.entity && other == id)
+    if let Some(id) = last_connection(remove.entity, &clients)
+        && let Some(entity) = players.0.remove(&id)
     {
-        return;
-    }
-    if let Some(entity) = players.0.remove(id) {
         commands.entity(entity).despawn();
     }
+}
+
+/// The client a closing connection belongs to, unless the client is still connected another way.
+pub(crate) fn last_connection(
+    closing: Entity,
+    clients: &Query<(Entity, &ClientId)>,
+) -> Option<ClientId> {
+    let (_, &id) = clients.get(closing).ok()?;
+    let elsewhere = clients
+        .iter()
+        .any(|(conn, other)| conn != closing && *other == id);
+    (!elsewhere).then_some(id)
 }
 
 #[derive(Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -292,13 +294,13 @@ pub fn join(world: &mut World) {
 }
 
 pub fn spawned(world: &mut World, player: Entity) {
-    crate::systems::area::transition::raise_area(world, EventKind::Entered, player);
+    transition::raise_area(world, EventKind::Entered, player);
 }
 
 fn spawn_position(
     world: &mut World,
     policy: SpawnPolicy,
-    zone: area::Id,
+    zone: AreaId,
     area: &area::Area,
 ) -> Pos<Tiles> {
     let spawn = world.resource::<GameSettings>().initial_spawn;
@@ -333,9 +335,33 @@ pub struct CharacterState {
     pub history: History,
 }
 
+impl CharacterState {
+    pub fn of(world: &World, entity: Entity, spawn: Pos<Tiles>) -> Option<CharacterState> {
+        Some(CharacterState {
+            name: world.get::<Name>(entity)?.name.clone(),
+            spawn,
+            discovered: world.get::<Discovered>(entity)?.clone(),
+            stats: stat::snapshot(world, entity),
+            inventory: world.get::<Inventory>(entity)?.clone(),
+            xp: world.get::<Xp>(entity)?.clone(),
+            equipment: world.get::<Equipment>(entity)?.clone(),
+            job: *world.get::<Job>(entity)?,
+            timed: world
+                .get::<TimedEffects>(entity)
+                .cloned()
+                .unwrap_or_default(),
+            memory: world.get::<Memory>(entity).cloned().unwrap_or_default(),
+            heard: world.get::<Heard>(entity).cloned().unwrap_or_default(),
+            ledger: shop::ledger(world, entity),
+            quests: world.get::<QuestLog>(entity).cloned().unwrap_or_default(),
+            history: world.get::<History>(entity).cloned().unwrap_or_default(),
+        })
+    }
+}
+
 fn fresh_state(
     content: &Content,
-    zone: area::Id,
+    zone: AreaId,
     at: Pos<Tiles>,
     name: String,
     immortal: bool,
@@ -361,7 +387,8 @@ fn fresh_state(
 
 pub fn player_stats(stats: &stat::StatMap, immortal: bool) -> Stats {
     Stats(
-        stat::listed(stats)
+        stats
+            .listed()
             .map(|stat| match stat.kind {
                 StatKind::Health | StatKind::MaxHealth if immortal => stat.kind.of(IMMORTAL_HEALTH),
                 _ => stat,
@@ -373,13 +400,14 @@ pub fn player_stats(stats: &stat::StatMap, immortal: bool) -> Stats {
 pub(crate) fn place(
     world: &mut World,
     client: ClientId,
-    zone: area::Id,
+    zone: AreaId,
     at: Pos<Tiles>,
     state: CharacterState,
 ) -> Entity {
     let content = *world.resource::<Content>();
     let def = def(&content);
     let model = def.model;
+    let now = Seconds(world.resource::<Time>().elapsed_secs());
     let entity = world
         .spawn((
             Character {
@@ -390,7 +418,7 @@ pub(crate) fn place(
                     dir: Direction::S,
                     action: Action::Idle,
                     model,
-                    attack_rate: PlaybackRate(stat::of_map(&def.stats, StatKind::AttackSpeed)),
+                    attack_rate: PlaybackRate(def.stats.get(StatKind::AttackSpeed)),
                 },
                 hitbox: Hitbox {
                     size: ActorModel::get(&content, model).hitbox(),
@@ -401,6 +429,10 @@ pub(crate) fn place(
             state.discovered,
             OwnedBy(client),
             Owner { client },
+            SpawnPoint(state.spawn),
+            ArrivalHold {
+                until: now + ARRIVAL_HOLD,
+            },
             (
                 state.inventory,
                 state.xp,
@@ -416,13 +448,6 @@ pub(crate) fn place(
             ),
         ))
         .id();
-    let now = Seconds(world.resource::<Time>().elapsed_secs());
-    world.entity_mut(entity).insert((
-        SpawnPoint(state.spawn),
-        ArrivalHold {
-            until: now + ARRIVAL_HOLD,
-        },
-    ));
     let belongings = belongings::of(world, entity);
     world.entity_mut(entity).insert(belongings);
     world.resource_mut::<Players>().0.insert(client, entity);
@@ -445,9 +470,7 @@ pub fn respawn(world: &mut World) {
         if let Some(mut memory) = world.get_mut::<Memory>(entity) {
             memory.leave_area(&content);
         }
-        if let Some(mut position) = world.get_mut::<Position>(entity) {
-            position.pos = spawn;
-        }
-        crate::systems::reach::forget(world, entity);
+        reach::forget(world, entity);
+        movement::relocate(world, entity, spawn);
     }
 }

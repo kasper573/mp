@@ -172,14 +172,17 @@ fn scripted(editor: &mut Editor) {
         "files" => {
             let files = arg
                 .split('|')
-                .map(|path| match path.starts_with("art/") {
-                    true => editor
-                        .project
-                        .as_ref()
-                        .and_then(|project| project.root.parent())
-                        .map(|parent| parent.join(path))
-                        .unwrap_or_else(|| PathBuf::from(path)),
-                    false => PathBuf::from(path),
+                .map(|path| {
+                    if path.starts_with("art/") {
+                        editor
+                            .project
+                            .as_ref()
+                            .and_then(|project| project.root.parent())
+                            .map(|parent| parent.join(path))
+                            .unwrap_or_else(|| PathBuf::from(path))
+                    } else {
+                        PathBuf::from(path)
+                    }
                 })
                 .collect();
             editor.jobs.script.pop_front();
@@ -300,10 +303,6 @@ pub fn start_for_tileset(editor: &mut Editor, key: &str) {
 
 pub fn start_animation(editor: &mut Editor, key: &str) {
     pick_files(editor, ImportTarget::Animation(key.to_owned()));
-}
-
-pub fn start_new_tileset(editor: &mut Editor) {
-    pick_files(editor, ImportTarget::NewTileset);
 }
 
 fn pick_files(editor: &mut Editor, target: ImportTarget) {

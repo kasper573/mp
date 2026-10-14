@@ -1,7 +1,10 @@
 use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+    Serialize, Deserialize, VariantArray, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioCategory {
     Music,

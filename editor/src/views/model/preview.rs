@@ -2,6 +2,7 @@ use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems::GameSettings;
+use game::systems::actor::Action;
 use game::systems::actor::render::ACTOR_ANCHOR;
 use serde_json::Value;
 
@@ -9,7 +10,6 @@ use super::{ModelSheet, StripFrame};
 use crate::app::Editor;
 use crate::ui::{theme, widgets};
 use crate::views::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
-use game::systems::actor::model::ActionName;
 
 pub struct StripPreview {
     pub playing: bool,
@@ -59,10 +59,10 @@ pub fn tick(
     preview: &mut StripPreview,
     dt: f32,
     frames: &[StripFrame],
-    action: ActionName,
+    action: Action,
 ) -> PreviewTick {
     let total = super::total_ms(frames).max(1) as f32;
-    let holds = action == ActionName::Death;
+    let holds = action == Action::Dead;
     let before = preview.position;
     if preview.playing {
         preview.position += dt * 1000.0 * preview.speed;

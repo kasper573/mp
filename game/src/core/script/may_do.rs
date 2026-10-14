@@ -4,7 +4,7 @@ pub type Reach<V> = <V as Vocabulary>::Reach;
 
 #[derive(Clone)]
 pub struct MayDo<V: Vocabulary> {
-    pub answers: Vec<<V::Event as EventDef>::Kind>,
+    pub answers: Vec<<V::Event as EventDef<V>>::Kind>,
     pub reaches: Vec<Reach<V>>,
     pub dialogue: Vec<Name>,
     pub calls: Vec<String>,
@@ -24,7 +24,7 @@ impl<V: Vocabulary> Default for MayDo<V> {
 }
 
 impl<V: Vocabulary> MayDo<V> {
-    pub fn answers(&self, kind: <V::Event as EventDef>::Kind) -> bool {
+    pub fn answers(&self, kind: <V::Event as EventDef<V>>::Kind) -> bool {
         self.answers.contains(&kind)
     }
 

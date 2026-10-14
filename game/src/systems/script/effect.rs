@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{Condition, Reach, RiftScripting};
 use crate::core::audio::playback::SfxId;
-use crate::core::content::Content;
 use crate::core::script::{
-    Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, Name, OwnerKind, ValueType,
+    Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
 };
 use crate::systems::area::warp::Warp;
 use crate::systems::chat::Say;
@@ -17,15 +16,15 @@ use crate::systems::item::effects::{
 };
 use crate::systems::job::{GrantXp, SetJob};
 use crate::systems::memory::{Forget, Remember};
-use crate::systems::notification::{self, Notification, NotificationKind, Notify};
+use crate::systems::notification::{self, Notify};
 use crate::systems::npc::body::{Attack, FaceToward, Stop, WalkTo, Wander};
 use crate::systems::npc::summon::{Despawn, SetAttitude, SpawnNpcs};
 use crate::systems::quest::effects::{
     AcceptQuest, CompleteTask, Decide, FailQuest, OfferQuest, TurnIn,
 };
+use crate::systems::script::{EffectCall, OwnerKind};
 use crate::systems::shop::OpenShop;
 use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
-use crate::systems::text::LineText;
 
 pub type Aim = Option<Condition>;
 
@@ -53,7 +52,7 @@ macro_rules! effects {
             fn keeps_box(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.keeps_box(),)* }
             }
-            fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+            fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
                 match self { $(RiftEffect::$variant(e) => e.compile(cx),)* }
             }
             fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -107,23 +106,8 @@ effects! {
     PlaySound(PlaySound),
 }
 
-pub const ANY_OWNER: &[OwnerKind] = &[
-    OwnerKind::Object,
-    OwnerKind::Npc,
-    OwnerKind::Item,
-    OwnerKind::Area,
-    OwnerKind::Quest,
-    OwnerKind::Shop,
-    OwnerKind::Blueprint,
-    OwnerKind::Any,
-];
-
-pub fn bad(e: (&str, String)) -> String {
-    format!("{}: {}", e.0, e.1)
-}
-
-pub fn aim(cx: &mut Compiler<RiftScripting>, who: &'static Aim) -> Result<Eval, String> {
-    cx.actor(who.as_ref()).map_err(bad)
+pub fn aim(cx: &mut Compiler<RiftScripting>, who: &'static Aim) -> Result<Eval, ScriptFault> {
+    cx.actor(who.as_ref())
 }
 
 pub fn aimed(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity> {
@@ -134,24 +118,37 @@ pub fn aimed_character(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity>
     super::query::character(world, cx, who)
 }
 
-pub fn refuse(world: &mut World, cx: &FlowCx, wired: Link, reason: impl Into<String>) {
-    if wired.is_some() {
-        return;
+pub fn settle(
+    world: &mut World,
+    cx: &FlowCx,
+    refused: Link,
+    outcome: Result<(), String>,
+) -> EffectStep {
+    match outcome {
+        Ok(()) => EffectStep::Done,
+        Err(reason) => refuse(world, cx, refused, reason),
     }
-    let Some(subject) = cx.subject else {
-        return;
-    };
-    if !super::query::is_character(world, subject) {
-        return;
+}
+
+// An unwired refusal is the player's to read; a wired one is the script's to handle.
+pub fn refuse(
+    world: &mut World,
+    cx: &FlowCx,
+    refused: Link,
+    reason: impl Into<String>,
+) -> EffectStep {
+    if refused.is_none() {
+        show_error(world, cx, reason);
     }
-    notification::notify(
-        world,
-        subject,
-        Notification::new(
-            NotificationKind::error(world.resource::<Content>()),
-            LineText::plain(reason.into()),
-        ),
-    );
+    EffectStep::Output("refused")
+}
+
+pub fn show_error(world: &mut World, cx: &FlowCx, reason: impl Into<String>) {
+    if let Some(subject) = cx.subject
+        && super::query::is_character(world, subject)
+    {
+        notification::error(world, subject, reason);
+    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -165,24 +162,18 @@ pub struct PlaySound {
 }
 
 impl EffectDef<RiftScripting> for PlaySound {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.audience == Audience::Subject
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let sfx = cx.audio(&self.sfx).map_err(bad)?;
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+        let sfx = cx.audio(&self.sfx)?;
         let audience = self.audience;
-        Ok(Box::new(move |world, cx| {
-            notification::play_sound(world, cx.owner.entity(), cx.subject, sfx, audience);
-            EffectStep::Output(0)
+        Ok(Box::new(move |world, _, cx| {
+            notification::play_sound(world, cx.owner, cx.subject, sfx, audience);
+            EffectStep::Done
         }))
     }
     fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -200,19 +191,9 @@ pub enum Audience {
     Subject,
 }
 
-pub fn integer(
+pub fn number(
     cx: &mut Compiler<RiftScripting>,
-    expr: Option<&'static Condition>,
-    default: i64,
-) -> Result<Eval, String> {
-    match expr {
-        Some(expr) => cx.expr(expr, ValueType::Integer).map_err(bad),
-        None => Ok(Box::new(move |_, _| {
-            crate::core::script::Value::Int(default)
-        })),
-    }
-}
-
-pub fn number(cx: &mut Compiler<RiftScripting>, expr: &'static Condition) -> Result<Eval, String> {
-    cx.expr(expr, ValueType::Number).map_err(bad)
+    expr: &'static Condition,
+) -> Result<Eval, ScriptFault> {
+    cx.expr(expr, ValueType::Number)
 }

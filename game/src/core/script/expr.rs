@@ -1,7 +1,8 @@
+use std::borrow::Cow;
+
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
-use std::borrow::Cow;
 
 use super::Vocabulary;
 

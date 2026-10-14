@@ -8,14 +8,16 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 use crate::core::content::{ContentRegistry, LoadStep};
 use crate::core::math::{Direction, Pos, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
+use crate::systems::actor::model::ModelId;
 use crate::systems::combat::Swing;
 use crate::systems::movement::{Path, Position};
-use crate::systems::stat::{self, StatKind, Stats};
+use crate::systems::stat::{self, Stats};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -32,38 +34,34 @@ pub fn content(registry: &mut ContentRegistry) {
         .hook(LoadStep::Files, model::build_all);
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Default,
+    VariantArray,
+    EnumString,
+    AsRefStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Action {
     #[default]
     Idle,
     Walk,
     Run,
     Attack,
+    #[serde(rename = "death")]
+    #[strum(serialize = "death")]
     Dead,
-}
-
-impl Action {
-    pub const ALL: [Action; 5] = [
-        Action::Idle,
-        Action::Walk,
-        Action::Run,
-        Action::Attack,
-        Action::Dead,
-    ];
-
-    pub fn named(name: &str) -> Option<Action> {
-        Action::ALL.into_iter().find(|action| action.name() == name)
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Action::Idle => "idle",
-            Action::Walk => "walk",
-            Action::Run => "run",
-            Action::Attack => "attack",
-            Action::Dead => "death",
-        }
-    }
 }
 
 #[derive(
@@ -80,22 +78,14 @@ impl Action {
     Debug,
     Default,
 )]
+#[serde(from = "[u8; 4]", into = "[u8; 4]")]
+#[schemars(extend("x-color" = true))]
 pub struct Rgba(pub u32);
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tint {
-    #[schemars(with = "[u8; 4]", extend("x-color" = true))]
-    #[serde(serialize_with = "rgba_bytes", deserialize_with = "rgba_from_bytes")]
     pub rgba: Rgba,
-}
-
-fn rgba_bytes<S: serde::Serializer>(rgba: &Rgba, serializer: S) -> Result<S::Ok, S::Error> {
-    rgba.0.to_be_bytes().serialize(serializer)
-}
-
-fn rgba_from_bytes<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Rgba, D::Error> {
-    <[u8; 4]>::deserialize(deserializer).map(|bytes| Rgba(u32::from_be_bytes(bytes)))
 }
 
 impl Rgba {
@@ -112,7 +102,7 @@ pub struct Actor {
     pub color: Rgba,
     pub dir: Direction,
     pub action: Action,
-    pub model: model::Id,
+    pub model: ModelId,
     pub attack_rate: PlaybackRate,
 }
 
@@ -146,12 +136,6 @@ pub struct Name {
     pub name: String,
 }
 
-fn set_action(actor: &mut Mut<Actor>, action: Action) {
-    if actor.action != action {
-        actor.action = action;
-    }
-}
-
 pub fn set_facing(actor: &mut Mut<Actor>, dir: Direction, action: Action) {
     if actor.dir != dir || actor.action != action {
         actor.dir = dir;
@@ -168,8 +152,7 @@ type Situation = (
 
 pub fn settle(mut actors: Query<Situation>) {
     for (mut actor, stats, swinging, walking) in &mut actors {
-        let dead = stats.is_some_and(|stats| stats.get(StatKind::Health) <= 0.0);
-        let action = if dead {
+        let action = if stats.is_some_and(stat::dead) {
             Action::Dead
         } else if swinging {
             Action::Attack
@@ -182,5 +165,23 @@ pub fn settle(mut actors: Query<Situation>) {
             Action::Idle
         };
         set_action(&mut actor, action);
+    }
+}
+
+fn set_action(actor: &mut Mut<Actor>, action: Action) {
+    if actor.action != action {
+        actor.action = action;
+    }
+}
+
+impl From<[u8; 4]> for Rgba {
+    fn from(bytes: [u8; 4]) -> Rgba {
+        Rgba(u32::from_be_bytes(bytes))
+    }
+}
+
+impl From<Rgba> for [u8; 4] {
+    fn from(rgba: Rgba) -> [u8; 4] {
+        rgba.0.to_be_bytes()
     }
 }

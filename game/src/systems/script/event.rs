@@ -1,41 +1,15 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, IntoStaticStr};
+use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use crate::core::content::serial;
-use crate::core::script::{EventDef, Name, OwnerKind, ValueType};
+use crate::core::script::{EventDef, Name, ValueType};
 use crate::core::tiling::Tiles;
-use crate::systems::attention::Id as AttentionId;
+use crate::systems::attention::AttentionId;
 use crate::systems::interact::Verb;
-use crate::systems::item::Id as ItemId;
-use crate::systems::npc::Id as NpcId;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
-pub enum EventKind {
-    Started,
-    Run,
-    Entered,
-    Left,
-    StoodOn,
-    Discovered,
-    Died,
-    LeveledUp,
-    Interacted,
-    Heard,
-    CameNear,
-    Attacked,
-    Defeated,
-    Used,
-    PickedUp,
-    Equipped,
-    Unequipped,
-    Accepted,
-    Completed,
-    Failed,
-    Bought,
-    Sold,
-}
+use crate::systems::item::ItemId;
+use crate::systems::npc::NpcId;
+use crate::systems::script::{OwnerKind, RiftScripting};
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -45,8 +19,10 @@ pub enum Who {
     Anyone,
 }
 
-#[derive(JsonSchema, Clone, Debug, Serialize, Deserialize)]
+#[derive(JsonSchema, Clone, Debug, Serialize, Deserialize, EnumDiscriminants)]
 #[serde(tag = "event", rename_all = "snake_case")]
+#[strum_discriminants(name(EventKind), derive(Hash, EnumString, IntoStaticStr))]
+#[strum_discriminants(strum(serialize_all = "snake_case"))]
 pub enum RiftEvent {
     Started,
     Run,
@@ -120,34 +96,11 @@ const ANY: &[OwnerKind] = &[OwnerKind::Any];
 const TRADE_FIELDS: &[(Name, ValueType)] =
     &[("item", ValueType::Integer), ("count", ValueType::Integer)];
 
-impl EventDef for RiftEvent {
+impl EventDef<RiftScripting> for RiftEvent {
     type Kind = EventKind;
 
     fn kind(&self) -> EventKind {
-        match self {
-            RiftEvent::Started => EventKind::Started,
-            RiftEvent::Run => EventKind::Run,
-            RiftEvent::Entered { .. } => EventKind::Entered,
-            RiftEvent::Left { .. } => EventKind::Left,
-            RiftEvent::StoodOn { .. } => EventKind::StoodOn,
-            RiftEvent::Discovered => EventKind::Discovered,
-            RiftEvent::Died { .. } => EventKind::Died,
-            RiftEvent::LeveledUp => EventKind::LeveledUp,
-            RiftEvent::Interacted { .. } => EventKind::Interacted,
-            RiftEvent::Heard { .. } => EventKind::Heard,
-            RiftEvent::CameNear { .. } => EventKind::CameNear,
-            RiftEvent::Attacked => EventKind::Attacked,
-            RiftEvent::Defeated => EventKind::Defeated,
-            RiftEvent::Used => EventKind::Used,
-            RiftEvent::PickedUp => EventKind::PickedUp,
-            RiftEvent::Equipped => EventKind::Equipped,
-            RiftEvent::Unequipped => EventKind::Unequipped,
-            RiftEvent::Accepted => EventKind::Accepted,
-            RiftEvent::Completed => EventKind::Completed,
-            RiftEvent::Failed => EventKind::Failed,
-            RiftEvent::Bought { .. } => EventKind::Bought,
-            RiftEvent::Sold { .. } => EventKind::Sold,
-        }
+        self.into()
     }
 
     fn owners(&self) -> &'static [OwnerKind] {

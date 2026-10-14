@@ -9,27 +9,27 @@ use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use egui::{RichText, Ui};
 use game::core::content::Content;
 use game::core::math::Pos;
-use game::core::script::{
-    FlowKey, FlowSteering, FlowTrace, Owner, OwnerKind, Pause, TraceStep, Value as ScriptValue,
-    ValueType,
-};
+use game::core::script::{FlowSteering, OwnerKindDef, Pause, Value as ScriptValue, ValueType};
 use game::core::tiling::Tiles;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::actor::Name;
-use game::systems::area::{self, AreaDef, AreaModule, AreaObject};
+use game::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
 use game::systems::dialogue::{self, Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::item::{Inventory, ItemDef, ItemStack};
-use game::systems::job::{self, Job, JobDef};
+use game::systems::job::{self, Job, JobDef, JobId};
 use game::systems::memory::{Memory, MemoryDef};
 use game::systems::notification::NotificationSent;
-use game::systems::npc::Npc;
+use game::systems::npc::{Npc, NpcId};
 use game::systems::player::snapshot::{CharacterSnapshot, JoinAs};
 use game::systems::player::{
     AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules, Xp,
 };
-use game::systems::quest::{self, ActiveQuest, FinishedQuest, QuestDef, QuestLog, QuestResult};
-use game::systems::script::{EventKind, Place, Reach, RiftInstances, RiftScripts};
+use game::systems::quest::{ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult};
+use game::systems::script::{
+    EventKind, FlowKey, FlowTrace, Owner, OwnerKind, Place, Reach, RiftInstances, RiftScripts,
+    TraceStep,
+};
 use game::systems::{self, GameSettings, TICK_HZ, memory, npc};
 
 use super::nodes::{self, NodeReads};
@@ -109,7 +109,7 @@ pub struct ScriptRun {
     flow: Option<FlowKey>,
     inputs: InputMap,
     pub conversation: Option<Conversation>,
-    area: area::Id,
+    area: AreaId,
     watched: Watched,
 }
 
@@ -672,7 +672,7 @@ fn character_card(
         .unwrap_or_else(|| "character".to_owned());
     let job = run.world().get::<Job>(subject).map(|job| job.def);
     let level = job::level(run.world(), subject);
-    let jobs: Vec<(job::Id, String)> = content
+    let jobs: Vec<(JobId, String)> = content
         .table::<JobDef>()
         .ids()
         .map(|id| (id, id.key(content).to_owned()))
@@ -1023,7 +1023,7 @@ impl QuestStanding {
     }
 }
 
-fn quest_standing(log: &QuestLog, quest: quest::Id) -> QuestStanding {
+fn quest_standing(log: &QuestLog, quest: QuestId) -> QuestStanding {
     if log.active(quest).is_some() {
         return QuestStanding::Active;
     }
@@ -1038,7 +1038,7 @@ fn set_quest_standing(
     world: &mut World,
     subject: Entity,
     content: &Content,
-    quest: quest::Id,
+    quest: QuestId,
     standing: QuestStanding,
 ) {
     let day = world.resource::<WallClock>().day();
@@ -1167,11 +1167,11 @@ fn start_run(
     Ok(run)
 }
 
-fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(area::Id, Pos<Tiles>)> {
+fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(AreaId, Pos<Tiles>)> {
     let spawn = content.built::<GameSettings>().initial_spawn;
     match owner.row.kind {
         OwnerKind::Area | OwnerKind::Object | OwnerKind::Blueprint => {
-            let area: area::Id = owner.row.id();
+            let area: AreaId = owner.row.id();
             let placed = area::placed(content, area);
             let near = match (owner.row.kind, owner.row.object) {
                 (OwnerKind::Object, Some(index)) => match &placed.get(index as usize)?.module {
@@ -1186,7 +1186,7 @@ fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(area::Id, Pos<T
             Some((area, near))
         }
         OwnerKind::Npc => {
-            let npc: npc::Id = owner.row.id();
+            let npc: NpcId = owner.row.id();
             for area in content.ids::<AreaDef>() {
                 for placed in area::placed(content, area) {
                     if let AreaModule::Resident(resident) = &placed.module
@@ -1205,11 +1205,11 @@ fn area_for(content: &Content, owner: &ScriptBinding) -> Option<(area::Id, Pos<T
 fn locate_owner(
     world: &mut World,
     owner: &ScriptBinding,
-    area_id: area::Id,
+    area_id: AreaId,
     at: Pos<Tiles>,
 ) -> Result<Owner, String> {
     Ok(match owner.row.kind {
-        OwnerKind::Area => Owner::Area,
+        OwnerKind::Area => Owner::Row(OwnerKind::Area, area_id.raw()),
         OwnerKind::Object => {
             let index = owner.row.object.ok_or("an object without an index")?;
             let entity = world
@@ -1221,7 +1221,7 @@ fn locate_owner(
             Owner::Entity(OwnerKind::Object, entity)
         }
         OwnerKind::Npc => {
-            let def: npc::Id = owner.row.id();
+            let def: NpcId = owner.row.id();
             let found = world
                 .query::<(Entity, &Npc)>()
                 .iter(world)

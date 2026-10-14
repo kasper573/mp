@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::render::render_resource::ShaderType;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString, VariantArray};
 
 use super::TILE;
 use super::camera::WorldCamera;
@@ -10,41 +11,33 @@ use crate::core::math::{Direction, Pos};
 use crate::core::tiling::{Cell, CellPos, Tiles};
 use crate::core::time::Seconds;
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Serialize,
+    Deserialize,
+    VariantArray,
+    AsRefStr,
+    EnumString,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+)]
 pub enum ScreenTransition {
     #[default]
     Crumble,
+    #[strum(serialize = "Tile wave")]
     TileWave,
     Sweep,
     Iris,
     Mosaic,
+    #[strum(serialize = "Dither dissolve")]
     Dither,
     Fade,
 }
 
 impl ScreenTransition {
-    pub const ALL: [ScreenTransition; 7] = [
-        ScreenTransition::Crumble,
-        ScreenTransition::TileWave,
-        ScreenTransition::Sweep,
-        ScreenTransition::Iris,
-        ScreenTransition::Mosaic,
-        ScreenTransition::Dither,
-        ScreenTransition::Fade,
-    ];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            ScreenTransition::Crumble => "Crumble",
-            ScreenTransition::TileWave => "Tile wave",
-            ScreenTransition::Sweep => "Sweep",
-            ScreenTransition::Iris => "Iris",
-            ScreenTransition::Mosaic => "Mosaic",
-            ScreenTransition::Dither => "Dither dissolve",
-            ScreenTransition::Fade => "Fade",
-        }
-    }
-
     fn pace(self) -> Pace {
         let (cover, uncover) = match self {
             ScreenTransition::Crumble => (0.55, 0.65),

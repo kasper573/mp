@@ -15,25 +15,25 @@ use bevy_replicon::prelude::Replicated;
 use bevy_time::Time;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
-use crate::core::script::{Owner as ScriptOwner, OwnerKind};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
 use crate::systems::movement::{Position, position};
-use crate::systems::notification::{self, Notification, NotificationKind};
+use crate::systems::notification;
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, commands_locked, sender_player};
+use crate::systems::player::{ClientId, Owner, Players, commands_locked, sender_player};
 use crate::systems::reach::{self, Pursuit, ReachAct};
-use crate::systems::script::ScriptModule;
-use crate::systems::script::{Condition, EventKind, RiftInstances};
+use crate::systems::script::{
+    Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
+};
 use crate::systems::stat::{self, Stat};
-use crate::systems::text::LineText;
 use crate::systems::visibility::{self, Presence, seen_by};
 use crate::systems::{drain_requests, equipment};
 
@@ -63,9 +63,9 @@ pub struct Inventory {
     pub max: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ItemStack {
-    pub item: Id,
+    pub item: ItemId,
     pub count: u32,
 }
 
@@ -74,7 +74,7 @@ pub struct ItemStack {
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ItemStackRow {
-    item: Id,
+    item: ItemId,
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     count: u32,
 }
@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for ItemStack {
             let ItemStackRow { item, count } = ItemStackRow::deserialize(deserializer)?;
             return Ok(ItemStack { item, count });
         }
-        let (item, count) = <(Id, u32)>::deserialize(deserializer)?;
+        let (item, count) = <(ItemId, u32)>::deserialize(deserializer)?;
         Ok(ItemStack { item, count })
     }
 }
@@ -118,7 +118,7 @@ impl JsonSchema for ItemStack {
 }
 
 impl ItemStack {
-    pub const fn new(item: Id, count: u32) -> ItemStack {
+    pub const fn new(item: ItemId, count: u32) -> ItemStack {
         ItemStack { item, count }
     }
 
@@ -157,7 +157,7 @@ impl Inventory {
         }
     }
 
-    pub fn count(&self, item: Id) -> u32 {
+    pub fn count(&self, item: ItemId) -> u32 {
         self.slots
             .iter()
             .filter(|slot| slot.item == item)
@@ -168,7 +168,7 @@ impl Inventory {
         self.max.saturating_sub(self.slots.len() as u32)
     }
 
-    pub fn set_count(&mut self, item: Id, count: u32) {
+    pub fn set_count(&mut self, item: ItemId, count: u32) {
         self.slots.retain(|slot| slot.item != item);
         if count > 0 {
             self.slots.push(ItemStack { item, count });
@@ -208,7 +208,13 @@ impl Inventory {
         Ok(())
     }
 
-    fn add(&mut self, content: &Content, item: Id, mut count: u32) {
+    pub fn take_up_to(&mut self, stacks: &[ItemStack]) {
+        for stack in stacks {
+            self.remove(*stack);
+        }
+    }
+
+    fn add(&mut self, content: &Content, item: ItemId, mut count: u32) {
         let stack_max = item.get(content).stack_max();
         for slot in self.slots.iter_mut().filter(|slot| slot.item == item) {
             if count == 0 {
@@ -255,30 +261,23 @@ fn merged(stacks: &[ItemStack]) -> Vec<ItemStack> {
     merged
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReservedBy {
-    None,
-    Account(ClientId),
-}
-
-impl ReservedBy {
-    pub fn allows(self, account: Option<ClientId>) -> bool {
-        match self {
-            ReservedBy::None => true,
-            ReservedBy::Account(client) => account == Some(client),
-        }
-    }
-}
-
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Reservation {
-    pub by: ReservedBy,
+    pub by: Option<ClientId>,
     pub at: Seconds,
 }
 
 impl Reservation {
     pub fn expired(&self, now: Seconds) -> bool {
         now - self.at >= RESERVATION_TTL
+    }
+
+    pub fn holder(&self, now: Seconds) -> Option<ClientId> {
+        self.by.filter(|_| !self.expired(now))
+    }
+
+    pub fn allows(&self, account: Option<ClientId>) -> bool {
+        self.by.is_none_or(|by| account == Some(by))
     }
 }
 
@@ -287,7 +286,7 @@ pub struct DropLife(pub Seconds);
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DroppedItem {
-    pub item: Id,
+    pub item: ItemId,
     pub count: u32,
 }
 
@@ -309,7 +308,7 @@ pub struct PickupRequest {
 
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Debug, PartialEq)]
 pub struct ItemConsumed {
-    pub item: Id,
+    pub item: ItemId,
     #[entities]
     pub actor: Entity,
 }
@@ -321,7 +320,7 @@ pub struct ItemsDropped {
     pub from: Pos<Tiles>,
 }
 
-pub type Id = ContentId<ItemDef>;
+pub type ItemId = ContentId<ItemDef>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ItemDef {
@@ -348,6 +347,17 @@ impl ModuleSet for ItemDef {
         match module {
             ItemModule::Stat(_) => ModuleRule::AnyNumber,
             _ => ModuleRule::AtMostOne,
+        }
+    }
+}
+
+impl ScriptedRow for ItemDef {
+    const OWNER: OwnerKind = OwnerKind::Item;
+
+    fn script(module: &ItemModule) -> Option<&ScriptModule> {
+        match module {
+            ItemModule::Script(script) => Some(script),
+            _ => None,
         }
     }
 }
@@ -383,7 +393,7 @@ pub enum ItemFlag {
     Currency,
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemCategory {
     Consumable,
@@ -394,12 +404,7 @@ pub enum ItemCategory {
 
 impl ItemCategory {
     pub fn label(self) -> &'static str {
-        match self {
-            ItemCategory::Consumable => "Consumable",
-            ItemCategory::Equipment => "Equipment",
-            ItemCategory::Material => "Material",
-            ItemCategory::Currency => "Currency",
-        }
+        self.into()
     }
 
     pub fn plural(self) -> &'static str {
@@ -413,17 +418,6 @@ impl ItemCategory {
 }
 
 impl ItemDef {
-    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
-        self.modules
-            .iter()
-            .enumerate()
-            .filter_map(|(index, module)| match module {
-                ItemModule::Script(script) => Some((index, script)),
-                _ => None,
-            })
-            .collect()
-    }
-
     pub fn flavor(&self) -> Option<&str> {
         self.modules.iter().find_map(|module| match module {
             ItemModule::Flavor(flavor) => Some(flavor.text.as_str()),
@@ -523,19 +517,12 @@ pub fn use_item(world: &mut World) {
             continue;
         }
         if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
-            notification::notify(
-                world,
-                entity,
-                Notification::new(
-                    NotificationKind::error(world.resource::<Content>()),
-                    LineText::plain(refusal),
-                ),
-            );
+            notification::error(world, entity, refusal);
         }
     }
 }
 
-pub fn use_held(world: &mut World, actor: Entity, item: Id) -> Result<(), String> {
+pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), String> {
     let slot = world
         .get::<Inventory>(actor)
         .and_then(|inventory| inventory.slots.iter().position(|stack| stack.item == item))
@@ -574,7 +561,7 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
     }
 }
 
-fn raise(world: &mut World, item: Id, kind: EventKind, actor: Entity) {
+pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
     world.resource_mut::<RiftInstances>().raise(
         ScriptOwner::Row(OwnerKind::Item, item.raw()),
         kind,
@@ -608,13 +595,7 @@ pub fn drop_item(world: &mut World) {
         let Some(slot) = removed else {
             continue;
         };
-        scatter_drop(
-            world,
-            player,
-            &[(slot.item, slot.count)],
-            ReservedBy::None,
-            None,
-        );
+        scatter_drop(world, player, &[(slot.item, slot.count)], None, None);
     }
 }
 
@@ -642,8 +623,8 @@ pub fn pickable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
         .query::<(Entity, &Position, &DroppedItem, Option<&Reservation>)>()
         .iter(world)
         .find_map(|(entity, at, _, reservation)| {
-            let reserved = reservation.map_or(ReservedBy::None, |reservation| reservation.by);
-            (at.pos.cell() == cell && reserved.allows(me)).then_some(entity)
+            let allowed = reservation.is_none_or(|reservation| reservation.allows(me));
+            (at.pos.cell() == cell && allowed).then_some(entity)
         })
 }
 
@@ -687,25 +668,27 @@ pub fn reserve(world: &mut World, npc: Entity, attacker: Entity, now: Seconds) {
     if world.get::<Npc>(npc).is_none() {
         return;
     }
-    let claim = match world.get::<Reservation>(npc) {
-        None => true,
-        Some(reservation) => {
-            reservation.by == ReservedBy::Account(account) || reservation.expired(now)
-        }
-    };
+    let claim = world
+        .get::<Reservation>(npc)
+        .is_none_or(|reservation| reservation.holder(now).is_none_or(|by| by == account));
     if claim {
         world.entity_mut(npc).insert(Reservation {
-            by: ReservedBy::Account(account),
+            by: Some(account),
             at: now,
         });
     }
 }
 
+pub fn credited(world: &World, victim: Entity, now: Seconds) -> Option<Entity> {
+    let client = world.get::<Reservation>(victim)?.holder(now)?;
+    world.resource::<Players>().0.get(&client).copied()
+}
+
 pub fn scatter_drop(
     world: &mut World,
     source: Entity,
-    drops: &[(Id, u32)],
-    reserved_by: ReservedBy,
+    drops: &[(ItemId, u32)],
+    reserved_by: Option<ClientId>,
     presence: Option<Presence>,
 ) {
     let Some(from) = position(world, source) else {
@@ -720,9 +703,9 @@ pub fn scatter_drop(
 pub fn scatter_at(
     world: &mut World,
     from: Pos<Tiles>,
-    area_id: area::Id,
-    drops: &[(Id, u32)],
-    reserved_by: ReservedBy,
+    area_id: AreaId,
+    drops: &[(ItemId, u32)],
+    reserved_by: Option<ClientId>,
     presence: Option<Presence>,
     life: Option<Seconds>,
 ) {
@@ -783,7 +766,7 @@ fn carried(world: &World, entity: Entity) -> Vec<Effect> {
         .unwrap_or_default()
 }
 
-fn announce_consumed(world: &mut World, actor: Entity, item: Id) {
+fn announce_consumed(world: &mut World, actor: Entity, item: ItemId) {
     for client in seen_by(world, actor) {
         visibility::send_to(world, client, ItemConsumed { item, actor });
     }
@@ -804,11 +787,11 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     let Some(drop) = world.get::<DroppedItem>(item).cloned() else {
         return;
     };
-    let reserved = world
-        .get::<Reservation>(item)
-        .map_or(ReservedBy::None, |reservation| reservation.by);
     let account = world.get::<Owner>(player).map(|owner| owner.client);
-    if !reserved.allows(account) {
+    if world
+        .get::<Reservation>(item)
+        .is_some_and(|reservation| !reservation.allows(account))
+    {
         return;
     }
     let content = *world.resource::<Content>();
@@ -825,7 +808,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     }
 }
 
-fn instantiate_effects(world: &mut World, actor: Entity, item: Id, duration: Seconds) {
+fn instantiate_effects(world: &mut World, actor: Entity, item: ItemId, duration: Seconds) {
     let content = *world.resource::<Content>();
     let until = world.resource::<WallClock>().now.after(duration);
     let entries = item

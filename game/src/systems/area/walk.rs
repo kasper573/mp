@@ -1,36 +1,12 @@
+use super::Scenery;
 use super::grid::AreaGrids;
 use super::tileset::{TilesetDef, Walk};
-use super::{AreaModule, Scenery};
 use crate::core::audio::playback::SfxId;
 use crate::core::content::Content;
 use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, GridDims, GridSize, TilePos, TileRect, Tiles};
 
-pub const OBSCURING_CUTOFF: f32 = 0.4;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct CellVotes {
-    pub grid: Option<bool>,
-    pub blocks: bool,
-    pub walks: bool,
-}
-
-impl CellVotes {
-    pub fn vote(&mut self, walk: Option<Walk>) {
-        match walk {
-            Some(Walk::Blocks) => self.blocks = true,
-            Some(Walk::Walkable) => self.walks = true,
-            None => {}
-        }
-    }
-
-    pub fn walkable(self) -> bool {
-        match self.grid {
-            Some(value) => value,
-            None => !self.blocks && self.walks,
-        }
-    }
-}
+const OBSCURING_CUTOFF: f32 = 0.4;
 
 pub struct WalkGrids {
     pub walk: Vec<bool>,
@@ -44,11 +20,11 @@ pub struct WalkGrids {
 pub fn grids(
     content: &Content,
     grids: &AreaGrids,
-    modules: &[AreaModule],
+    scenery: &[&Scenery],
     safe_zones: &[Rect<Tiles>],
 ) -> WalkGrids {
     let size = grids.size;
-    let votes = votes(content, grids, modules);
+    let votes = votes(content, grids, scenery);
     let safe_cells: Vec<bool> = size
         .cells()
         .map(|cell| safe_zones.iter().any(|zone| zone.contains(cell.center())))
@@ -71,7 +47,53 @@ pub fn grids(
     }
 }
 
-pub fn votes(content: &Content, grids: &AreaGrids, modules: &[AreaModule]) -> Vec<CellVotes> {
+pub fn tile_square(scenery: &Scenery, column: usize, row: usize) -> Rect<Tiles> {
+    let x = column as f32;
+    let y = row as f32;
+    let origin = Pos::new(
+        if scenery.flip.horizontal() {
+            scenery.at.x - x - 1.0
+        } else {
+            scenery.at.x + x
+        },
+        if scenery.flip.vertical() {
+            scenery.at.y - y - 1.0
+        } else {
+            scenery.at.y + y
+        },
+    );
+    Rect::new(origin, Size::splat(1.0))
+}
+
+pub fn in_map(size: GridSize, at: Pos<Tiles>) -> bool {
+    at.cell().index(size).is_some()
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct CellVotes {
+    grid: Option<bool>,
+    blocks: bool,
+    walks: bool,
+}
+
+impl CellVotes {
+    fn vote(&mut self, walk: Option<Walk>) {
+        match walk {
+            Some(Walk::Blocks) => self.blocks = true,
+            Some(Walk::Walkable) => self.walks = true,
+            None => {}
+        }
+    }
+
+    fn walkable(self) -> bool {
+        match self.grid {
+            Some(value) => value,
+            None => !self.blocks && self.walks,
+        }
+    }
+}
+
+fn votes(content: &Content, grids: &AreaGrids, scenery: &[&Scenery]) -> Vec<CellVotes> {
     let size = grids.size;
     let mut votes: Vec<CellVotes> = grids
         .walk
@@ -88,10 +110,7 @@ pub fn votes(content: &Content, grids: &AreaGrids, modules: &[AreaModule]) -> Ve
             }
         }
     }
-    for scenery in modules.iter().filter_map(|module| match module {
-        AreaModule::Scenery(scenery) => Some(scenery),
-        _ => None,
-    }) {
+    for scenery in scenery {
         let tileset = scenery.tileset.get(content);
         for (tile, rect) in scenery_tiles(scenery) {
             let walk = tileset.walk(tile);
@@ -115,7 +134,7 @@ pub fn votes(content: &Content, grids: &AreaGrids, modules: &[AreaModule]) -> Ve
     votes
 }
 
-pub fn scenery_tiles(scenery: &Scenery) -> impl Iterator<Item = (u32, Rect<Tiles>)> + '_ {
+fn scenery_tiles(scenery: &Scenery) -> impl Iterator<Item = (u32, Rect<Tiles>)> + '_ {
     scenery
         .tiles
         .iter()
@@ -128,37 +147,19 @@ pub fn scenery_tiles(scenery: &Scenery) -> impl Iterator<Item = (u32, Rect<Tiles
         })
 }
 
-pub fn tile_square(scenery: &Scenery, column: usize, row: usize) -> Rect<Tiles> {
-    let x = column as f32;
-    let y = row as f32;
-    let origin = Pos::new(
-        if scenery.flip.horizontal() {
-            scenery.at.x - x - 1.0
-        } else {
-            scenery.at.x + x
-        },
-        if scenery.flip.vertical() {
-            scenery.at.y - y - 1.0
-        } else {
-            scenery.at.y + y
-        },
-    );
-    Rect::new(origin, Size::splat(1.0))
-}
-
-pub fn scenery_blocks(scenery: &Scenery) -> impl Iterator<Item = CellPos> + '_ {
+fn scenery_blocks(scenery: &Scenery) -> impl Iterator<Item = CellPos> + '_ {
     scenery.blocks.iter().map(move |[x, y]| {
         let center = Pos::new(*x as f32 + 0.5, *y as f32 + 0.5);
         (scenery.at + scenery.flip.apply(center).to_vector()).cell()
     })
 }
 
-pub fn cell_overlap(rect: &Rect<Tiles>, cell: CellPos) -> f32 {
+fn cell_overlap(rect: &Rect<Tiles>, cell: CellPos) -> f32 {
     rect.intersection(&cell.bounds())
         .map_or(0.0, |overlap| overlap.area())
 }
 
-pub fn footsteps(content: &Content, grids: &AreaGrids) -> Vec<Option<SfxId>> {
+fn footsteps(content: &Content, grids: &AreaGrids) -> Vec<Option<SfxId>> {
     let mut footsteps = vec![None; (grids.size.width * grids.size.height) as usize];
     for layer in &grids.ground {
         for (index, cell) in layer.cells.iter().enumerate() {
@@ -172,8 +173,4 @@ pub fn footsteps(content: &Content, grids: &AreaGrids) -> Vec<Option<SfxId>> {
         }
     }
     footsteps
-}
-
-pub fn in_map(size: GridSize, at: Pos<Tiles>) -> bool {
-    at.cell().index(size).is_some()
 }

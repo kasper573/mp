@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 
-use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
 use game::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
-use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteEntry, PaletteRow};
+use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteRow};
 
 use crate::project::{ContentEdit, ProjectFiles, text_bytes};
 
@@ -255,13 +254,6 @@ impl GridDraft {
             }
         }
         (out, clipped)
-    }
-
-    pub fn palette_entries(&self, content: &Content) -> Vec<Option<PaletteEntry>> {
-        self.palette
-            .iter()
-            .map(|row| row.resolve(content))
-            .collect()
     }
 }
 

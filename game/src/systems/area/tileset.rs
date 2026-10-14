@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::{ContentId, ContentRow, RowCheck};
+use crate::core::content::id::nearest;
+use crate::core::content::locate::escape;
+use crate::core::content::{ContentId, ContentProblem, ContentRow, RowCheck};
 use crate::core::math::{Pos, Rect, WorldPx};
 
-pub type Id = ContentId<TilesetDef>;
+pub type TilesetId = ContentId<TilesetDef>;
 pub type SurfaceId = ContentId<SurfaceDef>;
 
 pub const MAX_TILE_PX: u32 = 512;
@@ -30,7 +32,7 @@ impl ContentRow for TilesetDef {
     fn check(&self, cx: &mut RowCheck) {
         cx.range("/tile", self.tile, 1, MAX_TILE_PX, "a tile size in pixels");
         for (set, terrains) in &self.terrains {
-            let pointer = format!("/terrains/{}", crate::core::content::locate::escape(set));
+            let pointer = format!("/terrains/{}", escape(set));
             cx.count(&pointer, terrains.len(), 2, 8, "terrains in the set");
             let mut seen: Vec<&String> = Vec::new();
             for terrain in terrains {
@@ -78,28 +80,29 @@ impl ContentRow for TilesetDef {
                 }
             }
             for (set, corners) in &data.corners {
-                let pointer = format!(
-                    "{pointer}/corners/{}",
-                    crate::core::content::locate::escape(set)
-                );
+                let pointer = format!("{pointer}/corners/{}", escape(set));
                 let Some(terrains) = self.terrains.get(set) else {
-                    cx.nearest(
+                    cx.problem(
                         &pointer,
-                        "unknown terrain",
-                        format!("set {set}"),
-                        "a terrain set the tileset declares",
-                        crate::core::content::id::nearest(self.terrains.keys(), set),
+                        ContentProblem::new(
+                            "unknown terrain",
+                            format!("set {set}"),
+                            "a terrain set the tileset declares",
+                        )
+                        .near(nearest(self.terrains.keys(), set)),
                     );
                     continue;
                 };
                 for (corner, terrain) in corners.iter().enumerate() {
                     if !terrains.contains(terrain) {
-                        cx.nearest(
+                        cx.problem(
                             format!("{pointer}/{corner}"),
-                            "unknown terrain",
-                            format!("{terrain} in set {set}"),
-                            format!("one of {}", terrains.join(", ")),
-                            crate::core::content::id::nearest(terrains, terrain),
+                            ContentProblem::new(
+                                "unknown terrain",
+                                format!("{terrain} in set {set}"),
+                                format!("one of {}", terrains.join(", ")),
+                            )
+                            .near(nearest(terrains, terrain)),
                         );
                     }
                 }

@@ -4,15 +4,15 @@ use serde::{Deserialize, Serialize};
 
 use super::Home;
 use crate::core::math::{Offset, Pos};
-use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaTag};
 use crate::systems::combat::Attitude;
 use crate::systems::movement::position;
-use crate::systems::npc::Id as NpcId;
+use crate::systems::npc::NpcId;
 use crate::systems::player::{ClientId, Owner};
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
-use crate::systems::script::{Reach, RiftScripting};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::{EffectCall, OwnerKind, Reach, RiftScripting};
 use crate::systems::stat;
 use crate::systems::visibility::Presence;
 
@@ -76,18 +76,18 @@ impl EffectDef<RiftScripting> for SetAttitude {
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(
+        &'static self,
+        _cx: &mut Compiler<RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let attitude = self.attitude;
-        Ok(Box::new(move |world, cx| {
-            if let Some(npc) = cx.owner.entity()
+        Ok(Box::new(move |world, _, cx| {
+            if let Some(npc) = cx.owner
                 && world.get_entity(npc).is_ok()
             {
                 world.entity_mut(npc).insert(attitude);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -99,30 +99,30 @@ impl EffectDef<RiftScripting> for SetAttitude {
 }
 
 impl EffectDef<RiftScripting> for SpawnNpcs {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(
+        &'static self,
+        _cx: &mut Compiler<RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
-            return Err(format!("count {} is not 1 to {MAX_SPAWNED}", self.count));
+            return Err(ScriptFault::new(
+                "out of range",
+                format!("a count 1 to {MAX_SPAWNED}, not {}", self.count),
+            ));
         }
         let (npc, count, near, shown) = (self.npc, self.count, self.near, self.shown);
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let beside = match near {
-                SpawnNear::Owner => cx.owner.entity().or(cx.subject),
+                SpawnNear::Owner => cx.owner.or(cx.subject),
                 SpawnNear::Subject => cx.subject,
             };
             let Some(beside) = beside else {
-                return EffectStep::Output(0);
+                return EffectStep::Done;
             };
             let only_for = match shown {
                 ShownFor::Subject => cx
@@ -139,7 +139,7 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
                 only_for,
                 cx.subject.filter(|_| shown == ShownFor::Subject),
             );
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -148,9 +148,6 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
 }
 
 impl EffectDef<RiftScripting> for Despawn {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -160,23 +157,18 @@ impl EffectDef<RiftScripting> for Despawn {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let refused = self.refused.as_deref();
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(npc) = effects::aimed(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody there to send away");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody there to send away");
             };
             if world.get::<Summoned>(npc).is_none() {
-                effects::refuse(world, cx, refused, "Only spawned npcs leave on command");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Only spawned npcs leave on command");
             }
             super::despawn(world, npc);
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -220,10 +212,9 @@ pub fn dismiss(world: &mut World, summons: &mut QueryState<(Entity, &'static Sum
         .iter(world)
         .filter_map(|(summon, summoned)| Some((summon, summoned.with?)))
         .filter(|&(summon, with)| {
-            let area = |entity| world.get::<AreaTag>(entity).map(|tag| tag.area);
             world.get_entity(with).is_err()
                 || stat::is_dead(world, with)
-                || area(with) != area(summon)
+                || !area::same_area(world, with, summon)
         })
         .map(|(summon, _)| summon)
         .collect();

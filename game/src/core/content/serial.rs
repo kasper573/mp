@@ -69,6 +69,10 @@ pub fn is_one(count: &u32) -> bool {
     *count == 1
 }
 
+pub fn is_zero(count: &u32) -> bool {
+    *count == 0
+}
+
 pub fn is_false(flag: &bool) -> bool {
     !*flag
 }

@@ -8,10 +8,6 @@ use crate::systems::player::session;
 pub struct LockedGesture;
 
 impl Gesture for LockedGesture {
-    fn priority(&self) -> i32 {
-        1
-    }
-
     fn claim(&self, world: &mut World) -> Option<ClickClaim> {
         session::is_locked(world).then_some(ClickClaim::Locked)
     }

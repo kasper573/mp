@@ -5,18 +5,30 @@ use std::collections::{HashMap, VecDeque};
 use bevy::prelude::*;
 use bevy_terminal::{AvailableTerminals, Terminal, TerminalLine};
 use serde::{Deserialize, Serialize};
+use strum::{IntoStaticStr, VariantArray};
 
-use crate::systems::hud::{RefreshWindows, TERMINAL_WINDOW};
+use crate::systems::hud::{RefreshWindows, Window};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Serialize,
+    Deserialize,
+    VariantArray,
+    IntoStaticStr,
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+)]
 pub enum TerminalKind {
     Global,
 }
 
 impl TerminalKind {
-    pub const ALL: [TerminalKind; 1] = [TerminalKind::Global];
-
-    pub fn terminal(self) -> &'static Terminal {
+    fn terminal(self) -> &'static Terminal {
         match self {
             TerminalKind::Global => &GLOBAL,
         }
@@ -24,6 +36,15 @@ impl TerminalKind {
 }
 
 static GLOBAL: Terminal = Terminal { access: None };
+
+pub fn register(app: &mut App) {
+    bevy_terminal::register(
+        app,
+        TerminalKind::VARIANTS
+            .iter()
+            .map(|&kind| (kind, kind.terminal())),
+    );
+}
 
 pub struct TerminalPlugin;
 
@@ -58,7 +79,7 @@ fn receive(
     for message in available.read() {
         if terminals.tabs != message.terminals {
             terminals.tabs = message.terminals.clone();
-            refresh.0.insert(TERMINAL_WINDOW);
+            refresh.0.insert(widget::TerminalWindow.title());
         }
     }
     for line in lines.read() {

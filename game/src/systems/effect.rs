@@ -1,5 +1,3 @@
-pub mod widget;
-
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
@@ -16,13 +14,6 @@ pub fn register(app: &mut App) {
     source(app, timed);
 }
 
-#[derive(Clone, Copy)]
-pub struct EffectContext<'a> {
-    pub world: &'a World,
-    pub source: Entity,
-    pub target: Entity,
-}
-
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum Effect {
     StatModifier(Stat),
@@ -30,28 +21,14 @@ pub enum Effect {
 }
 
 impl Effect {
-    pub fn icon(self) -> Option<&'static str> {
+    pub fn modifier(self, world: &World, entity: Entity) -> Stat {
         match self {
-            Effect::StatModifier(_) | Effect::Chasing => None,
-        }
-    }
-
-    pub fn compute(self, ctx: &EffectContext) -> Vec<Stat> {
-        match self {
-            Effect::StatModifier(stat) => vec![stat],
+            Effect::StatModifier(stat) => stat,
             Effect::Chasing => {
-                let base = stat::base(ctx.world, ctx.source, StatKind::MovementSpeed);
-                vec![StatKind::MovementSpeed.of(base * (CHASE_SPEED_MULTIPLIER - 1.0))]
+                let base = stat::base(world, entity, StatKind::MovementSpeed);
+                StatKind::MovementSpeed.of(base * (CHASE_SPEED_MULTIPLIER - 1.0))
             }
         }
-    }
-
-    pub fn describe(self, ctx: &EffectContext) -> String {
-        self.compute(ctx)
-            .iter()
-            .map(|stat| format!("{:+} {}", stat.value, stat.label()))
-            .collect::<Vec<_>>()
-            .join(", ")
     }
 }
 

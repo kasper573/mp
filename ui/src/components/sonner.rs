@@ -341,13 +341,14 @@ pub(crate) fn layout_toasts(
                 1.0 - here * PEEK_SCALE
             };
             let enter = Transform2d::new(rest + off, 0.9);
-            let (target, opacity, timing) = match toast.leaving {
-                true => (
+            let (target, opacity, timing) = if toast.leaving {
+                (
                     Transform2d::new(rest + away, scale * LEAVE_SCALE),
                     0.0,
                     STANDARD_EXIT,
-                ),
-                false => (Transform2d::new(rest, scale), 1.0, STANDARD_ENTER),
+                )
+            } else {
+                (Transform2d::new(rest, scale), 1.0, STANDARD_ENTER)
             };
             motion.aim_transform(enter, target, Some(timing));
             motion.aim_opacity(0.0, opacity, Some(timing));
@@ -382,9 +383,10 @@ fn layout_compact(
     cards: &mut Query<(&mut Toast, &mut Node, &mut Motion)>,
     reduced: bool,
 ) -> usize {
-    let limit = match toaster.expanded {
-        true => COMPACT_HELD,
-        false => COMPACT_SHOWN,
+    let limit = if toaster.expanded {
+        COMPACT_HELD
+    } else {
+        COMPACT_SHOWN
     };
     let mut live = 0usize;
     for entity in children.iter().rev() {
@@ -395,16 +397,18 @@ fn layout_compact(
         if !toast.leaving {
             live += 1;
         }
-        let display = match here < limit || toast.leaving {
-            true => Display::Flex,
-            false => Display::None,
+        let display = if here < limit || toast.leaving {
+            Display::Flex
+        } else {
+            Display::None
         };
         if node.display != display {
             node.display = display;
         }
-        let slide = match reduced {
-            true => Vec2::ZERO,
-            false => Vec2::new(COMPACT_SLIDE, 0.0),
+        let slide = if reduced {
+            Vec2::ZERO
+        } else {
+            Vec2::new(COMPACT_SLIDE, 0.0)
         };
         let enter = Transform2d::new(slide, 1.0);
         let rest = Transform2d::IDENTITY;
@@ -412,13 +416,15 @@ fn layout_compact(
             let swell = Transform2d::new(Vec2::ZERO, BUMP_SCALE);
             motion.aim_transform(swell, swell, None);
         }
-        let gone = match reduced {
-            true => rest,
-            false => Transform2d::new(slide * COMPACT_LEAVE_SLIDE, COMPACT_LEAVE_SCALE),
+        let gone = if reduced {
+            rest
+        } else {
+            Transform2d::new(slide * COMPACT_LEAVE_SLIDE, COMPACT_LEAVE_SCALE)
         };
-        let (target, opacity, timing) = match toast.leaving {
-            true => (gone, 0.0, STANDARD_EXIT),
-            false => (rest, 1.0, STANDARD_ENTER),
+        let (target, opacity, timing) = if toast.leaving {
+            (gone, 0.0, STANDARD_EXIT)
+        } else {
+            (rest, 1.0, STANDARD_ENTER)
         };
         motion.aim_transform(enter, target, Some(timing));
         motion.aim_opacity(0.0, opacity, Some(timing));

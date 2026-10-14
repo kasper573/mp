@@ -73,14 +73,6 @@ impl EditHistory {
         self.trim();
     }
 
-    pub fn can_undo(&self) -> bool {
-        self.applied > 0
-    }
-
-    pub fn can_redo(&self) -> bool {
-        self.applied < self.steps.len()
-    }
-
     pub fn undo_step(&self) -> Option<&EditStep> {
         self.applied.checked_sub(1).map(|at| &self.steps[at])
     }

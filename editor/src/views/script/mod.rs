@@ -12,7 +12,8 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Key, Modifiers, Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use game::core::script::OwnerKind;
+use game::core::script::OwnerKindDef;
+use game::systems::script::OwnerKind;
 use serde_json::{Map, Value};
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
@@ -1293,8 +1294,11 @@ pub fn write(editor: &mut Editor, doc: &ScriptDoc, script: Value, label: String)
                 owner: doc.owner.clone(),
                 node: named.or(selected).unwrap_or_default(),
                 to: None,
-                rule: refusal.rule.replace('_', " "),
-                text: format!("{}; expected {}.", refusal.found, refusal.expected),
+                rule: refusal.problem.rule.replace('_', " "),
+                text: format!(
+                    "{}; expected {}.",
+                    refusal.problem.found, refusal.problem.expected
+                ),
                 since: Instant::now(),
             }
         });

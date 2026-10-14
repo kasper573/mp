@@ -3,8 +3,7 @@ use game::core::content::Fixture;
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::attention::Id as AttentionId;
-use game::systems::attention::{Attention, AttentionMark};
+use game::systems::attention::{Attention, AttentionId, AttentionMark};
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::item::{Inventory, ItemStack};
@@ -44,6 +43,19 @@ fn gold(sim: &mut Sim, player: Entity) -> u32 {
 
 fn place(sim: &mut Sim, player: Entity, at: Pos<Tiles>) {
     sim.world().entity_mut(player).insert(Position { pos: at });
+}
+
+#[test]
+fn a_conversation_reaches_the_client_as_the_world_holds_it() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+
+    let opened = talk(&mut sim, 1, player, row("Grisha"));
+    let wire = postcard::to_allocvec(&opened).expect("a conversation serializes");
+    let received: Conversation = postcard::from_bytes(&wire).expect("a conversation deserializes");
+
+    assert!(opened.lines.iter().any(|line| line.face.is_some()));
+    assert_eq!(received, opened);
 }
 
 #[test]

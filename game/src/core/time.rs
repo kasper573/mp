@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 use bevy_ecs::prelude::Resource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -77,6 +79,13 @@ impl std::ops::Rem for Millis {
     type Output = Millis;
     fn rem(self, other: Millis) -> Millis {
         Millis(self.0 % other.0)
+    }
+}
+
+impl Hash for Seconds {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // -0.0 equals 0.0, so both must hash alike.
+        (self.0 + 0.0).to_bits().hash(state);
     }
 }
 
@@ -201,9 +210,10 @@ impl LocalClock {
         let (today, _) = local(self.now);
         let minutes = of_day / 60_000;
         let clock = format!("{:02}:{:02}", minutes / 60, minutes % 60);
-        match day == today {
-            true => clock,
-            false => format!("{} {clock}", WEEKDAYS[day.rem_euclid(7) as usize]),
+        if day == today {
+            clock
+        } else {
+            format!("{} {clock}", WEEKDAYS[day.rem_euclid(7) as usize])
         }
     }
 }

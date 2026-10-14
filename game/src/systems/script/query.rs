@@ -6,22 +6,22 @@ use serde::{Deserialize, Serialize};
 use super::{Condition, RiftScripting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
-use crate::core::script::{Compiler, Eval, FlowCx, Name, QueryDef, Value, ValueType};
+use crate::core::script::{Compiler, Eval, FlowCx, Name, QueryDef, ScriptFault, Value, ValueType};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::area::transition::Discovered;
-use crate::systems::area::{self, Area, AreaTag, object};
+use crate::systems::area::{self, Area, AreaId, AreaTag, object};
 use crate::systems::combat::{Attackers, Attitude};
 use crate::systems::effect::{self, Effect};
 use crate::systems::equipment::Equipment;
-use crate::systems::item::{DroppedItem, Id as ItemId, Inventory};
-use crate::systems::job::{self, Id as JobId, Job};
+use crate::systems::item::{DroppedItem, Inventory, ItemId};
+use crate::systems::job::{self, Job, JobId};
 use crate::systems::memory;
-use crate::systems::memory::Id as MemoryId;
+use crate::systems::memory::MemoryId;
 use crate::systems::movement::{self, Position};
-use crate::systems::npc::{Id as NpcId, Npc, Pack, body};
+use crate::systems::npc::{Npc, NpcId, Pack, body};
 use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
-use crate::systems::quest::{self, Id as QuestId, Objective};
+use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility;
 use crate::systems::visibility::Presence;
@@ -32,7 +32,7 @@ pub struct ActorRoster {
     characters: usize,
     character_bounds: Option<Bounds>,
     npc_bounds: Option<Bounds>,
-    areas: Vec<(area::Id, &'static Area)>,
+    areas: Vec<(AreaId, &'static Area)>,
 }
 
 #[derive(Clone, Copy)]
@@ -69,7 +69,7 @@ impl Bounds {
 pub struct Listed {
     pub entity: Entity,
     pub at: Pos<Tiles>,
-    pub area: area::Id,
+    pub area: AreaId,
     pub npc: Option<NpcId>,
     pub character: bool,
     pub dead: bool,
@@ -90,7 +90,7 @@ impl ActorRoster {
         }
     }
 
-    fn area(&self, id: area::Id) -> Option<&'static Area> {
+    fn area(&self, id: AreaId) -> Option<&'static Area> {
         self.areas
             .iter()
             .find(|(known, _)| *known == id)
@@ -167,7 +167,6 @@ pub enum Among {
 }
 
 type Of = Option<Box<Condition>>;
-type Actor = Box<Condition>;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -214,7 +213,7 @@ pub enum RiftQuery {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
         memory: MemoryId,
-        seconds: Actor,
+        seconds: Box<Condition>,
     },
     OnQuest {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -250,69 +249,69 @@ pub enum RiftQuery {
     InArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        area: area::Id,
+        area: AreaId,
     },
     KnowsArea {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        area: area::Id,
+        area: AreaId,
     },
     Nearest {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         npc: Option<NpcId>,
-        within: Actor,
+        within: Box<Condition>,
     },
     Count {
         among: Among,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         npc: Option<NpcId>,
-        within: Actor,
+        within: Box<Condition>,
     },
     Present {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     Distance {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     Health {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     IsNpc {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     Subject,
     Target,
     Walking {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     Hostile {
-        actor: Actor,
+        actor: Box<Condition>,
     },
     GroundItems {
         item: ItemId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        at: Option<Actor>,
-        within: Actor,
+        at: Option<Box<Condition>>,
+        within: Box<Condition>,
     },
 }
 
 impl QueryDef<RiftScripting> for RiftQuery {
-    fn value_type(&self, cx: &Compiler<RiftScripting>) -> Result<ValueType, String> {
-        Ok(match self {
-            RiftQuery::Level { .. } | RiftQuery::Holding { .. } | RiftQuery::FreeSlots { .. } => {
-                ValueType::Integer
-            }
-            RiftQuery::Count { .. } | RiftQuery::GroundItems { .. } => ValueType::Integer,
+    fn value_type(&self, cx: &Compiler<RiftScripting>) -> ValueType {
+        match self {
+            RiftQuery::Level { .. }
+            | RiftQuery::Holding { .. }
+            | RiftQuery::FreeSlots { .. }
+            | RiftQuery::Count { .. }
+            | RiftQuery::GroundItems { .. } => ValueType::Integer,
             RiftQuery::Stat { .. } | RiftQuery::Distance { .. } | RiftQuery::Health { .. } => {
                 ValueType::Number
             }
             RiftQuery::Memory { memory, .. } => memory.get(cx.content).ty,
             RiftQuery::QuestResetsIn { .. } => ValueType::Text,
-            RiftQuery::Nearest { .. } | RiftQuery::Target => ValueType::Actor,
-            RiftQuery::Subject => ValueType::Actor,
+            RiftQuery::Nearest { .. } | RiftQuery::Target | RiftQuery::Subject => ValueType::Actor,
             _ => ValueType::Boolean,
-        })
+        }
     }
 
     fn reads_subject(&self) -> bool {
@@ -338,11 +337,10 @@ impl QueryDef<RiftScripting> for RiftQuery {
         }
     }
 
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, String> {
-        let bad = |e: (&str, String)| format!("{}: {}", e.0, e.1);
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, ScriptFault> {
         Ok(match self {
             RiftQuery::Level { of } => {
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Int(
                         character(world, cx, &of)
@@ -352,7 +350,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::IsJob { of, job } => {
                 let job = *job;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world.get::<Job>(who).is_some_and(|held| held.def == job)
@@ -361,7 +359,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Stat { of, stat } => {
                 let stat = *stat;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Num(
                         character(world, cx, &of)
@@ -371,7 +369,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Buffed { of, stat } => {
                 let stat = *stat;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world.get::<effect::TimedEffects>(who).is_some_and(|timed| {
@@ -385,7 +383,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Holding { of, item } => {
                 let item = *item;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Int(character(world, cx, &of).map_or(0, |who| {
                         world
@@ -395,7 +393,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::FreeSlots { of } => {
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Int(character(world, cx, &of).map_or(0, |who| {
                         world
@@ -406,7 +404,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Wearing { of, item } => {
                 let item = *item;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world
@@ -417,7 +415,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Memory { of, memory } => {
                 let memory = *memory;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 let ty = memory.get(cx.content).ty;
                 Box::new(move |world, cx| {
                     character(world, cx, &of)
@@ -430,8 +428,8 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 seconds,
             } => {
                 let memory = *memory;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
-                let seconds = cx.expr(seconds, ValueType::Number).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
+                let seconds = cx.expr(seconds, ValueType::Number)?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         memory::set_within(
@@ -445,7 +443,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::OnQuest { of, quest } => {
                 let quest = *quest;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         quest::log_of(world, who).is_some_and(|log| log.active(quest).is_some())
@@ -454,7 +452,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::QuestDone { of, quest } => {
                 let quest = *quest;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         quest::log_of(world, who).is_some_and(|log| {
@@ -466,7 +464,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::QuestCooling { of, quest } => {
                 let quest = *quest;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         let today = world.resource::<WallClock>().day();
@@ -479,12 +477,17 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::TaskDone { of, quest, task } => {
                 let quest = *quest;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 let index = quest
                     .get(cx.content)
                     .objectives()
                     .position(|objective| matches!(objective, Objective::Task { task: known, .. } if known == task))
-                    .ok_or_else(|| format!("{} has no task {task}", quest.key(cx.content)))?;
+                    .ok_or_else(|| {
+                        ScriptFault::new(
+                            "unknown task",
+                            format!("{} has no task {task}", quest.key(cx.content)),
+                        )
+                    })?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         quest::log_of(world, who).is_some_and(|log| {
@@ -498,9 +501,12 @@ impl QueryDef<RiftScripting> for RiftQuery {
             RiftQuery::QuestResetsIn { of, quest } => {
                 let quest = *quest;
                 if !quest.get(cx.content).daily() {
-                    return Err(format!("{} never resets", quest.key(cx.content)));
+                    return Err(ScriptFault::new(
+                        "never resets",
+                        format!("a daily quest, not {}", quest.key(cx.content)),
+                    ));
                 }
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Text(
                         character(world, cx, &of)
@@ -514,7 +520,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Inside { of, object } => {
                 let object: Name = object;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(
                         actor(world, cx, &of).is_some_and(|who| object::inside(world, who, object)),
@@ -523,7 +529,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::InArea { of, area } => {
                 let area = *area;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(actor(world, cx, &of).is_some_and(|who| {
                         world
@@ -534,7 +540,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::KnowsArea { of, area } => {
                 let area = *area;
-                let of = cx.actor(of.as_deref()).map_err(bad)?;
+                let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(character(world, cx, &of).is_some_and(|who| {
                         world
@@ -545,7 +551,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Nearest { among, npc, within } => {
                 let (among, npc) = (*among, *npc);
-                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                let within = cx.expr(within, ValueType::Number)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
                     Value::Actor(nearest(world, cx, among, npc, within))
@@ -553,30 +559,28 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Count { among, npc, within } => {
                 let (among, npc) = (*among, *npc);
-                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                let within = cx.expr(within, ValueType::Number)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
                     Value::Int(around(world, cx, among, npc, within).count() as i64)
                 })
             }
             RiftQuery::Present { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| Value::Bool(actor(world, cx, &who).is_some()))
             }
             RiftQuery::Distance { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| {
-                    let distance = (|| {
-                        let who = actor(world, cx, &who)?;
-                        let from = movement::position(world, owner_entity(cx)?)?;
-                        let to = movement::position(world, who)?;
-                        Some(from.distance(to).0)
-                    })();
-                    Value::Num(f64::from(distance.unwrap_or(0.0)))
+                    let apart = cx
+                        .owner
+                        .zip(actor(world, cx, &who))
+                        .and_then(|(owner, who)| distance(world, owner, who));
+                    Value::Num(f64::from(apart.map_or(0.0, |apart| apart.0)))
                 })
             }
             RiftQuery::Health { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| {
                     Value::Num(
                         actor(world, cx, &who)
@@ -585,7 +589,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::IsNpc { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| {
                     Value::Bool(
                         actor(world, cx, &who).is_some_and(|who| world.get::<Npc>(who).is_some()),
@@ -594,10 +598,10 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::Subject => Box::new(|_, cx| Value::Actor(cx.subject)),
             RiftQuery::Target => Box::new(|world, cx| {
-                Value::Actor(owner_entity(cx).and_then(|owner| body::target(world, owner)))
+                Value::Actor(cx.owner.and_then(|owner| body::target(world, owner)))
             }),
             RiftQuery::Walking { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| {
                     Value::Bool(
                         actor(world, cx, &who).is_some_and(|who| movement::moving(world, who)),
@@ -605,7 +609,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 })
             }
             RiftQuery::Hostile { actor: who } => {
-                let who = cx.expr(who, ValueType::Actor).map_err(bad)?;
+                let who = cx.expr(who, ValueType::Actor)?;
                 Box::new(move |world, cx| {
                     Value::Bool(
                         actor(world, cx, &who).is_some_and(|who| {
@@ -616,20 +620,21 @@ impl QueryDef<RiftScripting> for RiftQuery {
             }
             RiftQuery::GroundItems { item, at, within } => {
                 let item = *item;
-                let at = cx.opt_expr(at.as_deref(), ValueType::Actor).map_err(bad)?;
-                let within = cx.expr(within, ValueType::Number).map_err(bad)?;
+                let at = cx.opt_expr(at.as_deref(), ValueType::Actor)?;
+                let within = cx.expr(within, ValueType::Number)?;
                 Box::new(move |world, cx| {
                     let within = Tiles(within(world, cx).as_num() as f32);
                     let center = match &at {
                         Some(at) => {
                             actor(world, cx, at).and_then(|who| movement::position(world, who))
                         }
-                        None => owner_entity(cx).and_then(|owner| movement::position(world, owner)),
+                        None => cx.owner.and_then(|owner| movement::position(world, owner)),
                     };
                     let Some(center) = center else {
                         return Value::Int(0);
                     };
-                    let area = owner_entity(cx)
+                    let area = cx
+                        .owner
                         .and_then(|owner| world.get::<AreaTag>(owner).map(|tag| tag.area));
                     let mut count = 0;
                     for entity in world.iter_entities() {
@@ -656,10 +661,6 @@ impl QueryDef<RiftScripting> for RiftQuery {
     }
 }
 
-pub fn owner_entity(cx: &FlowCx) -> Option<Entity> {
-    cx.owner.entity()
-}
-
 pub fn actor(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
     let who = eval(world, cx).as_actor()?;
     (world.get_entity(who).is_ok() && !stat::is_dead(world, who)).then_some(who)
@@ -671,6 +672,10 @@ pub fn character(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
 
 pub fn is_character(world: &World, who: Entity) -> bool {
     world.get::<PlayerOwner>(who).is_some()
+}
+
+fn distance(world: &World, from: Entity, to: Entity) -> Option<Tiles> {
+    Some(movement::position(world, from)?.distance(movement::position(world, to)?))
 }
 
 pub fn nearest(
@@ -728,7 +733,7 @@ struct Scan<'w> {
     roster: &'w ActorRoster,
     owner: Entity,
     from: Pos<Tiles>,
-    area: area::Id,
+    area: AreaId,
     shelter: Option<&'static Area>,
     attackers: Vec<Entity>,
     owner_presence: bool,
@@ -736,7 +741,7 @@ struct Scan<'w> {
 
 impl<'w> Scan<'w> {
     fn of(world: &'w World, cx: &FlowCx, among: Among, within: Tiles) -> Option<Scan<'w>> {
-        let owner = owner_entity(cx)?;
+        let owner = cx.owner?;
         let from = movement::position(world, owner)?;
         let area = world.get::<AreaTag>(owner)?.area;
         let roster = world.get_resource::<ActorRoster>()?;

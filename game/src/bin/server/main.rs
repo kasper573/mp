@@ -18,12 +18,12 @@ use bevy_replicon_renet2::RenetChannelsExt;
 use game::core::content::sync::{ServedContent, well_formed_hash};
 use game::core::content::{Content, ContentScope, FilesystemFolder, version, with_content};
 use game::core::math::Rng;
+use game::core::net::SessionRequest;
 use game::core::net::auth::TokenClaims;
 use game::core::platform::exit_when_stdin_closes;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::account::{Identity, Role};
-use game::systems::area::transition;
-use game::systems::area::{self, AreaDef};
+use game::systems::area::{self, AreaDef, AreaId, transition};
 use game::systems::launch::{
     AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig,
     ServerReady, Switch, TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
@@ -141,7 +141,7 @@ fn main() {
 }
 
 struct Settings {
-    area_ids: Vec<area::Id>,
+    area_ids: Vec<AreaId>,
     max_clients: usize,
     rules: SpawnRules,
     rng_seed: u64,
@@ -419,7 +419,7 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, areas: ServedAreas) -> Vec<area::Id> {
+fn select_areas(content: &Content, areas: ServedAreas) -> Vec<AreaId> {
     match areas {
         ServedAreas::Real => content.ids::<AreaDef>().collect(),
         // The initial spawn's area is one template instanced `count` times; the count is bounded
@@ -438,7 +438,7 @@ fn seeded(configured: Option<u64>) -> u64 {
 }
 
 fn build_world(
-    area: area::Id,
+    area: AreaId,
     content: &Content,
     rules: SpawnRules,
     rng_seed: u64,
@@ -603,7 +603,7 @@ struct Online(Arc<Mutex<HashMap<String, ClientId>>>);
 #[derive(Clone)]
 struct TestCharacters {
     content: Content,
-    areas: Vec<area::Id>,
+    areas: Vec<AreaId>,
     pending: Arc<Mutex<HashMap<String, JoinAs>>>,
     online: Online,
 }
@@ -677,12 +677,6 @@ async fn content_file(
     }
 }
 
-#[derive(Deserialize)]
-struct SessionRequest {
-    build: String,
-    rows: String,
-}
-
 async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> Response {
     let authorization = headers
         .get(header::AUTHORIZATION)
@@ -697,10 +691,10 @@ async fn session(State(http): State<Http>, headers: HeaderMap, body: String) -> 
         Err(error) => return (StatusCode::BAD_REQUEST, error.to_string()).into_response(),
     };
     if request.build != version::build() {
-        return (StatusCode::CONFLICT, "reload").into_response();
+        return (StatusCode::CONFLICT, "the server runs another build").into_response();
     }
     if request.rows != http.served.manifest.rows.hash {
-        return (StatusCode::CONFLICT, "sync").into_response();
+        return (StatusCode::CONFLICT, "the server serves other content").into_response();
     }
 
     // The ticket is the renet client id. The browser opens `wss://host/?ticket=<id>`; the WebSocket

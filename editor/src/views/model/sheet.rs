@@ -25,7 +25,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         starts
             .iter()
             .filter(|(start, _)| *start >= first && *start < last)
-            .map(|(_, strip)| format!("{} {}", strip.action.key(), strip.direction.key()))
+            .map(|(_, strip)| format!("{} {}", strip.action.as_ref(), strip.direction.as_ref()))
             .collect::<Vec<_>>()
             .join(" · ")
     };

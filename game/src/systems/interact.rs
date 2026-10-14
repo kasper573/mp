@@ -3,11 +3,12 @@ use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::systems::attention::{self, AttentionMark, Id as AttentionId};
+use crate::systems::attention::{self, AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
@@ -25,7 +26,7 @@ pub fn register(app: &mut App) {
     attention::mark_source(app, marks);
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, IntoStaticStr)]
 #[serde(rename_all = "snake_case")]
 pub enum Verb {
     Talk,
@@ -36,12 +37,7 @@ pub enum Verb {
 
 impl Verb {
     pub fn label(self) -> &'static str {
-        match self {
-            Verb::Talk => "Talk",
-            Verb::Use => "Use",
-            Verb::Open => "Open",
-            Verb::Read => "Read",
-        }
+        self.into()
     }
 
     pub fn cursor(self) -> CursorShape {

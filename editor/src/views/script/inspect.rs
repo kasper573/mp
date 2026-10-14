@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{RichText, Ui};
-use game::core::script::{OwnerKind, VariableType};
+use game::core::script::{OwnerKindDef, VariableType};
 use game::systems::area;
 use game::systems::area::blueprint::holes;
 use game::systems::area::{AreaDef, AreaModule};
+use game::systems::script::OwnerKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 

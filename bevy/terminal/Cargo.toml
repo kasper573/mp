@@ -13,3 +13,6 @@ bevy_ecs = { workspace = true }
 bevy_replicon = { workspace = true, features = ["client", "server"] }
 serde = { workspace = true }
 inventory = { workspace = true }
+
+[lints]
+workspace = true

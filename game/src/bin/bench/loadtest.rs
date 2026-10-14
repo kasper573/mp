@@ -20,6 +20,7 @@ use bevy_state::prelude::*;
 use game::core::content::sync::Manifest;
 use game::core::net::transport::{ClientSocket, SocketClientPlugin};
 use game::core::platform::ServerSocket;
+use game::systems::player::JoinRequest;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
 use tungstenite::Message;
@@ -330,6 +331,6 @@ fn announce_join(world: &mut World) {
     if world.resource::<Joined>().0 || session::my_id(world).is_none() {
         return;
     }
-    session::join(world);
+    world.write_message(JoinRequest);
     world.resource_mut::<Joined>().0 = true;
 }

@@ -14,6 +14,13 @@ pub(crate) fn ancestry<'a>(
     })
 }
 
+/// The entity itself, then each parent up to the root.
+pub fn self_and_ancestors(world: &World, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
+    std::iter::successors(Some(entity), |&entity| {
+        world.get::<ChildOf>(entity).map(ChildOf::parent)
+    })
+}
+
 /// The root, then every entity below it, depth first.
 pub(crate) fn descendants(world: &World, root: Entity) -> impl Iterator<Item = Entity> + '_ {
     let mut stack = vec![root];
@@ -24,6 +31,10 @@ pub(crate) fn descendants(world: &World, root: Entity) -> impl Iterator<Item = E
         }
         Some(entity)
     })
+}
+
+pub fn descendant_with<C: Component>(world: &World, root: Entity) -> Option<Entity> {
+    descendants(world, root).find(|&entity| world.get::<C>(entity).is_some())
 }
 
 pub(crate) fn ancestor_with<C: Component>(

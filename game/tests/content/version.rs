@@ -20,7 +20,7 @@ fn the_shipped_folder_carries_the_version_of_this_build() {
 
 #[test]
 fn the_version_is_pinned() {
-    assert_eq!(registry().version().0, "2ae8605f");
+    assert_eq!(registry().version().0, "ea8a6c40");
 }
 
 #[test]
@@ -33,11 +33,15 @@ fn another_version_is_refused_last() {
 
     let report = load(&folder.0).err().expect("refused");
 
-    let rules: Vec<&str> = report.errors.iter().map(|error| error.rule).collect();
+    let rules: Vec<&str> = report
+        .errors
+        .iter()
+        .map(|error| error.problem.rule)
+        .collect();
     assert_eq!(rules.last(), Some(&"content version"));
     assert!(rules.contains(&"unknown row"), "{rules:?}");
     let version = report.errors.last().expect("an error");
-    assert_eq!(version.found, "\"deadbeef\"");
+    assert_eq!(version.problem.found, "\"deadbeef\"");
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]

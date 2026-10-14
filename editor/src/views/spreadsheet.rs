@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -17,7 +18,6 @@ use crate::ui::assets::ICON_DECODES_PER_FRAME;
 use crate::ui::widgets;
 use crate::ui::{browser, theme};
 use crate::user::SpreadsheetView;
-use std::cmp::Ordering;
 
 const ROW_H: f32 = 29.0;
 const KEY_W: f32 = 110.0;
@@ -421,19 +421,16 @@ fn matches_search(row: &SpreadsheetRow, search: &str, columns: &[SpreadsheetColu
 
 fn sort_rows(rows: &mut [SpreadsheetRow], column: &SpreadsheetColumn, descending: bool) {
     rows.sort_by(|a, b| {
-        let order = match column.numeric {
-            true => ordered(column.number(a), column.number(b), |x, y| {
+        let order = if column.numeric {
+            ordered(column.number(a), column.number(b), |x, y| {
                 x.partial_cmp(y).unwrap_or(Ordering::Equal)
-            }),
-            false => ordered(column.text(a), column.text(b), |x, y| {
+            })
+        } else {
+            ordered(column.text(a), column.text(b), |x, y| {
                 x.to_lowercase().cmp(&y.to_lowercase())
-            }),
+            })
         };
-        match descending {
-            true => order.reverse(),
-            false => order,
-        }
-        .then_with(|| a.key.cmp(&b.key))
+        if descending { order.reverse() } else { order }.then_with(|| a.key.cmp(&b.key))
     });
 }
 
@@ -608,14 +605,16 @@ fn toolbar(
                     .show(ui, |ui| {
                         for column in columns.iter().filter(|c| c.source != ColumnSource::Key) {
                             let mut on = view.columns.contains(&column.id);
-                            let label = match column.sub.is_empty() {
-                                true => column.title.clone(),
-                                false => format!("{} · {}", column.title, column.sub),
+                            let label = if column.sub.is_empty() {
+                                column.title.clone()
+                            } else {
+                                format!("{} · {}", column.title, column.sub)
                             };
                             if ui.checkbox(&mut on, label).changed() {
-                                match on {
-                                    true => view.columns.push(column.id.clone()),
-                                    false => view.columns.retain(|id| *id != column.id),
+                                if on {
+                                    view.columns.push(column.id.clone())
+                                } else {
+                                    view.columns.retain(|id| *id != column.id)
                                 }
                                 changed = true;
                             }
@@ -689,13 +688,15 @@ fn table_body(
                 Some((_, false)) => format!("{} ▴", column.title.to_uppercase()),
                 None => column.title.to_uppercase(),
             };
-            let align = match column.numeric {
-                true => egui::Align2::RIGHT_TOP,
-                false => egui::Align2::LEFT_TOP,
+            let align = if column.numeric {
+                egui::Align2::RIGHT_TOP
+            } else {
+                egui::Align2::LEFT_TOP
             };
-            let x = match column.numeric {
-                true => rect.max.x - 6.0,
-                false => rect.min.x + 4.0,
+            let x = if column.numeric {
+                rect.max.x - 6.0
+            } else {
+                rect.min.x + 4.0
             };
             widgets::text_within(
                 painter,
@@ -844,9 +845,10 @@ fn table_body(
                         None if column.lacks_module(row) => ("—".to_owned(), theme::FAINT),
                         None => (String::new(), theme::FAINT),
                     };
-                    let (align, tx) = match column.numeric {
-                        true => (egui::Align2::RIGHT_CENTER, cell.max.x - 6.0),
-                        false => (egui::Align2::LEFT_CENTER, cell.min.x + 4.0),
+                    let (align, tx) = if column.numeric {
+                        (egui::Align2::RIGHT_CENTER, cell.max.x - 6.0)
+                    } else {
+                        (egui::Align2::LEFT_CENTER, cell.min.x + 4.0)
                     };
                     widgets::text_within(
                         &painter,
@@ -1186,17 +1188,16 @@ fn keys(
         let Some(value) = column.get(&rows[row_index].value).cloned() else {
             return;
         };
-        let targets: Vec<String> = match range.is_empty() {
-            true => rows
-                .get(row_index + 1)
+        let targets: Vec<String> = if range.is_empty() {
+            rows.get(row_index + 1)
                 .map(|r| vec![r.key.clone()])
-                .unwrap_or_default(),
-            false => rows
-                .iter()
+                .unwrap_or_default()
+        } else {
+            rows.iter()
                 .enumerate()
                 .filter(|(index, r)| range.contains(&(*index, column_index)) && r.key != key)
                 .map(|(_, r)| r.key.clone())
-                .collect(),
+                .collect()
         };
         if targets.is_empty() {
             return;
@@ -1512,14 +1513,16 @@ fn histogram(ui: &mut Ui, values: &[f64], highlight: Option<f64>) {
             egui::pos2(x + 2.0, rect.min.y + bar_h - h.max(2.0)),
             egui::pos2(x + bar_w - 2.0, rect.min.y + bar_h),
         );
-        let colour = match highlight_bin == Some(index) {
-            true => theme::SELECTION,
-            false => theme::RAISED.gamma_multiply(1.6),
+        let colour = if highlight_bin == Some(index) {
+            theme::SELECTION
+        } else {
+            theme::RAISED.gamma_multiply(1.6)
         };
         painter.rect_filled(bar, 2.0, colour);
-        let label = match integral && bins as f64 == high - low + 1.0 {
-            true => (low + index as f64).to_string(),
-            false => (low + span * index as f64 / bins as f64).to_string(),
+        let label = if integral && bins as f64 == high - low + 1.0 {
+            (low + index as f64).to_string()
+        } else {
+            (low + span * index as f64 / bins as f64).to_string()
         };
         if bins <= 12 {
             painter.text(

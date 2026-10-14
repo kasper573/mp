@@ -245,8 +245,9 @@ pub fn backfill(
 }
 
 pub fn signed(change: i32) -> String {
-    match change > 0 {
-        true => format!("+{change}"),
-        false => format!("\u{2212}{}", change.unsigned_abs()),
+    if change > 0 {
+        format!("+{change}")
+    } else {
+        format!("\u{2212}{}", change.unsigned_abs())
     }
 }

@@ -12,7 +12,7 @@ use fixedbitset::FixedBitSet;
 
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::attention::Attention;
 use crate::systems::dialogue::Conversation;
 use crate::systems::item::Inventory;
@@ -30,8 +30,7 @@ const VIEW_DISTANCE_SQ: f32 = VIEW_DISTANCE.0 * VIEW_DISTANCE.0;
 
 pub fn register(app: &mut App) {
     app.add_visibility_filter::<OwnedBy>();
-    app.init_resource::<RangeBit>();
-    app.init_resource::<PresenceBit>();
+    app.init_resource::<ScopeBits>();
     app.init_resource::<Sights>();
     app.init_resource::<Slots>();
     app.add_observer(grant_own_sight);
@@ -95,8 +94,7 @@ pub fn update(
     if clients.is_empty() {
         return;
     }
-    let bit = world.resource::<RangeBit>().0;
-    let presence_bit = world.resource::<PresenceBit>().0;
+    let bits = *world.resource::<ScopeBits>();
     let conditional: Vec<Entity> = presences.iter(world).collect();
     let found: Vec<(Subject, Option<SubjectSlot>)> = subjects_query
         .iter(world)
@@ -139,14 +137,14 @@ pub fn update(
         let hidden = hidden.as_mut();
         hidden.0.grow(slots);
         for (subject, slot) in &subjects {
-            let hide = !sees(sight.as_ref(), subject);
+            let hide = !sight.as_ref().is_some_and(|sight| sight.sees(subject));
             if hidden.0.contains(*slot) != hide {
                 hidden.0.set(*slot, hide);
-                visibility.set(subject.entity, bit, !hide);
+                visibility.set(subject.entity, bits.range, !hide);
             }
         }
         for (subject, shown) in present {
-            visibility.set(subject, presence_bit, shown);
+            visibility.set(subject, bits.presence, shown);
         }
     }
 }
@@ -168,9 +166,8 @@ pub fn seen_by(world: &mut World, entity: Entity) -> Vec<Entity> {
     clients
         .into_iter()
         .filter(|&(_, id)| {
-            sight(world, id).is_some_and(|sight| {
-                sees(Some(&sight), &subject) && present(world, entity, sight.focus)
-            })
+            sight(world, id)
+                .is_some_and(|sight| sight.sees(&subject) && present(world, entity, sight.focus))
         })
         .map(|(client, _)| client)
         .collect()
@@ -291,11 +288,11 @@ fn release_slot(
 
 fn reveal_to_all(
     remove: On<Remove<Presence>>,
-    bit: Res<PresenceBit>,
+    bits: Res<ScopeBits>,
     mut clients: Query<&mut ClientVisibility>,
 ) {
     for mut visibility in &mut clients {
-        visibility.set(remove.entity, bit.0, true);
+        visibility.set(remove.entity, bits.presence, true);
     }
 }
 
@@ -309,20 +306,17 @@ impl FromWorld for Sights {
 }
 
 #[derive(Resource, Clone, Copy)]
-struct RangeBit(FilterBit);
-
-impl FromWorld for RangeBit {
-    fn from_world(world: &mut World) -> Self {
-        RangeBit(entity_scope_bit(world))
-    }
+struct ScopeBits {
+    range: FilterBit,
+    presence: FilterBit,
 }
 
-#[derive(Resource, Clone, Copy)]
-struct PresenceBit(FilterBit);
-
-impl FromWorld for PresenceBit {
+impl FromWorld for ScopeBits {
     fn from_world(world: &mut World) -> Self {
-        PresenceBit(entity_scope_bit(world))
+        ScopeBits {
+            range: entity_scope_bit(world),
+            presence: entity_scope_bit(world),
+        }
     }
 }
 
@@ -337,13 +331,13 @@ fn entity_scope_bit(world: &mut World) -> FilterBit {
 struct Subject {
     entity: Entity,
     pos: Pos<Tiles>,
-    area: Option<area::Id>,
+    area: Option<AreaId>,
 }
 
 struct Sight {
     focus: Entity,
     pos: Option<Pos<Tiles>>,
-    area: Option<area::Id>,
+    area: Option<AreaId>,
 }
 
 fn sight(world: &World, client: ClientId) -> Option<Sight> {
@@ -359,15 +353,14 @@ fn sight(world: &World, client: ClientId) -> Option<Sight> {
     })
 }
 
-fn sees(sight: Option<&Sight>, subject: &Subject) -> bool {
-    let Some(sight) = sight else {
-        return false;
-    };
-    if subject.entity == sight.focus {
-        return true;
+impl Sight {
+    fn sees(&self, subject: &Subject) -> bool {
+        if subject.entity == self.focus {
+            return true;
+        }
+        let (Some(pos), Some(area)) = (self.pos, self.area) else {
+            return false;
+        };
+        subject.area == Some(area) && (pos - subject.pos).square_length() <= VIEW_DISTANCE_SQ
     }
-    let (Some(pos), Some(area)) = (sight.pos, sight.area) else {
-        return false;
-    };
-    subject.area == Some(area) && (pos - subject.pos).square_length() <= VIEW_DISTANCE_SQ
 }

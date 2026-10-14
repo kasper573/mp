@@ -13,21 +13,21 @@ use game::core::script::Value;
 use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use game::systems::TICK_HZ;
-use game::systems::area::{self, Area, AreaObject, Id as AreaId};
+use game::systems::area::{self, Area, AreaId, AreaObject};
 use game::systems::combat::Died;
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::interact::InteractRequest;
-use game::systems::item::Id as ItemId;
-use game::systems::item::{self, Inventory, ItemStack};
+use game::systems::item::{self, Inventory, ItemId, ItemStack};
 use game::systems::memory;
-use game::systems::memory::Id as MemoryId;
+use game::systems::memory::MemoryId;
 use game::systems::movement::position;
-use game::systems::notification::Id as NotificationId;
-use game::systems::notification::{Notification, NotificationKind, NotificationSent};
-use game::systems::npc::Id as NpcId;
-use game::systems::npc::{self, Npc, Pack};
+use game::systems::notification::{
+    Notification, NotificationId, NotificationKind, NotificationSent,
+};
+use game::systems::npc::{self, Npc, NpcId, Pack};
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
+use game::systems::script::condition;
 use game::systems::{GameSettings, WorldArea, from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
@@ -305,8 +305,12 @@ pub fn count(sim: &mut Sim, player: Entity, item: ItemId) -> u32 {
 }
 
 pub fn spoken(id: NotificationId) -> Notification {
-    id.get(content())
-        .for_player(&World::new(), Entity::PLACEHOLDER)
+    let def = id.get(content());
+    def.notification(condition::spoken(
+        &World::new(),
+        Entity::PLACEHOLDER,
+        &def.text,
+    ))
 }
 
 #[derive(Resource, Default)]

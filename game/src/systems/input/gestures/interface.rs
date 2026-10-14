@@ -8,10 +8,6 @@ use crate::systems::interface::CursorShape;
 pub struct InterfaceGesture;
 
 impl Gesture for InterfaceGesture {
-    fn priority(&self) -> i32 {
-        0
-    }
-
     fn claim(&self, world: &mut World) -> Option<ClickClaim> {
         world
             .resource::<InterfaceCursor>()

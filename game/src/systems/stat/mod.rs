@@ -4,13 +4,15 @@ pub mod widget;
 
 pub use health::{apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill};
 
+use std::collections::BTreeMap;
+
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::systems::effect::{self, EffectContext};
+use crate::systems::effect;
 
 #[derive(
     JsonSchema,
@@ -27,6 +29,7 @@ use crate::systems::effect::{self, EffectContext};
     IntoStaticStr,
 )]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "title_case")]
 pub enum StatKind {
     Health,
     MaxHealth,
@@ -54,42 +57,11 @@ impl StatKind {
     }
 }
 
-pub fn schema_with_units(schema: &mut schemars::Schema) {
-    let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) else {
-        return;
-    };
-    for &kind in StatKind::VARIANTS {
-        let name = serde_json::to_value(kind)
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or_default();
-        if let (Some(unit), Some(property)) = (
-            kind.unit(),
-            properties.get_mut(&name).and_then(|v| v.as_object_mut()),
-        ) {
-            property.insert(
-                "x-unit".to_owned(),
-                serde_json::Value::String(unit.to_owned()),
-            );
-        }
-    }
-}
-
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Stat {
     #[serde(rename = "stat")]
     pub kind: StatKind,
     pub value: f32,
-}
-
-pub type StatMap = std::collections::BTreeMap<StatKind, f32>;
-
-pub fn listed(stats: &StatMap) -> impl Iterator<Item = Stat> + '_ {
-    stats.iter().map(|(&kind, &value)| kind.of(value))
-}
-
-pub fn of_map(stats: &StatMap, kind: StatKind) -> f32 {
-    stats.get(&kind).copied().unwrap_or(0.0)
 }
 
 impl Stat {
@@ -98,19 +70,34 @@ impl Stat {
     }
 }
 
+#[derive(JsonSchema, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(transparent)]
+#[schemars(transform = schema_with_units)]
+pub struct StatMap(pub BTreeMap<StatKind, f32>);
+
+impl StatMap {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn get(&self, kind: StatKind) -> f32 {
+        self.0.get(&kind).copied().unwrap_or(0.0)
+    }
+
+    pub fn listed(&self) -> impl Iterator<Item = Stat> + '_ {
+        self.0.iter().map(|(&kind, &value)| kind.of(value))
+    }
+}
+
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Stats(pub Vec<Stat>);
 
-pub fn value(stats: &[Stat], kind: StatKind) -> f32 {
-    stats
-        .iter()
-        .find(|stat| stat.kind == kind)
-        .map_or(0.0, |stat| stat.value)
-}
-
 impl Stats {
     pub fn get(&self, kind: StatKind) -> f32 {
-        value(&self.0, kind)
+        self.0
+            .iter()
+            .find(|stat| stat.kind == kind)
+            .map_or(0.0, |stat| stat.value)
     }
 }
 
@@ -130,14 +117,9 @@ pub fn base(world: &World, entity: Entity, kind: StatKind) -> f32 {
 }
 
 pub fn effective(world: &World, entity: Entity, kind: StatKind) -> f32 {
-    let ctx = EffectContext {
-        world,
-        source: entity,
-        target: entity,
-    };
     let delta: f32 = effect::active_effects(world, entity)
-        .iter()
-        .flat_map(|effect| effect.compute(&ctx))
+        .into_iter()
+        .map(|effect| effect.modifier(world, entity))
         .filter(|stat| stat.kind == kind)
         .map(|stat| stat.value)
         .sum();
@@ -151,4 +133,25 @@ pub fn effective_all(world: &World, entity: Entity) -> Stats {
             .map(|&kind| kind.of(effective(world, entity, kind)))
             .collect(),
     )
+}
+
+fn schema_with_units(schema: &mut schemars::Schema) {
+    let Some(properties) = schema.get_mut("properties").and_then(|v| v.as_object_mut()) else {
+        return;
+    };
+    for &kind in StatKind::VARIANTS {
+        let name = serde_json::to_value(kind)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default();
+        if let (Some(unit), Some(property)) = (
+            kind.unit(),
+            properties.get_mut(&name).and_then(|v| v.as_object_mut()),
+        ) {
+            property.insert(
+                "x-unit".to_owned(),
+                serde_json::Value::String(unit.to_owned()),
+            );
+        }
+    }
 }

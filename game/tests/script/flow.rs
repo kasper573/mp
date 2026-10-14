@@ -2,16 +2,14 @@ use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
 use game::core::script::compile::compile_owner;
-use game::core::script::{Owner, OwnerKind};
 use game::core::tiling::Tiles;
 use game::systems::dialogue::Conversation;
-use game::systems::item::Id as ItemId;
+use game::systems::item::ItemId;
 use game::systems::movement::{Position, position};
-use game::systems::notification::Id as NotificationId;
-use game::systems::npc::Id as NpcId;
+use game::systems::notification::NotificationId;
 use game::systems::npc::body::{self, Act, Priority};
-use game::systems::npc::{self, Pack};
-use game::systems::script::{EventKind, Procedure, RiftInstances, ScriptModule};
+use game::systems::npc::{self, NpcId, Pack};
+use game::systems::script::{EventKind, Owner, OwnerKind, Procedure, RiftInstances, ScriptModule};
 use game::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
 

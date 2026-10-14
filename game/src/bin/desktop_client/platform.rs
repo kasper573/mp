@@ -135,9 +135,10 @@ impl Platform for DesktopPlatform {
         eprintln!("{status}");
     }
 
-    fn relaunch(&self, build: &str) -> bool {
-        eprintln!("the server runs build {build}; start a matching desktop-client");
-        false
+    fn relaunch(&self, build: &str) -> Result<(), String> {
+        Err(format!(
+            "The server runs build {build}. Start a desktop client of that build to play."
+        ))
     }
 }
 

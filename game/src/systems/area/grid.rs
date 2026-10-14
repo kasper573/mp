@@ -1,17 +1,31 @@
-use std::fmt;
+use std::collections::BTreeSet;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString};
 
-use super::tileset::TilesetDef;
-use super::{AreaDef, tileset};
-use crate::core::content::{Content, ContentRow, ErrorPlace, LoadError, row_folder};
-use crate::core::math::Pos;
+use super::AreaDef;
+use crate::core::content::{ContentProblem, ContentRow, ErrorPlace, LoadError, row_folder};
+use crate::core::math::{Pos, Rect, Size};
 use crate::core::tiling::{GridSize, Tiles};
-use std::collections::BTreeSet;
+use crate::systems::area::tileset::TilesetId;
 
-#[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    EnumString,
+    AsRefStr,
+)]
 #[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum Flip {
     #[default]
     None,
@@ -49,30 +63,27 @@ impl Flip {
         )
     }
 
+    pub fn anchored(self, at: Pos<Tiles>, size: Size<Tiles>) -> Rect<Tiles> {
+        let min = Pos::new(
+            if self.horizontal() {
+                at.x - size.width
+            } else {
+                at.x
+            },
+            if self.vertical() {
+                at.y - size.height
+            } else {
+                at.y
+            },
+        );
+        Rect::new(min, size)
+    }
+
     pub fn apply(self, p: Pos<Tiles>) -> Pos<Tiles> {
         Pos::new(
             if self.horizontal() { -p.x } else { p.x },
             if self.vertical() { -p.y } else { p.y },
         )
-    }
-
-    pub fn parse(text: &str) -> Option<Flip> {
-        match text {
-            "" | "none" => Some(Flip::None),
-            "horizontal" => Some(Flip::Horizontal),
-            "vertical" => Some(Flip::Vertical),
-            "both" => Some(Flip::Both),
-            _ => None,
-        }
-    }
-
-    pub fn csv(self) -> &'static str {
-        match self {
-            Flip::None => "",
-            Flip::Horizontal => "horizontal",
-            Flip::Vertical => "vertical",
-            Flip::Both => "both",
-        }
     }
 }
 
@@ -93,16 +104,15 @@ pub fn area_of_palette_file(path: &str) -> Option<&str> {
 }
 
 pub fn write_palette(rows: &[PaletteRow]) -> String {
-    let mut text = String::from("tileset,tile,flip\n");
-    for row in rows {
-        text.push_str(&format!(
-            "{},{},{}\n",
-            row.tileset,
-            row.tile,
-            row.flip.csv()
-        ));
-    }
-    text
+    let header = PALETTE_HEADER.map(str::to_owned).to_vec();
+    write_records(std::iter::once(header).chain(rows.iter().map(|row| {
+        let flip = if row.flip.is_none() {
+            ""
+        } else {
+            row.flip.as_ref()
+        };
+        vec![row.tileset.clone(), row.tile.to_string(), flip.to_owned()]
+    })))
 }
 
 pub fn layer_file(layer: &str) -> String {
@@ -111,7 +121,7 @@ pub fn layer_file(layer: &str) -> String {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PaletteEntry {
-    pub tileset: tileset::Id,
+    pub tileset: TilesetId,
     pub tile: u32,
     pub flip: Flip,
 }
@@ -176,13 +186,11 @@ pub fn write_walk(size: GridSize, walk: &[Option<bool>]) -> String {
 }
 
 fn write_grid<T>(size: GridSize, cells: &[T], show: impl Fn(&T) -> String) -> String {
-    let mut text = String::new();
-    for row in cells.chunks(size.width.max(1) as usize) {
-        let fields: Vec<String> = row.iter().map(&show).collect();
-        text.push_str(&fields.join(","));
-        text.push('\n');
-    }
-    text
+    write_records(
+        cells
+            .chunks(size.width.max(1) as usize)
+            .map(|row| row.iter().map(&show).collect()),
+    )
 }
 
 pub struct GridFile<'a> {
@@ -190,20 +198,21 @@ pub struct GridFile<'a> {
     pub text: &'a str,
 }
 
+pub struct BadCell {
+    pub rule: &'static str,
+    pub expected: String,
+}
+
 pub fn read_grid<T>(
     file: GridFile,
     size: GridSize,
-    mut cell: impl FnMut(&str) -> Result<T, String>,
+    mut cell: impl FnMut(&str) -> Result<T, BadCell>,
     errors: &mut Vec<LoadError>,
 ) -> Option<Vec<T>>
 where
     T: Default + Clone,
 {
-    let records: Vec<Vec<&str>> = file
-        .text
-        .lines()
-        .map(|line| line.split(',').collect())
-        .collect();
+    let records = read_records(&file, errors)?;
     let height = size.height as usize;
     let width = size.width as usize;
     if records.len() != height || records.iter().any(|record| record.len() != width) {
@@ -214,10 +223,11 @@ where
         errors.push(LoadError {
             file: file.path.to_owned(),
             at: ErrorPlace::WholeFile,
-            rule: "grid size",
-            found,
-            expected: format!("{height} rows of {width} columns, the area's size"),
-            nearest: None,
+            problem: ContentProblem::new(
+                "grid size",
+                found,
+                format!("{height} rows of {width} columns, the area's size"),
+            ),
         });
         return None;
     }
@@ -225,9 +235,9 @@ where
     let mut ok = true;
     for (row, record) in records.iter().enumerate() {
         for (column, field) in record.iter().enumerate() {
-            match cell(field.trim()) {
+            match cell(field) {
                 Ok(value) => cells[row * width + column] = value,
-                Err(expected) => {
+                Err(bad) => {
                     ok = false;
                     errors.push(LoadError {
                         file: file.path.to_owned(),
@@ -235,14 +245,7 @@ where
                             row: row + 1,
                             column: column + 1,
                         },
-                        rule: if expected.starts_with("0 to") {
-                            "palette out of range"
-                        } else {
-                            "bad cell"
-                        },
-                        found: format!("{field:?}"),
-                        expected,
-                        nearest: None,
+                        problem: ContentProblem::new(bad.rule, format!("{field:?}"), bad.expected),
                     });
                 }
             }
@@ -258,79 +261,101 @@ pub struct PaletteRow {
     pub flip: Flip,
 }
 
-impl PaletteRow {
-    pub fn resolve(&self, content: &Content) -> Option<PaletteEntry> {
-        Some(PaletteEntry {
-            tileset: content.by_key::<TilesetDef>(&self.tileset)?,
-            tile: self.tile,
-            flip: self.flip,
-        })
-    }
-}
-
 pub fn read_palette(file: GridFile, errors: &mut Vec<LoadError>) -> Option<Vec<PaletteRow>> {
-    let mut lines = file.text.lines().enumerate();
-    match lines.next() {
-        Some((_, "tileset,tile,flip")) => {}
-        other => {
-            errors.push(LoadError {
-                file: file.path.to_owned(),
-                at: ErrorPlace::Csv { row: 1, column: 1 },
-                rule: "bad cell",
-                found: format!("{:?}", other.map_or("", |(_, line)| line)),
-                expected: "the header tileset,tile,flip".to_owned(),
-                nearest: None,
-            });
-            return None;
-        }
+    let mut records = read_records(&file, errors)?.into_iter();
+    let header = records.next();
+    if header
+        .as_ref()
+        .is_none_or(|header| !header.iter().eq(PALETTE_HEADER))
+    {
+        errors.push(LoadError {
+            file: file.path.to_owned(),
+            at: ErrorPlace::Csv { row: 1, column: 1 },
+            problem: ContentProblem::new(
+                "bad cell",
+                format!("{:?}", header.as_ref().map(joined).unwrap_or_default()),
+                format!("the header {}", PALETTE_HEADER.join(",")),
+            ),
+        });
+        return None;
     }
     let mut rows = Vec::new();
     let mut ok = true;
-    for (index, line) in lines {
-        let fields: Vec<&str> = line.split(',').map(str::trim).collect();
-        let row = index + 1;
-        let mut bad = |column: usize, found: &str, expected: &str| {
-            errors.push(LoadError {
-                file: file.path.to_owned(),
-                at: ErrorPlace::Csv { row, column },
-                rule: "bad cell",
-                found: format!("{found:?}"),
-                expected: expected.to_owned(),
-                nearest: None,
-            });
-        };
-        if fields.len() != 3 {
-            bad(1, line, "three fields: tileset,tile,flip");
-            ok = false;
-            continue;
-        }
-        let tile = match fields[1].parse::<u32>() {
-            Ok(tile) => tile,
-            Err(_) => {
-                bad(2, fields[1], "a tile number");
+    for (index, record) in records.enumerate() {
+        match palette_row(&record) {
+            Ok(row) => rows.push(row),
+            Err((column, found, expected)) => {
                 ok = false;
-                continue;
+                errors.push(LoadError {
+                    file: file.path.to_owned(),
+                    at: ErrorPlace::Csv {
+                        row: index + 2,
+                        column,
+                    },
+                    problem: ContentProblem::new("bad cell", format!("{found:?}"), expected),
+                });
             }
-        };
-        let Some(flip) = Flip::parse(fields[2]) else {
-            bad(3, fields[2], "empty, horizontal, vertical or both");
-            ok = false;
-            continue;
-        };
-        rows.push(PaletteRow {
-            tileset: fields[0].to_owned(),
-            tile,
-            flip,
-        });
+        }
     }
     ok.then_some(rows)
 }
 
-impl fmt::Display for Flip {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match self {
-            Flip::None => "none",
-            other => other.csv(),
-        })
+const PALETTE_HEADER: [&str; 3] = ["tileset", "tile", "flip"];
+
+fn palette_row(record: &csv::StringRecord) -> Result<PaletteRow, (usize, String, &'static str)> {
+    if record.len() != PALETTE_HEADER.len() {
+        return Err((1, joined(record), "three fields: tileset,tile,flip"));
     }
+    let tile = record[1]
+        .parse::<u32>()
+        .map_err(|_| (2, record[1].to_owned(), "a tile number"))?;
+    let flip = match &record[2] {
+        "" => Ok(Flip::None),
+        text => text.parse::<Flip>(),
+    }
+    .map_err(|_| {
+        (
+            3,
+            record[2].to_owned(),
+            "empty, horizontal, vertical or both",
+        )
+    })?;
+    Ok(PaletteRow {
+        tileset: record[0].to_owned(),
+        tile,
+        flip,
+    })
+}
+
+fn read_records(file: &GridFile, errors: &mut Vec<LoadError>) -> Option<Vec<csv::StringRecord>> {
+    csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_reader(file.text.as_bytes())
+        .records()
+        .collect::<Result<_, _>>()
+        .map_err(|error| {
+            errors.push(LoadError {
+                file: file.path.to_owned(),
+                at: ErrorPlace::WholeFile,
+                problem: ContentProblem::new("unreadable file", error, "a UTF-8 CSV file"),
+            })
+        })
+        .ok()
+}
+
+fn joined(record: &csv::StringRecord) -> String {
+    record.iter().collect::<Vec<_>>().join(",")
+}
+
+fn write_records(records: impl Iterator<Item = Vec<String>>) -> String {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    for record in records {
+        writer
+            .write_record(record)
+            .expect("a record writes to memory");
+    }
+    String::from_utf8(writer.into_inner().expect("records write to memory"))
+        .expect("records write as UTF-8")
 }

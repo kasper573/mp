@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::movement::{self, approach, position};
 use crate::systems::stat;
 use crate::systems::visibility;
@@ -32,7 +32,7 @@ pub enum Pursuit {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Tether {
     pub anchor: Pos<Tiles>,
-    pub area: area::Id,
+    pub area: AreaId,
     pub range: Tiles,
     pub with: Option<Entity>,
 }
@@ -66,7 +66,7 @@ impl Tether {
 }
 
 pub fn intend(world: &mut World, actor: Entity, target: Entity, act: ReachAct) {
-    movement::forget(world, actor);
+    movement::halt(world, actor);
     world.entity_mut(actor).insert(ReachIntent { target, act });
 }
 
@@ -94,7 +94,7 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
     if stat::is_dead(world, actor)
         || world.get_entity(target).is_err()
         || stat::is_dead(world, target)
-        || !same_area(world, actor, target)
+        || !area::same_area(world, actor, target)
         || !visibility::coexist(world, actor, target)
     {
         return Pursuit::Lost;
@@ -111,10 +111,5 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
 
 pub fn forget(world: &mut World, actor: Entity) {
     world.entity_mut(actor).remove::<ReachIntent>();
-    movement::forget(world, actor);
-}
-
-fn same_area(world: &World, actor: Entity, target: Entity) -> bool {
-    let area = |entity| world.get::<AreaTag>(entity).map(|tag| tag.area);
-    area(actor).is_some() && area(actor) == area(target)
+    movement::halt(world, actor);
 }

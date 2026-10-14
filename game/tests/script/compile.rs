@@ -3,13 +3,13 @@ use std::sync::Arc;
 use game::core::content::{Content, ContentBuilder, ContentId, ContentScope, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
-use game::core::script::{EffectDef, OwnerKind, ScriptError};
-use game::systems::item::Id as ItemId;
-use game::systems::memory::Id as MemoryId;
+use game::core::script::{EffectDef, ScriptError};
+use game::systems::item::ItemId;
+use game::systems::memory::MemoryId;
 use game::systems::script::{
-    EventKind, Place, Procedure, Reach, ScriptDef, ScriptId, ScriptModule,
+    EventKind, OwnerKind, Place, Procedure, Reach, ScriptDef, ScriptId, ScriptModule,
 };
-use game::systems::shop::Id as ShopId;
+use game::systems::shop::ShopId;
 use serde_json::{Value, json};
 
 use crate::json::{effect, inline, parse};
@@ -189,6 +189,28 @@ fn too_many_steps_between_pauses_are_refused() {
     let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
 
     assert_eq!(error.rule, "too many steps");
+}
+
+#[test]
+fn an_effect_or_query_refuses_by_its_own_rule() {
+    let effect = inline(json!({
+        "on": entry(OwnerKind::Npc, "a"),
+        "a": { "type": "complete_task", "quest": "x_marks_the_spot", "task": "no_such_task" },
+    }));
+    let query = inline(json!({
+        "on": entry(OwnerKind::Npc, "a"),
+        "a": {
+            "type": "if",
+            "test": { "type": "task_done", "quest": "x_marks_the_spot", "task": "no_such_task" },
+        },
+    }));
+
+    for script in [effect, query] {
+        let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+
+        assert_eq!(error.rule, "unknown task");
+        assert_eq!(error.node.as_deref(), Some("a"));
+    }
 }
 
 const HELPER: ScriptId = ContentId::new(0);

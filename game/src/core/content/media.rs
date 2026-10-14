@@ -4,7 +4,7 @@ use std::io::Cursor;
 use rayon::prelude::*;
 
 use super::load::Loading;
-use super::report::ErrorPlace;
+use super::report::{ContentProblem, ErrorPlace};
 
 pub struct ImageSizes(pub HashMap<String, (u32, u32)>);
 
@@ -71,10 +71,7 @@ pub fn check_media(loading: &mut Loading) {
             Err((rule, found, expected)) => loading.file_error(
                 super::asset_file(&path),
                 ErrorPlace::WholeFile,
-                rule,
-                found,
-                expected,
-                None,
+                ContentProblem::new(rule, found, expected),
             ),
         }
     }

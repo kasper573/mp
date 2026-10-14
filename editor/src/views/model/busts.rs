@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
@@ -9,12 +10,11 @@ use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs};
-use std::collections::HashSet;
 
 const CARD: Vec2 = Vec2::new(178.0, 165.0);
 
 pub fn generic() -> impl Iterator<Item = &'static str> {
-    GenericExpression::VARIANTS.iter().map(|face| face.key())
+    GenericExpression::VARIANTS.iter().map(|face| face.as_ref())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

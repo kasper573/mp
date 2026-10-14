@@ -1,19 +1,20 @@
 use bevy::prelude::*;
+use strum::VariantArray;
 use ui::{Align, RichPiece, Side, TooltipText, tooltip, tooltip_content};
 
 use crate::core::content::Content;
-use crate::systems::equipment::{self, Equipment, EquipmentSlot};
+use crate::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
 use crate::systems::hud::{
     HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
     tooltip_label,
 };
 use crate::systems::input::map::{ActionInput, InputAction, input};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::item::{Id as ItemId, card};
+use crate::systems::item::{ItemId, card};
 use crate::systems::player::session;
 
 #[derive(Component, Default, Clone)]
-pub(super) struct EquipmentGrid;
+struct EquipmentGrid;
 
 pub struct EquipmentWindow;
 
@@ -29,9 +30,6 @@ impl Window for EquipmentWindow {
     }
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Equipment
-    }
-    fn order(&self) -> u32 {
-        1
     }
     fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
         single_tab(self.title(), ui::scrolled(content()))
@@ -52,24 +50,19 @@ fn content() -> Box<dyn Scene> {
     })
 }
 
+#[derive(Hash)]
 struct CellData {
     slot: EquipmentSlot,
-    item: Option<ItemId>,
-    icon: Option<Handle<Image>>,
+    worn: Option<(ItemId, Handle<Image>)>,
 }
 
-pub(super) fn sync_equipment(world: &mut World) {
+fn sync_equipment(world: &mut World) {
     let cells = equipment_cells(world);
     let mut grids = world.query_filtered::<Entity, With<EquipmentGrid>>();
     let Some(grid) = grids.iter(world).next() else {
         return;
     };
-    let keys: Vec<u64> = cells
-        .iter()
-        .enumerate()
-        .map(|(index, cell)| cell_key(index, cell))
-        .collect();
-    reconcile_children(world, grid, &keys, |world, index| {
+    reconcile_children(world, grid, &cells, |world, index| {
         cell_scene(world.resource::<Content>(), &cells[index])
     });
 }
@@ -78,33 +71,22 @@ fn equipment_cells(world: &World) -> Vec<CellData> {
     let content = world.resource::<Content>();
     let equipment = session::my_character(world).and_then(|me| me.get::<Equipment>());
     let assets = world.resource::<AssetServer>();
-    equipment::EquipmentSlot::all()
+    EquipmentSlot::VARIANTS
         .iter()
         .copied()
         .map(|slot| {
             let item = equipment.and_then(|equipment| equipment.slots.get(&slot).copied());
             CellData {
                 slot,
-                item,
-                icon: item.map(|item| assets.load(item.get(content).icon.path())),
+                worn: item.map(|item| (item, assets.load(item.get(content).icon.path()))),
             }
         })
         .collect()
 }
 
-fn cell_key(index: usize, cell: &CellData) -> u64 {
-    let content = cell.item.map_or(0, |item| item.index() as u64 + 1);
-    ((index as u64) << 48) | content
-}
-
 fn cell_scene(content: &Content, cell: &CellData) -> Box<dyn Scene> {
-    match &cell.icon {
-        Some(icon) => Box::new(worn_slot(
-            content,
-            cell.slot,
-            cell.item.expect("a worn slot holds an item"),
-            icon.clone(),
-        )),
+    match &cell.worn {
+        Some((item, icon)) => Box::new(worn_slot(content, cell.slot, *item, icon.clone())),
         None => Box::new(empty_slot(cell.slot)),
     }
 }
@@ -151,7 +133,7 @@ fn worn_slot(
         ui::CursorStyle::Pointer
         on(move |click: On<PointerClick>, input: ActionInput, mut commands: Commands| {
             if input.clicked(InputAction::UseItem, &click) {
-                commands.queue(move |world: &mut World| session::unequip(world, slot));
+                commands.write_message(UnequipRequest { slot });
             } else if input.clicked(InputAction::InspectItem, &click) {
                 commands.queue(move |world: &mut World| card::open(world, item));
             }

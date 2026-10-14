@@ -3,16 +3,14 @@ use std::time::Duration;
 use bevy::prelude::*;
 use ui::tokens::{palette, typography};
 
-use super::{Notification, NotificationKind, NotificationSent};
+use super::{Notification, NotificationSent};
+use crate::systems::hud::spawn_ui;
 
 #[derive(Component, Default, Clone)]
 pub(super) struct ErrorToaster;
 
 pub fn toast(world: &mut World, notification_sent: NotificationSent) {
     let notification = notification_sent.notification;
-    if !matches!(notification.kind, NotificationKind::Error { .. }) {
-        return;
-    }
     let Some(toaster) = world
         .query_filtered::<Entity, With<ErrorToaster>>()
         .iter(world)
@@ -45,9 +43,7 @@ pub fn toast(world: &mut World, notification_sent: NotificationSent) {
         row
         Children [ @{body} ]
     };
-    if let Ok(mut spawned) = world.spawn_scene(toast) {
-        spawned.insert(ChildOf(toaster));
-    }
+    spawn_ui(world, toast).insert(ChildOf(toaster));
 }
 
 pub fn shown(world: &mut World) -> Option<String> {
@@ -55,7 +51,7 @@ pub fn shown(world: &mut World) -> Option<String> {
         .query::<(&ErrorRow, &ui::Toast)>()
         .iter(world)
         .find(|(_, toast)| !toast.leaving)
-        .map(|(row, _)| super::plain_words(&row.0.text))
+        .map(|(row, _)| row.0.text.plain_words())
 }
 
 #[derive(Component, Clone)]

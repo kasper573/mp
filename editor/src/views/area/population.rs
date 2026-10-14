@@ -3,7 +3,8 @@ use game::core::content::Content;
 use game::core::math::{Direction, Pos, Rng};
 use game::core::tiling::Tiles;
 use game::core::time::{PlaybackRate, Seconds};
-use game::systems::actor::{Action, ActorModel, model};
+use game::systems::actor::model::ModelId;
+use game::systems::actor::{Action, ActorModel};
 use game::systems::area;
 use game::systems::npc::NpcDef;
 use game::systems::player::PlayerDef;
@@ -138,7 +139,7 @@ pub fn model_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
     content: Content,
-    model: model::Id,
+    model: ModelId,
 ) -> Option<NpcSprite> {
     let model = ActorModel::get(&content, model);
     let project = editor.project.as_ref()?;

@@ -104,3 +104,24 @@ fn refusals_read_as_what_is_needed() {
         "Needs 20 more Gold"
     );
 }
+
+#[test]
+fn taking_up_to_stacks_takes_what_is_held_and_no_more() {
+    let mut inventory = bag(
+        3,
+        &[
+            ItemStack::new(row("OrcTusk"), 3),
+            ItemStack::new(row("Bone"), 1),
+        ],
+    );
+
+    inventory.take_up_to(&[
+        ItemStack::new(row("OrcTusk"), 2),
+        ItemStack::new(row("OrcTusk"), 2),
+        ItemStack::new(row("Gold"), 5),
+    ]);
+
+    assert_eq!(inventory.count(row("OrcTusk")), 0);
+    assert_eq!(inventory.count(row("Gold")), 0);
+    assert_eq!(inventory.count(row("Bone")), 1);
+}

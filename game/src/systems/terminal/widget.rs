@@ -4,8 +4,7 @@ use bevy_terminal::TerminalInput;
 use crate::systems::hud::{HudAudience, Window, reconcile_children, single_tab};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::terminal::TerminalKind;
-use crate::systems::terminal::Terminals;
+use crate::systems::terminal::{TerminalKind, Terminals};
 
 pub struct TerminalWindow;
 
@@ -22,19 +21,16 @@ impl Window for TerminalWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Terminal
     }
-    fn order(&self) -> u32 {
-        6
-    }
     fn contents(&self, world: &World) -> Vec<ui::WindowContent> {
         let terminals = world.resource::<Terminals>();
         if terminals.tabs.is_empty() {
-            return single_tab("Terminal", ui::text("Waiting for server…"));
+            return single_tab(self.title(), ui::text("Waiting for server…"));
         }
         terminals
             .tabs
             .iter()
             .map(|&terminal| ui::WindowContent {
-                title: tab_title(terminal).to_owned(),
+                title: <&str>::from(terminal).to_owned(),
                 scene: Box::new(tab_scene(terminal)),
             })
             .collect()
@@ -47,12 +43,6 @@ impl Window for TerminalWindow {
 #[derive(Component, Clone)]
 struct TerminalLog {
     terminal: TerminalKind,
-}
-
-fn tab_title(terminal: TerminalKind) -> &'static str {
-    match terminal {
-        TerminalKind::Global => "Global",
-    }
 }
 
 fn tab_scene(terminal: TerminalKind) -> impl Scene {

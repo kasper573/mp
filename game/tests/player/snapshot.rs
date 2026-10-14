@@ -22,7 +22,7 @@ use game::systems::player::snapshot::{
 use game::systems::quest::{QuestLog, QuestResult};
 use game::systems::script::Place;
 use game::systems::shop::{Sale, ShopLedger};
-use game::systems::stat::{StatKind, Stats};
+use game::systems::stat::{StatKind, StatMap, Stats};
 use game::systems::text::LineText;
 
 use crate::support::{CLOCK, Sim, content, row};
@@ -159,7 +159,7 @@ fn tess(start: Place) -> CharacterSnapshot {
         name: "Tess".to_owned(),
         job: row("adventurer"),
         xp: 60,
-        stats: BTreeMap::from([(StatKind::Damage, 9.0)]),
+        stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
         effects: vec![SnapshotEffect {
             effect: Effect::Chasing,
             left: Seconds(30.0),

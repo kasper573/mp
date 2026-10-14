@@ -1,8 +1,11 @@
+use std::collections::HashSet;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use super::expr::Expr;
-use super::{Arrow, Name, Vocabulary};
+use super::{Arrow, Name, ScriptFault, Vocabulary};
 
 pub const MAX_LINES: usize = 16;
 pub const MAX_CHOICES: usize = 12;
@@ -28,29 +31,38 @@ pub struct Choice<V: Vocabulary> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires: Option<Expr<V>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub reveal: Vec<Reveal>,
+    pub reveal: Vec<ChoiceReveal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warn: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Arrow,
 }
 
-#[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, IntoStaticStr,
+)]
 #[serde(rename_all = "snake_case")]
-pub enum Reveal {
+#[strum(serialize_all = "snake_case")]
+pub enum ChoiceReveal {
     Locked,
     Needs,
     Costs,
     Gains,
 }
 
-impl Reveal {
+impl ChoiceReveal {
     pub fn name(self) -> &'static str {
-        match self {
-            Reveal::Locked => "locked",
-            Reveal::Needs => "needs",
-            Reveal::Costs => "costs",
-            Reveal::Gains => "gains",
+        self.into()
+    }
+
+    pub fn check_unique(reveal: &[ChoiceReveal]) -> Result<(), ScriptFault> {
+        let mut seen = HashSet::new();
+        match reveal.iter().find(|kind| !seen.insert(**kind)) {
+            Some(kind) => Err(ScriptFault::new(
+                "revealed twice",
+                format!("{} twice", kind.name()),
+            )),
+            None => Ok(()),
         }
     }
 }
@@ -69,7 +81,7 @@ pub struct ChoiceOffer<'a, V: Vocabulary> {
     pub label: &'static V::Text,
     pub locked: bool,
     pub requires: Option<&'static Expr<V>>,
-    pub reveal: &'static [Reveal],
+    pub reveal: &'static [ChoiceReveal],
     pub warn: Option<Name>,
     pub leads: Vec<&'a V::Effect>,
 }

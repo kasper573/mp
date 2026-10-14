@@ -4,7 +4,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use ui::{RichPiece, RichText};
 
-use super::despawn_all;
+use super::{ClientScreen, despawn_all};
 use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
 use crate::core::content::media::ImageSizes;
@@ -17,7 +17,9 @@ use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
-use crate::systems::area::{self, AreaTag, tileset};
+use crate::systems::area::tileset::TilesetId;
+use crate::systems::area::{self, AreaId, AreaTag, tileset};
+use crate::systems::hud::spawn_ui;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
 use crate::systems::player::AreaDrawn;
@@ -39,11 +41,11 @@ impl Plugin for AreaPlugin {
                     retain_loaded_images,
                     sync_death_banner,
                 )
-                    .run_if(in_state(super::Scene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnEnter(super::Scene::Area), restart_patience)
+            .add_systems(OnEnter(ClientScreen::Area), restart_patience)
             .add_systems(
-                OnExit(super::Scene::Area),
+                OnExit(ClientScreen::Area),
                 (despawn_all::<DeathBanner>, silence_soundscape, leave_area),
             );
     }
@@ -55,7 +57,7 @@ const ARRIVAL_PATIENCE: Seconds = Seconds(5.0);
 
 #[derive(Resource, Default)]
 struct SpawnedArea {
-    area: Option<area::Id>,
+    area: Option<AreaId>,
     images: Vec<Handle<Image>>,
 }
 
@@ -63,14 +65,14 @@ struct SpawnedArea {
 struct Crossing {
     last_seen: Option<Pose>,
     held: Option<Held>,
-    drawn: Option<area::Id>,
+    drawn: Option<AreaId>,
 }
 
 #[derive(Clone, Copy)]
 struct Pose {
     at: Pos<Tiles>,
     heading: Direction,
-    area: area::Id,
+    area: AreaId,
 }
 
 #[derive(Clone, Copy)]
@@ -177,7 +179,7 @@ fn pose_of(world: &World, character: Entity) -> Option<Pose> {
     })
 }
 
-fn area_drawable(world: &mut World, area: area::Id) -> bool {
+fn area_drawable(world: &mut World, area: AreaId) -> bool {
     let spawned = world.resource::<SpawnedArea>();
     if spawned.area != Some(area) {
         return false;
@@ -269,9 +271,9 @@ fn spawn_area_tiles(
     content: Res<Content>,
     mut spawned: ResMut<SpawnedArea>,
     tiles: Query<Entity, With<bevy_tilemap::MapTile>>,
-    mut images: ResMut<bevy::asset::Assets<Image>>,
-    mut meshes: ResMut<bevy::asset::Assets<Mesh>>,
-    mut materials: ResMut<bevy::asset::Assets<bevy_tilemap::TilemapMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<bevy_tilemap::TilemapMaterial>>,
     mut commands: Commands,
 ) {
     let Some(area_id) = viewpoint
@@ -340,7 +342,7 @@ fn spawn_area_tiles(
     let flat_count = area
         .scenery
         .iter()
-        .filter(|s| s.sort_line().is_none())
+        .filter(|scenery| scenery.sort_line().is_none())
         .count();
     let mut flat_index = 0;
     for scenery in &area.scenery {
@@ -408,7 +410,7 @@ fn silence_soundscape(mut soundscape: ResMut<Soundscape>) {
 }
 
 pub struct TileSheets {
-    pub tilesets: Vec<tileset::Id>,
+    pub tilesets: Vec<TilesetId>,
     pub sheets: Vec<bevy_tilemap::TileSheet>,
 }
 
@@ -416,11 +418,11 @@ impl TileSheets {
     pub fn new(
         content: &Content,
         grids: &area::AreaGrids,
-        scenery: impl Iterator<Item = tileset::Id>,
+        scenery: impl Iterator<Item = TilesetId>,
         mut image_of: impl FnMut(&tileset::TilesetDef) -> Handle<Image>,
     ) -> TileSheets {
         let sizes = content.built::<ImageSizes>();
-        let mut tilesets: Vec<tileset::Id> = grids
+        let mut tilesets: Vec<TilesetId> = grids
             .palette
             .iter()
             .map(|entry| entry.tileset)
@@ -456,7 +458,7 @@ impl TileSheets {
         TileSheets { tilesets, sheets }
     }
 
-    pub fn index(&self, tileset: tileset::Id) -> Option<usize> {
+    pub fn index(&self, tileset: TilesetId) -> Option<usize> {
         self.tilesets.iter().position(|&id| id == tileset)
     }
 }
@@ -472,7 +474,7 @@ fn sync_death_banner(world: &mut World) {
         .next();
     match (dead, banner) {
         (true, None) => {
-            let _ = world.spawn_scene(death_banner());
+            spawn_ui(world, death_banner());
         }
         (false, Some(banner)) => world.entity_mut(banner).despawn(),
         _ => {}

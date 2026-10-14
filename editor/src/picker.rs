@@ -1,9 +1,8 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::core::script::OwnerKind;
 use game::systems::area;
 use game::systems::area::{AreaDef, AreaModule};
 use game::systems::npc::{self, NpcDef};
-use game::systems::script::RiftScripts;
+use game::systems::script::{OwnerKind, RiftScripts};
 
 use crate::forms::{FormAction, FormCx};
 use crate::project::{row_file, row_of};

@@ -5,8 +5,7 @@ use strum::IntoStaticStr;
 
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
-    Answer, Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, FlowKey, Name, OwnerKind,
-    ValueType,
+    Answer, Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::{self, Actor};
@@ -15,9 +14,10 @@ use crate::systems::dialogue;
 use crate::systems::movement;
 use crate::systems::npc::{Home, Roams};
 use crate::systems::reach::{self, ReachAct};
-use crate::systems::script::effect::{self as effects, Arrow, Link};
-use crate::systems::script::query;
-use crate::systems::script::{Condition, Place, Reach, RiftInstances, RiftScripting};
+use crate::systems::script::effect::{Arrow, Link};
+use crate::systems::script::{
+    Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
+};
 use crate::systems::stat;
 use crate::systems::visibility;
 
@@ -25,11 +25,14 @@ use crate::systems::visibility;
 pub struct Priority(pub u8);
 
 impl Priority {
-    pub fn checked(priority: u8) -> Result<Priority, String> {
+    pub fn checked(priority: u8) -> Result<Priority, ScriptFault> {
         if (1..=9).contains(&priority) {
             Ok(Priority(priority))
         } else {
-            Err(format!("priority {priority} is not 1 to 9"))
+            Err(ScriptFault::new(
+                "out of range",
+                format!("a priority 1 to 9, not {priority}"),
+            ))
         }
     }
 }
@@ -124,7 +127,7 @@ pub fn order(world: &mut World, npc: Entity, act: Act, priority: Priority, flow:
         }
     };
     if let Some(interrupted) = interrupted {
-        clear(world, npc);
+        reach::forget(world, npc);
         answer(world, interrupted, Outcome::Interrupted);
     }
 }
@@ -165,7 +168,7 @@ pub fn drive(
     for &npc in npcs.iter() {
         if talking.contains(&npc) {
             if movement::moving(world, npc) {
-                movement::forget(world, npc);
+                movement::halt(world, npc);
             }
             continue;
         }
@@ -196,7 +199,7 @@ pub fn drive(
             running.started = true;
         }
         if let Some(output) = outcome {
-            clear(world, npc);
+            reach::forget(world, npc);
             if let Some(mut body) = world.get_mut::<Body>(npc) {
                 body.current = None;
             }
@@ -215,10 +218,6 @@ fn start_waiting(world: &mut World, npc: Entity) {
     }
 }
 
-fn clear(world: &mut World, npc: Entity) {
-    reach::forget(world, npc);
-}
-
 fn answer(world: &mut World, running: Running, outcome: Outcome) {
     if running.pauses()
         && let Some(flow) = running.flow
@@ -232,7 +231,7 @@ fn answer(world: &mut World, running: Running, outcome: Outcome) {
 fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
     match running.act {
         Act::Stop => {
-            movement::forget(world, npc);
+            movement::halt(world, npc);
             Some(Outcome::Next)
         }
         Act::Wander { leash } => {
@@ -247,7 +246,7 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
                 return Some(Outcome::Blocked);
             };
             if movement::approach(world, npc, goal, within) {
-                movement::forget(world, npc);
+                movement::halt(world, npc);
                 return Some(Outcome::Arrived);
             }
             if running.started && !movement::moving(world, npc) {
@@ -265,12 +264,10 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             let lost = (|| {
                 let at = movement::position(world, npc)?;
                 let there = movement::position(world, target)?;
-                let same_area = world.get::<AreaTag>(npc).map(|tag| tag.area)
-                    == world.get::<AreaTag>(target).map(|tag| tag.area);
                 let sheltered = area::wild(world, npc)
                     && area::of(world, npc).is_some_and(|area| area.safe(there));
                 Some(
-                    !same_area
+                    !area::same_area(world, npc, target)
                         || at.distance(there) > within
                         || !visibility::coexist(world, npc, target)
                         || sheltered,
@@ -296,9 +293,7 @@ fn destination(world: &World, npc: Entity, to: Destination) -> Option<Pos<Tiles>
             if stat::is_dead(world, actor) {
                 return None;
             }
-            if world.get::<AreaTag>(npc).map(|tag| tag.area)
-                != world.get::<AreaTag>(actor).map(|tag| tag.area)
-            {
+            if !area::same_area(world, npc, actor) {
                 return None;
             }
             movement::position(world, actor)
@@ -398,8 +393,6 @@ pub enum FaceTarget {
 type Aimed<T> = Box<dyn Fn(&World, &FlowCx) -> Option<T> + Send + Sync>;
 
 const NPC: &[OwnerKind] = &[OwnerKind::Npc];
-const WALK_BLOCKED: usize = 1;
-const ATTACK_LOST: usize = 1;
 
 impl EffectDef<RiftScripting> for Wander {
     fn owners(&self) -> &'static [OwnerKind] {
@@ -411,22 +404,17 @@ impl EffectDef<RiftScripting> for Wander {
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
-        let leash = cx
-            .opt_expr(self.leash.as_ref(), ValueType::Number)
-            .map_err(effects::bad)?;
-        Ok(Box::new(move |world, cx| {
+        let leash = cx.opt_expr(self.leash.as_ref(), ValueType::Number)?;
+        Ok(Box::new(move |world, _, cx| {
             let leash = leash
                 .as_ref()
                 .map(|leash| Tiles(leash(world, cx).as_num() as f32));
-            if let Some(npc) = cx.owner.entity() {
+            if let Some(npc) = cx.owner {
                 order(world, npc, Act::Wander { leash }, priority, None);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -451,11 +439,9 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
-        let within = cx
-            .expr(&self.within, ValueType::Number)
-            .map_err(effects::bad)?;
+        let within = cx.expr(&self.within, ValueType::Number)?;
         let to: Aimed<Destination> = match &self.to {
             WalkTarget::Place(place) => {
                 let at = place.at;
@@ -464,34 +450,24 @@ impl EffectDef<RiftScripting> for WalkTo {
             WalkTarget::Object(name) => {
                 let name = name.as_str();
                 Box::new(move |world, cx| {
-                    let area = cx
-                        .owner
-                        .entity()
-                        .and_then(|npc| world.get::<AreaTag>(npc))?
-                        .area;
+                    let area = cx.owner.and_then(|npc| world.get::<AreaTag>(npc))?.area;
                     object::named(world, area, name).map(Destination::Object)
                 })
             }
             WalkTarget::Actor(actor) => {
-                let actor: Eval = cx.expr(actor, ValueType::Actor).map_err(effects::bad)?;
+                let actor: Eval = cx.expr(actor, ValueType::Actor)?;
                 Box::new(move |world, cx| query::actor(world, cx, &actor).map(Destination::Actor))
             }
         };
-        Ok(Box::new(move |world, cx| {
-            let Some(npc) = cx.owner.entity() else {
-                return EffectStep::Output(WALK_BLOCKED);
+        Ok(Box::new(move |world, flow, cx| {
+            let Some(npc) = cx.owner else {
+                return EffectStep::Output(Outcome::Blocked.name());
             };
             let Some(to) = to(world, cx) else {
-                return EffectStep::Output(WALK_BLOCKED);
+                return EffectStep::Output(Outcome::Blocked.name());
             };
             let within = Tiles(within(world, cx).as_num() as f32);
-            order(
-                world,
-                npc,
-                Act::WalkTo { to, within },
-                priority,
-                Some(cx.key),
-            );
+            order(world, npc, Act::WalkTo { to, within }, priority, Some(flow));
             EffectStep::Pause
         }))
     }
@@ -517,20 +493,16 @@ impl EffectDef<RiftScripting> for Attack {
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
-        let target = cx
-            .expr(&self.target, ValueType::Actor)
-            .map_err(effects::bad)?;
-        let within = cx
-            .expr(&self.within, ValueType::Number)
-            .map_err(effects::bad)?;
-        Ok(Box::new(move |world, cx| {
-            let Some(npc) = cx.owner.entity() else {
-                return EffectStep::Output(ATTACK_LOST);
+        let target = cx.expr(&self.target, ValueType::Actor)?;
+        let within = cx.expr(&self.within, ValueType::Number)?;
+        Ok(Box::new(move |world, flow, cx| {
+            let Some(npc) = cx.owner else {
+                return EffectStep::Output(Outcome::Lost.name());
             };
             let Some(target) = query::actor(world, cx, &target) else {
-                return EffectStep::Output(ATTACK_LOST);
+                return EffectStep::Output(Outcome::Lost.name());
             };
             let within = Tiles(within(world, cx).as_num() as f32);
             order(
@@ -538,7 +510,7 @@ impl EffectDef<RiftScripting> for Attack {
                 npc,
                 Act::Attack { target, within },
                 priority,
-                Some(cx.key),
+                Some(flow),
             );
             EffectStep::Pause
         }))
@@ -558,16 +530,16 @@ impl EffectDef<RiftScripting> for Stop {
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(
+        &'static self,
+        _cx: &mut Compiler<RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
-        Ok(Box::new(move |world, cx| {
-            if let Some(npc) = cx.owner.entity() {
+        Ok(Box::new(move |world, _, cx| {
+            if let Some(npc) = cx.owner {
                 order(world, npc, Act::Stop, priority, None);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -585,27 +557,24 @@ impl EffectDef<RiftScripting> for FaceToward {
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let toward: Aimed<Pos<Tiles>> = match &self.toward {
             FaceTarget::Place(place) => {
                 let at = place.at;
                 Box::new(move |_, _| Some(at))
             }
             FaceTarget::Actor(actor) => {
-                let actor: Eval = cx.expr(actor, ValueType::Actor).map_err(effects::bad)?;
+                let actor: Eval = cx.expr(actor, ValueType::Actor)?;
                 Box::new(move |world, cx| {
                     query::actor(world, cx, &actor).and_then(|who| movement::position(world, who))
                 })
             }
         };
-        Ok(Box::new(move |world, cx| {
-            if let (Some(npc), Some(at)) = (cx.owner.entity(), toward(world, cx)) {
+        Ok(Box::new(move |world, _, cx| {
+            if let (Some(npc), Some(at)) = (cx.owner, toward(world, cx)) {
                 face_toward(world, npc, at);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {

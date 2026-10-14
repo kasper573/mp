@@ -17,6 +17,9 @@ members = [
 version = "0.1.0"
 edition = "2024"
 
+[workspace.lints.clippy]
+match_bool = "warn"
+
 [workspace.dependencies]
 askama = "0.16"
 axum-prometheus = "0.10"

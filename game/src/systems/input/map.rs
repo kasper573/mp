@@ -5,7 +5,7 @@ use bevy::picking::events::PointerClick;
 use bevy::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::VariantArray;
+use strum::{IntoStaticStr, VariantArray};
 use ui::{
     CatalogEntry, ClickGesture, DragGesture, InputCatalog, InputRef, KeyGesture, KeyModifiers,
     RichPiece,
@@ -23,8 +23,8 @@ use crate::core::content::{Content, ContentRow, Fixture};
     PartialEq,
     Eq,
     Hash,
-    strum::IntoStaticStr,
-    strum::VariantArray,
+    IntoStaticStr,
+    VariantArray,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum InputAction {
@@ -170,9 +170,7 @@ impl InputMap {
                 .collect(),
         )
     }
-}
 
-impl InputMap {
     pub fn bindings(&self, action: InputAction) -> &[InputBinding] {
         self.0.get(&action).map_or(&[], Vec::as_slice)
     }

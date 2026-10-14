@@ -8,7 +8,7 @@ use bevy_ecs::prelude::*;
 use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
 use game::core::math::Rng;
 use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::area::Id as AreaId;
+use game::systems::area::AreaId;
 use game::systems::player::snapshot::JoinAs;
 use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
 use game::systems::{from_client, load_content, start_server};

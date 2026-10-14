@@ -1,19 +1,16 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
 use ui::tokens::{palette, spacing, typography};
 use ui::{DragHandle, DragRoot, OnSettle};
 
 use super::card::{Countdown, icon, live_text};
-use super::{Parties, QuestId, QuestLog, QuestResult};
+use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
-use crate::systems::attention::AttentionMark;
-use crate::systems::hud::{self, HudAudience, Widget};
+use crate::systems::hud::{self, HudAudience, Widget, spawn_ui};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::screen::ClientScreen;
 
 const WIDTH: f32 = 230.0;
 const MARK: f32 = 16.0;
@@ -24,7 +21,7 @@ impl Plugin for QuestTrackerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Folded>()
             .init_resource::<Built>()
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -116,17 +113,16 @@ fn sync_tracker(world: &mut World) {
         .cloned()
         .unwrap_or_default();
     let folded = world.resource::<Folded>().0;
-    let mut hasher = DefaultHasher::new();
-    (&entries, folded).hash(&mut hasher);
-    let key = hasher.finish();
+    let key = hud::fingerprint(&(&entries, folded));
     if world.resource::<Built>().0 == Some(key) {
         return;
     }
     world.resource_mut::<Built>().0 = Some(key);
     if let Some(mut node) = world.get_mut::<Node>(panel) {
-        node.display = match entries.is_empty() {
-            true => Display::None,
-            false => Display::Flex,
+        node.display = if entries.is_empty() {
+            Display::None
+        } else {
+            Display::Flex
         };
     }
     let header = header(entries.len(), folded);
@@ -142,9 +138,7 @@ fn sync_tracker(world: &mut World) {
     }
     world.entity_mut(panel).despawn_related::<Children>();
     for part in parts {
-        if let Ok(mut spawned) = world.spawn_scene(part) {
-            spawned.insert(ChildOf(panel));
-        }
+        spawn_ui(world, part).insert(ChildOf(panel));
     }
 }
 
@@ -163,15 +157,9 @@ fn entries(world: &World) -> Vec<Entry> {
             if let Some(active) = log.active(quest) {
                 let timed = active.left.is_some();
                 if active.ready && def.decision().is_none() {
-                    let mark = if def.daily() {
-                        AttentionMark::RepeatableReady
-                    } else {
-                        AttentionMark::QuestReady
-                    }
-                    .id(content);
                     return Some(Entry {
                         quest,
-                        mark: Some(&mark.get(content).icon),
+                        mark: Some(&ready_mark(def).get(content).icon),
                         timed,
                         rows: vec![(
                             def.hand_in_hint(parties, quest),
@@ -186,9 +174,10 @@ fn entries(world: &World) -> Vec<Entry> {
                     .into_iter()
                     .enumerate()
                     .map(|(index, progress)| {
-                        let count = Count::Fixed(match progress.counted {
-                            true => format!("{}/{}", progress.have, progress.need),
-                            false => String::new(),
+                        let count = Count::Fixed(if progress.counted {
+                            format!("{}/{}", progress.have, progress.need)
+                        } else {
+                            String::new()
                         });
                         let tone = if progress.done() {
                             Tone::Done
@@ -235,9 +224,10 @@ fn entries(world: &World) -> Vec<Entry> {
 
 fn header(count: usize, folded: bool) -> impl Scene {
     let ink = ui::theme::theme().surface_floating.on;
-    let (title, toggle) = match folded {
-        true => (format!("QUESTS ({count})"), "+"),
-        false => ("QUESTS".to_owned(), "–"),
+    let (title, toggle) = if folded {
+        (format!("QUESTS ({count})"), "+")
+    } else {
+        ("QUESTS".to_owned(), "–")
     };
     bsn! {
         Node { justify_content: JustifyContent::SpaceBetween, align_items: AlignItems::Center, width: Val::Percent(100.0) }

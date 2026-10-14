@@ -1,21 +1,18 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use bevy::prelude::*;
 use ui::tokens::{palette, spacing, typography};
 use ui::{Carried, CarryTarget, ChipOptions, ConfirmOptions, Family, OnTap};
 
-use super::{Id as ShopId, OfferView, Sale, ShopRequest, ShopView, WareRefusal};
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::content::{Content, Fixture};
+use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
+use crate::core::content::Content;
 use crate::systems::dialogue::stage;
-use crate::systems::hud;
+use crate::systems::hud::{self, spawn_ui};
 use crate::systems::input::map::{ActionInput, InputAction, input};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
-use crate::systems::item::{Id as ItemId, Inventory, ItemCategory, ItemStack, card};
+use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::Scene as GameScene;
-use crate::systems::scene::mode::Mode;
+use crate::systems::screen::ClientScreen;
+use crate::systems::screen::mode::ClientMode;
 
 const COUNTER_SIZE: Vec2 = Vec2::new(620.0, 400.0);
 const ICON: f32 = 28.0;
@@ -39,9 +36,9 @@ impl Plugin for ShopCounterPlugin {
                 Update,
                 (show_counter, sync_counter)
                     .chain()
-                    .run_if(in_state(GameScene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(GameScene::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -104,7 +101,7 @@ fn show_counter(world: &mut World) {
     match (shop, panel) {
         (Some(shop), None) => {
             *world.resource_mut::<Browse>() = Browse::default();
-            let playing = *world.resource::<Mode>() == Mode::Play;
+            let playing = *world.resource::<ClientMode>() == ClientMode::Play;
             let panel = ui::DialoguePanelOptions {
                 title: shop.get(&content).title.to_owned(),
                 width: Val::Px(COUNTER_SIZE.x),
@@ -114,7 +111,7 @@ fn show_counter(world: &mut World) {
             if let Some(panel) = stage::show_panel(world, panel) {
                 world.entity_mut(panel).insert(CounterPanel);
             }
-            chime(world, InterfaceSound::UiOpen);
+            InterfaceSound::UiOpen.play(world);
         }
         (None, Some(panel)) => {
             world.entity_mut(panel).despawn();
@@ -188,9 +185,9 @@ fn sync_counter(world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    let playing = *world.resource::<Mode>() == Mode::Play;
+    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
     let browse = world.resource::<Browse>();
-    let synced = key(&(
+    let synced = hud::fingerprint(&(
         &shown,
         &inventory.slots,
         browse.tab,
@@ -218,9 +215,9 @@ fn sync_counter(world: &mut World) {
             format!("Buy back ({})", shelf.shown.buyback.len()),
         ),
     ];
-    let tab_keys: Vec<u64> = tabs
+    let tab_keys: Vec<(ShopTab, &String, bool)> = tabs
         .iter()
-        .map(|(tab, label)| key(&(tab, label, shelf.tab == *tab)))
+        .map(|(tab, label)| (*tab, label, shelf.tab == *tab))
         .collect();
     hud::reconcile_children(world, parts.tabs, &tab_keys, |_, index| {
         let (tab, label) = tabs[index].clone();
@@ -228,7 +225,7 @@ fn sync_counter(world: &mut World) {
     });
 
     let wants = shelf.shown.shop.get(&content).wants(&content);
-    hud::reconcile_children(world, parts.wants, &[key(&wants)], |_, _| {
+    hud::reconcile_children(world, parts.wants, &[&wants], |_, _| {
         Box::new(ui::styled_text(
             wants_note(&wants),
             palette::AMBER_80,
@@ -237,13 +234,13 @@ fn sync_counter(world: &mut World) {
     });
 
     let list_keys: Vec<u64> = if wares.is_empty() {
-        vec![key(&shelf.tab)]
+        vec![hud::fingerprint(&shelf.tab)]
     } else {
         wares
             .iter()
             .enumerate()
             .map(|(index, ware)| {
-                key(&(
+                hud::fingerprint(&(
                     shelf.tab,
                     index,
                     ware,
@@ -267,16 +264,16 @@ fn sync_counter(world: &mut World) {
         }
     });
 
-    let detail_keys: Vec<u64> = wares
+    let detail_keys: Vec<(ShopTab, usize, &Ware, Vec<u32>, bool)> = wares
         .get(selected)
         .map(|ware| {
-            key(&(
+            (
                 shelf.tab,
                 selected,
                 ware,
                 held(&shelf.inventory, ware),
                 shelf.playing,
-            ))
+            )
         })
         .into_iter()
         .collect();
@@ -285,7 +282,7 @@ fn sync_counter(world: &mut World) {
     });
 
     let selling = shelf.playing && !wants.is_empty();
-    hud::reconcile_children(world, parts.footer, &[key(&selling)], |_, _| {
+    hud::reconcile_children(world, parts.footer, &[selling], |_, _| {
         Box::new(sell_hint(selling))
     });
 }
@@ -314,12 +311,6 @@ fn single<C: Component>(world: &mut World) -> Option<Entity> {
     world.query_filtered::<Entity, With<C>>().iter(world).next()
 }
 
-fn key(value: &impl std::fmt::Debug) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    format!("{value:?}").hash(&mut hasher);
-    hasher.finish()
-}
-
 fn held(inventory: &Inventory, ware: &Ware) -> Vec<u32> {
     ware.price
         .iter()
@@ -335,7 +326,7 @@ struct Shelf {
     playing: bool,
 }
 
-#[derive(Debug)]
+#[derive(Hash)]
 struct Ware {
     item: ItemId,
     count: u32,
@@ -601,7 +592,7 @@ fn trade_button(tab: ShopTab, ware: &Ware, index: usize) -> impl Scene + use<> {
 }
 
 fn trade(world: &mut World, tab: ShopTab, index: usize) {
-    if *world.resource::<Mode>() != Mode::Play {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
     let index = index as u32;
@@ -613,7 +604,7 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
             world.write_message(ShopRequest::Buyback { sale: index });
         }
     }
-    chime(world, InterfaceSound::UiPick);
+    InterfaceSound::UiPick.play(world);
 }
 
 fn price_chip(
@@ -703,12 +694,12 @@ fn paid(content: &Content, pays: &[ItemStack], count: u32) -> String {
 }
 
 fn selling(world: &World) -> bool {
-    *world.resource::<Mode>() == Mode::Play && view(world).is_some()
+    *world.resource::<ClientMode>() == ClientMode::Play && view(world).is_some()
 }
 
 fn request_sale(world: &mut World, slot: u32) {
     let content = *world.resource::<Content>();
-    if *world.resource::<Mode>() != Mode::Play {
+    if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
     let Some((shop, declined)) = view(world).map(|shown| (shown.shop, shown.declined.clone()))
@@ -750,18 +741,10 @@ fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemS
         on_cancel: OnTap::new(|_| {}),
         keep: InputAction::TakeDefault.into(),
     });
-    world.spawn_scene(dialog).ok();
+    spawn_ui(world, dialog);
 }
 
 fn sell(world: &mut World, slot: u32, stack: ItemStack) {
     world.write_message(ShopRequest::Sell { slot, stack });
-    chime(world, InterfaceSound::Coins);
-}
-
-fn chime(world: &mut World, sound: InterfaceSound) {
-    let id = sound.id(world.resource::<Content>());
-    world.write_message(PlaySfx {
-        id,
-        place: SfxPlace::Interface,
-    });
+    InterfaceSound::Coins.play(world);
 }

@@ -2,53 +2,42 @@ use std::collections::BTreeSet;
 
 use bevy_ecs::prelude::*;
 
-use super::Id;
+use super::AreaId;
 use crate::core::content::Content;
 use crate::core::math::Pos;
-use crate::core::script::Owner as ScriptOwner;
 use crate::core::tiling::Tiles;
-use crate::systems::actor::Name;
-use crate::systems::dialogue::Heard;
-use crate::systems::effect::TimedEffects;
-use crate::systems::equipment::Equipment;
-use crate::systems::history::{self, History, HistoryEntry, HistoryMark, HistoryTopic};
-use crate::systems::item::Inventory;
-use crate::systems::job::Job;
-use crate::systems::memory::Memory;
+use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::npc::Npc;
-use crate::systems::player::{CharacterState, ClientId, Owner, Players, Xp};
-use crate::systems::quest::QuestLog;
-use crate::systems::script::{EventKind, RiftEvent, RiftInstances};
-use crate::systems::shop;
-use crate::systems::stat;
+use crate::systems::player::{CharacterState, ClientId, Owner, Players};
+use crate::systems::script::{EventKind, RiftEvent, RiftInstances, area_owner};
 use crate::systems::text::LineText;
 
 #[derive(Component, Clone, Copy)]
 pub struct Crossing {
-    pub dest_area: Id,
+    pub dest_area: AreaId,
     pub dest: Pos<Tiles>,
 }
 
 #[derive(Component, Clone, Debug, Default)]
-pub struct Discovered(BTreeSet<Id>);
+pub struct Discovered(BTreeSet<AreaId>);
 
 impl Discovered {
-    pub fn starting_in(zone: Id) -> Discovered {
+    pub fn starting_in(zone: AreaId) -> Discovered {
         Discovered(BTreeSet::from([zone]))
     }
 
-    pub fn discover(&mut self, area: Id) -> bool {
+    pub fn discover(&mut self, area: AreaId) -> bool {
         self.0.insert(area)
     }
 
-    pub fn knows(&self, area: Id) -> bool {
+    pub fn knows(&self, area: AreaId) -> bool {
         self.0.contains(&area)
     }
 }
 
 pub struct Traveler {
     pub client: ClientId,
-    pub dest_area: Id,
+    pub dest_area: AreaId,
     pub dest: Pos<Tiles>,
     pub state: CharacterState,
 }
@@ -63,38 +52,15 @@ pub fn departing(world: &mut World) -> Vec<Traveler> {
         .into_iter()
         .filter_map(|entity| {
             let crossing = *world.get::<Crossing>(entity)?;
+            let mut state = CharacterState::of(world, entity, crossing.dest)?;
+            state.memory.leave_area(&content);
             Some((
                 entity,
                 Traveler {
                     client: world.get::<Owner>(entity)?.client,
                     dest_area: crossing.dest_area,
                     dest: crossing.dest,
-                    state: CharacterState {
-                        name: world.get::<Name>(entity)?.name.clone(),
-                        spawn: crossing.dest,
-                        discovered: world.get::<Discovered>(entity)?.clone(),
-                        stats: stat::snapshot(world, entity),
-                        inventory: world.get::<Inventory>(entity)?.clone(),
-                        xp: world.get::<Xp>(entity)?.clone(),
-                        equipment: world.get::<Equipment>(entity)?.clone(),
-                        job: *world.get::<Job>(entity)?,
-                        timed: world
-                            .get::<TimedEffects>(entity)
-                            .cloned()
-                            .unwrap_or_default(),
-                        memory: world
-                            .get::<Memory>(entity)
-                            .cloned()
-                            .map(|mut memory| {
-                                memory.leave_area(&content);
-                                memory
-                            })
-                            .unwrap_or_default(),
-                        heard: world.get::<Heard>(entity).cloned().unwrap_or_default(),
-                        ledger: shop::ledger(world, entity),
-                        quests: world.get::<QuestLog>(entity).cloned().unwrap_or_default(),
-                        history: world.get::<History>(entity).cloned().unwrap_or_default(),
-                    },
+                    state,
                 },
             ))
         })
@@ -132,8 +98,9 @@ pub fn arrive(world: &mut World, mut traveler: Traveler) -> Entity {
 
 pub fn raise_area(world: &mut World, kind: EventKind, subject: Entity) {
     let is_npc = world.get::<Npc>(subject).is_some();
+    let owner = area_owner(world);
     world.resource_mut::<RiftInstances>().raise(
-        ScriptOwner::Area,
+        owner,
         kind,
         Some(subject),
         Vec::new(),

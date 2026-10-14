@@ -18,7 +18,8 @@ use crate::core::math::Pos;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::tiling::Tiles;
 use crate::systems::interface::CursorShape;
-use crate::systems::scene::Scene as GameScene;
+use crate::systems::player::session;
+use crate::systems::screen::ClientScreen;
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum ClickClaim {
@@ -32,15 +33,13 @@ pub enum ClickClaim {
 }
 
 pub fn claim(world: &mut World) -> ClickClaim {
-    let gestures = world.resource::<Gestures>().0.clone();
-    gestures
+    GESTURES
         .iter()
         .find_map(|gesture| gesture.claim(world))
         .unwrap_or(ClickClaim::Nothing)
 }
 
 pub trait Gesture: Send + Sync {
-    fn priority(&self) -> i32;
     fn claim(&self, world: &mut World) -> Option<ClickClaim>;
     fn drive(&self, world: &mut World, start: bool);
     fn cursor(&self, world: &mut World) -> Option<CursorIcon>;
@@ -49,18 +48,21 @@ pub trait Gesture: Send + Sync {
     }
 }
 
+// The first gesture to claim a click takes it.
 static GESTURES: &[&dyn Gesture] = &[
-    &attack::AttackGesture,
-    &default::DefaultGesture,
-    &interact::InteractGesture,
     &interface::InterfaceGesture,
     &locked::LockedGesture,
+    &attack::AttackGesture,
     &pickup::PickupGesture,
+    &interact::InteractGesture,
     &walk::WalkGesture,
+    &default::DefaultGesture,
 ];
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Startup, setup)
+    app.init_resource::<Latched>()
+        .init_resource::<LockSeen>()
+        .init_resource::<AppliedCursor>()
         .add_systems(
             Update,
             load_cursors.run_if(resource_exists_and_changed::<Content>),
@@ -69,12 +71,9 @@ pub fn plugin(app: &mut App) {
             Update,
             update
                 .in_set(WorldViewSystems)
-                .run_if(in_state(GameScene::Area)),
+                .run_if(in_state(ClientScreen::Area)),
         );
 }
-
-#[derive(Resource)]
-pub(crate) struct Gestures(pub Vec<&'static dyn Gesture>);
 
 #[derive(Resource, Default)]
 struct Latched(Option<GestureIndex>);
@@ -101,17 +100,7 @@ fn load_cursors(content: Res<Content>, assets: Res<AssetServer>, mut commands: C
     commands.insert_resource(CursorImages(images));
 }
 
-fn setup(mut commands: Commands) {
-    let mut gestures: Vec<&'static dyn Gesture> = GESTURES.to_vec();
-    gestures.sort_by_key(|gesture| gesture.priority());
-    commands.insert_resource(Gestures(gestures));
-    commands.init_resource::<Latched>();
-    commands.init_resource::<LockSeen>();
-    commands.init_resource::<AppliedCursor>();
-}
-
 fn update(world: &mut World) {
-    let gestures = world.resource::<Gestures>().0.clone();
     forget_clicks_across_lock(world);
 
     let mut active = world.resource::<Latched>().0;
@@ -119,7 +108,7 @@ fn update(world: &mut World) {
     let just = map::just_pressed(world, InputAction::Interact);
     // A click pressed and released between two frames arrives as `just` without `pressed`.
     if just {
-        active = gestures
+        active = GESTURES
             .iter()
             .position(|gesture| gesture.claim(world).is_some())
             .map(GestureIndex);
@@ -127,14 +116,14 @@ fn update(world: &mut World) {
         active = None;
     }
     if let Some(GestureIndex(index)) = active {
-        gestures[index].drive(world, just);
+        GESTURES[index].drive(world, just);
     }
     world.resource_mut::<Latched>().0 = active.filter(|_| pressed);
 
     let mut cursor = None;
     let mut highlight = None;
     let mut first_claimant = true;
-    for gesture in &gestures {
+    for gesture in GESTURES {
         if gesture.claim(world).is_none() {
             continue;
         }
@@ -158,7 +147,7 @@ fn update(world: &mut World) {
 }
 
 fn forget_clicks_across_lock(world: &mut World) {
-    let locked = crate::systems::player::session::is_locked(world);
+    let locked = session::is_locked(world);
     if std::mem::replace(&mut world.resource_mut::<LockSeen>().0, locked) != locked {
         world.resource_mut::<ButtonInput<MouseButton>>().reset_all();
         world.resource_mut::<Latched>().0 = None;

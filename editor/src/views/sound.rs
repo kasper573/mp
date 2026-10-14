@@ -1,12 +1,13 @@
 use egui::Ui;
+use game::core::audio::loader;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems::area;
+use game::systems::area::AreaId;
 
 use crate::app::Editor;
 use crate::ui::theme;
-use game::core::audio::loader;
 
 #[derive(Clone, Debug, Default)]
 pub struct ListeningPoint {
@@ -29,7 +30,7 @@ pub struct IntegratedLoudness {
     pub peak_dbfs: f64,
 }
 
-pub fn listen(editor: &mut Editor, content: Content, area_id: area::Id, at: Pos<Tiles>) {
+pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Tiles>) {
     let area = area::load(&content, area_id);
     let key = area_id.key(&content).to_owned();
     let mut heard = Vec::new();

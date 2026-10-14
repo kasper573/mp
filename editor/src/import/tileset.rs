@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
+use game::systems::area::grid::{self, PaletteRow};
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 
 use super::formats::{self, AnimationExport};
 use crate::ui::widgets;
-use game::systems::area::grid::{self, PaletteRow};
 
 pub const MAX_TILE_PX: u32 = 512;
 pub const MAX_COLOURS: usize = 256;
@@ -631,9 +631,10 @@ pub fn apply_anim_plan(
         }
         entry["animation"] = Value::Array(frames);
     }
-    let png = match changed {
-        true => Some(formats::encode_png(&image)?),
-        false => None,
+    let png = if changed {
+        Some(formats::encode_png(&image)?)
+    } else {
+        None
     };
     Ok((png, row))
 }

@@ -10,17 +10,17 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
-use crate::core::script::{Owner, OwnerKind, OwnerRow};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
 use crate::systems::actor::{Hitbox, Name as ActorName};
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::interact::Interactive;
 use crate::systems::movement::Position;
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner as PlayerOwner;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
-    self, Condition, EventKind, Place, RiftEvent, RiftInstances, ScriptModule,
+    self, Condition, EventKind, Owner, OwnerKind, OwnerRow, Place, RiftEvent, RiftInstances,
+    ScriptModule,
 };
 use crate::systems::visibility::Presence;
 use crate::systems::{WorldArea, dialogue};
@@ -44,6 +44,15 @@ pub struct ObjectDef {
     pub shown: Option<Condition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scripts: Vec<ScriptModule>,
+}
+
+impl ObjectDef {
+    pub fn title(&self, index: u32) -> String {
+        self.name
+            .clone()
+            .or_else(|| self.label.clone())
+            .unwrap_or_else(|| format!("object {index}"))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -274,7 +283,7 @@ pub fn spawn_all(world: &mut World) {
     }
 }
 
-pub fn named(world: &World, area: area::Id, name: &str) -> Option<Entity> {
+pub fn named(world: &World, area: AreaId, name: &str) -> Option<Entity> {
     world.iter_entities().find_map(|entity| {
         let object = entity.get::<AreaObject>()?;
         let tag = entity.get::<AreaTag>()?;
@@ -316,7 +325,7 @@ pub fn track(
                 .contains(&Owner::Entity(OwnerKind::Object, object))
         })
     };
-    let watched = |object: &AreaObject, area: area::Id| {
+    let watched = |object: &AreaObject, area: AreaId| {
         watchers
             .iter()
             .any(|watcher| watcher.area == area && Some(&watcher.object) == object.name.as_ref())
@@ -334,7 +343,7 @@ pub fn track(
     if placed.is_empty() {
         return;
     }
-    let positions: Vec<(Entity, Pos<Tiles>, area::Id)> = actors
+    let positions: Vec<(Entity, Pos<Tiles>, AreaId)> = actors
         .iter(world)
         .map(|(entity, at, tag)| (entity, at.pos, tag.area))
         .collect();
@@ -387,12 +396,12 @@ struct Placed {
     entity: Entity,
     name: Option<String>,
     shape: ObjectShape,
-    area: area::Id,
+    area: AreaId,
 }
 
 struct Watcher {
     npc: Entity,
-    area: area::Id,
+    area: AreaId,
     object: String,
 }
 

@@ -1,3 +1,3 @@
 fn main() {
-    print!("{}", game::systems::account::role::provisioning_conf());
+    print!("{}", game::systems::account::provisioning_conf());
 }

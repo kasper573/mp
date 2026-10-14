@@ -2,20 +2,20 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{DroppedItem, Id, Inventory, ItemStack, ReservedBy};
+use super::{DroppedItem, Inventory, ItemId, ItemStack};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectCall, EffectDef, EffectStep, Eval, FlowCx, Name, OwnerKind, ValueType,
+    Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
 };
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
-use crate::systems::area::{self, AreaTag};
+use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::equipment::{self, EquipmentSlot};
 use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
-use crate::systems::script::{Condition, Place, Reach, RiftScripting};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::{Condition, EffectCall, Place, Reach, RiftScripting};
 use crate::systems::visibility::Presence;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ pub struct Items {
 pub struct UseItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub item: Id,
+    pub item: ItemId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub used: Arrow,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,7 +47,7 @@ pub struct UseItem {
 pub struct Equip {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub item: Id,
+    pub item: ItemId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -69,7 +69,7 @@ pub struct Unequip {
 pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
-    pub item: Id,
+    pub item: ItemId,
     pub count: Condition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
@@ -83,13 +83,8 @@ pub struct SpawnGroundItems {
     pub items: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Spot>,
-    #[schemars(with = "GroundItemsFor")]
-    #[serde(
-        rename = "for",
-        serialize_with = "ground_items_for",
-        deserialize_with = "ground_items_for_from"
-    )]
-    pub for_subject: bool,
+    #[serde(rename = "for")]
+    pub for_whom: GroundItemsFor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds: Option<Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -124,33 +119,14 @@ pub enum Spot {
     Actor(Condition),
 }
 
-fn ground_items_for<S: serde::Serializer>(
-    for_subject: &bool,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(if *for_subject { "subject" } else { "anyone" })
-}
-
-#[derive(Deserialize, JsonSchema)]
+#[derive(JsonSchema, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum GroundItemsFor {
+pub enum GroundItemsFor {
     Subject,
     Anyone,
 }
 
-fn ground_items_for_from<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<bool, D::Error> {
-    Ok(matches!(
-        GroundItemsFor::deserialize(deserializer)?,
-        GroundItemsFor::Subject
-    ))
-}
-
 impl EffectDef<RiftScripting> for Items {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -160,28 +136,19 @@ impl EffectDef<RiftScripting> for Items {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let (take, give, refused) = (
             self.take.as_slice(),
             self.give.as_slice(),
             self.refused.as_deref(),
         );
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody to trade with");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to trade with");
             };
-            match exchange(world, actor, take, give) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = exchange(world, actor, take, give);
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -194,9 +161,6 @@ impl EffectDef<RiftScripting> for Items {
 }
 
 impl EffectDef<RiftScripting> for UseItem {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -206,24 +170,15 @@ impl EffectDef<RiftScripting> for UseItem {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let (item, refused) = (self.item, self.refused.as_deref());
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody to use it");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to use it");
             };
-            match super::use_held(world, actor, item) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = super::use_held(world, actor, item);
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -232,9 +187,6 @@ impl EffectDef<RiftScripting> for UseItem {
 }
 
 impl EffectDef<RiftScripting> for Equip {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -244,24 +196,15 @@ impl EffectDef<RiftScripting> for Equip {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let (item, refused) = (self.item, self.refused.as_deref());
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody to equip");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to equip");
             };
-            match equipment::equip_held(world, actor, item) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = equipment::equip_held(world, actor, item);
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -270,9 +213,6 @@ impl EffectDef<RiftScripting> for Equip {
 }
 
 impl EffectDef<RiftScripting> for Unequip {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -282,24 +222,15 @@ impl EffectDef<RiftScripting> for Unequip {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let (slot, refused) = (self.slot, self.refused.as_deref());
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody to unequip");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to unequip");
             };
-            match equipment::unequip_slot(world, actor, slot) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = equipment::unequip_slot(world, actor, slot);
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -308,9 +239,6 @@ impl EffectDef<RiftScripting> for Unequip {
 }
 
 impl EffectDef<RiftScripting> for DropItems {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
@@ -320,28 +248,17 @@ impl EffectDef<RiftScripting> for DropItems {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let count = cx
-            .expr(&self.count, ValueType::Integer)
-            .map_err(effects::bad)?;
+        let count = cx.expr(&self.count, ValueType::Integer)?;
         let (item, refused) = (self.item, self.refused.as_deref());
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                effects::refuse(world, cx, refused, "Nobody to drop them");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to drop them");
             };
             let count = count(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
-            match drop_held(world, actor, ItemStack::new(item, count)) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = drop_held(world, actor, ItemStack::new(item, count));
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -350,46 +267,35 @@ impl EffectDef<RiftScripting> for DropItems {
 }
 
 impl EffectDef<RiftScripting> for SpawnGroundItems {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
-        self.for_subject || self.at.is_none()
+        self.for_whom == GroundItemsFor::Subject || self.at.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let at = spot(cx, self.at.as_ref())?;
-        let seconds = cx
-            .opt_expr(self.seconds.as_ref(), ValueType::Number)
-            .map_err(effects::bad)?;
-        let (items, for_subject) = (self.items.as_slice(), self.for_subject);
-        Ok(Box::new(move |world, cx| {
+        let seconds = cx.opt_expr(self.seconds.as_ref(), ValueType::Number)?;
+        let (items, for_whom) = (self.items.as_slice(), self.for_whom);
+        Ok(Box::new(move |world, _, cx| {
             let Some((area, from)) = at(world, cx) else {
-                return EffectStep::Output(0);
+                return EffectStep::Done;
             };
             let ttl = seconds
                 .as_ref()
                 .map(|seconds| Seconds(seconds(world, cx).as_num() as f32));
             let client = cx
                 .subject
-                .filter(|_| for_subject)
+                .filter(|_| for_whom == GroundItemsFor::Subject)
                 .and_then(|subject| world.get::<Owner>(subject))
                 .map(|owner| owner.client);
-            let (reserved, presence) = match client {
-                Some(client) => (ReservedBy::Account(client), Some(Presence::For(client))),
-                None => (ReservedBy::None, None),
-            };
-            let drops: Vec<(Id, u32)> = items
+            let presence = client.map(Presence::For);
+            let drops: Vec<(ItemId, u32)> = items
                 .iter()
                 .map(|stack| (stack.item, stack.count))
                 .collect();
-            super::scatter_at(world, from, area, &drops, reserved, presence, ttl);
-            EffectStep::Output(0)
+            super::scatter_at(world, from, area, &drops, client, presence, ttl);
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -401,24 +307,18 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
 }
 
 impl EffectDef<RiftScripting> for ClearGroundItems {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.at.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let at = spot(cx, self.at.as_ref())?;
         let within = effects::number(cx, &self.within)?;
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let Some((area, center)) = at(world, cx) else {
-                return EffectStep::Output(0);
+                return EffectStep::Done;
             };
             let within = Tiles(within(world, cx).as_num() as f32);
             let cleared: Vec<Entity> = world
@@ -435,7 +335,7 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
             for entity in cleared {
                 world.despawn(entity);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -444,9 +344,6 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
 }
 
 impl EffectDef<RiftScripting> for MoveItems {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         false
     }
@@ -456,30 +353,19 @@ impl EffectDef<RiftScripting> for MoveItems {
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
-        let from = cx
-            .expr(&self.from, ValueType::Actor)
-            .map_err(effects::bad)?;
-        let to = cx.expr(&self.to, ValueType::Actor).map_err(effects::bad)?;
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+        let from = cx.expr(&self.from, ValueType::Actor)?;
+        let to = cx.expr(&self.to, ValueType::Actor)?;
         let (items, refused) = (self.items.as_slice(), self.refused.as_deref());
-        Ok(Box::new(move |world, cx| {
+        Ok(Box::new(move |world, _, cx| {
             let (Some(from), Some(to)) = (
                 effects::aimed_character(world, cx, &from),
                 effects::aimed_character(world, cx, &to),
             ) else {
-                effects::refuse(world, cx, refused, "Nobody to trade between");
-                return EffectStep::Output(1);
+                return effects::refuse(world, cx, refused, "Nobody to trade between");
             };
-            match move_between(world, from, to, items) {
-                Ok(()) => EffectStep::Output(0),
-                Err(reason) => {
-                    effects::refuse(world, cx, refused, reason);
-                    EffectStep::Output(1)
-                }
-            }
+            let outcome = move_between(world, from, to, items);
+            effects::settle(world, cx, refused, outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -505,31 +391,29 @@ pub fn exchange(
         .map_err(|refusal| refusal.describe(&content))
 }
 
-type SpotEval = Box<dyn Fn(&World, &FlowCx) -> Option<(area::Id, Pos<Tiles>)> + Send + Sync>;
+type SpotEval = Box<dyn Fn(&World, &FlowCx) -> Option<(AreaId, Pos<Tiles>)> + Send + Sync>;
 
-fn spot(cx: &mut Compiler<RiftScripting>, at: Option<&'static Spot>) -> Result<SpotEval, String> {
+fn spot(
+    cx: &mut Compiler<RiftScripting>,
+    at: Option<&'static Spot>,
+) -> Result<SpotEval, ScriptFault> {
     Ok(match at {
         Some(Spot::Place(place)) => {
             let place = *place;
             Box::new(move |_, _| Some((place.area, place.at)))
         }
         Some(Spot::Actor(actor)) => {
-            let actor: Eval = cx.expr(actor, ValueType::Actor).map_err(effects::bad)?;
+            let actor: Eval = cx.expr(actor, ValueType::Actor)?;
             Box::new(move |world, cx| {
                 let who = effects::aimed(world, cx, &actor)?;
                 standing(world, who)
             })
         }
-        None => Box::new(|world, cx| {
-            cx.owner
-                .entity()
-                .or(cx.subject)
-                .and_then(|who| standing(world, who))
-        }),
+        None => Box::new(|world, cx| cx.owner.or(cx.subject).and_then(|who| standing(world, who))),
     })
 }
 
-fn standing(world: &World, who: Entity) -> Option<(area::Id, Pos<Tiles>)> {
+fn standing(world: &World, who: Entity) -> Option<(AreaId, Pos<Tiles>)> {
     Some((world.get::<AreaTag>(who)?.area, position(world, who)?))
 }
 
@@ -544,13 +428,7 @@ fn drop_held(world: &mut World, actor: Entity, stack: ItemStack) -> Result<(), S
     inventory
         .exchange(&content, &[stack], &[])
         .map_err(|refusal| refusal.describe(&content))?;
-    super::scatter_drop(
-        world,
-        actor,
-        &[(stack.item, stack.count)],
-        ReservedBy::None,
-        None,
-    );
+    super::scatter_drop(world, actor, &[(stack.item, stack.count)], None, None);
     Ok(())
 }
 

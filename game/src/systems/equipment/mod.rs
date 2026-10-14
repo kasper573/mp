@@ -9,14 +9,10 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
-use crate::core::script::{Owner, OwnerKind};
 use crate::systems::effect::{self, Effect};
-use crate::systems::item::{Id as ItemId, ItemKind};
-use crate::systems::item::{Inventory, ItemStack};
-use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::script::condition;
-use crate::systems::script::{EventKind, RiftInstances};
-use crate::systems::text::LineText;
+use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
+use crate::systems::notification;
+use crate::systems::script::{EventKind, condition};
 use crate::systems::{drain_requests, player::sender_player};
 
 pub fn register(app: &mut App) {
@@ -64,10 +60,6 @@ impl EquipmentSlot {
     pub fn label(self) -> &'static str {
         self.into()
     }
-
-    pub fn all() -> &'static [EquipmentSlot] {
-        EquipmentSlot::VARIANTS
-    }
 }
 
 pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(), String> {
@@ -96,16 +88,8 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     else {
         return Err(format!("{} can't be worn", item.get(&content).name));
     };
-    if let Some(requires) = requires
-        && let Some(unmet) = condition::parts(requires)
-            .into_iter()
-            .find(|part| !condition::holds(world, player, part))
-    {
-        return Err(format!(
-            "{} needs {}",
-            item.get(&content).name,
-            condition::describe(&content, unmet)
-        ));
+    if let Some(unmet) = condition::first_unmet(world, player, requires) {
+        return Err(format!("{} needs {unmet}", item.get(&content).name));
     }
     let occupant = world
         .get::<Equipment>(player)
@@ -122,9 +106,9 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
         equipment.slots.insert(*into, item);
     }
     if let Some(occupant) = occupant {
-        raise(world, occupant, EventKind::Unequipped, player);
+        item::raise(world, occupant, EventKind::Unequipped, player);
     }
-    raise(world, item, EventKind::Equipped, player);
+    item::raise(world, item, EventKind::Equipped, player);
     Ok(())
 }
 
@@ -143,7 +127,7 @@ pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> R
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.remove(&slot);
     }
-    raise(world, item, EventKind::Unequipped, player);
+    item::raise(world, item, EventKind::Unequipped, player);
     Ok(())
 }
 
@@ -153,26 +137,9 @@ pub fn unequip(world: &mut World) {
             continue;
         };
         if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
-            notification::notify(
-                world,
-                player,
-                Notification::new(
-                    NotificationKind::error(world.resource::<Content>()),
-                    LineText::plain(refusal),
-                ),
-            );
+            notification::error(world, player, refusal);
         }
     }
-}
-
-fn raise(world: &mut World, item: ItemId, kind: EventKind, player: Entity) {
-    world.resource_mut::<RiftInstances>().raise(
-        Owner::Row(OwnerKind::Item, item.raw()),
-        kind,
-        Some(player),
-        Vec::new(),
-        |_| true,
-    );
 }
 
 fn equipped(world: &World, entity: Entity) -> Vec<Effect> {

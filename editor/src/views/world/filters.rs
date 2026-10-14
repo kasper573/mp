@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use game::core::content::ContentRow;
-use game::systems::area::{self, AreaDef, AreaModuleKind};
+use game::systems::area::{AreaDef, AreaId, AreaModuleKind};
 use game::systems::item::ItemDef;
 use game::systems::npc::NpcDef;
 use game::systems::quest::QuestDef;
@@ -46,7 +46,7 @@ impl MapLens {
         }
     }
 
-    fn sources(&self, atlas: &WorldAtlas, area: area::Id) -> Vec<RowSource> {
+    fn sources(&self, atlas: &WorldAtlas, area: AreaId) -> Vec<RowSource> {
         let info = &atlas.areas[&area];
         let here = |kind: RowSourceKind, name: String| RowSource {
             kind,
@@ -72,7 +72,7 @@ impl MapLens {
 pub fn lit_areas(
     atlas: &WorldAtlas,
     lenses: &[MapLens],
-) -> Option<BTreeMap<area::Id, Vec<RowSource>>> {
+) -> Option<BTreeMap<AreaId, Vec<RowSource>>> {
     if lenses.is_empty() {
         return None;
     }
@@ -280,14 +280,14 @@ impl AreaRange {
 }
 
 pub struct ColourRanges {
-    pub areas: BTreeMap<area::Id, AreaRange>,
+    pub areas: BTreeMap<AreaId, AreaRange>,
     pub low: f64,
     pub high: f64,
 }
 
 impl ColourRanges {
     pub fn of(atlas: &WorldAtlas, files: &ProjectFiles, colour: &ColourBy) -> ColourRanges {
-        let areas: BTreeMap<area::Id, AreaRange> = atlas
+        let areas: BTreeMap<AreaId, AreaRange> = atlas
             .areas
             .keys()
             .filter_map(|&area| Some((area, range_in(atlas, files, area, colour)?)))
@@ -295,13 +295,14 @@ impl ColourRanges {
         let shown = areas.values().map(|range| range.shown(colour.show));
         let low = shown.clone().fold(f64::INFINITY, f64::min);
         let high = shown.fold(f64::NEG_INFINITY, f64::max);
-        match areas.is_empty() {
-            true => ColourRanges {
+        if areas.is_empty() {
+            ColourRanges {
                 areas,
                 low: 0.0,
                 high: 1.0,
-            },
-            false => ColourRanges { areas, low, high },
+            }
+        } else {
+            ColourRanges { areas, low, high }
         }
     }
 
@@ -320,7 +321,7 @@ enum LensGroup<'a> {
 fn range_in(
     atlas: &WorldAtlas,
     files: &ProjectFiles,
-    area: area::Id,
+    area: AreaId,
     colour: &ColourBy,
 ) -> Option<AreaRange> {
     let info = &atlas.areas[&area];

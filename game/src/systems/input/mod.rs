@@ -13,8 +13,9 @@ use crate::core::render::TILE;
 use crate::core::render::screen::ToScreen;
 use crate::core::tiling::Tiles;
 use crate::systems::area::{self, AreaTag};
+use crate::systems::player::RespawnRequest;
 use crate::systems::player::session::{self, Viewpoint};
-use crate::systems::scene::Scene;
+use crate::systems::screen::ClientScreen;
 
 pub struct InputPlugin;
 
@@ -31,7 +32,7 @@ impl Plugin for InputPlugin {
                     respawn_when_dead.run_if(not(ui::typing)),
                     update_tile_highlight,
                 )
-                    .run_if(in_state(Scene::Area)),
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
@@ -124,6 +125,6 @@ fn touch_as_mouse(
 
 fn respawn_when_dead(world: &mut World) {
     if session::is_dead(world) && map::just_pressed(world, map::InputAction::Respawn) {
-        session::respawn(world);
+        world.write_message(RespawnRequest);
     }
 }

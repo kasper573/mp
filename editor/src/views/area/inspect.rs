@@ -5,7 +5,8 @@ use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::Rng;
 use game::core::script::VariableType;
-use game::systems::area::{self, AreaModuleKind};
+use game::core::tiling::{Cell, CellPos, TileSize};
+use game::systems::area::{self, AreaId, AreaModuleKind};
 use serde_json::Value;
 
 use super::pins::INITIAL_SPAWN;
@@ -25,7 +26,6 @@ use crate::ui::{inspector, patterns, theme, widgets};
 use crate::user::BrushSettings;
 use crate::value::RowValue;
 use crate::{forms, picker, schema, value, views};
-use game::core::tiling::{Cell, CellPos, TileSize};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let view_key = super::area_view_key(key);
@@ -89,13 +89,7 @@ fn tool_card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
     });
 }
 
-fn paint_card(
-    editor: &mut Editor,
-    ui: &mut Ui,
-    view_key: &str,
-    content: Content,
-    area_id: area::Id,
-) {
+fn paint_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, area_id: AreaId) {
     let title = match editor.views.area.view(view_key).tool {
         AreaTool::Fill => "Fill",
         AreaTool::Erase => "Erase",
@@ -174,7 +168,7 @@ fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
     response.clicked()
 }
 
-fn palette_summary(ui: &mut Ui, content: Content, area_id: area::Id) {
+fn palette_summary(ui: &mut Ui, content: Content, area_id: AreaId) {
     let grids = &area::load(&content, area_id).grids;
     let tilesets: HashSet<&String> = grids.palette_keys.iter().map(|row| &row.tileset).collect();
     widgets::section(ui, "Palette of this area");
@@ -193,7 +187,7 @@ fn terrain_card(
     ui: &mut Ui,
     view_key: &str,
     content: Content,
-    area_id: area::Id,
+    area_id: AreaId,
 ) {
     let tile_px = area::load(&content, area_id).tile;
     let layers = area::load(&content, area_id).grids.layer_names();
@@ -314,7 +308,7 @@ fn terrain_card(
 fn repaint_layer(
     editor: &mut Editor,
     content: Content,
-    area_id: area::Id,
+    area_id: AreaId,
     tileset: &str,
     set: &str,
     layer: usize,
@@ -578,7 +572,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content
     }
 }
 
-fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content, area_id: area::Id) {
+fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content, area_id: AreaId) {
     let Some(mut row) = editor.row_value("area", key) else {
         return;
     };

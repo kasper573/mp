@@ -7,10 +7,6 @@ use crate::systems::interface::CursorShape;
 pub struct DefaultGesture;
 
 impl Gesture for DefaultGesture {
-    fn priority(&self) -> i32 {
-        6
-    }
-
     fn claim(&self, _world: &mut World) -> Option<ClickClaim> {
         Some(ClickClaim::Nothing)
     }

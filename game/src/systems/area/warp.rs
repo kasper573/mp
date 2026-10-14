@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 
 use super::AreaTag;
 use super::transition::Crossing;
-use crate::core::script::{Compiler, EffectCall, EffectDef, EffectStep, Name, OwnerKind};
+use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
 use crate::systems::dialogue;
 use crate::systems::movement;
 use crate::systems::npc::Npc;
 use crate::systems::player::SpawnPoint;
 use crate::systems::reach;
-use crate::systems::script::effect::{self as effects, ANY_OWNER, Aim, Arrow, Link};
-use crate::systems::script::{Fill, Place, Reach, RiftScripting};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
+use crate::systems::script::{EffectCall, Fill, Place, Reach, RiftScripting};
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Warp {
@@ -23,31 +23,23 @@ pub struct Warp {
 }
 
 impl EffectDef<RiftScripting> for Warp {
-    fn owners(&self) -> &'static [OwnerKind] {
-        ANY_OWNER
-    }
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
     fn outputs(&'static self) -> Vec<(Name, Link)> {
         vec![("next", self.next.as_deref())]
     }
-    fn pauses(&self) -> bool {
-        false
-    }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, String> {
+    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let to = cx.place(&self.to).map_err(effects::bad)?;
-        Ok(Box::new(move |world, cx| {
-            match effects::aimed(world, cx, &who) {
-                Some(actor) => {
-                    if let Err(reason) = warp(world, actor, to) {
-                        effects::refuse(world, cx, None, reason);
-                    }
-                }
-                None => effects::refuse(world, cx, None, "Nobody to warp"),
+        let to = cx.place(&self.to)?;
+        Ok(Box::new(move |world, _, cx| {
+            let warped = effects::aimed(world, cx, &who)
+                .ok_or_else(|| "Nobody to warp".to_owned())
+                .and_then(|actor| warp(world, actor, to));
+            if let Err(reason) = warped {
+                effects::show_error(world, cx, reason);
             }
-            EffectStep::Output(0)
+            EffectStep::Done
         }))
     }
     fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {

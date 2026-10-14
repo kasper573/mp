@@ -1,8 +1,8 @@
-use crate::core::math::{Pos, Size};
-use crate::core::tiling::Tiles;
 use bevy::prelude::Vec2;
 
 use super::TILE;
+use crate::core::math::{Pos, Size};
+use crate::core::tiling::Tiles;
 
 pub trait ToScreen {
     fn to_screen(self) -> Vec2;

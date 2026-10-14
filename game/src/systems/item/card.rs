@@ -5,14 +5,13 @@ use ui::{
     ChipOptions, Family, InspectableOptions, OnTap, RichPiece, RichSpan, RichText, TextVoice,
 };
 
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::content::{Content, Fixture};
+use crate::core::content::Content;
 use crate::systems::hud;
 use crate::systems::input::map::{InputAction, input};
 use crate::systems::interface::InterfaceSound;
-use crate::systems::item::{Id as ItemId, ItemDef, ItemFlag, ItemKind};
+use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::scene::{Scene as GameScene, despawn_all};
+use crate::systems::screen::{ClientScreen, despawn_all};
 use crate::systems::script::condition;
 use crate::systems::stat::Stat;
 
@@ -27,9 +26,9 @@ pub struct ItemCardPlugin;
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemCard>()
-            .add_systems(Update, show_card.run_if(in_state(GameScene::Area)))
+            .add_systems(Update, show_card.run_if(in_state(ClientScreen::Area)))
             .add_systems(
-                OnExit(GameScene::Area),
+                OnExit(ClientScreen::Area),
                 (despawn_all::<ItemCardWindow>, forget),
             );
     }
@@ -168,7 +167,7 @@ fn show_card(world: &mut World) {
         world.entity_mut(panel).despawn();
     }
     let Some(item) = wanted else {
-        chime(world, InterfaceSound::UiClose);
+        InterfaceSound::UiClose.play(world);
         return;
     };
     let screen = world
@@ -196,7 +195,7 @@ fn show_card(world: &mut World) {
         world.entity_mut(panel).insert(ItemCardWindow { item });
     }
     if shown.is_none() {
-        chime(world, InterfaceSound::UiOpen);
+        InterfaceSound::UiOpen.play(world);
     }
 }
 
@@ -232,7 +231,8 @@ fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
                 facts.push(plain(format!("Restores {health_bonus} health")));
             }
             facts.extend(
-                modifiers(def).map(|stat| plain(format!("{} for {}s", modifier(stat), lasts.0))),
+                def.stats()
+                    .map(|stat| plain(format!("{} for {}s", modifier(stat), lasts.0))),
             );
         }
         ItemKind::Equipment { slot, requires } => {
@@ -240,7 +240,7 @@ fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
                 "Worn as your {}",
                 slot.label().to_lowercase()
             )));
-            facts.extend(modifiers(def).map(|stat| plain(modifier(stat))));
+            facts.extend(def.stats().map(|stat| plain(modifier(stat))));
             let viewer = world.resource::<Viewpoint>().0;
             facts.extend(requires.iter().map(|requirement| {
                 let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
@@ -256,8 +256,10 @@ fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
             }));
         }
         ItemKind::Usable => facts.push(plain("Can be used".to_owned())),
-        ItemKind::Resource => facts
-            .extend(modifiers(def).map(|stat| plain(format!("{} while carried", modifier(stat))))),
+        ItemKind::Resource => facts.extend(
+            def.stats()
+                .map(|stat| plain(format!("{} while carried", modifier(stat)))),
+        ),
     }
     match def.stack_max() {
         1 => {}
@@ -270,27 +272,6 @@ fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
     facts
 }
 
-fn modifiers(def: &ItemDef) -> impl Iterator<Item = Stat> {
-    def.stats()
-}
-
 fn modifier(stat: Stat) -> String {
-    let words: String = stat
-        .label()
-        .chars()
-        .enumerate()
-        .flat_map(|(index, letter)| {
-            let gap = (index > 0 && letter.is_uppercase()).then_some(' ');
-            gap.into_iter().chain(std::iter::once(letter))
-        })
-        .collect();
-    format!("{:+} {words}", stat.value)
-}
-
-fn chime(world: &mut World, sound: InterfaceSound) {
-    let id = sound.id(world.resource::<Content>());
-    world.write_message(PlaySfx {
-        id,
-        place: SfxPlace::Interface,
-    });
+    format!("{:+} {}", stat.value, stat.label())
 }

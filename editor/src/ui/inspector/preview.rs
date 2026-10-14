@@ -1,14 +1,15 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::Direction;
-use game::core::script::dialogue::Reveal;
+use game::core::script::dialogue::ChoiceReveal;
 use game::core::time::{PlaybackRate, Seconds};
 use game::systems::GameSettings;
-use game::systems::actor::model::{DirectionName, ModelDef};
+use game::systems::actor::model::ModelDef;
 use game::systems::actor::{Action, ActorModel};
 use game::systems::quest::{ActiveQuest, Parties, QuestDef};
 use game::systems::script::{Reach, RiftScripts};
 use serde_json::Value;
+use strum::VariantArray;
 
 use super::quests::quest_parties_sections;
 use super::usages::show_usages_grouped;
@@ -98,23 +99,19 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
             egui::ComboBox::from_id_salt("preview-action")
-                .selected_text(state.action.name())
+                .selected_text(state.action.as_ref())
                 .width(80.0)
                 .show_ui(ui, |ui| {
-                    for action in Action::ALL {
-                        ui.selectable_value(&mut state.action, action, action.name());
+                    for &action in Action::VARIANTS {
+                        ui.selectable_value(&mut state.action, action, action.as_ref());
                     }
                 });
             egui::ComboBox::from_id_salt("preview-direction")
-                .selected_text(DirectionName::of(state.direction).key())
+                .selected_text(state.direction.as_ref())
                 .width(56.0)
                 .show_ui(ui, |ui| {
-                    for direction in Direction::ALL {
-                        ui.selectable_value(
-                            &mut state.direction,
-                            direction,
-                            DirectionName::of(direction).key(),
-                        );
+                    for &direction in Direction::VARIANTS {
+                        ui.selectable_value(&mut state.direction, direction, direction.as_ref());
                     }
                 });
             if ui.button(if state.playing { "⏸" } else { "▸" }).clicked() {
@@ -329,7 +326,7 @@ pub(super) fn quest_card(
                     }
                 });
             }
-            if def.reveals(Reveal::Gains) {
+            if def.reveals(ChoiceReveal::Gains) {
                 ui.label(RichText::new("REWARDS").size(11.0).color(soft));
                 ui.horizontal_wrapped(|ui| {
                     if def.xp > 0 {

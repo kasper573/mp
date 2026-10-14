@@ -19,7 +19,7 @@ use game::core::content::{Content, ContentRow, Fixture};
 use game::core::math::{Pos, Size};
 use game::core::tiling::Tiles;
 use game::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
-use game::systems::area::{self, AreaDef};
+use game::systems::area::{self, AreaDef, AreaId};
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection, row_file};
@@ -165,11 +165,11 @@ impl OpenWorldMap {
         })
     }
 
-    pub fn card_rect(&self, area: area::Id, card: &Card) -> Rect {
+    pub fn card_rect(&self, area: AreaId, card: &Card) -> Rect {
         card_rect(self.atlas.size(area), card)
     }
 
-    pub fn art_rect(&self, area: area::Id, card: &Card) -> Rect {
+    pub fn art_rect(&self, area: AreaId, card: &Card) -> Rect {
         art_rect(self.atlas.size(area), card)
     }
 
@@ -195,7 +195,7 @@ impl OpenWorldMap {
             .map(|rect| rect.expand(REGION_PAD))
     }
 
-    pub fn card_ids(&self, parts: &[MapPart]) -> Vec<area::Id> {
+    pub fn card_ids(&self, parts: &[MapPart]) -> Vec<AreaId> {
         parts
             .iter()
             .filter_map(|part| match part {
@@ -227,7 +227,7 @@ impl OpenWorldMap {
 }
 
 impl WorldView {
-    pub fn look_at(&mut self, map: &OpenWorldMap, area: area::Id, zoom: f32) {
+    pub fn look_at(&mut self, map: &OpenWorldMap, area: AreaId, zoom: f32) {
         if let Some(card) = map.layout.cards.get(&area) {
             self.center = map.card_rect(area, card).center();
             self.zoom = zoom;

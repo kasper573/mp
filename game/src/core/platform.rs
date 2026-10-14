@@ -55,7 +55,8 @@ pub trait Platform: Send + Sync + 'static {
     fn connect(&self, url: &str) -> Box<dyn ServerSocket>;
     fn local_clock(&self) -> LocalClock;
     fn announce(&self, status: &str);
-    fn relaunch(&self, build: &str) -> bool;
+    /// Restarts the client on the server's `build`, or says what the player has to do instead.
+    fn relaunch(&self, build: &str) -> Result<(), String>;
 }
 
 #[derive(Resource, Clone)]

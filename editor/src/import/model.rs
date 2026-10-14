@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use game::systems::actor::Action;
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 
@@ -8,7 +9,6 @@ use super::formats::{self, AnimationExport, MAX_IMAGE_PX};
 use super::records::ImportRecord;
 use crate::views::model;
 use crate::views::model::{ModelStrip, StripFrame};
-use game::systems::actor::model::ActionName;
 
 pub type StripMapping = BTreeMap<String, Option<String>>;
 
@@ -260,7 +260,7 @@ pub fn strip_of_tag(tag: &str) -> Option<String> {
         _ => return None,
     };
     action
-        .parse::<ActionName>()
+        .parse::<Action>()
         .ok()
         .map(|_| format!("{action}_{direction}"))
 }
@@ -392,7 +392,7 @@ pub fn plan(
     for strip in ModelStrip::all() {
         {
             let name = strip.record_key();
-            let (action, direction) = (strip.action.key(), strip.direction.key());
+            let (action, direction) = (strip.action.as_ref(), strip.direction.as_ref());
             let before = row
                 .map(|row| model::strip_of(row, strip))
                 .unwrap_or_default();

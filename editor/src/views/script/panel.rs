@@ -2,14 +2,14 @@ use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
 use game::core::content::Content;
-use game::core::script::{MayDo, OwnerKind, OwnerRow};
+use game::core::script::MayDo;
 use game::systems::area;
 use game::systems::area::blueprint::BlueprintDef;
 use game::systems::area::{AreaDef, AreaModule};
 use game::systems::item::ItemDef;
 use game::systems::npc::NpcDef;
 use game::systems::quest::QuestDef;
-use game::systems::script::{Place, Reach, RiftScripting, RiftScripts};
+use game::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
 use game::systems::shop::ShopDef;
 use serde_json::Value;
 
@@ -95,11 +95,7 @@ pub fn owner_row(
                         .iter()
                         .position(|p| p.chain.is_empty() && p.origin == module)?;
                     let name = match &placed[index].module {
-                        AreaModule::Object(object) => object
-                            .name
-                            .clone()
-                            .or_else(|| object.label.clone())
-                            .unwrap_or_else(|| "object".to_owned()),
+                        AreaModule::Object(object) => object.title(index as u32),
                         _ => "object".to_owned(),
                     };
                     bound(

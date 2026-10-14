@@ -14,30 +14,30 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
-use crate::core::math::{Direction, Pos, Rect, Rng};
-use crate::core::script::{Owner, OwnerKind, OwnerRow};
+use crate::core::math::{Direction, Percent, Pos, Rect, Rng};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint, model};
-use crate::systems::area::{self, AreaModule, AreaTag, Wild};
+use crate::systems::actor::model::ModelId;
+use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint};
+use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Died};
 use crate::systems::dialogue;
 use crate::systems::effect::{self, Effect, TimedEffects};
 use crate::systems::interact::Interactive;
-use crate::systems::item::{Id as ItemId, Reservation, ReservedBy};
+use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
-use crate::systems::player::Players;
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::ActorRoster;
 use crate::systems::script::{
-    EventKind, Reach, RiftEvent, RiftInstances, RiftScripts, ScriptModule,
+    EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
+    ScriptModule, ScriptedRow, area_owner,
 };
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
-pub type Id = ContentId<NpcDef>;
+pub type NpcId = ContentId<NpcDef>;
 
 const CORPSE_LINGER: Seconds = Seconds(5.0);
 
@@ -47,7 +47,7 @@ pub fn register(app: &mut App) {
     effect::source(app, chase);
 }
 
-pub fn can_be_fought(scripts: &RiftScripts, npc: Id) -> bool {
+pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
     scripts
         .may_do(OwnerRow {
             kind: OwnerKind::Npc,
@@ -70,7 +70,7 @@ pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Npc {
-    pub def: Id,
+    pub def: NpcId,
 }
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -93,8 +93,7 @@ pub struct Near(Vec<Entity>);
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct NpcDef {
     pub name: String,
-    pub model: model::Id,
-    #[schemars(transform = crate::systems::stat::schema_with_units)]
+    pub model: ModelId,
     pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,
@@ -115,6 +114,17 @@ impl ModuleSet for NpcDef {
         match module {
             NpcModule::Script(_) => ModuleRule::AnyNumber,
             _ => ModuleRule::AtMostOne,
+        }
+    }
+}
+
+impl ScriptedRow for NpcDef {
+    const OWNER: OwnerKind = OwnerKind::Npc;
+
+    fn script(module: &NpcModule) -> Option<&ScriptModule> {
+        match module {
+            NpcModule::Script(script) => Some(script),
+            _ => None,
         }
     }
 }
@@ -159,7 +169,7 @@ pub struct LootItem {
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub amount: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chance: Option<f32>,
+    pub chance: Option<Percent>,
 }
 
 impl NpcDef {
@@ -199,17 +209,6 @@ impl NpcDef {
             NpcModule::Loot(loot) => Some(loot),
             _ => None,
         })
-    }
-
-    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
-        self.modules
-            .iter()
-            .enumerate()
-            .filter_map(|(index, module)| match module {
-                NpcModule::Script(script) => Some((index, script)),
-                _ => None,
-            })
-            .collect()
     }
 }
 
@@ -257,8 +256,8 @@ pub fn spawn_all(world: &mut World) {
 fn spawn_wild(
     world: &mut World,
     content: &Content,
-    area_id: area::Id,
-    npc: Id,
+    area_id: AreaId,
+    npc: NpcId,
     roams: Option<Rect<Tiles>>,
     pack: Pack,
 ) {
@@ -278,16 +277,16 @@ fn spawn_wild(
     }
 }
 
-pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Entity {
+pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
     let content = *world.resource::<Content>();
     let entity = world.spawn(character(&content, def, at, area)).id();
     world
         .entity_mut(entity)
-        .insert(Stats(stat::listed(&def.stats).collect()));
+        .insert(Stats(def.stats.listed().collect()));
     entity
 }
 
-pub fn spawn(world: &mut World, def: Id, at: Pos<Tiles>, area: area::Id, pack: Pack) -> Entity {
+pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: Pack) -> Entity {
     let content = *world.resource::<Content>();
     let entity = spawn_actor(world, def.get(&content), at, area);
     world.entity_mut(entity).insert((
@@ -334,8 +333,9 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
         .collect();
     for died in deaths {
         let is_npc = world.get::<Npc>(died.entity).is_some();
+        let owner = area_owner(world);
         world.resource_mut::<RiftInstances>().raise(
-            Owner::Area,
+            owner,
             EventKind::Died,
             Some(died.entity),
             Vec::new(),
@@ -347,13 +347,7 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
         if !is_npc {
             continue;
         }
-        let credited = match world.get::<Reservation>(died.entity) {
-            Some(reservation) if !reservation.expired(now) => match reservation.by {
-                ReservedBy::Account(client) => world.resource::<Players>().0.get(&client).copied(),
-                ReservedBy::None => None,
-            },
-            _ => None,
-        };
+        let credited = crate::systems::item::credited(world, died.entity, now);
         world.resource_mut::<RiftInstances>().raise(
             Owner::Entity(OwnerKind::Npc, died.entity),
             EventKind::Defeated,
@@ -367,7 +361,7 @@ pub fn defeated(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
 struct Watcher {
     npc: Entity,
     at: Pos<Tiles>,
-    area: area::Id,
+    area: AreaId,
     reach: Tiles,
 }
 
@@ -457,7 +451,7 @@ pub fn approach(world: &mut World) {
     }
 }
 
-fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) -> Character {
+fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Character {
     Character {
         replicated: Replicated,
         position: Position { pos: at },
@@ -466,7 +460,7 @@ fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) ->
             dir: Direction::S,
             action: Action::Idle,
             model: def.model,
-            attack_rate: PlaybackRate(stat::of_map(&def.stats, StatKind::AttackSpeed)),
+            attack_rate: PlaybackRate(def.stats.get(StatKind::AttackSpeed)),
         },
         hitbox: Hitbox {
             size: ActorModel::get(content, def.model).hitbox(),
@@ -475,7 +469,7 @@ fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: area::Id) ->
     }
 }
 
-fn start_scripts(world: &mut World, entity: Entity, def: Id) {
+fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
     let procedures = world
         .resource::<RiftScripts>()
         .of(OwnerRow {
@@ -553,9 +547,8 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 (None, None) => grid.random_node(&mut rng),
             }
             .unwrap_or_else(|| region.fallback_spawn());
-            if let Some(mut position) = world.get_mut::<Position>(id) {
-                position.pos = at;
-            }
+            reach::forget(world, id);
+            crate::systems::movement::relocate(world, id, at);
             world
                 .entity_mut(id)
                 .insert((Attitude::Friendly, body::Body::default(), Near::default()))
@@ -563,7 +556,6 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 .remove::<Reservation>()
                 .remove::<TimedEffects>();
             stat::refill(world, id);
-            reach::forget(world, id);
             start_scripts(world, id, npc);
         }
     });

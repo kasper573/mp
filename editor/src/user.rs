@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::ui::widgets;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use crate::ui::widgets;
 
 // Per-user state stays outside content folders, so it never ships with a game.
 #[derive(Clone, Debug)]

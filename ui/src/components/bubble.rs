@@ -232,10 +232,7 @@ pub(crate) fn sync_bubbles(
                 BubblePart::Fold => {
                     commands.entity(part).despawn_related::<Children>();
                     if let Ok((mut node, ..)) = nodes.get_mut(part) {
-                        node.display = match folded {
-                            true => Display::Flex,
-                            false => Display::None,
-                        };
+                        node.display = if folded { Display::Flex } else { Display::None };
                     }
                     if folded {
                         let count = bubble
@@ -253,10 +250,7 @@ pub(crate) fn sync_bubbles(
                 }
                 BubblePart::Lines => {
                     if let Ok((mut node, ..)) = nodes.get_mut(part) {
-                        node.display = match folded {
-                            true => Display::None,
-                            false => Display::Flex,
-                        };
+                        node.display = if folded { Display::None } else { Display::Flex };
                     }
                     let kept: Vec<(Entity, Entity, u64)> = tree
                         .children
@@ -335,10 +329,7 @@ fn line_scene(line: BubbleLine) -> impl Scene {
 }
 
 fn read_opacity(read: bool) -> f32 {
-    match read {
-        true => READ_OPACITY,
-        false => 1.0,
-    }
+    if read { READ_OPACITY } else { 1.0 }
 }
 
 fn bubble_presence(tail: Option<BubbleTail>) -> Presence {

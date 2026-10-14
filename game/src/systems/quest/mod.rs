@@ -15,35 +15,36 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
 use crate::core::content::{
-    Content, ContentId, ContentRow, Fixture, Loading, ModuleRule, ModuleSet, RowCheck,
+    Content, ContentId, ContentProblem, ContentRow, Fixture, Loading, ModuleRule, ModuleSet,
+    RowCheck,
 };
 use crate::core::math::{Percent, Rng};
-use crate::core::script::{Name, Owner as ScriptOwner, OwnerKind, OwnerRow};
+use crate::core::script::ChoiceReveal;
+use crate::core::script::Name;
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
-use crate::systems::area::AreaDef;
-use crate::systems::attention::{AttentionMark, Id as AttentionId};
-use crate::systems::dialogue::{ChoiceReveal, Revealable};
+use crate::systems::area::{self, AreaDef, AreaId};
+use crate::systems::attention::{AttentionId, AttentionMark};
+use crate::systems::dialogue::{self, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::{
-    INVENTORY_MAX, Id as ItemId, Inventory, ItemDef, ItemFlag, ItemStack, ReservedBy, scatter_drop,
+    INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack, scatter_drop,
 };
 use crate::systems::job;
 use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::npc::Id as NpcId;
+use crate::systems::npc::NpcId;
 use crate::systems::player::{Owner, sender_player};
 use crate::systems::rewards::KillCredited;
-use crate::systems::script::condition;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
-    self, Condition, EventKind, Reach, RiftInstances, RiftScripts, ScriptModule,
+    self, Condition, EventKind, Owner as ScriptOwner, OwnerKind, OwnerRow, Reach, RiftInstances,
+    RiftScripts, ScriptModule, ScriptedRow, condition,
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
 use crate::systems::{attention, drain_requests};
 
 pub type QuestId = ContentId<QuestDef>;
-pub type Id = QuestId;
 
 pub const QUEST_LOG_CAP: usize = 20;
 
@@ -83,6 +84,17 @@ impl ModuleSet for QuestDef {
                 ModuleRule::AnyNumber
             }
             _ => ModuleRule::AtMostOne,
+        }
+    }
+}
+
+impl ScriptedRow for QuestDef {
+    const OWNER: OwnerKind = OwnerKind::Quest;
+
+    fn script(module: &QuestModule) -> Option<&ScriptModule> {
+        match module {
+            QuestModule::Script(script) => Some(script),
+            _ => None,
         }
     }
 }
@@ -211,15 +223,152 @@ impl QuestDef {
         })
     }
 
-    pub fn scripts(&self) -> Vec<(usize, &ScriptModule)> {
-        self.modules
-            .iter()
+    pub fn objective_label(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        quest: QuestId,
+        objective: &Objective,
+    ) -> String {
+        match objective {
+            Objective::Hold(stack) => stack.item.get(content).name.to_owned(),
+            Objective::Defeat { npc, .. } => {
+                format!("Defeat the {}", npc.get(content).name)
+            }
+            Objective::Task { label, .. } | Objective::Decide { label, .. } => (*label).to_owned(),
+            Objective::Deliver { item } => format!(
+                "Bring {} to {}",
+                item.get(content).name,
+                parties
+                    .turn_in(quest)
+                    .map_or("its taker", |party| party.name.as_str())
+            ),
+        }
+    }
+
+    pub fn progress(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        active: &ActiveQuest,
+        inventory: Option<&Inventory>,
+    ) -> Vec<Progress> {
+        let held = |item| inventory.map_or(0, |inventory| inventory.count(item));
+        self.objectives()
             .enumerate()
-            .filter_map(|(index, module)| match module {
-                QuestModule::Script(script) => Some((index, script)),
-                _ => None,
+            .map(|(index, objective)| {
+                let counted = active.counts.get(index).copied().unwrap_or(0);
+                let (have, need, shown) = match objective {
+                    Objective::Hold(stack) => {
+                        (held(stack.item).min(stack.count), stack.count, true)
+                    }
+                    Objective::Defeat { count, .. } => (counted.min(*count), *count, true),
+                    Objective::Task { .. } => (counted.min(1), 1, true),
+                    Objective::Deliver { item } => (held(*item).min(1), 1, false),
+                    Objective::Decide { .. } => (0, 1, false),
+                };
+                Progress {
+                    label: self.objective_label(content, parties, active.quest, objective),
+                    have,
+                    need,
+                    counted: shown,
+                }
             })
             .collect()
+    }
+
+    pub fn complete(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        active: &ActiveQuest,
+        inventory: Option<&Inventory>,
+    ) -> bool {
+        self.objectives()
+            .zip(self.progress(content, parties, active, inventory))
+            .all(|(objective, progress)| {
+                matches!(objective, Objective::Decide { .. }) || progress.done()
+            })
+    }
+
+    pub fn kinds(&self) -> String {
+        let mut kinds: Vec<&str> = Vec::new();
+        for objective in self.objectives() {
+            let kind = match objective {
+                Objective::Hold(_) => "collect",
+                Objective::Defeat { .. } => "defeat",
+                Objective::Task { .. } => "explore",
+                Objective::Deliver { .. } => "deliver",
+                Objective::Decide { .. } => "choice",
+            };
+            if !kinds.contains(&kind) {
+                kinds.push(kind);
+            }
+        }
+        if self.time_limit().is_some() {
+            kinds.push("timed");
+        }
+        if self.daily() {
+            kinds.push("daily");
+        }
+        match kinds.split_last() {
+            Some((last, [])) => (*last).to_owned(),
+            Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+            None => String::new(),
+        }
+    }
+
+    pub fn meta(&'static self, parties: &Parties, quest: QuestId) -> String {
+        format!(
+            "{} · Level {} · from {}",
+            self.category,
+            self.min_level(),
+            parties
+                .giver(quest)
+                .map_or("nobody", |party| party.name.as_str())
+        )
+    }
+
+    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
+        if self.time_limit().is_some() {
+            return &InterfaceIcon::Timed.get(content).image;
+        }
+        if self.daily() {
+            return &AttentionMark::RepeatableOffered.get(content).icon;
+        }
+        self.objectives().next().map_or(
+            &AttentionMark::QuestOffered.get(content).icon,
+            |objective| objective.icon(content),
+        )
+    }
+
+    pub fn hand_in_hint(&self, parties: &Parties, quest: QuestId) -> String {
+        let giver = parties.giver(quest);
+        let taker = parties.turn_in(quest);
+        let verb = if giver == taker { "Return" } else { "Go" };
+        match taker {
+            Some(party) => format!("{verb} to {}", party.name),
+            None => format!("{verb} and hand it in"),
+        }
+    }
+
+    pub fn retry_hint(&self, parties: &Parties, quest: QuestId) -> String {
+        match parties.giver(quest) {
+            Some(party) if party.item.is_some() => format!("Use the {} to try again", party.name),
+            Some(party) => format!("Talk to {} to try again", party.name),
+            None => "Try again".to_owned(),
+        }
+    }
+
+    pub fn reveals(&self, reveal: ChoiceReveal) -> bool {
+        self.reveal.contains(&reveal)
+    }
+
+    pub fn decision(&self) -> Option<&[DecisionPath]> {
+        self.objectives().find_map(|objective| match objective {
+            Objective::Decide { paths, .. } => Some(paths.as_slice()),
+            _ => None,
+        })
     }
 
     fn stacks(&self, pick: fn(&QuestModule) -> Option<&Vec<ItemStack>>) -> &[ItemStack] {
@@ -351,13 +500,12 @@ impl Parties {
 fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
     let placed = |npc: NpcId| {
         content.ids::<AreaDef>().any(|area| {
-            crate::systems::area::residents(crate::systems::area::placed(content, area))
-                .any(|resident| resident == npc)
+            area::residents(area::placed(content, area)).any(|resident| resident == npc)
         })
     };
     Some(match owner.kind {
         OwnerKind::Npc => {
-            let npc: NpcId = ContentId::new(owner.row);
+            let npc: NpcId = owner.id();
             if !placed(npc) {
                 return None;
             }
@@ -368,10 +516,9 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             }
         }
         OwnerKind::Object => {
-            let area: ContentId<AreaDef> = ContentId::new(owner.row);
-            let (_, object) =
-                crate::systems::area::objects(crate::systems::area::placed(content, area))
-                    .find(|(index, _)| Some(*index) == owner.object)?;
+            let area: AreaId = owner.id();
+            let (_, object) = area::objects(area::placed(content, area))
+                .find(|(index, _)| Some(*index) == owner.object)?;
             Party {
                 name: object.label.clone().or_else(|| object.name.clone())?,
                 item: None,
@@ -379,7 +526,7 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
             }
         }
         OwnerKind::Item => {
-            let item: ContentId<ItemDef> = ContentId::new(owner.row);
+            let item: ItemId = owner.id();
             Party {
                 name: item.get(content).name.to_owned(),
                 item: Some(item),
@@ -390,14 +537,14 @@ fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
     })
 }
 
-#[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Hash)]
 pub struct QuestLog {
     pub active: Vec<ActiveQuest>,
     pub finished: Vec<FinishedQuest>,
     pub tracked: Vec<QuestId>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
 pub struct ActiveQuest {
     pub quest: QuestId,
     pub counts: Vec<u32>,
@@ -408,7 +555,7 @@ pub struct ActiveQuest {
     pub decided: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Hash)]
 pub struct FinishedQuest {
     pub quest: QuestId,
     pub result: QuestResult,
@@ -417,7 +564,7 @@ pub struct FinishedQuest {
     pub offered_again: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum QuestResult {
     Completed,
     Failed,
@@ -427,159 +574,6 @@ pub enum QuestResult {
 pub enum QuestRequest {
     Track { quest: QuestId, tracked: bool },
     Abandon { quest: QuestId },
-}
-
-impl QuestDef {
-    pub fn objective_label(
-        &self,
-        content: &Content,
-        parties: &Parties,
-        quest: QuestId,
-        objective: &Objective,
-    ) -> String {
-        match objective {
-            Objective::Hold(stack) => stack.item.get(content).name.to_owned(),
-            Objective::Defeat { npc, .. } => {
-                format!("Defeat the {}", npc.get(content).name)
-            }
-            Objective::Task { label, .. } | Objective::Decide { label, .. } => (*label).to_owned(),
-            Objective::Deliver { item } => format!(
-                "Bring {} to {}",
-                item.get(content).name,
-                parties
-                    .turn_in(quest)
-                    .map_or("its taker", |party| party.name.as_str())
-            ),
-        }
-    }
-
-    pub fn progress(
-        &self,
-        content: &Content,
-        parties: &Parties,
-        active: &ActiveQuest,
-        inventory: Option<&Inventory>,
-    ) -> Vec<Progress> {
-        let held = |item| inventory.map_or(0, |inventory| inventory.count(item));
-        self.objectives()
-            .enumerate()
-            .map(|(index, objective)| {
-                let counted = active.counts.get(index).copied().unwrap_or(0);
-                let (have, need, shown) = match objective {
-                    Objective::Hold(stack) => {
-                        (held(stack.item).min(stack.count), stack.count, true)
-                    }
-                    Objective::Defeat { count, .. } => (counted.min(*count), *count, true),
-                    Objective::Task { .. } => (counted.min(1), 1, true),
-                    Objective::Deliver { item } => (held(*item).min(1), 1, false),
-                    Objective::Decide { .. } => (0, 1, false),
-                };
-                Progress {
-                    label: self.objective_label(content, parties, active.quest, objective),
-                    have,
-                    need,
-                    counted: shown,
-                }
-            })
-            .collect()
-    }
-
-    pub fn complete(
-        &self,
-        content: &Content,
-        parties: &Parties,
-        active: &ActiveQuest,
-        inventory: Option<&Inventory>,
-    ) -> bool {
-        self.objectives()
-            .zip(self.progress(content, parties, active, inventory))
-            .all(|(objective, progress)| {
-                matches!(objective, Objective::Decide { .. }) || progress.done()
-            })
-    }
-
-    pub fn kinds(&self) -> String {
-        let mut kinds: Vec<&str> = Vec::new();
-        for objective in self.objectives() {
-            let kind = match objective {
-                Objective::Hold(_) => "collect",
-                Objective::Defeat { .. } => "defeat",
-                Objective::Task { .. } => "explore",
-                Objective::Deliver { item: _ } => "deliver",
-                Objective::Decide { .. } => "choice",
-            };
-            if !kinds.contains(&kind) {
-                kinds.push(kind);
-            }
-        }
-        if self.time_limit().is_some() {
-            kinds.push("timed");
-        }
-        if self.daily() {
-            kinds.push("daily");
-        }
-        match kinds.split_last() {
-            Some((last, [])) => (*last).to_owned(),
-            Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
-            None => String::new(),
-        }
-    }
-
-    pub fn meta(&'static self, parties: &Parties, quest: QuestId) -> String {
-        format!(
-            "{} · Level {} · from {}",
-            self.category,
-            self.min_level(),
-            parties
-                .giver(quest)
-                .map_or("nobody", |party| party.name.as_str())
-        )
-    }
-
-    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
-        if self.time_limit().is_some() {
-            return &InterfaceIcon::Timed.get(content).image;
-        }
-        if self.daily() {
-            return &AttentionMark::RepeatableOffered.get(content).icon;
-        }
-        self.objectives().next().map_or(
-            &AttentionMark::QuestOffered.get(content).icon,
-            |objective| objective.icon(content),
-        )
-    }
-
-    pub fn hand_in_hint(&self, parties: &Parties, quest: QuestId) -> String {
-        let giver = parties.giver(quest);
-        let taker = parties.turn_in(quest);
-        let verb = match giver == taker {
-            true => "Return",
-            false => "Go",
-        };
-        match taker {
-            Some(party) => format!("{verb} to {}", party.name),
-            None => format!("{verb} and hand it in"),
-        }
-    }
-
-    pub fn retry_hint(&self, parties: &Parties, quest: QuestId) -> String {
-        match parties.giver(quest) {
-            Some(party) if party.item.is_some() => format!("Use the {} to try again", party.name),
-            Some(party) => format!("Talk to {} to try again", party.name),
-            None => "Try again".to_owned(),
-        }
-    }
-
-    pub fn reveals(&self, reveal: ChoiceReveal) -> bool {
-        self.reveal.contains(&reveal)
-    }
-
-    pub fn decision(&self) -> Option<&[DecisionPath]> {
-        self.objectives().find_map(|objective| match objective {
-            Objective::Decide { paths, .. } => Some(paths.as_slice()),
-            _ => None,
-        })
-    }
 }
 
 impl ActiveQuest {
@@ -920,12 +914,12 @@ pub fn check_all(loading: &mut Loading) {
         for (index, module) in quest.modules.iter().enumerate() {
             match module {
                 QuestModule::Shown { condition } | QuestModule::Requires { condition } => {
-                    if let Err((rule, expected)) = condition::check(&content, condition) {
+                    if let Err(fault) = condition::check(&content, condition) {
                         check.error(
                             format!("/modules/{index}/condition"),
-                            rule,
+                            fault.rule,
                             "the condition",
-                            expected,
+                            fault.expected,
                         );
                     }
                 }
@@ -989,7 +983,7 @@ pub fn check_all(loading: &mut Loading) {
                 "a decision, a pick_one or a hand_over line",
             );
         }
-        if let Err((rule, found)) = crate::systems::dialogue::check_reveal(
+        if let Err(fault) = dialogue::check_reveal(
             &quest.reveal,
             Revealable {
                 needs: quest.requires().is_some(),
@@ -999,8 +993,8 @@ pub fn check_all(loading: &mut Loading) {
         ) {
             check.error(
                 "/reveal",
-                rule,
-                found,
+                fault.rule,
+                fault.expected,
                 "reveal only what the quest has, once",
             );
         }
@@ -1034,38 +1028,42 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
             loading.row_error(
                 id,
                 "",
-                "never offered",
-                key,
-                "a script that may reach offer_quest or accept_quest for it",
-                None,
+                ContentProblem::new(
+                    "never offered",
+                    key,
+                    "a script that may reach offer_quest or accept_quest for it",
+                ),
             );
         } else if !givers {
             loading.row_error(
                 id,
                 "",
-                "lives nowhere",
-                key,
-                "an owner placed in an area that may offer it",
-                None,
+                ContentProblem::new(
+                    "lives nowhere",
+                    key,
+                    "an owner placed in an area that may offer it",
+                ),
             );
         }
         if !turned_in.contains(&id) {
             loading.row_error(
                 id,
                 "",
-                "never turned in",
-                key,
-                "a script that may reach turn_in for it",
-                None,
+                ContentProblem::new(
+                    "never turned in",
+                    key,
+                    "a script that may reach turn_in for it",
+                ),
             );
         } else if !turn_ins {
             loading.row_error(
                 id,
                 "",
-                "lives nowhere",
-                key,
-                "an owner placed in an area that may turn it in",
-                None,
+                ContentProblem::new(
+                    "lives nowhere",
+                    key,
+                    "an owner placed in an area that may turn it in",
+                ),
             );
         }
     }
@@ -1103,14 +1101,9 @@ fn accept_refusal(world: &World, player: Entity, quest: QuestId) -> Option<Strin
     if let Some(refusal) = offer_refusal(world, player, quest) {
         return Some(refusal);
     }
-    let content = world.resource::<Content>();
-    let def = quest.get(content);
-    def.requires()
-        .into_iter()
-        .chain(def.shown())
-        .flat_map(condition::parts)
-        .find(|part| !condition::holds(world, player, part))
-        .map(|unmet| format!("Needs {}", condition::describe(content, unmet)))
+    let def = quest.get(world.resource::<Content>());
+    condition::first_unmet(world, player, def.requires().into_iter().chain(def.shown()))
+        .map(|unmet| format!("Needs {unmet}"))
 }
 
 pub fn open_to(world: &World, player: Entity, quest: QuestId) -> bool {
@@ -1130,16 +1123,9 @@ fn shown_to(world: &World, player: Entity, quest: QuestId) -> bool {
 }
 
 fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
-    let content = *world.resource::<Content>();
-    let Some(mut inventory) = world.get_mut::<Inventory>(player) else {
-        return;
-    };
-    let held: Vec<ItemStack> = grants
-        .iter()
-        .map(|stack| ItemStack::new(stack.item, stack.count.min(inventory.count(stack.item))))
-        .filter(|stack| stack.count > 0)
-        .collect();
-    let _ = inventory.exchange(&content, &held, &[]);
+    if let Some(mut inventory) = world.get_mut::<Inventory>(player) {
+        inventory.take_up_to(grants);
+    }
 }
 
 fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
@@ -1283,7 +1269,7 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
             world,
             kill.victim,
             &drops,
-            ReservedBy::Account(client),
+            Some(client),
             Some(Presence::For(client)),
         );
     }

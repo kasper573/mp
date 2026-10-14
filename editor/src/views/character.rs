@@ -6,7 +6,7 @@ use game::core::tiling::Tiles;
 use game::systems::GameSettings;
 use game::systems::area::{self, AreaDef, AreaModule};
 use game::systems::job::{JobDef, JobLevel};
-use game::systems::npc;
+use game::systems::npc::NpcId;
 use game::systems::quest::{Objective, Parties, Party, QuestDef};
 use game::systems::script::RiftScripts;
 use game::systems::stat::StatKind;
@@ -1151,7 +1151,7 @@ fn give(value: &mut Value, item: &str, count: u32) {
     }
 }
 
-fn npc_place(cx: &FormCx, npc: npc::Id) -> Option<(String, Pos<Tiles>)> {
+fn npc_place(cx: &FormCx, npc: NpcId) -> Option<(String, Pos<Tiles>)> {
     let content = cx.content?;
     content.ids::<AreaDef>().find_map(|area| {
         area::placed(&content, area)
@@ -1356,17 +1356,11 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .map(|tier| format!(" · {xp} of {} xp to {}", tier.xp, level + 1))
         .unwrap_or_else(|| format!(" · {xp} xp · top tier"));
     let settings = content.built::<GameSettings>();
-    let base = settings
-        .player
-        .get(&content)
-        .stats
-        .get(&StatKind::MaxHealth)
-        .copied()
-        .unwrap_or(0.0);
+    let base = settings.player.get(&content).stats.get(StatKind::MaxHealth);
     let from_tiers: f32 = tiers
         .iter()
         .filter(|tier| tier.xp <= xp)
-        .filter_map(|tier| tier.stats.get(&StatKind::MaxHealth))
+        .map(|tier| tier.stats.get(StatKind::MaxHealth))
         .sum();
     let own = row["stats"]["max_health"].as_f64().map(|v| v as f32);
     let health = own.unwrap_or(base + from_tiers);

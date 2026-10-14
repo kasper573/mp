@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use game::core::math::{Offset, Pos};
 use game::core::tiling::Tiles;
 use game::systems::area::transition::{self, Crossing};
-use game::systems::area::{AreaObject, Id as AreaId};
+use game::systems::area::{AreaId, AreaObject};
 use game::systems::dialogue::Conversation;
 use game::systems::history::{History, HistoryTopic};
 use game::systems::input::map::InputMap;
@@ -11,7 +11,7 @@ use game::systems::notification::{self, Notification, NotificationKind, Notifica
 use game::systems::npc::{self, Pack};
 use game::systems::player::{AreaDrawn, Xp, commands_locked};
 use game::systems::quest;
-use game::systems::quest::Id as QuestId;
+use game::systems::quest::QuestId;
 use game::systems::text::LineText;
 
 use crate::support::{

@@ -16,11 +16,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use game::core::content::ErrorPlace::{Json, WholeFile};
-use game::core::content::{Content, LoadError, LoadReport};
+use game::core::content::{Content, ContentProblem, LoadError, LoadReport};
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems;
-use game::systems::script::condition;
 
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;
@@ -89,10 +88,7 @@ impl ContentEdit {
 pub struct EditRefusal {
     pub file: String,
     pub pointer: String,
-    pub rule: &'static str,
-    pub found: String,
-    pub expected: String,
-    pub nearest: Option<String>,
+    pub problem: ContentProblem,
     pub errors: usize,
 }
 
@@ -102,10 +98,7 @@ impl EditRefusal {
         let first = report.errors.first().cloned().unwrap_or(LoadError {
             file: String::new(),
             at: WholeFile,
-            rule: "not loaded",
-            found: String::new(),
-            expected: "a folder that loads".to_owned(),
-            nearest: None,
+            problem: ContentProblem::new("not loaded", "", "a folder that loads"),
         });
         let pointer = match &first.at {
             Json { pointer, .. } => pointer.clone(),
@@ -114,19 +107,13 @@ impl EditRefusal {
         EditRefusal {
             file: first.file,
             pointer,
-            rule: first.rule,
-            found: first.found,
-            expected: first.expected,
-            nearest: first.nearest,
+            problem: first.problem,
             errors,
         }
     }
 
     pub fn sentence(&self) -> String {
-        let mut text = format!("{}: {}; expected {}", self.rule, self.found, self.expected);
-        if let Some(nearest) = &self.nearest {
-            text.push_str(&format!(" (nearest {nearest})"));
-        }
+        let mut text = self.problem.to_string();
         if self.errors > 1 {
             text.push_str(&format!(" · {} errors in all", self.errors));
         }
@@ -238,10 +225,11 @@ impl Project {
             return Err(Box::new(EditRefusal {
                 file: String::new(),
                 pointer: String::new(),
-                rule: "read-only",
-                found: reason.clone(),
-                expected: "a folder this editor may write".to_owned(),
-                nearest: None,
+                problem: ContentProblem::new(
+                    "read-only",
+                    reason.clone(),
+                    "a folder this editor may write",
+                ),
                 errors: 1,
             }));
         }
@@ -468,7 +456,6 @@ impl Project {
 
     fn swap(&mut self, content: Content) {
         if let Some(old) = self.content.take() {
-            condition::forget_compiled();
             self.retired.push(old);
         }
         let started = Instant::now();

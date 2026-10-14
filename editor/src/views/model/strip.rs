@@ -1,7 +1,9 @@
 use std::time::Instant;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
+use game::core::math::Direction;
 use serde_json::Value;
+use strum::VariantArray;
 
 use super::{
     FrameCueKind, MAX_FRAME_MS, MAX_FRAMES, ModelPage, ModelStrip, StripFrame, action_timing,
@@ -12,8 +14,6 @@ use crate::import;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
-use game::systems::actor::model::DirectionName;
-use strum::VariantArray;
 
 pub const PREVIEW: Vec2 = Vec2::new(170.0, 200.0);
 const CARD_H: f32 = 128.0;
@@ -179,19 +179,19 @@ pub fn header(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value, strip: M
     let mut pick = None;
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(strip.action.key())
+            RichText::new(strip.action.as_ref())
                 .size(16.0)
                 .strong()
                 .monospace(),
         );
         ui.add_space(6.0);
-        for &direction in DirectionName::VARIANTS {
+        for &direction in Direction::VARIANTS {
             let on = direction == strip.direction;
             let marked = timing.out_of_step(direction);
             let text = if marked {
-                format!("{} ●", direction.key())
+                format!("{} ●", direction.as_ref())
             } else {
-                direction.key().to_owned()
+                direction.as_ref().to_owned()
             };
             let response = widgets::mode_chip(ui, &text, on);
             if marked {
@@ -856,10 +856,10 @@ fn sentence(
     was: Option<u32>,
     total: u32,
     timing: &super::ActionTiming,
-    direction: DirectionName,
+    direction: Direction,
 ) -> String {
     let common: u32 = timing.common.iter().sum();
-    let others = DirectionName::VARIANTS.len() - 1;
+    let others = Direction::VARIANTS.len() - 1;
     let mut parts = Vec::new();
     if let Some(was) = was
         && was != total
@@ -1169,16 +1169,17 @@ pub fn confirm(
         return;
     };
     let source = strip_of(row, strip);
-    let others_of = |direction: DirectionName| ModelStrip { direction, ..strip };
-    let mismatched: Vec<String> = DirectionName::VARIANTS
+    let others_of = |direction: Direction| ModelStrip { direction, ..strip };
+    let mismatched: Vec<String> = Direction::VARIANTS
         .iter()
         .filter(|&&direction| direction != strip.direction)
         .filter_map(|&direction| {
             let other = strip_of(row, others_of(direction));
-            (other.len() != source.len()).then(|| format!("{} ({})", direction.key(), other.len()))
+            (other.len() != source.len())
+                .then(|| format!("{} ({})", direction.as_ref(), other.len()))
         })
         .collect();
-    let others = DirectionName::VARIANTS.len() - 1 - mismatched.len();
+    let others = Direction::VARIANTS.len() - 1 - mismatched.len();
     let (title, noun) = match what {
         StripConfirm::Timing => ("⑂ Apply timing to the other directions", "lengths"),
         StripConfirm::Cues => ("⑂ Copy cues to the other directions", "cues"),
@@ -1210,7 +1211,7 @@ pub fn confirm(
         return;
     }
     let mut changed = row.clone();
-    for &direction in DirectionName::VARIANTS {
+    for &direction in Direction::VARIANTS {
         if direction == strip.direction {
             continue;
         }
@@ -1234,7 +1235,7 @@ pub fn confirm(
                 },
             })
             .collect();
-        changed["sprites"]["actions"][strip.action.key()][direction.key()] =
+        changed["sprites"]["actions"][strip.action.as_ref()][direction.as_ref()] =
             super::frames_json(&merged);
     }
     let label = match what {

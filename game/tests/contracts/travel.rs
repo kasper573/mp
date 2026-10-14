@@ -3,14 +3,16 @@ use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::AreaObject;
 use game::systems::area::transition::Crossing;
+use game::systems::area::warp::warp;
 use game::systems::dialogue::Conversation;
-use game::systems::movement::{MoveRequest, Position, position};
+use game::systems::movement::{MoveRequest, Position, moving, on_tile, position};
 use game::systems::notification::Notification;
 use game::systems::player::commands_locked;
+use game::systems::script::Place;
 
 use crate::support::{
-    Sim, conversation, count, errors, give, heard_the_news, labels, leave, locked, object, pick,
-    remember, row, spawn_area, spoken, talk, townsperson,
+    Sim, conversation, count, errors, give, heard_the_news, labels, later, leave, locked, object,
+    pick, remember, row, spawn_area, spoken, talk, townsperson,
 };
 
 fn forest_road(sim: &mut Sim) -> Pos<Tiles> {
@@ -43,6 +45,29 @@ fn halted(sim: &mut Sim, player: Entity) -> bool {
             .get::<Conversation>(player)
             .is_some_and(|now| now.node == "halt")
     })
+}
+
+#[test]
+fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let start = position(sim.world(), player).expect("placed");
+    let away = sim.walkable_near(start, Tiles(4.0), Tiles(6.0));
+    let there = sim.walkable_near(start, Tiles(2.0), Tiles(3.0));
+
+    sim.send(1, MoveRequest { pos: away });
+    assert!(
+        sim.run_until(5.0, |world| !on_tile(world, player)),
+        "you never set off"
+    );
+    let to = Place {
+        area: spawn_area(),
+        at: there,
+    };
+    warp(sim.world(), player, to).expect("a warp within the area");
+    later(&mut sim, 2.0);
+    assert_eq!(position(sim.world(), player), Some(there));
+    assert!(!moving(sim.world(), player));
 }
 
 #[test]

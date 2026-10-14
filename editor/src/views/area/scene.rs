@@ -13,11 +13,11 @@ use game::core::math::{Pos, Rect};
 use game::core::render;
 use game::core::render::{TILE, ToScreen};
 use game::core::tiling::{TileSize, Tiles};
-use game::systems::area::{self, AreaModule, Flip, Scenery};
+use game::systems::area::{self, AreaId, AreaModule, Flip, Scenery};
+use game::systems::screen::area::TileSheets;
 
 use super::stamp;
 use crate::project::{ProjectFiles, hash};
-use game::systems::scene::area::TileSheets;
 
 pub struct AreaSceneRequest {
     pub key: String,
@@ -427,7 +427,7 @@ pub fn image_handle(
 
 struct SpawnSpec {
     content: Content,
-    area: area::Id,
+    area: AreaId,
     scenery: Vec<Scenery>,
     sheets: TileSheets,
     layer: usize,

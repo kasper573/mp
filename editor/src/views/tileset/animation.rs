@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use game::systems::actor::model::ActionName;
+use game::systems::actor::Action;
 use game::systems::area::tileset::TileFrame;
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
@@ -195,7 +195,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let dt = ui.input(|i| i.stable_dt).min(0.1);
     let view = editor.views.tileset.view_mut(key);
     preview::keys(ui, &mut view.preview, &frames);
-    preview::tick(&mut view.preview, dt, &frames, ActionName::Idle);
+    preview::tick(&mut view.preview, dt, &frames, Action::Idle);
     if let Some(common) = &common {
         keys(editor, ui, key, common);
     }
