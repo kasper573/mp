@@ -11,6 +11,7 @@ use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
+use crate::views::sound;
 use crate::{condition, picker, spans, thumbs, value};
 
 pub struct FormCx<'a> {
@@ -81,6 +82,7 @@ pub struct FormState {
     pub unfolded: HashSet<String>,
     pub status: Vec<String>,
     pub thumbnails: thumbs::Thumbnails,
+    pub loudness: sound::LoudnessCache,
     catalogue: Option<(u64, NodeCatalogue)>,
 }
 
@@ -554,7 +556,7 @@ fn union(
         .map(|variant| variant.field.clone())
         .unwrap_or_else(|| "type".to_owned());
     let mut picked = current.clone();
-    egui::ComboBox::from_id_salt(ui.id().with(path).with("variant"))
+    widgets::combo_box(ui.id().with(path).with("variant"))
         .selected_text(
             current
                 .as_deref()
@@ -741,7 +743,7 @@ fn choice(
         .position(|alternative| fits(cx.root, alternative, value));
     let mut picked = current;
     if alternatives.len() > 1 {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("choice"))
+        widgets::combo_box(ui.id().with(path).with("choice"))
             .selected_text(current.map(|at| names[at].as_str()).unwrap_or("pick…"))
             .show_ui(ui, |ui| {
                 for (at, name) in names.iter().enumerate() {
@@ -1263,7 +1265,7 @@ fn boolean(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) -> FormChange {
     let current = value.as_str().unwrap_or_default().to_owned();
     let mut picked = current.clone();
-    egui::ComboBox::from_id_salt(ui.id().with(path).with("enum"))
+    widgets::combo_box(ui.id().with(path).with("enum"))
         .selected_text(schema::title(&current))
         .show_ui(ui, |ui| {
             for option in options {

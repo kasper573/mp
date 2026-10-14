@@ -5,7 +5,8 @@ use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stro
 use super::theme;
 
 pub use design_tokens::widgets::{
-    card_frame, chip, chip_coloured, danger, key_hint, pill, primary, section, tab_strip, toggle,
+    card_frame, chip, chip_coloured, combo_box, danger, key_hint, pill, primary, section,
+    tab_strip, toggle,
 };
 
 pub fn section_count(ui: &mut Ui, text: &str, count: impl Display) {

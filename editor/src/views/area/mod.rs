@@ -619,7 +619,7 @@ fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, c
                     .size(13.0)
                     .color(Color32::WHITE),
             );
-            egui::ComboBox::from_id_salt((view_key, "preview-ground"))
+            widgets::combo_box((view_key, "preview-ground"))
                 .selected_text(theme::mono(&picked).size(13.0))
                 .show_ui(ui, |ui| {
                     for area in &areas {

@@ -98,7 +98,7 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
     if matches!(selection.table.as_str(), "npc" | "player" | "model") {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
-            egui::ComboBox::from_id_salt("preview-action")
+            widgets::combo_box("preview-action")
                 .selected_text(state.action.as_ref())
                 .width(80.0)
                 .show_ui(ui, |ui| {
@@ -106,7 +106,7 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
                         ui.selectable_value(&mut state.action, action, action.as_ref());
                     }
                 });
-            egui::ComboBox::from_id_salt("preview-direction")
+            widgets::combo_box("preview-direction")
                 .selected_text(state.direction.as_ref())
                 .width(56.0)
                 .show_ui(ui, |ui| {

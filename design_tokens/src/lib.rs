@@ -157,6 +157,9 @@ pub fn apply(ctx: &Context) {
     visuals.widgets.inactive.bg_fill = color::RAISED;
     visuals.widgets.inactive.weak_bg_fill = color::RAISED;
     visuals.widgets.inactive.bg_stroke = HAIRLINE;
+    // egui sizes a button that is frameless at rest by its padding, grown by this and shrunk by
+    // its border, and sizes it once hovered by its padding alone.
+    visuals.widgets.inactive.expansion = HAIRLINE.width;
     visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, color::TEXT);
     visuals.widgets.hovered.bg_fill = color::HOVER;
     visuals.widgets.hovered.weak_bg_fill = color::HOVER;

@@ -481,17 +481,17 @@ fn death_notice(world: &mut World) {
         map::input(InputAction::Respawn),
         TextPiece::text(" to respawn"),
     ]);
-    egui::Area::new(egui::Id::new("death"))
+    let area = egui::Area::new(egui::Id::new("death"))
         .order(Band::Notices.order())
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .interactable(false)
-        .show(&gui, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                let look = TextLook {
-                    size: TextRole::Body.size(),
-                    color: color::TEXT,
-                };
-                text::show(ui, world, &line, look, None);
-            });
+        .interactable(false);
+    gui::show_anchored(&gui, area, |ui| {
+        egui::Frame::popup(ui.style()).show(ui, |ui| {
+            let look = TextLook {
+                size: TextRole::Body.size(),
+                color: color::TEXT,
+            };
+            text::show(ui, world, &line, look, None);
         });
+    });
 }

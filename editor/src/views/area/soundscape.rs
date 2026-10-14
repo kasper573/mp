@@ -4,7 +4,6 @@ use serde_json::Value;
 
 use crate::forms::FormCx;
 use crate::ui::{theme, widgets};
-use crate::views::sound;
 use crate::{forms, picker};
 
 pub(super) fn soundscape_extras(
@@ -105,11 +104,7 @@ pub(super) fn soundscape_extras(
         };
         let number = channel["channel"].as_u64().unwrap_or(0);
         let volume = channel["volume"].as_f64().unwrap_or(1.0);
-        let loudness = cx
-            .files
-            .get(&format!("assets/{file}"))
-            .cloned()
-            .and_then(|bytes| sound::measure(&bytes));
+        let loudness = cx.state.loudness.of(cx.files, &format!("assets/{file}"));
         ui.label(theme::mono(format!("{number} · {file}")).size(12.5));
         let Some(loudness) = loudness else {
             widgets::hint(ui, "not measured: the file does not decode");

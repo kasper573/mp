@@ -6,7 +6,7 @@ pub mod mode;
 use bevy::prelude::*;
 use renet2::RenetClient;
 
-use crate::core::gui::Band;
+use crate::core::gui::{self, Band};
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
@@ -100,16 +100,16 @@ pub(crate) fn system_screen<R>(
     backdrop: Option<egui::Color32>,
     add: impl FnOnce(&mut egui::Ui) -> R,
 ) -> egui::InnerResponse<R> {
-    let shown = egui::Area::new(egui::Id::new(("screen", id)))
+    let area = egui::Area::new(egui::Id::new(("screen", id)))
         .order(Band::System.order())
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(gui, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.spacing_mut().item_spacing.y = 16.0;
-                add(ui)
-            })
-            .inner
-        });
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO);
+    let shown = gui::show_anchored(gui, area, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.spacing_mut().item_spacing.y = 16.0;
+            add(ui)
+        })
+        .inner
+    });
     let content = shown.response.layer_id;
     match backdrop {
         Some(fill) => {

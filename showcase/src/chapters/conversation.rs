@@ -24,7 +24,8 @@ fn play(shoot: &mut Shoot) {
     let stage = me.read_to_choices();
     me.caption_top("No buttons on the frame: Esc leaves, and the choices say the rest");
     me.caption_top("A choice shows its words and nothing more, unless the writer reveals more");
-    me.caption_top("↑ ↓ choose and Enter picks");
+    me.caption_top("↑ ↓ choose and Enter picks, and a pointer at rest never takes the choice back");
+    me.hover_choice(&stage.choices[0].label);
     let catch = stage
         .choices
         .iter()

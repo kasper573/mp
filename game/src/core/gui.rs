@@ -4,7 +4,7 @@ use std::hash::Hash;
 use bevy::prelude::*;
 use bevy_egui::{
     EguiContext, EguiGlobalSettings, EguiOutput, EguiPlugin, EguiPostUpdateSet,
-    EguiPrimaryContextPass, EguiTextureHandle, EguiUserTextures, PrimaryEguiContext,
+    EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui::load::SizedTexture;
 use egui::{FontDefinitions, LayerId, Order};
@@ -127,31 +127,48 @@ pub fn world_area(world: &mut World, id: impl Hash + std::fmt::Debug) -> egui::A
         .constrain(false)
 }
 
-/// The handle is held from the first ask on, so an image shown again never waits on a fresh load.
+/// egui places an area by the size it had the pass before, so one held by any point but its top
+/// left shows out of place on the pass its size changes, and that pass is drawn again.
+pub fn show_anchored<R>(
+    gui: &egui::Context,
+    area: egui::Area,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    let before = gui.memory(|memory| memory.area_rect(area.layer().id));
+    let shown = area.show(gui, add);
+    if before.is_some_and(|before| before.size() != shown.response.rect.size()) {
+        gui.request_discard("an anchored area changed size");
+    }
+    shown
+}
+
+/// An image is kept from the first ask on, so one shown again never waits on a fresh load.
 pub fn image(world: &mut World, asset: &AssetRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
 }
 
 pub fn image_file(world: &mut World, file: &str) -> Option<GuiImage> {
-    let known = world.resource::<GuiImages>().0.get(file).cloned();
-    let (handle, texture) = match known {
-        Some(known) => known,
-        None => {
-            let handle: Handle<Image> = world.resource::<AssetServer>().load(file.to_owned());
-            let texture = world
-                .resource_mut::<EguiUserTextures>()
-                .add_image(EguiTextureHandle::Strong(handle.clone()));
+    if !world.resource::<GuiImages>().0.contains_key(file) {
+        let handle = world.resource::<AssetServer>().load(file.to_owned());
+        world
+            .resource_mut::<GuiImages>()
+            .0
+            .insert(file.to_owned(), GuiTexture::Loading(handle));
+    }
+    let texture = match &world.resource::<GuiImages>().0[file] {
+        GuiTexture::Ready(texture) => texture.clone(),
+        GuiTexture::Loading(handle) => {
+            let texture = upload(world, file, handle)?;
             world
                 .resource_mut::<GuiImages>()
                 .0
-                .insert(file.to_owned(), (handle.clone(), texture));
-            (handle, texture)
+                .insert(file.to_owned(), GuiTexture::Ready(texture.clone()));
+            texture
         }
     };
-    let size = world.resource::<Assets<Image>>().get(&handle)?.size_f32();
     Some(GuiImage {
-        texture,
-        size: egui::vec2(size.x, size.y),
+        texture: texture.id(),
+        size: texture.size_vec2(),
         path: asset_of(file).to_owned(),
     })
 }
@@ -177,7 +194,12 @@ pub fn cursor(world: &World) -> egui::CursorIcon {
 }
 
 #[derive(Resource, Default)]
-struct GuiImages(HashMap<String, (Handle<Image>, egui::TextureId)>);
+struct GuiImages(HashMap<String, GuiTexture>);
+
+enum GuiTexture {
+    Loading(Handle<Image>),
+    Ready(egui::TextureHandle),
+}
 
 #[derive(Resource, Default)]
 struct GuiCursor(egui::CursorIcon);
@@ -223,6 +245,16 @@ fn set_motion(gui: &egui::Context, motion: MotionPreference) {
 
 fn forget_world_layers(mut layers: ResMut<WorldLayers>) {
     layers.0.clear();
+}
+
+/// bevy_egui blends every texture as premultiplied but samples a Bevy image as stored, which would
+/// show the colour of each transparent pixel; egui premultiplies the pixels it is handed itself.
+fn upload(world: &World, file: &str, handle: &Handle<Image>) -> Option<egui::TextureHandle> {
+    let image = world.resource::<Assets<Image>>().get(handle)?;
+    let rgba = image.clone().try_into_dynamic().ok()?.to_rgba8();
+    let size = [rgba.width() as usize, rgba.height() as usize];
+    let pixels = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+    Some(context(world)?.load_texture(file, pixels, egui::TextureOptions::NEAREST))
 }
 
 fn read_cursor(

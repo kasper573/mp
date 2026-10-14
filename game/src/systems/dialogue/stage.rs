@@ -106,6 +106,7 @@ pub struct StageView {
 pub struct StageChoice {
     pub label: String,
     pub locked: bool,
+    pub selected: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -144,9 +145,11 @@ pub fn view(world: &World) -> Option<StageView> {
         choices: shown
             .choices
             .iter()
-            .map(|choice| StageChoice {
+            .enumerate()
+            .map(|(index, choice)| StageChoice {
                 label: choice.label.words(world.resource::<InputMap>()),
                 locked: choice.locked,
+                selected: index == shown.selected,
             })
             .collect(),
     })
@@ -212,6 +215,7 @@ struct Shown {
     refusals_seen: u32,
     typing: Option<Entity>,
     selected: usize,
+    pointed: Option<usize>,
     shaken: Option<(usize, Duration)>,
     cast: Vec<CastMember>,
 }
@@ -328,6 +332,7 @@ impl Shown {
             line: 0,
             lines: now.lines,
             selected: first_open(&now.choices),
+            pointed: None,
             choices: now.choices,
             picked: false,
             typed_since: None,
@@ -596,23 +601,23 @@ fn draw_stage(world: &mut World) {
         return;
     }
     let screen = gui.content_rect();
-    let stage = egui::Area::new(Id::new("stage"))
+    let area = egui::Area::new(Id::new("stage"))
         .order(Band::Stage.order())
-        .anchor(Align2::CENTER_BOTTOM, Vec2::new(0.0, -BOX_LIFT))
-        .show(&gui, |ui| {
-            ui.vertical_centered(|ui| {
-                if !panels.is_empty() {
-                    docked_panels(ui, world, panels, screen);
-                    ui.add_space(PANEL_GAP);
-                }
-                world
-                    .resource::<Stage>()
-                    .shown
-                    .is_some()
-                    .then(|| dialogue_box(ui, world, screen))
-            })
-            .inner
-        });
+        .anchor(Align2::CENTER_BOTTOM, Vec2::new(0.0, -BOX_LIFT));
+    let stage = gui::show_anchored(&gui, area, |ui| {
+        ui.vertical_centered(|ui| {
+            if !panels.is_empty() {
+                docked_panels(ui, world, panels, screen);
+                ui.add_space(PANEL_GAP);
+            }
+            world
+                .resource::<Stage>()
+                .shown
+                .is_some()
+                .then(|| dialogue_box(ui, world, screen))
+        })
+        .inner
+    });
     let cast = egui::Area::new(Id::new("cast"))
         .order(Band::Stage.order())
         .fixed_pos(Pos2::ZERO)
@@ -789,6 +794,8 @@ fn choices(ui: &mut Ui, world: &mut World) {
             })
             .collect()
     };
+    let moved = ui.input(|input| input.pointer.delta() != Vec2::ZERO);
+    let mut pointed = None;
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         for (index, (choice, selected, offset)) in rows.into_iter().enumerate() {
@@ -797,10 +804,8 @@ fn choices(ui: &mut Ui, world: &mut World) {
                     choice_row(ui, world, &choice, index, selected, offset)
                 })
                 .inner;
-            if response.hovered()
-                && let Some(shown) = world.resource_mut::<Stage>().shown.as_mut()
-            {
-                shown.selected = index;
+            if response.hovered() {
+                pointed = Some(index);
             }
             if map::clicked(world, InputAction::PickChoice, &response) {
                 pick_at(world, index);
@@ -811,6 +816,23 @@ fn choices(ui: &mut Ui, world: &mut World) {
                 .insert(index, response.rect);
         }
     });
+    point_at(world, pointed, moved);
+}
+
+/// The pointer takes the choice only by moving onto a row, so the keys keep it from a pointer at
+/// rest, even on a row that came up under it.
+fn point_at(world: &mut World, pointed: Option<usize>, moved: bool) {
+    let mut stage = world.resource_mut::<Stage>();
+    let Some(shown) = stage.shown.as_mut() else {
+        return;
+    };
+    if let Some(index) = pointed
+        && moved
+        && shown.pointed != pointed
+    {
+        shown.selected = index;
+    }
+    shown.pointed = pointed;
 }
 
 fn shake_offset(age: Duration) -> f32 {
@@ -881,7 +903,7 @@ fn choice_row(
     response
         .widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, selected, &label));
     let visuals = ui.style().interact_selectable(&response, selected);
-    if selected || response.hovered() {
+    if selected {
         ui.painter().set(
             background,
             egui::epaint::RectShape::new(

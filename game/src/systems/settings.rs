@@ -136,7 +136,7 @@ fn text_speed_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui:
 fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
     let current = settings.screen_transition();
     let mut picked = current;
-    egui::ComboBox::from_id_salt("area transition")
+    widgets::combo_box("area transition")
         .selected_text(current.as_ref())
         .show_ui(ui, |ui| {
             for &transition in ScreenTransition::VARIANTS {

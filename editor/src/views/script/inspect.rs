@@ -1157,7 +1157,7 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
     let current = nodes::event_of(node).unwrap_or("").to_owned();
     let mut picked = current.clone();
     widgets::kv(ui, "event", |ui| {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("event"))
+        widgets::combo_box(ui.id().with(path).with("event"))
             .selected_text(&current)
             .show_ui(ui, |ui| {
                 for variant in &events {
@@ -1606,7 +1606,7 @@ fn speaker_rows(
     let current = LineSpeaker::of(by).unwrap_or(LineSpeaker::Narrator);
     let mut picked = current.kind();
     widgets::kv(ui, "by", |ui| {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("speaker"))
+        widgets::combo_box(ui.id().with(path).with("speaker"))
             .selected_text(theme::mono(current.kind()).size(13.0))
             .width(ui.available_width())
             .show_ui(ui, |ui| {
@@ -1838,7 +1838,7 @@ pub fn make_shared_body(
             ui.label(theme::faint(standing).size(12.5).monospace());
         });
         widgets::kv(ui, "owner", |ui| {
-            egui::ComboBox::from_id_salt("make-shared-kind")
+            widgets::combo_box("make-shared-kind")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&dialog.kind).size(13.0))
                 .show_ui(ui, |ui| {

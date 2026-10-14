@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use egui::Ui;
 use game::core::audio::loader;
 use game::core::content::Content;
@@ -6,6 +8,7 @@ use game::core::tiling::Tiles;
 use game::systems::area::{self, AreaId};
 
 use crate::app::Editor;
+use crate::project::ProjectFiles;
 use crate::ui::theme;
 
 #[derive(Clone, Debug, Default)]
@@ -69,6 +72,27 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Ti
         at: (at.x, at.y),
         heard,
     });
+}
+
+/// Measuring decodes the whole file, so each version of a file is measured once.
+#[derive(Default)]
+pub struct LoudnessCache {
+    measured: HashMap<String, (String, Option<IntegratedLoudness>)>,
+}
+
+impl LoudnessCache {
+    pub fn of(&mut self, files: &ProjectFiles, file: &str) -> Option<IntegratedLoudness> {
+        let hash = files.hash_of(file)?;
+        if let Some((seen, loudness)) = self.measured.get(file)
+            && seen == hash
+        {
+            return *loudness;
+        }
+        let loudness = files.get(file).and_then(|bytes| measure(bytes));
+        self.measured
+            .insert(file.to_owned(), (hash.to_owned(), loudness));
+        loudness
+    }
 }
 
 pub fn measure(bytes: &[u8]) -> Option<IntegratedLoudness> {

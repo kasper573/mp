@@ -18,6 +18,7 @@ use crate::systems::player::session::Viewpoint;
 const WIDTH: f32 = 480.0;
 const ICON: f32 = 20.0;
 const PICK: f32 = 32.0;
+const PADDING: f32 = 8.0;
 
 pub struct QuestCardPlugin;
 
@@ -79,13 +80,15 @@ fn show_card(ui: &mut Ui, world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    ui.set_width(WIDTH);
-    ui.spacing_mut().item_spacing.y = 8.0;
-    match moment {
-        Moment::Offer => offer(ui, world, quest, &inventory),
-        Moment::TurnIn => turn_in(ui, world, quest, &inventory),
-        Moment::Decision => decision(ui, world, quest),
-    }
+    egui::Frame::new().inner_margin(PADDING).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.spacing_mut().item_spacing.y = 8.0;
+        match moment {
+            Moment::Offer => offer(ui, world, quest, &inventory),
+            Moment::TurnIn => turn_in(ui, world, quest, &inventory),
+            Moment::Decision => decision(ui, world, quest),
+        }
+    });
 }
 
 fn offer(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {

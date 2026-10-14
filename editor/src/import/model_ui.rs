@@ -544,7 +544,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                 }
                 let current = dialog.mapping.get(tag).cloned().flatten();
                 let mut picked: Option<Option<String>> = None;
-                egui::ComboBox::from_id_salt(("import-strip", tag))
+                widgets::combo_box(("import-strip", tag))
                     .width(150.0)
                     .selected_text(
                         current
@@ -590,7 +590,7 @@ fn mapping_table(ui: &mut Ui, dialog: &mut ModelDialog) -> bool {
                         ui.label(theme::muted("every model needs this strip"));
                     });
                     let mut picked = None;
-                    egui::ComboBox::from_id_salt(("import-pick-tag", &name))
+                    widgets::combo_box(("import-pick-tag", &name))
                         .width(120.0)
                         .selected_text("pick a tag")
                         .show_ui(ui, |ui| {
@@ -672,7 +672,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
             ui.label(theme::muted("put it on"));
             let offered = cue.offered(count);
             let mut picked = None;
-            egui::ComboBox::from_id_salt(("import-place", &target, cue.from, cue.cue.label()))
+            widgets::combo_box(("import-place", &target, cue.from, cue.cue.label()))
                 .width(100.0)
                 .selected_text(theme::mono(format!("frame {}", offered + 1)).color(theme::FAINT))
                 .show_ui(ui, |ui| {
@@ -703,7 +703,7 @@ fn note_cell(ui: &mut Ui, dialog: &mut ModelDialog, tag: &str) -> bool {
         ui.horizontal(|ui| {
             ui.label(theme::muted("keep"));
             let mut picked = None;
-            egui::ComboBox::from_id_salt(("import-keep", &target))
+            widgets::combo_box(("import-keep", &target))
                 .width(150.0)
                 .selected_text(if retimed.keep_here {
                     "the lengths set here"
@@ -1353,7 +1353,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                             None => format!("frame {}", offered + 1),
                         };
                         let mut picked = None;
-                        egui::ComboBox::from_id_salt((
+                        widgets::combo_box((
                             "reimport-place",
                             &strip.name,
                             cue.from,
@@ -1449,7 +1449,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted("keep"));
                     let mut picked = None;
-                    egui::ComboBox::from_id_salt(("reimport-keep", &strip.name))
+                    widgets::combo_box(("reimport-keep", &strip.name))
                         .width(ui.available_width().min(200.0))
                         .selected_text(theme::mono(if retimed.keep_here {
                             "the lengths set here"

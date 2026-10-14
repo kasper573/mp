@@ -200,7 +200,7 @@ pub fn new_surface_dialog(
             widgets::default_focus(ui, &response);
         });
         widgets::kv(ui, "footstep", |ui| {
-            egui::ComboBox::from_id_salt("new-surface-footstep")
+            widgets::combo_box("new-surface-footstep")
                 .selected_text(theme::mono(&dialog.footstep))
                 .width(200.0)
                 .show_ui(ui, |ui| {

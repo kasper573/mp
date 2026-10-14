@@ -701,7 +701,7 @@ fn decision_picker(
             UsageDecision::Unpack => "Unpack into scenery".to_owned(),
             _ => remove_label.clone(),
         };
-        egui::ComboBox::from_id_salt(("decision", index))
+        widgets::combo_box(("decision", index))
             .selected_text(theme::mono(label).size(13.0))
             .show_ui(ui, |ui| {
                 if unpackable
@@ -750,7 +750,7 @@ fn decision_picker(
         egui::vec2(170.0, ui.spacing().interact_size.y),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
-            egui::ComboBox::from_id_salt(("repoint", index))
+            widgets::combo_box(("repoint", index))
                 .width(160.0)
                 .selected_text(selected)
                 .show_ui(ui, |ui| {

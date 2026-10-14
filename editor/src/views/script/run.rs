@@ -177,7 +177,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         {
             start = true;
         }
-        egui::ComboBox::from_id_salt(("run-event", doc.owner.slug()))
+        widgets::combo_box(("run-event", doc.owner.slug()))
             .selected_text(theme::mono(&setup.event).size(13.0))
             .show_ui(ui, |ui| {
                 for event in &events {
@@ -214,7 +214,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             }
             _ => {
-                egui::ComboBox::from_id_salt(("run-owner", doc.owner.slug()))
+                widgets::combo_box(("run-owner", doc.owner.slug()))
                     .selected_text(
                         theme::mono(
                             bound
@@ -232,7 +232,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         ui.label(theme::muted("by").size(13.0));
-        egui::ComboBox::from_id_salt(("run-character", doc.owner.slug()))
+        widgets::combo_box(("run-character", doc.owner.slug()))
             .selected_text(
                 theme::mono(
                     setup
@@ -285,7 +285,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted(format!("{name} takes")));
                     let pick = setup.random.get(name).copied();
-                    egui::ComboBox::from_id_salt(("run-random", doc.owner.slug(), name))
+                    widgets::combo_box(("run-random", doc.owner.slug(), name))
                         .selected_text(pick.map_or("its weights".to_owned(), |index| {
                             format!("output {}", index + 1)
                         }))
@@ -683,7 +683,7 @@ fn character_card(
         widgets::card_title(ui, "player", &name);
         widgets::kv(ui, "level", |ui| {
             let mut picked = level;
-            egui::ComboBox::from_id_salt("run-level")
+            widgets::combo_box("run-level")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(level.to_string()))
                 .show_ui(ui, |ui| {
@@ -705,7 +705,7 @@ fn character_card(
                 .map(|job| job.key(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
             let mut picked = job;
-            egui::ComboBox::from_id_salt("run-job")
+            widgets::combo_box("run-job")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current))
                 .show_ui(ui, |ui| {
@@ -882,7 +882,7 @@ fn quests_card(
                     *open = Some(EditorTab::for_row("quest", key));
                 }
                 let mut picked = standing;
-                egui::ComboBox::from_id_salt(("run-quest", key))
+                widgets::combo_box(("run-quest", key))
                     .selected_text(theme::mono(standing.label()))
                     .show_ui(ui, |ui| {
                         for option in QuestStanding::ALL {

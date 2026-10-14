@@ -147,7 +147,7 @@ fn level_card(
             .collect();
         if !missing.is_empty() {
             let mut picked: Option<StatKind> = None;
-            egui::ComboBox::from_id_salt(("add-stat", index))
+            widgets::combo_box(("add-stat", index))
                 .selected_text(theme::muted("+ stat"))
                 .width(INPUT)
                 .show_ui(ui, |ui| {

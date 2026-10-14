@@ -510,7 +510,7 @@ pub fn delete_blueprint_dialog(
                             BlueprintChoice::Replace(k) => k.clone(),
                             _ => String::new(),
                         };
-                        egui::ComboBox::from_id_salt(("replace", index))
+                        widgets::combo_box(("replace", index))
                             .selected_text(if picked.is_empty() { "Replace with…".to_owned() } else { picked.clone() })
                             .show_ui(ui, |ui| {
                                 for other in &others {

@@ -204,6 +204,7 @@ pub struct ProbeStage {
 pub struct ProbeChoice {
     pub label: String,
     pub locked: bool,
+    pub selected: bool,
     pub rect: Option<Rect<WindowPx>>,
 }
 
@@ -459,6 +460,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 .map(|(index, choice)| ProbeChoice {
                     label: choice.label,
                     locked: choice.locked,
+                    selected: choice.selected,
                     rect: rows.get(&index).copied().map(window_rect),
                 })
                 .collect(),

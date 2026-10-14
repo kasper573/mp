@@ -25,6 +25,7 @@ use crate::systems::screen::mode::ClientMode;
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
 const LIST_WIDTH: f32 = 250.0;
 const ROW_ICON: f32 = 20.0;
+const DETAIL_PADDING: f32 = 8.0;
 
 pub struct QuestLogPlugin;
 
@@ -184,9 +185,13 @@ fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
         .id_salt(("quest detail", page.tab.title()))
         .auto_shrink(false)
         .show(ui, |ui| {
-            if let Some(quest) = shown {
-                detail(ui, world, page, quest);
-            }
+            egui::Frame::new()
+                .inner_margin(DETAIL_PADDING)
+                .show(ui, |ui| {
+                    if let Some(quest) = shown {
+                        detail(ui, world, page, quest);
+                    }
+                });
         });
 }
 

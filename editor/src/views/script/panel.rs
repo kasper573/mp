@@ -177,7 +177,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if bound.len() > 1 {
         ui.horizontal(|ui| {
             ui.label(theme::muted("as").size(13.0));
-            egui::ComboBox::from_id_salt(pick_id)
+            widgets::combo_box(pick_id)
                 .selected_text(
                     theme::mono(
                         bound

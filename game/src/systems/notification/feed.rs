@@ -235,16 +235,16 @@ fn draw(world: &mut World) {
         bottom = rect.top() - GAP;
     }
     for (more, look) in more {
-        let shown = egui::Area::new(Id::new("feed-more"))
+        let area = egui::Area::new(Id::new("feed-more"))
             .order(Band::Notices.order())
             .interactable(false)
             .fade_in(false)
             .pivot(egui::Align2::RIGHT_BOTTOM)
-            .fixed_pos(Pos2::new(screen.right() - EDGE, bottom))
-            .show(&gui, |ui| {
-                ui.multiply_opacity(look.opacity);
-                rows::count_chip(ui, world, more);
-            });
+            .fixed_pos(Pos2::new(screen.right() - EDGE, bottom));
+        let shown = gui::show_anchored(&gui, area, |ui| {
+            ui.multiply_opacity(look.opacity);
+            rows::count_chip(ui, world, more);
+        });
         gui.set_transform_layer(shown.response.layer_id, look.around(shown.response.rect));
         drawn.push(shown.response.rect);
     }

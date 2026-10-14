@@ -11,7 +11,7 @@ use game::core::content::ContentRow;
 use game::core::math::Rng;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, ProjectFiles, hash, row_file};
+use crate::project::{ContentEdit, ProjectFiles, row_file};
 use crate::ui::{theme, widgets};
 
 const BINS: usize = 160;
@@ -49,15 +49,14 @@ pub struct WaveformCache {
 impl WaveformCache {
     pub fn wave(&mut self, files: &ProjectFiles, path: &str) -> Option<Waveform> {
         let file = format!("assets/{path}");
-        let bytes = files.get(&file)?;
-        let hash = hash(bytes);
+        let hash = files.hash_of(&file)?;
         if let Some((seen, wave)) = self.waves.get(&file)
-            && *seen == hash
+            && seen == hash
         {
             return wave.clone();
         }
-        let wave = analyse(bytes);
-        self.waves.insert(file, (hash, wave.clone()));
+        let wave = files.get(&file).and_then(|bytes| analyse(bytes));
+        self.waves.insert(file, (hash.to_owned(), wave.clone()));
         wave
     }
 }

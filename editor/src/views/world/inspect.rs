@@ -244,7 +244,7 @@ fn colour_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     let fields = ColourField::all(editor);
     let mut next = colour.clone();
     widgets::kv(ui, "value", |ui| {
-        egui::ComboBox::from_id_salt("colour-value")
+        widgets::combo_box("colour-value")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.field.text()).size(12.5))
             .show_ui(ui, |ui| {
@@ -256,7 +256,7 @@ fn colour_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
     });
     if next.field.table == ColourTable::Npc {
         widgets::kv(ui, "of", |ui| {
-            egui::ComboBox::from_id_salt("colour-of")
+            widgets::combo_box("colour-of")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(next.of.label()).size(12.5))
                 .show_ui(ui, |ui| {
@@ -267,7 +267,7 @@ fn colour_panel(editor: &mut Editor, ui: &mut Ui, atlas: &WorldAtlas) {
         });
     }
     widgets::kv(ui, "show", |ui| {
-        egui::ComboBox::from_id_salt("colour-show")
+        widgets::combo_box("colour-show")
             .width(ui.available_width() - 8.0)
             .selected_text(theme::mono(next.show.label()).size(12.5))
             .show_ui(ui, |ui| {
@@ -564,7 +564,7 @@ fn tile_panel(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTil
             || "none".to_owned(),
             |character| format!("{} · level {}", character.key, character.level),
         );
-    egui::ComboBox::from_id_salt("world-play-character")
+    widgets::combo_box("world-play-character")
         .width(ui.available_width() - 8.0)
         .selected_text(theme::mono(shown).size(12.5))
         .show_ui(ui, |ui| {
@@ -798,7 +798,7 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
         widgets::kv(ui, "colour", |ui| {
             let mut picked = region.colour;
             let current = region_colour_name(picked);
-            egui::ComboBox::from_id_salt(("region-colour", index))
+            widgets::combo_box(("region-colour", index))
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(current).size(12.5).color(region_colour(picked)))
                 .show_ui(ui, |ui| {

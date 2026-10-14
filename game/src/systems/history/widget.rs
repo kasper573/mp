@@ -22,6 +22,7 @@ const SIZE: Vec2 = Vec2::new(780.0, 460.0);
 const TIME_WIDTH: f32 = 72.0;
 const ICON: f32 = 16.0;
 const TALK_INDENT: f32 = 12.0;
+const PADDING: i8 = 8;
 
 pub struct HistoryPlugin;
 
@@ -132,11 +133,15 @@ impl Window for HistoryWindow {
             .stick_to_bottom(true)
             .auto_shrink(false)
             .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 3.0;
-                for row in &rows {
-                    let id = ui.id().with(row.key());
-                    lazily(ui, id, |ui| show_row(ui, world, row, clock));
-                }
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::symmetric(0, PADDING))
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 3.0;
+                        for row in &rows {
+                            let id = ui.id().with(row.key());
+                            lazily(ui, id, |ui| show_row(ui, world, row, clock));
+                        }
+                    });
             });
     }
 }

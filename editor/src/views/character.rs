@@ -303,7 +303,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::kv(ui, "job", |ui| {
             let current = value.text("job").to_owned();
             let mut picked = current.clone();
-            egui::ComboBox::from_id_salt("character-job")
+            widgets::combo_box("character-job")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current).size(13.0))
                 .show_ui(ui, |ui| {
@@ -446,7 +446,7 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             let current = value["equipment"][slot].as_str().map(str::to_owned);
             widgets::kv(ui, slot, |ui| {
                 let mut picked = current.clone();
-                egui::ComboBox::from_id_salt(("equipment", slot))
+                widgets::combo_box(("equipment", slot))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
                         Some(item) => theme::mono(format!("item/ {item}")).size(13.0),
@@ -869,7 +869,7 @@ fn quests(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            egui::ComboBox::from_id_salt(("quest-state", quest))
+                            widgets::combo_box(("quest-state", quest))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
                                     for option in Standing::ALL {

@@ -1,5 +1,5 @@
 use egui::{
-    Color32, CornerRadius, FontId, Response, RichText, Sense, Stroke, StrokeKind, Ui, Vec2,
+    Color32, CornerRadius, FontId, Response, RichText, Sense, Stroke, StrokeKind, Style, Ui, Vec2,
     WidgetInfo, WidgetType,
 };
 
@@ -21,7 +21,8 @@ pub fn section(ui: &mut Ui, text: &str) {
 /// One row of tabs with the active one underlined. Each tab tells the accessibility tree its own
 /// label, as written, though it is drawn in capitals.
 pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active: &mut T) {
-    ui.horizontal(|ui| {
+    let rule = ui.painter().add(egui::Shape::Noop);
+    let row = ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         for (tab, label) in tabs {
             let selected = *tab == *active;
@@ -66,12 +67,17 @@ pub fn tab_strip<T: PartialEq + Copy>(ui: &mut Ui, tabs: &[(T, String)], active:
             }
         }
     });
-    let rect = ui.max_rect();
-    let y = ui.cursor().min.y - 1.0;
-    ui.painter().line_segment(
-        [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-        HAIRLINE,
+    let y = row.response.rect.bottom() - 1.0;
+    let span = ui.max_rect().x_range();
+    ui.painter().set(
+        rule,
+        egui::Shape::line_segment([egui::pos2(span.min, y), egui::pos2(span.max, y)], HAIRLINE),
     );
+}
+
+/// A dropdown whose rows answer a hover with their fill alone, as a menu's do.
+pub fn combo_box(id_salt: impl egui::AsIdSalt) -> egui::ComboBox {
+    egui::ComboBox::from_id_salt(id_salt).popup_style(popover.into())
 }
 
 pub fn key_hint(ui: &mut Ui, keys: &str) {
@@ -218,4 +224,16 @@ fn focus_ring(ui: &Ui, rect: egui::Rect, corner_radius: CornerRadius) {
         Stroke::new(1.5, color::SELECTION),
         StrokeKind::Outside,
     );
+}
+
+fn popover(style: &mut Style) {
+    let widgets = &mut style.visuals.widgets;
+    for widget in [
+        &mut widgets.inactive,
+        &mut widgets.hovered,
+        &mut widgets.active,
+    ] {
+        widget.bg_stroke = Stroke::NONE;
+        widget.expansion = 0.0;
+    }
 }
