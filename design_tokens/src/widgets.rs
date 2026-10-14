@@ -5,6 +5,7 @@ use egui::{
 
 use crate::{CHIP_RADIUS, HAIRLINE, color, family};
 
+/// A heading drawn in capitals that tells the accessibility tree its label as written.
 pub fn section(ui: &mut Ui, text: &str) {
     ui.add_space(6.0);
     ui.label(
@@ -12,7 +13,8 @@ pub fn section(ui: &mut Ui, text: &str) {
             .size(11.0)
             .color(color::MUTED)
             .family(family::medium()),
-    );
+    )
+    .widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, text));
     ui.add_space(1.0);
 }
 
@@ -111,6 +113,15 @@ pub fn toggle(ui: &mut Ui, on: &mut bool) -> Response {
         focus_ring(ui, rect, CornerRadius::same(8));
     }
     response
+}
+
+/// egui paints a slider's rail in the inactive widget fill, which the theme gives windows too.
+pub fn slider(ui: &mut Ui, slider: egui::Slider) -> Response {
+    ui.scope(|ui| {
+        ui.visuals_mut().widgets.inactive.bg_fill = color::INPUT;
+        ui.add(slider.trailing_fill(true))
+    })
+    .inner
 }
 
 pub fn chip(ui: &mut Ui, text: &str) -> Response {

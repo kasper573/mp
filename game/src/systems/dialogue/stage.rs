@@ -646,31 +646,38 @@ fn docked_panels(
     panels: Vec<(PanelHead, DockedPanel)>,
     screen: Rect,
 ) {
-    ui.horizontal(|ui| {
+    let width_of = |head: &PanelHead| head.width.min(screen.width() * SCREEN_SHARE);
+    let gaps = panels.len().saturating_sub(1) as f32 * ui.spacing().item_spacing.x;
+    let row = panels.iter().map(|(head, _)| width_of(head)).sum::<f32>() + gaps;
+    let layout = Layout::left_to_right(Align::Max);
+    ui.allocate_ui_with_layout(Vec2::new(row, 0.0), layout, |ui| {
         for (index, (head, panel)) in panels.into_iter().enumerate() {
-            let width = head.width.min(screen.width() * SCREEN_SHARE);
+            let width = width_of(&head);
             let most = screen.height() * SCREEN_SHARE;
             let frame = egui::Frame::window(ui.style()).inner_margin(0.0);
             let shown = ui.push_id(("docked", index), |ui| {
                 frame.show(ui, |ui| {
-                    ui.set_width(width);
-                    match head.fixed_height {
-                        Some(height) => ui.set_height(height.min(most)),
-                        None => ui.set_max_height(most),
-                    }
-                    egui::Frame::new()
-                        .fill(color::BG)
-                        .inner_margin(egui::Margin::symmetric(10, 6))
-                        .show(ui, |ui| {
-                            ui.set_width(width - 20.0);
-                            ui.vertical_centered(|ui| {
-                                ui.label(
-                                    RichText::new(&head.title).text_style(egui::TextStyle::Heading),
-                                );
+                    ui.vertical(|ui| {
+                        ui.set_width(width);
+                        match head.fixed_height {
+                            Some(height) => ui.set_height(height.min(most)),
+                            None => ui.set_max_height(most),
+                        }
+                        egui::Frame::new()
+                            .fill(color::BG)
+                            .inner_margin(egui::Margin::symmetric(10, 6))
+                            .show(ui, |ui| {
+                                ui.set_width(width - 20.0);
+                                ui.vertical_centered(|ui| {
+                                    ui.label(
+                                        RichText::new(&head.title)
+                                            .text_style(egui::TextStyle::Heading),
+                                    );
+                                });
                             });
-                        });
-                    ui.add(egui::Separator::default().spacing(0.0));
-                    (panel.show)(ui, world);
+                        ui.add(egui::Separator::default().spacing(0.0));
+                        (panel.show)(ui, world);
+                    })
                 })
             });
             world

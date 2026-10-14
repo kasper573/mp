@@ -260,7 +260,7 @@ fn row(
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.vertical(|ui| {
+                            ui.with_layout(Layout::top_down(Align::Max), |ui| {
                                 for stack in &ware.price {
                                     price_chip(ui, world, &shelf.inventory, *stack);
                                 }

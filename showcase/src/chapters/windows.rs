@@ -75,7 +75,7 @@ fn play(shoot: &mut Shoot) {
     me.caption(
         "Sound has a volume each: master, music, ambience, effects and voice, all halfway to start",
     );
-    me.scroll_until(UiTarget::starting("Reduced motion"), "Voice");
+    me.scroll_until("Audio", "Voice");
     me.caption("Halfway is the mix as balanced, with room to turn any of them up or down");
     me.show_mixer();
     me.caption("Music is the soundscape's first channel: turned down, the harbour theme fades out");
@@ -108,7 +108,7 @@ fn play(shoot: &mut Shoot) {
     me.caption("Voice is how characters speak: at halfway, Grisha's greeting babbles…");
     hear_out_greeting(&mut me);
     me.act(InputAction::ToggleSettings);
-    me.scroll_until(UiTarget::starting("Reduced motion"), "Voice");
+    me.scroll_until("Audio", "Voice");
     set_fader(&mut me, "Voice", 0.0);
     me.act(InputAction::Dismiss);
     me.caption("…and with voice turned down, the same greeting is silent");

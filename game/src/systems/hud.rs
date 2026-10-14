@@ -391,14 +391,11 @@ fn launcher(world: &mut World, gui: &egui::Context, window: &'static dyn Window,
         .name(window.toggle())
         .unwrap_or_default();
     let shown = movable(world, gui, title, at, |ui, world| {
-        let size = Vec2::splat(WIDGET.0);
-        let button = match gui::image(world, &image) {
-            Some(icon) => {
-                egui::Button::image(icon.widget(Vec2::splat(LAUNCHER_ICON))).min_size(size)
-            }
-            None => egui::Button::new("").min_size(size),
-        };
-        let response = ui.add(button);
+        let response = ui.add(egui::Button::new("").min_size(Vec2::splat(WIDGET.0)));
+        if let Some(icon) = gui::image(world, &image) {
+            let at = Rect::from_center_size(response.rect.center(), Vec2::splat(LAUNCHER_ICON));
+            ui.put(at, icon.widget(Vec2::splat(LAUNCHER_ICON)));
+        }
         key_badge(ui, response.rect, &key);
         response.on_hover_text(title)
     });

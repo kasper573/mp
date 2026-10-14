@@ -821,6 +821,11 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
             .map(|widget| (widget.id.value(), *widget))
             .collect()
     });
+    let labels: HashMap<accesskit::NodeId, &str> = tree
+        .nodes
+        .iter()
+        .filter_map(|(id, node)| Some((*id, node.label().or(node.value())?)))
+        .collect();
     let world_layers = world.resource::<WorldLayers>();
     let titles = hud::window_titles(world)
         .into_iter()
@@ -855,7 +860,16 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 .then(|| node.label().map(str::to_owned))
                 .flatten();
             let text = (role != accesskit::Role::Image)
-                .then(|| node.label().or(node.value()).map(str::to_owned))
+                .then(|| {
+                    node.label()
+                        .or(node.value())
+                        .or_else(|| {
+                            node.labelled_by()
+                                .iter()
+                                .find_map(|by| labels.get(by).copied())
+                        })
+                        .map(|text| text.to_string())
+                })
                 .flatten()
                 .filter(|text| !text.is_empty());
             let slider = (role == accesskit::Role::Slider)

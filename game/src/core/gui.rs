@@ -194,6 +194,11 @@ fn adopt_context(
     let gui = context.get_mut().clone();
     gui.set_fonts(fonts.map_or_else(design_tokens::builtin_fonts, |fonts| fonts.0.clone()));
     design_tokens::apply(&gui);
+    // A window's corner reaches this far past its edge for a resize, which would take the clicks
+    // meant for a slot in the window beside it.
+    gui.all_styles_mut(|style| {
+        style.interaction.resize_grab_radius_corner = style.interaction.resize_grab_radius_side;
+    });
     gui.options_mut(|options| options.zoom_with_keyboard = false);
     set_motion(&gui, *motion);
     commands.insert_resource(GuiContext(gui));

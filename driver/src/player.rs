@@ -832,7 +832,7 @@ fn detour(
 // An enemy in front of the target takes the click, as it would take a player's: the way to the
 // target leads through it.
 fn in_the_way(seen: &ProbeSnapshot, target: Entity) -> bool {
-    matches!(seen.claim, ClickClaim::Attack(enemy) if enemy != target)
+    matches!(seen.claim, ClickClaim::Attack(other) | ClickClaim::Pickup(other) if other != target)
 }
 
 fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos<Tiles>> {

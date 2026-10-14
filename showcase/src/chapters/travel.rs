@@ -86,7 +86,7 @@ fn play(shoot: &mut Shoot) {
 
 fn choose_transition(me: &mut Player, current: &str, next: &str) {
     me.act(InputAction::ToggleSettings);
-    me.scroll_until(UiTarget::starting("Reduced motion"), current);
+    me.scroll_until("Audio", current);
     me.click_ui(current);
     me.hover_ui(next);
     me.click_ui(next);

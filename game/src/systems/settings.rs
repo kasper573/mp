@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use bevy::prelude::*;
+use design_tokens::widgets;
 use egui::Ui;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
@@ -15,7 +16,10 @@ use crate::systems::hud::{HudAudience, Window};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 
-const SLIDER_WIDTH: f32 = 220.0;
+const WINDOW_SIZE: egui::Vec2 = egui::Vec2::new(400.0, 410.0);
+const SLIDER_WIDTH: f32 = 150.0;
+const LABEL_WIDTH: f32 = 100.0;
+const FORM_SPACING: egui::Vec2 = egui::Vec2::new(16.0, 8.0);
 
 pub(crate) fn plugin(app: &mut App) {
     let settings = UserSettings::load(&*app.world().resource::<ClientPlatform>().0);
@@ -59,6 +63,9 @@ impl Window for SettingsWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Settings
     }
+    fn size(&self) -> egui::Vec2 {
+        WINDOW_SIZE
+    }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         egui::ScrollArea::vertical()
             .auto_shrink(false)
@@ -69,6 +76,8 @@ impl Window for SettingsWindow {
 }
 
 fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
+    ui.spacing_mut().slider_width = SLIDER_WIDTH;
+    widgets::section(ui, "Interface");
     let mut snapping = settings.snapping_enabled();
     if ui.checkbox(&mut snapping, "UI snapping").changed() {
         settings.toggle_snapping();
@@ -78,51 +87,70 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
         settings.toggle_reduced_motion();
     }
     ui.add_space(4.0);
+    form(ui, "interface", |ui| {
+        let label = ui.label("Text speed");
+        text_speed_slider(ui, settings, label.id);
+        ui.end_row();
+        let label = ui.label("Area transition");
+        transition_picker(ui, settings, label.id);
+        ui.end_row();
+    });
+    ui.add_space(8.0);
+    widgets::section(ui, "Audio");
+    form(ui, "audio", |ui| {
+        for fader in iter::once(AudioFader::Master).chain(
+            AudioCategory::VARIANTS
+                .iter()
+                .copied()
+                .map(AudioFader::Category),
+        ) {
+            let label = ui.label(fader_name(fader));
+            fader_slider(ui, settings, fader, label.id);
+            ui.end_row();
+        }
+    });
+}
+
+fn form(ui: &mut Ui, id: &str, add: impl FnOnce(&mut Ui)) {
+    egui::Grid::new(("settings", id))
+        .num_columns(2)
+        .min_col_width(LABEL_WIDTH)
+        .spacing(FORM_SPACING)
+        .show(ui, add);
+}
+
+fn text_speed_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
     let mut speed = settings.letters_per_second().0;
-    ui.spacing_mut().slider_width = SLIDER_WIDTH;
     let slider = egui::Slider::new(
         &mut speed,
         LettersPerSecond::SLOWEST.0..=LettersPerSecond::FASTEST.0,
     )
     .step_by(1.0)
-    .suffix(" letters a second")
-    .text("Text speed");
-    if ui.add(slider).changed() {
+    .fixed_decimals(0)
+    .suffix(" letters/s");
+    if widgets::slider(ui, slider).labelled_by(label).changed() {
         settings.set_letters_per_second(LettersPerSecond(speed.round()));
     }
-    ui.add_space(4.0);
-    transition_picker(ui, settings);
-    ui.add_space(8.0);
-    ui.heading("Audio");
-    for fader in iter::once(AudioFader::Master).chain(
-        AudioCategory::VARIANTS
-            .iter()
-            .copied()
-            .map(AudioFader::Category),
-    ) {
-        fader_slider(ui, settings, fader);
+}
+
+fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
+    let current = settings.screen_transition();
+    let mut picked = current;
+    egui::ComboBox::from_id_salt("area transition")
+        .selected_text(current.as_ref())
+        .show_ui(ui, |ui| {
+            for &transition in ScreenTransition::VARIANTS {
+                ui.selectable_value(&mut picked, transition, transition.as_ref());
+            }
+        })
+        .response
+        .labelled_by(label);
+    if picked != current {
+        settings.set_screen_transition(picked);
     }
 }
 
-fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
-    ui.horizontal(|ui| {
-        ui.label("Area transition");
-        let current = settings.screen_transition();
-        let mut picked = current;
-        egui::ComboBox::from_id_salt("area transition")
-            .selected_text(current.as_ref())
-            .show_ui(ui, |ui| {
-                for &transition in ScreenTransition::VARIANTS {
-                    ui.selectable_value(&mut picked, transition, transition.as_ref());
-                }
-            });
-        if picked != current {
-            settings.set_screen_transition(picked);
-        }
-    });
-}
-
-fn fader_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, fader: AudioFader) {
+fn fader_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, fader: AudioFader, label: egui::Id) {
     let mut volume = settings.volume(fader).0;
     let slider = egui::Slider::new(&mut volume, AudioVolume::SILENT.0..=AudioVolume::FULL.0)
         .custom_formatter(|value, _| format!("{:.0}%", value * 100.0))
@@ -133,9 +161,8 @@ fn fader_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, fader: AudioFader
                 .parse::<f64>()
                 .ok()
                 .map(|percent| percent / 100.0)
-        })
-        .text(fader_name(fader));
-    if ui.add(slider).changed() {
+        });
+    if widgets::slider(ui, slider).labelled_by(label).changed() {
         settings.set_volume(fader, AudioVolume((volume * 100.0).round() / 100.0));
     }
 }
