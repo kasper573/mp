@@ -59,7 +59,7 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
-      keycloak:
+      keycloak-healthcheck:
         condition: service_healthy
 
   keycloak:
@@ -71,28 +71,27 @@ services:
     image: ${DOCKER_REGISTRY_URL:-rift}/rift-keycloak:${DOCKER_IMAGE_VERSION:-latest}
     command: start --optimized --import-realm
     volumes:
-      - ./keycloak/rift-realm.json:/opt/keycloak/data/import/rift-realm.json
+      - ./keycloak/import:/opt/keycloak/data/import
       # roles.conf is generated from the game crate; the entrypoint syncs the realm with it on every
       # start. Mounted, not baked, so the image is independent of the roles and can be built before
       # the file is generated.
       - ./keycloak/roles.conf:/opt/keycloak/roles.conf
-    # The image has neither curl nor wget, so bash speaks the readiness endpoint's HTTP itself.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # the keycloak image doesn't have curl so we healthcheck it externally
+  keycloak-healthcheck:
+    env_file: *env_files
+    logging: *logging
+    image: curlimages/curl
+    command: ["sh", "-c", "sleep infinity"]
     healthcheck:
-      test:
-        - CMD
-        - bash
-        - -c
-        - >-
-          exec 3<>/dev/tcp/127.0.0.1/9000
-          && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
-          && grep -q '^HTTP/1.1 200' <&3
+      test: ["CMD-SHELL", "curl -fsS http://$$KEYCLOAK_MGMT_TARGET/health/live"]
       interval: 3s
       timeout: 5s
       retries: 20
       start_period: 5m
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   postgres:
     env_file: *env_files
@@ -214,7 +213,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile
       - reverse-proxy-data:/data
       - reverse-proxy-config:/config
       - caddy-logs:/var/log/caddy

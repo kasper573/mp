@@ -92,7 +92,7 @@ fn main() {
     let metrics = service::recorder();
     let sessions = Sessions::default();
     let online = Online::default();
-    let area_ids = select_areas(&content, &config);
+    let area_ids = select_areas(&content, config.areas);
     let http = Http {
         sessions: sessions.clone(),
         auth: match config.auth {
@@ -398,15 +398,12 @@ struct Conn {
 #[derive(Component)]
 struct Wire(u64);
 
-fn select_areas(content: &Content, config: &ServerConfig) -> Vec<AreaId> {
-    match config.areas {
+fn select_areas(content: &Content, areas: ServedAreas) -> Vec<AreaId> {
+    match areas {
         ServedAreas::Real => content.ids::<AreaDef>().collect(),
-        // The initial spawn's area is one template instanced many times; the count is bounded only
-        // by the machine, not by how many area rows the content table happens to define.
-        ServedAreas::Bench => {
-            let count = config
-                .bench_areas
-                .expect("RIFT_GAME_SERVER_BENCH_AREAS: how many areas a bench serves");
+        // The initial spawn's area is one template instanced `count` times; the count is bounded
+        // only by the machine, not by how many area rows the content table happens to define.
+        ServedAreas::Bench(count) => {
             vec![content.built::<GameSettings>().initial_spawn.area; count]
         }
     }
