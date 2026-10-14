@@ -2,7 +2,7 @@ name: Set up the build environment
 description: Pinned toolchain, just, and the Linux system libraries cargo can't provide.
 inputs:
   deps:
-    description: "Which Linux system libraries to install: none | build | all."
+    description: "What the job runs, which decides the Linux system packages it gets: build | test | e2e."
     default: build
 runs:
   using: composite
@@ -12,7 +12,7 @@ runs:
       shell: bash
       run: rustup show
     - name: Install wasm-bindgen-cli matching the lockfile
-      if: runner.os == 'Linux' && inputs.deps != 'none'
+      if: runner.os == 'Linux' && inputs.deps == 'e2e'
       shell: bash
       # `just wasm` post-processes the client with `wasm-bindgen`, whose version must match the
       # `wasm-bindgen` crate exactly; grab that prebuilt release rather than compiling the CLI.
@@ -22,40 +22,37 @@ runs:
         sudo install "/tmp/wasm-bindgen-${version}-x86_64-unknown-linux-musl/wasm-bindgen" /usr/local/bin/wasm-bindgen
         wasm-bindgen --version
     - name: Install Linux system libraries
-      if: runner.os == 'Linux' && inputs.deps != 'none'
+      if: runner.os == 'Linux'
       shell: bash
       # `-sys` crates link system C libraries cargo can't supply (the one platform-specific place, per
       # the repo's platform rule): the x11/gl libs, cmake/g++ for the native `ui` gallery and
       # `bevy_render`, and alsa for kira's cpal backend (the client audio code compiles natively too).
-      # xvfb + the Mesa DRI driver are for the e2e's headed browsers (software WebGL). The gameplay
-      # tests run the desktop client on Xwayland in a headless weston through Mesa's software Vulkan,
-      # drive it with xdotool, and record its picture with ffmpeg and its sound with parecord, from a
-      # PulseAudio sink it plays into through ALSA's pulse plugin. Drop the runner's microsoft/azure apt
-      # sources first — unused, and they 403 intermittently.
+      # The gameplay tests run the desktop client on Xwayland in a headless weston through Mesa's
+      # software Vulkan, drive it with xdotool, and record its picture with ffmpeg and its sound with
+      # parecord, from a PulseAudio sink it plays into through ALSA's pulse plugin. xvfb + the Mesa DRI
+      # driver are for the e2e's headed browsers (software WebGL). Drop the runner's microsoft/azure
+      # apt sources first — unused, and they 403 intermittently.
+      env:
+        BUILD_PACKAGES: >-
+          cmake g++ libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
+          libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev
+        TEST_PACKAGES: >-
+          mesa-vulkan-drivers weston xwayland xdotool ffmpeg pulseaudio pulseaudio-utils
+          libasound2-plugins
+        E2E_PACKAGES: xvfb libgl1-mesa-dri
+        DEPS: ${{ inputs.deps }}
       run: |
+        case "$DEPS" in
+          build) packages="$BUILD_PACKAGES" ;;
+          test) packages="$BUILD_PACKAGES $TEST_PACKAGES" ;;
+          e2e) packages="$BUILD_PACKAGES $E2E_PACKAGES" ;;
+          *) echo "::error::unknown deps '$DEPS'"; exit 1 ;;
+        esac
         sudo rm -f /etc/apt/sources.list.d/microsoft* /etc/apt/sources.list.d/azure*
         sudo apt-get update
-        sudo apt-get install -y cmake g++ libx11-dev libxext-dev libxft-dev libxinerama-dev \
-          libxcursor-dev libxrender-dev libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev \
-          xvfb libgl1-mesa-dri libasound2-dev mesa-vulkan-drivers weston xwayland xdotool ffmpeg \
-          pulseaudio pulseaudio-utils libasound2-plugins
+        sudo apt-get install -y $packages
     - name: Set up Node for the e2e
-      if: inputs.deps == 'all'
+      if: inputs.deps == 'e2e'
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: lts/*
-    # Cache the engines Playwright downloads (Firefox/WebKit, ~180MB) keyed on the lockfile, which
-    # pins their versions; `playwright install` then skips them on a hit. Chrome/Edge are apt channels.
-    - name: Cache Playwright browsers
-      if: runner.os == 'Linux' && inputs.deps == 'all'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
-    - name: Install the e2e suite and its browsers
-      if: runner.os == 'Linux' && inputs.deps == 'all'
-      shell: bash
-      working-directory: e2e
-      run: |
-        npm ci
-        npx playwright install --with-deps chrome firefox webkit ffmpeg

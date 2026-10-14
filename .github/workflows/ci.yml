@@ -14,13 +14,62 @@ permissions:
   contents: read
   packages: write
 
+env:
+  # rust-cache restores compiled dependencies; workspace crates rebuild every run, so their
+  # incremental artifacts would only bloat the cache.
+  CARGO_INCREMENTAL: "0"
+
+# Every push runs lint, test and e2e side by side, each on a runner of its own; main deploys once all
+# three pass.
+#
+# rust-cache is the sole build cache, one entry per job. Only main writes it and every branch reads
+# main's, so the cache holds one set of entries for main's lockfile whatever happens on branches, and
+# the entries main supersedes are the least recently used, the first evicted. Branches therefore build
+# only what main builds. A per-object compiler cache (sccache) is deliberately absent: on the GitHub
+# Actions backend it writes thousands of tiny entries that crowd out these.
 jobs:
-  # One job for every push: lint, test, build, and e2e. The branch decides two things and nothing
-  # else — how hard to optimize, and whether to deploy. main builds the optimized artifacts, runs the
-  # e2e against those exact binaries, then packages and ships them; branches build unoptimized and stop
-  # after the e2e. The images only package the host-built crates, so the deploy reuses the e2e build —
-  # no second compile, no artifact hand-off between jobs, and the e2e always ran on what we deploy.
-  ci:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Lint
+        # Unoptimized: lint doesn't ship.
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
+        run: just lint
+
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          deps: test
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Test
+        # Unoptimized: the tests don't ship. The gameplay tests record each client from a sound server sink.
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          just test
+      - name: Save gameplay test artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gameplay-artifacts
+          path: target/tmp/gameplay/
+          if-no-files-found: ignore
+
+  e2e:
     # Not the newest image: ubuntu-26.04 ships GStreamer 1.28, whose device monitor starts its
     # providers on a thread (gstdevicemonitor.c, since 1.28.0) and, when stopped while a provider is
     # still failing to start, frees the provider list the stopping side is about to walk. A runner has
@@ -30,12 +79,17 @@ jobs:
     # fix; https://gitlab.freedesktop.org/gstreamer/gstreamer/-/merge_requests/12396 tracks that code.
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # deploy: what main ships, so its e2e runs on those exact artifacts: the server at the release
+        # default, the wasm shrunk with z + LTO + strip (~44MB) for mobile Safari's per-tab memory.
+        # fast: what branches e2e, skipping the minutes LTO takes even on a warm cache: the server
+        # unoptimized (not the e2e bottleneck), the wasm at opt-3 so the software-rendered browsers keep
+        # up. main e2es it too, so that its cache, like every other, is main's.
+        build: ${{ github.ref == 'refs/heads/main' && fromJSON('["fast", "deploy"]') || fromJSON('["fast"]') }}
     env:
-      # rust-cache restores the registry and compiled dependencies across runs. Incremental off: the
-      # per-run incremental artifacts are large and machine-specific, so caching a lean shared-dep
-      # target/ restores far more than it costs.
-      CARGO_INCREMENTAL: "0"
-      DEPLOY: ${{ github.ref == 'refs/heads/main'  }}
+      BUILD: ${{ matrix.build }}
       DOCKER_REGISTRY: ghcr.io
       DOCKER_USERNAME: ${{ github.repository_owner }}
       DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -45,49 +99,33 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
         with:
-          deps: all
-      # The sole build cache. A per-object compiler cache (sccache) is deliberately absent: on the GitHub
-      # Actions backend it writes thousands of tiny entries that exhaust the repo's 10 GB cache quota and
-      # evict this one, so the whole dependency graph recompiled from cold every run.
+          deps: e2e
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          # main builds optimized and branches don't, so they keep separate caches to avoid rebuilding
-          # dependencies at the other's opt-level on every run.
-          key: ci-${{ github.ref == 'refs/heads/main' && 'main' || 'branch' }}
-          # Save the dependency cache even when the run fails (e.g. a flaky e2e), so the next push doesn't
-          # recompile every dependency from cold.
-          cache-on-failure: "true"
-      - name: Lint and test
-        # Unoptimized: lint and unit tests don't ship, so build them fast regardless of branch.
-        env:
-          CARGO_PROFILE_RELEASE_OPT_LEVEL: "0"
-        # The gameplay tests record each client from a sound server sink. The sound server stops with
-        # them, so the e2e below still runs on a runner without audio devices.
-        run: |
-          just lint
-          pulseaudio --start --exit-idle-time=-1
-          just test
-          pulseaudio --kill
-      - name: Save gameplay test artifacts
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: gameplay-artifacts
-          path: target/tmp/gameplay/
-          if-no-files-found: ignore
+          key: ${{ matrix.build }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build
-        # main deploys the server at the release default and the wasm shrunk with z + LTO + strip
-        # (~44MB) for mobile Safari's per-tab memory. Branches build the server unoptimized (not the
-        # e2e bottleneck) but the wasm at opt-3 — the e2e's software-rendered browsers need a client
-        # fast enough to keep up, and opt-3 wasm costs only seconds more to build than opt-0.
+        # The suite's browsers and the stack's images that don't package the build mostly download, so
+        # they come alongside the compiler.
         run: |
-          if [ "$DEPLOY" = "true" ]; then
+          {
+            (cd e2e && npm ci && npx playwright install --with-deps chrome firefox webkit ffmpeg)
+            just e2e-stack-images
+          } > "$RUNNER_TEMP/prepare.log" 2>&1 &
+          prepare=$!
+          if [ "$BUILD" = deploy ]; then
             just build
-            CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols CARGO_INCREMENTAL=0 just wasm
+            CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=true CARGO_PROFILE_RELEASE_STRIP=symbols just wasm
           else
             CARGO_PROFILE_RELEASE_OPT_LEVEL=0 just build
             CARGO_PROFILE_RELEASE_OPT_LEVEL=3 just wasm
           fi
+          echo "::group::Browsers and stack images"
+          status=0
+          wait "$prepare" || status=$?
+          cat "$RUNNER_TEMP/prepare.log"
+          echo "::endgroup::"
+          exit "$status"
       - name: Start the stack
         # rift.lan only resolves on a LAN; map it to loopback for the browsers that take no
         # host-resolver flag (Firefox/WebKit).
@@ -109,7 +147,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-artifacts
+          name: e2e-artifacts-${{ matrix.build }}
           path: |
             e2e/playwright-report/
             e2e/test-results/
@@ -120,17 +158,30 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: stack-logs
+          name: stack-logs-${{ matrix.build }}
           path: /tmp/stack.log
       - name: Build and push the stack images
-        if: ${{ env.DEPLOY == 'true' }}
+        if: ${{ github.ref == 'refs/heads/main' && matrix.build == 'deploy' }}
         # The website image bakes in the wasm bundle; the game-server image its server binary — both the
         # exact artifacts the e2e just ran against, repackaged for the prod registry (a docker cache hit).
         run: |
           echo "$DOCKER_PASSWORD" | docker login "$DOCKER_REGISTRY" -u "$DOCKER_USERNAME" --password-stdin
           just push-images
+
+  deploy:
+    needs: [lint, test, e2e]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DOCKER_REGISTRY: ghcr.io
+      DOCKER_USERNAME: ${{ github.repository_owner }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      DOCKER_REGISTRY_URL: ghcr.io/${{ github.repository_owner }}
+      DOCKER_IMAGE_VERSION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Upload docker runtime dependencies
-        if: ${{ env.DEPLOY == 'true' }}
         uses: burnett01/rsync-deployments@155b6d6c1219ab2224c20c58d423a3f1b850395f # v9
         with:
           switches: -avz --delete
@@ -140,7 +191,6 @@ jobs:
           remote_user: ${{ secrets.PROD_SSH_USERNAME }}
           remote_key: ${{ secrets.PROD_SSH_KEY }}
       - name: Deploy via SSH action
-        if: ${{ env.DEPLOY == 'true' }}
         id: deploy
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         continue-on-error: true
@@ -173,7 +223,7 @@ jobs:
             fi
             docker image prune -f
       - name: Download deployment logs from server
-        if: ${{ env.DEPLOY == 'true' && steps.deploy.outcome == 'failure' }}
+        if: ${{ steps.deploy.outcome == 'failure' }}
         uses: nicklasfrahm/scp-action@ff9723c16c864e37adf7ef4111362b86905bfb04 # v1.0.1
         with:
           direction: download
@@ -184,13 +234,13 @@ jobs:
           target: ./deploy-failure-logs.tar.gz
           insecure_ignore_fingerprint: true
       - name: Save deployment logs
-        if: ${{ env.DEPLOY == 'true' && steps.deploy.outcome == 'failure' }}
+        if: ${{ steps.deploy.outcome == 'failure' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deploy-failure-logs
           path: ./deploy-failure-logs.tar.gz
       - name: Fail workflow on deploy error
-        if: ${{ env.DEPLOY == 'true' && steps.deploy.outcome == 'failure' }}
+        if: ${{ steps.deploy.outcome == 'failure' }}
         run: |
           echo "🚨 Deployment failed — see deploy-failure-logs artifact for details."
           exit 1
@@ -198,7 +248,7 @@ jobs:
   # The archive a release ships, per platform from the same commit: editor, game-server,
   # desktop-client and the example content (`just archive`). Attached to the run of every main push.
   archive:
-    needs: ci
+    needs: [lint, test, e2e]
     if: ${{ github.ref == 'refs/heads/main' }}
     strategy:
       fail-fast: false
@@ -212,13 +262,9 @@ jobs:
             platform: macos-arm64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
-    env:
-      CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
-        with:
-          deps: build
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: archive-${{ matrix.platform }}

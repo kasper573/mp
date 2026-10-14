@@ -9,12 +9,14 @@ lint:
     cargo clippy --release --all-targets -- -D warnings
     cargo clippy --release -p game --lib --bin client --target wasm32-unknown-unknown -- -D warnings
 
+# Every test lives in a tests/ folder; the libs' and bins' own test harnesses would build for nothing.
 test:
-    cargo test --release -p game -p ui -p editor
+    cargo test --release -p game -p ui -p editor --test '*'
 
 # The website and game server binaries, and the roles the auth stack syncs from.
-build: roles
-    cargo build --release -p website -p game --bin website --bin game-server
+build:
+    cargo build --release -p website -p game --bin website --bin game-server --bin kc-roles
+    target/release/kc-roles > docker/keycloak/roles.conf
 
 # The browser client bundle the website serves; content syncs from the game server at boot.
 wasm:
@@ -48,7 +50,7 @@ reset:
 logs:
     {{compose}} logs --no-color
 
-kc-provision: roles
+kc-provision: build
     {{compose}} up -d --build keycloak
 
 # No service names: compose's build sections are the single source of truth for what we publish.
@@ -62,6 +64,11 @@ e2e filter="": build wasm e2e-stack-up (e2e-run filter)
 
 # The stack without its observability services, which the e2e doesn't exercise and which start slowest.
 e2e-stack-up: (up "")
+
+# The e2e stack's images that don't package the build, so they can be made while it compiles.
+e2e-stack-images:
+    {{compose}} build keycloak reverse-proxy
+    {{compose}} pull postgres
 
 # LP_NUM_THREADS bounds each headed browser's Mesa threads so parallel workers don't thrash.
 [doc("The Playwright suite against a running stack, on a virtual display.")]
@@ -118,10 +125,6 @@ loadtest count="dyn":
       cargo run --release -p game --bin loadtest -- {{count}}
 
 loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
-
-[private]
-roles:
-    cargo run --release -p game --bin kc-roles > docker/keycloak/roles.conf
 
 [private]
 up flags:
