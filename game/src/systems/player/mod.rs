@@ -44,7 +44,7 @@ use snapshot::JoinAs;
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
-    app.replicate::<Owner>()
+    app.replicate_once::<Owner>()
         .replicate::<Xp>()
         .replicate::<CommandLock>()
         .replicate::<ArrivalHold>()

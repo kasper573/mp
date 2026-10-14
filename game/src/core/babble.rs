@@ -106,7 +106,7 @@ impl BabbleRank {
 }
 
 pub fn register(app: &mut App) {
-    app.replicate::<Babbler>();
+    app.replicate_once::<Babbler>();
 }
 
 pub struct BabblePlugin;

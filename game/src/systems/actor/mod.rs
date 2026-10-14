@@ -23,8 +23,8 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
     app.replicate::<Actor>()
-        .replicate::<Hitbox>()
-        .replicate::<Name>();
+        .replicate_once::<Hitbox>()
+        .replicate_once::<Name>();
 }
 
 pub fn content(registry: &mut ContentRegistry) {

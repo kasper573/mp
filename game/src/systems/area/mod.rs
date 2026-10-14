@@ -52,7 +52,7 @@ pub const MAX_POPULATION: u32 = 500;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<AreaTag>();
+    app.replicate_once::<AreaTag>();
     object::register(app);
 }
 

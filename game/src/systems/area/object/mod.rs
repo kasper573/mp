@@ -27,7 +27,7 @@ use crate::systems::{WorldArea, dialogue};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<AreaObject>();
+    app.replicate_once::<AreaObject>();
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]

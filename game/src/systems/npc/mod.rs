@@ -43,7 +43,7 @@ const CORPSE_LINGER: Seconds = Seconds(5.0);
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
-    app.replicate::<Npc>();
+    app.replicate_once::<Npc>();
     effect::source(app, chase);
 }
 
