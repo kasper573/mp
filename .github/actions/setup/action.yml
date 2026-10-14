@@ -16,7 +16,11 @@ runs:
     - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
     - name: Install the pinned toolchain
       shell: bash
-      run: rustup show
+      # Into a rustup home of its own, so the pinned toolchain is the only one installed: rust-cache keys
+      # its entries by every installed toolchain, and the runner image's own changes with the image.
+      run: |
+        echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+        RUSTUP_HOME="$RUNNER_TEMP/rustup" rustup toolchain install --no-self-update
     - name: Install wasm-bindgen-cli matching the lockfile
       if: runner.os == 'Linux' && inputs.deps == 'e2e'
       shell: bash
