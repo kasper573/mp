@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
 use game::core::audio::soundscape::EDGE_FALLOFF;
 use game::core::math::{Pos, Rect};
-use game::core::tiling::{Cell, CellPos, TileRect, TileSize, Tiles};
+use game::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
 use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
@@ -16,7 +16,6 @@ use crate::app::Editor;
 use crate::forms;
 use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
-use game::core::tiling;
 
 const LABEL_GAP: f32 = 2.0;
 const LABEL_SHIFTS: u32 = 3;
@@ -71,7 +70,7 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &ar
     let visible = canvas.visible();
     let size = area.size.grid();
     let grids = area.grids;
-    for cell in tiling::cells(size) {
+    for cell in size.cells() {
         let bounds = cell.bounds();
         if !visible.intersects(&bounds) {
             continue;
@@ -524,7 +523,7 @@ pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &AreaFrame, area:
     }
     let visible = canvas.visible();
     let mut palette: Vec<(String, Color32)> = Vec::new();
-    for cell in tiling::cells(area.size.grid()) {
+    for cell in area.size.grid().cells() {
         let tile = cell.center();
         if !visible.contains(tile) {
             continue;

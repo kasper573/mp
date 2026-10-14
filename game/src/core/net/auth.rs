@@ -4,14 +4,14 @@ use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Resource, Clone)]
-pub struct Session {
+pub struct Credentials {
     pub authorization: String,
     pub roles: Vec<String>,
 }
 
-impl Session {
-    pub fn from_access_token(access_token: &str) -> Session {
-        Session {
+impl Credentials {
+    pub fn from_access_token(access_token: &str) -> Credentials {
+        Credentials {
             authorization: format!("Bearer {access_token}"),
             roles: TokenClaims::read_unverified(access_token)
                 .map(|claims| claims.realm_access.roles)

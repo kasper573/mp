@@ -16,19 +16,26 @@ use super::GAME_FILE;
 use super::check::RowCheck;
 use super::fixture::Fixture;
 use super::id::{ContentId, ContentScope, Leaf, LeafKind, LeafProblem, nearest, with_content};
-use super::locate::{JsonIndex, escape};
+use super::locate::{IndexedValue, JsonIndex, escape};
 use super::report::{ErrorPlace, LoadError, LoadReport, VERSION_RULE};
 use super::table::{Content, ContentBuilder, ContentRow, ModuleRule, ModuleSet, Table};
 use super::version::ContentVersion;
 
+// The steps a load runs its hooks at, in order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LoadStep {
+    // Every row parsed and checked on its own.
     Rows,
+    // Every file read and hashed.
     Files,
-    Blueprints,
-    Areas,
+    // Rows that stand for others, such as templates, expanded.
+    Expand,
+    // What's put together from expanded rows.
+    Assemble,
+    // Checks across tables.
     Across,
     Settings,
+    // Only once everything else loaded without an error.
     Compile,
 }
 
@@ -40,6 +47,7 @@ struct FixtureEntry {
     keys: Vec<&'static str>,
     check: FixtureCheck,
 }
+
 pub type FolderWriter = Box<dyn Fn(&Content, &mut FileWriter) -> io::Result<()> + Send + Sync>;
 
 #[derive(Default)]
@@ -170,18 +178,13 @@ impl ContentRegistry {
             &|text| loader.parse(text)
         };
         let (_, scope) = with_content(ContentScope::of(content), || parse(text));
-        let leaves = scope.leaves().to_vec();
         let index = JsonIndex::of(text);
-        let mut strings = index.strings();
-        leaves
-            .into_iter()
-            .filter_map(|leaf| {
-                let found = strings
-                    .by_ref()
-                    .find(|value| value.string.as_deref() == Some(leaf.value.as_str()))?;
+        placed(scope.leaves(), &index)
+            .filter_map(|(leaf, found)| {
+                let found = found?;
                 Some(Reference {
                     kind: leaf.kind,
-                    value: leaf.value,
+                    value: leaf.value.clone(),
                     known: leaf.problem.is_none(),
                     pointer: found.pointer.clone(),
                     key: found.key,
@@ -328,8 +331,8 @@ pub fn load(
     loading.run_hooks(registry, LoadStep::Rows);
     loading.hash_files();
     loading.run_hooks(registry, LoadStep::Files);
-    loading.run_hooks(registry, LoadStep::Blueprints);
-    loading.run_hooks(registry, LoadStep::Areas);
+    loading.run_hooks(registry, LoadStep::Expand);
+    loading.run_hooks(registry, LoadStep::Assemble);
     loading.run_hooks(registry, LoadStep::Across);
     loading.check_fixtures(registry);
     loading.run_hooks(registry, LoadStep::Settings);
@@ -550,29 +553,29 @@ impl Loading {
             })
             .collect();
         let root = self.folder.clone();
-        let parsed: Vec<Parsed> = jobs
+        let parsed: Vec<(usize, String, ParsedFile)> = jobs
             .into_par_iter()
             .map(|(index, key)| {
                 let loader = &registry.row_loaders()[index];
                 let file = super::row_file(loader.name(), &key);
-                parse_file(root.as_ref(), &file, &scope, |text| loader.parse(text))
-                    .finish(index, key)
+                let parsed = parse_file(root.as_ref(), &file, &scope, |text| loader.parse(text));
+                (index, key, parsed)
             })
             .collect();
 
         let mut rows: Vec<Vec<(String, Box<dyn Any + Send + Sync>)>> =
             registry.row_loaders().iter().map(|_| Vec::new()).collect();
-        for parsed in parsed {
+        for (loader, key, parsed) in parsed {
             if !parsed.errors.is_empty() {
-                let table = registry.row_loaders()[parsed.loader].name();
-                self.failed.insert((table, parsed.key.clone()));
+                let table = registry.row_loaders()[loader].name();
+                self.failed.insert((table, key.clone()));
             }
             self.errors.extend(parsed.errors);
             if let Some(index) = parsed.index {
                 self.indexes.insert(parsed.file, Arc::new(index));
             }
             if let Some(row) = parsed.row {
-                rows[parsed.loader].push((parsed.key, row));
+                rows[loader].push((key, row));
             }
         }
         for (loader, rows) in registry.row_loaders().iter().zip(rows) {
@@ -733,33 +736,11 @@ pub struct FileHash {
 
 pub struct FileHashes(pub BTreeMap<String, FileHash>);
 
-struct Parsed {
-    loader: usize,
-    key: String,
-    file: String,
-    row: Option<Box<dyn Any + Send + Sync>>,
-    index: Option<JsonIndex>,
-    errors: Vec<LoadError>,
-}
-
 struct ParsedFile {
     file: String,
     row: Option<Box<dyn Any + Send + Sync>>,
     index: Option<JsonIndex>,
     errors: Vec<LoadError>,
-}
-
-impl ParsedFile {
-    fn finish(self, loader: usize, key: String) -> Parsed {
-        Parsed {
-            loader,
-            key,
-            file: self.file,
-            row: self.row,
-            index: self.index,
-            errors: self.errors,
-        }
-    }
 }
 
 pub struct ParseError {
@@ -846,11 +827,7 @@ fn whole_file(
 
 pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<LoadError> {
     let mut errors = Vec::new();
-    let mut strings = index.strings();
-    for leaf in leaves {
-        let found = strings
-            .by_ref()
-            .find(|value| value.string.as_deref() == Some(leaf.value.as_str()));
+    for (leaf, found) in placed(leaves, index) {
         let Some(problem) = &leaf.problem else {
             continue;
         };
@@ -889,6 +866,20 @@ pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<L
         });
     }
     errors
+}
+
+// Where each leaf is written: a parse meets them in the order the file has them.
+fn placed<'a>(
+    leaves: &'a [Leaf],
+    index: &'a JsonIndex,
+) -> impl Iterator<Item = (&'a Leaf, Option<&'a IndexedValue>)> {
+    let mut strings = index.strings();
+    leaves.iter().map(move |leaf| {
+        let found = strings
+            .by_ref()
+            .find(|value| value.string.as_deref() == Some(leaf.value.as_str()));
+        (leaf, found)
+    })
 }
 
 fn article(word: &str) -> &'static str {
@@ -1202,7 +1193,7 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
 fn module_rules<Row: ModuleSet>(loading: &mut Loading) {
     let content = loading.content();
     let mut errors: Vec<(ContentId<Row>, usize, String)> = Vec::new();
-    let (_, _) = with_content(ContentScope::of(&content), || {
+    with_content(ContentScope::of(&content), || {
         for (id, row) in content.table::<Row>().iter() {
             let mut seen: Vec<String> = Vec::new();
             for (index, module) in row.modules().iter().enumerate() {
@@ -1261,9 +1252,7 @@ impl Listing {
             .map(|listing| listing.keys.clone())
             .unwrap_or_default()
     }
-}
 
-impl Listing {
     fn read(registry: &ContentRegistry, root: &dyn ContentFolder) -> Listed {
         let mut errors = Vec::new();
         let mut listing = Listing {

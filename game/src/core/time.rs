@@ -208,6 +208,7 @@ impl LocalClock {
     }
 }
 
+// Day 0, the Unix epoch, was a Thursday.
 const WEEKDAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]

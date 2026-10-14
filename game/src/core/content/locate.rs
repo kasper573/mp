@@ -1,3 +1,8 @@
+use jsonc_parser::ast::Value;
+use jsonc_parser::common::Ranged;
+use jsonc_parser::{CollectOptions, ParseOptions, parse_to_ast};
+
+/// Where each value and key of a JSON file sits, by JSON pointer.
 pub struct JsonIndex {
     values: Vec<IndexedValue>,
 }
@@ -12,18 +17,14 @@ pub struct IndexedValue {
 }
 
 impl JsonIndex {
+    // Text that isn't JSON indexes nothing: its parse error carries a place of its own.
     pub fn of(text: &str) -> JsonIndex {
-        let mut scanner = Scanner {
-            chars: text.chars().peekable(),
-            line: 1,
-            column: 1,
-            path: Vec::new(),
-            values: Vec::new(),
-        };
-        scanner.value();
-        JsonIndex {
-            values: scanner.values,
+        let mut index = JsonIndex { values: Vec::new() };
+        let parsed = parse_to_ast(text, &CollectOptions::default(), &strict_json());
+        if let Some(value) = parsed.ok().and_then(|parsed| parsed.value) {
+            index.visit(&value, String::new(), &Lines::of(text));
         }
+        index
     }
 
     pub fn position(&self, pointer: &str) -> Option<(usize, usize)> {
@@ -41,8 +42,47 @@ impl JsonIndex {
         }
     }
 
+    // In the order they're written.
     pub fn strings(&self) -> impl Iterator<Item = &IndexedValue> {
         self.values.iter().filter(|value| value.string.is_some())
+    }
+
+    fn visit(&mut self, value: &Value, pointer: String, lines: &Lines) {
+        let (line, column) = lines.place(value.start());
+        let string = match value {
+            Value::StringLit(literal) => Some(literal.value.to_string()),
+            _ => None,
+        };
+        self.values.push(IndexedValue {
+            pointer: pointer.clone(),
+            line,
+            column,
+            string,
+            key: false,
+        });
+        match value {
+            Value::Object(object) => {
+                for property in &object.properties {
+                    let name = property.name.as_str();
+                    let inner = format!("{pointer}/{}", escape(name));
+                    let (line, column) = lines.place(property.name.start());
+                    self.values.push(IndexedValue {
+                        pointer: inner.clone(),
+                        line,
+                        column,
+                        string: Some(name.to_owned()),
+                        key: true,
+                    });
+                    self.visit(&property.value, inner, lines);
+                }
+            }
+            Value::Array(array) => {
+                for (index, element) in array.elements.iter().enumerate() {
+                    self.visit(element, format!("{pointer}/{index}"), lines);
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -50,186 +90,37 @@ pub fn escape(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
-enum Frame {
-    Object { key: Option<String> },
-    Array { index: usize },
+fn strict_json() -> ParseOptions {
+    ParseOptions {
+        allow_comments: false,
+        allow_loose_object_property_names: false,
+        allow_trailing_commas: false,
+        allow_missing_commas: false,
+        allow_single_quoted_strings: false,
+        allow_hexadecimal_numbers: false,
+        allow_unary_plus_numbers: false,
+        allow_bare_decimal_point_numbers: false,
+        allow_non_finite_numbers: false,
+        allow_extended_string_escapes: false,
+    }
 }
 
-struct Scanner<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
-    line: usize,
-    column: usize,
-    path: Vec<Frame>,
-    values: Vec<IndexedValue>,
+struct Lines<'a> {
+    text: &'a str,
+    starts: Vec<usize>,
 }
 
-impl Scanner<'_> {
-    fn pointer(&self) -> String {
-        let mut pointer = String::new();
-        for frame in &self.path {
-            pointer.push('/');
-            match frame {
-                Frame::Object { key } => pointer.push_str(&escape(key.as_deref().unwrap_or(""))),
-                Frame::Array { index } => pointer.push_str(&index.to_string()),
-            }
-        }
-        pointer
+impl<'a> Lines<'a> {
+    fn of(text: &'a str) -> Lines<'a> {
+        let starts = std::iter::once(0)
+            .chain(text.match_indices('\n').map(|(at, _)| at + 1))
+            .collect();
+        Lines { text, starts }
     }
 
-    fn bump(&mut self) -> Option<char> {
-        let c = self.chars.next()?;
-        if c == '\n' {
-            self.line += 1;
-            self.column = 1;
-        } else {
-            self.column += 1;
-        }
-        Some(c)
-    }
-
-    fn skip_space(&mut self) {
-        while matches!(self.chars.peek(), Some(' ' | '\t' | '\n' | '\r')) {
-            self.bump();
-        }
-    }
-
-    fn value(&mut self) {
-        self.skip_space();
-        let (line, column) = (self.line, self.column);
-        let pointer = self.pointer();
-        match self.chars.peek().copied() {
-            Some('{') => {
-                self.record(pointer, line, column, None);
-                self.bump();
-                self.object();
-            }
-            Some('[') => {
-                self.record(pointer, line, column, None);
-                self.bump();
-                self.array();
-            }
-            Some('"') => {
-                let string = self.string();
-                self.record(pointer, line, column, Some(string));
-            }
-            Some(_) => {
-                self.record(pointer, line, column, None);
-                while let Some(c) = self.chars.peek() {
-                    if matches!(c, ',' | '}' | ']' | ' ' | '\t' | '\n' | '\r') {
-                        break;
-                    }
-                    self.bump();
-                }
-            }
-            None => {}
-        }
-    }
-
-    fn object(&mut self) {
-        loop {
-            self.skip_space();
-            match self.chars.peek().copied() {
-                Some('}') => {
-                    self.bump();
-                    return;
-                }
-                Some('"') => {
-                    let (line, column) = (self.line, self.column);
-                    let key = self.string();
-                    self.skip_space();
-                    if self.chars.peek() == Some(&':') {
-                        self.bump();
-                    }
-                    self.path.push(Frame::Object {
-                        key: Some(key.clone()),
-                    });
-                    let pointer = self.pointer();
-                    self.values.push(IndexedValue {
-                        pointer,
-                        line,
-                        column,
-                        string: Some(key),
-                        key: true,
-                    });
-                    self.value();
-                    self.path.pop();
-                    self.skip_space();
-                    if self.chars.peek() == Some(&',') {
-                        self.bump();
-                    }
-                }
-                Some(_) => {
-                    self.bump();
-                }
-                None => return,
-            }
-        }
-    }
-
-    fn array(&mut self) {
-        let mut index = 0;
-        loop {
-            self.skip_space();
-            match self.chars.peek().copied() {
-                Some(']') => {
-                    self.bump();
-                    return;
-                }
-                Some(',') => {
-                    self.bump();
-                }
-                Some(_) => {
-                    self.path.push(Frame::Array { index });
-                    self.value();
-                    self.path.pop();
-                    index += 1;
-                }
-                None => return,
-            }
-        }
-    }
-
-    fn string(&mut self) -> String {
-        let mut text = String::new();
-        self.bump();
-        while let Some(c) = self.bump() {
-            match c {
-                '"' => break,
-                '\\' => match self.bump() {
-                    Some('n') => text.push('\n'),
-                    Some('t') => text.push('\t'),
-                    Some('r') => text.push('\r'),
-                    Some('b') => text.push('\u{8}'),
-                    Some('f') => text.push('\u{c}'),
-                    Some('u') => {
-                        let mut code = String::new();
-                        for _ in 0..4 {
-                            if let Some(h) = self.bump() {
-                                code.push(h);
-                            }
-                        }
-                        if let Some(c) =
-                            u32::from_str_radix(&code, 16).ok().and_then(char::from_u32)
-                        {
-                            text.push(c);
-                        }
-                    }
-                    Some(other) => text.push(other),
-                    None => break,
-                },
-                other => text.push(other),
-            }
-        }
-        text
-    }
-
-    fn record(&mut self, pointer: String, line: usize, column: usize, string: Option<String>) {
-        self.values.push(IndexedValue {
-            pointer,
-            line,
-            column,
-            string,
-            key: false,
-        });
+    fn place(&self, offset: usize) -> (usize, usize) {
+        let line = self.starts.partition_point(|&start| start <= offset);
+        let column = self.text[self.starts[line - 1]..offset].chars().count() + 1;
+        (line, column)
     }
 }

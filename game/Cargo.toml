@@ -117,6 +117,7 @@ bevy_replicon_renet2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error = "0.1"
+jsonc-parser = "0.34"
 blake3 = "1"
 schemars = "1"
 png = "0.18"

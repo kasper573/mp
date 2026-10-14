@@ -172,10 +172,10 @@ pub enum LeafProblem {
     Unsafe,
 }
 
-/// Resolves keys while reading and collects every reference it met, so one parse reports every
-/// dangling reference instead of stopping at the first.
 type ScopeKeys = HashMap<TypeId, (&'static str, Vec<String>), NoOpHash>;
 
+/// Resolves keys while reading and collects every reference it met, so one parse reports every
+/// dangling reference instead of stopping at the first.
 #[derive(Clone)]
 pub struct ContentScope {
     keys: Arc<ScopeKeys>,

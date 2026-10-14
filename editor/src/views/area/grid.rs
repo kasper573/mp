@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use game::core::content::Content;
 use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::{self, Cell, CellPos, GridSize, NEIGHBORS_4, Tiles};
+use game::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
 use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteEntry, PaletteRow};
 
 use crate::project::{ContentEdit, ProjectFiles, text_bytes};
@@ -41,7 +41,7 @@ impl GridDraft {
     }
 
     pub fn cells(&self) -> impl Iterator<Item = CellPos> {
-        tiling::cells(self.size)
+        self.size.cells()
     }
 
     pub fn entry(&self, index: u32) -> Option<&PaletteRow> {

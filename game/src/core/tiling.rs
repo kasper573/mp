@@ -24,11 +24,6 @@ pub struct Tiles(pub f32);
 pub type CellPos = euclid::default::Point2D<i32>;
 pub type GridSize = euclid::default::Size2D<u32>;
 
-pub fn cells(size: GridSize) -> impl Iterator<Item = CellPos> {
-    let (w, h) = (size.width as i32, size.height as i32);
-    (0..h).flat_map(move |y| (0..w).map(move |x| CellPos::new(x, y)))
-}
-
 pub const NEIGHBORS_4: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 pub const NEIGHBORS_8: [(i32, i32); 8] = [
     (1, 0),

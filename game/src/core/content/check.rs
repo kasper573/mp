@@ -22,13 +22,7 @@ impl RowCheck {
         found: impl Display,
         expected: impl Display,
     ) {
-        self.errors.push(RowError {
-            pointer: pointer.into(),
-            rule,
-            found: found.to_string(),
-            expected: expected.to_string(),
-            nearest: None,
-        });
+        self.nearest(pointer, rule, found, expected, None);
     }
 
     pub fn nearest(

@@ -96,7 +96,7 @@ fn sort_key(error: &LoadError) -> SortKey<'_> {
         } => (*line, *column, pointer.clone()),
         ErrorPlace::Csv { row, column } => (*row, *column, String::new()),
     };
-    let rank = match (error.rule == VERSION_RULE, error.file == "game.json") {
+    let rank = match (error.rule == VERSION_RULE, error.file == super::GAME_FILE) {
         (true, _) => 2,
         (false, true) => 0,
         (false, false) => 1,

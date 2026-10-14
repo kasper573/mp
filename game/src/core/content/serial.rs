@@ -44,22 +44,6 @@ pub fn opt_rect_from<'de, U, D: Deserializer<'de>>(
     rect_from(deserializer).map(Some)
 }
 
-pub fn one() -> u32 {
-    1
-}
-
-pub fn is_one(count: &u32) -> bool {
-    *count == 1
-}
-
-pub fn is_false(flag: &bool) -> bool {
-    !*flag
-}
-
-pub fn is_empty<T>(list: &[T]) -> bool {
-    list.is_empty()
-}
-
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(extend("x-pos" = true))]
@@ -75,6 +59,22 @@ pub fn pos<U, S: Serializer>(pos: &Pos<U>, serializer: S) -> Result<S::Ok, S::Er
 pub fn pos_from<'de, U, D: Deserializer<'de>>(deserializer: D) -> Result<Pos<U>, D::Error> {
     let PosRow { x, y } = PosRow::deserialize(deserializer)?;
     Ok(Pos::new(x, y))
+}
+
+pub fn one() -> u32 {
+    1
+}
+
+pub fn is_one(count: &u32) -> bool {
+    *count == 1
+}
+
+pub fn is_false(flag: &bool) -> bool {
+    !*flag
+}
+
+pub fn is_empty<T>(list: &[T]) -> bool {
+    list.is_empty()
 }
 
 pub fn one_f32() -> f32 {

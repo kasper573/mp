@@ -10,8 +10,8 @@ use super::{Scene, despawn_all};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
 use crate::core::math::Rng;
-use crate::core::net::auth::Session;
-use crate::core::net::transport::Socket;
+use crate::core::net::auth::Credentials;
+use crate::core::net::transport::ClientSocket;
 use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::time::Seconds;
@@ -59,7 +59,7 @@ struct SessionRequest<'a> {
 }
 
 pub fn open_session(world: &mut World, spectate: bool) {
-    let Some(session) = world.get_resource::<Session>().cloned() else {
+    let Some(credentials) = world.get_resource::<Credentials>().cloned() else {
         error!("no access token; cannot open a session");
         return;
     };
@@ -72,7 +72,7 @@ pub fn open_session(world: &mut World, spectate: bool) {
     .expect("a session request serializes");
     let fetch = world.resource::<ClientPlatform>().0.post(
         format!("{game_server_url}/session"),
-        session.authorization,
+        credentials.authorization,
         body,
     );
     let task = IoTaskPool::get().spawn_local(fetch);
@@ -123,7 +123,7 @@ fn connect(world: &mut World, ticket: &str) {
         .0
         .connect(&format!("{ws_url}/?ticket={ticket}"));
     world.insert_resource(client);
-    world.insert_non_send(Socket(socket));
+    world.insert_non_send(ClientSocket(socket));
     info!("connection opened");
 }
 

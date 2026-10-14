@@ -4,7 +4,7 @@ use bevy_replicon_renet2::renet2::{RenetClient, RenetClientPlugin, RenetReceive,
 
 use crate::core::platform::ServerSocket;
 
-pub struct Socket(pub Box<dyn ServerSocket>);
+pub struct ClientSocket(pub Box<dyn ServerSocket>);
 
 /// Carries renet2 over a socket the platform opened, with no netcode layer: the socket itself is
 /// what connects and disconnects the client.
@@ -25,7 +25,7 @@ impl Plugin for SocketClientPlugin {
 
 fn receive(
     mut commands: Commands,
-    socket: Option<NonSend<Socket>>,
+    socket: Option<NonSend<ClientSocket>>,
     client: Option<ResMut<RenetClient>>,
 ) {
     let (Some(socket), Some(mut client)) = (socket, client) else {
@@ -43,12 +43,12 @@ fn receive(
     if socket.0.is_closed() {
         commands.remove_resource::<RenetClient>();
         commands.queue(|world: &mut World| {
-            world.remove_non_send::<Socket>();
+            world.remove_non_send::<ClientSocket>();
         });
     }
 }
 
-fn send(socket: Option<NonSend<Socket>>, client: Option<ResMut<RenetClient>>) {
+fn send(socket: Option<NonSend<ClientSocket>>, client: Option<ResMut<RenetClient>>) {
     let (Some(socket), Some(mut client)) = (socket, client) else {
         return;
     };

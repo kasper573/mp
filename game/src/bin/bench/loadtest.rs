@@ -18,7 +18,7 @@ use bevy_replicon::prelude::*;
 use bevy_replicon_renet2::RenetChannelsExt;
 use bevy_state::prelude::*;
 use game::core::content::sync::Manifest;
-use game::core::net::transport::{Socket, SocketClientPlugin};
+use game::core::net::transport::{ClientSocket, SocketClientPlugin};
 use game::core::platform::ServerSocket;
 use game::systems::player::session::{self, ClientSessionPlugin};
 use renet2::{ConnectionConfig, RenetClient};
@@ -238,7 +238,7 @@ fn build_client(http_url: &str, ws_url: &str, index: usize) -> Option<App> {
     };
     // The websocket is reliable+ordered (TCP), matching the server side.
     app.insert_resource(RenetClient::new(config, true));
-    app.insert_non_send(Socket(Box::new(socket)));
+    app.insert_non_send(ClientSocket(Box::new(socket)));
     app.finish();
     app.cleanup();
     Some(app)

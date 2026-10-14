@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use egui::{Color32, Stroke as EStroke, Vec2};
 use game::core::math::{Pos, Rect, Rng, Size};
-use game::core::tiling::{Cell, CellPos, TilePos, TileSize};
+use game::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
 use game::systems::area::{self, Flip};
 use game::systems::script::Place;
 
@@ -13,7 +13,6 @@ use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
 use crate::views::tileset::SheetCell;
 use crate::{thumbs, user};
-use game::core::tiling;
 use game::systems::area::tileset::TilesetDef;
 
 #[derive(Clone, Default, Debug)]
@@ -370,7 +369,7 @@ pub(super) fn pick_place(
     let area = frame.area();
     let warps = pins::warp_objects(frame.content, frame.area_id);
     let visible = canvas.visible();
-    for cell in tiling::cells(area.size.grid()) {
+    for cell in area.size.grid().cells() {
         let bounds = cell.bounds();
         if !visible.intersects(&bounds) {
             continue;

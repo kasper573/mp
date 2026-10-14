@@ -293,7 +293,7 @@ pub fn client_app(
     let session = params
         .access_token
         .as_deref()
-        .map(crate::core::net::auth::Session::from_access_token);
+        .map(crate::core::net::auth::Credentials::from_access_token);
     let spectator = session.as_ref().is_some_and(|session| {
         session
             .roles
@@ -467,7 +467,7 @@ pub fn registry() -> ContentRegistry {
     actor::content(&mut registry);
     area::content(&mut registry);
     registry
-        .hook(LoadStep::Blueprints, script::build_all)
+        .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)

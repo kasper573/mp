@@ -64,8 +64,8 @@ pub fn content(registry: &mut ContentRegistry) {
         .folder::<AreaDef>()
         .modules::<AreaDef>()
         .hook(LoadStep::Files, read_grids)
-        .hook(LoadStep::Blueprints, flatten_all)
-        .hook(LoadStep::Areas, build_all)
+        .hook(LoadStep::Expand, flatten_all)
+        .hook(LoadStep::Assemble, build_all)
         .hook(LoadStep::Across, world_map::check_all)
         .writer(write_grids);
 }
