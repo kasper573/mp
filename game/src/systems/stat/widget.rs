@@ -9,6 +9,7 @@ use crate::systems::job;
 use crate::systems::player::session;
 use crate::systems::stat;
 
+const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 260.0);
 const LABEL_WIDTH: f32 = 140.0;
 const ROW_SPACING: Vec2 = Vec2::new(16.0, 6.0);
 
@@ -26,6 +27,9 @@ impl Window for StatsWindow {
     }
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Stats
+    }
+    fn size(&self) -> Vec2 {
+        WINDOW_SIZE
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let rows = stat_rows(world);
