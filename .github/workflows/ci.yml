@@ -25,8 +25,9 @@ env:
 # rust-cache is the sole build cache, one entry per job. Only main writes it and every branch reads
 # main's, so the cache holds one set of entries for main's lockfile whatever happens on branches, and
 # the entries main supersedes are the least recently used, the first evicted. Branches therefore build
-# only what main builds. A per-object compiler cache (sccache) is deliberately absent: on the GitHub
-# Actions backend it writes thousands of tiny entries that crowd out these.
+# only what main builds. A failing run saves too: the dependencies it built are no different. A
+# per-object compiler cache (sccache) is deliberately absent: on the GitHub Actions backend it writes
+# thousands of tiny entries that crowd out these.
 jobs:
   lint:
     runs-on: ubuntu-24.04
@@ -37,6 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
+          cache-on-failure: "true"
       - name: Lint
         # Unoptimized: lint doesn't ship.
         env:
@@ -54,6 +56,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
+          cache-on-failure: "true"
       - name: Test
         # Unoptimized: the tests don't ship. The gameplay tests record each client from a sound server sink.
         env:
@@ -104,6 +107,7 @@ jobs:
         with:
           key: ${{ matrix.build }}
           save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ci-opt' }}
+          cache-on-failure: "true"
       - name: Build
         # The suite's browsers and the stack's images that don't package the build mostly download, so
         # they come alongside the compiler.

@@ -28,8 +28,9 @@ runs:
       # the repo's platform rule): the x11/gl libs, cmake/g++ for the native `ui` gallery and
       # `bevy_render`, and alsa for kira's cpal backend (the client audio code compiles natively too).
       # The gameplay tests run the desktop client on Xwayland in a headless weston through Mesa's
-      # software Vulkan, drive it with xdotool, and record its picture with ffmpeg and its sound with
-      # parecord, from a PulseAudio sink it plays into through ALSA's pulse plugin. xvfb + the Mesa DRI
+      # software Vulkan, its keyboard through the xkbcommon-x11 winit loads at runtime, drive it with
+      # xdotool, and record its picture with ffmpeg and its sound with parecord, from a PulseAudio sink
+      # it plays into through ALSA's pulse plugin. xvfb + the Mesa DRI
       # driver are for the e2e's headed browsers (software WebGL). Drop the runner's microsoft/azure
       # apt sources first — unused, and they 403 intermittently.
       env:
@@ -37,8 +38,8 @@ runs:
           cmake g++ libx11-dev libxext-dev libxft-dev libxinerama-dev libxcursor-dev libxrender-dev
           libxfixes-dev libpango1.0-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev
         TEST_PACKAGES: >-
-          mesa-vulkan-drivers weston xwayland xdotool ffmpeg pulseaudio pulseaudio-utils
-          libasound2-plugins
+          mesa-vulkan-drivers weston xwayland libxkbcommon-x11-0 xdotool ffmpeg pulseaudio
+          pulseaudio-utils libasound2-plugins
         E2E_PACKAGES: xvfb libgl1-mesa-dri
         DEPS: ${{ inputs.deps }}
       run: |
