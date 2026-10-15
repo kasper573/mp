@@ -4,6 +4,7 @@ mod clock;
 mod combat;
 mod content;
 mod conversation;
+mod draw_order;
 mod exchange;
 mod interaction;
 mod kill_credit;

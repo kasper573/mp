@@ -4,7 +4,7 @@ use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::Content;
 use crate::core::math::{Pos, WorldPx};
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{ToScreen, dynamic_z, sprite_transform};
+use crate::core::render::{RowDepth, ToScreen, dynamic_z, sprite_transform};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaTag};
@@ -94,6 +94,7 @@ fn attach_drop_sprite(
             ..default()
         },
         Transform::default(),
+        RowDepth::default(),
         Visibility::default(),
     ));
 }
@@ -139,33 +140,29 @@ fn start_drops(
 
 fn place_drops(
     content: Res<Content>,
-    mut drops: Query<(&Position, &AreaTag, &mut Transform), With<DroppedItem>>,
+    mut drops: Query<(&Position, &AreaTag, &mut Transform, &mut RowDepth), With<DroppedItem>>,
 ) {
-    for (position, tag, mut transform) in &mut drops {
-        *transform = sprite_transform(position.pos, drop_z(&content, tag, position.pos));
+    for (position, tag, mut transform, mut depth) in &mut drops {
+        *depth = RowDepth(drop_z(&content, tag, position.pos));
+        *transform = sprite_transform(position.pos, depth.0);
     }
 }
 
 fn animate_drops(
     time: Res<Time>,
-    content: Res<Content>,
-    mut drops: Query<(Entity, &Position, &AreaTag, &mut DropAnim, &mut Transform)>,
+    mut drops: Query<(Entity, &Position, &RowDepth, &mut DropAnim, &mut Transform)>,
     mut play: MessageWriter<PlaySfx>,
     mut commands: Commands,
 ) {
     let dt = Seconds(time.delta_secs());
-    for (entity, position, tag, mut anim, mut transform) in &mut drops {
+    for (entity, position, depth, mut anim, mut transform) in &mut drops {
         anim.elapsed += dt;
         let t = (anim.elapsed - anim.delay)
             .ratio(DROP_DURATION)
             .clamp(0.0, 1.0);
         let ground = anim.from.lerp(anim.to, ease_out(t));
         let hop = DROP_HOP.0 * (std::f32::consts::PI * t).sin();
-        transform.translation = Vec3::new(
-            ground.x,
-            ground.y + hop,
-            drop_z(&content, tag, position.pos),
-        );
+        transform.translation = Vec3::new(ground.x, ground.y + hop, depth.0);
         if anim.elapsed - anim.delay >= DROP_DURATION {
             play.write(PlaySfx {
                 id: anim.drop_sfx,

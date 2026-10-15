@@ -30,6 +30,30 @@ pub fn dynamic_z(area_height: f32, base: f32, y: Tiles) -> f32 {
     base + (y + Tiles(1.0)).ratio(Tiles(area_height + 2.0))
 }
 
+/// The depth a sprite sorts by from its row, which `order_rows` turns into the depth it is drawn at.
+#[derive(Component, Clone, Copy, Default, PartialEq, Debug)]
+pub struct RowDepth(pub f32);
+
+/// Sprites at one depth draw in whatever order the renderer meets them, which changes as entities
+/// move between tables. Each is drawn the smallest step f32 allows above its row, and above the
+/// sprite before it, in the order of their entities, so sprites sharing a row keep one order and
+/// stand in front of scenery whose sort line they share.
+pub fn order_rows(mut sprites: Query<(Entity, &RowDepth, &mut Transform)>) {
+    let mut rows: Vec<(f32, Entity)> = sprites
+        .iter()
+        .map(|(entity, depth, _)| (depth.0, entity))
+        .collect();
+    rows.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let mut below = f32::NEG_INFINITY;
+    for (row, entity) in rows {
+        let z = row.next_up().max(below.next_up());
+        below = z;
+        if let Ok((_, _, mut transform)) = sprites.get_mut(entity) {
+            transform.translation.z = z;
+        }
+    }
+}
+
 pub fn atlas_rect(region: WorldRect<WorldPx>) -> Rect {
     Rect::new(
         region.min().x,
@@ -64,7 +88,10 @@ impl Plugin for RenderPlugin {
             .init_resource::<icons::ResidentIcons>()
             .add_systems(
                 PostUpdate,
-                present::apply_present.after(bevy::transform::TransformSystems::Propagate),
+                (
+                    order_rows.before(bevy::transform::TransformSystems::Propagate),
+                    present::apply_present.after(bevy::transform::TransformSystems::Propagate),
+                ),
             )
             .add_systems(Update, icons::keep_icons_resident);
     }

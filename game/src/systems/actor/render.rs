@@ -8,7 +8,7 @@ use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::Direction;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{Animator, atlas_rect, dynamic_z, sprite_transform};
+use crate::core::render::{Animator, RowDepth, atlas_rect, dynamic_z, sprite_transform};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::{Action, Actor, ActorModel};
@@ -82,6 +82,7 @@ fn attach_sprites(
             Sprite { image, ..default() },
             ACTOR_ANCHOR,
             Transform::default(),
+            RowDepth::default(),
             Visibility::Hidden,
         ));
     }
@@ -95,6 +96,7 @@ type ActorView = (
     &'static AreaTag,
     &'static mut Sprite,
     &'static mut Transform,
+    &'static mut RowDepth,
     &'static mut Visibility,
 );
 
@@ -106,7 +108,8 @@ fn sync_actors(
 ) {
     let clock = Seconds(time.elapsed_secs());
     animator.retain(|entity| actors.contains(entity));
-    for (entity, actor, render, pose, tag, mut sprite, mut transform, mut visibility) in &mut actors
+    for (entity, actor, render, pose, tag, mut sprite, mut transform, mut depth, mut visibility) in
+        &mut actors
     {
         let elapsed = animator.elapsed(entity, pose.action as u64, clock);
         let model = ActorModel::get(&content, actor.model);
@@ -121,10 +124,8 @@ fn sync_actors(
         sprite.color = actor.color.color();
         let area = area::load(&content, tag.area);
         let at = render.0;
-        *transform = sprite_transform(
-            at,
-            dynamic_z(area.size.height, area.sort_base(), Tiles(at.y)),
-        );
+        *depth = RowDepth(dynamic_z(area.size.height, area.sort_base(), Tiles(at.y)));
+        *transform = sprite_transform(at, depth.0);
         if *visibility == Visibility::Hidden {
             *visibility = Visibility::Inherited;
         }
