@@ -858,7 +858,6 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         port: 0,
         ws_port: 0,
         max_clients: 8,
-        areas: launch::ServedAreas::Real,
         content_dir: folder.to_path_buf(),
         player_spawn_type: SpawnPolicy::Map,
         player_immortal: false,

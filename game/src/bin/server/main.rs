@@ -25,8 +25,8 @@ use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::account::{AccountId, Identity, Role};
 use game::systems::area::{self, AreaDef, AreaId, transition};
 use game::systems::launch::{
-    AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig,
-    ServerReady, Switch, TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
+    AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
+    TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
 };
 use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
@@ -90,7 +90,7 @@ fn main() {
     let metrics = service::recorder();
     let sessions = Sessions::default();
     let online = Online::default();
-    let area_ids = select_areas(&content, config.areas);
+    let area_ids: Vec<AreaId> = content.ids::<AreaDef>().collect();
     let http = Http {
         sessions: sessions.clone(),
         auth: match config.auth {
@@ -394,17 +394,6 @@ struct Conn {
 
 #[derive(Component)]
 struct Wire(u64);
-
-fn select_areas(content: &Content, areas: ServedAreas) -> Vec<AreaId> {
-    match areas {
-        ServedAreas::Real => content.ids::<AreaDef>().collect(),
-        // The initial spawn's area is one template instanced `count` times; the count is bounded
-        // only by the machine, not by how many area rows the content table happens to define.
-        ServedAreas::Bench(count) => {
-            vec![content.built::<GameSettings>().initial_spawn.area; count]
-        }
-    }
-}
 
 // Logged, so whatever happened can be played out again.
 fn seeded(configured: Option<u64>) -> u64 {

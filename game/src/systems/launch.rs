@@ -70,7 +70,6 @@ pub struct ServerConfig {
     pub port: u16,
     pub ws_port: u16,
     pub max_clients: usize,
-    pub areas: ServedAreas,
     pub content_dir: PathBuf,
     pub player_spawn_type: SpawnPolicy,
     pub player_immortal: bool,
@@ -95,39 +94,6 @@ pub enum AuthMode {
 pub enum Switch {
     On,
     Off,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ServedAreas {
-    Real,
-    Bench(usize),
-}
-
-impl Serialize for ServedAreas {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            ServedAreas::Real => serializer.serialize_str("real"),
-            ServedAreas::Bench(count) => serializer.serialize_str(&format!("bench,{count}")),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for ServedAreas {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<ServedAreas, D::Error> {
-        let spec = String::deserialize(deserializer)?;
-        if spec == "real" {
-            return Ok(ServedAreas::Real);
-        }
-        if let Some(count) = spec.strip_prefix("bench,") {
-            return count
-                .parse()
-                .map(ServedAreas::Bench)
-                .map_err(serde::de::Error::custom);
-        }
-        Err(serde::de::Error::custom(format!(
-            "expected `real` or `bench,<n>`, got `{spec}`"
-        )))
-    }
 }
 
 #[derive(Serialize, Deserialize)]
