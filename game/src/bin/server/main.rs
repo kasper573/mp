@@ -99,7 +99,7 @@ fn main() {
         },
         test_characters: match config.test_characters {
             Switch::On => Some(TestCharacters {
-                content,
+                content: content.clone(),
                 areas: area_ids.clone(),
                 pending: Arc::default(),
                 online: online.clone(),
@@ -688,8 +688,8 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
         Ok(identity) => identity,
         Err(status) => return status.into_response(),
     };
-    let content = characters.content;
-    let (request, scope) = with_content(ContentScope::of(&content), || {
+    let content = &characters.content;
+    let (request, scope) = with_content(ContentScope::of(content), || {
         serde_json::from_str::<TestCharacterRequest>(&body)
     });
     let request = match request {
@@ -712,17 +712,14 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
     };
     let start = request
         .start
-        .unwrap_or_else(|| snapshot::start_of(&content, character.get(&content)));
-    if let Err(problem) = area::check_place(&content, start) {
+        .unwrap_or_else(|| snapshot::start_of(content, character.get(content)));
+    if let Err(problem) = area::check_place(content, start) {
         return (StatusCode::BAD_REQUEST, format!("bad start: {problem}")).into_response();
     }
     if !characters.areas.contains(&start.area) {
         return (
             StatusCode::BAD_REQUEST,
-            format!(
-                "bad start: this server runs no {}",
-                start.area.key(&content)
-            ),
+            format!("bad start: this server runs no {}", start.area.key(content)),
         )
             .into_response();
     }
@@ -738,7 +735,7 @@ async fn test_character(State(http): State<Http>, headers: HeaderMap, body: Stri
     characters.pending.lock().expect("pending lock").insert(
         identity.id,
         JoinAs {
-            snapshot: character.get(&content).clone(),
+            snapshot: character.get(content).clone(),
             start,
         },
     );

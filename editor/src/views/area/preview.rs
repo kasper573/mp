@@ -41,7 +41,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     let generation = project.generation;

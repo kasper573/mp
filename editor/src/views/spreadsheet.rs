@@ -359,7 +359,11 @@ fn named_filters(editor: &Editor, table: &str) -> BTreeMap<&'static str, BTreeSe
 }
 
 fn can_be_fought(editor: &Editor) -> BTreeSet<String> {
-    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
         return BTreeSet::new();
     };
     if !content.has_built::<RiftScripts>() {

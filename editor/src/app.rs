@@ -595,14 +595,6 @@ impl Editor {
         }
     }
 
-    pub fn release_retired(&mut self) {
-        if let Some(project) = &mut self.project
-            && project.has_retired()
-        {
-            project.release_retired();
-        }
-    }
-
     pub fn refused(&mut self, label: &str, refusal: &EditRefusal) {
         let text = format!("{label}: refused · {}", refusal.sentence());
         self.toast(text);
@@ -714,7 +706,9 @@ impl Editor {
     }
 
     pub fn loaded(&self) -> Option<Content> {
-        self.project.as_ref().and_then(|project| project.content)
+        self.project
+            .as_ref()
+            .and_then(|project| project.content.clone())
     }
 
     fn poll_outside(&mut self) {
@@ -803,7 +797,6 @@ fn editor_ui(world: &mut World) {
     let frame_ms = world.resource::<Time>().delta_secs() * 1000.0;
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
-        editor.release_retired();
         let started = Instant::now();
         ui::show(&mut editor, &ctx);
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;

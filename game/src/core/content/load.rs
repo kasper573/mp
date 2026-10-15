@@ -394,12 +394,14 @@ pub struct Loading {
 
 impl Loading {
     pub fn content(&mut self) -> Content {
-        *self.snapshot.get_or_insert_with(|| self.builder.build())
+        self.snapshot
+            .get_or_insert_with(|| self.builder.build())
+            .clone()
     }
 
-    pub fn built<T: Any + Send + Sync>(&mut self, value: T) -> &'static T {
+    pub fn built<T: Any + Send + Sync>(&mut self, value: T) {
         self.snapshot = None;
-        self.builder.built(value)
+        self.builder.built(value);
     }
 
     pub fn error(&mut self, error: LoadError) {
@@ -449,15 +451,17 @@ impl Loading {
         self.failed.insert((Row::TABLE, key));
     }
 
-    pub fn rows<Row: ContentRow>(&mut self) -> Vec<(ContentId<Row>, &'static Row)> {
-        let content = self.content();
+    pub fn rows<'c, Row: ContentRow>(
+        &self,
+        content: &'c Content,
+    ) -> Vec<(ContentId<Row>, &'c Row)> {
         content
             .table::<Row>()
             .iter()
             .filter(|(id, _)| {
                 !self
                     .failed
-                    .contains(&(Row::TABLE, id.key(&content).to_owned()))
+                    .contains(&(Row::TABLE, id.key(content).to_owned()))
             })
             .collect()
     }

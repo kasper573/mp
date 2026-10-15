@@ -28,7 +28,7 @@ pub fn resize_dialog(
     let old = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .and_then(|c| {
             c.by_key::<area::AreaDef>(&dialog.area)
                 .map(|id| area::load(&c, id).size)
@@ -208,7 +208,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
     let content = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     let id = content
         .by_key::<area::AreaDef>(&dialog.area)
@@ -220,7 +220,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = super::grid::GridDraft::of(&dialog.area, area.grids);
+    let draft = super::grid::GridDraft::of(&dialog.area, &area.grids);
     let (resized, clipped) = draft.resized(new, shift);
     let mut row = editor
         .row_value("area", &dialog.area)

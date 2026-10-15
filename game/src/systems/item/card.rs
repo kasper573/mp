@@ -76,7 +76,7 @@ pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response 
 }
 
 pub fn tooltip(world: &World, response: &Response, item: ItemId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = item.get(&content);
     let lines = [overview(def)];
     let hint = StyledLine::new(inspect_hint());
@@ -110,7 +110,7 @@ pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
 }
 
 pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = item.get(&content);
     ui.spacing_mut().item_spacing.y = 8.0;
     ui.horizontal(|ui| {
@@ -186,7 +186,7 @@ fn draw_card(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let screen = gui.content_rect();
     let start = Rect::from_min_size(
         Pos2::new(
@@ -225,7 +225,7 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Color32)> {
     .collect()
 }
 
-fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color32)> {
+fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
     let content = world.resource::<Content>();
     let plain = |fact: String| (fact, color::TEXT);
     let mut facts = Vec::new();

@@ -424,7 +424,7 @@ fn publish(world: &mut World) {
 }
 
 fn snapshot(world: &mut World) -> ProbeSnapshot {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let me = session::my_character(world).map(|me| me.id());
     let viewpoint = world.resource::<session::Viewpoint>().0;
     let spectating = world.resource::<session::SpectateStatus>().0;
@@ -597,7 +597,7 @@ fn soundscape(world: &World) -> ProbeSoundscape {
             .map(|voice| ProbeVoice {
                 channel: voice.channel.0,
                 category: voice.category,
-                src: voice.src.to_owned(),
+                src: voice.src.as_str().to_owned(),
                 heard: voice.heard(),
             })
             .collect(),
@@ -917,7 +917,7 @@ fn shown_role(role: accesskit::Role) -> bool {
 }
 
 fn notifications(world: &mut World) -> ProbeNotifications {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let bubbles = bubble::shown(world)
         .into_iter()
         .map(|shown| ProbeBubble {

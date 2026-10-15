@@ -251,7 +251,8 @@ fn draw_cursor(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let cursor = shape.get(world.resource::<Content>());
+    let content = world.resource::<Content>().clone();
+    let cursor = shape.get(&content);
     let hotspot = egui::vec2(f32::from(cursor.hotspot.x), f32::from(cursor.hotspot.y));
     let Some(image) = gui::image(world, &cursor.image) else {
         return;

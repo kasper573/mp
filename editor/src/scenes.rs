@@ -292,7 +292,7 @@ fn open_one(editor: &mut Editor, step: &Step) {
             let size = editor
                 .project
                 .as_ref()
-                .and_then(|p| p.content)
+                .and_then(|p| p.content.clone())
                 .and_then(|c| c.by_key::<AreaDef>(key).map(|id| area::load(&c, id).size));
             editor.open_tab(EditorTab::Area { key: key.clone() });
             editor.dialogs.push(ModalDialog::Resize(ResizeDialog {

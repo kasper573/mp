@@ -84,7 +84,10 @@ pub fn show(
     if let Some(key) = clicked {
         next_focus = Some(key);
     }
-    let view = editor.views.script.view_mut(&owner);
+    let view = editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref());
     if let Some((key, fold)) = fold {
         if fold {
             view.folded.insert(key);
@@ -345,7 +348,11 @@ fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
                     format!("choice:{}#{index}", row.name),
                 ],
             ));
-            editor.views.script.view_mut(&doc.owner).selected = vec![row.name.clone()];
+            editor
+                .views
+                .script
+                .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+                .selected = vec![row.name.clone()];
         }
         None if !row.link => select_nodes(editor, doc, std::slice::from_ref(&row.name)),
         None => {}

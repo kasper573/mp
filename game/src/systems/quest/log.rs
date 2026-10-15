@@ -173,7 +173,7 @@ impl Page {
 }
 
 fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let listed = page.listed(&content);
     let shown = page.shown(&listed);
     egui::Panel::left(egui::Id::new(("quest list", page.tab.title())))
@@ -199,7 +199,7 @@ fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
 }
 
 fn list(ui: &mut Ui, world: &mut World, page: &Page, listed: &[QuestId], shown: Option<QuestId>) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let (title, aside) = match page.tab {
         LogTab::Active => (
             "Active quests",
@@ -244,7 +244,7 @@ fn empty_note(tab: LogTab) -> &'static str {
 }
 
 fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bool) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     let fill = if selected {
         color::ACCENT_SOFT
@@ -333,7 +333,7 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
 }
 
 fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     ui.spacing_mut().item_spacing.y = 8.0;
     ui.horizontal_wrapped(|ui| {
@@ -421,7 +421,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
 }
 
 fn timer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     ui.horizontal(|ui| {
         hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 16.0);
         let left = Countdown::LeftDetail
@@ -462,7 +462,7 @@ fn footer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
 }
 
 fn confirm_abandon(world: &mut World, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     let taken = def
         .grants()

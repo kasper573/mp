@@ -77,7 +77,7 @@ pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(),
 }
 
 pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Inventory>(player)
         .and_then(|inventory| inventory.slots.get(inv_slot).map(|slot| slot.item))
@@ -115,7 +115,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
 }
 
 pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Equipment>(player)
         .and_then(|equipment| equipment.slots.get(&slot).copied())

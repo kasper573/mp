@@ -536,7 +536,7 @@ pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), St
 }
 
 fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Inventory>(actor)
         .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
@@ -572,7 +572,7 @@ pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
 }
 
 pub fn drop_item(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     for request in drain_requests::<DropItemRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
@@ -711,7 +711,8 @@ pub fn scatter_at(
     if drops.is_empty() {
         return;
     }
-    let area = area::load(world.resource::<Content>(), area_id);
+    let content = world.resource::<Content>().clone();
+    let area = area::load(&content, area_id);
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let count = drops.len();
     let mut items = Vec::with_capacity(count);
@@ -793,7 +794,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     {
         return;
     }
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let collected = world
         .get_mut::<Inventory>(player)
         .is_some_and(|mut inventory| {
@@ -808,7 +809,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
 }
 
 fn instantiate_effects(world: &mut World, actor: Entity, item: ItemId, duration: Seconds) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let until = world.resource::<WallClock>().now.after(duration);
     let entries = item
         .get(&content)

@@ -392,7 +392,7 @@ fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
         });
     }
     if table == "npc" && cx.owner_table.as_deref() == Some("quest") && path.ends_with("/npc") {
-        let content = cx.content?;
+        let content = cx.content.clone()?;
         if !content.has_built::<RiftScripts>() {
             return None;
         }
@@ -411,7 +411,7 @@ fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
 fn pick_hint(cx: &FormCx, table: &str, key: &str) -> String {
     match table {
         "npc" => {
-            let Some(content) = cx.content else {
+            let Some(content) = cx.content.clone() else {
                 return String::new();
             };
             let Some(id) = content.by_key::<NpcDef>(key) else {

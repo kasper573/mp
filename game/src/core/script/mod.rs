@@ -32,7 +32,7 @@ use crate::core::content::{Content, ContentId, ContentRow};
 
 pub type Name = &'static str;
 pub type Arrow = Option<String>;
-pub type Link = Option<Name>;
+pub type Link<'a> = Option<&'a str>;
 
 /// What kind of thing owns a script, which decides the events raised for it and the effects it
 /// may use.
@@ -135,17 +135,17 @@ pub trait RevealDef: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 's
 }
 
 pub trait LineDef<V: Vocabulary> {
-    fn values(&'static self) -> Vec<&'static Expr<V>>;
+    fn values(&self) -> Vec<&Expr<V>>;
 }
 
 pub trait TextDef<V: Vocabulary> {
-    fn values(&'static self) -> Vec<&'static Expr<V>>;
+    fn values(&self) -> Vec<&Expr<V>>;
 }
 
 pub trait QueryDef<V: Vocabulary> {
     fn value_type(&self, cx: &Compiler<V>) -> ValueType;
     fn reads_subject(&self) -> bool;
-    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<Eval, ScriptFault>;
+    fn compile<'c>(&'c self, cx: &mut Compiler<'c, V>) -> Result<Eval, ScriptFault>;
 }
 
 pub trait EffectDef<V: Vocabulary> {
@@ -153,14 +153,14 @@ pub trait EffectDef<V: Vocabulary> {
         V::OwnerKind::VARIANTS
     }
     fn needs_subject(&self) -> bool;
-    fn outputs(&'static self) -> Vec<(Name, Link)>;
+    fn outputs(&self) -> Vec<(Name, Link<'_>)>;
     fn pauses(&self) -> bool {
         false
     }
     fn keeps_box(&self) -> bool {
         false
     }
-    fn compile(&'static self, cx: &mut Compiler<V>) -> Result<EffectCall<V>, ScriptFault>;
+    fn compile<'c>(&'c self, cx: &mut Compiler<'c, V>) -> Result<EffectCall<V>, ScriptFault>;
     fn reach(&self, cx: &Compiler<V>) -> Vec<Reach<V>>;
 }
 

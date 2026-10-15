@@ -240,7 +240,7 @@ pub struct SpawnGround {
 }
 
 pub fn spawn_ground(editor: &Editor) -> Option<SpawnGround> {
-    let content = editor.project.as_ref()?.content?;
+    let content = editor.project.as_ref()?.content.clone()?;
     let place = &content.built::<GameSettings>().initial_spawn;
     Some(SpawnGround {
         area: place.area.key(&content).to_owned(),

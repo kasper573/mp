@@ -68,7 +68,7 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &ar
     let canvas = frame.canvas;
     let visible = canvas.visible();
     let size = area.size.grid();
-    let grids = area.grids;
+    let grids = area.grids.clone();
     for cell in size.cells() {
         let bounds = cell.bounds();
         if !visible.intersects(&bounds) {
@@ -245,7 +245,7 @@ pub(super) fn overlay_selected_scenery(
         return;
     };
     let canvas = frame.canvas;
-    let grids = area.grids;
+    let grids = area.grids.clone();
     let size = area.size.grid();
     for cell in rect.tiles() {
         if let Some(cell_index) = cell.index(size)
@@ -390,7 +390,7 @@ pub(super) fn overlay_blueprint_ghost(
         frame.origin().0
     };
     let ctx = ui.ctx().clone();
-    let Some(sprite) = population::player_sprite(editor, &ctx, frame.content) else {
+    let Some(sprite) = population::player_sprite(editor, &ctx, &frame.content) else {
         return;
     };
     let view = editor.views.area.view_mut(view_key);
@@ -470,7 +470,7 @@ pub(super) fn overlay_populations(
         let Some(npc) = module["npc"].as_str() else {
             continue;
         };
-        let Some(sprite) = population::npc_sprite(editor, &ctx, frame.content, npc) else {
+        let Some(sprite) = population::npc_sprite(editor, &ctx, &frame.content, npc) else {
             continue;
         };
         for at in population::population_places(area, module, preview.seed) {

@@ -164,8 +164,8 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         return;
     };
     let tileset = module.text("tileset").to_owned();
-    let grids = frame.area().grids;
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
     let layer = editor
         .views
         .area
@@ -227,7 +227,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         editor.toast("The object has no warp to return from");
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(here_id) = content.by_key::<area::AreaDef>(area_key) else {
@@ -260,7 +260,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         editor.toast("The destination has no walkable cell");
         return;
     };
-    let mut names = object_names(content, there_id);
+    let mut names = object_names(&content, there_id);
     let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
@@ -378,9 +378,9 @@ pub(super) fn scenery_extras(
 }
 
 pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Option<usize> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     let area_id = content.by_key::<area::AreaDef>(area_key)?;
-    let grids = area::load(&content, area_id).grids;
+    let grids = area::load(&content, area_id).grids.clone();
     let rect = shapes::scenery_rect(module)?;
     let size = grids.size;
     Some(
@@ -401,8 +401,8 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usi
     let Some(at) = super::shapes::pos_of(&module["at"]) else {
         return;
     };
-    let grids = frame.area().grids;
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
     let mut adopted: Vec<Value> = module["blocks"].as_array().cloned().unwrap_or_default();
     let mut count = 0;
     for cell in rect.tiles() {

@@ -4135,7 +4135,6 @@ dependencies = [
  "tar",
  "tempfile",
  "testkit",
- "thread_local",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",

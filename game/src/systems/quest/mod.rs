@@ -19,7 +19,6 @@ use crate::core::content::{
     RowCheck,
 };
 use crate::core::math::{Percent, Rng};
-use crate::core::script::Name;
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::{self, AreaDef, AreaId};
 use crate::systems::attention::{AttentionId, AttentionMark};
@@ -148,7 +147,7 @@ impl QuestDef {
         })
     }
 
-    pub fn min_level(&'static self) -> u32 {
+    pub fn min_level(&self) -> u32 {
         self.requires()
             .into_iter()
             .flat_map(condition::parts)
@@ -317,7 +316,7 @@ impl QuestDef {
         }
     }
 
-    pub fn meta(&'static self, parties: &Parties, quest: QuestId) -> String {
+    pub fn meta(&self, parties: &Parties, quest: QuestId) -> String {
         format!(
             "{} · Level {} · from {}",
             self.category,
@@ -328,7 +327,7 @@ impl QuestDef {
         )
     }
 
-    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
         if self.time_limit().is_some() {
             return &InterfaceIcon::Timed.get(content).image;
         }
@@ -400,7 +399,7 @@ pub enum Objective {
 }
 
 impl Objective {
-    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
         match self {
             Objective::Hold(stack) => &stack.item.get(content).icon,
             Objective::Defeat { .. } => &InterfaceIcon::ObjectiveDefeat.get(content).image,
@@ -710,7 +709,7 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
     if let Some(refusal) = accept_refusal(world, player, quest) {
         return Err(refusal);
     }
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
     let mut inventory = world
@@ -753,7 +752,7 @@ pub fn turn_in(
     quest: QuestId,
     pick: Option<ItemStack>,
 ) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     if !ready_to_hand_in(world, player, quest) {
         return Err(not_ready(&content, quest));
@@ -770,7 +769,7 @@ pub fn turn_in(
 }
 
 pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
@@ -801,7 +800,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
 }
 
 pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
@@ -826,7 +825,7 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
 }
 
 pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -847,7 +846,7 @@ pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
 }
 
 pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: usize) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let done = world.get_mut::<QuestLog>(player).is_some_and(|mut log| {
         log.active
@@ -880,7 +879,7 @@ pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: u
     announce(world, player, clock);
 }
 
-pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: Name) {
+pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
     if let Some(mut log) = world.get_mut::<QuestLog>(player)
         && let Some(active) = log.active.iter_mut().find(|active| active.quest == quest)
     {
@@ -944,7 +943,7 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, quest) in loading.rows::<QuestDef>() {
+    for (id, quest) in loading.rows::<QuestDef>(&content) {
         let key = id.key(&content);
         let mut check = RowCheck::default();
         let item_rows = |stacks: &[ItemStack]| -> Vec<ItemId> {
@@ -1055,7 +1054,7 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
             QuestRole::TurnsIn(quest) => turned_in.insert(quest),
         };
     }
-    for (id, _) in loading.rows::<QuestDef>() {
+    for (id, _) in loading.rows::<QuestDef>(&content) {
         let key = id.key(&content);
         let found = parties.get(id);
         let givers = found.is_some_and(|found| !found.givers.is_empty());
@@ -1106,7 +1105,7 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
 }
 
 fn track(world: &mut World, player: Entity, quest: QuestId, tracked: bool) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -1168,7 +1167,7 @@ fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
 /// becomes ready or a daily quest is open again. What the log shows is read from the state
 /// itself, so this only runs where something may have changed.
 fn announce(world: &mut World, player: Entity, clock: WallClock) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let parties = world.resource::<Parties>().clone();
     let Some(log) = log_of(world, player) else {
         return;
@@ -1241,7 +1240,7 @@ fn announce(world: &mut World, player: Entity, clock: WallClock) {
 }
 
 fn credit_kill(world: &mut World, kill: KillCredited) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let parties = world.resource::<Parties>().clone();
     let player = kill.credited;
     let Some(mut log) = log_of(world, player).cloned() else {

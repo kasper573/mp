@@ -269,7 +269,7 @@ pub fn materialize(
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, snapshot) in loading.rows::<CharacterSnapshot>() {
+    for (id, snapshot) in loading.rows::<CharacterSnapshot>(&content) {
         let mut check = RowCheck::default();
         check_start(&content, snapshot, &mut check);
         check_bag(&content, snapshot, &mut check);

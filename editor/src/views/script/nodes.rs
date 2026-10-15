@@ -185,16 +185,16 @@ pub fn speaker_name(by: &Value) -> String {
     LineSpeaker::of(by).map_or_else(|| "?".to_owned(), |speaker| speaker.name())
 }
 
-pub fn bust_file(content: Option<Content>, speaker: &LineSpeaker) -> Option<String> {
+pub fn bust_file(content: Option<&Content>, speaker: &LineSpeaker) -> Option<String> {
     let content = content?;
     let LineSpeaker::Npc { npc, face } = speaker else {
         return None;
     };
     let busts = content
         .by_key::<NpcDef>(npc)?
-        .get(&content)
+        .get(content)
         .model
-        .get(&content)
+        .get(content)
         .busts()?;
     let face = face
         .as_deref()
@@ -278,7 +278,7 @@ pub struct NodeCatalogue {
 }
 
 impl NodeCatalogue {
-    pub fn build(root: &Value, content: Option<Content>) -> NodeCatalogue {
+    pub fn build(root: &Value, content: Option<&Content>) -> NodeCatalogue {
         let mut entries: Vec<NodeEntry> = FlowKind::VARIANTS
             .iter()
             .map(|&kind| NodeEntry {
@@ -291,7 +291,7 @@ impl NodeCatalogue {
                 pauses: kind.pauses(),
             })
             .collect();
-        let scope = content.map(|content| ContentScope::of(&content));
+        let scope = content.map(ContentScope::of);
         let parse = |template: Value| -> Option<Node> {
             let scope = scope.clone()?;
             let (parsed, _) = with_content(scope, || serde_json::from_value::<Node>(template));

@@ -65,7 +65,7 @@ fn empty_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot) {
 }
 
 fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = item.get(&content);
     let look = SlotLook {
         icon: Some(&def.icon),

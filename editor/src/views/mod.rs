@@ -134,7 +134,7 @@ pub fn play_here(editor: &mut Editor) {
         editor.toast("Play here needs an area view under the pointer");
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(area) = content.by_key::<AreaDef>(&hover.area) else {

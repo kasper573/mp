@@ -62,7 +62,8 @@ pub fn content(registry: &mut ContentRegistry) {
 }
 
 fn check_banks(loading: &mut Loading) {
-    for (id, bank) in loading.rows::<BabbleBankDef>() {
+    let content = loading.content();
+    for (id, bank) in loading.rows::<BabbleBankDef>(&content) {
         let mut check = RowCheck::default();
         check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
         for letter in letter_files(bank) {

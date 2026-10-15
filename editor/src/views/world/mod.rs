@@ -158,8 +158,8 @@ pub struct OpenWorldMap {
 impl OpenWorldMap {
     pub fn of(editor: &mut Editor) -> Option<OpenWorldMap> {
         let project = editor.project.as_ref()?;
-        let content = project.content?;
-        let atlas = editor.views.world.atlas(project, content);
+        let content = project.content.clone()?;
+        let atlas = editor.views.world.atlas(project, &content);
         let layout = laid_out(&atlas, WorldMap::World.get(&content));
         Some(OpenWorldMap {
             content,
@@ -221,7 +221,7 @@ impl OpenWorldMap {
     }
 
     pub fn write(&self, editor: &mut Editor, mut edit: ContentEdit, layout: &WorldMapDef) -> bool {
-        let Some(json) = value::untyped(self.content, layout) else {
+        let Some(json) = value::untyped(&self.content, layout) else {
             return false;
         };
         edit.write_json(layout_file(), &json);
@@ -242,7 +242,7 @@ impl WorldView {
         }
     }
 
-    fn atlas(&mut self, project: &Project, content: Content) -> Arc<WorldAtlas> {
+    fn atlas(&mut self, project: &Project, content: &Content) -> Arc<WorldAtlas> {
         match &self.atlas {
             Some(atlas) if atlas.generation == project.generation => atlas.clone(),
             _ => {
@@ -296,7 +296,7 @@ pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
 }
 
 pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, copy: &str) {
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     let Some(area) = content.by_key::<AreaDef>(original) else {

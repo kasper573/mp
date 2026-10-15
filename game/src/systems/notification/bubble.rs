@@ -373,7 +373,7 @@ fn place(world: &mut World) {
         return;
     };
     let (now, still) = rows::motion_time(world, &gui);
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let mut room = Room::of(world, window);
     let viewer = world
         .resource::<Viewpoint>()

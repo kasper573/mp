@@ -20,7 +20,7 @@ pub struct WalkGrids {
 pub fn grids(
     content: &Content,
     grids: &AreaGrids,
-    scenery: &[&Scenery],
+    scenery: &[Scenery],
     safe_zones: &[Rect<Tiles>],
 ) -> WalkGrids {
     let size = grids.size;
@@ -80,7 +80,7 @@ impl CellVotes {
     }
 }
 
-fn votes(content: &Content, grids: &AreaGrids, scenery: &[&Scenery]) -> Vec<CellVotes> {
+fn votes(content: &Content, grids: &AreaGrids, scenery: &[Scenery]) -> Vec<CellVotes> {
     let size = grids.size;
     let mut votes: Vec<CellVotes> = grids
         .walk

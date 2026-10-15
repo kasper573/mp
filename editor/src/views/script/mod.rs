@@ -18,10 +18,11 @@ use serde_json::{Map, Value};
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
-use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file};
+use crate::project::{ContentEdit, Project, RowSelection, catalogue_of, row_file};
 use crate::tabs::EditorTab;
 use crate::thumbs;
 use crate::ui::{dialogs, theme, widgets};
+use crate::user::UserFolder;
 use crate::value::RowValue;
 use graph::{FaceImage, NodePaletteOpen, ScriptGraph, ScriptGraphAction, ScriptGraphLayout};
 use nodes::{LineSpeaker, NodeCatalogue};
@@ -288,8 +289,8 @@ pub enum ScriptPanel {
 
 #[derive(Default)]
 pub struct ScriptViewState {
-    pub graph: Option<ScriptGraph>,
-    pub layout: ScriptGraphLayout,
+    pub graph: ScriptGraph,
+    pub outline: bool,
     pub layout_dirty: bool,
     pub selected: Vec<String>,
     pub marked: Vec<String>,
@@ -301,8 +302,26 @@ pub struct ScriptViewState {
 }
 
 impl ScriptViewState {
+    pub fn opened(layout: ScriptGraphLayout) -> ScriptViewState {
+        ScriptViewState {
+            graph: ScriptGraph::new(&layout),
+            outline: layout.outline,
+            ..Default::default()
+        }
+    }
+
     pub fn toggle_outline(&mut self) {
-        self.layout.outline = !self.layout.outline;
+        self.outline = !self.outline;
+        self.layout_dirty = true;
+    }
+
+    pub fn place_node(&mut self, name: &str, at: Pos2) {
+        self.graph.place(name, at);
+        self.layout_dirty = true;
+    }
+
+    pub fn rename_node(&mut self, old: &str, new: &str) {
+        self.graph.rename(old, new);
         self.layout_dirty = true;
     }
 }
@@ -419,9 +438,19 @@ impl ScriptViews {
         self.views.get(&self.find(owner)?)
     }
 
-    pub fn view_mut(&mut self, owner: &ScriptOwner) -> &mut ScriptViewState {
+    pub fn view_mut(
+        &mut self,
+        owner: &ScriptOwner,
+        user: &UserFolder,
+        project: Option<&Project>,
+    ) -> &mut ScriptViewState {
         let id = self.session(owner);
-        self.views.entry(id).or_default()
+        self.views.entry(id).or_insert_with(|| {
+            let layout = project
+                .map(|project| user.load_layout(&project.root, &owner.slug()))
+                .unwrap_or_default();
+            ScriptViewState::opened(layout)
+        })
     }
 
     pub fn run_of(&self, owner: &ScriptOwner) -> Option<&run::ScriptRun> {
@@ -529,11 +558,30 @@ pub struct LinkNodeDialog {
     pub port: usize,
 }
 
-pub fn sync_with_content(editor: &mut Editor) {
-    let generation = editor
+fn content_generation(editor: &Editor) -> u64 {
+    editor
         .project
         .as_ref()
-        .map_or(0, |project| project.generation);
+        .map_or(0, |project| project.generation)
+}
+
+fn sync_graph(editor: &mut Editor, doc: &ScriptDoc) {
+    let generation = content_generation(editor);
+    let Editor {
+        user,
+        project,
+        views,
+        ..
+    } = editor;
+    views
+        .script
+        .view_mut(&doc.owner, user, project.as_ref())
+        .graph
+        .sync(doc, catalogue_of(project.as_ref()), generation);
+}
+
+pub fn sync_with_content(editor: &mut Editor) {
+    let generation = content_generation(editor);
     let views = &mut editor.views.script;
     if views
         .run
@@ -567,33 +615,19 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
         editor.dock.main_surface_mut().set_focused_node(path.node);
     }
     sync_with_content(editor);
-    {
-        let Editor {
-            user,
-            project,
-            views,
-            ..
-        } = editor;
-        let id = views.script.session(owner);
-        views
-            .script
-            .views
-            .entry(id)
-            .or_insert_with(|| ScriptViewState {
-                layout: project
-                    .as_ref()
-                    .map(|project| user.load_layout(&project.root, &owner.slug()))
-                    .unwrap_or_default(),
-                ..Default::default()
-            });
-    }
+    sync_graph(editor, &doc);
     let mut actions = Vec::new();
     keys(editor, ui, &doc, &mut actions);
     status(editor, &doc);
     egui::CentralPanel::default()
         .frame(egui::Frame::NONE)
         .show(ui, |ui| {
-            if editor.views.script.view_mut(owner).layout.outline {
+            if editor
+                .views
+                .script
+                .view_mut(owner, &editor.user, editor.project.as_ref())
+                .outline
+            {
                 outline::show(editor, ui, &doc, &mut actions);
             } else {
                 canvas(editor, ui, &doc, &mut actions);
@@ -621,10 +655,6 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: Bottom
 }
 
 fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
-    let generation = editor
-        .project
-        .as_ref()
-        .map_or(0, |project| project.generation);
     let owner = doc.owner.clone();
     let (lit, current): (HashSet<String>, Option<String>) = editor
         .views
@@ -639,16 +669,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         .unwrap_or_default();
     let selected_before = {
         let views = &mut editor.views.script;
-        let catalogue = catalogue_of(editor.project.as_ref());
-        let view = views.view_mut(&owner);
-        if view
-            .graph
-            .as_ref()
-            .is_none_or(|graph| graph.built != generation)
-        {
-            graph::place_missing(doc, catalogue, &mut view.layout);
-            view.graph = Some(graph::build(doc, catalogue, &view.layout, generation));
-        }
+        let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
         let selection = &editor.selection;
         if selection.table == owner.table()
             && selection.keys == [owner.key()]
@@ -667,11 +688,10 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
     };
     let faces = faces(editor, ui.ctx(), doc);
     let id = snarl_id(&owner);
-    let (positions, to_global, mut taken, clicked, rects) = {
+    let (dragged, to_global, mut taken, clicked, rects) = {
         let views = &mut editor.views.script;
         let catalogue = catalogue_of(editor.project.as_ref());
-        let view = views.view_mut(&owner);
-        let graph = view.graph.as_mut().expect("built above");
+        let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
         let chosen: HashSet<String> = selected_before.iter().cloned().collect();
         let mut viewer = graph::ScriptGraphViewer {
             doc,
@@ -689,19 +709,19 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         };
         if view.to_global.is_none() {
             let mut bounds = Rect::NOTHING;
-            for at in view.layout.nodes.values() {
-                bounds = bounds.union(Rect::from_min_size(
-                    Pos2::new(at[0], at[1]),
-                    vec2(graph::CARD + 20.0, 120.0),
-                ));
+            for at in view.graph.positions().values() {
+                bounds = bounds.union(Rect::from_min_size(*at, vec2(graph::CARD + 20.0, 120.0)));
             }
             if bounds.is_finite() {
                 viewer.fit = Some((bounds, ui.max_rect()));
             }
         }
+        let graph = &mut view.graph;
+        let before = graph.node_spots();
         graph::widget(id).show(&mut graph.snarl, &mut viewer, ui);
+        let dragged = graph.node_spots() != before;
         (
-            graph::positions(graph),
+            dragged,
             viewer.to_global,
             viewer.actions,
             viewer.clicks,
@@ -709,19 +729,25 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         )
     };
     header_chip(editor, ui, doc);
-    editor.views.script.view_mut(&owner).rects = rects;
+    editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .rects = rects;
     run::conversation_box(editor, ui, doc);
     actions.append(&mut taken);
     let selected: Vec<String> = {
-        let view = editor.views.script.view_mut(&owner);
-        let graph = view.graph.as_ref().expect("built above");
+        let view = editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref());
+        let graph = &view.graph;
         let mut marked: Vec<String> = get_selected_nodes(id, ui.ctx())
             .iter()
             .filter_map(|id| graph.snarl.get_node(*id).map(|node| node.name.clone()))
             .collect();
         marked.sort();
-        if view.layout.nodes != positions {
-            view.layout.nodes = positions;
+        if dragged {
             view.layout_dirty = true;
         }
         view.to_global = Some(to_global);
@@ -744,7 +770,11 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
     };
     callout(editor, ui, &owner);
     if selected != selected_before {
-        editor.views.script.view_mut(&owner).selected = selected.clone();
+        editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .selected = selected.clone();
         if !selected.is_empty() {
             select_nodes(editor, doc, &selected);
         }
@@ -765,7 +795,7 @@ fn faces(editor: &mut Editor, ctx: &egui::Context, doc: &ScriptDoc) -> graph::Sp
             if faces.contains_key(&speaker) {
                 continue;
             }
-            let Some(file) = nodes::bust_file(project.content, &speaker) else {
+            let Some(file) = nodes::bust_file(project.content.as_ref(), &speaker) else {
                 continue;
             };
             let Some(thumb) = thumbnails.image(ctx, &project.files, &file) else {
@@ -835,7 +865,7 @@ pub fn chip_title(editor: &Editor, doc: &ScriptDoc) -> String {
 fn status(editor: &mut Editor, doc: &ScriptDoc) {
     let owner = doc.owner.clone();
     let view = editor.views.script.view(&owner);
-    let outline = view.is_some_and(|view| view.layout.outline);
+    let outline = view.is_some_and(|view| view.outline);
     let palette = view.is_some_and(|view| view.palette.is_some());
     let selected = view.map(|view| view.selected.clone()).unwrap_or_default();
     let what = if doc.is_shared() {
@@ -890,16 +920,15 @@ fn status(editor: &mut Editor, doc: &ScriptDoc) {
     editor.status.left.push(hint);
 }
 
-fn beside(view: &ScriptViewState, from: &str) -> Pos2 {
-    let Some(origin) = view.layout.nodes.get(from) else {
+fn beside(graph: &ScriptGraph, from: &str) -> Pos2 {
+    let placed = graph.positions();
+    let Some(origin) = placed.get(from) else {
         return Pos2::new(40.0, 40.0);
     };
-    let mut pos = Pos2::new(origin[0] + 280.0, origin[1]);
-    while view
-        .layout
-        .nodes
+    let mut pos = Pos2::new(origin.x + 280.0, origin.y);
+    while placed
         .values()
-        .any(|p| (p[0] - pos.x).abs() < 200.0 && (p[1] - pos.y).abs() < 60.0)
+        .any(|p| (p.x - pos.x).abs() < 200.0 && (p.y - pos.y).abs() < 60.0)
     {
         pos.y += 130.0;
     }
@@ -1019,7 +1048,11 @@ pub fn select_nodes(editor: &mut Editor, doc: &ScriptDoc, names: &[String]) {
         doc.owner.key(),
         names.iter().map(|name| format!("node:{name}")).collect(),
     ));
-    editor.views.script.view_mut(&doc.owner).selected = names.to_vec();
+    editor
+        .views
+        .script
+        .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+        .selected = names.to_vec();
 }
 
 pub fn is_node_selection(selection: &RowSelection) -> bool {
@@ -1033,7 +1066,13 @@ pub fn is_node_selection(selection: &RowSelection) -> bool {
 fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
     let owner = doc.owner.clone();
     let keys = editor.views.script.keys;
-    if editor.views.script.view_mut(&owner).palette.is_some() {
+    if editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .palette
+        .is_some()
+    {
         return;
     }
     if keys.fire {
@@ -1043,8 +1082,8 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
     }
     let views = &mut editor.views.script;
     let catalogue = catalogue_of(editor.project.as_ref());
-    let view = views.view_mut(&owner);
-    let in_outline = view.layout.outline;
+    let view = views.view_mut(&owner, &editor.user, editor.project.as_ref());
+    let in_outline = view.outline;
     if keys.outline {
         view.toggle_outline();
     }
@@ -1166,7 +1205,11 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
         }
         ScriptGraphAction::Duplicate(name) => duplicate(editor, doc, &name),
         ScriptGraphAction::Palette(open) => {
-            editor.views.script.view_mut(&owner).palette = Some(palette::NodePalette::new(open));
+            editor
+                .views
+                .script
+                .view_mut(&owner, &editor.user, editor.project.as_ref())
+                .palette = Some(palette::NodePalette::new(open));
         }
         ScriptGraphAction::AddLine(name) => {
             let mut script = doc.script.clone();
@@ -1223,12 +1266,14 @@ fn duplicate(editor: &mut Editor, doc: &ScriptDoc, name: &str) {
             nodes::set_arrow(source, &field, Some(&fresh));
         }
     }
-    let view = editor.views.script.view_mut(&owner);
-    let at = beside(view, name);
-    view.layout.nodes.insert(fresh.clone(), [at.x, at.y]);
-    view.layout_dirty = true;
     let label = format!("Duplicate {name} in {}", owner.title());
     if write(editor, doc, script, label) {
+        let view = editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref());
+        let at = beside(&view.graph, name);
+        view.place_node(&fresh, at);
         select_nodes(editor, doc, &[fresh]);
     }
 }
@@ -1337,23 +1382,23 @@ pub fn add_node(
         }
     }
     let owner = doc.owner.clone();
-    let view = editor.views.script.view_mut(&owner);
-    let graph_pos = match (at, view.to_global) {
-        (Some(at), Some(to_global)) => to_global.inverse() * at,
-        (Some(at), None) => at,
-        (None, _) => link
-            .as_ref()
-            .map_or(Pos2::new(40.0, 40.0), |(from, _)| beside(view, from)),
-    };
-    view.layout
-        .nodes
-        .insert(name.clone(), [graph_pos.x, graph_pos.y]);
-    view.layout_dirty = true;
     let label = match &link {
         Some((from, _)) => format!("Add {kind} after {from} in {}", owner.title()),
         None => format!("Add {kind} to {}", owner.title()),
     };
     if write(editor, doc, script, label) {
+        let view = editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref());
+        let graph_pos = match (at, view.to_global) {
+            (Some(at), Some(to_global)) => to_global.inverse() * at,
+            (Some(at), None) => at,
+            (None, _) => link
+                .as_ref()
+                .map_or(Pos2::new(40.0, 40.0), |(from, _)| beside(&view.graph, from)),
+        };
+        view.place_node(&name, graph_pos);
         select_nodes(editor, doc, &[name]);
     }
 }
@@ -1455,13 +1500,13 @@ pub fn rename_node(editor: &mut Editor, doc: &ScriptDoc, old: &str, new: &str) {
         nodes::rename(map, old, new, catalogue_of(editor.project.as_ref()));
     }
     let owner = doc.owner.clone();
-    let view = editor.views.script.view_mut(&owner);
-    if let Some(at) = view.layout.nodes.remove(old) {
-        view.layout.nodes.insert(new.to_owned(), at);
-        view.layout_dirty = true;
-    }
     let label = format!("Rename {old} to {new} in {}", owner.title());
     if write(editor, doc, script, label) {
+        editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .rename_node(old, new);
         select_nodes(editor, doc, &[new.to_owned()]);
     }
 }
@@ -1557,9 +1602,10 @@ fn save_layout(editor: &mut Editor, ui: &Ui, owner: &ScriptOwner) {
         return;
     }
     view.layout_dirty = false;
+    let layout = ScriptGraphLayout::of(&view.graph, view.outline);
     if let Err(error) = editor
         .user
-        .save_layout(&project.root, &owner.slug(), &view.layout)
+        .save_layout(&project.root, &owner.slug(), &layout)
     {
         editor.toast(format!("The graph layout was not saved: {error}"));
     }

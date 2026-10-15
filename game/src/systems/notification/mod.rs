@@ -271,7 +271,7 @@ impl ContentRow for NotificationDef {
 }
 
 impl NotificationDef {
-    pub fn notification(&'static self, text: LineText) -> Notification {
+    pub fn notification(&self, text: LineText) -> Notification {
         Notification {
             kind: (&self.kind).into(),
             text,
@@ -287,14 +287,14 @@ impl NotificationDef {
     }
 }
 
-impl From<&'static NotificationDefKind> for NotificationKind {
-    fn from(kind: &'static NotificationDefKind) -> NotificationKind {
+impl From<&NotificationDefKind> for NotificationKind {
+    fn from(kind: &NotificationDefKind) -> NotificationKind {
         match kind {
             NotificationDefKind::Speech { speaker } => {
                 NotificationKind::Speech { speaker: *speaker }
             }
             NotificationDefKind::Narration { label, sfx } => NotificationKind::Narration {
-                label: Cow::Borrowed(label),
+                label: Cow::Owned(label.clone()),
                 sfx: *sfx,
             },
             NotificationDefKind::Intro {
@@ -304,7 +304,7 @@ impl From<&'static NotificationDefKind> for NotificationKind {
                 emblem,
                 sfx,
             } => NotificationKind::Intro {
-                title: Cow::Borrowed(title),
+                title: Cow::Owned(title.clone()),
                 appearance: IntroAppearance {
                     tint: *tint,
                     motion: *motion,
@@ -329,16 +329,20 @@ impl EffectDef<RiftScripting> for Notify {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let def = self.notification.get(cx.content);
-        let values = text::values(&def.text)
+        let row = self.notification.get(cx.content);
+        let values = text::values(&row.text)
             .into_iter()
             .map(|value| cx.expr(value, ValueType::Text))
             .collect::<Result<Vec<_>, _>>()?;
+        let def = row.clone();
         Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
@@ -388,7 +392,7 @@ pub fn play_sound(
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, def) in loading.rows::<NotificationDef>() {
+    for (id, def) in loading.rows::<NotificationDef>(&content) {
         let mut check = RowCheck::default();
         for (index, span) in def.text.iter().enumerate() {
             if let Span::Value { value, .. } = span

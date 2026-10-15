@@ -864,7 +864,7 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
 }
 
 fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     let Some((parent, index)) = list_slot(pointer) else {
@@ -876,7 +876,7 @@ fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
     if index >= list.len() {
         return;
     }
-    let Some(parts) = placement::unpacked(content, &list[index]) else {
+    let Some(parts) = placement::unpacked(&content, &list[index]) else {
         return;
     };
     list.remove(index);

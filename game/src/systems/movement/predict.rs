@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use bevy_time::Time;
 
+use crate::core::content::Content;
 use crate::core::interpolate::{Jumps, Predicted};
 use crate::core::math::{Direction, Offset, Pos};
 use crate::core::tiling::{Cell, TilePos, Tiles};
@@ -24,7 +25,8 @@ pub fn request_walk(world: &mut World, goal: Pos<Tiles>) {
         return;
     };
     let free = !stat::is_dead(world, me) && !commands_locked(world, me);
-    let navigator = Navigator::of(world, me);
+    let content = world.resource::<Content>().clone();
+    let navigator = Navigator::of_in(&content, world, me);
     let Some(mut stride) = world.get_mut::<Stride>(me) else {
         return;
     };
@@ -58,9 +60,11 @@ pub(super) fn walk_ahead(world: &mut World) {
     let Some(me) = predicted_character(world) else {
         return;
     };
-    let (Some(server), Some(navigator)) =
-        (world.get::<Position>(me).cloned(), Navigator::of(world, me))
-    else {
+    let content = world.resource::<Content>().clone();
+    let (Some(server), Some(navigator)) = (
+        world.get::<Position>(me).cloned(),
+        Navigator::of_in(&content, world, me),
+    ) else {
         return;
     };
     let heard = world

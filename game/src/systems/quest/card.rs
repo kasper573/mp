@@ -94,7 +94,7 @@ fn show_card(ui: &mut Ui, world: &mut World) {
 }
 
 fn offer(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let parties = world.resource::<Parties>().clone();
     let def = quest.get(&content);
     let progress = def.progress(
@@ -126,7 +126,7 @@ fn offer(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) 
 }
 
 fn turn_in(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     head(ui, world, def);
     if def.reveals(ChoiceReveal::Costs) {
@@ -162,8 +162,8 @@ fn decision(ui: &mut Ui, world: &World, quest: QuestId) {
     });
 }
 
-fn head(ui: &mut Ui, world: &mut World, def: &'static QuestDef) {
-    let content = *world.resource::<Content>();
+fn head(ui: &mut Ui, world: &mut World, def: &QuestDef) {
+    let content = world.resource::<Content>().clone();
     ui.horizontal(|ui| {
         hud::icon(ui, world, def.icon(&content), PICK);
         ui.label(RichText::new(def.title.as_str()).font(TextRole::Heading.font_id()));
@@ -171,7 +171,7 @@ fn head(ui: &mut Ui, world: &mut World, def: &'static QuestDef) {
 }
 
 fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let held_colour = if held >= stack.count {
         color::MUTED
     } else {
@@ -196,11 +196,11 @@ fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
 pub(super) fn objective_row(
     ui: &mut Ui,
     world: &mut World,
-    objective: &'static Objective,
+    objective: &Objective,
     progress: &Progress,
     colour: Color32,
 ) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if progress.counted {
@@ -219,7 +219,7 @@ pub(super) fn objective_row(
 }
 
 pub(super) fn reward_chips(ui: &mut Ui, world: &mut World, def: &QuestDef) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     ui.horizontal_wrapped(|ui| {
         if def.xp > 0 {
             widgets::chip(ui, &format!("{} XP", def.xp));
@@ -232,7 +232,7 @@ pub(super) fn reward_chips(ui: &mut Ui, world: &mut World, def: &QuestDef) {
 }
 
 pub(super) fn picks(ui: &mut Ui, world: &mut World, def: &QuestDef) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     ui.horizontal(|ui| {
         for (index, stack) in def.pick_one().iter().enumerate() {
             ui.push_id(("pick", index), |ui| {

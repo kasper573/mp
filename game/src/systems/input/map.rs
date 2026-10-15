@@ -107,7 +107,7 @@ impl GestureKind {
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, def) in loading.rows::<InputDef>() {
+    for (id, def) in loading.rows::<InputDef>(&content) {
         let key = id.key(&content);
         let Some(action) = InputAction::VARIANTS
             .iter()

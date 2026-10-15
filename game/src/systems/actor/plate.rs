@@ -68,7 +68,7 @@ struct Plates(HashMap<Entity, egui::Rect>);
 
 struct Label {
     name: Option<String>,
-    role: Option<&'static str>,
+    role: Option<String>,
     color: Color32,
 }
 
@@ -93,7 +93,7 @@ pub fn draw_plates(world: &mut World) {
     if world.resource::<ActiveTransition>().phase() != ScreenTransitionPhase::Idle {
         return;
     }
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let viewer = world.resource::<Viewpoint>().0;
     let labelled: Vec<(Entity, Label, Pos<Tiles>, Hitbox)> = world
         .query_filtered::<(
@@ -189,7 +189,7 @@ fn draw_plate(ui: &mut egui::Ui, plate: &Plate) {
             TSTransform::IDENTITY,
         );
     }
-    if let Some(role) = plate.label.role {
+    if let Some(role) = plate.label.role.as_deref() {
         text::show_shadowed(
             &mut column,
             &role_text(role),
@@ -213,7 +213,10 @@ fn plate_size(gui: &egui::Context, label: &Label, icons: &[Option<GuiImage>]) ->
     [
         Some(icons),
         label.name.clone().map(|name| text(name, name_font())),
-        label.role.map(|role| text(role_text(role), role_font())),
+        label
+            .role
+            .as_deref()
+            .map(|role| text(role_text(role), role_font())),
     ]
     .into_iter()
     .flatten()
@@ -242,7 +245,7 @@ fn label(
             let def = npc.def.get(content);
             def.nameplate().map(|role| Label {
                 name: Some(def.name.to_owned()),
-                role: Some(role),
+                role: Some(role.to_owned()),
                 color: match attitude {
                     Some(Attitude::Hostile) => HOSTILE,
                     _ => Color32::WHITE,

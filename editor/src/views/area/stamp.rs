@@ -28,7 +28,7 @@ pub fn placement_json(blueprint: &str, at: Pos<Tiles>, flip: Flip, values: &Valu
 }
 
 pub fn placement_module(
-    content: Content,
+    content: &Content,
     blueprint: &str,
     at: Pos<Tiles>,
     flip: Flip,
@@ -38,7 +38,7 @@ pub fn placement_module(
 }
 
 pub fn placed_part(
-    content: Content,
+    content: &Content,
     part: &Value,
     values: &Value,
     variables: &BTreeMap<String, Variable>,
@@ -56,14 +56,14 @@ pub fn stamp_panel(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: Content,
+    content: &Content,
     area_id: AreaId,
 ) {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    for placement in area::placements(&content, area_id) {
+    for placement in area::placements(content, area_id) {
         if placement.chain.len() <= 1 {
             *counts
-                .entry(placement.blueprint.key(&content).to_owned())
+                .entry(placement.blueprint.key(content).to_owned())
                 .or_default() += 1;
         }
     }
@@ -170,7 +170,7 @@ pub(super) fn stamp_values(editor: &Editor, stamp: Option<&str>) -> Value {
 pub(super) fn blueprint_card(
     editor: &mut Editor,
     ui: &mut Ui,
-    content: Content,
+    content: &Content,
     key: &str,
     count: usize,
     selected: bool,
@@ -205,7 +205,7 @@ pub(super) fn blueprint_card(
 pub fn draw_blueprint_art(
     editor: &mut Editor,
     ui: &mut Ui,
-    content: Content,
+    content: &Content,
     key: &str,
     into: ERect,
 ) {
@@ -234,7 +234,7 @@ pub fn draw_blueprint_art(
     let ctx = ui.ctx().clone();
     let painter = ui.painter_at(into);
     for scenery in &sceneries {
-        let def = scenery.tileset.get(&content);
+        let def = scenery.tileset.get(content);
         let image = def.image.as_str().to_owned();
         let Some(project) = editor.project.as_ref() else {
             return;
@@ -309,7 +309,7 @@ pub(super) fn stamp_flip(editor: &Editor, stamp: &str) -> Flip {
 
 pub fn stamp_footprint(
     editor: &Editor,
-    content: Content,
+    content: &Content,
     stamp: &str,
     values: &Value,
 ) -> Size<Tiles> {
@@ -318,7 +318,7 @@ pub fn stamp_footprint(
         return Size::splat(1.0);
     };
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(&content, &[module], &mut errors);
+    let flattening = area::blueprint::flatten(content, &[module], &mut errors);
     let mut bounds: Option<Rect<Tiles>> = None;
     for placed in flattening.modules {
         if let Ok(json) = value::json(&placed.module)
@@ -343,7 +343,7 @@ pub fn stamp_input(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Are
     };
     let at = select::snap_to(tile, alt);
     let values = stamp_values(editor, Some(&stamp));
-    let footprint = stamp_footprint(editor, frame.content, &stamp, &values);
+    let footprint = stamp_footprint(editor, &frame.content, &stamp, &values);
     let spacing = editor
         .settings
         .stamps
@@ -383,13 +383,13 @@ pub(super) fn place_stamps(
     values: &Value,
     placed: Vec<Pos<Tiles>>,
 ) {
-    let content = frame.content;
+    let content = frame.content.clone();
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(stamp) else {
         return;
     };
     let def = id.get(&content);
     let flip = stamp_flip(editor, stamp);
-    let mut taken: HashSet<String> = object_names(content, frame.area_id);
+    let mut taken: HashSet<String> = object_names(&content, frame.area_id);
     let mut modules = Vec::new();
     for at in &placed {
         let mut own = values.clone();
@@ -441,8 +441,8 @@ pub(super) fn place_stamps(
     }
 }
 
-pub fn object_names(content: Content, area_id: AreaId) -> HashSet<String> {
-    area::objects(area::placed(&content, area_id))
+pub fn object_names(content: &Content, area_id: AreaId) -> HashSet<String> {
+    area::objects(area::placed(content, area_id))
         .filter_map(|(_, object)| object.name.clone())
         .collect()
 }
@@ -460,7 +460,7 @@ pub fn stamp_overlay(
     };
     let alt = painter.ctx().input(|i| i.modifiers.alt);
     let values = stamp_values(editor, Some(&stamp));
-    let footprint = stamp_footprint(editor, frame.content, &stamp, &values);
+    let footprint = stamp_footprint(editor, &frame.content, &stamp, &values);
     let color = Color32::from_rgb(90, 220, 220);
     let draw_ghost = |at: Pos<Tiles>| {
         let rect = Rect::new(Pos::new(at.x - 0.5, at.y - 0.5), footprint);

@@ -445,7 +445,7 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         None if doc.kind == OwnerKind::Npc => {
-            let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+            let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
                 return;
             };
             let placed: Vec<String> = content
@@ -743,7 +743,7 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .views
         .script
         .view(&doc.owner)
-        .is_some_and(|view| view.layout.outline);
+        .is_some_and(|view| view.outline);
     let mut fire = false;
     let mut toggle_outline = false;
     let mut make = false;
@@ -772,7 +772,11 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         editor.views.script.fire(&doc.owner);
     }
     if toggle_outline {
-        editor.views.script.view_mut(&doc.owner).toggle_outline();
+        editor
+            .views
+            .script
+            .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+            .toggle_outline();
     }
     if make {
         if doc.is_shared() {
@@ -1650,7 +1654,7 @@ fn speaker_rows(
             face,
         };
         let ctx = ui.ctx().clone();
-        if let Some(file) = nodes::bust_file(cx.content, &speaker)
+        if let Some(file) = nodes::bust_file(cx.content.as_ref(), &speaker)
             && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &file)
         {
             ui.add(

@@ -97,9 +97,8 @@ impl Sim {
         self.app.world_mut()
     }
 
-    pub fn map(&self) -> &'static Area {
-        let content = *self.app.world().resource::<Content>();
-        area::load(&content, self.area)
+    pub fn map(&self) -> &Area {
+        area::load(self.app.world().resource::<Content>(), self.area)
     }
 
     pub fn tick(&mut self) {

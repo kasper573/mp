@@ -221,7 +221,7 @@ impl Expansion<'_> {
         flip: Flip,
         values: &BTreeMap<String, VarValue<RiftScripting>>,
     ) {
-        let content = *self.content;
+        let content = self.content.clone();
         let Some(def) = content.table::<BlueprintDef>().get(placement.blueprint) else {
             return;
         };
@@ -422,7 +422,7 @@ impl Expansion<'_> {
         def: &BlueprintDef,
         filled: &BTreeMap<String, Value>,
     ) -> Vec<ScriptModule> {
-        let content = *self.content;
+        let content = self.content.clone();
         let mut scripts = Vec::new();
         for (index, module) in def.modules.iter().enumerate() {
             let pointer = format!("/modules/{index}");

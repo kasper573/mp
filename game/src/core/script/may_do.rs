@@ -1,4 +1,4 @@
-use super::{EventDef, Name, Vocabulary};
+use super::{EventDef, Vocabulary};
 
 pub type Reach<V> = <V as Vocabulary>::Reach;
 
@@ -6,7 +6,7 @@ pub type Reach<V> = <V as Vocabulary>::Reach;
 pub struct MayDo<V: Vocabulary> {
     pub answers: Vec<<V::Event as EventDef<V>>::Kind>,
     pub reaches: Vec<Reach<V>>,
-    pub dialogue: Vec<Name>,
+    pub dialogue: Vec<String>,
     pub calls: Vec<String>,
     pub waits: bool,
 }
@@ -30,7 +30,7 @@ impl<V: Vocabulary> MayDo<V> {
 
     pub fn absorb(&mut self, other: &MayDo<V>) {
         self.reaches.extend(other.reaches.iter().cloned());
-        self.dialogue.extend(other.dialogue.iter().copied());
+        self.dialogue.extend(other.dialogue.iter().cloned());
         self.calls.extend(other.calls.iter().cloned());
         self.waits |= other.waits;
     }

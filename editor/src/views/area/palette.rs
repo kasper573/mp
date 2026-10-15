@@ -20,15 +20,15 @@ pub enum PaletteLens {
     Terrains,
 }
 
-pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, area_id: AreaId) {
-    let tile_px = area::load(&content, area_id).tile;
-    let tilesets: Vec<(String, &'static TilesetDef)> = content
+pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Content, area_id: AreaId) {
+    let tile_px = area::load(content, area_id).tile;
+    let tilesets: Vec<(String, &TilesetDef)> = content
         .table::<TilesetDef>()
         .iter()
         .filter(|(_, def)| def.tile == tile_px)
-        .map(|(id, def)| (id.key(&content).to_owned(), def))
+        .map(|(id, def)| (id.key(content).to_owned(), def))
         .collect();
-    let used = area::load(&content, area_id).grids.tilesets();
+    let used = area::load(content, area_id).grids.tilesets();
     let view = editor.views.area.view(view_key);
     let stored = view.palette_lens;
     let lens = if view.tool == super::AreaTool::Terrain {
@@ -150,8 +150,8 @@ fn tile_sheet(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: Content,
-    tilesets: &[(String, &'static TilesetDef)],
+    content: &Content,
+    tilesets: &[(String, &TilesetDef)],
 ) {
     let Some(tileset_key) = editor.views.area.view(view_key).pick.tileset.clone() else {
         widgets::hint(ui, "No tileset of this tile size.");
@@ -243,7 +243,7 @@ fn tile_sheet(
                         info.push_str(&format!(" · {}", <&str>::from(walk)));
                     }
                     if let Some(surface) = data.surface {
-                        info.push_str(&format!(" · {}", surface.key(&content)));
+                        info.push_str(&format!(" · {}", surface.key(content)));
                     }
                     if !data.animation.is_empty() {
                         info.push_str(&format!(" · {} frames", data.animation.len()));
@@ -264,7 +264,7 @@ fn sheet_of(editor: &mut Editor, ui: &mut Ui, def: &TilesetDef) -> Option<Tilese
 }
 
 fn terrain_sets(
-    tilesets: &[(String, &'static TilesetDef)],
+    tilesets: &[(String, &TilesetDef)],
     used: &BTreeSet<String>,
 ) -> Vec<(String, String)> {
     let mut sets: Vec<(String, String)> = tilesets
@@ -283,7 +283,7 @@ fn terrain_chips(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    tilesets: &[(String, &'static TilesetDef)],
+    tilesets: &[(String, &TilesetDef)],
     used: &BTreeSet<String>,
 ) {
     let sets = terrain_sets(tilesets, used);
@@ -343,7 +343,7 @@ fn terrain_sheet(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    tilesets: &[(String, &'static TilesetDef)],
+    tilesets: &[(String, &TilesetDef)],
 ) {
     let pick = editor.views.area.view(view_key).terrain.clone();
     let (Some(tileset_key), Some(set)) = (pick.tileset.clone(), pick.set.clone()) else {

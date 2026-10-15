@@ -217,7 +217,7 @@ pub fn next_pack(world: &mut World) -> Pack {
 }
 
 pub fn spawn_all(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let area_id = world.resource::<WorldArea>().0;
     for module in area::modules(&content, area_id) {
         match module {
@@ -273,7 +273,7 @@ fn spawn_wild(
 }
 
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let entity = world.spawn(character(&content, def, at, area)).id();
     world
         .entity_mut(entity)
@@ -282,7 +282,7 @@ pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId
 }
 
 pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: Pack) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let entity = spawn_actor(world, def.get(&content), at, area);
     world.entity_mut(entity).insert((
         Npc { def },
@@ -500,7 +500,7 @@ fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
 type NpcIds = QueryState<Entity, With<Npc>>;
 
 pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let time = Seconds(world.resource::<Time>().elapsed_secs());
     let ids: Vec<Entity> = npcs.iter(world).collect();
     world.resource_scope(|world, mut rng: Mut<Rng>| {

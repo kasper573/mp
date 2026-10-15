@@ -103,7 +103,7 @@ const SETTLE_FOR: Duration = Duration::from_millis(50);
 pub fn sync(
     scenes: &mut AreaScenes,
     requests: Vec<AreaSceneRequest>,
-    content: Option<Content>,
+    content: Option<&Content>,
     files: &ProjectFiles,
     world: &mut World,
 ) {
@@ -246,7 +246,7 @@ fn despawn(scenes: &mut AreaScenes, key: &str, world: &mut World) {
 fn spawn(
     scenes: &mut AreaScenes,
     request: &AreaSceneRequest,
-    content: Content,
+    content: &Content,
     files: &ProjectFiles,
     world: &mut World,
     now: Duration,
@@ -282,9 +282,9 @@ fn spawn(
             AreaSceneOf(layer),
         ))
         .id();
-    let area = area::load(&content, area_id);
+    let area = area::load(content, area_id);
     let scenery: Vec<Scenery> = match &request.spec.scenery {
-        SceneryOf::Area => area::placed(&content, area_id)
+        SceneryOf::Area => area::placed(content, area_id)
             .iter()
             .filter(|placed| {
                 if placed.chain.is_empty() {
@@ -304,9 +304,9 @@ fn spawn(
             values,
         } => parts_scenery(content, blueprint, *at, values),
     };
-    let sheets = sheets_for(scenes, content, files, area.grids, &scenery, world);
+    let sheets = sheets_for(scenes, content, files, &area.grids, &scenery, world);
     let spec = SpawnSpec {
-        content,
+        content: content.clone(),
         area: area_id,
         scenery,
         sheets,
@@ -344,7 +344,7 @@ pub fn scenery_extent(sceneries: &[Scenery]) -> Option<Rect<Tiles>> {
 }
 
 pub fn parts_scenery(
-    content: Content,
+    content: &Content,
     blueprint: &str,
     at: Pos<Tiles>,
     values: &serde_json::Value,
@@ -353,7 +353,7 @@ pub fn parts_scenery(
         return Vec::new();
     };
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(&content, &[module], &mut errors);
+    let flattening = area::blueprint::flatten(content, &[module], &mut errors);
     flattening
         .modules
         .into_iter()
@@ -366,14 +366,14 @@ pub fn parts_scenery(
 
 fn sheets_for(
     scenes: &mut AreaScenes,
-    content: Content,
+    content: &Content,
     files: &ProjectFiles,
     grids: &area::AreaGrids,
     scenery: &[Scenery],
     world: &mut World,
 ) -> TileSheets {
     TileSheets::new(
-        &content,
+        content,
         grids,
         scenery.iter().map(|scenery| scenery.tileset),
         |def| image_handle(scenes, files, def.image.as_str(), world),
@@ -436,7 +436,7 @@ fn spawn_tiles(
     mut materials: ResMut<Assets<bevy_tilemap::TilemapMaterial>>,
 ) {
     let area = area::load(&spec.content, spec.area);
-    let grids = area.grids;
+    let grids = area.grids.clone();
     let size = grids.size;
     let origin = area.size.bounds().min().to_screen();
     let scene_tag = (

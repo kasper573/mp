@@ -576,7 +576,7 @@ fn refuse(world: &mut World, refused: RefusedPick) {
 }
 
 fn babble_along(world: &mut World, by: Speaker, line: Entity) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let babble = match by {
         Speaker::Npc(npc) => npc.get(&content).voice(),
         Speaker::Player => world
@@ -948,7 +948,7 @@ fn highlight(ui: &Ui, row: &ChoiceRow, selected: bool) {
 
 /// The row takes every click, so it is handed the item of the chip under the pointer to inspect.
 fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<ItemId> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let mut pointed = None;
     if let Some(warn) = &choice.warn {
         chip(ui, world, None, warn, color::DANGER);
@@ -1120,7 +1120,7 @@ fn busts(ui: &mut Ui, world: &mut World, dialogue: Rect, screen: Rect) {
     else {
         return;
     };
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let now = world.resource::<Time>().elapsed();
     let gui = ui.ctx().clone();
     for depth in [Depth::Back, Depth::Front] {
@@ -1266,7 +1266,7 @@ fn model_of(content: &Content, who: Speaker) -> Option<ModelId> {
     busts_of(content, model).map(|_| model)
 }
 
-fn busts_of(content: &Content, model: ModelId) -> Option<&'static Busts> {
+fn busts_of(content: &Content, model: ModelId) -> Option<&Busts> {
     model.get(content).busts()
 }
 

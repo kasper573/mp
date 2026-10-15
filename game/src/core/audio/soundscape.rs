@@ -33,7 +33,7 @@ impl Plugin for SoundscapePlugin {
 }
 
 #[derive(Resource, Default)]
-pub struct Soundscape(pub &'static [SoundscapeZone]);
+pub struct Soundscape(pub Vec<SoundscapeZone>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeZone {
@@ -63,7 +63,7 @@ pub struct SoundscapeLayer {
 #[derive(Resource, Default)]
 pub struct SoundscapeMixer {
     clock_start: Duration,
-    sources: HashMap<&'static str, Handle<AudioSource>>,
+    sources: HashMap<AssetRef, Handle<AudioSource>>,
     voices: Vec<SoundscapeVoice>,
     refused: Option<Vec<WantedLayer>>,
 }
@@ -71,7 +71,7 @@ pub struct SoundscapeMixer {
 pub struct SoundscapeVoice {
     pub channel: SoundscapeChannel,
     pub category: AudioCategory,
-    pub src: &'static str,
+    pub src: AssetRef,
     instance: Handle<AudioInstance>,
     share: f32,
     volume: f32,
@@ -154,7 +154,7 @@ impl SoundscapeVoice {
 struct WantedLayer {
     channel: SoundscapeChannel,
     category: AudioCategory,
-    src: &'static str,
+    src: AssetRef,
     share: f32,
     volume: f32,
     pan: f32,
@@ -180,7 +180,7 @@ fn load_sources(
         .0
         .iter()
         .flat_map(|zone| zone.channels.values())
-        .map(|layer| (layer.src.as_str(), assets.load(layer.src.path())))
+        .map(|layer| (layer.src.clone(), assets.load(layer.src.path())))
         .collect();
 }
 
@@ -212,7 +212,7 @@ fn mix(
         let playing = wanted.iter().find(|layer| voice.plays(layer));
         voice.approach(playing, elapsed);
         let Some(mut instance) = instances.get_mut(&voice.instance) else {
-            warn!("soundscape voice {} failed to start", voice.src);
+            warn!("soundscape voice {} failed to start", voice.src.as_str());
             mixer.refused = Some(wanted.clone());
             return false;
         };
@@ -230,7 +230,7 @@ fn mix(
         if mixer.voices.iter().any(|voice| voice.plays(layer)) {
             continue;
         }
-        let Some(source) = mixer.sources.get(layer.src) else {
+        let Some(source) = mixer.sources.get(&layer.src) else {
             continue;
         };
         let Some(clip) = sources.get(source) else {
@@ -247,7 +247,7 @@ fn mix(
         mixer.voices.push(SoundscapeVoice {
             channel: layer.channel,
             category: layer.category,
-            src: layer.src,
+            src: layer.src.clone(),
             instance,
             share: 0.0,
             volume: layer.volume,
@@ -259,7 +259,7 @@ fn mix(
 
 fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
     let mut wanted: Vec<WantedLayer> = Vec::new();
-    for zone in soundscape.0 {
+    for zone in &soundscape.0 {
         let Some(heard) = zone.heard_from(at) else {
             continue;
         };
@@ -268,13 +268,13 @@ fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
             let pan = (layer.pan + heard.pan).clamp(-1.0, 1.0);
             match wanted
                 .iter_mut()
-                .find(|wanted| wanted.channel == channel && wanted.src == layer.src.as_str())
+                .find(|wanted| wanted.channel == channel && wanted.src == layer.src)
             {
                 Some(wanted) => wanted.blend(power, layer, pan),
                 None => wanted.push(WantedLayer {
                     channel,
                     category: layer.category,
-                    src: layer.src.as_str(),
+                    src: layer.src.clone(),
                     share: power,
                     volume: layer.volume,
                     pan,

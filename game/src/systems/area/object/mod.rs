@@ -212,7 +212,7 @@ pub struct Underfoot {
 
 pub fn spawn_all(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let scripts = world.resource::<script::RiftScripts>().clone();
     for (index, object) in area::objects(area::placed(&content, zone)) {
         let index = index as usize;

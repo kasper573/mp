@@ -120,7 +120,7 @@ pub fn set_within(world: &World, player: Entity, key: MemoryId, lasts: Seconds) 
 
 pub fn set(world: &mut World, player: Entity, key: MemoryId, value: Value) {
     let clock = *world.resource::<WallClock>();
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     if let Some(mut memory) = world.get_mut::<Memory>(player) {
         memory.set(&content, key, value, clock);
     }
@@ -157,10 +157,13 @@ impl EffectDef<RiftScripting> for Remember {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let ty = self.memory.get(cx.content).ty;
         let to = cx.opt_expr(self.to.as_ref(), ty)?;
@@ -185,15 +188,18 @@ impl EffectDef<RiftScripting> for Forget {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let memories = self.memories.as_slice();
+        let memories = self.memories.clone();
         Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
-                for &memory in memories {
+                for &memory in &memories {
                     forget(world, player, memory);
                 }
             }

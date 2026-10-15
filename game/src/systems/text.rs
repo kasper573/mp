@@ -120,7 +120,7 @@ pub fn plain(text: impl Into<String>) -> Span {
     }
 }
 
-pub fn values(spans: &'static [Span]) -> Vec<&'static Expr<RiftScripting>> {
+pub fn values(spans: &[Span]) -> Vec<&Expr<RiftScripting>> {
     spans
         .iter()
         .filter_map(|span| match span {

@@ -270,7 +270,7 @@ impl<V: Vocabulary> Instances<V> {
         owner: Owner<V>,
         kind: <V::Event as EventDef<V>>::Kind,
         subject: Entity,
-    ) -> Vec<(String, Name)> {
+    ) -> Vec<(String, String)> {
         let Some(instance) = self.instances.get(&owner) else {
             return Vec::new();
         };
@@ -797,7 +797,7 @@ impl<V: Vocabulary> Default for FlowTrace<V> {
 pub struct TraceStep<V: Vocabulary> {
     pub key: FlowKey<V>,
     pub procedure: String,
-    pub node: Name,
+    pub node: String,
 }
 
 /// How a tool steers a run while this resource is in the world: the output each named random node
@@ -839,24 +839,25 @@ fn run_flow_traced<V: Vocabulary>(
             end_flow::<V>(world, key, flow, BoxEnding::Ended);
             return;
         };
+        let procedure = Arc::clone(&frame.procedure);
         let mut cx = FlowCx {
             owner: key.owner.entity(),
             subject: flow.subject,
             locals: std::mem::take(&mut frame.locals),
             state: world
                 .resource_mut::<Instances<V>>()
-                .take_state(key.owner, &frame.procedure),
+                .take_state(key.owner, &procedure),
             event: std::mem::take(&mut flow.event),
         };
         if let Some(trace) = trace.as_mut() {
             trace.steps.push(TraceStep {
                 key,
-                procedure: frame.procedure.label.clone(),
-                node: frame.procedure.name(node),
+                procedure: procedure.label.clone(),
+                node: procedure.name(node).to_owned(),
             });
         }
         let outcome;
-        match frame.procedure.step(node) {
+        match procedure.step(node) {
             Step::On { next } => outcome = StepOutcome::Next(*next),
             Step::If { test, yes, no } => {
                 outcome = StepOutcome::Next(if test(world, &cx).truthy() { *yes } else { *no });
@@ -864,7 +865,7 @@ fn run_flow_traced<V: Vocabulary>(
             Step::Random { weights, outputs } => {
                 let steered = world
                     .get_resource::<FlowSteering>()
-                    .and_then(|steering| steering.random.get(frame.procedure.name(node)))
+                    .and_then(|steering| steering.random.get(procedure.name(node)))
                     .copied()
                     .filter(|picked| *picked < outputs.len());
                 let picked = steered.unwrap_or_else(|| {
@@ -985,11 +986,11 @@ fn run_flow_traced<V: Vocabulary>(
                             outputs,
                             pauses,
                             ..
-                        } = frame.procedure.step(at)
+                        } = procedure.step(at)
                         else {
                             break;
                         };
-                        leads.push(*def);
+                        leads.push(def);
                         to = if *pauses {
                             None
                         } else {
@@ -1020,8 +1021,8 @@ fn run_flow_traced<V: Vocabulary>(
                     key,
                     subject,
                     DialogueView {
-                        script: &frame.procedure.label,
-                        node: frame.procedure.name(node),
+                        script: &procedure.label,
+                        node: procedure.name(node),
                         lines,
                         choices: offers,
                     },
@@ -1161,7 +1162,7 @@ fn peek_dialogues<V: Vocabulary>(
     procedure: &Procedure<V>,
     entry: StepIndex,
     cx: FlowCx,
-    found: &mut Vec<(String, Name)>,
+    found: &mut Vec<(String, String)>,
 ) {
     let mut todo = vec![(entry, cx)];
     let mut visited = HashSet::new();
@@ -1170,7 +1171,9 @@ fn peek_dialogues<V: Vocabulary>(
             continue;
         }
         match procedure.step(node) {
-            Step::Dialogue { .. } => found.push((procedure.label.clone(), procedure.name(node))),
+            Step::Dialogue { .. } => {
+                found.push((procedure.label.clone(), procedure.name(node).to_owned()))
+            }
             Step::Return { .. } => {}
             Step::If { test, yes, no } => {
                 let next = if test(world, &cx).truthy() { *yes } else { *no };

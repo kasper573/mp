@@ -39,7 +39,7 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
                 "on": entry(owner, "do"),
                 "do": value,
             }));
-            let compiled = compile(owner, &[script]);
+            let compiled = compile(owner, &[&script]);
             assert_eq!(
                 compiled.is_ok(),
                 allowed,
@@ -82,7 +82,7 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         "shop": { "type": "open_shop", "shop": "honesty_box" },
     }));
 
-    let procedures = compile(OwnerKind::Npc, &[script]).expect("compiles");
+    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
     let may_do = &procedures[0].may_do;
 
     assert_eq!(may_do.answers, vec![EventKind::Interacted]);
@@ -110,7 +110,7 @@ fn a_loop_without_a_wait_is_refused() {
         "b": { "type": "if", "test": true, "yes": "a" },
     }));
 
-    let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "loop without a wait");
     assert_eq!(error.expected, "a → b → a");
@@ -125,7 +125,7 @@ fn too_many_steps_between_pauses_are_refused() {
         "check": { "type": "if", "test": true },
     }));
 
-    let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "too many steps");
 }
@@ -141,7 +141,7 @@ fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
         },
     }));
 
-    let procedures = compile(OwnerKind::Npc, &[script]).expect("compiles");
+    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
     let reaches = &procedures[0].may_do.reaches;
 
     assert!(
@@ -169,7 +169,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
     }));
 
     for script in [effect, query] {
-        let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+        let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
         assert_eq!(error.rule, "unknown task");
         assert_eq!(error.node.as_deref(), Some("a"));
@@ -178,7 +178,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
 
 #[test]
 fn a_script_that_runs_itself_is_refused() {
-    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[calling("loops")])
+    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("loops")])
         .err()
         .expect("refused")
         .remove(0)
@@ -190,7 +190,7 @@ fn a_script_that_runs_itself_is_refused() {
 
 #[test]
 fn may_do_names_the_functions_a_script_calls() {
-    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[calling("helper")])
+    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("helper")])
         .expect("compiles");
 
     let may_do = &procedures[0].may_do;
@@ -209,7 +209,7 @@ fn an_if_always_taken_still_compiles_both_arrows() {
         "no": { "type": "notify", "notification": "forest_intro" },
     }));
 
-    let procedures = compile(OwnerKind::Area, &[script]).expect("compiles");
+    let procedures = compile(OwnerKind::Area, &[&script]).expect("compiles");
 
     assert_eq!(procedures[0].may_do.reaches.len(), 2);
 }
@@ -261,7 +261,7 @@ fn a_shared_script_row_reads_back_as_written() {
 
 fn compile(
     owner: OwnerKind,
-    modules: &[&'static ScriptModule],
+    modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
     compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
 }
@@ -351,7 +351,7 @@ fn functions() -> Content {
     tables.build()
 }
 
-fn calling(script: &str) -> &'static ScriptModule {
+fn calling(script: &str) -> ScriptModule {
     let mut scope = ContentScope::new();
     scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
     let (parsed, _) = with_content(scope, || {
@@ -363,7 +363,7 @@ fn calling(script: &str) -> &'static ScriptModule {
             }
         }))
     });
-    Box::leak(Box::new(parsed.expect("a module")))
+    parsed.expect("a module")
 }
 
 #[test]
@@ -377,7 +377,7 @@ fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
         }),
     );
 
-    compile(OwnerKind::Shop, &[script]).expect("compiles");
+    compile(OwnerKind::Shop, &[&script]).expect("compiles");
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
         }),
     );
 
-    let error = compile(OwnerKind::Object, &[script])
+    let error = compile(OwnerKind::Object, &[&script])
         .err()
         .expect("refused");
 

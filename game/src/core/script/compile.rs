@@ -77,11 +77,11 @@ pub struct Procedure<V: Vocabulary> {
     pub id: ProcedureId,
     pub owner: V::OwnerKind,
     pub label: String,
-    pub names: Vec<Name>,
+    pub names: Vec<String>,
     pub steps: Vec<Step<V>>,
     pub entries: Vec<(StepIndex, V::Event)>,
-    pub state: Vec<(Name, ValueType)>,
-    pub locals: Vec<(Name, ValueType)>,
+    pub state: Vec<(String, ValueType)>,
+    pub locals: Vec<(String, ValueType)>,
     pub may_do: MayDo<V>,
     pub returns: Vec<ValueType>,
     pub needs_subject: bool,
@@ -125,7 +125,7 @@ pub enum Step<V: Vocabulary> {
         value: Option<Eval>,
     },
     Dialogue {
-        node: &'static DialogueNode<V>,
+        node: DialogueNode<V>,
         values: Vec<Vec<Eval>>,
         labels: Vec<Vec<Eval>>,
         requires: Vec<Option<Eval>>,
@@ -134,7 +134,7 @@ pub enum Step<V: Vocabulary> {
         left: Option<StepIndex>,
     },
     Effect {
-        def: &'static V::Effect,
+        def: V::Effect,
         call: EffectCall<V>,
         outputs: Vec<(Name, Option<StepIndex>)>,
         pauses: bool,
@@ -176,8 +176,8 @@ impl<V: Vocabulary> Procedure<V> {
         step_successors(self.step(at))
     }
 
-    pub fn name(&self, at: StepIndex) -> Name {
-        self.names[at.0]
+    pub fn name(&self, at: StepIndex) -> &str {
+        &self.names[at.0]
     }
 }
 
@@ -192,16 +192,16 @@ impl<V: Vocabulary> Step<V> {
 }
 
 #[derive(Clone, Copy)]
-pub enum Call<V: Vocabulary> {
+pub enum Call<'c, V: Vocabulary> {
     Shared {
         script: ScriptId<V>,
-        values: &'static BTreeMap<String, VarValue<V>>,
+        values: &'c BTreeMap<String, VarValue<V>>,
     },
-    Inline(&'static InlineScript<V>),
+    Inline(&'c InlineScript<V>),
 }
 
-impl<V: Vocabulary> Call<V> {
-    pub fn of(module: &'static ScriptModule<V>) -> Call<V> {
+impl<'c, V: Vocabulary> Call<'c, V> {
+    pub fn of(module: &'c ScriptModule<V>) -> Call<'c, V> {
         match module {
             ScriptModule::Shared { script, values } => Call::Shared {
                 script: *script,
@@ -212,38 +212,38 @@ impl<V: Vocabulary> Call<V> {
     }
 }
 
-pub struct Binding<V: Vocabulary> {
+pub struct Binding<'c, V: Vocabulary> {
     pub owner: V::OwnerKind,
     pub label: String,
-    pub call: Call<V>,
+    pub call: Call<'c, V>,
 }
 
 #[derive(Clone)]
-pub enum Bound<V: Vocabulary> {
+pub enum Bound<'c, V: Vocabulary> {
     Integer(i64),
     Number(f64),
     Boolean(bool),
-    Text(&'static str),
-    Name(&'static str),
+    Text(&'c str),
+    Name(&'c str),
     Place(V::Place),
     Row(V::Row),
     Audio(V::Audio),
-    Condition(&'static Expr<V>),
+    Condition(&'c Expr<V>),
 }
 
 pub type ModuleErrors = Vec<(usize, ScriptError)>;
-type ValuesOf<V> = Option<&'static BTreeMap<String, VarValue<V>>>;
-type DeclaredOf<V> = Option<&'static BTreeMap<String, Variable<V>>>;
+type ValuesOf<'c, V> = Option<&'c BTreeMap<String, VarValue<V>>>;
+type DeclaredOf<'c, V> = Option<&'c BTreeMap<String, Variable<V>>>;
 
-pub fn compile_owner<V: Vocabulary>(
-    content: &Content,
+pub fn compile_owner<'c, V: Vocabulary>(
+    content: &'c Content,
     owner: V::OwnerKind,
     label: &str,
-    modules: &[&'static ScriptModule<V>],
+    modules: &[&'c ScriptModule<V>],
 ) -> Result<Vec<Arc<Procedure<V>>>, ModuleErrors> {
     let mut procedures = Vec::new();
     let mut errors = Vec::new();
-    let mut answered: HashMap<<V::Event as EventDef<V>>::Kind, Vec<Name>> = HashMap::new();
+    let mut answered: HashMap<<V::Event as EventDef<V>>::Kind, Vec<String>> = HashMap::new();
     for (index, module) in modules.iter().enumerate() {
         let procedure = match compile_binding(
             content,
@@ -276,7 +276,7 @@ pub fn compile_owner<V: Vocabulary>(
                     },
                 ));
             }
-            twice.push(procedure.name(*node));
+            twice.push(procedure.name(*node).to_owned());
         }
         procedures.push(procedure);
     }
@@ -287,26 +287,26 @@ pub fn compile_owner<V: Vocabulary>(
     }
 }
 
-pub fn compile_binding<V: Vocabulary>(
-    content: &Content,
-    binding: &Binding<V>,
+pub fn compile_binding<'c, V: Vocabulary>(
+    content: &'c Content,
+    binding: &Binding<'c, V>,
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
     compile_source(content, binding, &[])
 }
 
-fn slots(declared: &'static BTreeMap<String, ValueType>) -> Vec<(Name, ValueType)> {
+fn slots(declared: &BTreeMap<String, ValueType>) -> Vec<(&str, ValueType)> {
     declared
         .iter()
         .map(|(name, ty)| (name.as_str(), *ty))
         .collect()
 }
 
-fn resolve_value<V: Vocabulary>(
+fn resolve_value<'c, V: Vocabulary>(
     content: &Content,
     name: &str,
-    declared: &'static Variable<V>,
-    value: &'static VarValue<V>,
-) -> Result<Bound<V>, ScriptFault> {
+    declared: &'c Variable<V>,
+    value: &'c VarValue<V>,
+) -> Result<Bound<'c, V>, ScriptFault> {
     let mismatch = || {
         ScriptFault::new(
             "wrong type",
@@ -346,16 +346,16 @@ fn resolve_value<V: Vocabulary>(
     })
 }
 
-fn compile_source<V: Vocabulary>(
-    content: &Content,
-    binding: &Binding<V>,
+fn compile_source<'c, V: Vocabulary>(
+    content: &'c Content,
+    binding: &Binding<'c, V>,
     stack: &[ScriptId<V>],
 ) -> Result<Arc<Procedure<V>>, ScriptError> {
     let shared = match binding.call {
         Call::Shared { script, .. } => Some(script.key(content).to_owned()),
         Call::Inline(_) => None,
     };
-    let fail = |rule: &'static str, node: Option<Name>, expected: String| ScriptError {
+    let fail = |rule: &'static str, node: Option<&str>, expected: String| ScriptError {
         rule,
         owner: binding.label.clone(),
         node: node.map(str::to_owned),
@@ -369,50 +369,51 @@ fn compile_source<V: Vocabulary>(
         expected,
         script: None,
     };
-    let (source, values, declared): (Source<V>, ValuesOf<V>, DeclaredOf<V>) = match binding.call {
-        Call::Shared { script, values } => {
-            let def = script.get(content);
-            let called = !stack.is_empty();
-            if called {
-                if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
+    let (source, values, declared): (Source<'c, V>, ValuesOf<'c, V>, DeclaredOf<'c, V>) =
+        match binding.call {
+            Call::Shared { script, values } => {
+                let def = script.get(content);
+                let called = !stack.is_empty();
+                if called {
+                    if def.owner != V::OwnerKind::ANY && def.owner != binding.owner {
+                        return Err(at_call(
+                            "owners of another kind",
+                            format!(
+                                "script/{} is {}'s, run by {}",
+                                script.key(content),
+                                def.owner.name(),
+                                binding.owner.name()
+                            ),
+                        ));
+                    }
+                } else if def.owner != binding.owner {
                     return Err(at_call(
                         "owners of another kind",
-                        format!(
-                            "script/{} is {}'s, run by {}",
-                            script.key(content),
-                            def.owner.name(),
-                            binding.owner.name()
-                        ),
+                        format!("script/{} is {}'s", script.key(content), def.owner.name()),
                     ));
                 }
-            } else if def.owner != binding.owner {
-                return Err(at_call(
-                    "owners of another kind",
-                    format!("script/{} is {}'s", script.key(content), def.owner.name()),
-                ));
+                (
+                    Source {
+                        state: slots(&def.state),
+                        locals: slots(&def.locals),
+                        nodes: &def.nodes,
+                        label: format!("script/{}", script.key(content)),
+                    },
+                    Some(values),
+                    Some(&def.variables),
+                )
             }
-            (
+            Call::Inline(inline) => (
                 Source {
-                    state: slots(&def.state),
-                    locals: slots(&def.locals),
-                    nodes: &def.nodes,
-                    label: format!("script/{}", script.key(content)),
+                    state: slots(&inline.state),
+                    locals: slots(&inline.locals),
+                    nodes: &inline.nodes,
+                    label: binding.label.clone(),
                 },
-                Some(values),
-                Some(&def.variables),
-            )
-        }
-        Call::Inline(inline) => (
-            Source {
-                state: slots(&inline.state),
-                locals: slots(&inline.locals),
-                nodes: &inline.nodes,
-                label: binding.label.clone(),
-            },
-            None,
-            None,
-        ),
-    };
+                None,
+                None,
+            ),
+        };
     if source.nodes.len() > MAX_NODES {
         return Err(fail(
             "out of range",
@@ -444,7 +445,7 @@ fn compile_source<V: Vocabulary>(
             ),
         ));
     }
-    let mut variables: HashMap<Name, (VariableType, Option<Bound<V>>)> = HashMap::new();
+    let mut variables: HashMap<&'c str, (VariableType, Option<Bound<'c, V>>)> = HashMap::new();
     if let Some(declared) = declared {
         for (name, variable) in declared {
             let default = match &variable.default {
@@ -485,7 +486,7 @@ fn compile_source<V: Vocabulary>(
             ));
         }
     }
-    let names: Vec<Name> = source.nodes.keys().map(String::as_str).collect();
+    let names: Vec<&'c str> = source.nodes.keys().map(String::as_str).collect();
     let mut seen = HashSet::new();
     for name in &names {
         if !seen.insert(name.to_ascii_lowercase()) {
@@ -497,7 +498,7 @@ fn compile_source<V: Vocabulary>(
         }
     }
     let index_of = |name: &str| names.iter().position(|known| *known == name).map(StepIndex);
-    let arrow = |arrow: &'static Arrow, at: Name| -> Result<Option<StepIndex>, ScriptError> {
+    let arrow = |arrow: &'c Arrow, at: &'c str| -> Result<Option<StepIndex>, ScriptError> {
         match arrow.as_deref() {
             None => Ok(None),
             Some(name) => index_of(name).map(Some).ok_or_else(|| {
@@ -530,7 +531,7 @@ fn compile_source<V: Vocabulary>(
     let mut needs_subject = vec![false; names.len()];
     let mut returns = Vec::new();
     for (index, (name, node)) in source.nodes.iter().enumerate() {
-        let name: Name = name.as_str();
+        let name: &'c str = name.as_str();
         cx.node = Some(name);
         cx.event_fields = event_fields.get(name).copied().unwrap_or(&[]);
         let node_fail = |rule: &'static str, expected: String| fail(rule, Some(name), expected);
@@ -766,7 +767,7 @@ fn compile_source<V: Vocabulary>(
                     ));
                 }
                 needs_subject[index] = true;
-                may_do.dialogue.push(name);
+                may_do.dialogue.push(name.to_owned());
                 let mut values = Vec::new();
                 for line in &dialogue.lines {
                     let mut evals = Vec::new();
@@ -814,7 +815,7 @@ fn compile_source<V: Vocabulary>(
                     choices.push(arrow(&choice.to, name)?);
                 }
                 Step::Dialogue {
-                    node: dialogue,
+                    node: dialogue.clone(),
                     values,
                     labels,
                     requires,
@@ -850,7 +851,7 @@ fn compile_source<V: Vocabulary>(
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Step::Effect {
-                    def: effect,
+                    def: effect.clone(),
                     call,
                     outputs,
                     pauses: effect.pauses(),
@@ -929,11 +930,11 @@ fn compile_source<V: Vocabulary>(
         id: ProcedureId(NEXT_PROCEDURE.fetch_add(1, Ordering::Relaxed)),
         owner: binding.owner,
         label: source.label,
-        names,
+        names: names.iter().map(|name| (*name).to_owned()).collect(),
         steps,
         entries,
-        state: source.state,
-        locals: source.locals,
+        state: owned_slots(&source.state),
+        locals: owned_slots(&source.locals),
         may_do,
         returns,
         needs_subject: any_needs_subject,
@@ -942,20 +943,27 @@ fn compile_source<V: Vocabulary>(
 
 static NEXT_PROCEDURE: AtomicU64 = AtomicU64::new(1);
 
-struct Source<V: Vocabulary> {
-    state: Vec<(Name, ValueType)>,
-    locals: Vec<(Name, ValueType)>,
-    nodes: &'static BTreeMap<String, Node<V>>,
+struct Source<'c, V: Vocabulary> {
+    state: Vec<(&'c str, ValueType)>,
+    locals: Vec<(&'c str, ValueType)>,
+    nodes: &'c BTreeMap<String, Node<V>>,
     label: String,
+}
+
+fn owned_slots(slots: &[(&str, ValueType)]) -> Vec<(String, ValueType)> {
+    slots
+        .iter()
+        .map(|(name, ty)| ((*name).to_owned(), *ty))
+        .collect()
 }
 
 /// The event fields a node can read: those of the event every entry reaching it raises. A node
 /// reached by entries that raise different fields reads none, since a flow carries only the fields
 /// of the entry that started it.
 fn event_fields_by_node<V: Vocabulary>(
-    nodes: &'static BTreeMap<String, Node<V>>,
-) -> HashMap<&'static str, &'static [(Name, ValueType)]> {
-    let mut fields: HashMap<&'static str, Option<&'static [(Name, ValueType)]>> = HashMap::new();
+    nodes: &BTreeMap<String, Node<V>>,
+) -> HashMap<&str, &'static [(Name, ValueType)]> {
+    let mut fields: HashMap<&str, Option<&'static [(Name, ValueType)]>> = HashMap::new();
     for (entry, node) in nodes {
         let Node::On { event, .. } = node else {
             continue;
@@ -982,8 +990,8 @@ fn event_fields_by_node<V: Vocabulary>(
         .collect()
 }
 
-fn node_arrows<V: Vocabulary>(node: &'static Node<V>) -> Vec<&'static str> {
-    let arrows: Vec<&'static Arrow> = match node {
+fn node_arrows<V: Vocabulary>(node: &Node<V>) -> Vec<&str> {
+    let arrows: Vec<&Arrow> = match node {
         Node::On { next, .. }
         | Node::Wait { next, .. }
         | Node::Set { next, .. }
@@ -1035,10 +1043,10 @@ fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {
 
 fn bound_steps<V: Vocabulary>(
     steps: &[Step<V>],
-    names: &[Name],
+    names: &[&str],
     successors: &[Vec<StepIndex>],
     entries: &[(StepIndex, V::Event)],
-    fail: &impl Fn(&'static str, Option<Name>, String) -> ScriptError,
+    fail: &impl Fn(&'static str, Option<&str>, String) -> ScriptError,
 ) -> Result<(), ScriptError> {
     let mut walk = Walk {
         steps,
@@ -1069,14 +1077,14 @@ fn bound_steps<V: Vocabulary>(
 
 struct Walk<'a, V: Vocabulary, F> {
     steps: &'a [Step<V>],
-    names: &'a [Name],
+    names: &'a [&'a str],
     successors: &'a [Vec<StepIndex>],
     path: Vec<StepIndex>,
     memo: HashMap<StepIndex, usize>,
     fail: &'a F,
 }
 
-impl<V: Vocabulary, F: Fn(&'static str, Option<Name>, String) -> ScriptError> Walk<'_, V, F> {
+impl<V: Vocabulary, F: Fn(&'static str, Option<&str>, String) -> ScriptError> Walk<'_, V, F> {
     fn longest(&mut self, node: StepIndex) -> Result<usize, ScriptError> {
         if self.steps[node.0].pauses() {
             return Ok(1);
@@ -1148,11 +1156,11 @@ pub struct Compiler<'c, V: Vocabulary> {
     pub content: &'c Content,
     owner: V::OwnerKind,
     label: String,
-    variables: HashMap<Name, (VariableType, Option<Bound<V>>)>,
-    state: Vec<(Name, ValueType)>,
-    locals: Vec<(Name, ValueType)>,
-    node: Option<Name>,
-    used_vars: HashSet<Name>,
+    variables: HashMap<&'c str, (VariableType, Option<Bound<'c, V>>)>,
+    state: Vec<(&'c str, ValueType)>,
+    locals: Vec<(&'c str, ValueType)>,
+    node: Option<&'c str>,
+    used_vars: HashSet<&'c str>,
     read_slots: HashSet<Slot>,
     stack: Vec<ScriptId<V>>,
     subject_read: bool,
@@ -1187,11 +1195,11 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         &self.label
     }
 
-    pub fn node(&self) -> Option<Name> {
+    pub fn node(&self) -> Option<&'c str> {
         self.node
     }
 
-    pub fn expr(&mut self, expr: &'static Expr<V>, want: ValueType) -> Result<Eval, ScriptFault> {
+    pub fn expr(&mut self, expr: &'c Expr<V>, want: ValueType) -> Result<Eval, ScriptFault> {
         let (eval, ty) = self.typed(expr)?;
         if !want.accepts(ty) {
             return Err(ScriptFault::new(
@@ -1208,13 +1216,13 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
     pub fn opt_expr(
         &mut self,
-        expr: Option<&'static Expr<V>>,
+        expr: Option<&'c Expr<V>>,
         want: ValueType,
     ) -> Result<Option<Eval>, ScriptFault> {
         expr.map(|expr| self.expr(expr, want)).transpose()
     }
 
-    pub fn actor(&mut self, expr: Option<&'static Expr<V>>) -> Result<Eval, ScriptFault> {
+    pub fn actor(&mut self, expr: Option<&'c Expr<V>>) -> Result<Eval, ScriptFault> {
         match expr {
             Some(expr) => self.expr(expr, ValueType::Actor),
             None => {
@@ -1289,14 +1297,14 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         })
     }
 
-    pub fn var(&mut self, name: &str) -> Result<&Bound<V>, ScriptFault> {
+    pub fn var(&mut self, name: &str) -> Result<&Bound<'c, V>, ScriptFault> {
         let Some((name, _)) = self.variables.get_key_value(name) else {
             return Err(ScriptFault::new(
                 "unknown variable",
                 format!("{name}{}", nearest(name, self.variables.keys().copied())),
             ));
         };
-        let name: Name = name;
+        let name: &'c str = name;
         self.used_vars.insert(name);
         self.variables[name].1.as_ref().ok_or(ScriptFault::new(
             "missing value",
@@ -1306,7 +1314,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
     fn expr_tracking(
         &mut self,
-        expr: &'static Expr<V>,
+        expr: &'c Expr<V>,
         want: ValueType,
     ) -> Result<(Eval, bool), ScriptFault> {
         self.subject_read = false;
@@ -1316,7 +1324,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
     fn typed_tracking(
         &mut self,
-        expr: &'static Expr<V>,
+        expr: &'c Expr<V>,
     ) -> Result<(Eval, ValueType, bool), ScriptFault> {
         self.subject_read = false;
         let (eval, ty) = self.typed(expr)?;
@@ -1344,7 +1352,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
             .map(|index| (index, self.state[index].1))
     }
 
-    pub fn typed(&mut self, expr: &'static Expr<V>) -> Result<(Eval, ValueType), ScriptFault> {
+    pub fn typed(&mut self, expr: &'c Expr<V>) -> Result<(Eval, ValueType), ScriptFault> {
         if expr.depth() > expr::MAX_DEPTH {
             return Err(ScriptFault::new(
                 "out of range",
@@ -1360,7 +1368,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         self.typed_inner(expr)
     }
 
-    fn typed_inner(&mut self, expr: &'static Expr<V>) -> Result<(Eval, ValueType), ScriptFault> {
+    fn typed_inner(&mut self, expr: &'c Expr<V>) -> Result<(Eval, ValueType), ScriptFault> {
         Ok(match expr {
             Expr::Bool(value) => (constant(Value::Bool(*value)), ValueType::Boolean),
             Expr::Int(value) => (constant(Value::Int(*value)), ValueType::Integer),
@@ -1550,11 +1558,7 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         })
     }
 
-    fn list(
-        &mut self,
-        list: &'static [Expr<V>],
-        want: ValueType,
-    ) -> Result<Vec<Eval>, ScriptFault> {
+    fn list(&mut self, list: &'c [Expr<V>], want: ValueType) -> Result<Vec<Eval>, ScriptFault> {
         if list.len() > expr::MAX_LIST {
             return Err(ScriptFault::new(
                 "out of range",
@@ -1566,8 +1570,8 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
 
     fn numeric(
         &mut self,
-        a: &'static Expr<V>,
-        b: &'static Expr<V>,
+        a: &'c Expr<V>,
+        b: &'c Expr<V>,
     ) -> Result<(Eval, Eval, bool), ScriptFault> {
         let (a, ta) = self.typed_inner(a)?;
         let (b, tb) = self.typed_inner(b)?;

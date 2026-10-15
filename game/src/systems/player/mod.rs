@@ -169,7 +169,7 @@ impl PlayerDef {
     }
 }
 
-pub fn def(content: &Content) -> &'static PlayerDef {
+pub fn def(content: &Content) -> &PlayerDef {
     content.built::<GameSettings>().player.get(content)
 }
 
@@ -265,7 +265,7 @@ pub struct SpawnRules {
 
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let area = area::load(&content, zone);
     let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
     for request in drain_requests::<JoinRequest>(world) {
@@ -411,7 +411,7 @@ pub(crate) fn place(
     at: Pos<Tiles>,
     state: CharacterState,
 ) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = def(&content);
     let model = def.model;
     let now = Seconds(world.resource::<Time>().elapsed_secs());
@@ -448,7 +448,7 @@ pub(crate) fn place(
 }
 
 pub fn respawn(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     for request in drain_requests::<RespawnRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;

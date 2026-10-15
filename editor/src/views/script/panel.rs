@@ -39,7 +39,7 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
     let Some(project) = &editor.project else {
         return Vec::new();
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return Vec::new();
     };
     match &doc.owner {
@@ -159,7 +159,7 @@ fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
 }
 
 fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         ui.label(theme::muted("The folder does not load"));
         return;
     };

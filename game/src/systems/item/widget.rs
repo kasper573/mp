@@ -201,7 +201,7 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         slot(ui, world, SlotLook::EMPTY, Sense::hover());
         return;
     };
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = filled.stack.item.get(&content);
     let (outline, faded, verdict) = match &filled.verdict {
         None => (None, false, None),
@@ -246,7 +246,7 @@ fn draw_carried(world: &mut World) {
     let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(&gui) else {
         return;
     };
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(stack) = session::my_character(world)
         .and_then(|me| me.get::<Inventory>())
         .and_then(|inventory| inventory.slots.get(carried.0 as usize).copied())

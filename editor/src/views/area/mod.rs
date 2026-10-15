@@ -386,14 +386,20 @@ impl AreaViews {
 pub fn sync(editor: &mut Editor, world: &mut World) {
     let requests = std::mem::take(&mut editor.views.area.requests);
     let (content, files) = match &editor.project {
-        Some(project) => (project.content, &project.files),
+        Some(project) => (project.content.clone(), &project.files),
         None => {
             scene::clear(&mut editor.views.area.scenes, world);
             return;
         }
     };
     let Editor { views, .. } = editor;
-    scene::sync(&mut views.area.scenes, requests, content, files, world);
+    scene::sync(
+        &mut views.area.scenes,
+        requests,
+        content.as_ref(),
+        files,
+        world,
+    );
 }
 
 pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
@@ -437,7 +443,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
 }
 
 pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) {
-    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
         ui.label(theme::muted("The folder does not load."));
         return;
     };
@@ -454,8 +464,8 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, view_key: &str, tab: BottomTab) 
         return;
     };
     match tab {
-        BottomTab::Palette => palette::show(editor, ui, view_key, content, area_id),
-        BottomTab::Blueprints => stamp::stamp_panel(editor, ui, view_key, content, area_id),
+        BottomTab::Palette => palette::show(editor, ui, view_key, &content, area_id),
+        BottomTab::Blueprints => stamp::stamp_panel(editor, ui, view_key, &content, area_id),
         _ => {}
     }
 }
@@ -473,7 +483,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str) {
             editor
                 .project
                 .as_ref()
-                .and_then(|p| p.content)
+                .and_then(|p| p.content.clone())
                 .and_then(|c| c.table::<area::AreaDef>().keys().first().cloned())
         });
     let Some(preview) = preview else {
@@ -493,7 +503,7 @@ fn show_canvas(
     let Some(project) = &editor.project else {
         return;
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         ui.label(
             egui::RichText::new("The folder does not load; the area view waits for it.").weak(),
         );
@@ -528,18 +538,18 @@ fn show_canvas(
             }
         }
     }
-    let in_place = resolve_in_place(editor, content, view_key, area_key);
+    let in_place = resolve_in_place(editor, &content, view_key, area_key);
     let mut canvas_ui = ui.new_child(egui::UiBuilder::new().max_rect(canvas_rect));
     canvas(
         editor,
         &mut canvas_ui,
         view_key,
-        content,
+        &content,
         area_id,
         generation,
         in_place.clone(),
     );
-    banners(editor, ui, view_key, content, canvas_rect, &in_place);
+    banners(editor, ui, view_key, &content, canvas_rect, &in_place);
     let mut rail_ui = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rail)
@@ -557,7 +567,7 @@ fn show_canvas(
             editor,
             &mut layers_ui,
             view_key,
-            content,
+            &content,
             area_id,
             canvas_rect,
         );
@@ -566,7 +576,7 @@ fn show_canvas(
 
 fn resolve_in_place(
     editor: &mut Editor,
-    content: Content,
+    content: &Content,
     view_key: &str,
     area_key: &str,
 ) -> Vec<placement::Placement> {
@@ -588,7 +598,7 @@ fn banners(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: Content,
+    content: &Content,
     canvas_rect: ERect,
     in_place: &[placement::Placement],
 ) {
@@ -626,7 +636,7 @@ fn banners(
                 content
                     .ids::<area::AreaDef>()
                     .flat_map(|a| {
-                        area::placements(&content, a)
+                        area::placements(content, a)
                             .iter()
                             .filter(|p| p.blueprint == id && p.chain.len() <= 1)
                     })
@@ -699,7 +709,7 @@ fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: Content,
+    content: &Content,
     area_id: AreaId,
     generation: u64,
     in_place: Vec<placement::Placement>,
@@ -707,8 +717,8 @@ fn canvas(
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 0.0, Color32::from_rgb(20, 20, 24));
-    let area = area::load(&content, area_id);
-    let area_key = area_id.key(&content).to_owned();
+    let area = area::load(content, area_id);
+    let area_key = area_id.key(content).to_owned();
     let ppp = ui.ctx().pixels_per_point();
     let (center, zoom, spec, texture) = {
         let view = editor.views.area.views.get(view_key).expect("the view");
@@ -854,14 +864,14 @@ impl std::ops::Deref for AreaFrame<'_> {
 impl AreaSnapshot {
     pub fn of(
         editor: &Editor,
-        content: Content,
+        content: &Content,
         area_id: AreaId,
         area_key: &str,
         in_place: Vec<placement::Placement>,
     ) -> Self {
         let own = editor.row_value("area", area_key).unwrap_or(Value::Null);
         Self {
-            content,
+            content: content.clone(),
             area_id,
             area_key: area_key.to_owned(),
             modules: own["modules"].as_array().cloned().unwrap_or_default(),
@@ -871,18 +881,18 @@ impl AreaSnapshot {
     }
 
     pub fn for_area(editor: &mut Editor, area_key: &str) -> Option<Self> {
-        let content = editor.project.as_ref()?.content?;
+        let content = editor.project.as_ref()?.content.clone()?;
         let area_id = content.by_key::<area::AreaDef>(area_key)?;
         let view_key = area_view_key(area_key);
         let in_place = if editor.views.area.views.contains_key(&view_key) {
-            resolve_in_place(editor, content, &view_key, area_key)
+            resolve_in_place(editor, &content, &view_key, area_key)
         } else {
             Vec::new()
         };
-        Some(Self::of(editor, content, area_id, area_key, in_place))
+        Some(Self::of(editor, &content, area_id, area_key, in_place))
     }
 
-    pub fn area(&self) -> &'static area::Area {
+    pub fn area(&self) -> &area::Area {
         area::load(&self.content, self.area_id)
     }
 

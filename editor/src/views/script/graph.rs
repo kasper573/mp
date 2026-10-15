@@ -29,6 +29,19 @@ pub struct ScriptGraphLayout {
     pub outline: bool,
 }
 
+impl ScriptGraphLayout {
+    pub fn of(graph: &ScriptGraph, outline: bool) -> ScriptGraphLayout {
+        ScriptGraphLayout {
+            nodes: graph
+                .positions()
+                .into_iter()
+                .map(|(name, at)| (name, [at.x, at.y]))
+                .collect(),
+            outline,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ScriptGraphNode {
     pub name: String,
@@ -36,8 +49,149 @@ pub struct ScriptGraphNode {
 
 pub struct ScriptGraph {
     pub snarl: Snarl<ScriptGraphNode>,
-    pub ids: HashMap<String, NodeId>,
-    pub built: u64,
+    synced_generation: Option<u64>,
+}
+
+impl Default for ScriptGraph {
+    fn default() -> Self {
+        ScriptGraph::new(&ScriptGraphLayout::default())
+    }
+}
+
+impl ScriptGraph {
+    pub fn new(layout: &ScriptGraphLayout) -> ScriptGraph {
+        let mut snarl = Snarl::new();
+        for (name, at) in &layout.nodes {
+            snarl.insert_node(
+                Pos2::new(at[0], at[1]),
+                ScriptGraphNode { name: name.clone() },
+            );
+        }
+        ScriptGraph {
+            snarl,
+            synced_generation: None,
+        }
+    }
+
+    pub fn sync(&mut self, doc: &ScriptDoc, catalogue: &NodeCatalogue, generation: u64) {
+        if self.synced_generation == Some(generation) {
+            return;
+        }
+        self.synced_generation = Some(generation);
+        let names = doc.nodes();
+        let stale: Vec<NodeId> = self
+            .snarl
+            .nodes_ids_data()
+            .filter(|(_, node)| !names.contains_key(&node.value.name))
+            .map(|(id, _)| id)
+            .collect();
+        for id in stale {
+            self.snarl.remove_node(id);
+        }
+        for (name, at) in self.unplaced(doc, catalogue) {
+            self.place(&name, at);
+        }
+        self.sync_wires(doc, catalogue);
+    }
+
+    pub fn place(&mut self, name: &str, at: Pos2) {
+        match self.id_of(name) {
+            Some(id) => {
+                if let Some(info) = self.snarl.get_node_info_mut(id) {
+                    info.pos = at;
+                }
+            }
+            None => {
+                self.snarl.insert_node(
+                    at,
+                    ScriptGraphNode {
+                        name: name.to_owned(),
+                    },
+                );
+            }
+        }
+    }
+
+    pub fn rename(&mut self, old: &str, new: &str) {
+        if let Some(node) = self.id_of(old).and_then(|id| self.snarl.get_node_mut(id)) {
+            node.name = new.to_owned();
+        }
+    }
+
+    pub fn positions(&self) -> BTreeMap<String, Pos2> {
+        self.snarl
+            .nodes_pos_ids()
+            .map(|(_, pos, node)| (node.name.clone(), pos))
+            .collect()
+    }
+
+    pub fn node_spots(&self) -> Vec<Pos2> {
+        self.snarl.nodes_pos().map(|(pos, _)| pos).collect()
+    }
+
+    fn id_of(&self, name: &str) -> Option<NodeId> {
+        self.snarl
+            .nodes_ids_data()
+            .find(|(_, node)| node.value.name == name)
+            .map(|(id, _)| id)
+    }
+
+    fn unplaced(&self, doc: &ScriptDoc, catalogue: &NodeCatalogue) -> Vec<(String, Pos2)> {
+        let nodes = doc.nodes();
+        let depths = nodes::depths(nodes, catalogue);
+        let present = self.positions();
+        let mut next_y: BTreeMap<usize, f32> = BTreeMap::new();
+        for (name, at) in &present {
+            if let Some(node) = nodes.get(name) {
+                let depth = depths.get(name).copied().unwrap_or(0);
+                let bottom = at.y + estimated_height(node, catalogue) + 24.0;
+                let entry = next_y.entry(depth).or_insert(40.0);
+                *entry = entry.max(bottom);
+            }
+        }
+        let mut placed = Vec::new();
+        for (name, node) in nodes {
+            if present.contains_key(name) {
+                continue;
+            }
+            let depth = depths.get(name).copied().unwrap_or(0);
+            let y = next_y.entry(depth).or_insert(40.0);
+            let x = 40.0 + depth as f32 * COLUMN;
+            placed.push((name.clone(), Pos2::new(x, *y)));
+            *y += estimated_height(node, catalogue) + 24.0;
+        }
+        placed
+    }
+
+    fn sync_wires(&mut self, doc: &ScriptDoc, catalogue: &NodeCatalogue) {
+        let ids: HashMap<String, NodeId> = self
+            .snarl
+            .nodes_ids_data()
+            .map(|(id, node)| (node.value.name.clone(), id))
+            .collect();
+        let mut wanted = HashSet::new();
+        for (name, node) in doc.nodes() {
+            let Some(&from) = ids.get(name) else {
+                continue;
+            };
+            for (output, port) in nodes::ports(node, catalogue).iter().enumerate() {
+                let Some(&to) = port.target.as_ref().and_then(|target| ids.get(target)) else {
+                    continue;
+                };
+                wanted.insert((
+                    OutPinId { node: from, output },
+                    InPinId { node: to, input: 0 },
+                ));
+            }
+        }
+        let present: HashSet<(OutPinId, InPinId)> = self.snarl.wires().collect();
+        for (out, pin) in present.difference(&wanted) {
+            self.snarl.disconnect(*out, *pin);
+        }
+        for (out, pin) in wanted.difference(&present) {
+            self.snarl.connect(*out, *pin);
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -69,89 +223,6 @@ pub enum ScriptGraphAction {
         index: usize,
         text: Value,
     },
-}
-
-pub fn place_missing(doc: &ScriptDoc, catalogue: &NodeCatalogue, layout: &mut ScriptGraphLayout) {
-    let nodes = doc.nodes();
-    let depths = nodes::depths(nodes, catalogue);
-    let mut next_y: BTreeMap<usize, f32> = BTreeMap::new();
-    for (name, at) in &layout.nodes {
-        if let Some(node) = nodes.get(name) {
-            let depth = depths.get(name).copied().unwrap_or(0);
-            let bottom = at[1] + estimated_height(node, catalogue) + 24.0;
-            let entry = next_y.entry(depth).or_insert(40.0);
-            *entry = entry.max(bottom);
-        }
-    }
-    for (name, node) in nodes {
-        if layout.nodes.contains_key(name) {
-            continue;
-        }
-        let depth = depths.get(name).copied().unwrap_or(0);
-        let y = next_y.entry(depth).or_insert(40.0);
-        let x = 40.0 + depth as f32 * COLUMN;
-        layout.nodes.insert(name.clone(), [x, *y]);
-        *y += estimated_height(node, catalogue) + 24.0;
-    }
-    layout.nodes.retain(|name, _| nodes.contains_key(name));
-}
-
-fn estimated_height(node: &Value, catalogue: &NodeCatalogue) -> f32 {
-    let outputs = nodes::ports(node, catalogue).len() as f32;
-    if nodes::is_dialogue(node) {
-        let lines = node["lines"].as_array().map_or(0, Vec::len).min(3) as f32;
-        44.0 + lines * 30.0 + outputs * 17.0
-    } else {
-        let lines = nodes::pieces(node, catalogue).len() as f32;
-        44.0 + lines * 16.0 + outputs * 15.0
-    }
-}
-
-pub fn build(
-    doc: &ScriptDoc,
-    catalogue: &NodeCatalogue,
-    layout: &ScriptGraphLayout,
-    generation: u64,
-) -> ScriptGraph {
-    let mut snarl = Snarl::new();
-    let mut ids = HashMap::new();
-    for (name, _) in doc.nodes() {
-        let at = layout.nodes.get(name).copied().unwrap_or([40.0, 40.0]);
-        let id = snarl.insert_node(
-            Pos2::new(at[0], at[1]),
-            ScriptGraphNode { name: name.clone() },
-        );
-        ids.insert(name.clone(), id);
-    }
-    for (name, node) in doc.nodes() {
-        let from = ids[name];
-        for (index, port) in nodes::ports(node, catalogue).iter().enumerate() {
-            if let Some(target) = &port.target
-                && let Some(&to) = ids.get(target)
-            {
-                snarl.connect(
-                    OutPinId {
-                        node: from,
-                        output: index,
-                    },
-                    InPinId { node: to, input: 0 },
-                );
-            }
-        }
-    }
-    ScriptGraph {
-        snarl,
-        ids,
-        built: generation,
-    }
-}
-
-pub fn positions(graph: &ScriptGraph) -> BTreeMap<String, [f32; 2]> {
-    graph
-        .snarl
-        .nodes_pos_ids()
-        .map(|(_, pos, node)| (node.name.clone(), [pos.x, pos.y]))
-        .collect()
 }
 
 pub struct FaceImage {
@@ -791,4 +862,15 @@ pub fn pieces_job(pieces: &[SummaryPiece], width: f32) -> LayoutJob {
         job.append(&piece.text, 0.0, format);
     }
     job
+}
+
+fn estimated_height(node: &Value, catalogue: &NodeCatalogue) -> f32 {
+    let outputs = nodes::ports(node, catalogue).len() as f32;
+    if nodes::is_dialogue(node) {
+        let lines = node["lines"].as_array().map_or(0, Vec::len).min(3) as f32;
+        44.0 + lines * 30.0 + outputs * 17.0
+    } else {
+        let lines = nodes::pieces(node, catalogue).len() as f32;
+        44.0 + lines * 16.0 + outputs * 15.0
+    }
 }

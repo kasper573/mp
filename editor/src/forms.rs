@@ -39,7 +39,7 @@ impl<'a> FormCx<'a> {
     ) -> FormCx<'a> {
         FormCx {
             root,
-            content: project.content,
+            content: project.content.clone(),
             catalogue: &project.catalogue,
             files: &project.files,
             usages: &project.usages,

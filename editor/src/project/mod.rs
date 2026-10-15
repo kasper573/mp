@@ -163,7 +163,6 @@ pub struct Project {
     pub files: ProjectFiles,
     pub disk: BTreeMap<String, String>,
     pub content: Option<Content>,
-    retired: Vec<Content>,
     pub report: Option<LoadReport>,
     pub history: EditHistory,
     pub usages: ContentUsages,
@@ -190,7 +189,6 @@ impl Project {
             files,
             disk,
             content: None,
-            retired: Vec::new(),
             report: None,
             history: EditHistory::default(),
             usages: ContentUsages::default(),
@@ -340,10 +338,8 @@ impl Project {
 
     pub fn check(&self, edit: &ContentEdit) -> Result<(), Box<EditRefusal>> {
         let next = self.files.with(&edit.changes);
-        let (content, _) = load(&next, &self.root.display().to_string())
+        load(&next, &self.root.display().to_string())
             .map_err(|report| Box::new(EditRefusal::of(&report)))?;
-        // SAFETY: the content was loaded only to check the edit and nothing was taken out of it.
-        unsafe { content.release() };
         Ok(())
     }
 
@@ -441,27 +437,11 @@ impl Project {
         self.reload();
     }
 
-    pub fn has_retired(&self) -> bool {
-        !self.retired.is_empty()
-    }
-
-    pub fn release_retired(&mut self) {
-        for content in self.retired.drain(..) {
-            // SAFETY: content retires mid-frame, while that frame may still read it, and is only
-            // released by `Editor::release_retired` at the start of a later frame, when no
-            // frame-local handle survives and after the views dropped the worlds built on it.
-            unsafe { content.release() };
-        }
-    }
-
     fn swap(&mut self, content: Content) {
-        if let Some(old) = self.content.take() {
-            self.retired.push(old);
-        }
         let started = Instant::now();
         self.usages = ContentUsages::build(&content, &self.files);
         self.last_usages = Some(started.elapsed());
-        self.catalogue = NodeCatalogue::build(self.shapes.shape_of("script"), Some(content));
+        self.catalogue = NodeCatalogue::build(self.shapes.shape_of("script"), Some(&content));
         self.content = Some(content);
         self.generation += 1;
     }

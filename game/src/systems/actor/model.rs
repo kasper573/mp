@@ -296,7 +296,7 @@ pub fn build_all(loading: &mut Loading) {
     let content = loading.content();
     let sizes = content.built::<ImageSizes>();
     let mut models: Vec<Option<ActorModel>> = content.ids::<ModelDef>().map(|_| None).collect();
-    let rows = loading.rows::<ModelDef>();
+    let rows = loading.rows::<ModelDef>(&content);
     let figures = bust_figures(loading, &rows);
     for ((id, def), figure) in rows.into_iter().zip(figures) {
         let mut check = RowCheck::default();
@@ -424,9 +424,9 @@ pub fn build_all(loading: &mut Loading) {
 }
 
 pub struct ActorModel {
-    def: &'static ModelDef,
+    def: ModelDef,
     columns: u32,
-    strips: Vec<Vec<&'static [SheetFrame]>>,
+    strips: Vec<Vec<Vec<SheetFrame>>>,
     figure: Option<BustFigure>,
 }
 
@@ -439,7 +439,7 @@ pub struct BustFigure {
 }
 
 impl ActorModel {
-    pub fn get(content: &Content, model: ModelId) -> &'static ActorModel {
+    pub fn get(content: &Content, model: ModelId) -> &ActorModel {
         content
             .built::<Models>()
             .0
@@ -449,11 +449,7 @@ impl ActorModel {
     }
 
     // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
-    fn new(
-        def: &'static ModelDef,
-        image: Option<(u32, u32)>,
-        figure: Option<BustFigure>,
-    ) -> ActorModel {
+    fn new(def: &ModelDef, image: Option<(u32, u32)>, figure: Option<BustFigure>) -> ActorModel {
         let sheet = def.sheet();
         let columns = image
             .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
@@ -463,12 +459,12 @@ impl ActorModel {
             .map(|action| {
                 Direction::VARIANTS
                     .iter()
-                    .map(|direction| sheet.actions[action][direction].as_slice())
+                    .map(|direction| sheet.actions[action][direction].clone())
                     .collect()
             })
             .collect();
         ActorModel {
-            def,
+            def: def.clone(),
             columns,
             strips,
             figure,
@@ -483,7 +479,7 @@ impl ActorModel {
         self.def.hitbox.tiles()
     }
 
-    pub fn sheet(&self) -> &'static crate::core::assets::AssetRef {
+    pub fn sheet(&self) -> &crate::core::assets::AssetRef {
         &self.def.sheet().image
     }
 
@@ -563,8 +559,8 @@ impl ActorModel {
         (sfx, stepped)
     }
 
-    fn strip(&self, action: Action, dir: Direction) -> &'static [SheetFrame] {
-        self.strips[action as usize][dir as usize]
+    fn strip(&self, action: Action, dir: Direction) -> &[SheetFrame] {
+        &self.strips[action as usize][dir as usize]
     }
 
     fn region(&self, frame: u32) -> Rect<WorldPx> {
@@ -611,10 +607,7 @@ fn crossed(once: bool, total: Millis, at: Millis, prev: Option<Millis>, now: Mil
     count(now) > prev.map_or(0, count)
 }
 
-fn bust_figures(
-    loading: &Loading,
-    rows: &[(ModelId, &'static ModelDef)],
-) -> Vec<Option<BustFigure>> {
+fn bust_figures(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<Option<BustFigure>> {
     let folder = loading.folder();
     rows.par_iter()
         .map(|(_, def)| {

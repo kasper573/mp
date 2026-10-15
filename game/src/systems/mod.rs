@@ -128,7 +128,7 @@ pub fn server_app(
     app.insert_resource(WorldArea(area));
     app.insert_resource(assets.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(*assets);
+    app.insert_resource(assets.clone());
     app.insert_resource(assets.built::<quest::Parties>().clone());
     app.insert_resource(assets.built::<script::RiftScripts>().clone());
     app.insert_resource(input::map::InputMap::new(assets));

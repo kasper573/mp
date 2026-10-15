@@ -440,7 +440,7 @@ pub struct OpenTileset {
 impl OpenTileset {
     pub fn read(editor: &mut Editor, ctx: &egui::Context, key: &str) -> Option<OpenTileset> {
         let content = editor.loaded()?;
-        let def = typed_def(editor, content, key)?;
+        let def = typed_def(editor, &content, key)?;
         let sheet = TilesetSheet::of(editor, ctx, &def);
         Some(OpenTileset {
             key: key.to_owned(),
@@ -450,7 +450,7 @@ impl OpenTileset {
         })
     }
 
-    pub fn surface(&self, tile: u32) -> Option<&'static str> {
+    pub fn surface(&self, tile: u32) -> Option<&str> {
         self.def
             .surface(tile)
             .map(|surface| surface.key(&self.content))
@@ -485,10 +485,10 @@ pub fn try_change_tileset(
     change: impl FnOnce(&mut TilesetDef),
 ) -> Result<(), String> {
     let content = editor.loaded().ok_or("the folder does not load")?;
-    let mut def = typed_def(editor, content, key).ok_or_else(|| unreadable(editor, key))?;
+    let mut def = typed_def(editor, &content, key).ok_or_else(|| unreadable(editor, key))?;
     change(&mut def);
     def.tiles.retain(|_, data| !is_blank(data));
-    let json = value::untyped(content, &def).ok_or("the tileset does not write")?;
+    let json = value::untyped(&content, &def).ok_or("the tileset does not write")?;
     edit.write_json(row_file(TABLE, key), &json);
     editor.try_apply(edit)
 }
@@ -608,7 +608,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, key: &str, tab: BottomTab) {
     }
 }
 
-fn typed_def(editor: &Editor, content: Content, key: &str) -> Option<TilesetDef> {
+fn typed_def(editor: &Editor, content: &Content, key: &str) -> Option<TilesetDef> {
     value::typed(content, editor.row_value(TABLE, key)?)
 }
 
@@ -681,7 +681,7 @@ fn refresh_counts(editor: &mut Editor) {
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     if editor

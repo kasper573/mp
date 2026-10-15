@@ -14,19 +14,19 @@ pub fn parse<T: DeserializeOwned>(value: Value) -> T {
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 
-pub fn inline(nodes: Value) -> &'static ScriptModule {
-    Box::leak(Box::new(parse(serde_json::json!({
+pub fn inline(nodes: Value) -> ScriptModule {
+    parse(serde_json::json!({
         "type": "inline_script",
         "nodes": nodes,
-    }))))
+    }))
 }
 
-pub fn inline_with(locals: Value, nodes: Value) -> &'static ScriptModule {
-    Box::leak(Box::new(parse(serde_json::json!({
+pub fn inline_with(locals: Value, nodes: Value) -> ScriptModule {
+    parse(serde_json::json!({
         "type": "inline_script",
         "locals": locals,
         "nodes": nodes,
-    }))))
+    }))
 }
 
 pub fn effect(value: Value) -> RiftEffect {

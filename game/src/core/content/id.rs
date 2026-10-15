@@ -33,11 +33,11 @@ impl<Row> ContentId<Row> {
 }
 
 impl<Row: ContentRow> ContentId<Row> {
-    pub fn get(self, content: &Content) -> &'static Row {
+    pub fn get(self, content: &Content) -> &Row {
         content.table::<Row>().row(self)
     }
 
-    pub fn key(self, content: &Content) -> &'static str {
+    pub fn key(self, content: &Content) -> &str {
         content.table::<Row>().key(self)
     }
 }

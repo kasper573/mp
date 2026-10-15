@@ -29,7 +29,7 @@ pub(super) fn status_bar(
             widgets::plural(parts)
         ));
         left.push(
-            placement::placement_count(frame.content, blueprint)
+            placement::placement_count(&frame.content, blueprint)
                 .trim_end_matches('.')
                 .to_lowercase(),
         );

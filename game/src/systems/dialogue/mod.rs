@@ -109,7 +109,7 @@ pub enum ChoiceChip {
 }
 
 impl ChoiceChip {
-    pub fn needs(world: &World, player: Entity, requires: &'static Condition) -> Vec<ChoiceChip> {
+    pub fn needs(world: &World, player: Entity, requires: &Condition) -> Vec<ChoiceChip> {
         condition::parts(requires)
             .into_iter()
             .map(|part| ChoiceChip::Needs {
@@ -131,7 +131,7 @@ pub type CardPick = Arc<dyn Fn(&mut World, Entity) -> Result<Answer, String> + S
 pub struct CardOffer {
     pub label: LineText,
     pub tag: ChoiceTag,
-    pub icon: Option<&'static AssetRef>,
+    pub icon: Option<AssetRef>,
     pub chips: Vec<ChoiceChip>,
     pub locked: bool,
     pub warn: Option<String>,
@@ -234,7 +234,7 @@ pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueVie
             view: choice_view(world, subject, choice),
             pick: Pick::Choice {
                 index: choice.index,
-                requires: choice.requires,
+                requires: choice.requires.cloned(),
                 costs: revealed_costs(choice),
             },
         })
@@ -316,7 +316,7 @@ pub fn close_for(world: &mut World, player: Entity) {
     drop_session(world, player);
 }
 
-pub fn remark(world: &mut World, player: Entity, to: Entity, line: &'static Line) {
+pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
     let Some(session) = world.get::<ConversationSession>(player) else {
         return;
     };
@@ -454,7 +454,7 @@ struct Offer {
 enum Pick {
     Choice {
         index: usize,
-        requires: Option<&'static Condition>,
+        requires: Option<Condition>,
         costs: Vec<ItemStack>,
     },
     Card(CardPick),
@@ -666,7 +666,7 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
             costs,
         } => match script::run::choice_state::<RiftScripting>(world, flow, index) {
             ChoiceState::Open => affordable(world, player, &costs).map(|()| Answer::Pick(index)),
-            ChoiceState::Locked => Err(unmet(world, player, requires)),
+            ChoiceState::Locked => Err(unmet(world, player, requires.as_ref())),
             ChoiceState::Gone => Err(NO_LONGER.to_owned()),
         },
         Pick::Card(card) => card(world, player),
@@ -709,7 +709,7 @@ fn affordable(world: &World, player: Entity, costs: &[ItemStack]) -> Result<(), 
         .map_err(|refusal| refusal.describe(content))
 }
 
-fn unmet(world: &World, player: Entity, requires: Option<&'static Condition>) -> String {
+fn unmet(world: &World, player: Entity, requires: Option<&Condition>) -> String {
     condition::first_unmet(world, player, requires)
         .map_or_else(|| LOCKED.to_owned(), |unmet| format!("Needs {unmet}"))
 }

@@ -13,14 +13,14 @@ pub fn json<T: Serialize>(value: &T) -> serde_json::Result<Value> {
     serde_json::from_str(&serde_json::to_string(value)?)
 }
 
-pub fn typed<T: DeserializeOwned>(content: Content, json: Value) -> Option<T> {
-    content::with_content(ContentScope::of(&content), || serde_json::from_value(json))
+pub fn typed<T: DeserializeOwned>(content: &Content, json: Value) -> Option<T> {
+    content::with_content(ContentScope::of(content), || serde_json::from_value(json))
         .0
         .ok()
 }
 
-pub fn untyped<T: Serialize>(content: Content, value: &T) -> Option<Value> {
-    content::with_content(ContentScope::of(&content), || json(value))
+pub fn untyped<T: Serialize>(content: &Content, value: &T) -> Option<Value> {
+    content::with_content(ContentScope::of(content), || json(value))
         .0
         .ok()
 }

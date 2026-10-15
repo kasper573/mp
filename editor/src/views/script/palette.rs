@@ -53,7 +53,13 @@ struct Refused {
 
 pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let owner = doc.owner.clone();
-    let Some(mut palette) = editor.views.script.view_mut(&owner).palette.take() else {
+    let Some(mut palette) = editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .palette
+        .take()
+    else {
         return;
     };
     let catalogue = catalogue_of(editor.project.as_ref());
@@ -290,7 +296,11 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
         return;
     }
     if !close {
-        editor.views.script.view_mut(&owner).palette = Some(palette);
+        editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .palette = Some(palette);
     }
 }
 

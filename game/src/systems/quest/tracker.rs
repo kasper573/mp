@@ -75,7 +75,7 @@ enum Tone {
 
 struct Entry {
     quest: QuestId,
-    mark: Option<&'static AssetRef>,
+    mark: Option<AssetRef>,
     timed: bool,
     rows: Vec<(String, Count, Tone)>,
 }
@@ -119,7 +119,7 @@ fn header(ui: &mut Ui, world: &mut World, count: usize, folded: bool) {
 }
 
 fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let small = TextRole::Small.size();
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -131,7 +131,7 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
                 hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 12.0);
             }
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                if let Some(mark) = entry.mark {
+                if let Some(mark) = &entry.mark {
                     hud::icon(ui, world, mark, MARK);
                 }
                 ui.add(
@@ -188,7 +188,7 @@ fn entries(world: &World) -> Vec<Entry> {
                 if active.ready(content, parties, inventory) && def.decision().is_none() {
                     return Some(Entry {
                         quest,
-                        mark: Some(&ready_mark(def).get(content).icon),
+                        mark: Some(ready_mark(def).get(content).icon.clone()),
                         timed,
                         rows: vec![(def.hand_in_hint(parties, quest), Count::Hidden, Tone::Next)],
                     });

@@ -200,7 +200,7 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("closed", self.closed.as_deref())]
     }
     fn pauses(&self) -> bool {
@@ -209,7 +209,10 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn keeps_box(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let shop = self.shop;
         Ok(Box::new(move |world, flow, cx| {
@@ -385,7 +388,7 @@ pub fn refresh(world: &mut World, visits: &mut QueryState<Entity, With<ShopVisit
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    let shops = loading.rows::<ShopDef>();
+    let shops = loading.rows::<ShopDef>(&content);
     for &(id, shop) in &shops {
         for (index, module) in shop.modules.iter().enumerate() {
             let requires = match module {
@@ -517,7 +520,7 @@ fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stac
 }
 
 fn buy(world: &mut World, player: Entity, index: u32) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
@@ -566,7 +569,7 @@ fn buy(world: &mut World, player: Entity, index: u32) {
 }
 
 fn sell(world: &mut World, player: Entity, slot: u32, stack: ItemStack) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
@@ -642,7 +645,7 @@ fn trade(
     takes: &[ItemStack],
     gives: &[ItemStack],
 ) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let mut inventory = world
         .get_mut::<Inventory>(player)
         .ok_or_else(|| "You have no bag".to_owned())?;
@@ -721,7 +724,7 @@ fn stock(
 }
 
 fn refresh_view(world: &mut World, player: Entity) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
@@ -784,7 +787,7 @@ fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {
 }
 
 fn react(world: &mut World, player: Entity, pick: fn(&ShopReactions) -> &[Line]) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some((shop, nth)) = world.get_mut::<ShopVisit>(player).map(|mut visit| {
         visit.reactions += 1;
         (visit.shop, visit.reactions)

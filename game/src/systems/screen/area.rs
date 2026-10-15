@@ -286,7 +286,7 @@ fn spawn_area_tiles(
     let mut loaded = Vec::new();
     let sheets = TileSheets::new(
         &content,
-        area.grids,
+        &area.grids,
         area.scenery.iter().map(|scenery| scenery.tileset),
         |def| {
             let image = assets.load(def.image.path());
@@ -294,7 +294,7 @@ fn spawn_area_tiles(
             image
         },
     );
-    let grids = area.grids;
+    let grids = &area.grids;
     let size = grids.size;
     for (index, layer) in grids.ground.iter().enumerate() {
         let cells: Vec<Option<bevy_tilemap::GridCell>> = layer
@@ -391,14 +391,14 @@ fn play_area_soundscape(
     else {
         return;
     };
-    let zones = area::load(&content, area_id).soundscape.as_slice();
-    if !std::ptr::eq(soundscape.0, zones) {
-        soundscape.0 = zones;
+    let zones = &area::load(&content, area_id).soundscape;
+    if soundscape.0 != *zones {
+        soundscape.0.clone_from(zones);
     }
 }
 
 fn silence_soundscape(mut soundscape: ResMut<Soundscape>) {
-    soundscape.0 = &[];
+    soundscape.0.clear();
 }
 
 pub struct TileSheets {

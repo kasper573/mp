@@ -54,8 +54,8 @@ pub fn arrivals(editor: &Editor, area_key: &str) -> Vec<ArrivalPin> {
     out
 }
 
-pub fn warp_objects(content: Content, area_id: AreaId) -> Vec<ObjectShape> {
-    area::warp_objects(&content, area_id)
+pub fn warp_objects(content: &Content, area_id: AreaId) -> Vec<ObjectShape> {
+    area::warp_objects(content, area_id)
         .into_iter()
         .map(|(_, object)| object.shape)
         .collect()

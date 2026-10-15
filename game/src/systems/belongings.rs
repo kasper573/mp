@@ -63,7 +63,7 @@ pub fn notify_changes(
             continue;
         }
         world.entity_mut(player).insert(now.clone());
-        let content = *world.resource::<Content>();
+        let content = world.resource::<Content>().clone();
         for notification in changes(&content, &before, &now) {
             notification::notify(world, player, notification);
         }

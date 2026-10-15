@@ -554,14 +554,18 @@ impl Grid {
     }
 }
 
-struct Navigator {
-    grid: &'static Grid,
+struct Navigator<'c> {
+    grid: &'c Grid,
     flies: bool,
 }
 
-impl Navigator {
-    fn of(world: &World, entity: Entity) -> Option<Navigator> {
-        let area = area::of(world, entity)?;
+impl<'c> Navigator<'c> {
+    fn of(world: &'c World, entity: Entity) -> Option<Navigator<'c>> {
+        Navigator::of_in(world.resource::<Content>(), world, entity)
+    }
+
+    fn of_in(content: &'c Content, world: &World, entity: Entity) -> Option<Navigator<'c>> {
+        let area = area::of_in(content, world, entity)?;
         let wild = area::wild(world, entity);
         let flies = airborne(world, entity);
         Some(Navigator {

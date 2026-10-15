@@ -212,8 +212,11 @@ pub fn poll(editor: &mut Editor) {
         sender,
     }) = to_spawn
     {
-        let content = editor.project.as_ref().and_then(|project| project.content);
-        match hand_over(content, ports.http, &character, start) {
+        let content = editor
+            .project
+            .as_ref()
+            .and_then(|project| project.content.clone());
+        match hand_over(content.as_ref(), ports.http, &character, start) {
             Ok(()) => {
                 editor.output.say(
                     "editor",
@@ -569,13 +572,13 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let content = project.content;
-    let spawn_area = content.map(|content| {
+    let content = project.content.clone();
+    let spawn_area = content.as_ref().map(|content| {
         content
             .built::<GameSettings>()
             .initial_spawn
             .area
-            .key(&content)
+            .key(content)
             .to_owned()
     });
     let mut characters: Vec<TestCharacter> = project
@@ -586,12 +589,13 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
             let row = project.files.json(file)?;
             let xp = row["xp"].as_u64().unwrap_or(0) as u32;
             let level = content
+                .as_ref()
                 .and_then(|content| {
                     row["job"]
                         .as_str()
                         .and_then(|job| content.by_key::<JobDef>(job))
                         .map(|job| {
-                            job.get(&content)
+                            job.get(content)
                                 .levels
                                 .iter()
                                 .filter(|tier| tier.xp <= xp)
@@ -698,7 +702,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let folder_version = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|c| c.built::<GameSettings>().content_version.0.clone());
     let ok = checked
         .as_ref()
@@ -946,7 +950,7 @@ fn ready_ports(line: &str) -> Option<ServerPorts> {
 }
 
 fn hand_over(
-    content: Option<Content>,
+    content: Option<&Content>,
     http: u16,
     character: &str,
     start: Option<Place>,
@@ -957,7 +961,7 @@ fn hand_over(
     };
     let body = match content {
         Some(content) => {
-            with_content(ContentScope::of(&content), || {
+            with_content(ContentScope::of(content), || {
                 serde_json::to_string(&request)
             })
             .0

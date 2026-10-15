@@ -217,13 +217,13 @@ pub enum Speaker {
 }
 
 impl LineDef<RiftScripting> for Line {
-    fn values(&'static self) -> Vec<&'static Expr<RiftScripting>> {
+    fn values(&self) -> Vec<&Expr<RiftScripting>> {
         self.text.values()
     }
 }
 
 impl TextDef<RiftScripting> for Vec<Span> {
-    fn values(&'static self) -> Vec<&'static Expr<RiftScripting>> {
+    fn values(&self) -> Vec<&Expr<RiftScripting>> {
         text::values(self)
     }
 }
@@ -352,30 +352,28 @@ pub fn build_all(loading: &mut Loading) {
     let content = loading.content();
     let mut all = HashMap::new();
     let mut errors: Vec<(ScriptSite, ScriptError)> = Vec::new();
-    let mut bind =
-        |row: OwnerRow, label: String, modules: Vec<(ScriptSite, &'static ScriptModule)>| {
-            if modules.is_empty() {
-                return;
+    let mut bind = |row: OwnerRow, label: String, modules: Vec<(ScriptSite, &ScriptModule)>| {
+        if modules.is_empty() {
+            return;
+        }
+        let scripts: Vec<&ScriptModule> = modules.iter().map(|(_, module)| *module).collect();
+        match compile_owner(&content, row.kind, &label, &scripts) {
+            Ok(procedures) => {
+                all.insert(row, procedures);
             }
-            let scripts: Vec<&'static ScriptModule> =
-                modules.iter().map(|(_, module)| *module).collect();
-            match compile_owner(&content, row.kind, &label, &scripts) {
-                Ok(procedures) => {
-                    all.insert(row, procedures);
-                }
-                Err(failed) => errors.extend(
-                    failed
-                        .into_iter()
-                        .map(|(index, error)| (modules[index].0.clone(), error)),
-                ),
-            }
-        };
+            Err(failed) => errors.extend(
+                failed
+                    .into_iter()
+                    .map(|(index, error)| (modules[index].0.clone(), error)),
+            ),
+        }
+    };
     bind_table::<AreaDef>(loading, &mut bind);
     bind_table::<NpcDef>(loading, &mut bind);
     bind_table::<ItemDef>(loading, &mut bind);
     bind_table::<QuestDef>(loading, &mut bind);
     bind_table::<ShopDef>(loading, &mut bind);
-    for (id, _) in loading.rows::<AreaDef>() {
+    for (id, _) in loading.rows::<AreaDef>(&content) {
         let key = id.key(&content);
         let placed = area::placed(&content, id);
         for (index, object) in area::objects(placed) {
@@ -460,15 +458,14 @@ pub fn build_all(loading: &mut Loading) {
         );
     }
     loading.built(Scripts(Arc::new(all)));
-    loading.built(condition::CompiledConditions::default());
 }
 
 fn bind_table<Row: ScriptedRow>(
     loading: &mut Loading,
-    bind: &mut impl FnMut(OwnerRow, String, Vec<(ScriptSite, &'static ScriptModule)>),
+    bind: &mut impl FnMut(OwnerRow, String, Vec<(ScriptSite, &ScriptModule)>),
 ) {
     let content = loading.content();
-    for (id, def) in loading.rows::<Row>() {
+    for (id, def) in loading.rows::<Row>(&content) {
         let key = id.key(&content);
         let modules = def
             .modules()
@@ -664,7 +661,7 @@ pub fn check_all(loading: &mut Loading) {
             }
         }
     }
-    for (id, def) in loading.rows::<ItemDef>() {
+    for (id, def) in loading.rows::<ItemDef>(&content) {
         let usable = matches!(def.kind, ItemKind::Usable);
         let answers = scripts
             .may_do(OwnerRow {
@@ -685,7 +682,7 @@ pub fn check_all(loading: &mut Loading) {
             );
         }
     }
-    for (id, _) in loading.rows::<ShopDef>() {
+    for (id, _) in loading.rows::<ShopDef>(&content) {
         let opened = scripts.owners().any(|(row, _)| {
             scripts
                 .may_do(*row)

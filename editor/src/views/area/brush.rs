@@ -99,8 +99,8 @@ pub(super) fn grid_stroke(
         return;
     };
     if pressed && editor.views.area.view(view_key).stroke().is_none() {
-        let grids = frame.area().grids;
-        let draft = grid::GridDraft::of(&frame.area_key, grids);
+        let grids = frame.area().grids.clone();
+        let draft = grid::GridDraft::of(&frame.area_key, &grids);
         let seed = stroke_seed(editor.frame, cell);
         let view = editor.views.area.view_mut(view_key);
         view.skipped = None;
@@ -128,7 +128,7 @@ pub(super) fn apply_brush(
     center: CellPos,
     brush: &user::BrushSettings,
 ) {
-    let content = frame.content;
+    let content = frame.content.clone();
     let view = editor.views.area.view_mut(view_key);
     let layer = view.layer;
     let walk_value = view.walk_value;
@@ -266,8 +266,8 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
     let walk_overlay = view.walk_overlay;
     let walk_value = view.walk_value;
     let brush = editor.settings.brush.clone();
-    let grids = frame.area().grids;
-    let mut draft = grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = grid::GridDraft::of(&frame.area_key, &grids);
     let cells = draft.flood(layer, cell);
     if cells.is_empty() {
         return;
@@ -321,7 +321,7 @@ pub(super) fn eyedrop(
     cell: CellPos,
     topmost: bool,
 ) {
-    let grids = frame.area().grids;
+    let grids = frame.area().grids.clone();
     let view = editor.views.area.view_mut(view_key);
     let layers: Vec<usize> = if topmost {
         (0..grids.ground.len()).rev().collect()
@@ -364,7 +364,7 @@ pub(super) fn pick_place(
 ) {
     let canvas = frame.canvas;
     let area = frame.area();
-    let warps = pins::warp_objects(frame.content, frame.area_id);
+    let warps = pins::warp_objects(&frame.content, frame.area_id);
     let visible = canvas.visible();
     for cell in area.size.grid().cells() {
         let bounds = cell.bounds();

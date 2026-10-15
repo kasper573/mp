@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::expr::Expr;
-use super::{Arrow, Name, RevealDef, ScriptFault, Vocabulary};
+use super::{Arrow, RevealDef, ScriptFault, Vocabulary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +49,7 @@ pub fn check_reveals_unique<R: RevealDef>(reveal: &[R]) -> Result<(), ScriptFaul
 
 pub struct DialogueView<'a, V: Vocabulary> {
     pub script: &'a str,
-    pub node: Name,
+    pub node: &'a str,
     pub lines: Vec<(&'a V::Line, SpokenValues)>,
     pub choices: Vec<ChoiceOffer<'a, V>>,
 }
@@ -58,11 +58,11 @@ pub type SpokenValues = Vec<super::Value>;
 
 pub struct ChoiceOffer<'a, V: Vocabulary> {
     pub index: usize,
-    pub label: &'static V::Text,
+    pub label: &'a V::Text,
     pub label_values: SpokenValues,
     pub locked: bool,
-    pub requires: Option<&'static Expr<V>>,
-    pub reveal: &'static [V::Reveal],
-    pub warn: Option<Name>,
+    pub requires: Option<&'a Expr<V>>,
+    pub reveal: &'a [V::Reveal],
+    pub warn: Option<&'a str>,
     pub leads: Vec<&'a V::Effect>,
 }

@@ -21,9 +21,9 @@ use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema, value};
 
-pub fn placement_bounds(content: Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
+pub fn placement_bounds(content: &Content, area_id: AreaId) -> HashMap<usize, Rect<Tiles>> {
     let mut out: HashMap<usize, Rect<Tiles>> = HashMap::new();
-    for placed in area::placed(&content, area_id) {
+    for placed in area::placed(content, area_id) {
         if placed.chain.is_empty() {
             continue;
         }
@@ -53,7 +53,7 @@ pub fn first_area_using(editor: &Editor, blueprint: &str) -> Option<String> {
         })
 }
 
-pub fn placement_count(content: Content, blueprint: &str) -> String {
+pub fn placement_count(content: &Content, blueprint: &str) -> String {
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(blueprint) else {
         return String::new();
     };
@@ -61,7 +61,7 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
     let mut areas: Vec<AreaId> = Vec::new();
     let mut nested = 0;
     for area_id in content.ids::<area::AreaDef>() {
-        for placement in area::placements(&content, area_id) {
+        for placement in area::placements(content, area_id) {
             if placement.blueprint != id {
                 continue;
             }
@@ -78,7 +78,7 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
     let mut text = match areas.as_slice() {
         [] => "Placed nowhere yet.".to_owned(),
         [only] => {
-            let name = only.get(&content).name.clone();
+            let name = only.get(content).name.clone();
             format!(
                 "Placed {direct} time{}, all in {name}.",
                 widgets::plural(direct)
@@ -95,7 +95,7 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
 pub fn placement_card(
     ui: &mut Ui,
     cx: &mut FormCx,
-    content: Option<Content>,
+    content: Option<&Content>,
     module: &mut Value,
     path: &str,
 ) -> bool {
@@ -111,7 +111,7 @@ pub fn placement_card(
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&blueprint) else {
         return false;
     };
-    let def = id.get(&content);
+    let def = id.get(content);
     if def.variables.is_empty() {
         crate::ui::widgets::kv_text(ui, "values", "none: no variables");
         return false;
@@ -263,7 +263,7 @@ pub fn shared_values(ui: &mut Ui, cx: &mut FormCx, row: &mut Value, indices: &[u
     if !same_blueprint {
         return false;
     }
-    let Some(content) = cx.content else {
+    let Some(content) = cx.content.clone() else {
         return false;
     };
     let blueprint = row["modules"][indices[0]]["blueprint"]
@@ -328,7 +328,7 @@ pub struct Placement {
 }
 
 pub fn resolve_in_place(
-    content: Content,
+    content: &Content,
     modules: &[Value],
     path: &[usize],
 ) -> Option<Vec<Placement>> {
@@ -341,7 +341,7 @@ pub fn resolve_in_place(
     for &part in parts {
         let current = chain.last()?;
         let id = content.by_key::<area::blueprint::BlueprintDef>(&current.blueprint)?;
-        let def = id.get(&content);
+        let def = id.get(content);
         let placed = placed_part(
             content,
             def.parts.get(part)?,
@@ -376,7 +376,7 @@ pub struct PartView {
 }
 
 pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
-    let content = frame.content;
+    let content = frame.content.clone();
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(&place.blueprint) else {
         return Vec::new();
     };
@@ -384,7 +384,7 @@ pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
     let mut out = Vec::new();
     for (index, part) in def.parts.iter().enumerate() {
         let Some(module) = placed_part(
-            content,
+            &content,
             part,
             &place.values,
             &def.variables,
@@ -396,7 +396,7 @@ pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
         let nested = (module.is_module(AreaModuleKind::Blueprint))
             .then(|| module.text("blueprint").to_owned());
         let bounds = match &nested {
-            Some(nested_key) => nested_bounds(content, nested_key, &module),
+            Some(nested_key) => nested_bounds(&content, nested_key, &module),
             None => shapes::bounds(&module, None),
         };
         out.push(PartView {
@@ -410,7 +410,7 @@ pub fn parts_in_place(frame: &AreaFrame, place: &Placement) -> Vec<PartView> {
 }
 
 pub(super) fn nested_bounds(
-    content: Content,
+    content: &Content,
     blueprint: &str,
     placement: &Value,
 ) -> Option<Rect<Tiles>> {
@@ -651,7 +651,7 @@ pub fn move_parts_in_place(
             shapes::shift(part, bx, by);
         }
     }
-    let count = placement_count(frame.content, &place.blueprint);
+    let count = placement_count(&frame.content, &place.blueprint);
     let mut edit = ContentEdit::new(format!(
         "Move {} parts of {} · {count}",
         indices.len(),
@@ -672,7 +672,7 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
     if let Some(parts) = row["parts"].as_array_mut() {
         super::remove_indices(parts, &indices);
     }
-    let count = placement_count(frame.content, &place.blueprint);
+    let count = placement_count(&frame.content, &place.blueprint);
     let mut edit = ContentEdit::new(format!(
         "Remove {} parts of {} · {count}",
         indices.len(),
@@ -684,9 +684,9 @@ pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &
     }
 }
 
-pub fn unpacked(content: Content, module: &Value) -> Option<Vec<Value>> {
+pub fn unpacked(content: &Content, module: &Value) -> Option<Vec<Value>> {
     let id = content.by_key::<area::blueprint::BlueprintDef>(module["blueprint"].as_str()?)?;
-    let def = id.get(&content);
+    let def = id.get(content);
     let at = shapes::pos_of(&module["at"])?;
     let flip = serde_json::from_value(module["flip"].clone()).unwrap_or_default();
     def.parts
@@ -731,7 +731,7 @@ pub fn unpack(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
         let module = modules.get(index)?;
         let key = module["blueprint"].as_str().unwrap_or("the blueprint");
         let label = format!("Unpack {key} in {}", frame.area_key);
-        let unpacked = unpacked(frame.content, module)?;
+        let unpacked = unpacked(&frame.content, module)?;
         if unpacked.is_empty() {
             return None;
         }
@@ -778,7 +778,7 @@ pub fn replace_with(
     replacement: &str,
     scope: ReplaceScope,
 ) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(row) = editor.row_value("area", area_key) else {
@@ -844,8 +844,8 @@ pub(super) fn placement_extras(
         return;
     };
     ui.add_space(4.0);
-    if let Some(content) = cx.content {
-        widgets::hint(ui, &placement_count(content, &key));
+    if let Some(content) = cx.content.clone() {
+        widgets::hint(ui, &placement_count(&content, &key));
     }
     ui.horizontal_wrapped(|ui| {
         if ui.button("▣ Edit blueprint").clicked() {

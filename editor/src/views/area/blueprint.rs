@@ -33,12 +33,12 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
     }
     let (Some(project), Some(content)) = (
         editor.project.as_ref(),
-        editor.project.as_ref().and_then(|p| p.content),
+        editor.project.as_ref().and_then(|p| p.content.clone()),
     ) else {
         return;
     };
     let name = rows::free_key(&project.files, "blueprint", "new_blueprint");
-    let matches = matching_groups(content, area_key, &modules, &indices);
+    let matches = matching_groups(&content, area_key, &modules, &indices);
     editor
         .dialogs
         .push(ModalDialog::MakeBlueprint(MakeBlueprintDialog {
@@ -78,7 +78,7 @@ pub struct BlueprintMatch {
 }
 
 fn matching_groups(
-    content: Content,
+    content: &Content,
     own_area: &str,
     modules: &[Value],
     own_indices: &[usize],
@@ -98,8 +98,8 @@ fn matching_groups(
     let wanted = signature(&relative);
     let mut out = Vec::new();
     for area_id in content.ids::<area::AreaDef>() {
-        let key = area_id.key(&content);
-        let Ok(row) = value::json(area_id.get(&content)) else {
+        let key = area_id.key(content);
+        let Ok(row) = value::json(area_id.get(content)) else {
             continue;
         };
         let all: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
@@ -481,7 +481,7 @@ pub fn delete_blueprint_dialog(
     let others: Vec<String> = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|c| {
             c.table::<area::blueprint::BlueprintDef>()
                 .keys()
@@ -554,7 +554,7 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
     let content = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     content
         .by_key::<area::blueprint::BlueprintDef>(&dialog.blueprint)
@@ -602,7 +602,7 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
                         return Err("a bad pointer".into());
                     }
                     let placement_json = list.remove(index);
-                    let unpacked = placement::unpacked(content, &placement_json)
+                    let unpacked = placement::unpacked(&content, &placement_json)
                         .ok_or("a part the engine refuses")?;
                     for (offset, module) in unpacked.into_iter().enumerate() {
                         list.insert(index + offset, module);

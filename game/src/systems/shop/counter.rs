@@ -145,7 +145,7 @@ fn shelf(world: &World) -> Option<Shelf> {
 }
 
 fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let wares = shelf.wares(&content);
     let selected = shelf.selected.min(wares.len().saturating_sub(1));
     let wants = shelf.shown.shop.get(&content).wants(&content);
@@ -226,7 +226,7 @@ fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected:
 }
 
 fn row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui::Response {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = ware.item.get(&content);
     let name = counted(&def.name, ware.count);
     let note = unavailable(ware)
@@ -286,7 +286,7 @@ fn row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui::Res
 }
 
 fn detail(ui: &mut Ui, world: &mut World, shelf: &Shelf, ware: &Ware, index: usize) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     egui::Panel::bottom(Id::new("shop-price"))
         .frame(egui::Frame::new().inner_margin(egui::Margin::same(12)))
         .show_separator_line(true)
@@ -500,7 +500,7 @@ fn selling(world: &World) -> bool {
 }
 
 fn request_sale(world: &mut World, slot: u32) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
@@ -525,7 +525,7 @@ fn request_sale(world: &mut World, slot: u32) {
 }
 
 fn confirm_sale(world: &mut World, shop: ShopId, stack: ItemStack, pays: &[ItemStack], slot: u32) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let name = &stack.item.get(&content).name;
     hud::confirm(
         world,

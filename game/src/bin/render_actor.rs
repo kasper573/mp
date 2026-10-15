@@ -279,7 +279,7 @@ fn layout(content: &Content, models: &[ModelId]) -> Layout {
 }
 
 fn setup(world: &mut World, clips: Vec<Clip>, total: usize, layout: &Layout) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let assets = world.resource::<AssetServer>().clone();
     let sheets: BTreeMap<ModelId, Handle<Image>> = clips
         .iter()

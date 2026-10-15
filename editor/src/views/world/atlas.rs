@@ -245,7 +245,7 @@ pub struct QuestLineStep {
 
 impl WorldAtlas {
     pub fn build(
-        content: Content,
+        content: &Content,
         files: &ProjectFiles,
         usages: &ContentUsages,
         generation: u64,
@@ -481,9 +481,9 @@ impl WorldAtlas {
             .min_by(|a, b| self.owners[a.owner].label.cmp(&self.owners[b.owner].label))
     }
 
-    fn add_owners(&mut self, content: Content, scripts: &RiftScripts, id: AreaId) {
-        let key = id.key(&content);
-        let placed = area::placed(&content, id);
+    fn add_owners(&mut self, content: &Content, scripts: &RiftScripts, id: AreaId) {
+        let key = id.key(content);
+        let placed = area::placed(content, id);
         let mut seeds = vec![AtlasOwner {
             area: id,
             kind: OwnerKind::Area,
@@ -530,11 +530,11 @@ impl WorldAtlas {
                 object: Some(index),
             });
         }
-        for (ordinal, placement) in area::placements(&content, id).iter().enumerate() {
+        for (ordinal, placement) in area::placements(content, id).iter().enumerate() {
             if placement.scripts.is_empty() {
                 continue;
             }
-            let blueprint = placement.blueprint.key(&content);
+            let blueprint = placement.blueprint.key(content);
             seeds.push(AtlasOwner {
                 area: id,
                 kind: OwnerKind::Blueprint,
@@ -566,11 +566,11 @@ impl WorldAtlas {
             if !seen.insert(npc) {
                 continue;
             }
-            let npc_key = npc.key(&content);
+            let npc_key = npc.key(content);
             seeds.push(AtlasOwner {
                 area: id,
                 kind: OwnerKind::Npc,
-                name: npc.get(&content).name.clone(),
+                name: npc.get(content).name.clone(),
                 label: format!("npc/{npc_key}"),
                 npc: Some(npc),
                 at,
@@ -612,7 +612,7 @@ impl WorldAtlas {
         }
     }
 
-    fn find_sources(&mut self, content: Content, usages: &ContentUsages, id: AreaId) {
+    fn find_sources(&mut self, content: &Content, usages: &ContentUsages, id: AreaId) {
         let mut found: Vec<(&'static str, String, RowSource)> = Vec::new();
         let Some(info) = self.areas.get(&id) else {
             return;
@@ -646,22 +646,22 @@ impl WorldAtlas {
                 source(RowSourceKind::Placed, &format!("×{count}"), &here),
             ));
             for loot in npc
-                .get(&content)
+                .get(content)
                 .loot()
                 .into_iter()
                 .flat_map(|loot| &loot.items)
             {
                 found.push((
                     ItemDef::TABLE,
-                    loot.item.key(&content).to_owned(),
+                    loot.item.key(content).to_owned(),
                     source(RowSourceKind::Drop, key, &opens),
                 ));
             }
             for quest in content.ids::<QuestDef>() {
-                for drop in quest.get(&content).drops().filter(|drop| drop.from == *npc) {
+                for drop in quest.get(content).drops().filter(|drop| drop.from == *npc) {
                     found.push((
                         ItemDef::TABLE,
-                        drop.item.key(&content).to_owned(),
+                        drop.item.key(content).to_owned(),
                         source(RowSourceKind::Drop, key, &opens),
                     ));
                 }
@@ -682,29 +682,29 @@ impl WorldAtlas {
                 match reach {
                     Reach::Warp(place) => found.push((
                         AreaDef::TABLE,
-                        place.area.key(&content).to_owned(),
+                        place.area.key(content).to_owned(),
                         by(RowSourceKind::Warp),
                     )),
                     Reach::Spawns(npc) => found.push((
                         NpcDef::TABLE,
-                        npc.key(&content).to_owned(),
+                        npc.key(content).to_owned(),
                         by(RowSourceKind::Spawns),
                     )),
                     Reach::Gives(item) | Reach::Drops(item) => found.push((
                         ItemDef::TABLE,
-                        item.key(&content).to_owned(),
+                        item.key(content).to_owned(),
                         by(RowSourceKind::Gives),
                     )),
                     Reach::OpensShop(shop) => {
-                        let shop_key = shop.key(&content);
+                        let shop_key = shop.key(content);
                         let opens = OpenTarget::Row {
                             table: ShopDef::TABLE,
                             key: shop_key.to_owned(),
                         };
-                        for offer in shop.get(&content).sells() {
+                        for offer in shop.get(content).sells() {
                             found.push((
                                 ItemDef::TABLE,
-                                offer.item.key(&content).to_owned(),
+                                offer.item.key(content).to_owned(),
                                 source(RowSourceKind::Sells, shop_key, &opens),
                             ));
                         }
@@ -716,7 +716,7 @@ impl WorldAtlas {
                     }
                     Reach::Remembers(memory) => found.push((
                         MemoryDef::TABLE,
-                        memory.key(&content).to_owned(),
+                        memory.key(content).to_owned(),
                         by(RowSourceKind::Remembers),
                     )),
                     _ => {}
@@ -730,10 +730,10 @@ impl WorldAtlas {
                     Reach::Decides(quest) => (RowSourceKind::Decides, quest),
                     _ => continue,
                 };
-                let quest_key = quest.key(&content);
+                let quest_key = quest.key(content);
                 found.push((QuestDef::TABLE, quest_key.to_owned(), by(kind)));
                 if matches!(kind, RowSourceKind::Offers | RowSourceKind::TurnsIn) {
-                    let def = quest.get(&content);
+                    let def = quest.get(content);
                     let opens = OpenTarget::Row {
                         table: QuestDef::TABLE,
                         key: quest_key.to_owned(),
@@ -746,7 +746,7 @@ impl WorldAtlas {
                     {
                         found.push((
                             ItemDef::TABLE,
-                            stack.item.key(&content).to_owned(),
+                            stack.item.key(content).to_owned(),
                             source(RowSourceKind::Quest, quest_key, &opens),
                         ));
                     }
@@ -762,9 +762,9 @@ impl WorldAtlas {
         ];
         let mut files = vec![row_file(AreaDef::TABLE, &info.key)];
         files.extend(
-            area::placements(&content, id)
+            area::placements(content, id)
                 .iter()
-                .map(|placement| row_file(BlueprintDef::TABLE, placement.blueprint.key(&content))),
+                .map(|placement| row_file(BlueprintDef::TABLE, placement.blueprint.key(content))),
         );
         for file in &files {
             for usage in usages.in_file(file) {
@@ -793,11 +793,11 @@ impl WorldAtlas {
         }
     }
 
-    fn build_quests(&mut self, content: Content) {
+    fn build_quests(&mut self, content: &Content) {
         let mut quests: Vec<AtlasQuest> = Vec::new();
         for id in content.ids::<QuestDef>() {
-            let key = id.key(&content).to_owned();
-            let def = id.get(&content);
+            let key = id.key(content).to_owned();
+            let def = id.get(content);
             let mut steps = Vec::new();
             let offering = |reach: &Reach| matches!(reach, Reach::Offers(quest) | Reach::Accepts(quest) if *quest == id);
             let giver = self.who_does(&offering);
@@ -823,15 +823,15 @@ impl WorldAtlas {
                             })
                             .map(|(area, _)| *area)
                             .collect();
-                        (counted("defeat", *count, npc.key(&content)), areas)
+                        (counted("defeat", *count, npc.key(content)), areas)
                     }
                     Objective::Hold(stack) => (
-                        counted("hold", stack.count, stack.item.key(&content)),
-                        self.areas_finding(ItemDef::TABLE, stack.item.key(&content)),
+                        counted("hold", stack.count, stack.item.key(content)),
+                        self.areas_finding(ItemDef::TABLE, stack.item.key(content)),
                     ),
                     Objective::Deliver { item } => (
-                        counted("deliver", 1, item.key(&content)),
-                        self.areas_finding(ItemDef::TABLE, item.key(&content)),
+                        counted("deliver", 1, item.key(content)),
+                        self.areas_finding(ItemDef::TABLE, item.key(content)),
                     ),
                     Objective::Task { label, .. } => (
                         label.clone(),
@@ -873,7 +873,7 @@ impl WorldAtlas {
             let requires: Vec<String> = [def.shown(), def.requires()]
                 .into_iter()
                 .flatten()
-                .map(|condition| condition::describe(&content, condition))
+                .map(|condition| condition::describe(content, condition))
                 .collect();
             quests.push(AtlasQuest {
                 key,
@@ -913,15 +913,15 @@ impl WorldAtlas {
         self.quests = quests;
     }
 
-    fn links_of(&self, content: Content, id: QuestId) -> Vec<QuestLink> {
-        let def = id.get(&content);
+    fn links_of(&self, content: &Content, id: QuestId) -> Vec<QuestLink> {
+        let def = id.get(content);
         let mut queries = Vec::new();
         for condition in [def.shown(), def.requires()].into_iter().flatten() {
             positive_queries(condition, &mut queries);
         }
         let mut after: Vec<QuestLink> = Vec::new();
         let mut link = |quest: QuestId, how: QuestLinkHow| {
-            let quest = quest.key(&content).to_owned();
+            let quest = quest.key(content).to_owned();
             if !after.iter().any(|known| known.quest == quest) {
                 after.push(QuestLink { quest, how });
             }
@@ -948,10 +948,7 @@ impl WorldAtlas {
                             | Reach::Decides(other) = reach
                                 && *other != id
                             {
-                                link(
-                                    *other,
-                                    QuestLinkHow::Memory(memory.key(&content).to_owned()),
-                                );
+                                link(*other, QuestLinkHow::Memory(memory.key(content).to_owned()));
                             }
                         }
                     }
@@ -1017,19 +1014,19 @@ impl AtlasArea {
 
 type RowName = (String, String);
 
-fn area_info(content: Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
-    let key = id.key(&content).to_owned();
-    let def = id.get(&content);
-    let loaded = area::load(&content, id);
-    let placed = area::placed(&content, id);
+fn area_info(content: &Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
+    let key = id.key(content).to_owned();
+    let def = id.get(content);
+    let loaded = area::load(content, id);
+    let placed = area::placed(content, id);
     let mut text = files
         .json(&row_file(AreaDef::TABLE, &key))
         .map(|row| row.to_string().to_lowercase())
         .unwrap_or_default();
-    for placement in area::placements(&content, id) {
+    for placement in area::placements(content, id) {
         if let Some(row) = files.json(&row_file(
             BlueprintDef::TABLE,
-            placement.blueprint.key(&content),
+            placement.blueprint.key(content),
         )) {
             text.push(' ');
             text.push_str(&row.to_string().to_lowercase());
@@ -1041,13 +1038,13 @@ fn area_info(content: Content, files: &ProjectFiles, id: AreaId) -> AtlasArea {
         match &flattened.module {
             AreaModule::Resident(resident) => residents.push(PlacedNpc {
                 npc: resident.npc,
-                key: resident.npc.key(&content).to_owned(),
+                key: resident.npc.key(content).to_owned(),
                 at: resident.at,
                 count: 1,
             }),
             AreaModule::Population(population) => populations.push(PlacedNpc {
                 npc: population.npc,
-                key: population.npc.key(&content).to_owned(),
+                key: population.npc.key(content).to_owned(),
                 at: population
                     .roams
                     .map_or_else(|| loaded.center(), |roams| roams.center()),

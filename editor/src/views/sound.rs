@@ -22,9 +22,9 @@ pub struct HeardModule {
     pub channels: Vec<(u32, String, f32)>,
 }
 
-pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Tiles>) {
-    let area = area::load(&content, area_id);
-    let key = area_id.key(&content).to_owned();
+pub fn listen(editor: &mut Editor, content: &Content, area_id: AreaId, at: Pos<Tiles>) {
+    let area = area::load(content, area_id);
+    let key = area_id.key(content).to_owned();
     let mut heard = Vec::new();
     for (index, zone) in area.soundscape.iter().enumerate() {
         let Some(positional) = zone.heard_from(at) else {

@@ -501,7 +501,7 @@ fn start(
         .by_key
         .get(&scene_key)
         .map(|scene| (scene.texture, scene.uv()));
-    let spawn = cx.content.map(|content| {
+    let spawn = cx.content.clone().map(|content| {
         let place = &content.built::<GameSettings>().initial_spawn;
         (place.area.key(&content).to_owned(), place.at)
     });
@@ -552,7 +552,7 @@ fn start(
                 }
             }
         });
-        if let Some(content) = cx.content
+        if let Some(content) = cx.content.clone()
             && let Some(area_id) = content.by_key::<AreaDef>(&area_key)
         {
             let size = area::load(&content, area_id).size;
@@ -759,7 +759,7 @@ struct ObjectiveLine {
 }
 
 fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
-    let Some(content) = cx.content else {
+    let Some(content) = cx.content.clone() else {
         return Vec::new();
     };
     let Some(id) = content.by_key::<QuestDef>(quest) else {
@@ -822,8 +822,9 @@ fn quests(
         .collect();
     let parties = cx
         .content
+        .as_ref()
         .filter(|content| content.has_built::<RiftScripts>())
-        .map(|content| Parties::of(&content, content.built::<RiftScripts>()));
+        .map(|content| Parties::of(content, content.built::<RiftScripts>()));
     let mut order: Vec<String> = in_log.clone();
     let rest: Vec<String> = all
         .iter()
@@ -847,14 +848,15 @@ fn quests(
                     .and_then(|list| list.iter().position(|q| q["quest"].as_str() == Some(quest)));
                 let standing =
                     Standing::of(entry_index.and_then(|i| value["quests"][i]["state"].as_str()));
-                let giver = cx
-                    .content
-                    .zip(parties.as_ref())
-                    .and_then(|(content, parties)| {
-                        content
-                            .by_key::<QuestDef>(quest)
-                            .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
-                    });
+                let giver =
+                    cx.content
+                        .as_ref()
+                        .zip(parties.as_ref())
+                        .and_then(|(content, parties)| {
+                            content
+                                .by_key::<QuestDef>(quest)
+                                .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
+                        });
                 let requires = cx.files.json(&row_file("quest", quest)).and_then(|row| {
                     row["modules"].as_array().and_then(|modules| {
                         modules
@@ -1022,7 +1024,7 @@ fn quests(
 }
 
 fn giver_of<'p>(cx: &FormCx, parties: Option<&'p Parties>, quest: &str) -> Option<&'p Party> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     let id = content.by_key::<QuestDef>(quest)?;
     parties?.giver(id)
 }
@@ -1054,7 +1056,7 @@ enum Moment {
 impl Moment {
     fn all(cx: &FormCx, quest: &str) -> Vec<Moment> {
         let mut moments = vec![Moment::JustOffered, Moment::ObjectivesMet];
-        if let Some(content) = cx.content
+        if let Some(content) = cx.content.clone()
             && let Some(id) = content.by_key::<QuestDef>(quest)
         {
             for objective in id.get(&content).objectives() {
@@ -1167,7 +1169,7 @@ fn give(value: &mut Value, item: &str, count: u32) {
 }
 
 fn npc_place(cx: &FormCx, npc: NpcId) -> Option<(String, Pos<Tiles>)> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     content.ids::<AreaDef>().find_map(|area| {
         area::placed(&content, area)
             .iter()
@@ -1338,7 +1340,7 @@ fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
 }
 
 pub fn level_of(cx: &FormCx, job: &str, xp: u32) -> u32 {
-    let Some(content) = cx.content else {
+    let Some(content) = cx.content.clone() else {
         return 0;
     };
     content
@@ -1355,7 +1357,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(row) = editor.row_value(TABLE, key) else {
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;

@@ -153,9 +153,10 @@ pub(super) fn script_extras(ui: &mut Ui, cx: &mut FormCx, table: &str, module: &
             },
         );
     }
-    if let (Some(content), Some(owner_key)) =
-        (cx.content, key.as_deref().or(cx.owner_key.as_deref()))
-        && content.has_built::<RiftScripts>()
+    if let (Some(content), Some(owner_key)) = (
+        cx.content.clone(),
+        key.as_deref().or(cx.owner_key.as_deref()),
+    ) && content.has_built::<RiftScripts>()
         && let Some(bound) = panel::owner_row(&content, table, owner_key, &pointer)
     {
         let may = content.built::<RiftScripts>().may_do(bound.row);

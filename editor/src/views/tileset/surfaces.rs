@@ -156,7 +156,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             name,
             ..def.clone()
         };
-        write_surface(editor, content, surface, &def, ContentEdit::new(label));
+        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
     }
     if let Some(footstep) = new_footstep
         && let Some(sfx) = content.by_key::<SfxDef>(&footstep)
@@ -166,7 +166,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             footstep: sfx,
             ..def.clone()
         };
-        write_surface(editor, content, surface, &def, ContentEdit::new(label));
+        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
     }
 }
 
@@ -238,7 +238,7 @@ fn add_surface(
         name: dialog.name.trim().to_owned(),
         footstep,
     };
-    let json = value::untyped(content, &def).ok_or("the surface does not write")?;
+    let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
     let mut edit = ContentEdit::new(format!("New surface {key}"));
     edit.write_json(row_file(TABLE, &key), &json);
     editor.try_apply(edit)?;
@@ -248,7 +248,7 @@ fn add_surface(
 
 fn write_surface(
     editor: &mut Editor,
-    content: Content,
+    content: &Content,
     key: &str,
     def: &SurfaceDef,
     mut edit: ContentEdit,

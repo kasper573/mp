@@ -336,7 +336,7 @@ pub(super) fn part_cards(
 }
 
 pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(key) else {
@@ -344,7 +344,7 @@ pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
     };
     let editing: Option<(String, usize)> = editor.views.area.views.values().find_map(|view| {
         let modules = super::modules::area_modules(editor, &view.area);
-        let chain = placement::resolve_in_place(content, &modules, &view.in_place)?;
+        let chain = placement::resolve_in_place(&content, &modules, &view.in_place)?;
         let innermost = chain.last()?;
         (innermost.blueprint == key).then(|| (view.area.clone(), innermost.module))
     });
@@ -435,7 +435,7 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
     let area_keys: Vec<String> = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|content| {
             content
                 .ids::<area::AreaDef>()
@@ -549,7 +549,7 @@ fn placements_keeping(
     key: &str,
     made: &[holes::MadeVariable],
 ) -> Vec<(String, Value)> {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return Vec::new();
     };
     let mut out = Vec::new();

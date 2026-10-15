@@ -145,7 +145,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let characters: Vec<(String, String)> = editor
         .project
         .as_ref()
-        .and_then(|project| project.content)
+        .and_then(|project| project.content.clone())
         .map(|content| {
             content
                 .ids::<CharacterSnapshot>()
@@ -573,7 +573,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
     if editor.views.script.run_of(&owner_key).is_none() {
         return false;
     }
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return false;
     };
     let bound = bindings(editor, doc);
@@ -1037,7 +1037,7 @@ fn start_run(
 ) -> Result<ScriptRun, String> {
     let doc_session = editor.views.script.session(&doc.owner);
     let project = editor.project.as_ref().ok_or("no project")?;
-    let content = project.content.ok_or("the folder does not load")?;
+    let content = project.content.clone().ok_or("the folder does not load")?;
     let generation = project.generation;
     let (area_id, near) = area_for(&content, owner).ok_or("no area to run in")?;
     let clock = WallClock {
@@ -1211,7 +1211,7 @@ fn snapshot_for(
     let json = files
         .json_owned(&row_file("test_character", key))
         .ok_or_else(|| format!("no test character {key}"))?;
-    value::typed(*content, json).ok_or_else(|| format!("test character {key} does not read"))
+    value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
 }
 
 fn step(world: &mut World) {

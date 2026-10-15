@@ -171,7 +171,7 @@ fn brawler() -> Vec<Arc<Procedure>> {
             "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
         }),
     );
-    compile_owner(content(), OwnerKind::Npc, "test/brawler", &[script]).expect("compiles")
+    compile_owner(content(), OwnerKind::Npc, "test/brawler", &[&script]).expect("compiles")
 }
 
 fn brawling_npc(sim: &mut Sim, near: Pos<Tiles>, pack: u32) -> Entity {

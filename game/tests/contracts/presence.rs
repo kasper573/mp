@@ -7,8 +7,8 @@ use game::systems::movement::position;
 use game::systems::npc::{self, Pack};
 use game::systems::player::ClientId;
 use game::systems::reach::{self, ReachAct};
+use game::systems::script::RiftQuery;
 use game::systems::script::condition::{self, CompiledCondition};
-use game::systems::script::{Condition, RiftQuery};
 use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
@@ -88,7 +88,7 @@ fn presence_by_condition_follows_the_players_memory() {
         of: None,
         memory: row("PellDead"),
     });
-    let pell_alive: &'static Condition = Box::leak(Box::new(Expr::Not(Box::new(pell_dead))));
+    let pell_alive = Expr::Not(Box::new(pell_dead));
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let orc = orc_near(&mut sim, player);
@@ -96,7 +96,7 @@ fn presence_by_condition_follows_the_players_memory() {
         .entity_mut(orc)
         .insert(Presence::When(CompiledCondition::new(
             content(),
-            pell_alive,
+            &pell_alive,
         )));
     assert!(visibility::present(sim.world(), orc, player));
 
@@ -116,7 +116,7 @@ fn a_world_that_serves_no_area_judges_an_items_requirements() {
         panic!("the bone shield asks something of its wearer");
     };
     let mut world = World::new();
-    world.insert_resource(*content());
+    world.insert_resource(content().clone());
     let viewer = world.spawn_empty().id();
 
     assert!(!condition::holds(&world, viewer, requirement));

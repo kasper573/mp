@@ -97,7 +97,6 @@ csv = "1"
 futures-timer = { version = "3", features = ["wasm-bindgen"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 derive_more = { version = "2", features = ["add", "add_assign"] }
-thread_local = "1"
 euclid = { version = "0.22", features = ["serde"] }
 pathfinding = "4"
 fixedbitset = "0.5"
