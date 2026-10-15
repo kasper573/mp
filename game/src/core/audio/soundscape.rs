@@ -304,7 +304,9 @@ fn toward(from: f32, to: f32, step: f32) -> f32 {
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum ShapeRow {
+    #[schemars(extend("x-rect" = true))]
     Rect { x: f32, y: f32, w: f32, h: f32 },
+    #[schemars(extend("x-rect" = true))]
     Ellipse { x: f32, y: f32, w: f32, h: f32 },
 }
 

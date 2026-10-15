@@ -378,10 +378,11 @@ pub(super) fn is_objective(tag: &str) -> bool {
     )
 }
 
-pub fn summary_of(module: &Value) -> String {
+pub fn summary_of(root: &Value, module: &Value) -> String {
     let Some(object) = module.as_object() else {
         return String::new();
     };
+    let shape = module_shape(root, module);
     let mut parts = Vec::new();
     if object.get("type").and_then(Value::as_str) == Some("bust") {
         let own = object
@@ -396,12 +397,13 @@ pub fn summary_of(module: &Value) -> String {
         }
         match field {
             Value::String(text) => parts.push(text.clone()),
-            Value::Number(number) => parts.push(match name.as_str() {
-                "count" | "amount" | "times" => {
-                    format!("× {}", number.as_f64().unwrap_or(0.0))
-                }
-                _ => format!("{name} {}", number.as_f64().unwrap_or(0.0)),
-            }),
+            Value::Number(number) => {
+                let number = number.as_f64().unwrap_or(0.0);
+                parts.push(
+                    schema::number_shorthand(root, &shape["properties"][name], number)
+                        .unwrap_or_else(|| format!("{name} {number}")),
+                );
+            }
             Value::Array(items) => parts.push(format!("{} {name}", items.len())),
             Value::Object(nodes) if name == "nodes" => parts.push(format!("{} nodes", nodes.len())),
             Value::Object(fields) if fields.contains_key("type") => {
@@ -416,47 +418,72 @@ pub fn summary_of(module: &Value) -> String {
     parts.join(" · ")
 }
 
-pub fn module_lines(module: &Value) -> String {
-    fn scalar(name: &str, value: &Value) -> String {
-        match value {
-            Value::String(text) => text.clone(),
-            Value::Number(number) => {
-                let number = number.as_f64().unwrap_or(0.0).to_string();
-                if name == "chance" {
-                    format!("{number}%")
-                } else {
-                    number
-                }
-            }
-            other => other.to_string(),
-        }
-    }
+pub fn module_lines(root: &Value, module: &Value) -> String {
+    let shape = module_shape(root, module);
     let mut lines: Vec<String> = Vec::new();
     for (name, field) in module.as_object().into_iter().flatten() {
         if name == "type" {
             continue;
         }
+        let field_shape = &shape["properties"][name];
         match field {
             Value::Array(items) => {
+                let item_shape =
+                    schema::resolve(root, &schema::non_null(root, field_shape)["items"]);
                 for item in items {
                     match item.as_object() {
-                        Some(fields) => {
-                            let mut cells: Vec<String> = fields
-                                .iter()
-                                .map(|(name, value)| scalar(name, value))
-                                .collect();
-                            if fields.contains_key("item") && !fields.contains_key("amount") {
-                                cells.insert(1, "1".to_owned());
-                            }
-                            lines.push(cells.join("  "));
-                        }
+                        Some(_) => lines.push(entry_cells(root, item_shape, item).join("  ")),
                         None => lines.push(item.to_string()),
                     }
                 }
             }
             Value::Object(_) => lines.push(format!("{name} …")),
-            other => lines.push(format!("{name} {}", scalar(name, other))),
+            other => lines.push(format!("{name} {}", cell(root, field_shape, other))),
         }
     }
     lines.join("\n")
+}
+
+fn module_shape<'a>(root: &'a Value, module: &Value) -> &'a Value {
+    schema::settle(root, &root["properties"]["modules"]["items"], module)
+}
+
+fn entry_cells(root: &Value, shape: &Value, entry: &Value) -> Vec<String> {
+    let fields = schema::properties(schema::settle(root, shape, entry));
+    if fields.is_empty() {
+        return entry
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(_, value)| cell(root, &Value::Null, value))
+            .collect();
+    }
+    fields
+        .into_iter()
+        .filter_map(|(name, field)| match entry.get(name.as_str()) {
+            Some(value) if !value.is_null() => Some(cell(root, field, value)),
+            _ if field.get("x-count").is_some() => field
+                .get("default")
+                .map(|default| cell(root, field, default)),
+            _ => field
+                .get("x-blank")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        })
+        .collect()
+}
+
+fn cell(root: &Value, field: &Value, value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Number(number) => {
+            let number = number.as_f64().unwrap_or(0.0);
+            if schema::non_null(root, field)["x-unit"] == "%" {
+                format!("{number}%")
+            } else {
+                number.to_string()
+            }
+        }
+        other => other.to_string(),
+    }
 }

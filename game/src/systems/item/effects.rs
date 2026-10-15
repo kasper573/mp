@@ -70,6 +70,7 @@ pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
     pub count: Condition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Arrow,

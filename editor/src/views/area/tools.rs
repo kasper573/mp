@@ -152,15 +152,7 @@ pub fn input(
     if response.secondary_clicked() {
         context_menu_at(editor, view_key, frame);
     }
-    let in_place = frame.in_place.last().cloned();
     match tool {
-        AreaTool::Select if in_place.is_some() => placement::select_input_in_place(
-            editor,
-            view_key,
-            frame,
-            in_place.as_ref().expect("in place"),
-            modifiers,
-        ),
         AreaTool::Select => select_input(editor, ui, view_key, frame, modifiers),
         AreaTool::Paint if walk_overlay => {
             grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk)

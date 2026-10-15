@@ -161,8 +161,11 @@ pub struct Loot {
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct LootItem {
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub amount: u32,
+    #[schemars(extend("x-blank" = "always"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chance: Option<Percent>,
 }

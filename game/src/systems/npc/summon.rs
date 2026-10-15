@@ -31,6 +31,7 @@ pub struct SetAttitude {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SpawnNpcs {
     pub npc: NpcId,
+    #[schemars(extend("x-count" = true))]
     pub count: u32,
     pub near: SpawnNear,
     pub shown: ShownFor,

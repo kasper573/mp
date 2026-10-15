@@ -14,7 +14,7 @@ use crate::project::{ProjectFiles, row_of};
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
 use crate::value::RowValue;
-use crate::{condition, forms, spans};
+use crate::{condition, spans};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
 #[strum(serialize_all = "snake_case")]
@@ -624,7 +624,7 @@ pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &
         schema::SchemaKind::Choice(alternatives) => {
             if let Some(alternative) = alternatives
                 .iter()
-                .find(|alternative| forms::fits(root, alternative, value))
+                .find(|alternative| schema::fits(root, alternative, value))
             {
                 fill_references(root, alternative, value, files);
             }

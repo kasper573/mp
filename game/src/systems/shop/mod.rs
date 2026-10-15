@@ -148,6 +148,8 @@ impl ShopDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ShopOffer {
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub count: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

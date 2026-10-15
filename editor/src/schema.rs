@@ -128,6 +128,83 @@ pub fn resolve<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
     schema
 }
 
+pub fn at_pointer<'a>(
+    root: &'a Value,
+    schema: &'a Value,
+    value: &Value,
+    pointer: &str,
+) -> Option<&'a Value> {
+    let mut schema = settle(root, schema, value);
+    let mut value = value;
+    for segment in pointer.split('/').skip(1) {
+        let segment = segment.replace("~1", "/").replace("~0", "~");
+        let field = match kind(root, schema) {
+            SchemaKind::Object => schema.get("properties")?.get(&segment)?,
+            SchemaKind::Map(values) => values,
+            SchemaKind::Array(items) => items,
+            _ => return None,
+        };
+        value = match value {
+            Value::Object(fields) => fields.get(&segment)?,
+            Value::Array(items) => items.get(segment.parse::<usize>().ok()?)?,
+            _ => return None,
+        };
+        schema = settle(root, field, value);
+    }
+    Some(schema)
+}
+
+pub fn settle<'a>(root: &'a Value, schema: &'a Value, value: &Value) -> &'a Value {
+    let schema = resolve(root, schema);
+    match kind(root, schema) {
+        SchemaKind::Union(variants) => variants
+            .into_iter()
+            .find(|variant| {
+                value.get(&variant.field).and_then(Value::as_str) == Some(variant.tag.as_str())
+            })
+            .map_or(schema, |variant| variant.schema),
+        SchemaKind::Choice(alternatives) => alternatives
+            .into_iter()
+            .find(|alternative| fits(root, alternative, value))
+            .map_or(schema, |alternative| resolve(root, alternative)),
+        _ => schema,
+    }
+}
+
+pub fn non_null<'a>(root: &'a Value, schema: &'a Value) -> &'a Value {
+    let schema = resolve(root, schema);
+    match kind(root, schema) {
+        SchemaKind::Choice(alternatives) if is_optional(schema) => {
+            let mut taken = alternatives
+                .into_iter()
+                .filter(|alternative| type_names(alternative) != ["null"]);
+            match (taken.next(), taken.next()) {
+                (Some(only), None) => resolve(root, only),
+                _ => schema,
+            }
+        }
+        _ => schema,
+    }
+}
+
+pub fn number_shorthand(root: &Value, field: &Value, number: f64) -> Option<String> {
+    if non_null(root, field)["x-unit"] == "%" {
+        Some(format!("{number}%"))
+    } else if field.get("x-count").is_some() {
+        Some(format!("× {number}"))
+    } else {
+        None
+    }
+}
+
+pub fn blank_meaning<'a>(schema: &'a Value, value: &Value) -> Vec<&'a str> {
+    properties(schema)
+        .into_iter()
+        .filter(|(name, _)| value.get(name.as_str()).is_none_or(Value::is_null))
+        .filter_map(|(_, field)| field.get("x-blank").and_then(Value::as_str))
+        .collect()
+}
+
 pub fn kind<'a>(root: &'a Value, schema: &'a Value) -> SchemaKind<'a> {
     let schema = resolve(root, schema);
     if let Some(value) = schema.get("const") {
@@ -235,6 +312,53 @@ pub fn is_optional(schema: &Value) -> bool {
                     .iter()
                     .any(|alternative| type_names(alternative) == vec!["null"])
             })
+}
+
+pub fn fits(root: &Value, schema: &Value, value: &Value) -> bool {
+    let schema = resolve(root, schema);
+    if let Some(constant) = schema.get("const") {
+        return constant == value;
+    }
+    if let Some(options) = schema.get("enum").and_then(Value::as_array) {
+        return options.contains(value);
+    }
+    if let Some(alternatives) = schema
+        .get("oneOf")
+        .or_else(|| schema.get("anyOf"))
+        .and_then(Value::as_array)
+    {
+        return alternatives
+            .iter()
+            .any(|alternative| fits(root, alternative, value));
+    }
+    let types = type_names(schema);
+    if types.is_empty() {
+        return true;
+    }
+    types.iter().any(|name| match *name {
+        "null" => value.is_null(),
+        "boolean" => value.is_boolean(),
+        "integer" => value.is_i64() || value.is_u64(),
+        "number" => value.is_number(),
+        "string" => value.is_string(),
+        "array" => value.is_array(),
+        "object" => {
+            value.is_object()
+                && required(schema)
+                    .iter()
+                    .all(|name| value.get(name).is_some())
+                && schema
+                    .get("properties")
+                    .and_then(Value::as_object)
+                    .is_none_or(|properties| {
+                        properties
+                            .iter()
+                            .filter(|(name, _)| value.get(*name).is_some())
+                            .all(|(name, field)| fits(root, field, &value[name]))
+                    })
+        }
+        _ => true,
+    })
 }
 
 pub fn type_names(schema: &Value) -> Vec<&str> {

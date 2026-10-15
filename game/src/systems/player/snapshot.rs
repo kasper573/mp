@@ -36,6 +36,7 @@ pub struct CharacterSnapshot {
     pub stats: StatMap,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub effects: Vec<SnapshotEffect>,
+    #[schemars(extend("x-usage" = "from the bag"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bag: Vec<ItemStack>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

@@ -7,11 +7,11 @@ use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};
+use super::placement::{self, PartView, Placement};
 use super::{
-    AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner, pins,
-    shapes,
+    AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner,
+    blueprint_part, module_index, module_part, pick, pins, shapes,
 };
-use super::{pick, placement};
 use crate::app::{Clipboard, Editor, RightTab};
 use crate::project::RowSelection;
 use crate::rows;
@@ -33,59 +33,36 @@ pub(super) fn select_input(
     frame: &AreaFrame,
     modifiers: egui::Modifiers,
 ) {
+    let scope = match frame.in_place.last() {
+        Some(place) => SelectScope::Blueprint {
+            place,
+            parts: placement::parts_in_place(frame, place),
+        },
+        None => SelectScope::Area,
+    };
     let response = frame.response;
-    let Some(tile) = frame.pointer_tile else {
+    let Some(tile) = scope.tile(frame) else {
         if response.drag_stopped() {
-            finish_select_drag(editor, view_key, frame, modifiers);
+            finish_select_drag(editor, view_key, &scope, frame, modifiers);
         }
         return;
     };
-    if modifiers.alt && response.clicked() {
-        editor.views.area.view_mut(view_key).listener = Some(tile);
-        pick::listen(editor, frame, tile);
-        return;
-    }
-    if let Some(ghost) = editor.views.area.view(view_key).paste.clone() {
-        if response.clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-            finish_paste(editor, view_key, frame, ghost, tile);
+    if scope.is_area() {
+        if modifiers.alt && response.clicked() {
+            editor.views.area.view_mut(view_key).listener = Some(tile);
+            pick::listen(editor, frame, tile);
+            return;
         }
-        return;
-    }
-    let selected = selected_indices(editor, &frame.area_key);
-    if response.drag_started_by(egui::PointerButton::Primary) {
-        let on_handle = selected
-            .iter()
-            .find_map(|&index| handle_at(frame, index, frame.pointer?));
-        let hit = frame.hit(tile);
-        let pin = pins::pin_at(editor, frame, frame.pointer.unwrap_or_default());
-        let view = editor.views.area.view_mut(view_key);
-        if let Some((index, corner, start)) = on_handle {
-            view.set_drag(AreaDrag::Resize {
-                part: super::module_part(index),
-                corner,
-                start,
-            });
-        } else if let Some(pin) = pin {
-            view.set_drag(match pin {
-                pins::PinHit::InitialSpawn => AreaDrag::InitialSpawn,
-                pins::PinHit::Place { file, pointer } => AreaDrag::Pin { file, pointer },
-            });
-        } else if let Some(hit) = hit {
-            if !selected.contains(&hit) {
-                editor.selection =
-                    RowSelection::parts("area", &frame.area_key, vec![super::module_part(hit)]);
+        if let Some(ghost) = editor.views.area.view(view_key).paste.clone() {
+            if response.clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                finish_paste(editor, view_key, frame, ghost, tile);
             }
-            editor
-                .views
-                .area
-                .view_mut(view_key)
-                .set_drag(AreaDrag::Move {
-                    from: tile,
-                    moved: false,
-                });
-        } else {
-            view.set_drag(AreaDrag::Box { from: tile });
+            return;
         }
+    }
+    let hit = scope.hit(frame, tile);
+    if response.drag_started_by(egui::PointerButton::Primary) {
+        start_select_drag(editor, view_key, frame, &scope, tile, hit);
         return;
     }
     if response.dragged_by(egui::PointerButton::Primary) {
@@ -93,43 +70,235 @@ pub(super) fn select_input(
         return;
     }
     if response.drag_stopped() {
-        finish_select_drag(editor, view_key, frame, modifiers);
+        finish_select_drag(editor, view_key, &scope, frame, modifiers);
         return;
     }
-    if response.double_clicked()
-        && let Some(hit) = frame.hit(tile)
-    {
-        if frame.modules[hit].is_module(AreaModuleKind::Blueprint) {
-            placement::edit_in_place(editor, view_key, frame, hit);
-        } else {
-            editor.panels.right = RightTab::Inspector;
-        }
+    if response.double_clicked() && scope.double_click(editor, view_key, frame, hit) {
         return;
     }
     if response.clicked() {
-        if let Some(pin) = pins::pin_at(editor, frame, frame.pointer.unwrap_or_default()) {
+        if scope.is_area()
+            && let Some(pin) = pins::pin_at(editor, frame, frame.pointer.unwrap_or_default())
+        {
             pins::open_pin(editor, pin);
             return;
         }
-        match frame.hit(tile) {
+        match hit {
             Some(index) => {
                 let parts = toggled(
                     editor,
-                    "area",
-                    &frame.area_key,
-                    super::module_part(index),
+                    scope.table(),
+                    scope.key(frame),
+                    scope.part(index),
                     modifiers,
                 );
-                editor.selection = RowSelection::parts("area", &frame.area_key, parts);
+                editor.selection = RowSelection::parts(scope.table(), scope.key(frame), parts);
             }
-            None => {
-                if !modifiers.shift && !modifiers.ctrl {
-                    editor.selection = RowSelection::row("area", &frame.area_key);
+            None if !modifiers.shift && !modifiers.ctrl => scope.clear_selection(editor, frame),
+            None => {}
+        }
+        if scope.is_area() {
+            editor.views.area.view_mut(view_key).cursor_cell = Some(tile.cell());
+        }
+    }
+}
+
+enum SelectScope<'a> {
+    Area,
+    Blueprint {
+        place: &'a Placement,
+        parts: Vec<PartView>,
+    },
+}
+
+impl SelectScope<'_> {
+    fn is_area(&self) -> bool {
+        matches!(self, SelectScope::Area)
+    }
+
+    fn tile(&self, frame: &AreaFrame) -> Option<Pos<Tiles>> {
+        match self {
+            SelectScope::Area => frame.pointer_tile,
+            SelectScope::Blueprint { .. } => frame.drag_tile(),
+        }
+    }
+
+    fn table(&self) -> &'static str {
+        match self {
+            SelectScope::Area => "area",
+            SelectScope::Blueprint { .. } => "blueprint",
+        }
+    }
+
+    fn key<'a>(&'a self, frame: &'a AreaFrame) -> &'a str {
+        match self {
+            SelectScope::Area => &frame.area_key,
+            SelectScope::Blueprint { place, .. } => &place.blueprint,
+        }
+    }
+
+    fn part(&self, index: usize) -> String {
+        match self {
+            SelectScope::Area => module_part(index),
+            SelectScope::Blueprint { .. } => blueprint_part(index),
+        }
+    }
+
+    fn selected(&self, editor: &Editor, frame: &AreaFrame) -> Vec<usize> {
+        match self {
+            SelectScope::Area => selected_indices(editor, &frame.area_key),
+            SelectScope::Blueprint { place, .. } => {
+                placement::selected_part_indices(editor, &place.blueprint)
+            }
+        }
+    }
+
+    fn hit(&self, frame: &AreaFrame, tile: Pos<Tiles>) -> Option<usize> {
+        match self {
+            SelectScope::Area => frame.hit(tile),
+            SelectScope::Blueprint { parts, .. } => parts
+                .iter()
+                .filter(|part| part.bounds.is_some_and(|b| b.contains(tile)))
+                .min_by(|a, b| {
+                    a.bounds
+                        .map_or(0.0, |b| b.area())
+                        .total_cmp(&b.bounds.map_or(0.0, |b| b.area()))
+                })
+                .map(|part| part.part),
+        }
+    }
+
+    fn contained(&self, frame: &AreaFrame, rect: Rect<Tiles>) -> Vec<usize> {
+        match self {
+            SelectScope::Area => (0..frame.modules.len())
+                .filter(|&index| {
+                    super::is_selectable(&frame.modules[index])
+                        && frame
+                            .module_bounds(index)
+                            .is_some_and(|bounds| rect.contains_rect(&bounds))
+                })
+                .collect(),
+            SelectScope::Blueprint { parts, .. } => parts
+                .iter()
+                .filter(|part| part.bounds.is_some_and(|b| rect.contains_rect(&b)))
+                .map(|part| part.part)
+                .collect(),
+        }
+    }
+
+    fn move_selected(&self, editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) {
+        match self {
+            SelectScope::Area => move_selection(editor, frame, dx, dy),
+            SelectScope::Blueprint { place, .. } => {
+                let indices = self.selected(editor, frame);
+                if !indices.is_empty() {
+                    placement::move_parts_in_place(editor, frame, place, &indices, dx, dy);
                 }
             }
         }
-        editor.views.area.view_mut(view_key).cursor_cell = Some(tile.cell());
     }
+
+    fn clear_selection(&self, editor: &mut Editor, frame: &AreaFrame) {
+        match self {
+            SelectScope::Area => editor.selection = RowSelection::row("area", &frame.area_key),
+            SelectScope::Blueprint { .. } => editor.selection.parts.clear(),
+        }
+    }
+
+    fn double_click(
+        &self,
+        editor: &mut Editor,
+        view_key: &str,
+        frame: &AreaFrame,
+        hit: Option<usize>,
+    ) -> bool {
+        match (self, hit) {
+            (SelectScope::Area, Some(index)) => {
+                if frame.modules[index].is_module(AreaModuleKind::Blueprint) {
+                    placement::edit_in_place(editor, view_key, frame, index);
+                } else {
+                    editor.panels.right = RightTab::Inspector;
+                }
+                true
+            }
+            (SelectScope::Blueprint { parts, .. }, Some(index)) => {
+                let nested = parts
+                    .iter()
+                    .find(|part| part.part == index)
+                    .and_then(|part| part.nested.as_deref());
+                match nested {
+                    Some(blueprint) => {
+                        placement::enter_nested(editor, view_key, index, blueprint);
+                        true
+                    }
+                    None => false,
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+fn start_select_drag(
+    editor: &mut Editor,
+    view_key: &str,
+    frame: &AreaFrame,
+    scope: &SelectScope,
+    tile: Pos<Tiles>,
+    hit: Option<usize>,
+) {
+    if scope.is_area() {
+        let on_handle = frame.pointer.and_then(|pointer| {
+            scope
+                .selected(editor, frame)
+                .into_iter()
+                .find_map(|index| handle_at(frame, index, pointer))
+        });
+        if let Some((index, corner, start)) = on_handle {
+            set_drag(
+                editor,
+                view_key,
+                AreaDrag::Resize {
+                    part: module_part(index),
+                    corner,
+                    start,
+                },
+            );
+            return;
+        }
+        if let Some(pin) = pins::pin_at(editor, frame, frame.pointer.unwrap_or_default()) {
+            set_drag(
+                editor,
+                view_key,
+                match pin {
+                    pins::PinHit::InitialSpawn => AreaDrag::InitialSpawn,
+                    pins::PinHit::Place { file, pointer } => AreaDrag::Pin { file, pointer },
+                },
+            );
+            return;
+        }
+    }
+    match hit {
+        Some(index) => {
+            if !scope.selected(editor, frame).contains(&index) {
+                editor.selection =
+                    RowSelection::parts(scope.table(), scope.key(frame), vec![scope.part(index)]);
+            }
+            set_drag(
+                editor,
+                view_key,
+                AreaDrag::Move {
+                    from: tile,
+                    moved: false,
+                },
+            );
+        }
+        None => set_drag(editor, view_key, AreaDrag::Box { from: tile }),
+    }
+}
+
+fn set_drag(editor: &mut Editor, view_key: &str, drag: AreaDrag) {
+    editor.views.area.view_mut(view_key).set_drag(drag);
 }
 
 pub(super) fn track_move(view: &mut AreaViewState, tile: Pos<Tiles>) {
@@ -204,9 +373,10 @@ pub(super) fn handle_at(
         .map(|(corner, _)| (index, corner, bounds))
 }
 
-pub(super) fn finish_select_drag(
+fn finish_select_drag(
     editor: &mut Editor,
     view_key: &str,
+    scope: &SelectScope,
     frame: &AreaFrame,
     modifiers: egui::Modifiers,
 ) {
@@ -219,24 +389,15 @@ pub(super) fn finish_select_drag(
     match drag {
         AreaDrag::Box { from } => {
             let rect = Rect::from_points([from, tile]);
-            let hits = (0..frame.modules.len()).filter(|&index| {
-                if frame.modules[index].is_module(AreaModuleKind::Population)
-                    && frame.modules[index]["roams"].is_null()
-                {
-                    return false;
-                }
-                frame
-                    .module_bounds(index)
-                    .is_some_and(|bounds| rect.contains_rect(&bounds))
-            });
+            let hits = scope.contained(frame, rect);
             let parts = boxed(
                 editor,
-                "area",
-                &frame.area_key,
-                hits.map(super::module_part),
+                scope.table(),
+                scope.key(frame),
+                hits.into_iter().map(|index| scope.part(index)),
                 modifiers,
             );
-            editor.selection = RowSelection::parts("area", &frame.area_key, parts);
+            editor.selection = RowSelection::parts(scope.table(), scope.key(frame), parts);
         }
         AreaDrag::Move { from, moved } => {
             if !moved {
@@ -246,14 +407,14 @@ pub(super) fn finish_select_drag(
             if dx == 0.0 && dy == 0.0 {
                 return;
             }
-            move_selection(editor, frame, dx, dy);
+            scope.move_selected(editor, frame, dx, dy);
         }
         AreaDrag::Resize {
             part,
             corner,
             start,
         } => {
-            let Some(index) = super::module_index(&part) else {
+            let Some(index) = module_index(&part) else {
                 return;
             };
             let (min, max) = (start.min(), start.max());
@@ -285,7 +446,7 @@ pub(super) fn finish_select_drag(
             let at = snap_to(tile, modifiers.alt);
             pins::set_spawn(editor, &frame.area_key, at);
         }
-        _ => {}
+        AreaDrag::Stamp { .. } => {}
     }
 }
 

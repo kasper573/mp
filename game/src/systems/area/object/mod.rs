@@ -64,7 +64,9 @@ pub enum ObjectShape {
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum ShapeRow {
+    #[schemars(extend("x-pos" = true))]
     Point { x: f32, y: f32 },
+    #[schemars(extend("x-rect" = true))]
     Rect { x: f32, y: f32, w: f32, h: f32 },
 }
 

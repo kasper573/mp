@@ -243,13 +243,20 @@ pub(super) fn part_cards(
                 let mut plain = part.clone();
                 let before = plain.clone();
                 cx.holes = Some(forms::FormHoles {
-                    filled: holes
+                    fields: holeable
                         .iter()
-                        .map(|hole| (format!("{path}{}", hole.pointer), hole.name.clone()))
-                        .collect(),
-                    open: holeable
-                        .iter()
-                        .map(|field| (format!("{path}{}", field.pointer), field.kind))
+                        .map(|field| {
+                            (
+                                format!("{path}{}", field.pointer),
+                                forms::FieldHole::Open(field.kind),
+                            )
+                        })
+                        .chain(holes.iter().map(|hole| {
+                            (
+                                format!("{path}{}", hole.pointer),
+                                forms::FieldHole::Filled(hole.name.clone()),
+                            )
+                        }))
                         .collect(),
                     variables: variables.clone(),
                     requests: Vec::new(),

@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog, registry};
 use crate::project::{ContentEdit, Project, ProjectFiles, RowSelection, row_file, row_of};
+use crate::schema::SchemaShapes;
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
@@ -477,38 +478,43 @@ fn list_slot(pointer: &str) -> Option<(String, usize)> {
 }
 
 fn usage_detail(project: &Project, file: &str, pointer: &str) -> String {
-    let Some(row) = project.files.json(file) else {
+    let (Some(row), Some((table, _))) = (project.files.json(file), row_of(file)) else {
         return String::new();
     };
     let parent = pointer
         .rsplit_once('/')
         .map(|(parent, _)| parent)
         .unwrap_or("");
-    let Some(entry) = row.pointer(parent).and_then(Value::as_object) else {
+    let Some(at) = row.pointer(parent) else {
         return String::new();
     };
+    let Some(entry) = at.as_object() else {
+        return String::new();
+    };
+    let root = project.shapes.shape_of(table);
+    let shape = schema::at_pointer(root, root, &row, parent).unwrap_or(&Value::Null);
     let mut parts: Vec<String> = Vec::new();
     for (name, value) in entry {
         if format!("{parent}/{name}") == pointer || name == "type" {
             continue;
         }
         let text = match value {
-            Value::Number(number) => match name.as_str() {
-                "chance" => format!("{}%", number.as_f64().unwrap_or(0.0)),
-                "amount" | "count" | "times" => {
-                    format!("× {}", number.as_f64().unwrap_or(0.0))
-                }
-                _ => format!("{name} {}", number.as_f64().unwrap_or(0.0)),
-            },
+            Value::Number(number) => {
+                let number = number.as_f64().unwrap_or(0.0);
+                schema::number_shorthand(root, &shape["properties"][name], number)
+                    .unwrap_or_else(|| format!("{name} {number}"))
+            }
             Value::String(text) => format!("{name} {text}"),
             Value::Bool(true) => name.clone(),
             _ => continue,
         };
         parts.push(text);
     }
-    if entry.get("chance").is_none() && entry.contains_key("item") {
-        parts.push("always".to_owned());
-    }
+    parts.extend(
+        schema::blank_meaning(shape, at)
+            .into_iter()
+            .map(str::to_owned),
+    );
     parts.join(" · ")
 }
 
@@ -610,7 +616,14 @@ pub fn delete_body(editor: &mut Editor, ui: &mut Ui, dialog: &mut DeleteDialog) 
                         widgets::badge(ui, badge);
                         ui.label(theme::strong(&title));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            decision_picker(ui, &dialog.table, index, group, &candidates);
+                            decision_picker(
+                                ui,
+                                &project.shapes,
+                                &dialog.table,
+                                index,
+                                group,
+                                &candidates,
+                            );
                         });
                     });
                     ui.add_space(2.0);
@@ -681,6 +694,7 @@ fn group_title(project: &Project, group: &UsageGroup) -> String {
 
 fn decision_picker(
     ui: &mut Ui,
+    shapes: &SchemaShapes,
     table: &str,
     index: usize,
     group: &mut UsageGroup,
@@ -690,10 +704,8 @@ fn decision_picker(
     if group.removable {
         let remove_label = if group.whole_modules {
             format!("Remove the {} modules", group.kind.replace('_', " "))
-        } else if entries_word(&group.kind) == "from the bag" {
-            "Remove from the bag".to_owned()
         } else {
-            format!("Remove the {}", entries_word(&group.kind))
+            format!("Remove {}", usage_phrase(shapes, &group.table, &group.kind))
         };
         let unpackable = table == "blueprint" && group.whole_modules;
         let label = match group.decision {
@@ -789,12 +801,13 @@ fn usage_lines(ui: &mut Ui, index: usize, lines: &[(String, String)]) {
         });
 }
 
-fn entries_word(kind: &str) -> &'static str {
-    match kind {
-        "buys" | "sells" | "offers" | "stock" => "offers",
-        "bag" | "inventory" | "start" => "from the bag",
-        _ => "entries",
-    }
+fn usage_phrase(shapes: &SchemaShapes, table: &str, field: &str) -> String {
+    shapes
+        .tables
+        .get(table)
+        .and_then(|table| table.shape["properties"][field]["x-usage"].as_str())
+        .unwrap_or("the entries")
+        .to_owned()
 }
 
 pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> {

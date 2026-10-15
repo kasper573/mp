@@ -1,6 +1,7 @@
 pub mod app;
 mod audio;
 mod condition;
+pub mod drafts;
 mod forms;
 pub mod import;
 mod picker;
@@ -15,6 +16,6 @@ pub mod templates;
 pub mod thumbs;
 mod ui;
 mod usages;
-mod user;
+pub mod user;
 mod value;
-mod views;
+pub mod views;

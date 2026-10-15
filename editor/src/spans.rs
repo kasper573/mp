@@ -4,7 +4,8 @@ use game::systems::text::{Ink, Motion, Voice};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
-use crate::forms::{FormChange, FormCx, clear_draft, committed, draft_of, set_draft, take_draft};
+use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
+use crate::forms::{FormChange, FormCx, committed};
 use crate::ui::{theme, widgets};
 use crate::{condition, forms, picker};
 

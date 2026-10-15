@@ -23,7 +23,9 @@ impl ContentRow for CursorDef {
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hotspot {
+    #[schemars(extend("x-unit" = "px"))]
     pub x: u16,
+    #[schemars(extend("x-unit" = "px"))]
     pub y: u16,
 }
 

@@ -6,7 +6,8 @@ use game::systems::npc::{self, NpcDef};
 use game::systems::script::{OwnerKind, RiftScripts};
 use serde_json::Value;
 
-use crate::forms::{FormAction, FormCx, clear_draft, draft_of, set_draft};
+use crate::drafts::{clear_draft, draft_of, set_draft};
+use crate::forms::{FormAction, FormCx};
 use crate::project::{ProjectFiles, row_file, row_of};
 use crate::thumbs;
 use crate::ui::{theme, widgets};

@@ -7,7 +7,8 @@ use serde_json::Value;
 use super::{LEFT_COLUMN, act, add_module_popup};
 use super::{theme, widgets};
 use crate::app::{Editor, registry};
-use crate::forms::{self, FormAction, FormCx, clear_draft, draft_of, set_draft};
+use crate::drafts::{clear_draft, draft_of, set_draft};
+use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::schema::{self, SchemaKind};
 use crate::value::RowValue;
@@ -375,12 +376,10 @@ pub(super) fn shared_field(
     });
 }
 
-pub(super) fn fieldless_note(table: &str, tag: &str) -> &'static str {
-    match (table, tag) {
-        ("model", "airborne") => {
-            "No fields. Walks ignore blocked cells; wild ones keep out of safe zones."
-        }
-        _ => "No fields: having it is the setting.",
+pub(super) fn fieldless_note(variant: &Value) -> String {
+    match variant["description"].as_str() {
+        Some(description) => format!("No fields. {description}"),
+        None => "No fields: having it is the setting.".to_owned(),
     }
 }
 

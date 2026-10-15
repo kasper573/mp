@@ -321,6 +321,7 @@ pub struct SoundChannel {
     pub channel: u32,
     #[schemars(extend("x-asset" = "audio"))]
     pub file: AssetRef,
+    #[schemars(extend("default" = serial::one_f32()))]
     #[serde(
         default = "serial::one_f32",
         skip_serializing_if = "serial::is_one_f32"
@@ -508,6 +509,7 @@ impl From<SceneryTile> for SceneryTileRow {
 #[serde(deny_unknown_fields)]
 pub struct Population {
     pub npc: NpcId,
+    #[schemars(extend("x-count" = true))]
     pub count: u32,
     #[schemars(with = "Option<serial::RectRow>")]
     #[serde(

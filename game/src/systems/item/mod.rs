@@ -75,6 +75,8 @@ pub struct ItemStack {
 #[serde(deny_unknown_fields)]
 struct ItemStackRow {
     item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     count: u32,
 }

@@ -11,9 +11,9 @@ use serde_json::Value;
 
 use super::holes::value_kind;
 use super::inspect::Followups;
+use super::modules;
 use super::stamp::placed_part;
 use super::{AreaFrame, AreaSnapshot, shapes};
-use super::{modules, select};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
@@ -438,17 +438,9 @@ pub fn edit_in_place(editor: &mut Editor, view_key: &str, frame: &AreaFrame, ind
     start_in_place(editor, view_key, &frame.area_key, index);
 }
 
-pub fn enter_nested(editor: &mut Editor, view_key: &str, part: &PartView) {
-    let Some(nested) = &part.nested else {
-        return;
-    };
-    editor
-        .views
-        .area
-        .view_mut(view_key)
-        .in_place
-        .push(part.part);
-    editor.selection = RowSelection::row("blueprint", nested);
+pub fn enter_nested(editor: &mut Editor, view_key: &str, part: usize, blueprint: &str) {
+    editor.views.area.view_mut(view_key).in_place.push(part);
+    editor.selection = RowSelection::row("blueprint", blueprint);
 }
 
 pub fn selected_part_indices(editor: &Editor, blueprint: &str) -> Vec<usize> {
@@ -465,110 +457,6 @@ pub fn selected_part_indices(editor: &Editor, blueprint: &str) -> Vec<usize> {
         .collect();
     out.sort_unstable();
     out
-}
-
-pub fn select_input_in_place(
-    editor: &mut Editor,
-    view_key: &str,
-    frame: &AreaFrame,
-    place: &Placement,
-    modifiers: egui::Modifiers,
-) {
-    let response = frame.response;
-    let parts = parts_in_place(frame, place);
-    let Some(tile) = frame.drag_tile() else {
-        return;
-    };
-    let hit = parts
-        .iter()
-        .filter(|part| part.bounds.is_some_and(|b| b.contains(tile)))
-        .min_by(|a, b| {
-            a.bounds
-                .map_or(0.0, |b| b.area())
-                .total_cmp(&b.bounds.map_or(0.0, |b| b.area()))
-        })
-        .map(|part| part.part);
-    let selected = selected_part_indices(editor, &place.blueprint);
-    if response.drag_started_by(egui::PointerButton::Primary) {
-        let view = editor.views.area.view_mut(view_key);
-        match hit {
-            Some(index) => {
-                if !selected.contains(&index) {
-                    editor.selection = RowSelection::parts(
-                        "blueprint",
-                        &place.blueprint,
-                        vec![super::blueprint_part(index)],
-                    );
-                }
-                editor
-                    .views
-                    .area
-                    .view_mut(view_key)
-                    .set_drag(super::AreaDrag::Move {
-                        from: tile,
-                        moved: false,
-                    });
-            }
-            None => view.set_drag(super::AreaDrag::Box { from: tile }),
-        }
-        return;
-    }
-    if response.dragged_by(egui::PointerButton::Primary) {
-        select::track_move(editor.views.area.view_mut(view_key), tile);
-        return;
-    }
-    if response.drag_stopped() {
-        let Some(drag) = editor.views.area.view_mut(view_key).take_drag() else {
-            return;
-        };
-        match drag {
-            super::AreaDrag::Box { from } => {
-                let rect = Rect::from_points([from, tile]);
-                let hits = parts
-                    .iter()
-                    .filter(|part| part.bounds.is_some_and(|b| rect.contains_rect(&b)))
-                    .map(|part| super::blueprint_part(part.part));
-                let picked = select::boxed(editor, "blueprint", &place.blueprint, hits, modifiers);
-                editor.selection = RowSelection::parts("blueprint", &place.blueprint, picked);
-            }
-            super::AreaDrag::Move { from, moved: true } => {
-                let (dx, dy) = select::snapped_delta(from, tile, modifiers.alt);
-                if dx != 0.0 || dy != 0.0 {
-                    let indices = selected_part_indices(editor, &place.blueprint);
-                    move_parts_in_place(editor, frame, place, &indices, dx, dy);
-                }
-            }
-            _ => {}
-        }
-        return;
-    }
-    if response.double_clicked()
-        && let Some(index) = hit
-        && let Some(part) = parts.iter().find(|p| p.part == index)
-        && part.nested.is_some()
-    {
-        enter_nested(editor, view_key, part);
-        return;
-    }
-    if response.clicked() {
-        match hit {
-            Some(index) => {
-                let picked = select::toggled(
-                    editor,
-                    "blueprint",
-                    &place.blueprint,
-                    super::blueprint_part(index),
-                    modifiers,
-                );
-                editor.selection = RowSelection::parts("blueprint", &place.blueprint, picked);
-            }
-            None => {
-                if !modifiers.shift && !modifiers.ctrl {
-                    editor.selection.parts.clear();
-                }
-            }
-        }
-    }
 }
 
 pub fn overlay_in_place(

@@ -434,6 +434,7 @@ impl KeyGesture {
 pub struct ClickGesture {
     #[schemars(schema_with = "mouse_button_schema")]
     pub button: MouseButton,
+    #[schemars(extend("x-count" = true))]
     pub times: u8,
     #[serde(flatten)]
     pub modifiers: KeyModifiers,

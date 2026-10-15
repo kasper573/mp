@@ -915,9 +915,7 @@ impl AreaSnapshot {
             let Some(bounds) = self.module_bounds(index) else {
                 continue;
             };
-            if self.modules[index].is_module(AreaModuleKind::Population)
-                && self.modules[index]["roams"].is_null()
-            {
+            if !is_selectable(&self.modules[index]) {
                 continue;
             }
             if bounds.contains(tile) {
@@ -947,6 +945,10 @@ impl AreaFrame<'_> {
                 .map(|p| self.canvas.to_tile(p))
         })
     }
+}
+
+fn is_selectable(module: &Value) -> bool {
+    !(module.is_module(AreaModuleKind::Population) && module["roams"].is_null())
 }
 
 fn origin_of(center: Pos<Tiles>, in_place: &[placement::Placement]) -> (Pos<Tiles>, area::Flip) {
@@ -1025,7 +1027,7 @@ pub fn open_area_at(editor: &mut Editor, area: &str, at: Option<Pos<Tiles>>, par
     }
 }
 
-pub(super) fn run_action(editor: &mut Editor, frame: &AreaSnapshot, action: AreaAction) {
+pub fn run_action(editor: &mut Editor, frame: &AreaSnapshot, action: AreaAction) {
     match action {
         AreaAction::Copy => select::copy_selection(editor, frame),
         AreaAction::Duplicate => select::duplicate_selection(editor, frame),

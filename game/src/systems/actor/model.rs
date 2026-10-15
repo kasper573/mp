@@ -126,7 +126,10 @@ pub struct SheetFrame {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ModelModule {
     Bust(Busts),
-    Scale { factor: f32 },
+    Scale {
+        factor: f32,
+    },
+    /// Walks ignore blocked cells; wild ones keep out of safe zones.
     Airborne,
 }
 

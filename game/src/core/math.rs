@@ -14,6 +14,7 @@ pub struct WindowPx(pub f32);
 #[derive(
     JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd, Default,
 )]
+#[schemars(extend("x-unit" = "%"))]
 pub struct Percent(pub f32);
 
 impl Percent {

@@ -1,7 +1,7 @@
 use egui::{Color32, FontId, RichText, Stroke, Ui};
 use serde_json::Value;
 
-use crate::forms::{self, FormChange, FormCx, fits};
+use crate::forms::{self, FormChange, FormCx};
 use crate::schema::{self, SchemaKind, SchemaVariant};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -124,7 +124,7 @@ pub fn edit(
             && value.get("var").is_none()
             && !plain
                 .iter()
-                .any(|alternative| fits(cx.root, alternative, value))
+                .any(|alternative| schema::fits(cx.root, alternative, value))
         {
             ui.colored_label(theme::DANGER, "unknown block");
             changed |= forms::raw_json(ui, cx, value, path);
@@ -452,7 +452,7 @@ fn query_block(
             let optional = !required.contains(&name.as_str()) || schema::is_optional(field);
             let present = value.get(name).is_some_and(|v| !v.is_null());
             if !present {
-                if optional && matches!(name.as_str(), "of" | "among" | "at" | "npc") {
+                if optional {
                     continue;
                 }
                 let fresh = schema::template(cx.root, field);
@@ -466,7 +466,7 @@ fn query_block(
                 }
                 continue;
             }
-            if matches!(name.as_str(), "of" | "among" | "actor" | "at") {
+            if schema::table_of(schema::non_null(cx.root, field)).is_none() {
                 ui.label(theme::muted(name).size(12.0));
             }
             ui.scope(|ui| {

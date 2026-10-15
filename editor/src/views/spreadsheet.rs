@@ -271,9 +271,7 @@ fn leaves(
     }
     let schema = schema::resolve(root, schema);
     match schema::kind(root, schema) {
-        SchemaKind::Object
-            if schema::marker(schema).is_none() && forms::geometry_of(root, schema).is_none() =>
-        {
+        SchemaKind::Object if schema::marker(schema).is_none() => {
             for (name, field) in schema::properties(schema) {
                 path.push(name.clone());
                 leaves(root, field, path, out);
