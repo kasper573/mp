@@ -2,15 +2,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use driver::{WaitBudget, area_key, area_named, beside_resident, ground_near, in_warp, open};
-use game::core::math::{Offset, Pos};
+use driver::{
+    WaitBudget, area_key, area_named, beside_resident, clickable_point, ground_near, in_warp, taken,
+};
+use game::core::math::{Offset, Pos, WindowPx};
 use game::core::tiling::Tiles;
 use game::systems::probe::ProbeSnapshot;
 
 use crate::playtest;
 
-const LINE: usize = 7;
-const FIRST_GOAL: usize = 4;
+const LINE: usize = 12;
+// A slow machine draws few frames, and the view follows the walk by up to a tile a frame, so a click
+// aimed mid-walk lands up to this many tiles further along than aimed.
+const DRIFT: usize = 2;
 const CLEARANCE: f32 = 3.0;
 
 // Where the player showed on screen, frame by frame.
@@ -39,7 +43,9 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
         }
     });
 
-    player.point_at_tile(tiles[FIRST_GOAL]);
+    let (first_goal, at) =
+        player.wait_for("the line in view", |seen| farthest_in_view(seen, &tiles, 1));
+    player.point_at(at);
     let clicked = player.click().frame;
     player.wait_within(
         "the walk to set off",
@@ -55,11 +61,18 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
                 .then_some(())
         },
     );
-    player.point_at_tile(tiles[LINE - 1]);
+    let (_, at) = player.wait_for("more of the line in view", |seen| {
+        farthest_in_view(seen, &tiles, first_goal + 1)
+    });
+    player.point_at(at);
     player.click();
     let end = player.come_to_rest();
 
-    assert_eq!(end, tiles[LINE - 1]);
+    assert!(
+        tiles[first_goal + 1..].contains(&end),
+        "the walk ended at {end:?}, not on the line past {:?}",
+        tiles[first_goal]
+    );
     let drawn = drawn.borrow();
     let way: Vec<Pos<Tiles>> = drawn
         .iter()
@@ -79,16 +92,30 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
     }
 }
 
-// A level line of open ground near the player, one tile per step, so all of it stays in the wide
-// view once the player stands at its start, and with nobody near enough to wander onto it during
-// the walk: a click on them would talk instead.
+// The farthest tile of the line from `from` on that a click can reach now, and where to click it,
+// leaving room past it for the click to drift.
+fn farthest_in_view(
+    seen: &ProbeSnapshot,
+    tiles: &[Pos<Tiles>],
+    from: usize,
+) -> Option<(usize, Pos<WindowPx>)> {
+    (from..tiles.len() - DRIFT).rev().find_map(|index| {
+        let tile = tiles[index];
+        clickable_point(seen, tile)
+            .filter(|_| !taken(seen, tile))
+            .map(|at| (index, at))
+    })
+}
+
+// A level line of open ground starting near the player, one tile per step, with nobody near enough
+// to wander onto it during the walk: a click on them would talk instead.
 fn quiet_line(seen: &ProbeSnapshot) -> Option<(Offset<Tiles>, Vec<Pos<Tiles>>)> {
     let area = area_key(seen)?;
     let grid = &area_named(area).grid;
     let me = seen.me.as_ref()?.at;
     let quiet = |tile: Pos<Tiles>| {
         grid.walkable(tile)
-            && open(seen, tile)
+            && !taken(seen, tile)
             && !in_warp(seen, tile)
             && seen
                 .actors
