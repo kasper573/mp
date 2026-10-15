@@ -98,6 +98,7 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "rusty_sword") == 1
     });
 
+    close_bag(&mut me);
     me.caption_top("Leaving the conversation closes the shop with it");
     me.act(InputAction::Dismiss);
     me.conversation_over();
@@ -113,6 +114,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top(
         "Her shop has no reactions: trades pass in silence, and your bag lights up what she takes",
     );
+    me.act(InputAction::ToggleInventory);
     me.hold();
     me.act_on_ui(
         InputAction::SellItem,
@@ -121,9 +123,9 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the bones to sell", |snapshot| {
         holding(snapshot, "bone_token") == 4
     });
+    close_bag(&mut me);
     me.act(InputAction::Dismiss);
     me.wait_until("the exchange to close", |snapshot| snapshot.shop.is_none());
-    me.act(InputAction::ToggleInventory);
 
     me.caption("Even a box on the pier can keep a shop, inside a conversation of its own");
     me.shop_at("honesty-box");
@@ -139,6 +141,14 @@ fn shop_is(snapshot: &ProbeSnapshot, shop: &str) -> bool {
         .shop
         .as_ref()
         .is_some_and(|open| open.shop.key(content()) == shop)
+}
+
+// Esc closes the bag before the conversation under it.
+fn close_bag(me: &mut Player) {
+    me.act(InputAction::ToggleInventory);
+    me.wait_until("the bag to close", |snapshot| {
+        UiTarget::text("Inventory").find(snapshot).is_none()
+    });
 }
 
 // The ware's row in the list, rather than its name repeated on the details beside it.

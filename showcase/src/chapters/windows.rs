@@ -3,6 +3,7 @@ use std::f32::consts::TAU;
 use driver::{Player, UiTarget, content, holding};
 use game::core::math::{Offset, Pos, WindowPx};
 use game::systems::input::map::InputAction;
+use game::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
 use crate::shoot::{Shoot, Star};
@@ -57,7 +58,10 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the sword to be taken off", |snapshot| {
         holding(snapshot, "rusty_sword") == 1
     });
-    me.caption("Esc closes the card before any window");
+    me.caption("A right-click brings the card in front, and Esc closes what's in front");
+    inspect(&mut me, SHIELD, "bone_shield");
+    me.wait_until("the card in front", card_in_front);
+    me.hold();
     me.act(InputAction::Dismiss);
     me.wait_until("the item card to close", |snapshot| {
         snapshot.item_card.is_none()
@@ -159,6 +163,18 @@ fn inspect(me: &mut Player, icon: &str, item: &str) {
             .item_card
             .is_some_and(|card| card.item.key(content()) == item)
     });
+}
+
+fn card_in_front(snapshot: &ProbeSnapshot) -> bool {
+    snapshot.item_card.is_some_and(|card| {
+        let name = &card.item.get(content()).name;
+        snapshot
+            .ui
+            .iter()
+            .filter(|element| element.text.as_ref() == Some(name))
+            .filter(|element| card.rect.contains(element.rect.center()))
+            .all(|element| !element.click_through)
+    })
 }
 
 // The item card repeats the icon of the item it shows; only the copies outside it count.

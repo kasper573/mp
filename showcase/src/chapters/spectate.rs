@@ -118,13 +118,13 @@ fn switch_to(me: &mut Player, name: &str) {
         },
     );
     for _ in 0..online {
-        let before = watched_name(&me.snapshot());
-        if before.as_deref() == Some(name) {
+        let before = me.wait_for("the spectator to watch someone", watched_name);
+        if before == name {
             return;
         }
         me.act(InputAction::SpectateNext);
         me.wait_until("the spectator to switch", |snapshot| {
-            watched_name(snapshot) != before
+            watched_name(snapshot).is_some_and(|now| now != before)
         });
     }
     panic!("never got to watch {name}");

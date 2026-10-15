@@ -4,7 +4,7 @@ use design_tokens::{TextRole, color, widgets};
 use egui::{Color32, Pos2, Rect, Response, RichText, Ui, Vec2};
 
 use crate::core::content::Content;
-use crate::core::gui::{self, Band};
+use crate::core::gui::{self, Band, GuiContext};
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook, TextPiece, TextVoice};
 use crate::systems::hud::{self, Sizing, WindowFrame};
 use crate::systems::input::map::{self, InputAction, input};
@@ -26,6 +26,7 @@ pub struct ItemCardPlugin;
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemCard>()
+            .add_systems(Update, bring_to_front.run_if(in_state(ClientScreen::Area)))
             .add_systems(
                 EguiPrimaryContextPass,
                 draw_card
@@ -37,7 +38,9 @@ impl Plugin for ItemCardPlugin {
 }
 
 pub fn open(world: &mut World, item: ItemId) {
-    let was_shown = world.resource_mut::<ItemCard>().wanted.replace(item);
+    let mut card = world.resource_mut::<ItemCard>();
+    let was_shown = card.wanted.replace(item);
+    card.to_front = true;
     if was_shown.is_none() {
         InterfaceSound::UiOpen.play(world);
     }
@@ -152,11 +155,27 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
 #[derive(Resource, Default)]
 struct ItemCard {
     wanted: Option<ItemId>,
+    to_front: bool,
     drawn: Option<(ItemId, Rect)>,
 }
 
 fn forget(mut card: ResMut<ItemCard>) {
     *card = ItemCard::default();
+}
+
+// A press brings the area it lands on to the front as its pass ends, and areas brought to the front
+// in the same pass keep their order. So the card comes to the front a pass after it was asked for,
+// to end up above the window it was asked for from.
+fn bring_to_front(mut card: ResMut<ItemCard>, gui: Option<Res<GuiContext>>) {
+    if !card.to_front {
+        return;
+    }
+    card.to_front = false;
+    if let Some(gui) = gui
+        && card.wanted.is_some()
+    {
+        gui.0.move_to_top(layer());
+    }
 }
 
 fn draw_card(world: &mut World) {

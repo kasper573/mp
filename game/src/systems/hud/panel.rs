@@ -87,7 +87,7 @@ pub(crate) fn window<R>(
                 let bar = title_bar(ui, title, open);
                 let inner = match sizing {
                     Sizing::Resizable => body(ui, rect.max.y - margin.bottom, |ui| add(ui, world)),
-                    Sizing::FitsContent => add(ui, world),
+                    Sizing::FitsContent => fitted(ui, |ui| add(ui, world)),
                 };
                 (bar, inner)
             });
@@ -297,6 +297,13 @@ fn body<R>(ui: &mut Ui, bottom: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
         add(ui)
     })
     .inner
+}
+
+// An area lays its content out within the size it last had, which would hold a fitted window's
+// scrolling content to its height for the item it showed before.
+fn fitted<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
+    ui.set_max_height(ui.ctx().content_rect().bottom() - ui.max_rect().top());
+    add(ui)
 }
 
 fn corner_grip(ui: &mut Ui, id: Id, window: Rect) -> egui::Response {
