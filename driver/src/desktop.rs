@@ -218,12 +218,18 @@ impl Desktop {
     }
 
     // Both clicks of a double click go out together: the game counts it by the time between them. Frames
-    // far enough apart can still split them, and then, as a player would, it clicks again.
+    // far enough apart can still split them, and then, as a player would, it clicks again. Each try
+    // waits out the run of clicks before it, which the game would otherwise count it on from.
     pub fn click(&mut self, button: Button, times: u8) -> ProbeSnapshot {
         let deadline = Deadline::from(self, BUDGET);
         loop {
+            if times > 1 {
+                self.wait_for("the click run before to close", BUDGET, |snapshot| {
+                    (!snapshot.input.click_run_open).then_some(())
+                });
+            }
             let landed = self.click_once(button, times);
-            if times == 1 || landed.input.seen.click_run >= times {
+            if times == 1 || landed.input.seen.click_run == times {
                 return landed;
             }
             if deadline.passed(self) {

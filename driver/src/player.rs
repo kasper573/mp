@@ -17,7 +17,7 @@ use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
     UiTarget, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest, open,
-    portal, taken, townsperson,
+    passed_by, portal, taken, townsperson,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -400,7 +400,11 @@ impl Player {
                 .iter()
                 .rev()
                 .map(|cell| cell.center())
-                .find(|tile| open(&seen, *tile) && (!in_warp(&seen, *tile) || *tile == target))
+                .find(|tile| {
+                    open(&seen, *tile)
+                        && !passed_by(&seen, *tile)
+                        && (!in_warp(&seen, *tile) || *tile == target)
+                })
                 .or_else(|| detour(&seen, grid, target, path.len()));
             // Those standing in the way move on, or `arrived` says how close is close enough.
             let Some(hop) = hop else {
@@ -871,7 +875,9 @@ fn detour(
     grid.nodes()
         .iter()
         .copied()
-        .filter(|tile| open(snapshot, *tile) && !in_warp(snapshot, *tile))
+        .filter(|tile| {
+            open(snapshot, *tile) && !passed_by(snapshot, *tile) && !in_warp(snapshot, *tile)
+        })
         .filter_map(|tile| Some((tile, grid.path(tile.cell(), target.cell())?.len())))
         .filter(|(_, way)| *way < left)
         .min_by_key(|(_, way)| *way)

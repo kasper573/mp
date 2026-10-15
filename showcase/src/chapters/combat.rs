@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
 use driver::{
-    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, npc_is,
+    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding, npc_is,
     resident_home,
 };
 use game::core::math::{Offset, Pos};
@@ -57,9 +57,13 @@ fn play(shoot: &mut Shoot) {
     me.caption("Press I to open the inventory");
     me.act(InputAction::ToggleInventory);
     me.find_ui("Inventory");
-    me.find_ui(potion());
+    me.find_ui(UiTarget::image(GREATER_POTION));
+    let potions = holding(&me.snapshot(), "greater_health_potion");
     me.caption("Double-click a potion to drink it");
-    me.act_on_ui(InputAction::UseItem, potion());
+    me.act_on_ui(InputAction::UseItem, UiTarget::image(GREATER_POTION));
+    me.wait_until("the potion drunk", |snapshot| {
+        holding(snapshot, "greater_health_potion") < potions
+    });
     me.caption("Kills earn experience — see the xp under your name");
     me.hold();
     me.act(InputAction::ToggleInventory);
@@ -71,14 +75,7 @@ fn play(shoot: &mut Shoot) {
     chase_ends(&mut me, &chaser);
 }
 
-fn potion() -> UiTarget {
-    UiTarget::new("a potion", |element, _| {
-        element
-            .image
-            .as_deref()
-            .is_some_and(|image| image.contains("potion"))
-    })
-}
+const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
 
 // Loot lying under a monster can't be clicked until it moves or falls, so it's given a while.
 const LOOTING: WaitBudget = WaitBudget {

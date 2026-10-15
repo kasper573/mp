@@ -99,6 +99,8 @@ pub struct ProbeInput {
     pub cursor: Option<Pos<WindowPx>>,
     /// Whether the system draws the cursor, rather than the frame or nothing.
     pub system_cursor: bool,
+    /// Whether a click now would still count on from the latest one, as a double or triple click.
+    pub click_run_open: bool,
     #[serde(flatten)]
     pub seen: ProbeInputSeen,
 }
@@ -410,6 +412,18 @@ fn count_clicks(gui: Option<Res<GuiContext>>, mut seen: ResMut<ProbeInputSeen>) 
     }
 }
 
+// egui counts a click as the third of a run while the click two before it came within twice the
+// double click delay, wherever that click landed.
+fn click_run_open(world: &World) -> bool {
+    world.get_resource::<GuiContext>().is_some_and(|gui| {
+        let delay = gui
+            .0
+            .options(|options| options.input_options.max_double_click_delay);
+        let since = gui.0.input(|input| input.pointer.time_since_last_click());
+        f64::from(since) < 2.0 * delay
+    })
+}
+
 // A snapshot scans the whole world, so only a frame the driver is waiting for pays for one.
 fn publish(world: &mut World) {
     if !world.contains_resource::<Content>() || !world.non_send::<Probe>().0.awaited() {
@@ -452,6 +466,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 .and_then(Window::cursor_position)
                 .map(|at| Pos::new(at.x, at.y)),
             system_cursor,
+            click_run_open: click_run_open(world),
             seen: *world.resource::<ProbeInputSeen>(),
         },
         screen: window

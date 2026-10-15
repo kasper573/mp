@@ -168,6 +168,19 @@ pub fn taken(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
             .any(|item| item.at.cell() == tile.cell())
 }
 
+// Anyone walking can step under the pointer between the frame that shows ground clear and the click
+// landing there, so ground within a tile of them is left alone while they pass.
+pub fn passed_by(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
+    let me = snapshot.me.as_ref().map(|me| me.id);
+    snapshot
+        .actors
+        .iter()
+        .filter(|actor| Some(actor.id) != me && matches!(actor.action, Action::Walk | Action::Run))
+        .any(|actor| actor.hitbox.inflate(PASSING.0, PASSING.0).contains(tile))
+}
+
+const PASSING: Tiles = Tiles(1.0);
+
 // Stepping into a warp takes it.
 pub fn in_warp(snapshot: &ProbeSnapshot, tile: Pos<Tiles>) -> bool {
     snapshot
