@@ -32,35 +32,6 @@ fn turned_on_in_the_settings_a_frame_rate_meter_shows_in_the_bottom_left_corner(
     });
 }
 
-#[test]
-fn a_max_fps_picked_in_the_settings_holds_when_they_open_again() {
-    let mut playtest = playtest();
-    let mut player = playtest.join_as("talker", None);
-    player.in_world();
-
-    player.act(InputAction::ToggleSettings);
-    player.scroll_until("Audio", "Uncapped");
-    player.click_ui("Uncapped");
-    player.hover_ui("Refresh rate");
-    player.click_ui("Refresh rate");
-    player.wait_until("Refresh rate to be picked", |snapshot| {
-        UiTarget::text("Refresh rate").find(snapshot).is_some()
-            && UiTarget::text("Uncapped").find(snapshot).is_none()
-    });
-    player.act(InputAction::ToggleSettings);
-    player.wait_until("the settings to close", |snapshot| {
-        UiTarget::text("Refresh rate").find(snapshot).is_none()
-    });
-
-    player.act(InputAction::ToggleSettings);
-    player.scroll_until("Audio", "Refresh rate");
-    assert!(
-        UiTarget::text("Uncapped")
-            .find(&player.snapshot())
-            .is_none()
-    );
-}
-
 fn meter() -> UiTarget {
     UiTarget::containing(" FPS (")
 }

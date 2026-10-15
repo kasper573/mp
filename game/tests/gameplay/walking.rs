@@ -21,9 +21,16 @@ const CLEARANCE: f32 = 3.0;
 // How far the walk goes with the button held, short enough that the pointer leading it stays on
 // the line.
 const HELD_FOR: f32 = 5.0;
+const HITCH: Duration = Duration::from_millis(400);
 
-// Where the player showed on screen, frame by frame.
-type Frames = Rc<RefCell<Vec<(u32, Pos<Tiles>)>>>;
+// Where the player showed on screen, and where the server had them, frame by frame.
+type Frames = Rc<RefCell<Vec<Shown>>>;
+
+struct Shown {
+    frame: u32,
+    drawn: Pos<Tiles>,
+    at: Pos<Tiles>,
+}
 
 #[test]
 fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_for() {
@@ -122,6 +129,49 @@ fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
     assert_unbroken(&drawn, pressed, start, end, step);
 }
 
+#[test]
+fn a_walk_held_up_along_the_way_shows_at_its_end_no_later_than_the_server_has_it_there() {
+    let mut playtest = playtest();
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let start = player.walk_to(tiles[0]);
+    let drawn = record_drawn(&mut player);
+
+    let (goal, at) = player.wait_for("the line in view", |seen| farthest_in_view(seen, &tiles, 1));
+    player.point_at(at);
+    let clicked = player.click().frame;
+    loop {
+        player.hitch(HITCH);
+        let seen = player.snapshot();
+        let walked = (seen.me.as_ref().expect("the player").drawn - tiles[0]).dot(step);
+        let ahead = walked.round() as usize + 1 + DRIFT;
+        if ahead >= goal {
+            break;
+        }
+        player.point_at_tile(tiles[ahead]);
+        player.click();
+    }
+    let end = player.come_to_rest();
+    player.wait_until("the walk shown at its end", |snapshot| {
+        snapshot.me.as_ref().is_some_and(|me| me.drawn == end)
+    });
+
+    assert_eq!(end, tiles[goal]);
+    assert_unbroken(&drawn, clicked, start, end, step);
+    let first = |there: fn(&Shown) -> Pos<Tiles>| {
+        drawn
+            .borrow()
+            .iter()
+            .find(|shown| shown.frame > clicked && there(shown) == end)
+            .map(|shown| shown.frame)
+            .expect("a frame with the walk at its end")
+    };
+    let (shown, heard) = (first(|shown| shown.drawn), first(|shown| shown.at));
+    assert!(
+        shown <= heard,
+        "the walk showed at its end in frame {shown}, after the server's word of it in {heard}"
+    );
+}
+
 fn on_a_quiet_line(playtest: &mut driver::Playtest) -> (Player, Offset<Tiles>, Vec<Pos<Tiles>>) {
     let mut player = playtest.join_as(
         "traveler",
@@ -140,9 +190,13 @@ fn record_drawn(player: &mut Player) -> Frames {
             && log
                 .borrow()
                 .last()
-                .is_none_or(|&(frame, _)| frame < snapshot.frame)
+                .is_none_or(|shown| shown.frame < snapshot.frame)
         {
-            log.borrow_mut().push((snapshot.frame, me.drawn));
+            log.borrow_mut().push(Shown {
+                frame: snapshot.frame,
+                drawn: me.drawn,
+                at: me.at,
+            });
         }
     });
     drawn
@@ -160,8 +214,8 @@ fn assert_unbroken(
     let drawn = drawn.borrow();
     let way: Vec<Pos<Tiles>> = drawn
         .iter()
-        .filter(|(frame, at)| *frame > since && *at != start)
-        .map(|&(_, at)| at)
+        .filter(|shown| shown.frame > since && shown.drawn != start)
+        .map(|shown| shown.drawn)
         .take_while(|&at| at != end)
         .collect();
     assert!(!way.is_empty(), "the walk went unseen");

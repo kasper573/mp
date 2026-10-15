@@ -27,7 +27,6 @@ use crate::systems::combat::{self, Attitude};
 use crate::systems::dialogue::stage;
 use crate::systems::history::widget::{self as history, HistoryBook};
 use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
-use crate::systems::hud;
 use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::interact;
@@ -840,18 +839,6 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
         .filter_map(|(id, node)| Some((*id, node.label().or(node.value())?)))
         .collect();
     let world_layers = world.resource::<WorldLayers>();
-    let titles = hud::window_titles(world)
-        .into_iter()
-        .map(|title| ProbeUiElement {
-            text: Some(title.title),
-            image: None,
-            editable: false,
-            focused: false,
-            click_through: false,
-            in_world: false,
-            slider: None,
-            rect: window_rect(title.rect),
-        });
     tree.nodes
         .iter()
         .filter(|(_, node)| shown_role(node.role()))
@@ -904,7 +891,6 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 rect: window_rect(rect),
             })
         })
-        .chain(titles)
         .collect()
 }
 
@@ -921,6 +907,7 @@ fn shown_role(role: accesskit::Role) -> bool {
             | Role::TextInput
             | Role::Image
             | Role::Link
+            | Role::Splitter
     )
 }
 

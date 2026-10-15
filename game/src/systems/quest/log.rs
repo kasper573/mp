@@ -12,7 +12,7 @@ use super::{
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::script::ChoiceReveal;
-use crate::systems::hud::{self, Confirm, HudAudience, Window};
+use crate::systems::hud::{self, Confirm, HudAudience, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
@@ -39,7 +39,7 @@ impl Plugin for QuestLogPlugin {
 
 pub struct QuestLogWindow;
 
-impl Window for QuestLogWindow {
+impl HudWindow for QuestLogWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }

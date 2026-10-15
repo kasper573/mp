@@ -1,5 +1,3 @@
-use std::num::NonZeroU32;
-
 use bevy::asset::{AssetPath, embedded_path};
 use bevy::camera::visibility::RenderLayers;
 use bevy::camera::{RenderTarget, ScalingMode};
@@ -8,8 +6,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, TextureFormat};
 use bevy::shader::ShaderRef;
 use bevy::sprite_render::Material2d;
-use bevy::window::{PresentMode, PrimaryWindow};
-use serde::{Deserialize, Serialize};
+use bevy::window::PrimaryWindow;
 
 use super::TILE;
 use super::camera::WorldCamera;
@@ -30,47 +27,6 @@ pub(super) struct WorldTargets {
     held: Handle<Image>,
     size: (u32, u32),
 }
-
-/// How often frames come: once per refresh of the display, or as fast as the client draws them.
-#[derive(
-    Serialize,
-    Deserialize,
-    strum::AsRefStr,
-    strum::VariantArray,
-    Clone,
-    Copy,
-    Debug,
-    Default,
-    PartialEq,
-    Eq,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum MaxFps {
-    #[default]
-    #[strum(serialize = "Refresh rate")]
-    RefreshRate,
-    Uncapped,
-}
-
-/// Paces the window's frames at `max_fps`, leaving it untouched when it already is.
-pub fn pace(window: &mut Mut<Window>, max_fps: MaxFps) {
-    let (present_mode, in_flight) = match max_fps {
-        MaxFps::RefreshRate => (PresentMode::AutoVsync, SYNCED_FRAMES_IN_FLIGHT),
-        MaxFps::Uncapped => (PresentMode::AutoNoVsync, UNSYNCED_FRAMES_IN_FLIGHT),
-    };
-    if window.present_mode != present_mode
-        || window.desired_maximum_frame_latency != Some(in_flight)
-    {
-        window.present_mode = present_mode;
-        window.desired_maximum_frame_latency = Some(in_flight);
-    }
-}
-
-// Each frame queued behind the one on screen shows its input a refresh later.
-const SYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(1).unwrap();
-// A compositor hands a frame's buffer back only when it next refreshes, so without vsync it's the
-// frames in flight, not the client, that would otherwise cap the frame rate at a few per refresh.
-const UNSYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(8).unwrap();
 
 #[derive(Resource, Default, Clone, Copy)]
 pub struct Viewport {

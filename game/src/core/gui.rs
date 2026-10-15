@@ -225,6 +225,26 @@ pub fn dragging(world: &World) -> bool {
     context(world).is_some_and(|gui| gui.dragged_id().is_some())
 }
 
+/// Draws what follows the pointer, its top left `from` the pointer, in the frame the pointer is read:
+/// never kept on screen or faded in, as egui does to its areas, which would part it from the pointer.
+pub fn at_pointer<R>(
+    gui: &egui::Context,
+    id: egui::Id,
+    band: Band,
+    from: egui::Vec2,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> Option<R> {
+    let at = gui.pointer_latest_pos()?;
+    let shown = egui::Area::new(id)
+        .order(band.order())
+        .fixed_pos(at + from)
+        .interactable(false)
+        .constrain(false)
+        .fade_in(false)
+        .show(gui, add);
+    Some(shown.inner)
+}
+
 pub fn cursor(world: &World) -> egui::CursorIcon {
     world.resource::<GuiCursor>().0
 }

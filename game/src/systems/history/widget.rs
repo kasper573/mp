@@ -10,7 +10,7 @@ use crate::core::platform::ClientPlatform;
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook};
 use crate::core::time::LocalClock;
 use crate::systems::actor::Name;
-use crate::systems::hud::{self, HudAudience, Window};
+use crate::systems::hud::{self, HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
@@ -98,7 +98,7 @@ pub fn shown_tab(world: &World) -> Option<HistoryTab> {
 
 pub struct HistoryWindow;
 
-impl Window for HistoryWindow {
+impl HudWindow for HistoryWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }

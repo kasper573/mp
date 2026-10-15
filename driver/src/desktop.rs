@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use game::core::math::{Pos, WindowPx};
-use game::core::render::present::MaxFps;
 use game::systems::launch::{self, CLIENT_ENV_PREFIX, ClientConfig};
 use game::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
@@ -82,9 +81,6 @@ impl Desktop {
             exit_on_stdin_eof: true,
             probe: Some(listener.local_addr().expect("a bound probe port")),
         };
-        // A playtest waits on frames and the client bench counts them, so they come as fast as the
-        // client draws them rather than at the virtual screen's refresh.
-        launch::seed_max_fps(&config.profile_dir, MaxFps::Uncapped);
         let log = File::create(folder.join("client.log")).expect("a client log");
         let mut client = Command::new(binary)
             .envs(launch::env_of(CLIENT_ENV_PREFIX, &config))
@@ -176,6 +172,41 @@ impl Desktop {
             (cursor.distance_to(to) <= 1.0).then(|| snapshot.clone())
         });
         self.note(&seen, &format!("pointer at {:?}", (to.x, to.y)));
+        seen
+    }
+
+    // The client misses frames as when its system holds it up: frozen for `length`, it then
+    // catches up on the time that passed.
+    pub fn hitch(&self, length: Duration) {
+        let pid = self.client.id().to_string();
+        signal(&pid, "STOP");
+        std::thread::sleep(length);
+        signal(&pid, "CONT");
+    }
+
+    // Through every point in turn as fast as a flick of the hand, many to a frame, coming to rest on
+    // the last.
+    pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
+        let to = through.last().expect("a point to sweep to").round();
+        let moves: Vec<String> = through
+            .iter()
+            .flat_map(|at| {
+                let at = at.round();
+                [
+                    "mousemove".to_owned(),
+                    at.x.to_string(),
+                    at.y.to_string(),
+                    "sleep".to_owned(),
+                    SWEEP_STEP.to_owned(),
+                ]
+            })
+            .collect();
+        self.xdotool(&moves.iter().map(String::as_str).collect::<Vec<_>>());
+        let seen = self.wait_for("the pointer to come to rest", BUDGET, |snapshot| {
+            let cursor = snapshot.input.cursor?;
+            (cursor.distance_to(to) <= 1.0).then(|| snapshot.clone())
+        });
+        self.note(&seen, &format!("pointer swept to {:?}", (to.x, to.y)));
         seen
     }
 
@@ -399,6 +430,8 @@ impl Deadline {
 // Only a hung client goes this long without a frame: on a machine run into the ground, a frame can
 // take the better part of a minute.
 const STALL: Duration = Duration::from_secs(300);
+// Seconds between the moves of a sweep: a mouse reports a few hundred times a second.
+const SWEEP_STEP: &str = "0.004";
 
 // A virtual X screen of the desktop's own: a rootful Xwayland on a headless Wayland compositor. Unlike
 // on Xvfb, a GPU's driver hands it frames without copying each one through the CPU.
@@ -555,4 +588,12 @@ fn accept(listener: &TcpListener, client: &mut Child) -> TcpStream {
         );
         std::thread::sleep(Duration::from_millis(10));
     }
+}
+
+fn signal(pid: &str, signal: &str) {
+    let sent = Command::new("kill")
+        .args(["-s", signal, pid])
+        .status()
+        .expect("kill to run");
+    assert!(sent.success(), "the client took no {signal} signal");
 }

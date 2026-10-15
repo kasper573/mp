@@ -16,7 +16,7 @@ use crate::systems::area::{AreaId, AreaTag};
 use crate::systems::attention::Attention;
 use crate::systems::dialogue::Conversation;
 use crate::systems::item::Inventory;
-use crate::systems::movement::{HeardMoves, MoveTarget, Position, position};
+use crate::systems::movement::{HeardMove, MoveTarget, Position, position};
 use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players};
 use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
@@ -225,7 +225,7 @@ impl VisibilityFilter for OwnedBy {
         ShopView,
         QuestLog,
         MoveTarget,
-        HeardMoves,
+        HeardMove,
     );
 
     fn is_visible(&self, _: Entity, sight: Option<&PrivateSight>) -> bool {

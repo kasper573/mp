@@ -25,8 +25,8 @@ pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
     app.replicate::<Position>()
-        .replicate_filtered::<MoveTarget, With<HeardMoves>>()
-        .replicate::<HeardMoves>()
+        .replicate_filtered::<MoveTarget, With<HeardMove>>()
+        .replicate::<HeardMove>()
         .add_client_message::<MoveRequest>(Channel::Ordered);
 }
 
@@ -38,12 +38,17 @@ pub struct Position {
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MoveRequest {
     pub pos: Pos<Tiles>,
+    pub seq: MoveSeq,
 }
 
-/// How many [`MoveRequest`]s the server has heard from a player, heeded or not. Its client counts the
-/// ones it sends, so it can tell when the server's walk accounts for all of them.
+/// A client numbers its [`MoveRequest`]s in the order it sends them.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MoveSeq(pub u32);
+
+/// The latest [`MoveRequest`] the server has heard from a player, heeded or not, so its client can
+/// tell when the server's walk accounts for every one it sent.
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq)]
-pub struct HeardMoves(pub u32);
+pub struct HeardMove(pub MoveSeq);
 
 pub fn position(world: &World, entity: Entity) -> Option<Pos<Tiles>> {
     world.get::<Position>(entity).map(|p| p.pos)
@@ -115,8 +120,8 @@ pub fn move_request(world: &mut World) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
-        if let Some(mut heard) = world.get_mut::<HeardMoves>(player) {
-            heard.0 += 1;
+        if let Some(mut heard) = world.get_mut::<HeardMove>(player) {
+            heard.0 = heard.0.max(request.message.seq);
         }
         if stat::is_dead(world, player) || commands_locked(world, player) {
             continue;
@@ -138,12 +143,12 @@ pub fn halt(world: &mut World, entity: Entity) {
     let Some(at) = position(world, entity) else {
         return;
     };
-    match world.get::<Path>(entity).and_then(Path::next) {
-        Some(next) if !at.on_center() => {
+    match world.get::<Path>(entity).and_then(|path| halted(at, path)) {
+        Some(next) => {
             world.entity_mut(entity).insert(Path { tiles: vec![next] });
             goto(world, entity, next.center());
         }
-        _ => {
+        None => {
             world.entity_mut(entity).remove::<(MoveTarget, Path)>();
             if let Some(mut position) = world.get_mut::<Position>(entity)
                 && at.on_center()
@@ -605,6 +610,11 @@ impl Navigator {
                 .cell_walkable(from.lerp(to, i as f32 / samples as f32).cell())
         })
     }
+}
+
+/// Where a walk halted at `at` stops: at the end of the step it's on, if it's mid-step.
+fn halted(at: Pos<Tiles>, path: &Path) -> Option<CellPos> {
+    path.next().filter(|_| !at.on_center())
 }
 
 /// The cell an actor at `at`, mid-step toward `next`, is stepping off.

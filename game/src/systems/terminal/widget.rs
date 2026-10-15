@@ -5,7 +5,7 @@ use bevy_terminal::TerminalInput;
 use design_tokens::widgets;
 use egui::{Id, Ui};
 
-use crate::systems::hud::{self, HudAudience, Window};
+use crate::systems::hud::{self, HudAudience, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::terminal::{TerminalKind, Terminals};
@@ -14,7 +14,7 @@ const TITLE: &str = "Terminal";
 
 pub struct TerminalWindow;
 
-impl Window for TerminalWindow {
+impl HudWindow for TerminalWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }

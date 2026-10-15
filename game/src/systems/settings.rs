@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use bevy::prelude::*;
-use bevy::window::{PrimaryWindow, Window as OsWindow};
 use design_tokens::widgets;
 use egui::Ui;
 use serde::{Deserialize, Serialize};
@@ -11,10 +10,9 @@ use strum::VariantArray;
 use crate::core::audio::mix::{AudioCategory, AudioFader, AudioMix, AudioVolume};
 use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
-use crate::core::render::present::{self, MaxFps};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
 use crate::core::text::{MotionPreference, TypewriterSpeed};
-use crate::systems::hud::{HudAudience, Window};
+use crate::systems::hud::{HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 
@@ -52,7 +50,7 @@ pub(crate) struct LettersPerSecond(pub f32);
 
 pub struct SettingsWindow;
 
-impl Window for SettingsWindow {
+impl HudWindow for SettingsWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }
@@ -69,16 +67,15 @@ impl Window for SettingsWindow {
         WINDOW_SIZE
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
-        let uncaps_frames = world.resource::<ClientPlatform>().0.uncaps_frames();
         egui::ScrollArea::vertical()
             .auto_shrink(false)
             .show(ui, |ui| {
-                show_settings(ui, &mut world.resource_mut::<UserSettings>(), uncaps_frames)
+                show_settings(ui, &mut world.resource_mut::<UserSettings>())
             });
     }
 }
 
-fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>, uncaps_frames: bool) {
+fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     ui.spacing_mut().slider_width = SLIDER_WIDTH;
     widgets::section(ui, "Interface");
     let mut snapping = settings.snapping_enabled();
@@ -101,11 +98,6 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>, uncaps_frames: b
         let label = ui.label("Area transition");
         transition_picker(ui, settings, label.id);
         ui.end_row();
-        if uncaps_frames {
-            let label = ui.label("Max FPS");
-            max_fps_picker(ui, settings, label.id);
-            ui.end_row();
-        }
     });
     ui.add_space(8.0);
     widgets::section(ui, "Audio");
@@ -159,23 +151,6 @@ fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui:
         .labelled_by(label);
     if picked != current {
         settings.set_screen_transition(picked);
-    }
-}
-
-fn max_fps_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
-    let current = settings.max_fps();
-    let mut picked = current;
-    widgets::combo_box("max fps")
-        .selected_text(current.as_ref())
-        .show_ui(ui, |ui| {
-            for &max_fps in MaxFps::VARIANTS {
-                ui.selectable_value(&mut picked, max_fps, max_fps.as_ref());
-            }
-        })
-        .response
-        .labelled_by(label);
-    if picked != current {
-        settings.set_max_fps(picked);
     }
 }
 
@@ -251,14 +226,6 @@ impl UserSettings {
         self.screen.transition = transition;
     }
 
-    pub(crate) fn max_fps(&self) -> MaxFps {
-        self.screen.max_fps
-    }
-
-    pub(crate) fn set_max_fps(&mut self, max_fps: MaxFps) {
-        self.screen.max_fps = max_fps;
-    }
-
     pub(crate) fn frame_rate_shown(&self) -> bool {
         self.screen.frame_rate
     }
@@ -316,7 +283,7 @@ impl Default for LettersPerSecond {
 }
 
 const KEY: &str = "rift.user_settings";
-const DEFAULT_SNAP: WindowPx = WindowPx(16.0);
+pub const DEFAULT_SNAP: WindowPx = WindowPx(16.0);
 
 #[derive(Serialize, Deserialize)]
 struct UiSettings {
@@ -356,20 +323,6 @@ struct ScreenSettings {
     transition: ScreenTransition,
     #[serde(default)]
     frame_rate: bool,
-    #[serde(default)]
-    max_fps: MaxFps,
-}
-
-/// Sets the frame rate in settings stored as [`Platform::save`] keeps them, as a player who picked it
-/// would have left it.
-pub(crate) fn seed_max_fps(stored: &mut BTreeMap<String, String>, max_fps: MaxFps) {
-    let mut settings: UserSettings = stored
-        .get(KEY)
-        .and_then(|json| serde_json::from_str(json).ok())
-        .unwrap_or_default();
-    settings.screen.max_fps = max_fps;
-    let json = serde_json::to_string_pretty(&settings).expect("settings serialize");
-    stored.insert(KEY.to_owned(), json);
 }
 
 /// Saved on change rather than at each place that changes a setting. The initial load counts as a
@@ -386,7 +339,6 @@ fn apply(
     mut motion: ResMut<MotionPreference>,
     mut audio_mix: ResMut<AudioMix>,
     mut transition: ResMut<ScreenTransitionPreference>,
-    mut windows: Query<&mut OsWindow, With<PrimaryWindow>>,
 ) {
     if !settings.is_changed() {
         return;
@@ -395,7 +347,4 @@ fn apply(
     motion.reduced = settings.text.reduced_motion;
     *audio_mix = settings.sound;
     transition.0 = settings.screen.transition;
-    if let Ok(mut window) = windows.single_mut() {
-        present::pace(&mut window, settings.screen.max_fps);
-    }
 }

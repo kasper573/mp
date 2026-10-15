@@ -132,6 +132,16 @@ impl Player {
         seen.expect("at least one step")
     }
 
+    pub fn hitch(&mut self, length: Duration) {
+        self.desktop.hitch(length);
+    }
+
+    pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
+        let seen = self.desktop.sweep_pointer(through);
+        self.pointer = through.last().copied();
+        seen
+    }
+
     pub fn point_at_tile(&mut self, tile: Pos<Tiles>) -> ProbeSnapshot {
         let seen = self.snapshot();
         let Some(at) = clickable_point(&seen, tile) else {
@@ -213,16 +223,25 @@ impl Player {
         item: impl Into<UiTarget>,
         onto: impl Into<UiTarget>,
     ) -> ProbeSnapshot {
-        let (button, held) = bindings(InputAction::CarryItem)
-            .iter()
-            .find_map(|binding| match *binding {
-                InputBinding::Drag(gesture) => Some((gesture.button, gesture.modifiers)),
-                _ => None,
-            })
-            .expect("a drag is bound to carrying items");
+        let (button, held) = carry_binding();
         self.aim_at_ui(&item.into(), Aim::Click);
         let target = self.find_ui(onto);
         self.drag(button_of(button), held, target.rect.center())
+    }
+
+    pub fn carrying<T>(
+        &mut self,
+        item: impl Into<UiTarget>,
+        during: impl FnOnce(&mut Player) -> T,
+    ) -> T {
+        let (button, held) = carry_binding();
+        self.aim_at_ui(&item.into(), Aim::Click);
+        self.with_held(held, |player| {
+            player.desktop.button_down(button_of(button));
+            let done = during(player);
+            player.desktop.button_up(button_of(button));
+            done
+        })
     }
 
     // A tab sits on the row of tabs that "All" heads; the same title can show in the records below it.
@@ -908,4 +927,14 @@ fn keysym(key: KeyCode) -> String {
         _ if name.starts_with("Arrow") => name["Arrow".len()..].to_owned(),
         _ => name,
     }
+}
+
+fn carry_binding() -> (MouseButton, KeyModifiers) {
+    bindings(InputAction::CarryItem)
+        .iter()
+        .find_map(|binding| match *binding {
+            InputBinding::Drag(gesture) => Some((gesture.button, gesture.modifiers)),
+            _ => None,
+        })
+        .expect("a drag is bound to carrying items")
 }

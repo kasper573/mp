@@ -316,6 +316,12 @@ pub fn client_app(
                 .set(ImagePlugin::default_nearest()),
         ),
     );
+    // The client shows a world the server plays out in real time, so a frame however long moves it
+    // on by all the time the frame took, as the server's world moved on, rather than by the most the
+    // engine otherwise lets one frame take.
+    app.world_mut()
+        .resource_mut::<Time<Virtual>>()
+        .set_max_delta(std::time::Duration::MAX);
     if let Some(credentials) = credentials {
         app.insert_resource(credentials);
     }
@@ -352,6 +358,7 @@ pub fn client_app(
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,
             item::card::ItemCardPlugin,
+            item::widget::CarryPlugin,
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,
             quest::tracker::QuestTrackerPlugin,

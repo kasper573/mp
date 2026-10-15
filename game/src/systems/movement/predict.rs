@@ -8,8 +8,8 @@ use crate::core::time::Seconds;
 use crate::systems::actor::render::RenderActor;
 use crate::systems::actor::{Action, Actor};
 use crate::systems::movement::{
-    HeardMoves, MoveRequest, MoveTarget, Navigator, Path, RenderPosition, SNAP, gait, position,
-    speed_of, stepping_off, walk,
+    HeardMove, MoveRequest, MoveSeq, MoveTarget, Navigator, Path, RenderPosition, SNAP, gait,
+    halted, position, speed_of, stepping_off, walk,
 };
 use crate::systems::player::{commands_locked, session};
 use crate::systems::stat;
@@ -21,21 +21,20 @@ use crate::systems::stat;
 /// as asking once for its end does.
 pub fn request_walk(world: &mut World, goal: Pos<Tiles>) {
     let Some(me) = predicted_character(world) else {
-        world.write_message(MoveRequest { pos: goal });
         return;
     };
     let free = !stat::is_dead(world, me) && !commands_locked(world, me);
     let navigator = Navigator::of(world, me);
     let Some(mut stride) = world.get_mut::<Stride>(me) else {
-        world.write_message(MoveRequest { pos: goal });
         return;
     };
     let goal = stride.end_through(goal);
-    stride.sent += 1;
+    stride.sent = MoveSeq(stride.sent.0 + 1);
+    let seq = stride.sent;
     if free && let Some(navigator) = navigator {
         stride.head_for(&navigator, goal);
     }
-    world.write_message(MoveRequest { pos: goal });
+    world.write_message(MoveRequest { pos: goal, seq });
 }
 
 /// The client's own character as it walks on screen. It runs ahead of the server, which hears of
@@ -49,8 +48,8 @@ pub(super) struct Stride {
     path: Path,
     target: Option<Pos<Tiles>>,
     facing: Direction,
-    /// The [`MoveRequest`]s sent for this character, to compare with its [`HeardMoves`].
-    sent: u32,
+    /// The latest [`MoveRequest`] sent for this character, to compare with its [`HeardMove`].
+    sent: MoveSeq,
     /// Where the server last had the character.
     seen: Pos<Tiles>,
 }
@@ -62,7 +61,9 @@ pub(super) fn walk_ahead(world: &mut World) {
     let (Some(server), Some(navigator)) = (position(world, me), Navigator::of(world, me)) else {
         return;
     };
-    let heard = world.get::<HeardMoves>(me).map_or(0, |heard| heard.0);
+    let heard = world
+        .get::<HeardMove>(me)
+        .map_or(MoveSeq::default(), |heard| heard.0);
     let server_goal = world.get::<MoveTarget>(me).map(|target| target.pos);
     let alive = !stat::is_dead(world, me);
     let speed = speed_of(world, me);
@@ -100,7 +101,7 @@ impl Stride {
             path: Path::default(),
             target: None,
             facing,
-            sent: 0,
+            sent: MoveSeq::default(),
             seen: at,
         }
     }
@@ -138,12 +139,12 @@ impl Stride {
     }
 
     fn halt(&mut self) {
-        match self.path.next() {
-            Some(next) if !self.at.on_center() => {
+        match halted(self.at, &self.path) {
+            Some(next) => {
                 self.path = Path { tiles: vec![next] };
                 self.target = Some(next.center());
             }
-            _ => {
+            None => {
                 self.path = Path::default();
                 self.target = None;
             }

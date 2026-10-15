@@ -233,19 +233,18 @@ fn draw_cursor(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let Some(at) = gui.input(|input| input.pointer.latest_pos()) else {
-        return;
-    };
     let cursor = shape.get(world.resource::<Content>());
     let hotspot = egui::vec2(f32::from(cursor.hotspot.x), f32::from(cursor.hotspot.y));
     let Some(image) = gui::image(world, &cursor.image) else {
         return;
     };
-    egui::Area::new(egui::Id::new("drawn cursor"))
-        .order(Band::Cursor.order())
-        .fixed_pos(at - hotspot)
-        .interactable(false)
-        .show(&gui, |ui| ui.add(image.widget(image.size)));
+    gui::at_pointer(
+        &gui,
+        egui::Id::new("drawn cursor"),
+        Band::Cursor,
+        -hotspot,
+        |ui| ui.add(image.widget(image.size)),
+    );
 }
 
 fn content_cursor(world: &World, shape: CursorShape) -> CursorIcon {

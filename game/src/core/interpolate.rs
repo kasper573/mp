@@ -145,7 +145,8 @@ impl<T: Interpolate> Playback<T> {
 
     fn advance(&mut self, dt: Seconds, period: Seconds) -> T {
         let lead = (period - self.elapsed) + period * self.queue.len() as f32;
-        self.lead += (lead - self.lead) * SMOOTH;
+        let kept = 0.5_f32.powf(dt.ratio(period * SMOOTHING_SNAPSHOTS));
+        self.lead += (lead - self.lead) * (1.0 - kept);
         let deviation = (self.lead - target_lead(period)).ratio(period);
         let speed = (1.0 + STEER * deviation).clamp(0.5, 2.0);
         self.elapsed += dt * speed;
@@ -173,10 +174,10 @@ const TARGET: usize = 1;
 /// stalling.
 const STEER: f32 = 0.3;
 
-/// Per-advance smoothing applied to the buffered lead before it steers playback speed. Snapshots
-/// arrive as discrete bumps, so the raw lead sawtooths; smoothing steers off the average instead,
-/// keeping playback speed flat rather than wobbling once per snapshot.
-const SMOOTH: f32 = 0.05;
+/// The half-life, in snapshots, of the smoothing applied to the buffered lead before it steers
+/// playback speed. Snapshots arrive as discrete bumps, so the raw lead sawtooths; smoothing steers
+/// off the average instead, keeping playback speed flat rather than wobbling once per snapshot.
+const SMOOTHING_SNAPSHOTS: f32 = 2.0;
 
 /// Past this many queued snapshots the consumer has fallen so far behind (a long stall, a
 /// backgrounded tab) that draining smoothly is pointless; playback resyncs straight to the newest

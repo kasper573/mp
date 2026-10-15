@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{HAIRLINE, WIDGET_RADIUS, color};
 use egui::{
     Align, Color32, Id, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
@@ -9,7 +10,7 @@ use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{StyledLine, TextPiece};
-use crate::systems::hud::{self, HudAudience, Window};
+use crate::systems::hud::{self, HudAudience, HudWindow};
 use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
@@ -17,6 +18,7 @@ use crate::systems::item::{
     UseItemRequest, card,
 };
 use crate::systems::player::session;
+use crate::systems::screen::ClientScreen;
 
 pub(crate) const SLOT: f32 = 36.0;
 const SLOT_ICON: f32 = 32.0;
@@ -65,9 +67,22 @@ pub fn slot_action(app: &mut App, slot_action: SlotAction) {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CarriedSlot(pub u32);
 
+pub struct CarryPlugin;
+
+impl Plugin for CarryPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_carried
+                .in_set(Band::Pointer)
+                .run_if(in_state(ClientScreen::Area)),
+        );
+    }
+}
+
 pub struct InventoryWindow;
 
-impl Window for InventoryWindow {
+impl HudWindow for InventoryWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }
@@ -92,7 +107,6 @@ impl Window for InventoryWindow {
                     }
                 });
             });
-        carried_ghost(ui.ctx(), world);
     }
 }
 
@@ -225,11 +239,11 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
     hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
 }
 
-fn carried_ghost(gui: &egui::Context, world: &mut World) {
-    let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(gui) else {
+fn draw_carried(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
         return;
     };
-    let Some(at) = gui.pointer_latest_pos() else {
+    let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(&gui) else {
         return;
     };
     let content = *world.resource::<Content>();
@@ -242,11 +256,13 @@ fn carried_ghost(gui: &egui::Context, world: &mut World) {
     let Some(image) = gui::image(world, &stack.item.get(&content).icon) else {
         return;
     };
-    egui::Area::new(Id::new("carried item"))
-        .order(Band::Pointer.order())
-        .fixed_pos(at - Vec2::splat(CARRIED / 2.0))
-        .interactable(false)
-        .show(gui, |ui| ui.add(image.widget(Vec2::splat(CARRIED))));
+    gui::at_pointer(
+        &gui,
+        Id::new("carried item"),
+        Band::Pointer,
+        -Vec2::splat(CARRIED / 2.0),
+        |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
+    );
 }
 
 fn inventory_cells(world: &World) -> Vec<CellData> {

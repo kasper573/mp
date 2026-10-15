@@ -1,7 +1,7 @@
 use game::core::math::{Offset, Pos};
 use game::core::tiling::{Cell, TilePos, Tiles};
 use game::systems::area::{self, AreaDef, AreaId};
-use game::systems::movement::{self, HeardMoves, MoveRequest, position};
+use game::systems::movement::{self, HeardMove, MoveRequest, MoveSeq, position};
 use game::systems::player::CommandLock;
 
 use crate::support::{Sim, content};
@@ -135,7 +135,7 @@ fn a_walk_over_open_ground_keeps_to_the_straight_line() {
 }
 
 #[test]
-fn the_server_counts_every_move_asked_of_it_heeded_or_not() {
+fn the_server_owns_up_to_the_latest_move_asked_of_it_heeded_or_not() {
     let mut walk = Walk::start();
     walk.ask(Offset::new(3.0, 0.0));
     walk.ask(Offset::new(4.0, 0.0));
@@ -144,13 +144,14 @@ fn the_server_counts_every_move_asked_of_it_heeded_or_not() {
     walk.ask(Offset::new(-4.0, 0.0));
     walk.ticks(1);
 
-    assert_eq!(walk.heard(), HeardMoves(3));
+    assert_eq!(walk.heard(), HeardMove(MoveSeq(3)));
 }
 
 struct Walk {
     sim: Sim,
     player: bevy_ecs::entity::Entity,
     start: Pos<Tiles>,
+    asked: MoveSeq,
 }
 
 impl Walk {
@@ -160,7 +161,12 @@ impl Walk {
         let player = sim.join(1);
         sim.tick();
         movement::relocate(sim.world(), player, start);
-        Walk { sim, player, start }
+        Walk {
+            sim,
+            player,
+            start,
+            asked: MoveSeq::default(),
+        }
     }
 
     fn toward(mut self, to: Offset<Tiles>) -> Walk {
@@ -169,8 +175,15 @@ impl Walk {
     }
 
     fn ask(&mut self, to: Offset<Tiles>) {
+        self.asked = MoveSeq(self.asked.0 + 1);
         let pos = self.start + to;
-        self.sim.send(1, MoveRequest { pos });
+        self.sim.send(
+            1,
+            MoveRequest {
+                pos,
+                seq: self.asked,
+            },
+        );
     }
 
     fn ticks(&mut self, count: usize) {
@@ -183,12 +196,12 @@ impl Walk {
         position(self.sim.world(), self.player).expect("the player") - self.start
     }
 
-    fn heard(&mut self) -> HeardMoves {
+    fn heard(&mut self) -> HeardMove {
         *self
             .sim
             .world()
-            .get::<HeardMoves>(self.player)
-            .expect("a count of moves heard")
+            .get::<HeardMove>(self.player)
+            .expect("the latest move heard")
     }
 
     fn trail(&mut self) -> Vec<Offset<Tiles>> {

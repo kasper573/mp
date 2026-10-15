@@ -4,7 +4,7 @@ use game::core::tiling::Tiles;
 use game::core::time::Seconds;
 use game::systems::area::AreaTag;
 use game::systems::item::{DroppedItem, Inventory, PickupRequest, Reservation};
-use game::systems::movement::{MoveRequest, Position, position};
+use game::systems::movement::{MoveRequest, MoveSeq, Position, position};
 use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct, Tether};
 
@@ -34,7 +34,13 @@ fn walking_away_cancels_the_intent() {
 
     sim.send(1, PickupRequest { target: item });
     sim.tick();
-    sim.send(1, MoveRequest { pos: start });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: start,
+            seq: MoveSeq(1),
+        },
+    );
 
     assert!(!sim.run_until(10.0, |world| bones(world, player) > 0));
     assert!(sim.world().get_entity(item).is_ok());

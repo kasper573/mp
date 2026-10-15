@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use design_tokens::color;
 use egui::{RichText, Ui, Vec2};
 
-use crate::systems::hud::{HudAudience, Window};
+use crate::systems::hud::{HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::job;
@@ -15,7 +15,7 @@ const ROW_SPACING: Vec2 = Vec2::new(16.0, 6.0);
 
 pub struct StatsWindow;
 
-impl Window for StatsWindow {
+impl HudWindow for StatsWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }

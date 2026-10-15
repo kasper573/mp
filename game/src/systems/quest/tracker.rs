@@ -6,7 +6,7 @@ use super::card::Countdown;
 use super::{Parties, QuestId, QuestLog, QuestResult, ready_mark};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
-use crate::systems::hud::{self, HudAudience, Widget};
+use crate::systems::hud::{self, HudAudience, HudWidget};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session::Viewpoint;
@@ -24,7 +24,7 @@ impl Plugin for QuestTrackerPlugin {
 
 pub struct QuestTrackerWidget;
 
-impl Widget for QuestTrackerWidget {
+impl HudWidget for QuestTrackerWidget {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }

@@ -8,7 +8,7 @@ use super::{SpectateRequest, Spectating};
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::actor::Name;
-use crate::systems::hud::{self, HudAudience, Widget};
+use crate::systems::hud::{self, HudAudience, HudWidget};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::player::session::{SpectateStatus, Viewpoint};
 use crate::systems::screen::{ClientScreen, mode::ClientMode};
@@ -39,7 +39,7 @@ impl Plugin for SpectatorPlugin {
 
 pub struct SpectatorWidget;
 
-impl Widget for SpectatorWidget {
+impl HudWidget for SpectatorWidget {
     fn audience(&self) -> HudAudience {
         HudAudience::Spectators
     }
