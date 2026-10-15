@@ -12,7 +12,7 @@ use super::dialogue::{ChoiceOffer, DialogueView};
 use super::may_do::MayDo;
 use super::node::MAX_LIVE_FLOWS;
 use super::value::Value;
-use super::{EventDef, Name, Vocabulary};
+use super::{EventDef, Name, RevealDef, Vocabulary};
 use crate::core::math::Rng;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -349,29 +349,35 @@ pub fn choice_state<V: Vocabulary>(
 }
 
 fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey<V>, choice: usize) -> Option<bool> {
-    let (procedure, node, cx) = {
-        let mut instances = world.resource_mut::<Instances<V>>();
-        let flow = instances.flow_mut(key)?;
-        if flow.pause != Some(Pause::Dialogue) {
-            return None;
-        }
-        let subject = flow.subject;
-        let event = flow.event.clone();
-        let frame = flow.frames.last_mut()?;
-        let node = frame.node?;
-        let procedure = frame.procedure.clone();
-        if !matches!(procedure.step(node), Step::Dialogue { .. }) {
-            return None;
-        }
-        let locals = std::mem::take(&mut frame.locals);
-        let cx = FlowCx {
-            owner: key.owner.entity(),
-            subject,
-            locals,
-            state: instances.take_state(key.owner, &procedure),
-            event,
-        };
-        (procedure, node, cx)
+    let mut flow = world.resource_mut::<Instances<V>>().take_flow(key)?;
+    let open = open_choice_of(world, key, &mut flow, choice);
+    put_flow(world, key, flow);
+    open
+}
+
+fn open_choice_of<V: Vocabulary>(
+    world: &mut World,
+    key: FlowKey<V>,
+    flow: &mut Flow<V>,
+    choice: usize,
+) -> Option<bool> {
+    if flow.pause != Some(Pause::Dialogue) {
+        return None;
+    }
+    let node = flow.frames.last()?.node?;
+    let procedure = flow.frames.last()?.procedure.clone();
+    if !matches!(procedure.step(node), Step::Dialogue { .. }) {
+        return None;
+    }
+    let mut frame = flow.frames.pop()?;
+    let cx = FlowCx {
+        owner: key.owner.entity(),
+        subject: flow.subject,
+        locals: std::mem::take(&mut frame.locals),
+        state: world
+            .resource_mut::<Instances<V>>()
+            .take_state(key.owner, &procedure),
+        event: std::mem::take(&mut flow.event),
     };
     let open = match procedure.step(node) {
         Step::Dialogue { requires, .. } => requires.get(choice).map(|requires| {
@@ -381,7 +387,8 @@ fn choice_open<V: Vocabulary>(world: &mut World, key: FlowKey<V>, choice: usize)
         }),
         _ => None,
     };
-    restore(&mut world.resource_mut::<Instances<V>>(), key, cx);
+    give_back(world, &mut frame, flow, cx);
+    flow.frames.push(frame);
     open
 }
 
@@ -967,7 +974,7 @@ fn run_flow_traced<V: Vocabulary>(
                         Some(requires) => requires(world, &cx).truthy(),
                         None => true,
                     };
-                    if !met && !choice.reveal.contains(&super::ChoiceReveal::Locked) {
+                    if !met && !choice.reveal.iter().any(|kind| kind.shows_while_locked()) {
                         continue;
                     }
                     let mut leads = Vec::new();
@@ -1137,16 +1144,6 @@ enum StepOutcome<V: Vocabulary> {
         return_to: Option<StepIndex>,
     },
     Return(Option<Value>),
-}
-
-fn restore<V: Vocabulary>(instances: &mut Instances<V>, key: FlowKey<V>, cx: FlowCx) {
-    let Some(flow) = instances.flow_mut(key) else {
-        return;
-    };
-    let frame = flow.frames.last_mut().expect("a frame");
-    frame.locals = cx.locals;
-    let procedure = frame.procedure.clone();
-    instances.put_state(key.owner, &procedure, cx.state);
 }
 
 fn end_flow<V: Vocabulary>(world: &mut World, key: FlowKey<V>, flow: Flow<V>, ending: BoxEnding) {

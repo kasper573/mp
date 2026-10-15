@@ -50,7 +50,7 @@ use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_fi
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-use crate::views::navigation;
+use crate::views::navigation::{self, Viewport};
 use crate::{play, user};
 
 pub const TILE_PX: f32 = 16.0;
@@ -87,9 +87,13 @@ pub struct AreaHover {
 }
 
 #[derive(Clone, Debug)]
-pub enum DeferredAreaAction {
+pub enum AreaAction {
     Copy,
     Duplicate,
+    Delete,
+    OpenBlueprint(String),
+    MakeBlueprint,
+    GoTo(String, Pos<Tiles>),
     Unpack(usize),
     Replace(usize),
     Split(usize),
@@ -192,7 +196,6 @@ pub struct AreaViewState {
     pub blueprint_search: String,
     pub blueprint_everywhere: bool,
     pub palette_lens: palette::PaletteLens,
-    pub deferred: Vec<DeferredAreaAction>,
     pub menu: Option<modules::AreaMenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,
     pub population_previews: HashMap<String, PopulationPreview>,
@@ -331,45 +334,6 @@ pub enum ResizeCorner {
 pub struct PasteGhost {
     pub modules: Vec<Value>,
     pub at: Option<Pos<Tiles>>,
-}
-
-#[derive(Clone, Copy)]
-pub struct AreaCanvas {
-    pub rect: ERect,
-    pub center: Pos<Tiles>,
-    pub zoom: f32,
-}
-
-impl AreaCanvas {
-    pub fn scale(&self) -> f32 {
-        TILE_PX * self.zoom
-    }
-
-    pub fn to_screen(self, p: Pos<Tiles>) -> Pos2 {
-        let c = self.rect.center();
-        Pos2::new(
-            c.x + (p.x - self.center.x) * self.scale(),
-            c.y + (p.y - self.center.y) * self.scale(),
-        )
-    }
-
-    pub fn to_tile(self, p: Pos2) -> Pos<Tiles> {
-        let c = self.rect.center();
-        Pos::new(
-            self.center.x + (p.x - c.x) / self.scale(),
-            self.center.y + (p.y - c.y) / self.scale(),
-        )
-    }
-
-    pub fn rect(&self, r: Rect<Tiles>) -> ERect {
-        ERect::from_min_max(self.to_screen(r.min()), self.to_screen(r.max()))
-    }
-
-    pub fn visible(&self) -> Rect<Tiles> {
-        let min = self.to_tile(self.rect.min);
-        let max = self.to_tile(self.rect.max);
-        Rect::new(min, Size::new(max.x - min.x, max.y - min.y))
-    }
 }
 
 impl AreaViews {
@@ -794,7 +758,11 @@ fn canvas(
     if let Some((texture, uv)) = texture {
         painter.image(texture, rect, uv, Color32::WHITE);
     }
-    let canvas = AreaCanvas { rect, center, zoom };
+    let canvas = Viewport {
+        screen: rect,
+        center,
+        zoom,
+    };
     let hovered = response.hover_pos().filter(|_| response.hovered());
     let pointer_tile = hovered.map(|p| canvas.to_tile(p));
     if let Some(tile) = pointer_tile {
@@ -803,17 +771,10 @@ fn canvas(
             tile,
         });
     }
-    let own = editor.row_value("area", &area_key).unwrap_or(Value::Null);
-    let modules: Vec<Value> = own["modules"].as_array().cloned().unwrap_or_default();
-    let placement_bounds = placement::placement_bounds(content, area_id);
+    let snapshot = AreaSnapshot::of(editor, content, area_id, &area_key, in_place);
     let frame = AreaFrame {
+        snapshot,
         canvas,
-        content,
-        area_id,
-        area_key: area_key.clone(),
-        modules,
-        in_place,
-        placement_bounds,
         pointer: hovered,
         pointer_tile,
         response: &response,
@@ -829,9 +790,6 @@ fn canvas(
     let blueprint_tab = editor.views.area.view(view_key).blueprint.is_some();
     if !blueprint_tab {
         editor.views.area.active = Some(area_key.clone());
-    }
-    for deferred in std::mem::take(&mut editor.views.area.view_mut(view_key).deferred) {
-        run_deferred(editor, &frame, deferred);
     }
     if !blueprint_tab {
         overlay_populations(editor, ui, &painter, view_key, &frame, area);
@@ -867,31 +825,69 @@ fn canvas(
     remember_camera(editor, view_key);
 }
 
-pub struct AreaFrame<'a> {
-    pub canvas: AreaCanvas,
+pub struct AreaSnapshot {
     pub content: Content,
     pub area_id: AreaId,
     pub area_key: String,
     pub modules: Vec<Value>,
     pub in_place: Vec<placement::Placement>,
     pub placement_bounds: HashMap<usize, Rect<Tiles>>,
+}
+
+pub struct AreaFrame<'a> {
+    pub snapshot: AreaSnapshot,
+    pub canvas: Viewport<Tiles>,
     pub pointer: Option<Pos2>,
     pub pointer_tile: Option<Pos<Tiles>>,
     pub response: &'a egui::Response,
     pub labels: AreaLabels,
 }
 
-impl AreaFrame<'_> {
+impl std::ops::Deref for AreaFrame<'_> {
+    type Target = AreaSnapshot;
+
+    fn deref(&self) -> &AreaSnapshot {
+        &self.snapshot
+    }
+}
+
+impl AreaSnapshot {
+    pub fn of(
+        editor: &Editor,
+        content: Content,
+        area_id: AreaId,
+        area_key: &str,
+        in_place: Vec<placement::Placement>,
+    ) -> Self {
+        let own = editor.row_value("area", area_key).unwrap_or(Value::Null);
+        Self {
+            content,
+            area_id,
+            area_key: area_key.to_owned(),
+            modules: own["modules"].as_array().cloned().unwrap_or_default(),
+            in_place,
+            placement_bounds: placement::placement_bounds(content, area_id),
+        }
+    }
+
+    pub fn for_area(editor: &mut Editor, area_key: &str) -> Option<Self> {
+        let content = editor.project.as_ref()?.content?;
+        let area_id = content.by_key::<area::AreaDef>(area_key)?;
+        let view_key = area_view_key(area_key);
+        let in_place = if editor.views.area.views.contains_key(&view_key) {
+            resolve_in_place(editor, content, &view_key, area_key)
+        } else {
+            Vec::new()
+        };
+        Some(Self::of(editor, content, area_id, area_key, in_place))
+    }
+
     pub fn area(&self) -> &'static area::Area {
         area::load(&self.content, self.area_id)
     }
 
     pub fn size(&self) -> Size<Tiles> {
         self.area().size
-    }
-
-    pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
-        origin_of(self.canvas.center, &self.in_place)
     }
 
     pub fn in_map(&self, tile: Pos<Tiles>) -> bool {
@@ -922,6 +918,12 @@ impl AreaFrame<'_> {
             }
         }
         best.map(|(index, _)| index)
+    }
+}
+
+impl AreaFrame<'_> {
+    pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
+        origin_of(self.canvas.center, &self.in_place)
     }
 
     pub fn pointer_cell(&self) -> Option<CellPos> {
@@ -1013,15 +1015,22 @@ pub fn open_area_at(editor: &mut Editor, area: &str, at: Option<Pos<Tiles>>, par
     }
 }
 
-pub(super) fn run_deferred(editor: &mut Editor, frame: &AreaFrame, deferred: DeferredAreaAction) {
-    match deferred {
-        DeferredAreaAction::Copy => select::copy_selection(editor, frame),
-        DeferredAreaAction::Duplicate => select::duplicate_selection(editor, frame),
-        DeferredAreaAction::Unpack(index) => placement::unpack(editor, frame, index),
-        DeferredAreaAction::Replace(index) => placement::replace_dialog(editor, frame, index),
-        DeferredAreaAction::Split(index) => scenery::split_scenery(editor, frame, index),
-        DeferredAreaAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
-        DeferredAreaAction::AdoptBlocks(index) => scenery::adopt_blocks(editor, frame, index),
+pub(super) fn run_action(editor: &mut Editor, frame: &AreaSnapshot, action: AreaAction) {
+    match action {
+        AreaAction::Copy => select::copy_selection(editor, frame),
+        AreaAction::Duplicate => select::duplicate_selection(editor, frame),
+        AreaAction::Delete => select::delete_selection(editor, frame),
+        AreaAction::OpenBlueprint(key) => {
+            editor.select(RowSelection::row("blueprint", &key));
+            editor.open_tab(EditorTab::Blueprint { key });
+        }
+        AreaAction::MakeBlueprint => blueprint::make_blueprint_from_selection(editor, frame),
+        AreaAction::GoTo(area, at) => open_area_at(editor, &area, Some(at), None),
+        AreaAction::Unpack(index) => placement::unpack(editor, frame, index),
+        AreaAction::Replace(index) => placement::replace_dialog(editor, frame, index),
+        AreaAction::Split(index) => scenery::split_scenery(editor, frame, index),
+        AreaAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
+        AreaAction::AdoptBlocks(index) => scenery::adopt_blocks(editor, frame, index),
     }
 }
 

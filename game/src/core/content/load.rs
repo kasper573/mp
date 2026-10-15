@@ -58,6 +58,16 @@ pub struct ContentRegistry {
     settings: Option<Box<dyn SettingsLoader>>,
     writers: Vec<FolderWriter>,
     module_rules: Vec<(&'static str, ModuleProbe)>,
+    list_kinds: Vec<ListKind>,
+}
+
+/// What the entries of a JSON list field are called in shape errors: a list of `field` whose
+/// entry names an unknown variant reports `rule`, and asks for `expected` in its place.
+#[derive(Clone, Copy, Debug)]
+struct ListKind {
+    pub field: &'static str,
+    pub rule: &'static str,
+    pub expected: &'static str,
 }
 
 type ModuleProbe = Box<dyn Fn(&serde_json::Value) -> Option<ModuleRule> + Send + Sync>;
@@ -89,6 +99,20 @@ impl ContentRegistry {
             .iter()
             .find(|(name, _)| *name == table)
             .and_then(|(_, probe)| probe(json))
+    }
+
+    pub fn list_kind(
+        &mut self,
+        field: &'static str,
+        rule: &'static str,
+        expected: &'static str,
+    ) -> &mut ContentRegistry {
+        self.list_kinds.push(ListKind {
+            field,
+            rule,
+            expected,
+        });
+        self
     }
 
     pub fn folder<Row: ContentRow>(&mut self) -> &mut ContentRegistry {
@@ -197,6 +221,10 @@ impl ContentRegistry {
 
     pub(super) fn settings_loader(&self) -> Option<&dyn SettingsLoader> {
         self.settings.as_deref()
+    }
+
+    fn list_kinds(&self) -> &[ListKind] {
+        &self.list_kinds
     }
 
     pub(super) fn row_loaders(&self) -> &[Box<dyn TableLoader>] {
@@ -518,7 +546,13 @@ impl Loading {
             .map(|(index, key)| {
                 let loader = &registry.row_loaders()[index];
                 let file = super::row_file(loader.name(), &key);
-                let parsed = parse_file(root.as_ref(), &file, &scope, |text| loader.parse(text));
+                let parsed = parse_file(
+                    root.as_ref(),
+                    &file,
+                    &scope,
+                    registry.list_kinds(),
+                    |text| loader.parse(text),
+                );
                 (index, key, parsed)
             })
             .collect();
@@ -543,12 +577,18 @@ impl Loading {
         }
         self.snapshot = None;
 
-        let settings = parse_file(root.as_ref(), GAME_FILE, &scope, |text| {
-            registry
-                .settings_loader()
-                .map(|loader| loader.parse(text))
-                .unwrap_or_else(|| Ok(Box::new(())))
-        });
+        let settings = parse_file(
+            root.as_ref(),
+            GAME_FILE,
+            &scope,
+            registry.list_kinds(),
+            |text| {
+                registry
+                    .settings_loader()
+                    .map(|loader| loader.parse(text))
+                    .unwrap_or_else(|| Ok(Box::new(())))
+            },
+        );
         self.errors.extend(settings.errors);
         if let Some(index) = settings.index {
             self.indexes.insert(GAME_FILE.to_owned(), Arc::new(index));
@@ -715,6 +755,7 @@ fn parse_file(
     root: &dyn ContentFolder,
     file: &str,
     scope: &ContentScope,
+    list_kinds: &[ListKind],
     parse: impl FnOnce(&str) -> ParseResult,
 ) -> ParsedFile {
     let mut parsed = ParsedFile {
@@ -756,7 +797,9 @@ fn parse_file(
                 .errors
                 .extend(reference_errors(file, scope.leaves(), &index));
         }
-        Err(error) => parsed.errors.push(shape_error(file, &error, &index)),
+        Err(error) => parsed
+            .errors
+            .push(shape_error(file, &error, &index, list_kinds)),
     }
     parsed.index = Some(index);
     parsed
@@ -862,7 +905,12 @@ pub fn pointer_of(path: &serde_path_to_error::Path) -> String {
     pointer
 }
 
-fn shape_error(file: &str, error: &ParseError, index: &JsonIndex) -> LoadError {
+fn shape_error(
+    file: &str,
+    error: &ParseError,
+    index: &JsonIndex,
+    list_kinds: &[ListKind],
+) -> LoadError {
     use serde_json::error::Category;
     let inner = &error.inner;
     let pointer = error.pointer.clone();
@@ -901,11 +949,11 @@ fn shape_error(file: &str, error: &ParseError, index: &JsonIndex) -> LoadError {
     LoadError {
         file: file.to_owned(),
         at,
-        problem: classify_shape(&message, &pointer),
+        problem: classify_shape(&message, &pointer, list_kinds),
     }
 }
 
-fn classify_shape(message: &str, pointer: &str) -> ContentProblem {
+fn classify_shape(message: &str, pointer: &str, list_kinds: &[ListKind]) -> ContentProblem {
     if let Some(rest) = message.strip_prefix("missing field `") {
         let field = rest.trim_end_matches('`');
         return ContentProblem::new(
@@ -935,26 +983,14 @@ fn classify_shape(message: &str, pointer: &str) -> ContentProblem {
     if let Some(rest) = message.strip_prefix("unknown variant `") {
         let (variant, options) = split_options(rest);
         let nearest = nearest(&options, variant);
-        let in_modules = pointer
+        let list = pointer
             .rsplit('/')
             .nth(1)
-            .is_some_and(|parent| parent == "modules" || parent == "parts");
-        let rule = if in_modules {
-            "unknown module type"
-        } else {
-            "unknown variant"
-        };
+            .and_then(|parent| list_kinds.iter().find(|kind| kind.field == parent));
         return ContentProblem::new(
-            rule,
+            list.map_or("unknown variant", |kind| kind.rule),
             format!("{variant:?}"),
-            expected_options(
-                if in_modules {
-                    "a module type"
-                } else {
-                    "a variant"
-                },
-                &options,
-            ),
+            expected_options(list.map_or("a variant", |kind| kind.expected), &options),
         )
         .near(nearest.map(|v| format!("{v:?}")));
     }

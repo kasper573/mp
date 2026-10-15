@@ -113,6 +113,7 @@ struct LockSeen(bool);
 struct GestureIndex(usize);
 
 #[derive(Resource, Default)]
+/// The cursor the area's gestures chose for this frame, `None` where no gesture runs.
 struct ChosenCursor(Option<Cursor>);
 
 /// The system draws its cursor as the pointer moves, but a frame reaches the screen a few frames
@@ -182,9 +183,7 @@ fn update(world: &mut World) {
             world.remove_resource::<ActiveTileHighlight>();
         }
     }
-    if cursor.is_some() {
-        world.resource_mut::<ChosenCursor>().0 = cursor;
-    }
+    world.resource_mut::<ChosenCursor>().0 = cursor;
 }
 
 fn forget_clicks_across_lock(world: &mut World) {
@@ -196,15 +195,20 @@ fn forget_clicks_across_lock(world: &mut World) {
 }
 
 fn show_cursor(world: &mut World) {
-    let Some(chosen) = world.resource::<ChosenCursor>().0 else {
-        return;
-    };
+    let in_area = *world.resource::<State<ClientScreen>>().get() == ClientScreen::Area;
+    let chosen = in_area
+        .then(|| world.resource::<ChosenCursor>().0)
+        .flatten();
     let shown = match chosen {
-        Cursor::Shaped(shape) if gui::dragging(world) => ShownCursor {
+        None => ShownCursor {
+            icon: Some(CursorIcon::System(SystemCursorIcon::Default)),
+            in_frame: None,
+        },
+        Some(Cursor::Shaped(shape)) if gui::dragging(world) => ShownCursor {
             icon: None,
             in_frame: Some(shape),
         },
-        Cursor::Shaped(shape) => {
+        Some(Cursor::Shaped(shape)) => {
             let icon = content_cursor(world, shape);
             if let CursorIcon::Custom(CustomCursor::Image(image)) = &icon
                 && !world.resource::<Assets<Image>>().contains(&image.handle)
@@ -216,7 +220,7 @@ fn show_cursor(world: &mut World) {
                 in_frame: None,
             }
         }
-        Cursor::System(icon) => ShownCursor {
+        Some(Cursor::System(icon)) => ShownCursor {
             icon: Some(CursorIcon::System(icon)),
             in_frame: None,
         },

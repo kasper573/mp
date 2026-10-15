@@ -7,7 +7,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::core::content::{Content, ContentRow, Fixture};
+use crate::core::content::{Content, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::text::{InputRef, KeyNames, TextPiece};
 
 #[derive(
@@ -62,6 +62,77 @@ pub enum InputAction {
 
 impl Fixture for InputAction {
     type Row = InputDef;
+}
+
+impl InputAction {
+    pub fn gestures(self) -> &'static [GestureKind] {
+        match self {
+            InputAction::Advance | InputAction::PickChoice => {
+                &[GestureKind::Press, GestureKind::Click]
+            }
+            InputAction::Select
+            | InputAction::InspectItem
+            | InputAction::UseItem
+            | InputAction::DropItem
+            | InputAction::SellItem => &[GestureKind::Click],
+            InputAction::CarryItem => &[GestureKind::Drag],
+            InputAction::SubmitText | InputAction::TakeDefault => &[GestureKind::Shortcut],
+            _ => &[GestureKind::Press],
+        }
+    }
+}
+
+/// The ways the game reads an action. A binding the action's reader never sees is rejected at load.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GestureKind {
+    Press,
+    Click,
+    Drag,
+    Shortcut,
+}
+
+impl GestureKind {
+    fn accepts(self, binding: InputBinding) -> bool {
+        match self {
+            GestureKind::Press => matches!(
+                binding,
+                InputBinding::Key(_) | InputBinding::AnyKey | InputBinding::Mouse { .. }
+            ),
+            GestureKind::Click => matches!(binding, InputBinding::Click(_)),
+            GestureKind::Drag => matches!(binding, InputBinding::Drag(_)),
+            GestureKind::Shortcut => matches!(binding, InputBinding::Key(_)),
+        }
+    }
+}
+
+pub fn check_all(loading: &mut Loading) {
+    let content = loading.content();
+    for (id, def) in loading.rows::<InputDef>() {
+        let key = id.key(&content);
+        let Some(action) = InputAction::VARIANTS
+            .iter()
+            .copied()
+            .find(|action| action.key() == key)
+        else {
+            continue;
+        };
+        let mut check = RowCheck::default();
+        for (index, binding) in def.bindings.iter().enumerate() {
+            if !action
+                .gestures()
+                .iter()
+                .any(|gesture| gesture.accepts(*binding))
+            {
+                check.error(
+                    format!("/bindings/{index}"),
+                    "unread binding",
+                    binding.name(),
+                    "a binding the game reads for this action",
+                );
+            }
+        }
+        loading.row_errors(id, check);
+    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]

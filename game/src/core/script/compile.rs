@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use bevy_ecs::prelude::*;
 
-use super::dialogue::{ChoiceReveal, DialogueNode, MAX_CHOICES, MAX_LINES};
+use super::dialogue::{DialogueNode, MAX_CHOICES, MAX_LINES, check_reveals_unique};
 use super::expr::{self, Expr};
 use super::may_do::MayDo;
 use super::node::{
@@ -792,7 +792,7 @@ fn compile_source<V: Vocabulary>(
                         );
                     }
                     labels.push(evals);
-                    ChoiceReveal::check_unique(&choice.reveal)
+                    check_reveals_unique(&choice.reveal)
                         .map_err(|fault| node_fail(fault.rule, fault.expected))?;
                     if choice
                         .warn

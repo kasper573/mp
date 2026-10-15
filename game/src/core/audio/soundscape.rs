@@ -57,6 +57,7 @@ pub struct SoundscapeLayer {
     pub src: AssetRef,
     pub volume: f32,
     pub pan: f32,
+    pub category: AudioCategory,
 }
 
 #[derive(Resource, Default)]
@@ -69,23 +70,13 @@ pub struct SoundscapeMixer {
 
 pub struct SoundscapeVoice {
     pub channel: SoundscapeChannel,
+    pub category: AudioCategory,
     pub src: &'static str,
     instance: Handle<AudioInstance>,
     share: f32,
     volume: f32,
     pan: f32,
     applied: Option<(f32, f32)>,
-}
-
-impl SoundscapeChannel {
-    pub const MUSIC: SoundscapeChannel = SoundscapeChannel(1);
-
-    pub fn category(self) -> AudioCategory {
-        match self {
-            SoundscapeChannel::MUSIC => AudioCategory::Music,
-            _ => AudioCategory::Ambience,
-        }
-    }
 }
 
 impl SoundscapeZone {
@@ -162,6 +153,7 @@ impl SoundscapeVoice {
 #[derive(Clone, PartialEq)]
 struct WantedLayer {
     channel: SoundscapeChannel,
+    category: AudioCategory,
     src: &'static str,
     share: f32,
     volume: f32,
@@ -228,11 +220,7 @@ fn mix(
             instance.stop(AudioTween::default());
             return false;
         }
-        voice.apply(
-            &mut instance,
-            audio_mix.gain(voice.channel.category()),
-            elapsed,
-        );
+        voice.apply(&mut instance, audio_mix.gain(voice.category), elapsed);
         true
     });
     if mixer.refused.is_some() {
@@ -258,6 +246,7 @@ fn mix(
             .handle();
         mixer.voices.push(SoundscapeVoice {
             channel: layer.channel,
+            category: layer.category,
             src: layer.src,
             instance,
             share: 0.0,
@@ -284,6 +273,7 @@ fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
                 Some(wanted) => wanted.blend(power, layer, pan),
                 None => wanted.push(WantedLayer {
                     channel,
+                    category: layer.category,
                     src: layer.src.as_str(),
                     share: power,
                     volume: layer.volume,

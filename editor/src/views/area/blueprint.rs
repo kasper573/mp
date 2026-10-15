@@ -8,7 +8,7 @@ use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
 use super::placement;
-use super::{AreaFrame, shapes};
+use super::{AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, REFUSED};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{dialogs, theme, widgets};
@@ -51,7 +51,7 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
         }));
 }
 
-pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaFrame) {
+pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     let mut indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
         .iter()
         .filter_map(|p| super::module_index(p))

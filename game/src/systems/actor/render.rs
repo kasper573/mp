@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
@@ -8,7 +6,7 @@ use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::Direction;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{Animator, RowDepth, atlas_rect, dynamic_z, place_sprite};
+use crate::core::render::{Animator, Previous, RowDepth, atlas_rect, dynamic_z, place_sprite};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::{Action, Actor, ActorModel};
@@ -20,11 +18,10 @@ pub struct ActorPlugin;
 
 impl Plugin for ActorPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CuePlayheads>()
-            .add_plugins(InterpolatePlugin::<RenderActor>::default())
+        app.add_plugins(InterpolatePlugin::<RenderActor>::default())
             .add_systems(
                 Update,
-                (attach_sprites, sync_actors, actor_cues)
+                (attach_sprites, sync_actors)
                     .chain()
                     .in_set(WorldViewSystems)
                     .run_if(in_state(ClientScreen::Area)),
@@ -106,20 +103,21 @@ fn sync_actors(
     content: Res<Content>,
     mut animator: ResMut<Animator>,
     mut actors: Query<ActorView>,
+    mut play: MessageWriter<PlaySfx>,
 ) {
     let clock = Seconds(time.elapsed_secs());
     animator.retain(|entity| actors.contains(entity));
     for (entity, actor, render, pose, tag, mut sprite, mut transform, mut depth, mut visibility) in
         &mut actors
     {
-        let elapsed = animator.elapsed(entity, pose.action as u64, clock);
         let model = ActorModel::get(&content, actor.model);
+        let playhead = animator.advance(entity, pose.action as u64, clock);
         draw_actor_frame(
             &mut sprite,
             model,
             pose.action,
             pose.dir,
-            elapsed,
+            playhead.elapsed,
             actor.attack_rate,
         );
         sprite.color = actor.color.color();
@@ -130,38 +128,27 @@ fn sync_actors(
         if *visibility == Visibility::Hidden {
             *visibility = Visibility::Inherited;
         }
-    }
-}
-
-#[derive(Resource, Default)]
-struct CuePlayheads(HashMap<Entity, (Action, Seconds)>);
-
-fn actor_cues(
-    time: Res<Time>,
-    content: Res<Content>,
-    mut animator: ResMut<Animator>,
-    mut playheads: ResMut<CuePlayheads>,
-    actors: Query<(Entity, &Actor, &RenderPosition, &RenderActor, &AreaTag)>,
-    mut play: MessageWriter<PlaySfx>,
-) {
-    let clock = Seconds(time.elapsed_secs());
-    playheads.0.retain(|entity, _| actors.contains(*entity));
-    for (entity, actor, render, pose, tag) in &actors {
-        let at = render.0;
-        let now = animator.elapsed(entity, pose.action as u64, clock);
-        let Some((was, then)) = playheads.0.insert(entity, (pose.action, now)) else {
+        if playhead.previous == Previous::Unseen {
             continue;
+        }
+        let since = match playhead.previous {
+            Previous::Continued(before) => Some(before),
+            Previous::Unseen | Previous::Restarted => None,
         };
-        let since = (was == pose.action).then_some(then);
-        let model = ActorModel::get(&content, actor.model);
-        let (cues, stepped) = model.cues(pose.action, pose.dir, since, now, actor.attack_rate);
+        let (cues, stepped) = model.cues(
+            pose.action,
+            pose.dir,
+            since,
+            playhead.elapsed,
+            actor.attack_rate,
+        );
         for id in cues {
             play.write(PlaySfx {
                 id: *id,
                 place: SfxPlace::World(at),
             });
         }
-        if stepped && let Some(id) = area::load(&content, tag.area).footstep_at(at.cell()) {
+        if stepped && let Some(id) = area.footstep_at(at.cell()) {
             play.write(PlaySfx {
                 id: *id,
                 place: SfxPlace::World(at),

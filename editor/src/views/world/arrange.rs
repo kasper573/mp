@@ -25,15 +25,21 @@ const PREVIEW_PINNED: Color32 = Color32::from_rgb(120, 160, 230);
 const PREVIEW_CARD: Color32 = Color32::from_rgb(110, 118, 140);
 
 pub struct ArrangeDialog {
+    options: ArrangeOptions,
+    solved: Option<Solved>,
+}
+
+#[derive(Clone, PartialEq)]
+struct ArrangeOptions {
     everything: bool,
     keep_regions: bool,
     doors_hint: bool,
     selected: Vec<String>,
-    solved: Option<Solved>,
 }
 
 struct Solved {
     generation: u64,
+    options: ArrangeOptions,
     after: WorldMapDef,
 }
 
@@ -47,10 +53,12 @@ pub fn open(editor: &mut Editor) {
         .map(|area| map.atlas.key(area).to_owned())
         .collect();
     editor.dialogs.push(ModalDialog::Arrange(ArrangeDialog {
-        everything: true,
-        keep_regions: true,
-        doors_hint: true,
-        selected,
+        options: ArrangeOptions {
+            everything: true,
+            keep_regions: true,
+            doors_hint: true,
+            selected,
+        },
         solved: None,
     }));
 }
@@ -74,10 +82,13 @@ pub fn dialog(
     let before = &map.layout;
     let generation = map.atlas.generation;
     let solved = match dialog.solved.take() {
-        Some(solved) if solved.generation == generation => solved,
+        Some(solved) if solved.generation == generation && solved.options == dialog.options => {
+            solved
+        }
         _ => Solved {
             generation,
-            after: arranged(&map, &dialog),
+            options: dialog.options.clone(),
+            after: arranged(&map, &dialog.options),
         },
     };
     let after = &solved.after;
@@ -89,37 +100,36 @@ pub fn dialog(
         .filter(|(area, card)| before.cards.get(area).is_some_and(|was| was.at != card.at))
         .count();
     let mut answer = None;
-    let mut changed = false;
     dialogs::card(ctx, "arrange-world", 720.0, |ui| {
         ui.label(RichText::new("✲ Arrange the world map").size(17.0).strong());
         ui.add_space(8.0);
-        changed |= toggle_row(
+        toggle_row(
             ui,
-            &mut dialog.everything,
+            &mut dialog.options.everything,
             &format!("Arrange the {unpinned} unpinned cards"),
             &match pinned {
                 0 => "nothing is pinned".to_owned(),
                 _ => format!("{pinned} pinned stay put"),
             },
         );
-        if !dialog.everything {
+        if !dialog.options.everything {
             ui.label(
-                theme::faint(match dialog.selected.len() {
+                theme::faint(match dialog.options.selected.len() {
                     0 => "nothing is selected, so nothing moves".to_owned(),
                     count => format!("only the {count} selected cards move"),
                 })
                 .size(12.0),
             );
         }
-        changed |= toggle_row(
+        toggle_row(
             ui,
-            &mut dialog.keep_regions,
+            &mut dialog.options.keep_regions,
             "Keep each region's cards together",
             "",
         );
-        changed |= toggle_row(
+        toggle_row(
             ui,
-            &mut dialog.doors_hint,
+            &mut dialog.options.doors_hint,
             "Let doors hint at direction",
             "a door on the east edge pulls its area east",
         );
@@ -161,17 +171,17 @@ pub fn dialog(
         }
         Some(DialogAnswer::Cancel) => None,
         None => {
-            dialog.solved = (!changed).then_some(solved);
+            dialog.solved = Some(solved);
             Some(dialog)
         }
     }
 }
 
-fn arranged(map: &OpenWorldMap, dialog: &ArrangeDialog) -> WorldMapDef {
+fn arranged(map: &OpenWorldMap, options: &ArrangeOptions) -> WorldMapDef {
     let mut start = map.layout.clone();
-    if !dialog.everything {
+    if !options.everything {
         for (area, card) in &mut start.cards {
-            if !dialog
+            if !options
                 .selected
                 .iter()
                 .any(|key| *key == map.atlas.key(*area))
@@ -180,23 +190,21 @@ fn arranged(map: &OpenWorldMap, dialog: &ArrangeDialog) -> WorldMapDef {
             }
         }
     }
-    let mut after = solve(map, &start, dialog.keep_regions, dialog.doors_hint);
+    let mut after = solve(map, &start, options.keep_regions, options.doors_hint);
     for (area, card) in &mut after.cards {
         card.pinned = map.layout.cards.get(area).is_some_and(|was| was.pinned);
     }
     after
 }
 
-fn toggle_row(ui: &mut Ui, on: &mut bool, label: &str, note: &str) -> bool {
+fn toggle_row(ui: &mut Ui, on: &mut bool, label: &str, note: &str) {
     ui.horizontal(|ui| {
-        let changed = widgets::toggle(ui, on).changed();
+        widgets::toggle(ui, on);
         ui.label(RichText::new(label).size(13.0));
         if !note.is_empty() {
             ui.label(theme::faint(format!("· {note}")).size(12.0));
         }
-        changed
-    })
-    .inner
+    });
 }
 
 fn preview(ui: &mut Ui, map: &OpenWorldMap, layout: &WorldMapDef) {

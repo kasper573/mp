@@ -3,11 +3,11 @@ use std::sync::Arc;
 use game::core::content::{Content, ContentBuilder, ContentScope, Table, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
-use game::core::script::{EffectDef, ScriptError};
+use game::core::script::{EffectDef, Expr, ScriptError};
 use game::systems::item::ItemId;
 use game::systems::memory::MemoryId;
 use game::systems::script::{
-    EventKind, OwnerKind, Place, Procedure, Reach, ScriptDef, ScriptModule,
+    EventKind, OwnerKind, Place, Procedure, Reach, RiftScripting, ScriptDef, ScriptModule,
 };
 use game::systems::shop::ShopId;
 use serde_json::{Value, json};
@@ -212,6 +212,31 @@ fn an_if_always_taken_still_compiles_both_arrows() {
     let procedures = compile(OwnerKind::Area, &[script]).expect("compiles");
 
     assert_eq!(procedures[0].may_do.reaches.len(), 2);
+}
+
+#[test]
+fn every_expression_shape_serializes_back_to_the_json_it_was_read_from() {
+    let shapes = json!([
+        true,
+        3,
+        2.5,
+        "text",
+        { "var": "aggro" },
+        { "type": "local", "local": "target" },
+        { "type": "state", "state": "count" },
+        { "type": "event", "event": "started" },
+        { "type": "all", "of": [true, { "type": "not", "of": false }] },
+        { "type": "any", "of": [false] },
+        { "type": "join", "of": ["a", "b"] },
+        { "type": "round", "of": 2.5 },
+        { "type": "not_equal", "a": { "var": "aggro" }, "b": 4 },
+        { "type": "at_least", "a": { "var": "aggro" }, "b": 4 },
+        { "type": "divide", "a": 9, "b": 3 }
+    ]);
+    for shape in shapes.as_array().expect("a list") {
+        let expr: Expr<RiftScripting> = parse(shape.clone());
+        assert_eq!(serde_json::to_value(&expr).expect("json"), *shape);
+    }
 }
 
 #[test]

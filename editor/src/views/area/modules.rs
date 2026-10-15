@@ -5,8 +5,8 @@ use game::systems::area::AreaModuleKind;
 use game::systems::script::Place;
 use serde_json::Value;
 
-use super::select::{copy_selection, delete_selection, duplicate_selection, start_paste};
-use super::{AreaFrame, AreaTool, AreaViewState, DeferredAreaAction, blueprint, pins, shapes};
+use super::select::start_paste;
+use super::{AreaAction, AreaFrame, AreaTool, AreaViewState, pins, shapes};
 use super::{pick, placement};
 use crate::app::Editor;
 use crate::project::{ContentEdit, RowSelection, row_file};
@@ -43,7 +43,7 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaF
         &frame.response.ctx,
         view,
         view_key,
-        frame.pointer.unwrap_or(frame.canvas.rect.center()),
+        frame.pointer.unwrap_or(frame.canvas.screen.center()),
         tile,
     );
 }
@@ -56,7 +56,7 @@ pub(super) fn open_add_menu(
     tile: Pos<Tiles>,
 ) {
     if let Some(view) = editor.views.area.views.get_mut(view_key) {
-        let at = frame.pointer.unwrap_or(frame.canvas.rect.center());
+        let at = frame.pointer.unwrap_or(frame.canvas.screen.center());
         open_menu(ui.ctx(), view, view_key, at, tile);
     }
 }
@@ -195,15 +195,15 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             ui.separator();
             ui.label(RichText::new(format!("{} selected", selected.len())).strong());
             if ui.button("Copy (Ctrl C)").clicked() {
-                action = Some(MenuAction::Copy);
+                action = Some(MenuAction::Area(AreaAction::Copy));
                 ui.close();
             }
             if ui.button("Duplicate (Ctrl D)").clicked() {
-                action = Some(MenuAction::Duplicate);
+                action = Some(MenuAction::Area(AreaAction::Duplicate));
                 ui.close();
             }
             if ui.button("Make blueprint (Ctrl Alt B)").clicked() {
-                action = Some(MenuAction::MakeBlueprint);
+                action = Some(MenuAction::Area(AreaAction::MakeBlueprint));
                 ui.close();
             }
             if selected.len() == 1 {
@@ -217,30 +217,30 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                             ui.close();
                         }
                         if ui.button("Unpack").clicked() {
-                            action = Some(MenuAction::Defer(DeferredAreaAction::Unpack(index)));
+                            action = Some(MenuAction::Area(AreaAction::Unpack(index)));
                             ui.close();
                         }
                         if ui.button("Replace with…").clicked() {
-                            action = Some(MenuAction::Defer(DeferredAreaAction::Replace(index)));
+                            action = Some(MenuAction::Area(AreaAction::Replace(index)));
                             ui.close();
                         }
                     }
                     if module.is_module(AreaModuleKind::Scenery)
                         && ui.button("Split into tiles").clicked()
                     {
-                        action = Some(MenuAction::Defer(DeferredAreaAction::Split(index)));
+                        action = Some(MenuAction::Area(AreaAction::Split(index)));
                         ui.close();
                     }
                     if module.is_module(AreaModuleKind::Object)
                         && ui.button("Return door…").clicked()
                     {
-                        action = Some(MenuAction::Defer(DeferredAreaAction::ReturnDoor(index)));
+                        action = Some(MenuAction::Area(AreaAction::ReturnDoor(index)));
                         ui.close();
                     }
                 }
             }
             if ui.button("Delete (Del)").clicked() {
-                action = Some(MenuAction::Delete);
+                action = Some(MenuAction::Area(AreaAction::Delete));
                 ui.close();
             }
         }
@@ -267,13 +267,9 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
             pick::listen(editor, frame, tile);
         }
         MenuAction::Add(kind) => add_module(editor, view_key, frame, kind, tile),
-        MenuAction::Copy => copy_selection(editor, frame),
-        MenuAction::Duplicate => duplicate_selection(editor, frame),
-        MenuAction::Delete => delete_selection(editor, frame),
         MenuAction::Paste => start_paste(editor, view_key),
-        MenuAction::MakeBlueprint => blueprint::make_blueprint_from_selection(editor, frame),
         MenuAction::EditInPlace(index) => placement::edit_in_place(editor, view_key, frame, index),
-        MenuAction::Defer(deferred) => super::run_deferred(editor, frame, deferred),
+        MenuAction::Area(action) => super::run_action(editor, frame, action),
     }
 }
 
@@ -283,13 +279,9 @@ pub(super) enum MenuAction {
     SetSpawn,
     Listen,
     Add(AreaModuleKind),
-    Copy,
-    Duplicate,
-    Delete,
     Paste,
-    MakeBlueprint,
     EditInPlace(usize),
-    Defer(DeferredAreaAction),
+    Area(AreaAction),
 }
 
 pub fn variant_template(editor: &Editor, kind: &str) -> Option<Value> {

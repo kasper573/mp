@@ -4,11 +4,8 @@ use bevy::prelude::*;
 use egui::emath::TSTransform;
 use egui::{Color32, Id, Pos2, Rect, Stroke, Vec2};
 
-use super::rows::{self, Fades, Move, Presence};
-use super::{
-    Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD,
-    window_visible,
-};
+use super::rows::{self, Clock, Fades, Move, Presence, Swell};
+use super::{Notification, NotificationKind, NotificationSent, reading, window_visible};
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine};
 use crate::core::time::Seconds;
@@ -64,26 +61,27 @@ impl Plugin for FeedPlugin {
 pub fn show(world: &mut World, notification_sent: NotificationSent) {
     let notification = notification_sent.notification;
     let mut feed = world.resource_mut::<Feed>();
+    let clock = feed.clock;
     let merge = feed.toasts.iter().enumerate().find_map(|(index, shown)| {
         merged(&shown.notification, &notification).map(|merged| (index, merged))
     });
     if let Some((index, merged)) = merge {
         let mut toast = feed.toasts.remove(index);
         toast.notification = merged;
-        toast.age = Duration::ZERO;
-        toast.bumped = true;
+        toast.until = clock.ends_after(toast.lasts);
+        toast.swell.bump();
         feed.toasts.push(toast);
         return;
     }
     feed.keys += 1;
     let key = feed.keys;
+    let lasts = reading_time(&notification);
     feed.toasts.push(FeedToast {
         key,
-        lasts: Duration::from_secs_f32(reading_time(&notification).0),
+        until: clock.ends_after(lasts),
+        lasts,
         notification,
-        age: Duration::ZERO,
-        bumped: false,
-        bumped_at: None,
+        swell: Swell::default(),
     });
 }
 
@@ -102,6 +100,7 @@ struct Feed {
     fades: Fades<FeedToast>,
     more: Fades<u32>,
     drawn: Vec<Rect>,
+    clock: Clock,
     keys: u64,
 }
 
@@ -109,10 +108,9 @@ struct Feed {
 struct FeedToast {
     key: u64,
     notification: Notification,
-    age: Duration,
-    lasts: Duration,
-    bumped: bool,
-    bumped_at: Option<f64>,
+    until: Duration,
+    lasts: Seconds,
+    swell: Swell,
 }
 
 fn age(world: &mut World) {
@@ -122,17 +120,16 @@ fn age(world: &mut World) {
     }
     let delta = world.resource::<Time>().delta();
     let mut feed = world.resource_mut::<Feed>();
-    for toast in &mut feed.toasts {
-        toast.age += delta;
-    }
-    feed.toasts.retain(|toast| toast.age < toast.lasts);
+    feed.clock.advance(delta);
+    let clock = feed.clock;
+    feed.toasts.retain(|toast| !clock.lapsed(toast.until));
 }
 
 fn draw(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let (now, still) = rows::clock(world, &gui);
+    let (now, still) = rows::motion_time(world, &gui);
     let screen = gui.content_rect();
     let room = stage::box_right(world).map_or(WIDEST, |right| {
         (screen.width() - right - 2.0 * EDGE).clamp(NARROWEST, WIDEST)
@@ -141,9 +138,7 @@ fn draw(world: &mut World) {
     let limit = if expanded { HELD } else { SHOWN };
     let mut feed = world.resource_mut::<Feed>();
     for toast in &mut feed.toasts {
-        if std::mem::take(&mut toast.bumped) {
-            toast.bumped_at = Some(now);
-        }
+        toast.swell.start_if_bumped(now);
     }
     let overflow = feed.toasts.len().saturating_sub(limit);
     let current: Vec<(u64, FeedToast)> = feed
@@ -165,7 +160,7 @@ fn draw(world: &mut World) {
         FeedToast {
             key,
             notification,
-            bumped_at,
+            swell,
             ..
         },
         look,
@@ -224,8 +219,8 @@ fn draw(world: &mut World) {
                         });
                     });
             });
-        let swell = rows::bump(bumped_at, now, still);
-        let swell = TSTransform::new(rect.center().to_vec2() * (1.0 - swell), swell);
+        let bump = swell.scale(now, still);
+        let swell = TSTransform::new(rect.center().to_vec2() * (1.0 - bump), bump);
         gui.set_transform_layer(shown.response.layer_id, look.around(rect) * swell);
         drawn.push(rect);
         bottom = rect.top() - GAP;
@@ -283,8 +278,7 @@ fn merged(shown: &Notification, newer: &Notification) -> Option<Notification> {
 
 fn reading_time(notification: &Notification) -> Seconds {
     let words = notification.text.word_count() + 1;
-    let seconds = READING_BASE.0 + READING_PER_WORD.0 * words as f32;
-    Seconds(seconds.clamp(READING_MIN.0, READING_MAX.0))
+    Seconds(reading(words).0.clamp(READING_MIN.0, READING_MAX.0))
 }
 
 fn label(notification: &Notification) -> String {

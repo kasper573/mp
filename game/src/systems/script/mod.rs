@@ -26,6 +26,7 @@ use crate::core::tiling::Tiles;
 use crate::systems::actor::model::Face;
 use crate::systems::area::blueprint::BlueprintDef;
 use crate::systems::area::{self, AreaDef, AreaId, AreaObject};
+use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::item::{ItemDef, ItemId, ItemKind};
 use crate::systems::job::{JobDef, JobId};
 use crate::systems::memory::{MemoryDef, MemoryId};
@@ -262,6 +263,7 @@ impl Vocabulary for RiftScripting {
     type OwnerKind = OwnerKind;
     type Event = RiftEvent;
     type Query = RiftQuery;
+    type Reveal = ChoiceReveal;
     type Effect = RiftEffect;
     type Line = Line;
     type Text = Vec<Span>;

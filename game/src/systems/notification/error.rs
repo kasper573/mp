@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use egui::emath::TSTransform;
 use egui::{Rect, Vec2};
 
-use super::rows::{self, Fades, Move, Presence};
+use super::rows::{self, Clock, Fades, Move, Presence, Swell};
 use super::{Notification, NotificationSent, window_visible};
 use crate::core::text;
 use crate::systems::screen::ClientScreen;
@@ -19,21 +19,20 @@ const PRESENCE: Presence = Presence {
 pub fn toast(world: &mut World, notification_sent: NotificationSent) {
     let notification = notification_sent.notification;
     let mut errors = world.resource_mut::<Errors>();
+    let clock = errors.clock;
     if let Some(shown) = &mut errors.shown
         && shown.notification == notification
     {
-        shown.age = Duration::ZERO;
-        shown.bumped = true;
+        shown.until = clock.ends_after(notification.stays());
+        errors.swell.bump();
         return;
     }
     errors.keys += 1;
     let key = errors.keys;
     errors.shown = Some(ErrorToast {
         key,
-        lasts: notification.stays().into(),
+        until: clock.ends_after(notification.stays()),
         notification,
-        age: Duration::ZERO,
-        bumped: false,
     });
 }
 
@@ -56,19 +55,15 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = rows::clock(world, gui);
+    let (now, still) = rows::motion_time(world, gui);
     let mut errors = world.resource_mut::<Errors>();
-    if let Some(shown) = &mut errors.shown
-        && std::mem::take(&mut shown.bumped)
-    {
-        errors.bumped_at = Some(now);
-    }
+    errors.swell.start_if_bumped(now);
+    let bump = errors.swell.scale(now, still);
     let current = errors
         .shown
         .as_ref()
         .map(|shown| (shown.key, (shown.key, shown.notification.clone())));
     let toasts = errors.fades.sync(now, PRESENCE, still, current);
-    let bump = rows::bump(errors.bumped_at, now, still);
     let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
     for ((key, notification), look) in toasts {
@@ -108,16 +103,15 @@ struct Errors {
     shown: Option<ErrorToast>,
     fades: Fades<(u64, Notification)>,
     drawn: Vec<Rect>,
-    bumped_at: Option<f64>,
+    swell: Swell,
+    clock: Clock,
     keys: u64,
 }
 
 struct ErrorToast {
     key: u64,
     notification: Notification,
-    age: Duration,
-    lasts: Duration,
-    bumped: bool,
+    until: Duration,
 }
 
 fn age(world: &mut World) {
@@ -127,11 +121,13 @@ fn age(world: &mut World) {
     if held {
         return;
     }
-    let over = errors.shown.as_mut().is_some_and(|shown| {
-        shown.age += delta;
-        shown.age >= shown.lasts
-    });
-    if over {
+    errors.clock.advance(delta);
+    let clock = errors.clock;
+    if errors
+        .shown
+        .as_ref()
+        .is_some_and(|shown| clock.lapsed(shown.until))
+    {
         errors.shown = None;
     }
 }

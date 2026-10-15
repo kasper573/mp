@@ -7,7 +7,7 @@ mod picker;
 mod play;
 pub mod project;
 mod rows;
-mod scenes;
+pub mod scenes;
 pub mod schema;
 mod spans;
 mod tabs;

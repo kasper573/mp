@@ -121,7 +121,11 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     if let Some(scene) = editor.views.area.scenes.by_key.get(&view_key) {
         painter.image(scene.texture, rect, scene.uv(), egui::Color32::WHITE);
     }
-    let canvas = super::AreaCanvas { rect, center, zoom };
+    let canvas = navigation::Viewport {
+        screen: rect,
+        center,
+        zoom,
+    };
     for arrival in pins::arrivals(editor, &area_key) {
         let at = canvas.to_screen(arrival.at);
         painter.circle_filled(at, 3.0, egui::Color32::from_rgb(255, 190, 90));

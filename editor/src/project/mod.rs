@@ -24,6 +24,7 @@ use game::systems;
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;
 use crate::value;
+use crate::views::script::nodes::NodeCatalogue;
 
 #[derive(Clone, Debug, Default)]
 pub struct ContentEdit {
@@ -172,6 +173,7 @@ pub struct Project {
     pub last_usages: Option<Duration>,
     pub generation: u64,
     pub outside_rewrote: usize,
+    pub catalogue: NodeCatalogue,
 }
 
 impl Project {
@@ -182,6 +184,7 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
+        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), None);
         let mut project = Project {
             root: root.to_path_buf(),
             files,
@@ -197,6 +200,7 @@ impl Project {
             last_usages: None,
             generation: 0,
             outside_rewrote: 0,
+            catalogue,
         };
         project.reload();
         Ok(project)
@@ -457,9 +461,19 @@ impl Project {
         let started = Instant::now();
         self.usages = ContentUsages::build(&content, &self.files);
         self.last_usages = Some(started.elapsed());
+        self.catalogue = NodeCatalogue::build(self.shapes.shape_of("script"), Some(content));
         self.content = Some(content);
         self.generation += 1;
     }
+}
+
+static NO_CATALOGUE: NodeCatalogue = NodeCatalogue {
+    entries: Vec::new(),
+    events: Vec::new(),
+};
+
+pub fn catalogue_of(project: Option<&Project>) -> &NodeCatalogue {
+    project.map_or(&NO_CATALOGUE, |project| &project.catalogue)
 }
 
 pub struct OutsideChanges {

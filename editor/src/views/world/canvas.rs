@@ -19,7 +19,7 @@ use super::{
 use crate::app::Editor;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::area::{TILE_PX, scene};
-use crate::views::navigation;
+use crate::views::navigation::{self, Viewport};
 
 const LABEL: f32 = 28.0;
 const PAD: f32 = 3.0;
@@ -37,30 +37,6 @@ const NOTE_INK: Color32 = Color32::from_rgb(40, 36, 20);
 const NOTE_WIDTH: f32 = 188.0;
 const NOTE_PAD: f32 = 6.0;
 const MINIMAP_CARD: Color32 = Color32::from_rgb(140, 150, 180);
-
-pub struct MapViewport {
-    pub rect: Rect,
-    pub center: Pos2,
-    pub zoom: f32,
-}
-
-impl MapViewport {
-    pub fn scale(&self) -> f32 {
-        self.zoom * TILE_PX
-    }
-
-    pub fn to_screen(&self, p: Pos2) -> Pos2 {
-        self.rect.center() + (p - self.center) * self.scale()
-    }
-
-    pub fn to_map(&self, p: Pos2) -> Pos2 {
-        self.center + (p - self.rect.center()) / self.scale()
-    }
-
-    pub fn rect(&self, r: Rect) -> Rect {
-        Rect::from_min_max(self.to_screen(r.min), self.to_screen(r.max))
-    }
-}
 
 pub struct MapCard {
     pub area: AreaId,
@@ -81,7 +57,7 @@ pub struct MapEdge {
 
 pub struct MapCanvas {
     pub response: Response,
-    pub viewport: MapViewport,
+    pub viewport: Viewport<Tiles>,
     pub cards: Vec<MapCard>,
     pub edges: Vec<MapEdge>,
     pub region_labels: Vec<(usize, Rect)>,
@@ -138,12 +114,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
     if !editor.views.world.fitted {
         fit(editor, map, rect);
     }
-    navigate(editor, ui, &response, rect);
-    let viewport = MapViewport {
-        rect,
-        center: editor.views.world.center,
-        zoom: editor.views.world.zoom,
-    };
+    let viewport = navigate(editor, ui, &response, rect);
     dots(&painter, &viewport);
     let preview = editor
         .views
@@ -559,12 +530,12 @@ fn draw_caption(painter: &Painter, atlas: &WorldAtlas, card: &MapCard, dimmed: b
     );
 }
 
-fn place(map: &OpenWorldMap, layout: &WorldMapDef, viewport: &MapViewport) -> Vec<MapCard> {
+fn place(map: &OpenWorldMap, layout: &WorldMapDef, viewport: &Viewport<Tiles>) -> Vec<MapCard> {
     let mut cards = layout
         .cards
         .iter()
         .map(|(&area, card)| {
-            let art = viewport.rect(map.art_rect(area, card));
+            let art = viewport.rect(navigation::rect_from_egui(map.art_rect(area, card)));
             if shows_areas(viewport.zoom) {
                 return MapCard {
                     area,
@@ -574,7 +545,7 @@ fn place(map: &OpenWorldMap, layout: &WorldMapDef, viewport: &MapViewport) -> Ve
                     caption_width: 0.0,
                 };
             }
-            let outer = viewport.rect(map.card_rect(area, card));
+            let outer = viewport.rect(navigation::rect_from_egui(map.card_rect(area, card)));
             let room = Vec2::new(
                 outer.width() - 2.0 * PAD,
                 outer.height() - LABEL - 2.0 * PAD,
@@ -760,7 +731,7 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
     let view = &mut editor.views.world;
     match map.bounds(&map.layout) {
         Some(bounds) => {
-            view.center = bounds.center();
+            view.center = navigation::pos_from_egui(bounds.center());
             view.zoom = navigation::fit_zoom(
                 rect.size() - Vec2::splat(80.0),
                 Vec2::new(bounds.width(), bounds.height()),
@@ -769,28 +740,29 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
             .clamp(MIN_ZOOM, MAX_ZOOM);
         }
         None => {
-            view.center = Pos2::ZERO;
+            view.center = Pos::origin();
             view.zoom = 0.1;
         }
     }
     view.fitted = true;
 }
 
-fn navigate(editor: &mut Editor, ui: &Ui, response: &Response, rect: Rect) {
+fn navigate(editor: &mut Editor, ui: &Ui, response: &Response, rect: Rect) -> Viewport<Tiles> {
     let view = &mut editor.views.world;
-    navigation::zoom_and_pan(
-        ui,
-        response,
-        rect,
-        (MIN_ZOOM, MAX_ZOOM),
-        &mut view.center,
-        &mut view.zoom,
-    );
+    let mut viewport = Viewport {
+        screen: rect,
+        center: view.center,
+        zoom: view.zoom,
+    };
+    navigation::zoom_and_pan(ui, response, &mut viewport, (MIN_ZOOM, MAX_ZOOM));
+    view.center = viewport.center;
+    view.zoom = viewport.zoom;
+    viewport
 }
 
-fn dots(painter: &Painter, viewport: &MapViewport) {
-    let rect = viewport.rect;
-    let origin = viewport.to_screen(Pos2::ZERO);
+fn dots(painter: &Painter, viewport: &Viewport<Tiles>) {
+    let rect = viewport.screen;
+    let origin = viewport.to_screen(Pos::origin());
     let start = |origin: f32, min: f32| origin + ((min - origin) / DOT_STEP).floor() * DOT_STEP;
     let mut y = start(origin.y, rect.min.y);
     while y < rect.max.y {
@@ -840,13 +812,13 @@ fn distance_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
     (p - (a + ab * t)).length()
 }
 
-fn draw_regions(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) {
+fn draw_regions(painter: &Painter, viewport: &Viewport<Tiles>, drawing: &Drawing) {
     let layout = drawing.shown;
     for (index, region) in layout.regions.iter().enumerate() {
         let Some(r) = drawing.map.region_rect(layout, region) else {
             continue;
         };
-        let screen = viewport.rect(r);
+        let screen = viewport.rect(navigation::rect_from_egui(r));
         let lit = drawing.selected.contains(&MapPart::Region(index));
         let colour = region_colour(region.colour);
         painter.rect_filled(screen, 6.0, theme::alpha(colour, 14));
@@ -861,7 +833,7 @@ fn draw_regions(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) {
 
 fn draw_region_labels(
     painter: &Painter,
-    viewport: &MapViewport,
+    viewport: &Viewport<Tiles>,
     drawing: &Drawing,
 ) -> Vec<(usize, Rect)> {
     let layout = drawing.shown;
@@ -870,7 +842,9 @@ fn draw_region_labels(
         .iter()
         .enumerate()
         .filter_map(|(index, region)| {
-            let screen = viewport.rect(drawing.map.region_rect(layout, region)?);
+            let screen = viewport.rect(navigation::rect_from_egui(
+                drawing.map.region_rect(layout, region)?,
+            ));
             let label = widgets::floating_chip(
                 painter,
                 screen.left_top() + Vec2::new(8.0, -2.0),
@@ -1021,7 +995,7 @@ pub fn line_badge(painter: &Painter, at: Pos2, badge: &str, branch: bool) {
     );
 }
 
-fn draw_notes(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) -> Vec<Rect> {
+fn draw_notes(painter: &Painter, viewport: &Viewport<Tiles>, drawing: &Drawing) -> Vec<Rect> {
     drawing
         .shown
         .notes
@@ -1034,7 +1008,7 @@ fn draw_notes(painter: &Painter, viewport: &MapViewport, drawing: &Drawing) -> V
                 NOTE_INK,
                 NOTE_WIDTH,
             );
-            let at = viewport.to_screen(Pos2::new(note.x, note.y));
+            let at = viewport.to_screen(Pos::new(note.x, note.y));
             let paper = Rect::from_min_size(at, galley.size() + Vec2::splat(2.0 * NOTE_PAD));
             let stroke = if drawing.selected.contains(&MapPart::Note(index)) {
                 Stroke::new(2.0, theme::SELECTION)
@@ -1112,7 +1086,7 @@ fn draw_edge_tags(painter: &Painter, atlas: &WorldAtlas, cards: &[MapCard], rect
 fn draw_drag(
     painter: &Painter,
     map: &OpenWorldMap,
-    viewport: &MapViewport,
+    viewport: &Viewport<Tiles>,
     cards: &[MapCard],
     drag: &MapDrag,
     pointer: Option<Pos2>,
@@ -1146,7 +1120,7 @@ fn draw_drag(
             ) else {
                 return;
             };
-            let ghost = viewport.rect(map.art_rect(id, stored));
+            let ghost = viewport.rect(navigation::rect_from_egui(map.art_rect(id, stored)));
             widgets::dashed_rect(painter, ghost, Stroke::new(1.0, theme::MUTED), 4.0, 3.0);
             let tiles = map.atlas.size(id);
             widgets::floating_chip(
@@ -1216,12 +1190,17 @@ fn legend(painter: &Painter, rect: Rect) {
     entry(36.0, Stroke::new(1.5, theme::WARN), false, "one way");
 }
 
-fn minimap(painter: &Painter, map: &OpenWorldMap, layout: &WorldMapDef, viewport: &MapViewport) {
+fn minimap(
+    painter: &Painter,
+    map: &OpenWorldMap,
+    layout: &WorldMapDef,
+    viewport: &Viewport<Tiles>,
+) {
     let Some(bounds) = map.bounds(layout) else {
         return;
     };
-    let rect = viewport.rect;
-    let view = Rect::from_min_max(viewport.to_map(rect.min), viewport.to_map(rect.max));
+    let rect = viewport.screen;
+    let view = navigation::rect_to_egui(viewport.visible());
     if view.contains_rect(bounds) {
         return;
     }

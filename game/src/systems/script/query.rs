@@ -24,8 +24,10 @@ use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility::{self, Presence};
 
+/// Who stood where as the tick began. Every script in a tick counts the same actors, whatever order
+/// the scripts run in.
 #[derive(Resource, Default)]
-pub struct ActorRoster {
+pub struct TickRoster {
     listed: Vec<Listed>,
     characters: usize,
     character_bounds: Option<Bounds>,
@@ -75,7 +77,7 @@ pub struct Listed {
     pub presence: bool,
 }
 
-impl ActorRoster {
+impl TickRoster {
     pub fn iter(&self) -> impl Iterator<Item = &Listed> {
         self.listed.iter()
     }
@@ -122,8 +124,8 @@ type RosterQuery = QueryState<
     Or<(With<PlayerOwner>, With<Npc>)>,
 >;
 
-pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
-    let mut listed = std::mem::take(&mut world.get_resource_or_init::<ActorRoster>().listed);
+pub fn take_tick_roster(world: &mut World, query: &mut RosterQuery) {
+    let mut listed = std::mem::take(&mut world.get_resource_or_init::<TickRoster>().listed);
     listed.clear();
     listed.extend(query.iter(world).map(
         |(entity, at, tag, npc, stats, character, held, presence)| Listed {
@@ -137,7 +139,7 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
             presence,
         },
     ));
-    let mut areas = std::mem::take(&mut world.resource_mut::<ActorRoster>().areas);
+    let mut areas = std::mem::take(&mut world.resource_mut::<TickRoster>().areas);
     let assets = world.resource::<Content>();
     for entry in &listed {
         if !areas.iter().any(|(id, _)| *id == entry.area) {
@@ -146,7 +148,7 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
     }
     listed.sort_by_key(|entry| !entry.character);
     let characters = listed.iter().take_while(|entry| entry.character).count();
-    let mut roster = world.resource_mut::<ActorRoster>();
+    let mut roster = world.resource_mut::<TickRoster>();
     roster.character_bounds = Bounds::around(&listed[..characters]);
     roster.npc_bounds = Bounds::around(&listed[characters..]);
     roster.listed = listed;
@@ -728,7 +730,7 @@ pub fn around<'w>(
 }
 
 struct Scan<'w> {
-    roster: &'w ActorRoster,
+    roster: &'w TickRoster,
     owner: Entity,
     from: Pos<Tiles>,
     area: AreaId,
@@ -742,7 +744,7 @@ impl<'w> Scan<'w> {
         let owner = cx.owner?;
         let from = movement::position(world, owner)?;
         let area = world.get::<AreaTag>(owner)?.area;
-        let roster = world.get_resource::<ActorRoster>()?;
+        let roster = world.get_resource::<TickRoster>()?;
         if !roster.may_reach(among, from, within) {
             return None;
         }

@@ -9,13 +9,12 @@ use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::population::NpcSprite;
-use super::{
-    AreaCanvas, AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes,
-};
+use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
+use crate::views::navigation::Viewport;
 
 const LABEL_GAP: f32 = 2.0;
 const LABEL_SHIFTS: u32 = 3;
@@ -567,7 +566,7 @@ pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &AreaFrame, area:
 
 fn draw_sprite(
     painter: &egui::Painter,
-    canvas: AreaCanvas,
+    canvas: Viewport<Tiles>,
     at: Pos<Tiles>,
     sprite: &NpcSprite,
     alpha: u8,

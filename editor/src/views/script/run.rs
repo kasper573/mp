@@ -35,9 +35,9 @@ use game::systems::{self, GameSettings, TICK_HZ, memory, npc};
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
-use super::{ScriptDoc, ScriptOwner, inspect};
+use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
-use crate::project::{ProjectFiles, RowSelection, row_file, row_of};
+use crate::project::{ProjectFiles, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
@@ -95,7 +95,7 @@ impl RunLogLine {
 }
 
 pub struct ScriptRun {
-    pub doc_owner: ScriptOwner,
+    pub doc: ScriptSessionId,
     pub generation: u64,
     pub label: String,
     world: World,
@@ -124,13 +124,7 @@ struct Watched {
 pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let bound = bindings(editor, doc);
     let owner_key = doc.owner.clone();
-    let mut setup: RunSetup = editor
-        .views
-        .script
-        .setups
-        .get(&owner_key)
-        .cloned()
-        .unwrap_or_default();
+    let mut setup: RunSetup = editor.views.script.setup_of(&owner_key);
     let events: Vec<String> = doc
         .nodes()
         .values()
@@ -160,12 +154,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         })
         .unwrap_or_default();
     let running = editor.views.script.run_of(&doc.owner).is_some();
-    let mut start = editor
-        .views
-        .script
-        .fire
-        .take()
-        .is_some_and(|fired| fired == doc.owner);
+    let mut start = editor.views.script.take_fire(&doc.owner);
     let mut stop = false;
     let mut open_owner: Option<String> = None;
     let mut step = false;
@@ -314,11 +303,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         });
     });
-    editor
-        .views
-        .script
-        .setups
-        .insert(owner_key.clone(), setup.clone());
+    editor.views.script.set_setup(&owner_key, setup.clone());
     if let Some(file) = open_owner
         && let Some((table, key)) = row_of(&file)
     {
@@ -351,7 +336,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|(name, node)| NodeCard {
             name: name.clone(),
             title: super::graph::card_title(name, node),
-            detail: nodes::summary(node, &editor.views.script.catalogue),
+            detail: nodes::summary(node, catalogue_of(editor.project.as_ref())),
         })
         .collect();
     let owner_label = bound
@@ -592,13 +577,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
         return false;
     };
     let bound = bindings(editor, doc);
-    let setup = editor
-        .views
-        .script
-        .setups
-        .get(&owner_key)
-        .cloned()
-        .unwrap_or_default();
+    let setup = editor.views.script.setup_of(&owner_key);
     let reaches: Vec<Reach> = bound
         .get(setup.owner)
         .or(bound.first())
@@ -1056,6 +1035,7 @@ fn start_run(
     owner: &ScriptBinding,
     setup: &RunSetup,
 ) -> Result<ScriptRun, String> {
+    let doc_session = editor.views.script.session(&doc.owner);
     let project = editor.project.as_ref().ok_or("no project")?;
     let content = project.content.ok_or("the folder does not load")?;
     let generation = project.generation;
@@ -1100,7 +1080,7 @@ fn start_run(
     let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
     let mut run = ScriptRun {
-        doc_owner: doc.owner.clone(),
+        doc: doc_session,
         generation,
         label: format!("{} · {}", owner.label, setup.event),
         world,

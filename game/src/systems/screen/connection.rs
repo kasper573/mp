@@ -15,7 +15,7 @@ use crate::core::net::SessionRequest;
 use crate::core::net::auth::Credentials;
 use crate::core::net::transport::ClientSocket;
 use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
-use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
 
 pub(super) const OVERLAY_BG: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
@@ -121,8 +121,8 @@ fn connect(world: &mut World, ticket: &str) {
 #[derive(Resource, Default)]
 struct Backdrop(Option<egui::Color32>);
 
-fn veil(phase: Res<ScreenTransitionPhase>, mut backdrop: ResMut<Backdrop>) {
-    backdrop.0 = overlay(*phase);
+fn veil(transition: Res<ActiveTransition>, mut backdrop: ResMut<Backdrop>) {
+    backdrop.0 = overlay(transition.phase());
 }
 
 fn connecting(world: &mut World) {

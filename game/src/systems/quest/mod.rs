@@ -19,12 +19,11 @@ use crate::core::content::{
     RowCheck,
 };
 use crate::core::math::{Percent, Rng};
-use crate::core::script::ChoiceReveal;
 use crate::core::script::Name;
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::{self, AreaDef, AreaId};
 use crate::systems::attention::{AttentionId, AttentionMark};
-use crate::systems::dialogue::{self, Revealable};
+use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::{
@@ -459,26 +458,19 @@ pub struct Party {
 impl Parties {
     pub fn of(content: &Content, scripts: &RiftScripts) -> Parties {
         let mut parties: HashMap<QuestId, QuestParties> = HashMap::new();
-        for (owner, _) in scripts.owners() {
-            let Some(party) = party_name(content, *owner) else {
+        for (owner, role) in quest_roles(scripts) {
+            let Some(party) = party_name(content, owner) else {
                 continue;
             };
-            for reach in scripts.may_do(*owner).reaches {
-                match reach {
-                    Reach::Offers(quest) | Reach::Accepts(quest) => {
-                        let parties = parties.entry(quest).or_default();
-                        if !parties.givers.contains(&party) {
-                            parties.givers.push(party.clone());
-                        }
-                    }
-                    Reach::TurnsIn(quest) => {
-                        let parties = parties.entry(quest).or_default();
-                        if !parties.turn_ins.contains(&party) {
-                            parties.turn_ins.push(party.clone());
-                        }
-                    }
-                    _ => {}
+            let parties = parties.entry(role.quest()).or_default();
+            match role {
+                QuestRole::Gives(_) if !parties.givers.contains(&party) => {
+                    parties.givers.push(party);
                 }
+                QuestRole::TurnsIn(_) if !parties.turn_ins.contains(&party) => {
+                    parties.turn_ins.push(party);
+                }
+                _ => {}
             }
         }
         Parties(Arc::new(parties))
@@ -495,6 +487,35 @@ impl Parties {
     pub fn turn_in(&self, quest: QuestId) -> Option<&Party> {
         self.get(quest).and_then(|parties| parties.turn_ins.first())
     }
+}
+
+enum QuestRole {
+    Gives(QuestId),
+    TurnsIn(QuestId),
+}
+
+impl QuestRole {
+    fn quest(&self) -> QuestId {
+        match *self {
+            QuestRole::Gives(quest) | QuestRole::TurnsIn(quest) => quest,
+        }
+    }
+}
+
+fn quest_roles(scripts: &RiftScripts) -> Vec<(OwnerRow, QuestRole)> {
+    let mut roles = Vec::new();
+    for (owner, _) in scripts.owners() {
+        for reach in scripts.may_do(*owner).reaches {
+            match reach {
+                Reach::Offers(quest) | Reach::Accepts(quest) => {
+                    roles.push((*owner, QuestRole::Gives(quest)));
+                }
+                Reach::TurnsIn(quest) => roles.push((*owner, QuestRole::TurnsIn(quest))),
+                _ => {}
+            }
+        }
+    }
+    roles
 }
 
 fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
@@ -1028,18 +1049,11 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
     let content = loading.content();
     let mut offered = HashSet::new();
     let mut turned_in = HashSet::new();
-    for (owner, _) in scripts.owners() {
-        for reach in scripts.may_do(*owner).reaches {
-            match reach {
-                Reach::Offers(quest) | Reach::Accepts(quest) => {
-                    offered.insert(quest);
-                }
-                Reach::TurnsIn(quest) => {
-                    turned_in.insert(quest);
-                }
-                _ => {}
-            }
-        }
+    for (_, role) in quest_roles(scripts) {
+        match role {
+            QuestRole::Gives(quest) => offered.insert(quest),
+            QuestRole::TurnsIn(quest) => turned_in.insert(quest),
+        };
     }
     for (id, _) in loading.rows::<QuestDef>() {
         let key = id.key(&content);

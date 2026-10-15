@@ -6,6 +6,7 @@ use game::systems::item::ItemDef;
 use game::systems::npc::NpcDef;
 use game::systems::quest::QuestDef;
 use game::systems::shop::ShopDef;
+use serde::Deserialize;
 use serde_json::Value;
 use strum::VariantArray;
 
@@ -107,7 +108,8 @@ pub fn tag_line(sources: &[RowSource]) -> String {
         .join(" · ")
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, VariantArray)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, VariantArray, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ColourTable {
     Npc,
     Item,
@@ -128,7 +130,7 @@ impl ColourTable {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ColourField {
     pub table: ColourTable,
     pub path: Vec<String>,
@@ -145,18 +147,6 @@ impl ColourField {
                     .map(move |path| ColourField { table, path })
             })
             .collect()
-    }
-
-    pub fn parse(text: &str) -> Option<ColourField> {
-        let mut parts = text.split('.');
-        let head = parts.next()?;
-        let table = *ColourTable::VARIANTS
-            .iter()
-            .find(|table| table.table() == head)?;
-        Some(ColourField {
-            table,
-            path: parts.map(str::to_owned).collect(),
-        })
     }
 
     pub fn name(&self) -> &str {

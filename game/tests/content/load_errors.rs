@@ -135,3 +135,24 @@ fn a_bust_listed_before_the_generic_ones_is_placed_at_its_own_line() {
         own.at
     );
 }
+
+#[test]
+fn a_binding_the_game_never_reads_for_its_action_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.edit("tables/input/carry_item.json", |row| {
+        row["bindings"] = json!([{ "type": "click", "button": "Left", "times": 1 }]);
+    });
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let rules: Vec<(&str, &str)> = report
+        .errors
+        .iter()
+        .map(|error| (error.problem.rule, error.problem.expected.as_str()))
+        .collect();
+    assert_eq!(
+        rules,
+        vec![("unread binding", "a binding the game reads for this action")]
+    );
+    assert_eq!(report.errors[0].file, "tables/input/carry_item.json");
+}

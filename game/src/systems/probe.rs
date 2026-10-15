@@ -17,7 +17,7 @@ use crate::core::gui::{self, GuiContext, WorldLayers};
 use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
 use crate::core::platform::ClientPlatform;
 use crate::core::render::tile_to_window;
-use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::model::ModelId;
@@ -547,7 +547,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         ui: ui(world),
         covered: covered(world),
         soundscape: soundscape(world),
-        transition: *world.resource::<ScreenTransitionPhase>(),
+        transition: world.resource::<ActiveTransition>().phase(),
         view,
         area,
     }
@@ -596,7 +596,7 @@ fn soundscape(world: &World) -> ProbeSoundscape {
             .iter()
             .map(|voice| ProbeVoice {
                 channel: voice.channel.0,
-                category: voice.channel.category(),
+                category: voice.category,
                 src: voice.src.to_owned(),
                 heard: voice.heard(),
             })

@@ -1,11 +1,11 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::Direction;
-use game::core::script::dialogue::ChoiceReveal;
 use game::core::time::{PlaybackRate, Seconds};
 use game::systems::GameSettings;
 use game::systems::actor::model::ModelDef;
 use game::systems::actor::{Action, ActorModel};
+use game::systems::dialogue::ChoiceReveal;
 use game::systems::quest::{ActiveQuest, Parties, QuestDef};
 use game::systems::script::{Reach, RiftScripts};
 use serde_json::Value;

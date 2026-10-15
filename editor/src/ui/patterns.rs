@@ -1,6 +1,28 @@
-use egui::{Color32, Painter, Pos2, Rect, Stroke};
+use egui::{Color32, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2};
 
 use super::theme;
+
+pub fn card_slot(ui: &mut Ui, size: Vec2, selected: bool) -> (Response, Painter) {
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let painter = ui.painter_at(rect);
+    paint_card(&painter, rect, selected);
+    (response, painter)
+}
+
+pub fn paint_card(painter: &Painter, rect: Rect, selected: bool) {
+    let (fill, border) = if selected {
+        (theme::ACCENT_SOFT, theme::ACCENT)
+    } else {
+        (theme::INPUT, theme::BORDER)
+    };
+    painter.rect(
+        rect,
+        3.0,
+        fill,
+        Stroke::new(1.0, border),
+        egui::StrokeKind::Inside,
+    );
+}
 
 pub fn hatch(painter: &Painter, rect: Rect, colour: Color32, scale: f32) {
     painter.rect_filled(rect, 0.0, theme::alpha(colour, colour.a() / 3));

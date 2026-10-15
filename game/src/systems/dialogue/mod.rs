@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::script::{
-    self, Answer, BoxEnding, ChoiceOffer, ChoiceReveal, ChoiceState, DialogueView, ScriptFault,
+    self, Answer, BoxEnding, ChoiceOffer, ChoiceState, DialogueView, RevealDef, ScriptFault,
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
@@ -163,6 +165,28 @@ pub struct Revealable {
     pub gains: bool,
 }
 
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, IntoStaticStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ChoiceReveal {
+    Locked,
+    Needs,
+    Costs,
+    Gains,
+}
+
+impl RevealDef for ChoiceReveal {
+    fn shows_while_locked(self) -> bool {
+        self == ChoiceReveal::Locked
+    }
+
+    fn name(self) -> &'static str {
+        self.into()
+    }
+}
+
 pub fn check_reveal(reveal: &[ChoiceReveal], revealable: Revealable) -> Result<(), ScriptFault> {
     for kind in reveal {
         let (present, what) = match kind {
@@ -177,7 +201,7 @@ pub fn check_reveal(reveal: &[ChoiceReveal], revealable: Revealable) -> Result<(
             ));
         }
     }
-    ChoiceReveal::check_unique(reveal)
+    script::check_reveals_unique(reveal)
 }
 
 pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<RiftScripting>) {

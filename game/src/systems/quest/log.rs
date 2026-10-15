@@ -11,8 +11,8 @@ use super::{
     QuestResult,
 };
 use crate::core::content::{Content, Fixture};
-use crate::core::script::ChoiceReveal;
 use crate::core::time::UnixMillis;
+use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::hud::{self, Confirm, HudAudience, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;

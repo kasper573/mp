@@ -7,7 +7,7 @@ use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
 use super::nodes::{self, LineSpeaker, OutlineRow};
 use super::{ScriptDoc, select_nodes};
 use crate::app::{Editor, RightTab};
-use crate::project::RowSelection;
+use crate::project::{RowSelection, catalogue_of};
 use crate::spans;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -22,7 +22,7 @@ pub fn show(
     actions: &mut Vec<ScriptGraphAction>,
 ) {
     let owner = doc.owner.clone();
-    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), &editor.views.script.catalogue);
+    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), catalogue_of(editor.project.as_ref()));
     let summaries = summaries(editor, doc);
     let (focus, folded) = editor
         .views
@@ -116,7 +116,7 @@ pub fn show(
             Some(index) => target
                 .is_none()
                 .then(|| (row.name.clone(), format!("/choices/{index}/to"))),
-            None => super::free_port_link(doc, &editor.views.script.catalogue, &row.name),
+            None => super::free_port_link(doc, catalogue_of(editor.project.as_ref()), &row.name),
         };
         actions.push(ScriptGraphAction::Palette(NodePaletteOpen {
             at: ui.max_rect().left_top() + egui::vec2(60.0 + row.depth as f32 * INDENT, 40.0),
@@ -294,7 +294,7 @@ fn draw(
 }
 
 fn summaries(editor: &Editor, doc: &ScriptDoc) -> HashMap<String, String> {
-    let catalogue = &editor.views.script.catalogue;
+    let catalogue = catalogue_of(editor.project.as_ref());
     doc.nodes()
         .iter()
         .map(|(name, node)| {
@@ -336,7 +336,7 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
 fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
-            editor.views.script.focus = Some(doc.owner.clone());
+            editor.views.script.focus_on(&doc.owner);
             editor.select(RowSelection::parts(
                 doc.owner.table(),
                 doc.owner.key(),

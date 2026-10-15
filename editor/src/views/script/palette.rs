@@ -7,6 +7,7 @@ use super::graph::NodePaletteOpen;
 use super::nodes::{NodeCatalogue, NodeEntry};
 use super::{ScriptDoc, add_node, nodes};
 use crate::app::Editor;
+use crate::project::catalogue_of;
 use crate::ui::{theme, widgets};
 
 pub struct NodePalette {
@@ -55,7 +56,7 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let Some(mut palette) = editor.views.script.view_mut(&owner).palette.take() else {
         return;
     };
-    let catalogue = &editor.views.script.catalogue;
+    let catalogue = catalogue_of(editor.project.as_ref());
     let needle = palette.search.trim().to_lowercase();
     let linking = palette.open.link.is_some();
     let (fits, refused) = sorted(catalogue, doc, linking);

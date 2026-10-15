@@ -9,6 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
 use game::core::content::Content;
 use game::systems::area::tileset::{TileData, TilesetDef, TilesetGrid, Walk};
+use serde::Deserialize;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
@@ -82,8 +83,11 @@ impl SurfaceUse {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, IntoStaticStr, VariantArray)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, IntoStaticStr, VariantArray, Deserialize,
+)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum TilesetMode {
     #[default]
     Walk,
@@ -106,8 +110,9 @@ impl TilesetMode {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, VariantArray)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, EnumString, VariantArray, Deserialize)]
 #[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum WalkBrush {
     Walkable,
     #[default]

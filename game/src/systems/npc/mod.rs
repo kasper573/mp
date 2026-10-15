@@ -28,7 +28,7 @@ use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
-use crate::systems::script::query::ActorRoster;
+use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
@@ -361,7 +361,7 @@ struct Watcher {
 }
 
 pub fn approach(world: &mut World) {
-    let Some(roster) = world.get_resource::<ActorRoster>() else {
+    let Some(roster) = world.get_resource::<TickRoster>() else {
         return;
     };
     let instances = world.resource::<RiftInstances>();

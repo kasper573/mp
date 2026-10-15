@@ -11,7 +11,7 @@ use crate::app::Editor;
 use crate::import;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
-use crate::ui::{theme, widgets};
+use crate::ui::{patterns, theme, widgets};
 
 pub const PREVIEW: Vec2 = Vec2::new(170.0, 200.0);
 const CARD_H: f32 = 128.0;
@@ -19,7 +19,8 @@ const LANE_LABEL: f32 = 56.0;
 const LANE_H: f32 = 22.0;
 const NUDGE: u32 = 10;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TimingSetBy {
     #[default]
     Ms,
@@ -789,24 +790,7 @@ pub fn frame_card(
     index: usize,
     selected: bool,
 ) {
-    painter.rect(
-        rect,
-        3.0,
-        if selected {
-            theme::ACCENT_SOFT
-        } else {
-            theme::INPUT
-        },
-        egui::Stroke::new(
-            1.0,
-            if selected {
-                theme::ACCENT
-            } else {
-                theme::BORDER
-            },
-        ),
-        egui::StrokeKind::Inside,
-    );
+    patterns::paint_card(painter, rect, selected);
     let art = ERect::from_min_max(
         rect.min + Vec2::new(2.0, 4.0),
         rect.right_bottom() - Vec2::new(2.0, 44.0),

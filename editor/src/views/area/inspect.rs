@@ -20,6 +20,7 @@ use super::{AreaViewState, grid, terrain};
 use super::{brush, placement, resize, stamp};
 use crate::app::{Editor, ModalDialog, PlacePick};
 use crate::forms::FormCx;
+use crate::forms::{clear_draft, draft_or, set_draft};
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::ui::{inspector, patterns, theme, widgets};
@@ -569,12 +570,11 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content, area
     };
     let area = area::load(&content, area_id);
     let name_id = ui.id().with(("area-name", key));
-    let mut draft = editor
-        .form
-        .drafts
-        .get(&name_id)
-        .cloned()
-        .unwrap_or_else(|| row["name"].as_str().unwrap_or_default().to_owned());
+    let mut draft = draft_or(
+        ui,
+        name_id,
+        row["name"].as_str().unwrap_or_default().to_owned(),
+    );
     let mut rename = None;
     let mut menu_action: Option<AreaMenu> = None;
     widgets::card_frame(false).show(ui, |ui| {
@@ -612,10 +612,10 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: Content, area
                 )
             });
             if response.changed() {
-                editor.form.drafts.insert(name_id, draft.clone());
+                set_draft(ui, name_id, &draft.clone());
             }
             if forms::committed(ui, &response) {
-                editor.form.drafts.remove(&name_id);
+                clear_draft(ui, name_id);
                 if row["name"].as_str() != Some(draft.as_str()) {
                     rename = Some(draft.clone());
                 }
@@ -931,18 +931,18 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     "",
                     |ui| {
                         if ui.button("Copy as JSON").clicked() {
-                            out.deferred.push(super::DeferredAreaAction::Copy);
+                            out.actions.push(super::AreaAction::Copy);
                             ui.close();
                         }
                         if ui.button("Duplicate").clicked() {
-                            out.deferred.push(super::DeferredAreaAction::Duplicate);
+                            out.actions.push(super::AreaAction::Duplicate);
                             ui.close();
                         }
                         if ui
                             .add(egui::Button::new("Remove all").shortcut_text("Del"))
                             .clicked()
                         {
-                            out.extras.push(placement::PlacementAction::RemoveAll);
+                            out.actions.push(super::AreaAction::Delete);
                             ui.close();
                         }
                     },
@@ -953,7 +953,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if ui.button("⧉ Make blueprint…").clicked() {
-                    out.extras.push(placement::PlacementAction::MakeBlueprint);
+                    out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
             widgets::key_hint_text(ui, "Ctrl Alt B", "makes a blueprint of the selection");
@@ -967,16 +967,10 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     for action in actions {
         inspector::act(editor, action, "area", &area_key);
     }
-    for extra in out.extras {
-        placement::act(editor, extra, &area_key, &indices);
-    }
-    if let Some(view) = editor
-        .views
-        .area
-        .views
-        .get_mut(&super::area_view_key(&area_key))
-    {
-        view.deferred.extend(out.deferred);
+    for action in out.actions {
+        if let Some(snapshot) = super::AreaSnapshot::for_area(editor, &area_key) {
+            super::run_action(editor, &snapshot, action);
+        }
     }
     if editor.pick.is_some() {
         ui.add_space(6.0);
@@ -1022,11 +1016,11 @@ fn module_inspector(
         ui.set_width(ui.available_width());
         widgets::card_header(ui, &kind, &shown_kind, "", |ui| {
             if ui.button("Copy as JSON").clicked() {
-                out.deferred.push(super::DeferredAreaAction::Copy);
+                out.actions.push(super::AreaAction::Copy);
                 ui.close();
             }
             if ui.button("Duplicate").clicked() {
-                out.deferred.push(super::DeferredAreaAction::Duplicate);
+                out.actions.push(super::AreaAction::Duplicate);
                 ui.close();
             }
             ui.separator();
@@ -1034,7 +1028,7 @@ fn module_inspector(
                 .add(egui::Button::new("Remove").shortcut_text("Del"))
                 .clicked()
             {
-                out.extras.push(placement::PlacementAction::RemoveAll);
+                out.actions.push(super::AreaAction::Delete);
                 ui.close();
             }
         });
@@ -1117,8 +1111,7 @@ fn module_inspector(
 
 #[derive(Default)]
 pub(super) struct Followups {
-    pub extras: Vec<placement::PlacementAction>,
-    pub deferred: Vec<super::DeferredAreaAction>,
+    pub actions: Vec<super::AreaAction>,
 }
 
 pub(super) fn hidden_fields(kind: Option<AreaModuleKind>) -> &'static [&'static str] {
@@ -1145,12 +1138,12 @@ fn object_extras(ui: &mut Ui, module: &Value, out: &mut Followups, index: usize)
                 .on_hover_text(where_)
                 .clicked()
             {
-                out.extras.push(placement::PlacementAction::GoTo(area.clone(), *at));
+                out.actions.push(super::AreaAction::GoTo(area.clone(), *at));
             }
         }
         let hint = "An object with script/warp leading back here, on the nearest walkable cell outside the destination";
         if ui.button("← Return door").on_hover_text(hint).clicked() {
-            out.deferred.push(super::DeferredAreaAction::ReturnDoor(index));
+            out.actions.push(super::AreaAction::ReturnDoor(index));
         }
     });
 }

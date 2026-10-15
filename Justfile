@@ -96,8 +96,8 @@ showcase *chapters:
       target/release/showcase {{chapters}}
 
 # The art exports sit beside the copy, so import scenes find them.
-[doc("Records the editor on a copy of the example content at SCENE; HOOK runs with WORK naming the copy's parent.")]
-editor-showcase scene seconds="8" input="" hook="":
+[doc("Records the editor on a copy of the example content at SCENE, a JSON array of steps, as editor-NAME.webm; HOOK runs with WORK naming the copy's parent.")]
+editor-showcase name scene seconds="8" input="" hook="":
     #!/usr/bin/env bash
     set -euo pipefail
     cargo build --release -p editor
@@ -105,7 +105,7 @@ editor-showcase scene seconds="8" input="" hook="":
     trap 'rm -rf "$WORK"' EXIT
     cp -r content "$WORK/game"
     cp -r art "$WORK/art"
-    just record {{quote(showcase_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
+    just record {{quote(showcase_dir / "editor-" + kebabcase(name) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
 # Frames sampled evenly across VIDEO, tiled into one image beside it: a recording at a glance.

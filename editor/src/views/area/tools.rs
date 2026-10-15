@@ -1,5 +1,5 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use game::core::math::{Offset, Pos, Rect};
+use game::core::math::{Offset, Rect};
 use game::core::tiling::{Cell, TilePos, Tiles};
 use game::systems::area::AreaModuleKind;
 
@@ -15,7 +15,7 @@ use crate::app::Editor;
 use crate::project::RowSelection;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-use crate::views::navigation;
+use crate::views::navigation::{self, Viewport};
 
 pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let view = editor.views.area.view_mut(view_key);
@@ -132,16 +132,14 @@ pub fn input(
     let response = frame.response;
     let modifiers = ui.input(|i| i.modifiers);
     let view = editor.views.area.view_mut(view_key);
-    let mut center = Pos2::new(view.center.x, view.center.y);
-    let panning = navigation::zoom_and_pan(
-        ui,
-        response,
-        frame.canvas.rect,
-        (MIN_ZOOM, MAX_ZOOM),
-        &mut center,
-        &mut view.zoom,
-    );
-    view.center = Pos::new(center.x, center.y);
+    let mut viewport = Viewport {
+        screen: frame.canvas.screen,
+        center: view.center,
+        zoom: view.zoom,
+    };
+    let panning = navigation::zoom_and_pan(ui, response, &mut viewport, (MIN_ZOOM, MAX_ZOOM));
+    view.center = viewport.center;
+    view.zoom = viewport.zoom;
     if panning {
         return;
     }
@@ -536,7 +534,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let at = view
             .cursor_cell
             .map(|c| frame.canvas.to_screen(c.center()))
-            .unwrap_or(frame.canvas.rect.center());
+            .unwrap_or(frame.canvas.screen.center());
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
         super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }

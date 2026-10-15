@@ -8,8 +8,8 @@ use super::{
 };
 use crate::core::content::Content;
 use crate::core::platform::ClientPlatform;
-use crate::core::script::ChoiceReveal;
 use crate::core::time::UnixMillis;
+use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
 use crate::systems::dialogue::{Conversation, ConversationPanel};
 use crate::systems::hud;

@@ -48,8 +48,11 @@ pub enum ModelPage {
     Busts,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, EnumString, IntoStaticStr, VariantArray)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Debug, EnumString, IntoStaticStr, VariantArray, Deserialize,
+)]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum FrameCueKind {
     Apex,
     Sound,

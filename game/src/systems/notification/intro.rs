@@ -6,7 +6,7 @@ use egui::emath::TSTransform;
 use egui::{Align, Color32, FontId, Layout, Rect, Sense, Stroke, UiBuilder, Vec2};
 use serde::{Deserialize, Serialize};
 
-use super::rows::{self, Fades, Move, Presence};
+use super::rows::{self, Clock, Fades, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
@@ -80,7 +80,7 @@ pub fn shown(world: &World) -> Option<(String, String)> {
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = rows::clock(world, gui);
+    let (now, still) = rows::motion_time(world, gui);
     let mut shown = world.resource_mut::<ShownIntro>();
     let current = shown
         .showing
@@ -189,7 +189,7 @@ struct ShownIntro {
     waiting: Option<Notification>,
     settled_for: Duration,
     showing: Option<ShowingIntro>,
-    clock: Duration,
+    clock: Clock,
     fades: Fades<(u64, Notification)>,
     drawn: Vec<Rect>,
     keys: u64,
@@ -216,7 +216,7 @@ fn reveal_when_settled(world: &mut World) {
     let Some(notification) = shown.waiting.take() else {
         return;
     };
-    let until = shown.clock + Duration::from(notification.stays());
+    let until = shown.clock.ends_after(notification.stays());
     shown.keys += 1;
     let key = shown.keys;
     let sfx = notification.kind.sfx();
@@ -238,13 +238,13 @@ fn age(world: &mut World) {
     let delta = world.resource::<Time>().delta();
     let mut shown = world.resource_mut::<ShownIntro>();
     if !held {
-        shown.clock += delta;
+        shown.clock.advance(delta);
     }
-    let now = shown.clock;
+    let clock = shown.clock;
     if shown
         .showing
         .as_ref()
-        .is_some_and(|showing| showing.until <= now)
+        .is_some_and(|showing| clock.lapsed(showing.until))
     {
         shown.showing = None;
     }

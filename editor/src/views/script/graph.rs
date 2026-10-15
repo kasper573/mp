@@ -169,7 +169,6 @@ pub struct ScriptGraphViewer<'a> {
     pub current: Option<&'a str>,
     pub selected: &'a HashSet<String>,
     pub faces: &'a SpeakerFaces,
-    pub drafts: &'a mut HashMap<egui::Id, String>,
     pub actions: Vec<ScriptGraphAction>,
     pub clicks: Vec<NodeClick>,
     pub to_global: TSTransform,
@@ -237,14 +236,8 @@ impl ScriptGraphViewer<'_> {
                         ui.set_width(width);
                         if editing {
                             let id = ui.id().with(("line", name, index));
-                            let edit = spans::line(
-                                ui,
-                                self.drafts,
-                                &line["text"],
-                                id,
-                                FontId::proportional(12.5),
-                                "…",
-                            );
+                            let edit =
+                                spans::line(ui, &line["text"], id, FontId::proportional(12.5), "…");
                             if let Some(text) = edit.spans {
                                 self.actions.push(ScriptGraphAction::EditLine {
                                     name: name.to_owned(),

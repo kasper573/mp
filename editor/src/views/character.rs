@@ -10,6 +10,7 @@ use game::systems::npc::NpcId;
 use game::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use game::systems::script::RiftScripts;
 use game::systems::stat::StatKind;
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
@@ -35,7 +36,8 @@ pub struct CharacterView {
     pub more_memories: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CharacterSection {
     #[default]
     Identity,
@@ -43,9 +45,11 @@ pub enum CharacterSection {
     Bag,
     Equipment,
     Start,
+    #[serde(rename = "areas")]
     AreasKnown,
     Quests,
     Memories,
+    #[serde(rename = "lines")]
     LinesHeard,
     Shops,
     History,

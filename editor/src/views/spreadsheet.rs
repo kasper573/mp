@@ -350,6 +350,14 @@ fn save_view(editor: &mut Editor, table: &str, view: SpreadsheetView) {
     editor.save_settings();
 }
 
+fn named_filters(editor: &Editor, table: &str) -> BTreeMap<&'static str, BTreeSet<String>> {
+    let mut named = BTreeMap::new();
+    if table == NpcDef::TABLE {
+        named.insert(CAN_BE_FOUGHT, can_be_fought(editor));
+    }
+    named
+}
+
 fn can_be_fought(editor: &Editor) -> BTreeSet<String> {
     let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
         return BTreeSet::new();
@@ -377,11 +385,11 @@ fn filters_of(view: &SpreadsheetView) -> Vec<String> {
 fn passes(
     row: &SpreadsheetRow,
     filter: &str,
-    fought: &BTreeSet<String>,
+    named: &BTreeMap<&'static str, BTreeSet<String>>,
     columns: &[SpreadsheetColumn],
 ) -> bool {
-    if filter == CAN_BE_FOUGHT {
-        return fought.contains(&row.key);
+    if let Some(keys) = named.get(filter) {
+        return keys.contains(&row.key);
     }
     if let Some(tag) = filter.strip_prefix("has ") {
         return row.has_module(tag);
@@ -463,7 +471,7 @@ pub fn shown_rows(
     let all = rows_of(editor, table);
     let columns = columns_cached(editor, table, &all);
     let view = view_of(editor, table, &columns);
-    let fought = can_be_fought(editor);
+    let named = named_filters(editor, table);
     let filters = filters_of(&view);
     let search = editor
         .views
@@ -478,7 +486,7 @@ pub fn shown_rows(
         .filter(|row| {
             filters
                 .iter()
-                .all(|filter| passes(row, filter, &fought, &columns))
+                .all(|filter| passes(row, filter, &named, &columns))
         })
         .filter(|row| matches_search(row, &search, &columns))
         .collect();

@@ -191,10 +191,8 @@ impl Notification {
     }
 
     pub fn stays(&self) -> Seconds {
-        self.lasts.unwrap_or_else(|| {
-            let words = self.text.word_count() as f32;
-            Seconds(READING_BASE.0 + READING_PER_WORD.0 * words)
-        })
+        self.lasts
+            .unwrap_or_else(|| reading(self.text.word_count()))
     }
 
     fn spoken_by(&self, world: &World, npc: Entity) -> bool {
@@ -536,4 +534,8 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
     }
+}
+
+fn reading(words: usize) -> Seconds {
+    Seconds(READING_BASE.0 + READING_PER_WORD.0 * words as f32)
 }

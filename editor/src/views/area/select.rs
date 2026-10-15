@@ -7,7 +7,10 @@ use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};
-use super::{AreaDrag, AreaFrame, AreaTool, AreaViewState, PasteGhost, ResizeCorner, pins, shapes};
+use super::{
+    AreaDrag, AreaFrame, AreaSnapshot, AreaTool, AreaViewState, PasteGhost, ResizeCorner, pins,
+    shapes,
+};
 use super::{pick, placement};
 use crate::app::{Clipboard, Editor, RightTab};
 use crate::project::RowSelection;
@@ -332,7 +335,7 @@ pub fn move_selection(editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) 
     });
 }
 
-pub fn copy_selection(editor: &mut Editor, frame: &AreaFrame) {
+pub fn copy_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     let indices = selected_indices(editor, &frame.area_key);
     if indices.is_empty() {
         return;
@@ -423,7 +426,7 @@ pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, pasted: Vec<Value
     );
 }
 
-pub fn duplicate_selection(editor: &mut Editor, frame: &AreaFrame) {
+pub fn duplicate_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     let indices = selected_indices(editor, &frame.area_key);
     if indices.is_empty() {
         return;
@@ -457,7 +460,7 @@ pub fn duplicate_selection(editor: &mut Editor, frame: &AreaFrame) {
     );
 }
 
-pub fn delete_selection(editor: &mut Editor, frame: &AreaFrame) {
+pub fn delete_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     if editor.selection.table == "blueprint"
         && let Some(place) = frame.in_place.last().cloned()
     {

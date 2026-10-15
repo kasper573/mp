@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::family;
-use egui::emath::TSTransform;
+use egui::emath::{GuiRounding, TSTransform};
 use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band, GuiImage};
 use crate::core::math::Pos;
 use crate::core::render::tile_to_window;
-use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::text::{self, TextShadow};
 use crate::core::tiling::Tiles;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
@@ -84,13 +84,13 @@ fn clear_plates(mut plates: ResMut<Plates>) {
 }
 
 // One area holds every plate, so they all sit under the bubbles that float above them.
-fn draw_plates(world: &mut World) {
+pub fn draw_plates(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
     let mut plates = world.resource_mut::<Plates>();
     plates.0.clear();
-    if *world.resource::<ScreenTransitionPhase>() != ScreenTransitionPhase::Idle {
+    if world.resource::<ActiveTransition>().phase() != ScreenTransitionPhase::Idle {
         return;
     }
     let content = *world.resource::<Content>();
@@ -132,10 +132,8 @@ fn draw_plates(world: &mut World) {
             }
             let size = plate_size(&gui, &label, &icons);
             let rect = egui::Rect::from_min_size(
-                egui::pos2(
-                    (top.x - size.x / 2.0).round(),
-                    (top.y - HEAD_ROOM - size.y).round(),
-                ),
+                egui::pos2(top.x - size.x / 2.0, top.y - HEAD_ROOM - size.y)
+                    .round_to_pixels(gui.pixels_per_point()),
                 size,
             );
             Some(Plate {

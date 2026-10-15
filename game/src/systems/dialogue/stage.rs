@@ -405,13 +405,13 @@ fn show_line(world: &mut World) {
         world.despawn(before);
     }
     let now = world.resource::<Time>().elapsed();
-    let mut cast = cast_members(world, now);
+    let previous_cast = world
+        .resource::<Stage>()
+        .shown
+        .as_ref()
+        .map_or_else(Vec::new, |shown| shown.cast.clone());
+    let cast = cast_members(world, now, &previous_cast);
     if let Some(shown) = world.resource_mut::<Stage>().shown.as_mut() {
-        for member in &mut cast {
-            if let Some(before) = shown.cast.iter().find(|before| before.who == member.who) {
-                member.since = before.since;
-            }
-        }
         shown.cast = cast;
     }
     babble_along(world, line.by, typing);
@@ -431,26 +431,30 @@ fn advance(world: &mut World) {
     }
 }
 
+fn press_advance(world: &mut World) {
+    match typing_line(world) {
+        Some(line) => {
+            if let Some(mut typewriter) = world.get_mut::<Typewriter>(line) {
+                typewriter.finish();
+            }
+        }
+        None => advance(world),
+    }
+}
+
 fn stage_keys(world: &mut World) {
     if world.resource::<Stage>().shown.is_none() || hud::confirming(world) {
         return;
     }
-    if let Some(line) = typing_line(world) {
-        if map::just_pressed(world, InputAction::Advance)
-            && let Some(mut typewriter) = world.get_mut::<Typewriter>(line)
-        {
-            typewriter.finish();
-        }
-        return;
-    }
-    let choosing = world
-        .resource::<Stage>()
-        .shown
-        .as_ref()
-        .is_some_and(Shown::choosing);
+    let choosing = typing_line(world).is_none()
+        && world
+            .resource::<Stage>()
+            .shown
+            .as_ref()
+            .is_some_and(Shown::choosing);
     if !choosing {
         if map::just_pressed(world, InputAction::Advance) {
-            advance(world);
+            press_advance(world);
         }
         return;
     }
@@ -731,23 +735,7 @@ fn dialogue_box(ui: &mut Ui, world: &mut World, screen: Rect) -> Rect {
     );
     let dialogue = held.inner;
     if playing && map::clicked(world, InputAction::Advance, &held.response) {
-        match typing_line(world) {
-            Some(line) => {
-                if let Some(mut typewriter) = world.get_mut::<Typewriter>(line) {
-                    typewriter.finish();
-                }
-            }
-            None => {
-                let choosing = world
-                    .resource::<Stage>()
-                    .shown
-                    .as_ref()
-                    .is_some_and(|shown| shown.choosing() || shown.typed_since.is_none());
-                if !choosing {
-                    advance(world);
-                }
-            }
-        }
+        press_advance(world);
     }
     name_tag(ui, world, dialogue);
     continue_mark(ui, world, dialogue);
@@ -1204,7 +1192,7 @@ fn lerp_color(from: Color32, to: Color32, t: f32) -> Color32 {
     )
 }
 
-fn cast_members(world: &World, now: Duration) -> Vec<CastMember> {
+fn cast_members(world: &World, now: Duration, before: &[CastMember]) -> Vec<CastMember> {
     let Some(shown) = world.resource::<Stage>().shown.as_ref() else {
         return Vec::new();
     };
@@ -1251,7 +1239,10 @@ fn cast_members(world: &World, now: Duration) -> Vec<CastMember> {
                 .unwrap_or_else(|| busts.generic.of(GenericExpression::Neutral));
             Some(CastMember {
                 who,
-                since: now,
+                since: before
+                    .iter()
+                    .find(|member| member.who == who)
+                    .map_or(now, |member| member.since),
                 bust: bust.clone(),
                 model,
                 side: side_of(who),

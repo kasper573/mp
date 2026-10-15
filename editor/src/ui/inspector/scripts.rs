@@ -241,7 +241,7 @@ pub(super) fn outline_block(ui: &mut Ui, cx: &mut FormCx, module: &Value) {
     };
     ui.add_space(4.0);
     widgets::section(ui, "Outline · read-only");
-    let catalogue = cx.state.catalogue(cx.generation, cx.root, cx.content);
+    let catalogue = cx.catalogue;
     let rows = nodes::outline(nodes, catalogue);
     egui::Frame::new()
         .fill(theme::INPUT)

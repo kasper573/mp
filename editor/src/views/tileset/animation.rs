@@ -8,7 +8,7 @@ use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;
 use crate::forms;
 use crate::project::ContentEdit;
-use crate::ui::{theme, widgets};
+use crate::ui::{patterns, theme, widgets};
 use crate::views::model::StripFrame;
 use crate::views::model::preview;
 
@@ -609,20 +609,8 @@ fn timeline_card(
     frame: OffsetFrame,
     on: bool,
 ) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(Vec2::new(136.0, 132.0), Sense::click());
-    let painter = ui.painter_at(rect);
-    let (fill, border) = if on {
-        (theme::ACCENT_SOFT, theme::ACCENT)
-    } else {
-        (theme::INPUT, theme::BORDER)
-    };
-    painter.rect(
-        rect,
-        3.0,
-        fill,
-        Stroke::new(1.0, border),
-        egui::StrokeKind::Inside,
-    );
+    let (response, painter) = patterns::card_slot(ui, Vec2::new(136.0, 132.0), on);
+    let rect = response.rect;
     let art = ERect::from_min_max(
         rect.min + Vec2::new(8.0, 6.0),
         rect.right_bottom() - Vec2::new(8.0, 26.0),

@@ -16,7 +16,9 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 pub use compile::{Compiler, EffectCall, EffectStep, Eval, OwnerRow, Procedure, Scripts, Step};
-pub use dialogue::{Choice, ChoiceOffer, ChoiceReveal, DialogueNode, DialogueView, SpokenValues};
+pub use dialogue::{
+    Choice, ChoiceOffer, DialogueNode, DialogueView, SpokenValues, check_reveals_unique,
+};
 pub use expr::Expr;
 pub use may_do::{MayDo, Reach};
 pub use node::{Assignment, Node, Target};
@@ -98,6 +100,7 @@ pub trait Vocabulary:
         + Send
         + Sync
         + 'static;
+    type Reveal: RevealDef + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
     type Place: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
     type Row: Clone + Send + Sync + 'static;
     type Audio: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
@@ -123,6 +126,12 @@ pub trait EventDef<V: Vocabulary>: Clone {
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
     fn fields(&self) -> &'static [(Name, ValueType)];
+}
+
+pub trait RevealDef: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 'static {
+    /// Whether a choice revealing this still shows, locked, while its requirements are unmet.
+    fn shows_while_locked(self) -> bool;
+    fn name(self) -> &'static str;
 }
 
 pub trait LineDef<V: Vocabulary> {

@@ -164,7 +164,7 @@ pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f
 }
 
 pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = clock(world, gui);
+    let (now, still) = motion_time(world, gui);
     let (lines, more) = lines_of::<Captions>(world);
     let mut placed = world.resource_mut::<PlacedRows<Captions>>();
     let scrim = placed.scrim.sync(
@@ -240,7 +240,7 @@ pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) ->
 }
 
 pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = clock(world, gui);
+    let (now, still) = motion_time(world, gui);
     let (lines, more) = lines_of::<Milestones>(world);
     let rows = world.resource_mut::<PlacedRows<Milestones>>().fades.sync(
         now,
@@ -323,15 +323,57 @@ pub(super) fn hovered(world: &World, rects: &[Rect]) -> bool {
 const BUMP_SCALE: f32 = 1.08;
 const BUMP_SECONDS: f64 = 0.25;
 
-/// How far a toast swells after it is bumped by a repeat, easing back to its size.
-pub(super) fn bump(bumped_at: Option<f64>, now: f64, still: bool) -> f32 {
-    bumped_at.filter(|_| !still).map_or(1.0, |at| {
-        let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
-        1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
-    })
+/// The time a notification place has been on show. It only moves while the place is not held,
+/// so a notification read under the pointer keeps its time.
+#[derive(Default, Clone, Copy)]
+pub(super) struct Clock(Duration);
+
+impl Clock {
+    pub(super) fn advance(&mut self, delta: Duration) {
+        self.0 += delta;
+    }
+
+    pub(super) fn now(self) -> Duration {
+        self.0
+    }
+
+    pub(super) fn ends_after(self, stays: Seconds) -> Duration {
+        self.0 + stays.into()
+    }
+
+    pub(super) fn lapsed(self, deadline: Duration) -> bool {
+        self.0 >= deadline
+    }
 }
 
-pub(super) fn clock(world: &World, gui: &egui::Context) -> (f64, bool) {
+/// A toast's swell after a repeat bumps it: armed by the bump, timed from the next draw.
+#[derive(Default, Clone, Copy)]
+pub(super) struct Swell {
+    bumped: bool,
+    started: Option<f64>,
+}
+
+impl Swell {
+    pub(super) fn bump(&mut self) {
+        self.bumped = true;
+    }
+
+    pub(super) fn start_if_bumped(&mut self, now: f64) {
+        if std::mem::take(&mut self.bumped) {
+            self.started = Some(now);
+        }
+    }
+
+    /// How far the toast is scaled now, easing back to its size.
+    pub(super) fn scale(self, now: f64, still: bool) -> f32 {
+        self.started.filter(|_| !still).map_or(1.0, |at| {
+            let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
+            1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
+        })
+    }
+}
+
+pub(super) fn motion_time(world: &World, gui: &egui::Context) -> (f64, bool) {
     (
         gui.input(|input| input.time),
         world.resource::<MotionPreference>().reduced,
@@ -529,7 +571,7 @@ struct VoiceRows {
     replace_after: Duration,
     rows: Vec<VoiceRow>,
     turned_away: Option<TurnedAway>,
-    clock: Duration,
+    clock: Clock,
     keys: u64,
 }
 
@@ -555,17 +597,20 @@ impl VoiceRows {
             replace_after: replace_after.into(),
             rows: Vec::new(),
             turned_away: None,
-            clock: Duration::ZERO,
+            clock: Clock::default(),
             keys: 0,
         }
     }
 
     fn join(&mut self, voice: Cow<'static, str>, notification_sent: NotificationSent) {
-        let now = self.clock;
+        let now = self.clock.now();
         let stays: Duration = notification_sent.notification.stays().into();
         if let Some(row) = self.rows.iter_mut().find(|row| row.voice == voice) {
             if row.shown.notification == notification_sent.notification {
-                row.read_by = row.read_by.max(now + stays);
+                row.read_by = row.read_by.max(
+                    self.clock
+                        .ends_after(notification_sent.notification.stays()),
+                );
                 return;
             }
             row.replaced += 1;
@@ -578,7 +623,7 @@ impl VoiceRows {
                 until: now,
             });
             turned_away.more += 1;
-            turned_away.until = now + Duration::from(COUNT_LINGERS);
+            turned_away.until = self.clock.ends_after(COUNT_LINGERS);
             return;
         }
         let after = self.rows.last().map_or(now, |last| last.read_by.max(now));
@@ -598,8 +643,8 @@ impl VoiceRows {
         if held {
             return;
         }
-        self.clock += delta;
-        let now = self.clock;
+        self.clock.advance(delta);
+        let now = self.clock.now();
         for row in &mut self.rows {
             if now >= row.changed + self.replace_after
                 && let Some(newest) = row.newest.take()

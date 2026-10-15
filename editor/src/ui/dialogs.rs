@@ -18,6 +18,7 @@ use crate::views::{area, script, world};
 use crate::{import, play, rows, templates, ui};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
+    import::show_readings(editor, ctx);
     let mut dialogs = std::mem::take(&mut editor.dialogs);
     let mut keep = Vec::new();
     for dialog in dialogs.drain(..) {

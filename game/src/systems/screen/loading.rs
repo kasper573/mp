@@ -17,7 +17,7 @@ use crate::core::content::version;
 use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
 use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform, StartParams};
-use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
 use crate::systems::install_content;
 
@@ -91,8 +91,13 @@ const CARD_FRAME: Duration = Duration::from_millis(100);
 // Room for the most the card ever says, so it keeps one size as its lines come and go.
 const CARD_SIZE: egui::Vec2 = egui::Vec2::new(320.0, 200.0);
 
+#[derive(Resource)]
+struct PacingBeforeLoading(WinitSettings);
+
 fn begin(world: &mut World) {
     world.remove_resource::<LoadingFailure>();
+    let before = world.resource::<WinitSettings>().clone();
+    world.insert_resource(PacingBeforeLoading(before));
     world.insert_resource(WinitSettings {
         focused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
         unfocused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
@@ -103,7 +108,9 @@ fn begin(world: &mut World) {
 fn forget(world: &mut World) {
     world.remove_resource::<Syncing>();
     world.remove_resource::<LoadingFailure>();
-    world.insert_resource(WinitSettings::game());
+    if let Some(PacingBeforeLoading(before)) = world.remove_resource::<PacingBeforeLoading>() {
+        world.insert_resource(before);
+    }
     *world.resource_mut::<Shown>() = Shown::default();
 }
 
@@ -189,7 +196,7 @@ fn show(world: &mut World) {
         world.resource_mut::<Shown>().progress = latest;
     }
     let failure = world.get_resource::<LoadingFailure>().cloned();
-    let veiled = *world.resource::<ScreenTransitionPhase>() != ScreenTransitionPhase::Idle;
+    let veiled = world.resource::<ActiveTransition>().phase() != ScreenTransitionPhase::Idle;
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let model = {
         let shown = world.resource::<Shown>();

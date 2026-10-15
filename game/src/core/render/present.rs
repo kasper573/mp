@@ -10,7 +10,7 @@ use bevy::window::PrimaryWindow;
 
 use super::TILE;
 use super::camera::WorldCamera;
-use super::transition::{ActiveTransition, CutUniform, ScreenTransitionPhase};
+use super::transition::{ActiveTransition, CutUniform};
 use crate::core::platform::ClientPlatform;
 use crate::core::time::Seconds;
 
@@ -39,13 +39,17 @@ impl WorldTargets {
         }
     }
 
-    fn render_target(&self) -> RenderTarget {
-        RenderTarget::Image(self.live.clone().into())
-    }
-
-    fn show(&self, material: &mut Present) {
-        material.world = self.live.clone();
-        material.snapshot = self.held.clone();
+    fn bind(
+        &self,
+        target: &mut RenderTarget,
+        screen: &Handle<Present>,
+        materials: &mut Assets<Present>,
+    ) {
+        *target = RenderTarget::Image(self.live.clone().into());
+        if let Some(mut material) = materials.get_mut(screen) {
+            material.world = self.live.clone();
+            material.snapshot = self.held.clone();
+        }
     }
 
     fn swap_held(&mut self, images: &mut Assets<Image>) {
@@ -95,14 +99,14 @@ pub(super) fn setup(
 ) {
     let (target_w, target_h) = target_size(&window);
     let targets = WorldTargets::new(&mut images, (target_w, target_h));
-    let mut camera_target = targets.render_target();
-    let mut material = Present {
-        world: targets.live.clone(),
+    let screen = materials.add(Present {
+        world: Handle::default(),
         tint: Vec4::ZERO,
-        snapshot: targets.held.clone(),
+        snapshot: Handle::default(),
         cut: CutUniform::IDLE,
-    };
-    targets.show(&mut material);
+    });
+    let mut camera_target = RenderTarget::default();
+    targets.bind(&mut camera_target, &screen, &mut materials);
     commands.insert_resource(targets);
 
     commands.spawn((
@@ -111,7 +115,7 @@ pub(super) fn setup(
             order: 0,
             ..default()
         },
-        std::mem::take(&mut camera_target),
+        camera_target,
         world_projection(target_w, target_h),
         Msaa::Off,
         WorldCamera,
@@ -130,7 +134,7 @@ pub(super) fn setup(
 
     commands.spawn((
         Mesh2d(meshes.add(Rectangle::new(1.0, 1.0))),
-        MeshMaterial2d(materials.add(material)),
+        MeshMaterial2d(screen),
         Transform::from_scale(Vec3::new(
             window.resolution.width(),
             window.resolution.height(),
@@ -167,13 +171,10 @@ pub(super) fn fit(
         targets.size = (target_w, target_h);
         targets.live = images.add(world_target(target_w, target_h));
         if let Ok((mut target, mut projection)) = camera.single_mut() {
-            *target = targets.render_target();
             *projection = world_projection(target_w, target_h);
-        }
-        if let Ok((_, material)) = quad.single()
-            && let Some(mut material) = materials.get_mut(&material.0)
-        {
-            targets.show(&mut material);
+            if let Ok((_, screen)) = quad.single() {
+                targets.bind(&mut target, &screen.0, &mut materials);
+            }
         }
     }
     if let Ok((mut transform, _)) = quad.single_mut() {
@@ -185,13 +186,11 @@ pub(super) fn apply_present(
     time: Res<Time>,
     tint: Res<ScreenTint>,
     mut transition: ResMut<ActiveTransition>,
-    mut phase: ResMut<ScreenTransitionPhase>,
     camera: Query<(&Camera, &GlobalTransform), With<WorldCamera>>,
     screen: Query<&MeshMaterial2d<Present>, With<Screen>>,
     mut materials: ResMut<Assets<Present>>,
 ) {
-    let (current, cut) = transition.advance(Seconds(time.delta_secs()), camera.single().ok());
-    phase.set_if_neq(current);
+    let cut = transition.advance(Seconds(time.delta_secs()), camera.single().ok());
     let Ok(handle) = screen.single().map(|material| material.0.clone()) else {
         return;
     };
@@ -213,21 +212,19 @@ pub(super) fn hold_frame(world: &mut World) {
         targets.swap_held(&mut images);
     });
     let targets = world.resource::<WorldTargets>().clone();
-    let mut cameras = world.query_filtered::<&mut RenderTarget, With<WorldCamera>>();
-    for mut target in cameras.iter_mut(world) {
-        *target = targets.render_target();
-    }
     let screens: Vec<Handle<Present>> = world
         .query_filtered::<&MeshMaterial2d<Present>, With<Screen>>()
         .iter(world)
         .map(|material| material.0.clone())
         .collect();
-    let mut materials = world.resource_mut::<Assets<Present>>();
-    for handle in screens {
-        if let Some(mut material) = materials.get_mut(&handle) {
-            targets.show(&mut material);
+    world.resource_scope(|world, mut materials: Mut<Assets<Present>>| {
+        let mut cameras = world.query_filtered::<&mut RenderTarget, With<WorldCamera>>();
+        for mut target in cameras.iter_mut(world) {
+            for screen in &screens {
+                targets.bind(&mut target, screen, &mut materials);
+            }
         }
-    }
+    });
 }
 
 fn world_projection(width: u32, height: u32) -> Projection {

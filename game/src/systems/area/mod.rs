@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::assets::AssetRef;
+use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::{
     SoundscapeChannel, SoundscapeLayer, SoundscapeShape, SoundscapeZone,
@@ -326,6 +327,12 @@ pub struct SoundChannel {
     pub volume: f32,
     #[serde(default, skip_serializing_if = "serial::is_zero_f32")]
     pub pan: f32,
+    #[serde(default, skip_serializing_if = "is_ambience")]
+    pub category: AudioCategory,
+}
+
+fn is_ambience(category: &AudioCategory) -> bool {
+    *category == AudioCategory::Ambience
 }
 
 impl SoundscapeDef {
@@ -377,6 +384,7 @@ impl SoundscapeDef {
                             src: channel.file.clone(),
                             volume: channel.volume,
                             pan: channel.pan,
+                            category: channel.category,
                         },
                     )
                 })

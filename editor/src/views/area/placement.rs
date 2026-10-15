@@ -9,16 +9,14 @@ use game::systems::area::{self, AreaId, AreaModuleKind, Flip};
 use game::systems::script::Variable;
 use serde_json::Value;
 
-use super::blueprint::open_make_blueprint;
 use super::holes::value_kind;
 use super::inspect::Followups;
 use super::stamp::placed_part;
-use super::{AreaFrame, shapes};
+use super::{AreaFrame, AreaSnapshot, shapes};
 use super::{modules, select};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
-use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
 use crate::{forms, schema, value};
@@ -92,37 +90,6 @@ pub fn placement_count(content: Content, blueprint: &str) -> String {
         text.push_str(&format!(" {nested} more sit inside other blueprints."));
     }
     text
-}
-
-pub enum PlacementAction {
-    OpenBlueprint(String),
-    RemoveAll,
-    MakeBlueprint,
-    GoTo(String, Pos<Tiles>),
-}
-
-pub fn act(editor: &mut Editor, extra: PlacementAction, area_key: &str, indices: &[usize]) {
-    match extra {
-        PlacementAction::OpenBlueprint(key) => {
-            editor.select(RowSelection::row("blueprint", &key));
-            editor.open_tab(EditorTab::Blueprint { key });
-        }
-        PlacementAction::RemoveAll => {
-            let applied = modules::change_modules(editor, area_key, |modules| {
-                super::remove_indices(modules, indices);
-                Some(format!("Remove {} modules from {area_key}", indices.len()))
-            });
-            if applied {
-                editor.selection.parts.clear();
-            }
-        }
-        PlacementAction::MakeBlueprint => {
-            open_make_blueprint(editor, area_key, indices.to_vec());
-        }
-        PlacementAction::GoTo(area, at) => {
-            super::open_area_at(editor, &area, Some(at), None);
-        }
-    }
 }
 
 pub fn placement_card(
@@ -620,7 +587,7 @@ pub fn overlay_in_place(
     if let Some(bounds) = extent {
         let shade = egui::Color32::from_rgba_unmultiplied(0, 0, 0, 150);
         let lit = canvas.rect(bounds);
-        let full = canvas.rect;
+        let full = canvas.screen;
         for dark in [
             egui::Rect::from_min_max(full.min, egui::pos2(full.max.x, lit.min.y)),
             egui::Rect::from_min_max(egui::pos2(full.min.x, lit.max.y), full.max),
@@ -694,7 +661,7 @@ pub fn move_parts_in_place(
     editor.apply(edit);
 }
 
-pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaFrame, place: &Placement) {
+pub fn delete_parts_in_place(editor: &mut Editor, frame: &AreaSnapshot, place: &Placement) {
     let indices = selected_part_indices(editor, &place.blueprint);
     if indices.is_empty() {
         return;
@@ -758,7 +725,7 @@ fn value_carries(variable: &Variable, value: &Value) -> bool {
         ) && value.is_string()
 }
 
-pub fn unpack(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn unpack(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let mut count = 0;
     let applied = modules::change_modules(editor, &frame.area_key, |modules| {
         let module = modules.get(index)?;
@@ -784,7 +751,7 @@ pub enum ReplaceScope {
     Everywhere,
 }
 
-pub fn replace_dialog(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn replace_dialog(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     editor.dialogs.push(ModalDialog::PickRow(PickRowDialog {
         title: format!(
             "Replace {} with",
@@ -882,13 +849,14 @@ pub(super) fn placement_extras(
     }
     ui.horizontal_wrapped(|ui| {
         if ui.button("▣ Edit blueprint").clicked() {
-            out.extras.push(PlacementAction::OpenBlueprint(key.clone()));
+            out.actions
+                .push(super::AreaAction::OpenBlueprint(key.clone()));
         }
         if ui.button("Unpack into scenery").clicked() {
-            out.deferred.push(super::DeferredAreaAction::Unpack(index));
+            out.actions.push(super::AreaAction::Unpack(index));
         }
         if ui.button("Replace with…").clicked() {
-            out.deferred.push(super::DeferredAreaAction::Replace(index));
+            out.actions.push(super::AreaAction::Replace(index));
         }
     });
     widgets::key_hint_text(ui, "Enter", "edits the blueprint in place");

@@ -205,7 +205,7 @@ pub fn server_app(
                 (
                     (rewards::grant, quest::credit, npc::defeated).chain(),
                     (
-                        script::query::index_actors,
+                        script::query::take_tick_roster,
                         (area::object::track, npc::approach)
                             .chain()
                             .run_if(on_replication_tick),
@@ -461,6 +461,7 @@ pub fn registry() -> ContentRegistry {
         .row::<script::ScriptDef>()
         .row::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
+        .list_kind("modules", "unknown module type", "a module type")
         .fixture::<input::map::InputAction>()
         .fixture::<attention::AttentionMark>()
         .fixture::<interface::InterfaceSound>()
@@ -475,6 +476,7 @@ pub fn registry() -> ContentRegistry {
     registry
         .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)
+        .hook(LoadStep::Across, input::map::check_all)
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)

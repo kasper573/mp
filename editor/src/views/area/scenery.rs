@@ -5,10 +5,10 @@ use game::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
 use super::inspect::Followups;
+use super::modules;
 use super::placement::warp_destinations;
 use super::stamp::object_names;
-use super::{AreaFrame, shapes};
-use super::{modules, placement};
+use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::widgets;
@@ -158,7 +158,7 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     }
 }
 
-pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = shapes::scenery_rect(module) else {
         return;
@@ -217,7 +217,7 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
     }
 }
 
-pub fn return_door(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let area_key = &frame.area_key;
     let modules = &frame.modules;
     let Some(module) = modules.get(index) else {
@@ -362,18 +362,17 @@ pub(super) fn scenery_extras(
             .button(format!("⧉ Make the {under} blocked cells its own"))
             .clicked()
         {
-            out.deferred
-                .push(super::DeferredAreaAction::AdoptBlocks(index));
+            out.actions.push(super::AreaAction::AdoptBlocks(index));
         }
     } else {
         widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
         if ui.button("▣ Make blueprint…").clicked() {
-            out.extras.push(placement::PlacementAction::MakeBlueprint);
+            out.actions.push(super::AreaAction::MakeBlueprint);
         }
         if ui.button("Split into tiles").clicked() {
-            out.deferred.push(super::DeferredAreaAction::Split(index));
+            out.actions.push(super::AreaAction::Split(index));
         }
     });
 }
@@ -394,7 +393,7 @@ pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Opti
     )
 }
 
-pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize) {
+pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = super::shapes::scenery_rect(module) else {
         return;

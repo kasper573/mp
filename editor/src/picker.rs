@@ -6,7 +6,7 @@ use game::systems::npc::{self, NpcDef};
 use game::systems::script::{OwnerKind, RiftScripts};
 use serde_json::Value;
 
-use crate::forms::{FormAction, FormCx};
+use crate::forms::{FormAction, FormCx, clear_draft, draft_of, set_draft};
 use crate::project::{ProjectFiles, row_file, row_of};
 use crate::thumbs;
 use crate::ui::{theme, widgets};
@@ -102,7 +102,7 @@ fn picker_body(
         },
     ];
     let search_id = id.with("search");
-    let mut search = cx.state.drafts.get(&search_id).cloned().unwrap_or_default();
+    let mut search = draft_of(ui, search_id).unwrap_or_default();
     let total = cx.files.paths_under(&format!("tables/{table}/")).count();
     let needle = search.to_lowercase();
     let blocked = pick_block(cx, table, path);
@@ -151,7 +151,7 @@ fn picker_body(
                 );
                 widgets::default_focus(ui, &response);
                 if response.changed() {
-                    cx.state.drafts.insert(search_id, search.clone());
+                    set_draft(ui, search_id, &search.clone());
                     highlight = 0;
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -348,16 +348,16 @@ fn picker_body(
             *key = row_key;
             changed = true;
         }
-        close_picker(ui, cx, id, search_id);
+        close_picker(ui, id, search_id);
     }
     if escape {
-        close_picker(ui, cx, id, search_id);
+        close_picker(ui, id, search_id);
     }
     changed
 }
 
-fn close_picker(ui: &mut Ui, cx: &mut FormCx, id: egui::Id, search_id: egui::Id) {
-    cx.state.drafts.remove(&search_id);
+fn close_picker(ui: &mut Ui, id: egui::Id, search_id: egui::Id) {
+    clear_draft(ui, search_id);
     ui.ctx()
         .data_mut(|d| d.remove_temp::<usize>(id.with("highlight")));
     ui.close();
@@ -590,12 +590,12 @@ pub fn asset(ui: &mut Ui, cx: &mut FormCx, file: &mut String, path: &str) -> boo
             .width(420.0)
             .show(|ui| {
                 let search_id = id.with("search");
-                let mut search = cx.state.drafts.get(&search_id).cloned().unwrap_or_default();
+                let mut search = draft_of(ui, search_id).unwrap_or_default();
                 if ui
                     .add(egui::TextEdit::singleline(&mut search).hint_text("search assets/"))
                     .changed()
                 {
-                    cx.state.drafts.insert(search_id, search.clone());
+                    set_draft(ui, search_id, &search.clone());
                 }
                 let needle = search.to_lowercase();
                 let paths: Vec<String> = cx

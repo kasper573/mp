@@ -388,7 +388,7 @@ pub(super) fn pick_place(
         pick.file, pick.pointer
     );
     painter.text(
-        canvas.rect.min + Vec2::new(8.0, 8.0),
+        canvas.screen.min + Vec2::new(8.0, 8.0),
         egui::Align2::LEFT_TOP,
         text,
         egui::FontId::proportional(13.0),

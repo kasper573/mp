@@ -13,6 +13,7 @@ use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems;
 use game::systems::script::Place;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::forms::FormState;
@@ -22,6 +23,7 @@ use crate::project::watch::FolderWatcher;
 use crate::project::{
     ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection, row_file,
 };
+use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::EditorTab;
 use crate::thumbs::Thumbnail;
@@ -32,12 +34,12 @@ use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
-use crate::{import, play, rows, scenes, ui, views};
+use crate::{import, play, rows, ui, views};
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
-    pub scene: Option<String>,
+    pub scene: Option<Vec<Step>>,
     pub user: Option<PathBuf>,
     pub frame_log: Option<PathBuf>,
 }
@@ -100,7 +102,7 @@ pub struct Editor {
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
-    pub scene: Option<String>,
+    pub scene: Option<Vec<Step>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
     pub play: play::PlayTest,
@@ -168,7 +170,8 @@ pub enum RightTab {
     Conflicts,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BottomTab {
     #[default]
     History,

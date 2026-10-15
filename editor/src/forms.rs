@@ -16,7 +16,7 @@ use crate::{audio, condition, picker, spans, thumbs, value};
 pub struct FormCx<'a> {
     pub root: &'a Value,
     pub content: Option<Content>,
-    pub generation: u64,
+    pub catalogue: &'a NodeCatalogue,
     pub files: &'a ProjectFiles,
     pub usages: &'a ContentUsages,
     pub shapes: &'a SchemaShapes,
@@ -40,7 +40,7 @@ impl<'a> FormCx<'a> {
         FormCx {
             root,
             content: project.content,
-            generation: project.generation,
+            catalogue: &project.catalogue,
             files: &project.files,
             usages: &project.usages,
             shapes,
@@ -77,35 +77,12 @@ pub enum HoleRequest {
 
 #[derive(Default)]
 pub struct FormState {
-    pub drafts: HashMap<egui::Id, String>,
     pub errors: HashMap<String, String>,
     pub folded: HashSet<String>,
     pub unfolded: HashSet<String>,
     pub status: Vec<String>,
     pub thumbnails: thumbs::Thumbnails,
     pub audio: audio::WaveformCache,
-    catalogue: Option<(u64, NodeCatalogue)>,
-}
-
-impl FormState {
-    pub fn catalogue(
-        &mut self,
-        generation: u64,
-        root: &Value,
-        content: Option<Content>,
-    ) -> &NodeCatalogue {
-        if self
-            .catalogue
-            .as_ref()
-            .is_some_and(|(built, _)| *built != generation)
-        {
-            self.catalogue = None;
-        }
-        &self
-            .catalogue
-            .get_or_insert_with(|| (generation, NodeCatalogue::build(root, content)))
-            .1
-    }
 }
 
 pub enum FormAction {
@@ -343,7 +320,7 @@ fn plain(
 ) -> FormChange {
     let schema = schema::resolve(cx.root, schema);
     if path.ends_with("/chance") && matches!(schema::kind(cx.root, schema), SchemaKind::Choice(_)) {
-        return chance(ui, cx, value, path);
+        return chance(ui, value, path);
     }
     if let Some(marker) = schema::marker(schema) {
         match marker {
@@ -652,12 +629,7 @@ fn geometry(
             number("h")
         ),
     };
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = draft_or(ui, id, current.clone());
     let response = boxed_input(ui, Some("tiles"), |ui| {
         ui.add(
             egui::TextEdit::singleline(&mut draft)
@@ -667,11 +639,11 @@ fn geometry(
         )
     });
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        set_draft(ui, id, &draft.clone());
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         let numbers: Vec<f64> = draft
             .split(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
             .filter(|part| !part.is_empty())
@@ -982,18 +954,13 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
     changed
 }
 
-fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+fn chance(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("chance");
     let current = value
         .as_f64()
         .map(|number| number.to_string())
         .unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = draft_or(ui, id, current.clone());
     let response = boxed_input(ui, Some("%"), |ui| {
         ui.add(
             egui::TextEdit::singleline(&mut draft)
@@ -1004,10 +971,10 @@ fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormCh
         )
     });
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        set_draft(ui, id, &draft.clone());
     }
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         if draft.trim() != current.trim() {
             *value = match draft.trim().parse::<f64>() {
                 Ok(number) => Value::from(number),
@@ -1035,18 +1002,13 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                     remove = Some(key.clone());
                 }
                 let id = ui.id().with(&item_path).with("key");
-                let mut draft = cx
-                    .state
-                    .drafts
-                    .get(&id)
-                    .cloned()
-                    .unwrap_or_else(|| key.clone());
+                let mut draft = draft_or(ui, id, key.clone());
                 let response = ui.add(egui::TextEdit::singleline(&mut draft).desired_width(110.0));
                 if response.changed() {
-                    cx.state.drafts.insert(id, draft.clone());
+                    set_draft(ui, id, &draft.clone());
                 }
                 if committed(ui, &response) {
-                    cx.state.drafts.remove(&id);
+                    clear_draft(ui, id);
                     if draft != *key && !draft.is_empty() {
                         rename = Some((key.clone(), draft));
                     }
@@ -1068,20 +1030,20 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
         }
         ui.horizontal(|ui| {
             let id = ui.id().with(path).with("new-key");
-            let mut draft = cx.state.drafts.get(&id).cloned().unwrap_or_default();
+            let mut draft = draft_of(ui, id).unwrap_or_default();
             let response = ui.add(
                 egui::TextEdit::singleline(&mut draft)
                     .hint_text("new key")
                     .desired_width(110.0),
             );
             if response.changed() {
-                cx.state.drafts.insert(id, draft.clone());
+                set_draft(ui, id, &draft.clone());
             }
             let add = ui.small_button("+ add").clicked()
                 || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
             if add && !draft.is_empty() && !entries.contains_key(&draft) {
                 entries.insert(draft, schema::template(cx.root, values));
-                cx.state.drafts.remove(&id);
+                clear_draft(ui, id);
                 changed = FormChange::at(path);
             }
         });
@@ -1092,12 +1054,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
 pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("text");
     let current = value.as_str().unwrap_or_default().to_owned();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = draft_or(ui, id, current.clone());
     let multiline = current.len() > 60 || current.contains('\n');
     let response = boxed_input(ui, None, |ui| {
         if multiline {
@@ -1116,16 +1073,16 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
         }
     });
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        set_draft(ui, id, &draft.clone());
     }
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         if draft != current {
             *value = Value::String(draft);
             changed = FormChange::at(path);
@@ -1148,12 +1105,7 @@ pub fn number(
         .as_f64()
         .map(|number| number.to_string())
         .unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = draft_or(ui, id, current.clone());
     let unit = schema["x-unit"].as_str().map(str::to_owned);
     let response = boxed_input(ui, unit.as_deref(), |ui| {
         ui.add(
@@ -1167,16 +1119,16 @@ pub fn number(
         response.request_focus();
     }
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        set_draft(ui, id, &draft.clone());
     }
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         if draft.trim() != current {
             match draft.trim().parse::<f64>() {
                 Ok(parsed) => {
@@ -1313,22 +1265,17 @@ fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("json");
     let current = serde_json::to_string(value).unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = draft_or(ui, id, current.clone());
     let response = ui.add(
         egui::TextEdit::singleline(&mut draft)
             .desired_width(f32::INFINITY)
             .font(egui::TextStyle::Monospace),
     );
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        set_draft(ui, id, &draft.clone());
     }
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         if draft != current {
             match serde_json::from_str::<Value>(&draft) {
                 Ok(parsed) => {
@@ -1434,21 +1381,38 @@ pub fn drafted(
     current: &str,
     input: impl FnOnce(&mut Ui, &mut String) -> egui::Response,
 ) -> Option<String> {
-    let mut draft = ui
-        .ctx()
-        .data(|d| d.get_temp::<String>(id))
-        .unwrap_or_else(|| current.to_owned());
+    let mut draft = draft_or(ui, id, current.to_owned());
     let response = input(ui, &mut draft);
     if committed(ui, &response) {
-        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+        clear_draft(ui, id);
         return (draft != current).then_some(draft);
     }
     if response.has_focus() {
-        ui.ctx().data_mut(|d| d.insert_temp(id, draft));
+        set_draft(ui, id, &draft);
     } else {
-        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+        clear_draft(ui, id);
     }
     None
+}
+
+pub fn draft_of(ui: &Ui, id: egui::Id) -> Option<String> {
+    ui.ctx().data(|d| d.get_temp::<String>(id))
+}
+
+pub fn draft_or(ui: &Ui, id: egui::Id, current: String) -> String {
+    draft_of(ui, id).unwrap_or(current)
+}
+
+pub fn set_draft(ui: &Ui, id: egui::Id, text: &str) {
+    ui.ctx().data_mut(|d| d.insert_temp(id, text.to_owned()));
+}
+
+pub fn take_draft(ui: &Ui, id: egui::Id) -> Option<String> {
+    ui.ctx().data_mut(|d| d.remove_temp::<String>(id))
+}
+
+pub fn clear_draft(ui: &Ui, id: egui::Id) {
+    take_draft(ui, id);
 }
 
 pub fn committed(ui: &Ui, response: &egui::Response) -> bool {

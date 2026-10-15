@@ -15,7 +15,9 @@ use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
-use crate::core::render::transition::{self, ScreenTransitionPhase, WorldViewSystems};
+use crate::core::render::transition::{
+    self, ActiveTransition, ScreenTransitionPhase, WorldViewSystems,
+};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
@@ -90,7 +92,7 @@ struct Held {
 /// The view is revealed when no crossing is held under the veil and no transition plays over it.
 pub fn settled(world: &World) -> bool {
     world.resource::<Crossing>().held.is_none()
-        && *world.resource::<ScreenTransitionPhase>() == ScreenTransitionPhase::Idle
+        && world.resource::<ActiveTransition>().phase() == ScreenTransitionPhase::Idle
 }
 
 pub fn carry_view_across(world: &mut World) {
@@ -178,19 +180,25 @@ fn pose_of(world: &World, character: Entity) -> Option<Pose> {
 }
 
 fn area_drawable(world: &mut World, area: AreaId) -> bool {
-    let spawned = world.resource::<SpawnedArea>();
-    if spawned.area != Some(area) {
+    if world.resource::<SpawnedArea>().area != Some(area) {
         return false;
     }
-    let mut pending = spawned.images.clone();
-    pending.extend(
-        world
-            .query::<&Sprite>()
-            .iter(world)
-            .map(|sprite| sprite.image.clone()),
-    );
+    let on_show = images_on_show(world);
     let images = world.resource::<Assets<Image>>();
-    pending.iter().all(|image| images.contains(image))
+    on_show.iter().all(|image| images.contains(image))
+}
+
+fn images_on_show(world: &mut World) -> Vec<Handle<Image>> {
+    let spawned = world.resource::<SpawnedArea>().images.clone();
+    spawned
+        .into_iter()
+        .chain(
+            world
+                .query::<&Sprite>()
+                .iter(world)
+                .map(|sprite| sprite.image.clone()),
+        )
+        .collect()
 }
 
 /// Leaving the area scene keeps the last view under the veil, so a lost connection or a content
@@ -240,18 +248,7 @@ fn retain_loaded_images(
 }
 
 fn release_unshown_images(world: &mut World) {
-    let mut shown: HashSet<AssetId<Image>> = world
-        .resource::<SpawnedArea>()
-        .images
-        .iter()
-        .map(Handle::id)
-        .collect();
-    shown.extend(
-        world
-            .query::<&Sprite>()
-            .iter(world)
-            .map(|sprite| sprite.image.id()),
-    );
+    let shown: HashSet<AssetId<Image>> = images_on_show(world).iter().map(Handle::id).collect();
     world
         .resource_mut::<RetainedImages>()
         .0

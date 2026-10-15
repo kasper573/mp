@@ -4,7 +4,7 @@ use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 use game::core::content::ContentRow;
 use game::systems::area::world_map::WorldMapDef;
 
-use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
+use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
 use crate::picker::{self, PictureFrame};
@@ -33,6 +33,12 @@ impl Default for BrowserState {
             },
         }
     }
+}
+
+#[derive(Clone)]
+enum FolderAction {
+    New,
+    OpenTable,
 }
 
 enum Hit {
@@ -144,9 +150,28 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 Some(node)
             },
             &mut |folder| {
-                folder.locked = shapes.has_fixtures(&folder.id);
-                folder.adds = !folder.locked;
-                folder.table = true;
+                let open = TreeAction {
+                    glyph: "▦",
+                    tip: "Open table".to_owned(),
+                    menu_label: "Open table".to_owned(),
+                    action: FolderAction::OpenTable,
+                };
+                if shapes.has_fixtures(&folder.id) {
+                    folder.note = Some(
+                        "Fixtures: the engine names these rows, so none can be added".to_owned(),
+                    );
+                    folder.actions = vec![open];
+                } else {
+                    folder.actions = vec![
+                        TreeAction {
+                            glyph: "+",
+                            tip: format!("New {}", folder.label),
+                            menu_label: format!("New {}…", folder.label),
+                            action: FolderAction::New,
+                        },
+                        open,
+                    ];
+                }
             },
         )
     };
@@ -179,8 +204,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 &nodes,
                 false,
                 tree::TreeHooks {
-                    menu: Some(&mut |ui, node| {
-                        if let Some((table, key)) = row_of(&node.id) {
+                    menu: Some(&mut |ui, id| {
+                        if let Some((table, key)) = row_of(id) {
                             row_menu(ui, &mut action, table, key);
                         }
                     }),
@@ -192,11 +217,11 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
             )
         })
         .inner;
-    if let Some(table) = out.add {
-        rows::new_row_dialog(editor, &table);
-    }
-    if let Some(table) = out.open_table {
-        editor.open_tab(EditorTab::Spreadsheet { table });
+    if let Some((folder, action)) = out.action {
+        match action {
+            FolderAction::New => rows::new_row_dialog(editor, &folder),
+            FolderAction::OpenTable => editor.open_tab(EditorTab::Spreadsheet { table: folder }),
+        }
     }
     if out
         .clicked

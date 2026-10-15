@@ -1,13 +1,25 @@
 use bevy::prelude::Resource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 #[derive(
-    Serialize, Deserialize, VariantArray, IntoStaticStr, Clone, Copy, Debug, PartialEq, Eq,
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    VariantArray,
+    IntoStaticStr,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum AudioCategory {
     Music,
+    #[default]
     Ambience,
     Effects,
     Voice,

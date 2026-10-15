@@ -5,7 +5,7 @@ use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
 use egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
 
-use super::rows::{self, Fades, Look, Move, Presence};
+use super::rows::{self, Clock, Fades, Look, Move, Presence};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleId, BabbleRank, Babbler, Babbling};
@@ -68,6 +68,7 @@ impl Plugin for BubblePlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 place
+                    .after(plate::draw_plates)
                     .in_set(Band::World)
                     .run_if(in_state(ClientScreen::Area)),
             )
@@ -104,7 +105,7 @@ pub fn say(world: &mut World, notification_sent: NotificationSent) {
                 newest: None,
                 replaced: 0,
                 changed: Duration::ZERO,
-                clock: Duration::ZERO,
+                clock: Clock::default(),
                 arrived,
                 drawn: None,
             });
@@ -160,7 +161,7 @@ struct Speaking {
     newest: Option<SpokenLine>,
     replaced: u32,
     changed: Duration,
-    clock: Duration,
+    clock: Clock,
     arrived: u64,
     drawn: Option<Drawn>,
 }
@@ -239,7 +240,7 @@ impl Speaking {
             .find(|shown| shown.notification == line.notification)
         {
             if let Some(read_by) = &mut same.read_by {
-                *read_by = (*read_by).max(clock + Duration::from(line.notification.stays()));
+                *read_by = (*read_by).max(clock.ends_after(line.notification.stays()));
             }
             return;
         }
@@ -253,8 +254,8 @@ impl Speaking {
 
     /// Moves the speaker's lines along, and hands back the typing of those it let go.
     fn tick(&mut self, delta: Duration, typed: &[bool]) -> Vec<Entity> {
-        self.clock += delta;
-        let now = self.clock;
+        self.clock.advance(delta);
+        let now = self.clock.now();
         let mut previous_read_by: Option<Duration> = None;
         for (line, &typed) in self.lines.iter_mut().zip(typed) {
             if line.read_by.is_none() && typed {
@@ -371,7 +372,7 @@ fn place(world: &mut World) {
     let Some(window) = window_size(world) else {
         return;
     };
-    let (now, still) = rows::clock(world, &gui);
+    let (now, still) = rows::motion_time(world, &gui);
     let content = *world.resource::<Content>();
     let mut room = Room::of(world, window);
     let viewer = world
@@ -610,7 +611,7 @@ fn speech(world: &World, content: &Content, speaking: &Speaking, folded: bool) -
         replaced => format!("{name} +{replaced}"),
     };
     let typed = typed_lines(world, speaking);
-    let now = speaking.clock;
+    let now = speaking.clock.now();
     let lines = speaking.lines[..speaking.shown_lines(&typed)]
         .iter()
         .map(|line| {

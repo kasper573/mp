@@ -77,7 +77,6 @@ impl Plugin for RenderPlugin {
             .init_resource::<present::Viewport>()
             .init_resource::<transition::ActiveTransition>()
             .init_resource::<transition::ScreenTransitionPreference>()
-            .init_resource::<transition::ScreenTransitionPhase>()
             .configure_sets(
                 PreUpdate,
                 transition::WorldViewSystems.run_if(not(transition::covering)),
@@ -104,18 +103,49 @@ impl Plugin for RenderPlugin {
 
 #[derive(Resource, Default)]
 pub struct Animator {
-    anchors: HashMap<Entity, (u64, Seconds)>,
+    anchors: HashMap<Entity, Anchor>,
+}
+
+#[derive(Clone, Copy)]
+struct Anchor {
+    state: u64,
+    start: Seconds,
+    played: Seconds,
+}
+
+/// Where an entity's animation stood at the frame before, in the state it is in now.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Previous {
+    Unseen,
+    Restarted,
+    Continued(Seconds),
+}
+
+pub struct Playhead {
+    pub elapsed: Seconds,
+    pub previous: Previous,
 }
 
 impl Animator {
-    pub fn elapsed(&mut self, entity: Entity, state: u64, time: Seconds) -> Seconds {
-        match self.anchors.get(&entity) {
-            Some(&(seen, start)) if seen == state => time - start,
-            _ => {
-                self.anchors.insert(entity, (state, time));
-                Seconds(0.0)
+    pub fn advance(&mut self, entity: Entity, state: u64, time: Seconds) -> Playhead {
+        let anchor = self.anchors.get(&entity).copied();
+        let (previous, start) = match anchor {
+            Some(anchor) if anchor.state == state => {
+                (Previous::Continued(anchor.played), anchor.start)
             }
-        }
+            Some(_) => (Previous::Restarted, time),
+            None => (Previous::Unseen, time),
+        };
+        let elapsed = time - start;
+        self.anchors.insert(
+            entity,
+            Anchor {
+                state,
+                start,
+                played: elapsed,
+            },
+        );
+        Playhead { elapsed, previous }
     }
 
     pub fn retain(&mut self, mut alive: impl FnMut(Entity) -> bool) {

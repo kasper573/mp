@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{Objective, QuestId};
 use crate::core::content::{Content, Fixture};
-use crate::core::script::{
-    Answer, ChoiceReveal, Compiler, EffectDef, EffectStep, Name, ScriptFault,
+use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::systems::dialogue::{
+    self, CardOffer, ChoiceChip, ChoiceReveal, ChoiceTag, ConversationPanel,
 };
-use crate::systems::dialogue::{self, CardOffer, ChoiceChip, ChoiceTag, ConversationPanel};
 use crate::systems::item::{Inventory, ItemStack};
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
