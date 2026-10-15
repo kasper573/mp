@@ -31,9 +31,7 @@ use game::systems::launch::{
 use game::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use game::systems::player::{ClientId, SpawnPolicy, SpawnRules};
 use game::systems::spectate::{self, SpectatorTransfer};
-use game::systems::{
-    GameSettings, load_content, notification, server_app, start_server, step_areas,
-};
+use game::systems::{GameSettings, load_content, server_app, start_server, step_areas};
 use game::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
 use rand::Rng as _;
@@ -294,7 +292,6 @@ fn simulate(mut worlds: Vec<App>, mut transport: WsTransport, lobby: &Lobby, res
         }
 
         step_areas(&mut worlds, wall_clock(reset));
-        notification::relay(&mut worlds.iter_mut().map(App::world_mut).collect::<Vec<_>>());
 
         begin_transfers(&mut worlds, &mut transfers, tick);
 

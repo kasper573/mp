@@ -305,6 +305,17 @@ pub fn rename_layer(
     edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
     edit.remove(old);
     if editor.apply(edit) {
+        for view in editor
+            .views
+            .area
+            .views
+            .values_mut()
+            .filter(|view| view.area == area_key)
+        {
+            if view.hidden_ground.remove(from) {
+                view.hidden_ground.insert(to.to_owned());
+            }
+        }
         Ok(())
     } else {
         Err(REFUSED.to_owned())

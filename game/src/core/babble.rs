@@ -98,11 +98,11 @@ pub struct Babbling {
     pub rank: BabbleRank,
 }
 
+/// The voice that babbles when several speak at once: the foremost one, else the highest rank.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BabbleRank(pub u32);
-
-impl BabbleRank {
-    pub const DIALOGUE_BOX: BabbleRank = BabbleRank(u32::MAX);
+pub enum BabbleRank {
+    Ranked(u32),
+    Foremost,
 }
 
 pub fn register(app: &mut App) {
@@ -141,11 +141,11 @@ impl BabbleClips {
 }
 
 fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut<BabbleClips>) {
-    clips.0 = content
-        .table::<BabbleBankDef>()
-        .rows()
-        .map(|bank| {
-            letter_files(bank)
+    let table = content.table::<BabbleBankDef>();
+    clips.0 = table
+        .ids()
+        .map(|id| {
+            letter_files(table.row(id))
                 .map(|file| assets.load(file.path()))
                 .collect()
         })

@@ -181,7 +181,6 @@ pub struct ContentScope {
     keys: Arc<ScopeKeys>,
     assets: Option<Arc<Vec<String>>>,
     leaves: Vec<Leaf>,
-    content: Option<Content>,
 }
 
 impl ContentScope {
@@ -190,13 +189,11 @@ impl ContentScope {
             keys: Arc::new(HashMap::default()),
             assets: None,
             leaves: Vec::new(),
-            content: None,
         }
     }
 
     pub fn of(content: &Content) -> ContentScope {
         let mut scope = ContentScope::new();
-        scope.content = Some(*content);
         for (type_id, table) in content.tables() {
             Arc::make_mut(&mut scope.keys).insert(type_id, (table.name(), table.keys().to_vec()));
         }

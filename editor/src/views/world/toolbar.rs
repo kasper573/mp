@@ -41,7 +41,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
                     super::arrange::open(editor);
                 }
                 if ui.button(RichText::new("Fit").size(12.5)).clicked() {
-                    editor.views.world.fitted = false;
+                    editor.views.world.request_fit();
                 }
                 ui.label(
                     theme::faint(format!("zoom {:.0}%", editor.views.world.zoom * 100.0))

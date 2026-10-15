@@ -186,6 +186,7 @@ pub fn server_app(
             Update,
             (
                 (
+                    effect::expire,
                     player::arrival_holds,
                     combat::regen,
                     movement::move_request,
@@ -198,7 +199,6 @@ pub fn server_app(
                     shop::requests,
                     quest::requests,
                     equipment::unequip,
-                    effect::expire,
                     combat::combat,
                 )
                     .chain(),
@@ -231,6 +231,8 @@ pub fn server_app(
                 )
                     .chain(),
                 (
+                    stat::settle_health,
+                    combat::defeats,
                     actor::settle,
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,

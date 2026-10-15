@@ -13,6 +13,7 @@ use crate::systems::effect::{self, Effect};
 use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::notification;
 use crate::systems::script::{EventKind, condition};
+use crate::systems::stat;
 use crate::systems::{drain_requests, player::sender_player};
 
 pub fn register(app: &mut App) {
@@ -94,14 +95,15 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     let occupant = world
         .get::<Equipment>(player)
         .and_then(|equipment| equipment.slots.get(into).copied());
-    if let Some(mut inventory) = world.get_mut::<Inventory>(player) {
-        inventory.slots.remove(inv_slot);
-        if let Some(occupant) = occupant {
-            inventory
-                .exchange(&content, &[], &[ItemStack::new(occupant, 1)])
-                .expect("the equipped item's slot was just freed");
-        }
-    }
+    let returned: Vec<ItemStack> = occupant
+        .map(|occupant| ItemStack::new(occupant, 1))
+        .into_iter()
+        .collect();
+    world
+        .get_mut::<Inventory>(player)
+        .ok_or_else(|| "Has no bag".to_owned())?
+        .exchange(&content, &[ItemStack::new(item, 1)], &returned)
+        .map_err(|refusal| refusal.describe(&content))?;
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.insert(*into, item);
     }
@@ -136,6 +138,9 @@ pub fn unequip(world: &mut World) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
+        if stat::is_dead(world, player) {
+            continue;
+        }
         if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
             notification::error(world, player, refusal);
         }

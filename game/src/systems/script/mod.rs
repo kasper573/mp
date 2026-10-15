@@ -20,7 +20,7 @@ use crate::core::content::{Content, ContentProblem, ContentRow, Loading, ModuleS
 use crate::core::math::Pos;
 use crate::core::script::{
     self, BoxEnding, DialogueView, Expr, Instances, LineDef, OwnerKindDef, ScriptError, Scripts,
-    Vocabulary, compile::compile_owner,
+    TextDef, Vocabulary, compile::compile_owner,
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::model::Face;
@@ -33,7 +33,7 @@ use crate::systems::notification::{NotificationDef, NotificationId};
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::quest::{Parties, QuestDef, QuestId};
 use crate::systems::shop::{ShopDef, ShopId};
-use crate::systems::text::Span;
+use crate::systems::text::{self, Span};
 use crate::systems::{WorldArea, dialogue};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -217,13 +217,13 @@ pub enum Speaker {
 
 impl LineDef<RiftScripting> for Line {
     fn values(&'static self) -> Vec<&'static Expr<RiftScripting>> {
-        self.text
-            .iter()
-            .filter_map(|span| match span {
-                Span::Value { value, .. } => Some(&**value),
-                _ => None,
-            })
-            .collect()
+        self.text.values()
+    }
+}
+
+impl TextDef<RiftScripting> for Vec<Span> {
+    fn values(&'static self) -> Vec<&'static Expr<RiftScripting>> {
+        text::values(self)
     }
 }
 
@@ -238,6 +238,7 @@ pub enum Reach {
     TurnsIn(QuestId),
     Fails(QuestId),
     Completes(QuestId),
+    Decides(QuestId),
     Remembers(MemoryId),
     OpensShop(ShopId),
     Spawns(NpcId),

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use crate::core::render;
+use crate::core::math::Pos;
+use crate::core::tiling::Tiles;
 use crate::systems::combat::{self, AttackRequest};
 use crate::systems::input::gestures::{ClickClaim, Cursor, Gesture};
 use crate::systems::interface::CursorShape;
@@ -9,21 +10,22 @@ use crate::systems::player::session;
 pub struct AttackGesture;
 
 impl Gesture for AttackGesture {
-    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+    fn claim(&self, world: &mut World, tile: Option<Pos<Tiles>>) -> Option<ClickClaim> {
         if !session::is_alive(world) {
             return None;
         }
-        let point = render::cursor_tile(world)?;
-        combat::enemy_at(world, point).map(ClickClaim::Attack)
+        combat::enemy_at(world, tile?).map(ClickClaim::Attack)
     }
 
-    fn drive(&self, world: &mut World, start: bool) {
-        if start && let Some(ClickClaim::Attack(target)) = self.claim(world) {
+    fn drive(&self, world: &mut World, claim: Option<ClickClaim>, start: bool) {
+        if let Some(ClickClaim::Attack(target)) = claim
+            && start
+        {
             world.write_message(AttackRequest { target });
         }
     }
 
-    fn cursor(&self, _world: &mut World) -> Option<Cursor> {
+    fn cursor(&self, _world: &mut World, _claim: ClickClaim) -> Option<Cursor> {
         Some(Cursor::Shaped(CursorShape::Attack))
     }
 }

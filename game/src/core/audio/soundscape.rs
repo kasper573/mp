@@ -64,6 +64,7 @@ pub struct SoundscapeMixer {
     clock_start: Duration,
     sources: HashMap<&'static str, Handle<AudioSource>>,
     voices: Vec<SoundscapeVoice>,
+    refused: Option<Vec<WantedLayer>>,
 }
 
 pub struct SoundscapeVoice {
@@ -158,6 +159,7 @@ impl SoundscapeVoice {
     }
 }
 
+#[derive(Clone, PartialEq)]
 struct WantedLayer {
     channel: SoundscapeChannel,
     src: &'static str,
@@ -206,6 +208,36 @@ fn mix(
         .0
         .map_or_else(Vec::new, |at| wanted_layers(&soundscape, at));
     let clock = time.elapsed().saturating_sub(mixer.clock_start);
+    let elapsed = Seconds(time.delta_secs());
+    if mixer
+        .refused
+        .as_ref()
+        .is_some_and(|refused| *refused != wanted)
+    {
+        mixer.refused = None;
+    }
+    mixer.voices.retain_mut(|voice| {
+        let playing = wanted.iter().find(|layer| voice.plays(layer));
+        voice.approach(playing, elapsed);
+        let Some(mut instance) = instances.get_mut(&voice.instance) else {
+            warn!("soundscape voice {} failed to start", voice.src);
+            mixer.refused = Some(wanted.clone());
+            return false;
+        };
+        if playing.is_none() && voice.share <= 0.0 {
+            instance.stop(AudioTween::default());
+            return false;
+        }
+        voice.apply(
+            &mut instance,
+            audio_mix.gain(voice.channel.category()),
+            elapsed,
+        );
+        true
+    });
+    if mixer.refused.is_some() {
+        return;
+    }
     for layer in &wanted {
         if mixer.voices.iter().any(|voice| voice.plays(layer)) {
             continue;
@@ -234,24 +266,6 @@ fn mix(
             applied: None,
         });
     }
-    let elapsed = Seconds(time.delta_secs());
-    mixer.voices.retain_mut(|voice| {
-        let wanted = wanted.iter().find(|layer| voice.plays(layer));
-        voice.approach(wanted, elapsed);
-        let Some(mut instance) = instances.get_mut(&voice.instance) else {
-            return true;
-        };
-        if wanted.is_none() && voice.share <= 0.0 {
-            instance.stop(AudioTween::default());
-            return false;
-        }
-        voice.apply(
-            &mut instance,
-            audio_mix.gain(voice.channel.category()),
-            elapsed,
-        );
-        true
-    });
 }
 
 fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {

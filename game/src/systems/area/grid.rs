@@ -6,7 +6,7 @@ use strum::{AsRefStr, EnumString};
 
 use super::AreaDef;
 use crate::core::content::{ContentProblem, ContentRow, ErrorPlace, LoadError, row_folder};
-use crate::core::math::{Pos, Rect, Size};
+use crate::core::math::{Pos, Rect};
 use crate::core::tiling::{GridSize, Tiles};
 use crate::systems::area::tileset::TilesetId;
 
@@ -63,20 +63,18 @@ impl Flip {
         )
     }
 
-    pub fn anchored(self, at: Pos<Tiles>, size: Size<Tiles>) -> Rect<Tiles> {
-        let min = Pos::new(
-            if self.horizontal() {
-                at.x - size.width
-            } else {
-                at.x
-            },
-            if self.vertical() {
-                at.y - size.height
-            } else {
-                at.y
-            },
-        );
-        Rect::new(min, size)
+    pub fn place(self, r: Rect<Tiles>, at: Pos<Tiles>) -> Rect<Tiles> {
+        let x = if self.horizontal() {
+            at.x - (r.origin.x + r.size.width)
+        } else {
+            at.x + r.origin.x
+        };
+        let y = if self.vertical() {
+            at.y - (r.origin.y + r.size.height)
+        } else {
+            at.y + r.origin.y
+        };
+        Rect::new(Pos::new(x, y), r.size)
     }
 
     pub fn apply(self, p: Pos<Tiles>) -> Pos<Tiles> {

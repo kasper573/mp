@@ -7,7 +7,9 @@ use super::{
     resets_label,
 };
 use crate::core::content::Content;
+use crate::core::platform::ClientPlatform;
 use crate::core::script::ChoiceReveal;
+use crate::core::time::UnixMillis;
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
 use crate::systems::dialogue::{Conversation, ConversationPanel};
 use crate::systems::hud;
@@ -286,26 +288,30 @@ pub(super) enum Countdown {
 }
 
 impl Countdown {
-    pub(super) fn label(self, log: &QuestLog, quest: QuestId) -> Option<String> {
+    pub(super) fn label(self, log: &QuestLog, quest: QuestId, now: UnixMillis) -> Option<String> {
         match self {
-            Countdown::Left => log.active(quest)?.left.map(clock_label),
+            Countdown::Left => log.active(quest)?.left(now).map(clock_label),
             Countdown::LeftDetail => log
                 .active(quest)?
-                .left
+                .left(now)
                 .map(|left| format!("{} left", clock_label(left))),
-            Countdown::Resets => log.finished(quest)?.resets_in.map(resets_label),
+            Countdown::Resets => log.finished(quest)?.resets_in(now).map(resets_label),
             Countdown::ResetsDetail => log
                 .finished(quest)?
-                .resets_in
+                .resets_in(now)
                 .map(|left| format!("Done for today · {}", resets_label(left))),
         }
     }
 }
 
-pub(super) fn time_left(content: &Content, log: &QuestLog, quest: QuestId) -> f32 {
+pub(super) fn clock_now(world: &World) -> UnixMillis {
+    world.resource::<ClientPlatform>().0.local_clock().now
+}
+
+pub(super) fn time_left(content: &Content, log: &QuestLog, quest: QuestId, now: UnixMillis) -> f32 {
     let left = log
         .active(quest)
-        .and_then(|active| active.left)
+        .and_then(|active| active.left(now))
         .map_or(0.0, |left| left.0);
     let limit = quest.get(content).time_limit().map_or(1.0, |limit| limit.0);
     (left / limit).clamp(0.0, 1.0)

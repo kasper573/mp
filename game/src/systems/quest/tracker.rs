@@ -81,6 +81,7 @@ struct Entry {
 }
 
 enum Count {
+    Hidden,
     Fixed(String),
     Live(Countdown),
 }
@@ -123,7 +124,9 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if entry.timed {
-                let left = Countdown::Left.label(log, entry.quest).unwrap_or_default();
+                let left = Countdown::Left
+                    .label(log, entry.quest, super::card::clock_now(world))
+                    .unwrap_or_default();
                 ui.label(RichText::new(left).size(small).color(color::WARN));
                 hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 12.0);
             }
@@ -145,8 +148,11 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
     for (label, count, tone) in &entry.rows {
         let colour = tone.colour();
         let count = match count {
+            Count::Hidden => String::new(),
             Count::Fixed(count) => count.clone(),
-            Count::Live(shows) => shows.label(log, entry.quest).unwrap_or_default(),
+            Count::Live(shows) => shows
+                .label(log, entry.quest, super::card::clock_now(world))
+                .unwrap_or_default(),
         };
         ui.horizontal(|ui| {
             ui.add_space(8.0);
@@ -178,17 +184,13 @@ fn entries(world: &World) -> Vec<Entry> {
         .filter_map(|&quest| {
             let def = quest.get(content);
             if let Some(active) = log.active(quest) {
-                let timed = active.left.is_some();
-                if active.ready && def.decision().is_none() {
+                let timed = active.deadline.is_some();
+                if active.ready(content, parties, inventory) && def.decision().is_none() {
                     return Some(Entry {
                         quest,
                         mark: Some(&ready_mark(def).get(content).icon),
                         timed,
-                        rows: vec![(
-                            def.hand_in_hint(parties, quest),
-                            Count::Fixed(String::new()),
-                            Tone::Next,
-                        )],
+                        rows: vec![(def.hand_in_hint(parties, quest), Count::Hidden, Tone::Next)],
                     });
                 }
                 let progress = def.progress(content, parties, active, inventory);
@@ -197,11 +199,11 @@ fn entries(world: &World) -> Vec<Entry> {
                     .into_iter()
                     .enumerate()
                     .map(|(index, progress)| {
-                        let count = Count::Fixed(if progress.counted {
-                            format!("{}/{}", progress.have, progress.need)
+                        let count = if progress.counted {
+                            Count::Fixed(format!("{}/{}", progress.have, progress.need))
                         } else {
-                            String::new()
-                        });
+                            Count::Hidden
+                        };
                         let tone = if progress.done() {
                             Tone::Done
                         } else if Some(index) == next {
@@ -227,12 +229,8 @@ fn entries(world: &World) -> Vec<Entry> {
                     Tone::Done,
                 )],
                 QuestResult::Failed => vec![
-                    ("Failed".to_owned(), Count::Fixed(String::new()), Tone::Bad),
-                    (
-                        def.retry_hint(parties, quest),
-                        Count::Fixed(String::new()),
-                        Tone::Plain,
-                    ),
+                    ("Failed".to_owned(), Count::Hidden, Tone::Bad),
+                    (def.retry_hint(parties, quest), Count::Hidden, Tone::Plain),
                 ],
             };
             Some(Entry {

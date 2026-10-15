@@ -639,14 +639,7 @@ fn verdict_row(ui: &mut Ui, label: &str, ok: bool, text: &str) {
         );
         ui.vertical(|ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(if ok { "✓" } else { "!" }).color(if ok {
-                    theme::OK
-                } else {
-                    theme::WARN
-                }));
-                ui.label(RichText::new(text).size(12.5));
-            });
+            widgets::verdict(ui, ok, text);
         });
     });
 }

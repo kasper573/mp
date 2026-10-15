@@ -14,7 +14,7 @@ pub(super) fn status_bar(
 ) {
     let view = editor.views.area.view(view_key);
     let mut left: Vec<String> = Vec::new();
-    if let Some(place) = view.in_place.last() {
+    if let Some(place) = frame.in_place.last() {
         let parts = part_count(frame, &place.blueprint);
         let picked = placement::selected_part_indices(editor, &place.blueprint);
         match picked.as_slice() {
@@ -101,7 +101,7 @@ pub(super) fn status_bar(
             }
         }
     }
-    if let Some(stroke) = &view.stroke {
+    if let Some(stroke) = view.stroke() {
         left.push(format!(
             "stroke: {} {}",
             stroke.cells.len(),

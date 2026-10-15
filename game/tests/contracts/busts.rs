@@ -3,7 +3,7 @@ use std::path::Path;
 
 use game::systems::actor::model::ModelDef;
 
-use crate::support::content;
+use testkit::content;
 
 const BUST_CAP_BYTES: u64 = 120 * 1024;
 const CAST_BUDGET_BYTES: u64 = 3 * 1024 * 1024;

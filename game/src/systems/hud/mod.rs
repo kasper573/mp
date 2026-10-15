@@ -1,6 +1,6 @@
 mod panel;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
@@ -26,6 +26,7 @@ const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 200.0);
 const LAUNCHER_ICON: f32 = 32.0;
 const MARGIN: f32 = 8.0;
 const TOOLTIP_WIDTH: f32 = 260.0;
+const CONFIRM: &str = "confirm";
 
 pub struct HudPlugin;
 
@@ -138,25 +139,16 @@ pub(crate) fn just_opened(world: &World, window: &'static str) -> bool {
     !world.resource::<WindowsDrawn>().last.contains(window)
 }
 
-pub(crate) fn close_topmost_window(world: &mut World) -> bool {
-    let Some(gui) = gui::context(world) else {
-        return false;
-    };
-    let open: HashMap<LayerId, &'static str> = world
-        .resource::<Open>()
-        .0
-        .iter()
-        .map(|&title| (panel::layer(title), title))
-        .collect();
-    let topmost = gui.memory(|memory| {
-        memory
-            .layer_ids()
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .find_map(|layer| open.get(&layer).copied())
-    });
-    topmost.is_some_and(|title| close_window(world, title))
+pub(crate) fn open_windows(world: &World) -> impl Iterator<Item = &'static str> + '_ {
+    world.resource::<Open>().0.iter().copied()
+}
+
+pub(crate) fn window_layer(title: &'static str) -> LayerId {
+    panel::layer(title)
+}
+
+pub(crate) fn confirm_layer() -> LayerId {
+    LayerId::new(Band::Modal.order(), Id::new(CONFIRM))
 }
 
 pub(crate) fn pieces(world: &World) -> Vec<Rect> {
@@ -341,7 +333,7 @@ fn draw_confirm(world: &mut World) {
         .resource::<InputMap>()
         .shortcut(InputAction::TakeDefault);
     let mut decided = None;
-    let modal = egui::Modal::new(Id::new("confirm")).show(&gui, |ui| {
+    let modal = egui::Modal::new(Id::new(CONFIRM)).show(&gui, |ui| {
         ui.set_max_width(360.0);
         ui.heading(&pending.confirm.title);
         ui.add_space(4.0);

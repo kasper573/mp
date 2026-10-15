@@ -6,7 +6,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
 
 use super::rows::{self, Fades, Look, Move, Presence};
-use super::{Notification, NotificationKind, NotificationSent};
+use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleId, BabbleRank, Babbler, Babbling};
 use crate::core::content::Content;
@@ -60,7 +60,11 @@ pub struct BubblePlugin;
 impl Plugin for BubblePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Bubbles>()
-            .add_systems(Update, tick.run_if(in_state(ClientScreen::Area)))
+            .add_systems(
+                Update,
+                tick.run_if(in_state(ClientScreen::Area))
+                    .run_if(window_visible),
+            )
             .add_systems(
                 EguiPrimaryContextPass,
                 place
@@ -448,7 +452,7 @@ fn place(world: &mut World) {
                     Some(at) => SfxPlace::World(at),
                     None => SfxPlace::Interface,
                 },
-                rank: BabbleRank((FULL - seat.min(FULL)) as u32),
+                rank: BabbleRank::Ranked((FULL - seat.min(FULL)) as u32),
             });
         for typing in speaking.typing().collect::<Vec<_>>() {
             match babbling {

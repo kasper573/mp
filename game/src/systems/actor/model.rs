@@ -506,7 +506,7 @@ impl ActorModel {
         let elapsed = (t.millis() * rate(action, attack_speed)).max(Millis(0.0));
         let total = total_ms(strip);
         let position = if action == Action::Dead {
-            elapsed.min(total - Millis(1.0))
+            elapsed
         } else {
             elapsed % total
         };

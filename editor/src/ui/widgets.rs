@@ -23,6 +23,17 @@ pub fn kv(ui: &mut Ui, key: &str, value: impl FnOnce(&mut Ui)) {
     });
 }
 
+pub fn verdict(ui: &mut Ui, ok: bool, text: &str) {
+    ui.horizontal_wrapped(|ui| {
+        ui.label(RichText::new(if ok { "✓" } else { "!" }).color(if ok {
+            theme::OK
+        } else {
+            theme::WARN
+        }));
+        ui.label(RichText::new(text).size(12.5));
+    });
+}
+
 pub fn kv_text(ui: &mut Ui, key: &str, value: impl Into<String>) {
     kv(ui, key, |ui| {
         ui.label(value.into());

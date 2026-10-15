@@ -115,16 +115,13 @@ pub fn finished(snapshot: &ProbeSnapshot, quest: &str) -> Option<QuestResult> {
 }
 
 // Notices come and go: on a machine too busy to draw every frame, one can be up and gone between two
-// of them. What it left in history is how to tell it came.
-
-// A row in the feed: what came and went, and quests taken up or failed.
-pub fn in_feed(snapshot: &ProbeSnapshot, row: &str) -> bool {
-    snapshot.feed.iter().any(|shown| shown == row)
-        || snapshot
-            .history
-            .records
-            .iter()
-            .any(|record| record.text == row)
+// of them. History keeps every one, so it is how to tell that a notice came.
+pub fn noticed(snapshot: &ProbeSnapshot, row: &str) -> bool {
+    snapshot
+        .history
+        .records
+        .iter()
+        .any(|record| record.text == row)
 }
 
 // A notice that says whom or what it's from: narration, alerts, milestones, intros, and words called
@@ -139,15 +136,10 @@ pub fn told_by(snapshot: &ProbeSnapshot, by: &str) -> bool {
 
 pub fn erred(snapshot: &ProbeSnapshot, saying: &str) -> bool {
     snapshot
-        .notifications
-        .error
-        .as_deref()
-        .is_some_and(|error| error.contains(saying))
-        || snapshot
-            .history
-            .records
-            .iter()
-            .any(|record| record.topic == HistoryTopic::Error && record.text.contains(saying))
+        .history
+        .records
+        .iter()
+        .any(|record| record.topic == HistoryTopic::Error && record.text.contains(saying))
 }
 
 // Where the tile shows in the window, if it does, clear of the interface over it.
@@ -197,6 +189,22 @@ impl UiTarget {
         let text = text.to_owned();
         UiTarget::new(format!("{text:?}"), move |element, _| {
             element.text.as_deref() == Some(text.as_str())
+        })
+    }
+
+    pub fn text_field() -> UiTarget {
+        UiTarget::new("the text field", |element, _| element.editable)
+    }
+
+    pub fn typing_field() -> UiTarget {
+        UiTarget::text_field().and("with focus", |element, _| element.focused)
+    }
+
+    // A clickable row or tab: a button named by its text, where the same text may show as a label too.
+    pub fn button(text: &str) -> UiTarget {
+        let text = text.to_owned();
+        UiTarget::new(format!("button {text:?}"), move |element, _| {
+            element.button && element.text.as_deref() == Some(text.as_str())
         })
     }
 

@@ -8,7 +8,7 @@ use crate::core::content::Content;
 use crate::core::interpolate::{Interpolate, InterpolatePlugin};
 use crate::core::math::Direction;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{Animator, RowDepth, atlas_rect, dynamic_z, sprite_transform};
+use crate::core::render::{Animator, RowDepth, atlas_rect, dynamic_z, place_sprite};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::{Action, Actor, ActorModel};
@@ -126,7 +126,7 @@ fn sync_actors(
         let area = area::load(&content, tag.area);
         let at = render.0;
         *depth = RowDepth(dynamic_z(area.size.height, area.sort_base(), Tiles(at.y)));
-        *transform = sprite_transform(at, depth.0);
+        place_sprite(&mut transform, at);
         if *visibility == Visibility::Hidden {
             *visibility = Visibility::Inherited;
         }

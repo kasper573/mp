@@ -1,4 +1,4 @@
-use driver::{UiTarget, finished, holding, in_feed, on_quest};
+use driver::{UiTarget, finished, holding, noticed, on_quest};
 use game::core::tiling::Tiles;
 use game::systems::input::map::InputAction;
 use game::systems::quest::QuestResult;
@@ -82,7 +82,7 @@ fn play(shoot: &mut Shoot) {
         finished(snapshot, "tusks_for_the_chief") == Some(QuestResult::Failed)
     });
     me.wait_until("the failed quest in the feed", |snapshot| {
-        in_feed(snapshot, "Quest failed · Tusks for the Chief")
+        noticed(snapshot, "Quest failed · Tusks for the Chief")
     });
     me.caption_top("Mara's quest fails, in red in the corner, and the choice is remembered");
     me.read_to_choices();

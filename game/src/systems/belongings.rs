@@ -8,7 +8,7 @@ use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{Inventory, ItemId};
-use crate::systems::job;
+use crate::systems::job::{self, Job};
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::player::Xp;
 use crate::systems::text::LineText;
@@ -21,7 +21,12 @@ pub struct Belongings {
     level: u32,
 }
 
-pub type ChangedBelongings = Or<(Changed<Inventory>, Changed<Equipment>, Changed<Xp>)>;
+pub type ChangedBelongings = Or<(
+    Changed<Inventory>,
+    Changed<Equipment>,
+    Changed<Xp>,
+    Changed<Job>,
+)>;
 
 pub fn of(world: &World, player: Entity) -> Belongings {
     let mut items: BTreeMap<ItemId, u32> = BTreeMap::new();

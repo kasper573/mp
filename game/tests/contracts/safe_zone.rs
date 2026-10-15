@@ -6,7 +6,7 @@ use game::systems::movement::{self, MoveRequest, MoveSeq, position};
 use game::systems::npc::{self, NpcId, Pack};
 use game::systems::reach::{self, ReachAct};
 
-use crate::support::{Sim, content, place, row, spawn_area};
+use testkit::{Sim, content, place, row, spawn_area};
 
 #[test]
 fn wild_monsters_never_set_foot_in_a_safe_zone() {

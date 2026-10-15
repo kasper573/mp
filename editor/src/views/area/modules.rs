@@ -26,10 +26,10 @@ pub(super) fn context_menu_at(editor: &mut Editor, view_key: &str, frame: &AreaF
     };
     let view = editor.views.area.view_mut(view_key);
     view.cursor_cell = Some(tile.cell());
-    view.drag = None;
+    view.take_drag();
     let selecting = view.tool == AreaTool::Select;
     if selecting && let Some(hit) = frame.hit(tile) {
-        let part = format!("/modules/{hit}");
+        let part = super::module_part(hit);
         if !super::selected_parts(editor, &frame.area_key).contains(&part) {
             editor.selection = RowSelection {
                 table: "area".to_owned(),
@@ -207,10 +207,8 @@ pub(super) fn show_add_menu(ui: &mut Ui, editor: &mut Editor, view_key: &str, fr
                 ui.close();
             }
             if selected.len() == 1 {
-                let index: Option<usize> = selected
-                    .iter()
-                    .next()
-                    .and_then(|p| p.strip_prefix("/modules/")?.parse().ok());
+                let index: Option<usize> =
+                    selected.iter().next().and_then(|p| super::module_index(p));
                 if let Some(index) = index {
                     let module = &frame.modules[index];
                     if module.is_module(AreaModuleKind::Blueprint) {
@@ -412,46 +410,135 @@ pub fn add_module(
     );
 }
 
-pub fn append_modules(
+pub fn append_modules(editor: &mut Editor, area_key: &str, new: Vec<Value>, label: &str) -> bool {
+    let count = new.len();
+    let mut start = 0;
+    let applied = change_modules(editor, area_key, |modules| {
+        start = modules.len();
+        modules.extend(new);
+        Some(label.to_owned())
+    });
+    if applied {
+        select_appended(editor, area_key, start, count);
+    }
+    applied
+}
+
+pub enum Placement {
+    Whole,
+    Partly { skipped: usize, reason: String },
+}
+
+pub fn place_modules(
     editor: &mut Editor,
     area_key: &str,
-    modules: Vec<Value>,
+    new: Vec<Value>,
     label: &str,
-) -> bool {
-    let Some(mut row) = editor.row_value("area", area_key) else {
-        return false;
+) -> Placement {
+    let count = new.len();
+    let existing = area_modules(editor, area_key);
+    let start = existing.len();
+    let whole: Vec<Value> = existing
+        .iter()
+        .cloned()
+        .chain(new.iter().cloned())
+        .collect();
+    let Some(edit) = module_edit(editor, area_key, |list| {
+        *list = whole;
+        Some(label.to_owned())
+    }) else {
+        return Placement::Partly {
+            skipped: count,
+            reason: "the area is gone".to_owned(),
+        };
     };
-    let mut list = row["modules"].as_array().cloned().unwrap_or_default();
-    let start = list.len();
-    let count = modules.len();
-    list.extend(modules);
-    row["modules"] = Value::Array(list);
-    let mut edit = ContentEdit::new(label);
-    edit.write_json(row_file("area", area_key), &row);
-    if !editor.apply(edit) {
-        return false;
+    let Some(refusal) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.check(&edit).err())
+    else {
+        return match editor.try_apply(edit) {
+            Ok(()) => {
+                select_appended(editor, area_key, start, count);
+                Placement::Whole
+            }
+            Err(reason) => Placement::Partly {
+                skipped: count,
+                reason,
+            },
+        };
+    };
+    let mut reason = refusal.sentence();
+    let mut kept = existing;
+    let mut kept_count = 0;
+    let mut skipped = 0;
+    for module in new {
+        let mut candidate = kept.clone();
+        candidate.push(module);
+        let Some(probe) = module_edit(editor, area_key, |list| {
+            *list = candidate.clone();
+            Some(String::new())
+        }) else {
+            break;
+        };
+        match editor.project.as_ref().map(|project| project.check(&probe)) {
+            Some(Ok(())) => {
+                kept = candidate;
+                kept_count += 1;
+            }
+            Some(Err(refused)) => {
+                skipped += 1;
+                if kept_count == 0 {
+                    reason = refused.sentence();
+                }
+            }
+            None => break,
+        }
     }
+    if kept_count > 0
+        && let Some(edit) = module_edit(editor, area_key, |list| {
+            *list = kept;
+            Some(format!("{label} ({skipped} skipped)"))
+        })
+    {
+        let _ = editor.try_apply(edit);
+    }
+    Placement::Partly { skipped, reason }
+}
+
+fn select_appended(editor: &mut Editor, area_key: &str, start: usize, count: usize) {
     editor.selection = RowSelection::parts(
         "area",
         area_key,
-        (start..start + count)
-            .map(|i| format!("/modules/{i}"))
-            .collect(),
+        (start..start + count).map(super::module_part).collect(),
     );
-    true
 }
 
-pub fn write_modules(
+pub fn change_modules(
     editor: &mut Editor,
     area_key: &str,
-    modules: Vec<Value>,
-    label: &str,
+    change: impl FnOnce(&mut Vec<Value>) -> Option<String>,
 ) -> bool {
-    let Some(mut row) = editor.row_value("area", area_key) else {
-        return false;
-    };
+    module_edit(editor, area_key, change).is_some_and(|edit| editor.apply(edit))
+}
+
+pub fn area_modules(editor: &Editor, area_key: &str) -> Vec<Value> {
+    editor
+        .row_value("area", area_key)
+        .and_then(|row| row["modules"].as_array().cloned())
+        .unwrap_or_default()
+}
+
+pub fn module_edit(
+    editor: &Editor,
+    area_key: &str,
+    change: impl FnOnce(&mut Vec<Value>) -> Option<String>,
+) -> Option<ContentEdit> {
+    let mut row = editor.row_value("area", area_key)?;
+    let mut modules = area_modules(editor, area_key);
+    let label = change(&mut modules)?;
     row["modules"] = Value::Array(modules);
     let mut edit = ContentEdit::new(label);
     edit.write_json(row_file("area", area_key), &row);
-    editor.apply(edit)
+    Some(edit)
 }

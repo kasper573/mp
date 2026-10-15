@@ -33,19 +33,19 @@ fn play(shoot: &mut Shoot) {
     me.caption("Esc hands the keys back to the game, and C closes the terminal");
     me.act(InputAction::Dismiss);
     me.wait_until("the field to let go of the keys", |snapshot| {
-        typing_field().find(snapshot).is_none()
+        UiTarget::typing_field().find(snapshot).is_none()
     });
     me.act(InputAction::ToggleTerminal);
     me.wait_until("the terminal to close", |snapshot| {
-        text_field().find(snapshot).is_none()
+        UiTarget::text_field().find(snapshot).is_none()
     });
 }
 
 // Keys typed before the field holds focus, or a submit sent before every key has landed, would be
 // lost: each step waits for the game to catch up.
 fn submit(player: &mut Player, text: &str) {
-    player.find_ui(typing_field());
-    let field = text_field();
+    player.find_ui(UiTarget::typing_field());
+    let field = UiTarget::text_field();
     player.type_text(text, |snapshot| {
         field
             .find(snapshot)
@@ -53,16 +53,8 @@ fn submit(player: &mut Player, text: &str) {
     });
     player.act(InputAction::SubmitText);
     player.wait_until("the line to be sent", |snapshot| {
-        typing_field()
+        UiTarget::typing_field()
             .find(snapshot)
             .is_some_and(|field| field.text.is_none())
     });
-}
-
-fn text_field() -> UiTarget {
-    UiTarget::new("the text field", |element, _| element.editable)
-}
-
-fn typing_field() -> UiTarget {
-    text_field().and("with focus", |element, _| element.focused)
 }

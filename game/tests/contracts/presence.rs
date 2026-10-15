@@ -12,7 +12,7 @@ use game::systems::script::{Condition, RiftQuery};
 use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
-use crate::support::{Sim, content, remember, row, spawn_area, townsperson};
+use testkit::{Sim, content, remember, row, spawn_area, townsperson};
 
 #[test]
 fn an_npc_spawned_for_one_player_cannot_be_fought_by_another() {

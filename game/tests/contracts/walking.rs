@@ -4,7 +4,7 @@ use game::systems::area::{self, AreaDef, AreaId};
 use game::systems::movement::{self, HeardMove, MoveRequest, MoveSeq, position};
 use game::systems::player::CommandLock;
 
-use crate::support::{Sim, content};
+use testkit::{Sim, content};
 
 const TICKS: usize = 240;
 

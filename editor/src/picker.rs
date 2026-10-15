@@ -1,10 +1,13 @@
+use std::sync::Arc;
+
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 use game::systems::area::{self, AreaDef, AreaModule};
 use game::systems::npc::{self, NpcDef};
 use game::systems::script::{OwnerKind, RiftScripts};
+use serde_json::Value;
 
 use crate::forms::{FormAction, FormCx};
-use crate::project::{row_file, row_of};
+use crate::project::{ProjectFiles, row_file, row_of};
 use crate::thumbs;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -463,72 +466,71 @@ pub fn display_name(cx: &FormCx, table: &str, key: &str) -> String {
 }
 
 fn picture_file(cx: &FormCx, table: &str, key: &str) -> Option<String> {
-    let row = cx.files.json(&row_file(table, key))?;
-    match table {
-        "model" => row["sprites"]["image"].as_str().map(str::to_owned),
-        "item" => row["icon"].as_str().map(str::to_owned),
-        "tileset" | "attention" | "interface_icon" | "cursor" => {
-            row["image"].as_str().map(str::to_owned)
-        }
+    picture_of(cx.files, table, key).map(|picture| picture.path)
+}
+
+pub struct Picture {
+    pub path: String,
+    pub frame: PictureFrame,
+}
+
+pub enum PictureFrame {
+    Sprite(Arc<Value>),
+    Whole,
+    Tile(f32),
+}
+
+pub fn picture_of(files: &ProjectFiles, table: &str, key: &str) -> Option<Picture> {
+    let row = files.json(&row_file(table, key))?;
+    let (path, frame) = match table {
+        "model" => (sprite_image(&row)?, PictureFrame::Sprite(row)),
         "npc" | "player" => {
-            let model = row["model"].as_str()?;
-            cx.files.json(&row_file("model", model))?["sprites"]["image"]
-                .as_str()
-                .map(str::to_owned)
+            let model = files.json(&row_file("model", row["model"].as_str()?))?;
+            (sprite_image(&model)?, PictureFrame::Sprite(model))
         }
-        _ => None,
-    }
+        "item" | "attention" | "interface_icon" | "cursor" => {
+            let path = row["icon"].as_str().or(row["image"].as_str())?;
+            (path.to_owned(), PictureFrame::Whole)
+        }
+        "tileset" => {
+            let tile = row["tile"].as_f64().unwrap_or(16.0) as f32;
+            (row["image"].as_str()?.to_owned(), PictureFrame::Tile(tile))
+        }
+        _ => return None,
+    };
+    Some(Picture { path, frame })
+}
+
+fn sprite_image(model: &Value) -> Option<String> {
+    model["sprites"]["image"].as_str().map(str::to_owned)
 }
 
 pub fn thumbnail(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str, size: f32) {
-    let Some(row) = cx.files.json(&row_file(table, key)) else {
+    let Some(picture) = picture_of(cx.files, table, key) else {
         return;
     };
     let ctx = ui.ctx().clone();
-    match table {
-        "item" | "attention" | "interface_icon" | "cursor" => {
-            let path = row["icon"].as_str().or(row["image"].as_str());
-            if let Some(path) = path
-                && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, path)
-            {
-                ui.add(
-                    egui::Image::from_texture((thumb.texture.id(), egui::vec2(size, size)))
-                        .fit_to_exact_size(egui::vec2(size, size)),
-                );
-            }
+    let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &picture.path) else {
+        return;
+    };
+    match picture.frame {
+        PictureFrame::Sprite(model) => {
+            let frame = thumbs::model_frame(&model, &thumb);
+            let scale = size / frame.size.y.max(1.0);
+            ui.add(
+                egui::Image::from_texture((thumb.texture.id(), frame.size * scale)).uv(frame.uv),
+            );
         }
-        "model" | "npc" | "player" => {
-            let model = if table == "model" {
-                Some(row.clone())
-            } else {
-                row["model"]
-                    .as_str()
-                    .and_then(|m| cx.files.json(&row_file("model", m)))
-            };
-            if let Some(model) = model
-                && let Some(path) = model["sprites"]["image"].as_str()
-                && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, path)
-            {
-                let frame = thumbs::model_frame(&model, &thumb);
-                let scale = size / frame.size.y.max(1.0);
-                ui.add(
-                    egui::Image::from_texture((thumb.texture.id(), frame.size * scale))
-                        .uv(frame.uv),
-                );
-            }
+        PictureFrame::Whole => {
+            ui.add(
+                egui::Image::from_texture((thumb.texture.id(), egui::vec2(size, size)))
+                    .fit_to_exact_size(egui::vec2(size, size)),
+            );
         }
-        "tileset" => {
-            if let Some(path) = row["image"].as_str()
-                && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, path)
-            {
-                let tile = row["tile"].as_f64().unwrap_or(16.0) as f32;
-                let uv = thumbs::uv(thumb.size, 0.0, 0.0, tile * 2.0, tile * 2.0);
-                ui.add(
-                    egui::Image::from_texture((thumb.texture.id(), egui::vec2(size, size))).uv(uv),
-                );
-            }
+        PictureFrame::Tile(tile) => {
+            let uv = thumbs::uv(thumb.size, 0.0, 0.0, tile * 2.0, tile * 2.0);
+            ui.add(egui::Image::from_texture((thumb.texture.id(), egui::vec2(size, size))).uv(uv));
         }
-        _ => {}
     }
 }
 

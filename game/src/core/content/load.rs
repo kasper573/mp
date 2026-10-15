@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fmt::Display;
 use std::io;
 use std::marker::PhantomData;
@@ -378,10 +378,6 @@ impl Loading {
         self.errors.push(error);
     }
 
-    pub fn errors(&self) -> &[LoadError] {
-        &self.errors
-    }
-
     pub fn extend_errors(&mut self, errors: impl IntoIterator<Item = LoadError>) {
         self.errors.extend(errors);
     }
@@ -423,13 +419,6 @@ impl Loading {
     pub fn fail<Row: ContentRow>(&mut self, id: ContentId<Row>) {
         let key = id.key(&self.content()).to_owned();
         self.failed.insert((Row::TABLE, key));
-    }
-
-    pub fn failed<Row: ContentRow>(&mut self, id: ContentId<Row>) -> bool {
-        let content = self.content();
-        let key = id.key(&content);
-        content.table::<Row>().get(id).is_none()
-            || self.failed.contains(&(Row::TABLE, key.to_owned()))
     }
 
     pub fn rows<Row: ContentRow>(&mut self) -> Vec<(ContentId<Row>, &'static Row)> {
@@ -826,16 +815,23 @@ pub fn reference_errors(file: &str, leaves: &[Leaf], index: &JsonIndex) -> Vec<L
     errors
 }
 
-// Where each leaf is written: a parse meets them in the order the file has them.
+// A leaf is written where its value is. The parse may meet the leaves in another order than the
+// file has them (flattened fields are read in declaration order), so each leaf takes the next
+// unclaimed occurrence of its value.
 fn placed<'a>(
     leaves: &'a [Leaf],
     index: &'a JsonIndex,
 ) -> impl Iterator<Item = (&'a Leaf, Option<&'a IndexedValue>)> {
-    let mut strings = index.strings();
+    let mut occurrences: HashMap<&'a str, VecDeque<&'a IndexedValue>> = HashMap::new();
+    for value in index.strings() {
+        if let Some(string) = value.string.as_deref() {
+            occurrences.entry(string).or_default().push_back(value);
+        }
+    }
     leaves.iter().map(move |leaf| {
-        let found = strings
-            .by_ref()
-            .find(|value| value.string.as_deref() == Some(leaf.value.as_str()));
+        let found = occurrences
+            .get_mut(leaf.value.as_str())
+            .and_then(VecDeque::pop_front);
         (leaf, found)
     })
 }

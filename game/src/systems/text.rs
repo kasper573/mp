@@ -230,10 +230,6 @@ impl LineText {
         )
     }
 
-    pub fn of(spans: &[Span]) -> LineText {
-        LineText::spoken(spans, &[])
-    }
-
     pub fn plain(text: impl Into<String>) -> LineText {
         LineText(vec![SpanText::Text {
             text: text.into(),

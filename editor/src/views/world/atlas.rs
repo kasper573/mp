@@ -24,6 +24,7 @@ use crate::usages::ContentUsages;
 pub struct WorldAtlas {
     pub generation: u64,
     pub areas: BTreeMap<AreaId, AtlasArea>,
+    ids: BTreeMap<String, AreaId>,
     pub warps: Vec<AtlasWarp>,
     pub owners: Vec<AtlasOwner>,
     pub initial_spawn: AreaId,
@@ -108,6 +109,7 @@ pub enum RowSourceKind {
     TurnsIn,
     Fails,
     Completes,
+    Decides,
     Opens,
     Remembers,
     Runs,
@@ -132,6 +134,7 @@ impl RowSourceKind {
             RowSourceKind::TurnsIn => ("turn-in", "turn-ins"),
             RowSourceKind::Fails => ("failure", "failures"),
             RowSourceKind::Completes => ("task", "tasks"),
+            RowSourceKind::Decides => ("decision", "decisions"),
             RowSourceKind::Remembers => ("remembered", "remembered"),
             RowSourceKind::Runs => ("script", "scripts"),
             RowSourceKind::Named => ("named", "named"),
@@ -159,6 +162,7 @@ impl RowSourceKind {
             RowSourceKind::TurnsIn => "Turned in at",
             RowSourceKind::Fails => "Failed by",
             RowSourceKind::Completes => "Tasks done at",
+            RowSourceKind::Decides => "Decided at",
             RowSourceKind::Opens => "Opened by",
             RowSourceKind::Remembers => "Remembered by",
             RowSourceKind::Runs => "Run by",
@@ -249,6 +253,7 @@ impl WorldAtlas {
         let mut atlas = WorldAtlas {
             generation,
             areas: BTreeMap::new(),
+            ids: BTreeMap::new(),
             warps: Vec::new(),
             owners: Vec::new(),
             initial_spawn: content.built::<GameSettings>().initial_spawn.area,
@@ -261,6 +266,7 @@ impl WorldAtlas {
         };
         for id in content.ids::<AreaDef>() {
             let info = area_info(content, files, id);
+            atlas.ids.insert(info.key.clone(), id);
             atlas.areas.insert(id, info);
         }
         if content.has_built::<RiftScripts>() {
@@ -294,10 +300,7 @@ impl WorldAtlas {
     }
 
     pub fn id(&self, key: &str) -> Option<AreaId> {
-        self.areas
-            .iter()
-            .find(|(_, info)| info.key == key)
-            .map(|(id, _)| *id)
+        self.ids.get(key).copied()
     }
 
     pub fn key(&self, id: AreaId) -> &str {
@@ -724,6 +727,7 @@ impl WorldAtlas {
                     Reach::TurnsIn(quest) => (RowSourceKind::TurnsIn, quest),
                     Reach::Fails(quest) => (RowSourceKind::Fails, quest),
                     Reach::Completes(quest) => (RowSourceKind::Completes, quest),
+                    Reach::Decides(quest) => (RowSourceKind::Decides, quest),
                     _ => continue,
                 };
                 let quest_key = quest.key(&content);
@@ -829,10 +833,16 @@ impl WorldAtlas {
                         counted("deliver", 1, item.key(&content)),
                         self.areas_finding(ItemDef::TABLE, item.key(&content)),
                     ),
-                    Objective::Task { label, .. } | Objective::Decide { label, .. } => (
+                    Objective::Task { label, .. } => (
                         label.clone(),
                         self.areas_where(
                             &|reach| matches!(reach, Reach::Completes(quest) if *quest == id),
+                        ),
+                    ),
+                    Objective::Decide { label, .. } => (
+                        label.clone(),
+                        self.areas_where(
+                            &|reach| matches!(reach, Reach::Decides(quest) if *quest == id),
                         ),
                     ),
                 };
@@ -934,7 +944,8 @@ impl WorldAtlas {
                             if let Reach::Offers(other)
                             | Reach::Accepts(other)
                             | Reach::TurnsIn(other)
-                            | Reach::Completes(other) = reach
+                            | Reach::Completes(other)
+                            | Reach::Decides(other) = reach
                                 && *other != id
                             {
                                 link(

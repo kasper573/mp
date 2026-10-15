@@ -391,6 +391,38 @@ pub fn exchange(
         .map_err(|refusal| refusal.describe(&content))
 }
 
+pub fn move_between(
+    world: &mut World,
+    from: Entity,
+    to: Entity,
+    items: &[ItemStack],
+) -> Result<(), String> {
+    let content = *world.resource::<Content>();
+    if from == to {
+        return Err("Nothing to move".to_owned());
+    }
+    if let Some(bound) = items.iter().find(|stack| stack.item.get(&content).bound()) {
+        return Err(format!("{} is bound", bound.item.get(&content).name));
+    }
+    let mut giving = world
+        .get::<Inventory>(from)
+        .cloned()
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    let mut taking = world
+        .get::<Inventory>(to)
+        .cloned()
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    giving
+        .exchange(&content, items, &[])
+        .map_err(|refusal| refusal.describe(&content))?;
+    taking
+        .exchange(&content, &[], items)
+        .map_err(|refusal| refusal.describe(&content))?;
+    world.entity_mut(from).insert(giving);
+    world.entity_mut(to).insert(taking);
+    Ok(())
+}
+
 type SpotEval = Box<dyn Fn(&World, &FlowCx) -> Option<(AreaId, Pos<Tiles>)> + Send + Sync>;
 
 fn spot(
@@ -429,34 +461,5 @@ fn drop_held(world: &mut World, actor: Entity, stack: ItemStack) -> Result<(), S
         .exchange(&content, &[stack], &[])
         .map_err(|refusal| refusal.describe(&content))?;
     super::scatter_drop(world, actor, &[(stack.item, stack.count)], None, None);
-    Ok(())
-}
-
-fn move_between(
-    world: &mut World,
-    from: Entity,
-    to: Entity,
-    items: &[ItemStack],
-) -> Result<(), String> {
-    let content = *world.resource::<Content>();
-    if let Some(bound) = items.iter().find(|stack| stack.item.get(&content).bound()) {
-        return Err(format!("{} is bound", bound.item.get(&content).name));
-    }
-    let mut giving = world
-        .get::<Inventory>(from)
-        .cloned()
-        .ok_or_else(|| "Has no bag".to_owned())?;
-    let mut taking = world
-        .get::<Inventory>(to)
-        .cloned()
-        .ok_or_else(|| "Has no bag".to_owned())?;
-    giving
-        .exchange(&content, items, &[])
-        .map_err(|refusal| refusal.describe(&content))?;
-    taking
-        .exchange(&content, &[], items)
-        .map_err(|refusal| refusal.describe(&content))?;
-    world.entity_mut(from).insert(giving);
-    world.entity_mut(to).insert(taking);
     Ok(())
 }

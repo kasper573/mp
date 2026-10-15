@@ -26,7 +26,7 @@ use game::systems::shop::{Sale, ShopLedger};
 use game::systems::stat::{StatKind, StatMap, Stats};
 use game::systems::text::LineText;
 
-use crate::support::{CLOCK, Sim, content, row};
+use testkit::{CLOCK, Sim, content, row};
 
 const LATER: WallClock = WallClock {
     now: UnixMillis(1_000_000_000),

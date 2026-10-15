@@ -14,9 +14,9 @@ use crate::core::time::{Millis, PlaybackRate, Seconds};
 use crate::systems::actor::{self, Action, Actor, ActorModel, Timing, set_facing};
 use crate::systems::area;
 use crate::systems::movement::{halt, moving, on_tile, position};
-use crate::systems::player::{self, Owner, commands_locked, sender_player, session};
+use crate::systems::player::{self, Owner, sender_player, session};
 use crate::systems::reach::{self, Pursuit, ReachAct};
-use crate::systems::stat::{self, StatKind};
+use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::{drain_requests, visibility};
 
 pub fn register(app: &mut App) {
@@ -65,7 +65,11 @@ pub struct Attackers {
 #[derive(Message, Clone, Debug, PartialEq)]
 pub struct Died {
     pub entity: Entity,
-    pub killer: Option<Entity>,
+}
+
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct Dead {
+    pub at: Seconds,
 }
 
 #[derive(Component, Clone, Debug, PartialEq)]
@@ -102,9 +106,7 @@ pub fn regen(world: &mut World) {
         .iter(world)
         .collect();
     for player in players {
-        if !stat::is_dead(world, player) {
-            stat::heal(world, player, regen.health);
-        }
+        stat::heal(world, player, regen.health);
     }
 }
 
@@ -114,8 +116,7 @@ pub fn request(world: &mut World) {
             continue;
         };
         let target = request.message.target;
-        if stat::is_dead(world, entity)
-            || commands_locked(world, entity)
+        if !player::may_command(world, entity)
             || world.get_entity(target).is_err()
             || stat::is_dead(world, target)
             || !attackable(world, entity, target)
@@ -136,12 +137,12 @@ pub fn combat(
     progress_swings(world, time, swings);
 }
 
-pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) -> bool {
+pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) {
     if world.get_entity(target).is_err()
         || stat::is_dead(world, target)
         || player::held(world, target)
     {
-        return false;
+        return;
     }
     let time = Seconds(world.resource::<Time>().elapsed_secs());
     if let Some(attacker) = attacker {
@@ -150,16 +151,33 @@ pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, dama
         crate::systems::npc::attacked(world, target, attacker);
     }
     stat::apply_damage(world, target, damage);
-    if !stat::is_dead(world, target) {
-        return false;
+}
+
+/// The one place a fallen actor is declared dead. Every health change lands before this runs, so
+/// however health reached zero, the death is recorded and announced exactly once.
+pub fn defeats(world: &mut World) {
+    let time = Seconds(world.resource::<Time>().elapsed_secs());
+    let fallen: Vec<Entity> = world
+        .query_filtered::<(Entity, &Stats), Without<Dead>>()
+        .iter(world)
+        .filter(|(_, stats)| stat::dead(stats))
+        .map(|(entity, _)| entity)
+        .collect();
+    for entity in fallen {
+        reach::forget(world, entity);
+        world
+            .entity_mut(entity)
+            .remove::<Attackers>()
+            .insert(Dead { at: time });
+        world.write_message(Died { entity });
     }
-    reach::forget(world, target);
-    world.entity_mut(target).remove::<Attackers>();
-    world.write_message(Died {
-        entity: target,
-        killer: attacker,
-    });
-    true
+}
+
+pub fn revive(world: &mut World, entity: Entity, at: Pos<Tiles>) {
+    reach::forget(world, entity);
+    crate::systems::movement::relocate(world, entity, at);
+    stat::revive(world, entity);
+    world.entity_mut(entity).remove::<Dead>();
 }
 
 fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
@@ -194,11 +212,12 @@ fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
             continue;
         }
         let dir = Direction::from(target_at - at);
+        let speed = attack_speed.at_least(0.01);
         if let Some(mut actor) = world.get_mut::<Actor>(id) {
             set_facing(&mut actor, dir, Action::Attack);
+            actor.attack_rate = speed;
         }
         let timing = attack_timing(world, id, dir);
-        let speed = attack_speed.at_least(0.01);
         world.entity_mut(id).insert(Swing {
             target,
             hit_at: time + timing.apex / speed,

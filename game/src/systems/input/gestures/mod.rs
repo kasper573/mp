@@ -19,6 +19,7 @@ use super::map::{self, InputAction};
 use crate::core::content::{Content, Fixture};
 use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
+use crate::core::render;
 use crate::core::render::transition::WorldViewSystems;
 use crate::core::tiling::Tiles;
 use crate::systems::interface::CursorShape;
@@ -37,9 +38,14 @@ pub enum ClickClaim {
 }
 
 pub fn claim(world: &mut World) -> ClickClaim {
+    let tile = render::cursor_tile(world);
+    claim_at(world, tile)
+}
+
+pub fn claim_at(world: &mut World, tile: Option<Pos<Tiles>>) -> ClickClaim {
     GESTURES
         .iter()
-        .find_map(|gesture| gesture.claim(world))
+        .find_map(|gesture| gesture.claim(world, tile))
         .unwrap_or(ClickClaim::Nothing)
 }
 
@@ -50,11 +56,17 @@ pub enum Cursor {
     System(SystemCursorIcon),
 }
 
+/// A gesture takes a click by claiming it from the tile under the pointer, which is `None` while the
+/// pointer is off the world or over the interface.
 pub trait Gesture: Send + Sync {
-    fn claim(&self, world: &mut World) -> Option<ClickClaim>;
-    fn drive(&self, world: &mut World, start: bool);
-    fn cursor(&self, world: &mut World) -> Option<Cursor>;
-    fn tile_highlight(&self, _world: &mut World) -> Option<ActiveTileHighlight> {
+    fn claim(&self, world: &mut World, tile: Option<Pos<Tiles>>) -> Option<ClickClaim>;
+    fn drive(&self, world: &mut World, claim: Option<ClickClaim>, start: bool);
+    fn cursor(&self, world: &mut World, claim: ClickClaim) -> Option<Cursor>;
+    fn tile_highlight(
+        &self,
+        _world: &mut World,
+        _claim: ClickClaim,
+    ) -> Option<ActiveTileHighlight> {
         None
     }
 }
@@ -128,35 +140,37 @@ fn load_cursors(content: Res<Content>, assets: Res<AssetServer>, mut commands: C
 fn update(world: &mut World) {
     forget_clicks_across_lock(world);
 
+    let tile = render::cursor_tile(world);
+    let claims: Vec<Option<ClickClaim>> = GESTURES
+        .iter()
+        .map(|gesture| gesture.claim(world, tile))
+        .collect();
     let mut active = world.resource::<Latched>().0;
     let pressed = map::pressed(world, InputAction::Interact);
     let just = map::just_pressed(world, InputAction::Interact);
     // A click pressed and released between two frames arrives as `just` without `pressed`.
     if just {
-        active = GESTURES
-            .iter()
-            .position(|gesture| gesture.claim(world).is_some())
-            .map(GestureIndex);
+        active = claims.iter().position(Option::is_some).map(GestureIndex);
     } else if !pressed {
         active = None;
     }
     if let Some(GestureIndex(index)) = active {
-        GESTURES[index].drive(world, just);
+        GESTURES[index].drive(world, claims[index], just);
     }
     world.resource_mut::<Latched>().0 = active.filter(|_| pressed);
 
     let mut cursor = None;
     let mut highlight = None;
     let mut first_claimant = true;
-    for gesture in GESTURES {
-        if gesture.claim(world).is_none() {
+    for (gesture, claim) in GESTURES.iter().zip(&claims) {
+        let Some(claim) = *claim else {
             continue;
-        }
+        };
         if first_claimant {
-            highlight = gesture.tile_highlight(world);
+            highlight = gesture.tile_highlight(world, claim);
             first_claimant = false;
         }
-        cursor = gesture.cursor(world);
+        cursor = gesture.cursor(world, claim);
         if cursor.is_some() {
             break;
         }

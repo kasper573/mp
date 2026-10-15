@@ -1,9 +1,6 @@
-use driver::{UiTarget, area_key, clickable_point, erred, ground_near, in_feed};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
+use driver::{UiTarget, erred, noticed, open_ground_beside};
 use game::systems::input::gestures::ClickClaim;
 use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -51,7 +48,9 @@ fn play(shoot: &mut Shoot) {
     );
     me.talk_to("grisha");
     me.come_to_rest();
-    let off_stage = open_ground(&me.snapshot());
+    let off_stage = *open_ground_beside(&me.snapshot())
+        .first()
+        .expect("open ground in view beside the conversation");
     let pointed = me.point_at_tile(off_stage);
     assert_eq!(pointed.claim, ClickClaim::Locked);
     me.click();
@@ -93,7 +92,7 @@ fn play(shoot: &mut Shoot) {
     me.pick("Buy a round for the room.");
     me.on_stage("round");
     me.wait_until("the round's price in the feed", |snapshot| {
-        in_feed(snapshot, "−10 Gold")
+        noticed(snapshot, "−10 Gold")
     });
     me.caption_top("What it took shows in the corner, over Grisha's bust");
     me.read_to_choices();
@@ -120,25 +119,4 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Close the lid.");
     me.conversation_over();
-}
-
-// Ground in view beside the player, farthest from anyone, so nobody strolls under the pointer.
-fn open_ground(snapshot: &ProbeSnapshot) -> Pos<Tiles> {
-    let me = snapshot.me.as_ref().expect("the player").at;
-    let room = |tile: &Pos<Tiles>| {
-        snapshot
-            .actors
-            .iter()
-            .map(|actor| actor.at.distance_to(*tile))
-            .fold(f32::INFINITY, f32::min)
-    };
-    ground_near(
-        area_key(snapshot).expect("an area"),
-        me,
-        Tiles(2.0)..=Tiles(4.0),
-    )
-    .into_iter()
-    .filter(|tile| clickable_point(snapshot, *tile).is_some())
-    .max_by(|a, b| room(a).total_cmp(&room(b)))
-    .expect("open ground in view beside the conversation")
 }

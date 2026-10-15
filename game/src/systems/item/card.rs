@@ -26,7 +26,6 @@ pub struct ItemCardPlugin;
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemCard>()
-            .add_systems(Update, chime.run_if(in_state(ClientScreen::Area)))
             .add_systems(
                 EguiPrimaryContextPass,
                 draw_card
@@ -38,11 +37,26 @@ impl Plugin for ItemCardPlugin {
 }
 
 pub fn open(world: &mut World, item: ItemId) {
-    world.resource_mut::<ItemCard>().wanted = Some(item);
+    let was_shown = world.resource_mut::<ItemCard>().wanted.replace(item);
+    if was_shown.is_none() {
+        InterfaceSound::UiOpen.play(world);
+    }
 }
 
 pub fn close(world: &mut World) -> bool {
-    world.resource_mut::<ItemCard>().wanted.take().is_some()
+    let closed = world.resource_mut::<ItemCard>().wanted.take().is_some();
+    if closed {
+        InterfaceSound::UiClose.play(world);
+    }
+    closed
+}
+
+pub fn showing(world: &World) -> bool {
+    world.resource::<ItemCard>().wanted.is_some()
+}
+
+pub fn layer() -> egui::LayerId {
+    crate::systems::hud::window_layer(WINDOW_KEY)
 }
 
 pub fn shown(world: &World) -> Option<(ItemId, Rect)> {
@@ -138,26 +152,11 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
 #[derive(Resource, Default)]
 struct ItemCard {
     wanted: Option<ItemId>,
-    heard: Option<ItemId>,
     drawn: Option<(ItemId, Rect)>,
 }
 
 fn forget(mut card: ResMut<ItemCard>) {
     *card = ItemCard::default();
-}
-
-fn chime(world: &mut World) {
-    let card = world.resource::<ItemCard>();
-    let sound = match (card.heard, card.wanted) {
-        (None, Some(_)) => Some(InterfaceSound::UiOpen),
-        (Some(_), None) => Some(InterfaceSound::UiClose),
-        _ => None,
-    };
-    let wanted = card.wanted;
-    world.resource_mut::<ItemCard>().heard = wanted;
-    if let Some(sound) = sound {
-        sound.play(world);
-    }
 }
 
 fn draw_card(world: &mut World) {

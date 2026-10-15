@@ -232,7 +232,7 @@ impl EffectDef<RiftScripting> for OpenShop {
 pub struct ShopView {
     pub shop: ShopId,
     pub offers: Vec<OfferView>,
-    pub buyback: Vec<Sale>,
+    pub buyback: Vec<BuybackView>,
     pub declined: Vec<u32>,
 }
 
@@ -241,6 +241,14 @@ pub struct OfferView {
     pub left: Option<u32>,
     pub restocks_in: Option<Seconds>,
     pub refusal: Option<WareRefusal>,
+    pub held: Vec<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub struct BuybackView {
+    pub sale: Sale,
+    pub refusal: Option<WareRefusal>,
+    pub held: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -643,6 +651,25 @@ fn trade(
         .map_err(|refusal| refusal.describe(&content))
 }
 
+fn held(inventory: &Inventory, price: &[ItemStack]) -> Vec<u32> {
+    price
+        .iter()
+        .map(|stack| inventory.count(stack.item))
+        .collect()
+}
+
+fn price_refusal(
+    content: &Content,
+    inventory: &Inventory,
+    price: &[ItemStack],
+) -> Option<WareRefusal> {
+    let mut trial = inventory.clone();
+    trial
+        .exchange(content, price, &[])
+        .err()
+        .map(|refusal| WareRefusal::of(refusal, content))
+}
+
 fn offer_refusal(
     world: &World,
     player: Entity,
@@ -699,20 +726,38 @@ fn refresh_view(world: &mut World, player: Entity) {
         return;
     };
     let now = world.resource::<WallClock>().now;
-    let offers = (0..shop.get(&content).sells().count() as u32)
-        .map(|index| {
+    let inventory = world
+        .get::<Inventory>(player)
+        .cloned()
+        .unwrap_or_else(Inventory::empty);
+    let offers = shop
+        .get(&content)
+        .sells()
+        .enumerate()
+        .map(|(index, offer)| {
+            let index = index as u32;
             let stock = stock(world, player, shop, index, now);
             OfferView {
                 left: stock.map(|(left, _)| left),
                 restocks_in: stock.and_then(|(_, restocks_in)| restocks_in),
                 refusal: offer_refusal(world, player, shop, index, now),
+                held: held(&inventory, &offer.price),
             }
         })
         .collect();
     let buyback = world
         .get::<ShopLedger>(player)
         .and_then(|ledger| ledger.sales.get(&shop))
-        .map(|sales| sales.iter().cloned().collect())
+        .map(|sales| {
+            sales
+                .iter()
+                .map(|sale| BuybackView {
+                    sale: sale.clone(),
+                    refusal: price_refusal(&content, &inventory, &sale.paid),
+                    held: held(&inventory, &sale.paid),
+                })
+                .collect()
+        })
         .unwrap_or_default();
     let view = ShopView {
         shop,

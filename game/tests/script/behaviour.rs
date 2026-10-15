@@ -12,7 +12,7 @@ use game::systems::stat::{self, StatKind};
 use serde_json::json;
 
 use crate::json::inline_with;
-use crate::support::{Sim, content, health, place, row, spawn_area, townsperson};
+use testkit::{Sim, content, health, place, row, spawn_area, townsperson};
 
 #[test]
 fn an_aggressive_monster_picks_a_character_in_its_aggro_range_and_drops_one_beyond_it() {

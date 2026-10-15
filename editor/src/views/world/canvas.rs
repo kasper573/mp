@@ -19,6 +19,7 @@ use super::{
 use crate::app::Editor;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::area::{TILE_PX, scene};
+use crate::views::navigation;
 
 const LABEL: f32 = 28.0;
 const PAD: f32 = 3.0;
@@ -95,11 +96,7 @@ impl MapCanvas {
     }
 
     pub fn card_at(&self, p: Pos2) -> Option<AreaId> {
-        self.cards
-            .iter()
-            .filter(|card| card.frame.contains(p))
-            .min_by(|a, b| a.frame.area().total_cmp(&b.frame.area()))
-            .map(|card| card.area)
+        topmost_card_at(&self.cards, p)
     }
 
     pub fn tile_at(&self, atlas: &WorldAtlas, p: Pos2) -> Option<MapTileHit> {
@@ -158,13 +155,9 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap) {
     let atlas = &map.atlas;
     let cards = place(map, shown, &viewport);
     let edges = edges(atlas, &cards);
-    let hovered = response.hover_pos().and_then(|p| {
-        cards
-            .iter()
-            .filter(|card| card.frame.contains(p))
-            .min_by(|a, b| a.frame.area().total_cmp(&b.frame.area()))
-            .map(|card| card.area)
-    });
+    let hovered = response
+        .hover_pos()
+        .and_then(|p| topmost_card_at(&cards, p));
     let drawing = Drawing {
         map,
         shown,
@@ -768,9 +761,12 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
     match map.bounds(&map.layout) {
         Some(bounds) => {
             view.center = bounds.center();
-            let px_per_tile = ((rect.width() - 80.0) / bounds.width().max(1.0))
-                .min((rect.height() - 80.0) / bounds.height().max(1.0));
-            view.zoom = (px_per_tile / TILE_PX).clamp(MIN_ZOOM, MAX_ZOOM);
+            view.zoom = navigation::fit_zoom(
+                rect.size() - Vec2::splat(80.0),
+                Vec2::new(bounds.width(), bounds.height()),
+                TILE_PX,
+            )
+            .clamp(MIN_ZOOM, MAX_ZOOM);
         }
         None => {
             view.center = Pos2::ZERO;
@@ -781,33 +777,15 @@ fn fit(editor: &mut Editor, map: &OpenWorldMap, rect: Rect) {
 }
 
 fn navigate(editor: &mut Editor, ui: &Ui, response: &Response, rect: Rect) {
-    let scroll = ui.input(|i| i.smooth_scroll_delta);
-    let zoom_delta = ui.input(|i| i.zoom_delta());
     let view = &mut editor.views.world;
-    if response.hovered() && (scroll.y != 0.0 || zoom_delta != 1.0) {
-        let factor = if zoom_delta != 1.0 {
-            zoom_delta
-        } else {
-            (scroll.y / 240.0).exp2()
-        };
-        let before = view.zoom;
-        view.zoom = (view.zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
-        if let Some(p) = response.hover_pos() {
-            let at = MapViewport {
-                rect,
-                center: view.center,
-                zoom: before,
-            }
-            .to_map(p);
-            view.center = at + (view.center - at) * (before / view.zoom);
-        }
-    }
-    let space = ui.input(|i| i.key_down(egui::Key::Space));
-    let panning = response.dragged_by(egui::PointerButton::Middle)
-        || (space && response.dragged_by(egui::PointerButton::Primary));
-    if panning {
-        view.center -= response.drag_delta() / (view.zoom * TILE_PX);
-    }
+    navigation::zoom_and_pan(
+        ui,
+        response,
+        rect,
+        (MIN_ZOOM, MAX_ZOOM),
+        &mut view.center,
+        &mut view.zoom,
+    );
 }
 
 fn dots(painter: &Painter, viewport: &MapViewport) {
@@ -1276,4 +1254,12 @@ fn minimap(painter: &Painter, map: &OpenWorldMap, layout: &WorldMapDef, viewport
         Stroke::new(1.0, theme::WARN),
         StrokeKind::Outside,
     );
+}
+
+fn topmost_card_at(cards: &[MapCard], p: Pos2) -> Option<AreaId> {
+    cards
+        .iter()
+        .filter(|card| card.frame.contains(p))
+        .min_by(|a, b| a.frame.area().total_cmp(&b.frame.area()))
+        .map(|card| card.area)
 }

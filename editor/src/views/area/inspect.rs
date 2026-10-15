@@ -430,15 +430,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content
                 if picker::row(ui, &mut cx, "blueprint", &mut picked, "/stamp/blueprint")
                     && !picked.is_empty()
                 {
-                    let view = editor.views.area.view_mut(view_key);
-                    view.stamp = Some(picked.clone());
-                    let stored = editor
-                        .settings
-                        .stamps
-                        .get(&picked)
-                        .cloned()
-                        .unwrap_or_default();
-                    view.stamp_values = Value::Object(stored.values.into_iter().collect());
+                    editor.views.area.view_mut(view_key).stamp = Some(picked.clone());
                 }
             });
         }
@@ -453,7 +445,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content
             return;
         };
         let footprint = {
-            let values = editor.views.area.view(view_key).stamp_values.clone();
+            let values = stamp::stamp_values(editor, Some(&stamp));
             let size = stamp::stamp_footprint(editor, content, &stamp, &values);
             (
                 size.width.round().max(1.0) as u32,
@@ -564,7 +556,6 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content
                     .unwrap_or_default();
                 save = true;
             }
-            editor.views.area.view_mut(view_key).stamp_values = values;
         }
     });
     if save {
@@ -896,7 +887,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let indices: Vec<usize> = selection
         .parts
         .iter()
-        .filter_map(|part| part.strip_prefix("/modules/")?.parse().ok())
+        .filter_map(|part| super::module_index(part))
         .collect();
     if indices.is_empty() {
         return;
@@ -1012,7 +1003,7 @@ fn module_inspector(
     out: &mut Followups,
 ) -> bool {
     let variants = cx.shapes.module_variants("area");
-    let path = format!("/modules/{index}");
+    let path = super::module_part(index);
     let kind = row["modules"][index]["type"]
         .as_str()
         .unwrap_or("module")
@@ -1069,18 +1060,17 @@ fn module_inspector(
             Some(AreaModuleKind::Scenery) => changed |= scenery_rows(ui, module, &path),
             Some(AreaModuleKind::Population) => {
                 if let Some(view) = view {
+                    let preview = view
+                        .population_previews
+                        .entry(module.to_string())
+                        .or_default();
                     widgets::kv(ui, "preview", |ui| {
-                        let mut shown = !view.population_hidden.contains(&index);
+                        let mut shown = !preview.hidden;
                         if widgets::toggle(ui, &mut shown).changed() {
-                            if shown {
-                                view.population_hidden.remove(&index);
-                            } else {
-                                view.population_hidden.insert(index);
-                            }
+                            preview.hidden = !shown;
                         }
                         if ui.button("↻ Re-roll").clicked() {
-                            let seed = view.population_seed.entry(index).or_default();
-                            *seed = seed.wrapping_add(1);
+                            preview.seed = preview.seed.wrapping_add(1);
                         }
                     });
                 }

@@ -1,11 +1,14 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use egui::emath::{TSTransform, easing};
+use egui::emath::TSTransform;
 use egui::{Color32, Id, Pos2, Rect, Stroke, Vec2};
 
 use super::rows::{self, Fades, Move, Presence};
-use super::{Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD};
+use super::{
+    Notification, NotificationKind, NotificationSent, READING_BASE, READING_PER_WORD,
+    window_visible,
+};
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine};
 use crate::core::time::Seconds;
@@ -26,8 +29,6 @@ const PADDING: Vec2 = Vec2::new(8.0, 2.0);
 const BORDER: f32 = 1.0;
 const SHOWN: usize = 3;
 const HELD: usize = 8;
-const BUMP_SCALE: f32 = 1.08;
-const BUMP_SECONDS: f64 = 0.25;
 const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
 const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
 const SLATE_50: Color32 = Color32::from_rgb(73, 74, 80);
@@ -46,13 +47,17 @@ pub struct FeedPlugin;
 impl Plugin for FeedPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Feed>()
-            .add_systems(Update, age.run_if(in_state(ClientScreen::Area)))
+            .add_systems(
+                Update,
+                age.run_if(in_state(ClientScreen::Area))
+                    .run_if(window_visible),
+            )
             .add_systems(
                 bevy_egui::EguiPrimaryContextPass,
                 draw.in_set(Band::Notices)
                     .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnExit(ClientScreen::Area), forget);
+            .add_systems(OnExit(ClientScreen::Area), rows::forget::<Feed>);
     }
 }
 
@@ -110,10 +115,6 @@ struct FeedToast {
     bumped_at: Option<f64>,
 }
 
-fn forget(mut feed: ResMut<Feed>) {
-    *feed = Feed::default();
-}
-
 fn age(world: &mut World) {
     let expanded = rows::hovered(world, &world.resource::<Feed>().drawn);
     if expanded {
@@ -145,15 +146,13 @@ fn draw(world: &mut World) {
         }
     }
     let overflow = feed.toasts.len().saturating_sub(limit);
-    let order: Vec<u64> = feed.toasts.iter().map(|toast| toast.key).collect();
     let current: Vec<(u64, FeedToast)> = feed
         .toasts
         .iter()
         .skip(overflow)
         .map(|toast| (toast.key, toast.clone()))
         .collect();
-    let mut toasts = feed.fades.sync(now, TOAST_PRESENCE, still, current);
-    toasts.sort_by_key(|(toast, _)| order.iter().position(|&key| key == toast.key));
+    let toasts = feed.fades.sync(now, TOAST_PRESENCE, still, current);
     let more = feed.more.sync(
         now,
         MORE_PRESENCE,
@@ -225,10 +224,7 @@ fn draw(world: &mut World) {
                         });
                     });
             });
-        let swell = bumped_at.filter(|_| !still).map_or(1.0, |at| {
-            let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
-            1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
-        });
+        let swell = rows::bump(bumped_at, now, still);
         let swell = TSTransform::new(rect.center().to_vec2() * (1.0 - swell), swell);
         gui.set_transform_layer(shown.response.layer_id, look.around(rect) * swell);
         drawn.push(rect);

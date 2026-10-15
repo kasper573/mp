@@ -15,7 +15,7 @@ use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
-use crate::core::render::transition::{self, WorldViewSystems};
+use crate::core::render::transition::{self, ScreenTransitionPhase, WorldViewSystems};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
@@ -25,8 +25,8 @@ use crate::systems::area::tileset::TilesetId;
 use crate::systems::area::{self, AreaId, AreaTag, tileset};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
-use crate::systems::player::AreaDrawn;
 use crate::systems::player::session::{self, Viewpoint};
+use crate::systems::player::{ARRIVAL_PATIENCE, AreaDrawn};
 
 pub struct AreaPlugin;
 
@@ -58,25 +58,21 @@ impl Plugin for AreaPlugin {
     }
 }
 
-/// A view held on screen this long without its new area becoming drawable is revealed regardless:
-/// a missing image or a lost arrival must not hide the world for good.
-const ARRIVAL_PATIENCE: Seconds = Seconds(5.0);
-
 #[derive(Resource, Default)]
 struct SpawnedArea {
     area: Option<AreaId>,
     images: Vec<Handle<Image>>,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Copy)]
 struct Crossing {
     last_seen: Option<Pose>,
     held: Option<Held>,
-    drawn: Option<AreaId>,
 }
 
 #[derive(Clone, Copy)]
 struct Pose {
+    character: Entity,
     at: Pos<Tiles>,
     heading: Direction,
     area: AreaId,
@@ -91,13 +87,15 @@ struct Held {
     rendered: bool,
 }
 
-fn carry_view_across(world: &mut World) {
+/// The view is revealed when no crossing is held under the veil and no transition plays over it.
+pub fn settled(world: &World) -> bool {
+    world.resource::<Crossing>().held.is_none()
+        && *world.resource::<ScreenTransitionPhase>() == ScreenTransitionPhase::Idle
+}
+
+pub fn carry_view_across(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let Crossing {
-        last_seen,
-        held,
-        drawn,
-    } = *world.resource::<Crossing>();
+    let Crossing { last_seen, held } = *world.resource::<Crossing>();
     let (last_seen, held) = match world.resource::<Viewpoint>().0 {
         Some(character) => match (pose_of(world, character), held, last_seen) {
             (None, _, _) => (last_seen, held),
@@ -105,11 +103,14 @@ fn carry_view_across(world: &mut World) {
                 transition::freeze(world, seen.at, seen.heading);
                 (Some(pose), Some(Held::new(now, seen)))
             }
+            (Some(pose), None, Some(seen)) if seen.character == pose.character => {
+                (Some(pose), None)
+            }
+            (Some(pose), None, _) => (Some(pose), Some(Held::new(now, pose))),
             (Some(pose), Some(held), _) => {
                 let drawable = area_drawable(world, pose.area);
                 if now - held.since > ARRIVAL_PATIENCE || (drawable && held.rendered) {
-                    transition::reveal(world, pose.at);
-                    release_unshown_images(world);
+                    reveal(world, pose);
                     (Some(pose), None)
                 } else {
                     (
@@ -121,7 +122,6 @@ fn carry_view_across(world: &mut World) {
                     )
                 }
             }
-            (Some(pose), None, _) => (Some(pose), None),
         },
         None => match (held, last_seen) {
             (Some(_), _)
@@ -141,23 +141,13 @@ fn carry_view_across(world: &mut World) {
             _ => (None, held),
         },
     };
-    let drawn = match last_seen {
-        Some(pose) if held.is_none() && drawn != Some(pose.area) => {
-            if area_drawable(world, pose.area) {
-                world.write_message(AreaDrawn);
-                Some(pose.area)
-            } else {
-                None
-            }
-        }
-        Some(_) => drawn,
-        None => None,
-    };
-    *world.resource_mut::<Crossing>() = Crossing {
-        last_seen,
-        held,
-        drawn,
-    };
+    *world.resource_mut::<Crossing>() = Crossing { last_seen, held };
+}
+
+fn reveal(world: &mut World, pose: Pose) {
+    transition::reveal(world, pose.at);
+    release_unshown_images(world);
+    world.write_message(AreaDrawn);
 }
 
 fn restart_patience(world: &mut World) {
@@ -178,11 +168,12 @@ impl Held {
 }
 
 fn pose_of(world: &World, character: Entity) -> Option<Pose> {
-    let character = world.get_entity(character).ok()?;
+    let entity = world.get_entity(character).ok()?;
     Some(Pose {
-        at: character.get::<RenderPosition>()?.0,
-        heading: character.get::<Actor>()?.dir,
-        area: character.get::<AreaTag>()?.area,
+        character,
+        at: entity.get::<RenderPosition>()?.0,
+        heading: entity.get::<Actor>()?.dir,
+        area: entity.get::<AreaTag>()?.area,
     })
 }
 
@@ -207,9 +198,7 @@ fn area_drawable(world: &mut World, area: AreaId) -> bool {
 /// where the character lands.
 fn leave_area(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let Crossing {
-        last_seen, held, ..
-    } = *world.resource::<Crossing>();
+    let Crossing { last_seen, held } = *world.resource::<Crossing>();
     let held = match (last_seen, held) {
         (Some(pose), None) => {
             transition::freeze(world, pose.at, pose.heading);
@@ -224,7 +213,6 @@ fn leave_area(world: &mut World) {
     *world.resource_mut::<Crossing>() = Crossing {
         last_seen: None,
         held,
-        drawn: None,
     };
     world.resource_mut::<SpawnedArea>().area = None;
     world.resource_mut::<RetainedImages>().0.clear();

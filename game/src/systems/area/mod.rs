@@ -442,10 +442,9 @@ impl Scenery {
     }
 
     pub fn bounds(&self) -> Rect<Tiles> {
-        self.flip.anchored(
-            self.at,
-            Size::new(self.width() as f32, self.height() as f32),
-        )
+        let size = Size::new(self.width() as f32, self.height() as f32);
+        self.flip
+            .place(Rect::new(Pos::new(0.0, 0.0), size), self.at)
     }
 
     pub fn sort_line(&self) -> Option<Tiles> {

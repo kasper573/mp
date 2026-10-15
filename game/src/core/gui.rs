@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -97,14 +96,7 @@ impl Plugin for GuiPlugin {
                     .chain(),
             )
             .add_systems(PreUpdate, adopt_context)
-            .add_systems(
-                Update,
-                (
-                    install_fonts.run_if(resource_exists_and_changed::<GuiFonts>),
-                    apply_motion.run_if(resource_exists_and_changed::<MotionPreference>),
-                )
-                    .run_if(resource_exists::<GuiContext>),
-            )
+            .add_systems(Update, apply_look.run_if(look_changed))
             .add_systems(
                 EguiPrimaryContextPass,
                 forget_world_layers.before(Band::Stage),
@@ -157,6 +149,13 @@ pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
         gui.data_mut(|data| data.remove::<Pointed>(key));
         return;
     }
+    let (delay, grace) = {
+        let style = gui.global_style();
+        (
+            style.interaction.tooltip_delay,
+            style.interaction.tooltip_grace_time,
+        )
+    };
     let (now, pass) = (gui.input(|input| input.time), gui.cumulative_pass_nr());
     let since = gui.data_mut(|data| {
         let since = data
@@ -166,9 +165,8 @@ pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
         data.insert_temp(key, Pointed { since, pass });
         since
     });
-    let follows_another =
-        egui::Tooltip::seconds_since_last_tooltip(gui) < TOOLTIP_FOLLOW.as_secs_f32();
-    if follows_another || now - since >= TOOLTIP_DELAY.as_secs_f64() {
+    let follows_another = egui::Tooltip::seconds_since_last_tooltip(gui) < grace;
+    if follows_another || now - since >= f64::from(delay) {
         egui::Tooltip::for_widget(response).show(add);
     }
 }
@@ -249,8 +247,8 @@ pub fn cursor(world: &World) -> egui::CursorIcon {
     world.resource::<GuiCursor>().0
 }
 
-const TOOLTIP_DELAY: Duration = Duration::from_millis(400);
-const TOOLTIP_FOLLOW: Duration = Duration::from_millis(300);
+const TOOLTIP_DELAY_SECS: f32 = 0.4;
+const TOOLTIP_GRACE_SECS: f32 = 0.3;
 
 #[derive(Clone, Copy)]
 struct Pointed {
@@ -271,31 +269,39 @@ struct GuiCursor(egui::CursorIcon);
 
 fn adopt_context(
     mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>>,
-    fonts: Option<Res<GuiFonts>>,
-    motion: Res<MotionPreference>,
     mut commands: Commands,
 ) {
     let Ok(mut context) = contexts.single_mut() else {
         return;
     };
     let gui = context.get_mut().clone();
-    gui.set_fonts(fonts.map_or_else(design_tokens::builtin_fonts, |fonts| fonts.0.clone()));
     design_tokens::apply(&gui);
     // A window's corner reaches this far past its edge for a resize, which would take the clicks
     // meant for a slot in the window beside it.
     gui.all_styles_mut(|style| {
         style.interaction.resize_grab_radius_corner = style.interaction.resize_grab_radius_side;
+        style.interaction.tooltip_delay = TOOLTIP_DELAY_SECS;
+        style.interaction.tooltip_grace_time = TOOLTIP_GRACE_SECS;
     });
     gui.options_mut(|options| options.zoom_with_keyboard = false);
-    set_motion(&gui, *motion);
     commands.insert_resource(GuiContext(gui));
 }
 
-fn install_fonts(gui: Res<GuiContext>, fonts: Res<GuiFonts>) {
-    gui.0.set_fonts(fonts.0.clone());
+fn look_changed(
+    gui: Option<Res<GuiContext>>,
+    fonts: Option<Res<GuiFonts>>,
+    motion: Option<Res<MotionPreference>>,
+) -> bool {
+    gui.is_some_and(|gui| {
+        gui.is_changed()
+            || fonts.is_some_and(|fonts| fonts.is_changed())
+            || motion.is_some_and(|motion| motion.is_changed())
+    })
 }
 
-fn apply_motion(gui: Res<GuiContext>, motion: Res<MotionPreference>) {
+fn apply_look(gui: Res<GuiContext>, fonts: Option<Res<GuiFonts>>, motion: Res<MotionPreference>) {
+    gui.0
+        .set_fonts(fonts.map_or_else(design_tokens::builtin_fonts, |fonts| fonts.0.clone()));
     set_motion(&gui.0, *motion);
 }
 

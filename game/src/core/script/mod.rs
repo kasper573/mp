@@ -90,7 +90,14 @@ pub trait Vocabulary:
         + Send
         + Sync
         + 'static;
-    type Text: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
+    type Text: TextDef<Self>
+        + Clone
+        + Serialize
+        + DeserializeOwned
+        + JsonSchema
+        + Send
+        + Sync
+        + 'static;
     type Place: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
     type Row: Clone + Send + Sync + 'static;
     type Audio: Clone + Serialize + DeserializeOwned + JsonSchema + Send + Sync + 'static;
@@ -119,6 +126,10 @@ pub trait EventDef<V: Vocabulary>: Clone {
 }
 
 pub trait LineDef<V: Vocabulary> {
+    fn values(&'static self) -> Vec<&'static Expr<V>>;
+}
+
+pub trait TextDef<V: Vocabulary> {
     fn values(&'static self) -> Vec<&'static Expr<V>>;
 }
 

@@ -15,6 +15,7 @@ use crate::core::audio::soundscape::{self, SoundscapeMixer, SoundscapeShape};
 use crate::core::content::{Content, ContentScope, with_content};
 use crate::core::gui::{self, GuiContext, WorldLayers};
 use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
+use crate::core::platform::ClientPlatform;
 use crate::core::render::tile_to_window;
 use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::tiling::{TilePos, Tiles};
@@ -23,13 +24,12 @@ use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
 use crate::systems::area::{self, AreaId, AreaObject, AreaTag};
 use crate::systems::attention::{Attention, AttentionId, StatusBadges};
-use crate::systems::combat::{self, Attitude};
+use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
 use crate::systems::history::widget::{self as history, HistoryBook};
 use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
 use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
-use crate::systems::interact;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro};
@@ -38,6 +38,7 @@ use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
+use crate::systems::spectate::Spectating;
 use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
@@ -72,6 +73,7 @@ pub struct ProbeSnapshot {
     pub area: Option<AreaId>,
     pub me: Option<ProbeBody>,
     pub viewpoint: Option<ProbeBody>,
+    pub spectating: Option<Spectating>,
     pub actors: Vec<ProbeBody>,
     pub props: Vec<ProbeFixture>,
     pub items: Vec<ProbeGroundItem>,
@@ -183,6 +185,7 @@ pub struct ProbeUiElement {
     pub text: Option<String>,
     pub image: Option<String>,
     pub editable: bool,
+    pub button: bool,
     pub focused: bool,
     pub click_through: bool,
     pub in_world: bool,
@@ -383,10 +386,10 @@ fn count_clicks(gui: Option<Res<GuiContext>>, mut seen: ResMut<ProbeInputSeen>) 
     let Some(gui) = gui else {
         return;
     };
-    let run = gui.0.input(|input| {
+    let (run, released) = gui.0.input(|input| {
         let pointer = &input.pointer;
         let primary = egui::PointerButton::Primary;
-        if pointer.button_triple_clicked(primary) {
+        let run = if pointer.button_triple_clicked(primary) {
             Some(3)
         } else if pointer.button_double_clicked(primary) {
             Some(2)
@@ -399,10 +402,11 @@ fn count_clicks(gui: Option<Res<GuiContext>>, mut seen: ResMut<ProbeInputSeen>) 
             .into_iter()
             .any(|button| pointer.button_clicked(button))
             .then_some(1)
-        }
+        };
+        (run, pointer.any_released())
     });
-    if let Some(run) = run {
-        seen.click_run = run;
+    if released {
+        seen.click_run = run.unwrap_or(0);
     }
 }
 
@@ -423,6 +427,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
     let content = *world.resource::<Content>();
     let me = session::my_character(world).map(|me| me.id());
     let viewpoint = world.resource::<session::Viewpoint>().0;
+    let spectating = world.resource::<session::SpectateStatus>().0;
     let area = viewpoint
         .and_then(|seen| world.get::<AreaTag>(seen))
         .map(|tag| tag.area);
@@ -510,9 +515,9 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             buyback: shown
                 .buyback
                 .iter()
-                .map(|sale| ProbeStack {
-                    item: sale.item,
-                    count: sale.count,
+                .map(|buyback| ProbeStack {
+                    item: buyback.sale.item,
+                    count: buyback.sale.count,
                 })
                 .collect(),
         }),
@@ -534,6 +539,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             .unwrap_or_default(),
         me: me.and_then(|me| body(world, me)),
         viewpoint: viewpoint.and_then(|seen| body(world, seen)),
+        spectating,
         actors: actors(world, me, area),
         props: props(world, area),
         items: items(world, area),
@@ -602,14 +608,15 @@ fn quests(world: &World, seen: Entity) -> Option<ProbeQuests> {
     let content = world.resource::<Content>();
     let log = world.get::<QuestLog>(seen)?;
     let inventory = world.get::<Inventory>(seen);
+    let now = world.resource::<ClientPlatform>().0.local_clock().now;
     Some(ProbeQuests {
         active: log
             .active
             .iter()
             .map(|active| ProbeQuest {
                 quest: active.quest,
-                ready: active.ready,
-                left: active.left,
+                ready: active.ready(content, world.resource::<Parties>(), inventory),
+                left: active.left(now),
                 progress: active
                     .quest
                     .get(content)
@@ -761,13 +768,10 @@ fn aim(world: &mut World, entity: Entity, hitbox: Rect<Tiles>) -> Pos<Tiles> {
 }
 
 fn clicked(world: &mut World, spot: Pos<Tiles>) -> Option<Entity> {
-    if let Some(enemy) = combat::enemy_at(world, spot) {
-        return Some(enemy);
+    match gestures::claim_at(world, Some(spot)) {
+        ClickClaim::Attack(entity) | ClickClaim::Interact(entity) => Some(entity),
+        _ => None,
     }
-    if item::pickable_at(world, spot).is_some() {
-        return None;
-    }
-    interact::interactable_at(world, spot)
 }
 
 fn items(world: &mut World, area: Option<AreaId>) -> Vec<ProbeGroundItem> {
@@ -884,6 +888,7 @@ fn ui(world: &mut World) -> Vec<ProbeUiElement> {
                 text,
                 image,
                 editable,
+                button: role == accesskit::Role::Button,
                 focused: tree.focus == *id,
                 click_through: gui::layer_at(&gui, rect.center()) != Some(widget.layer_id),
                 in_world: world_layers.contains(widget.layer_id),

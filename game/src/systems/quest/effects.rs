@@ -185,13 +185,8 @@ impl EffectDef<RiftScripting> for TurnIn {
                 return effects::refuse(world, cx, refused, "Nobody to hand it in");
             };
             if !super::ready_to_hand_in(world, player, quest) {
-                let title = &quest.get(world.resource::<Content>()).title;
-                return effects::refuse(
-                    world,
-                    cx,
-                    refused,
-                    format!("{title} isn't ready to hand in"),
-                );
+                let message = super::not_ready(world.resource::<Content>(), quest);
+                return effects::refuse(world, cx, refused, message);
             }
             if decides {
                 let handed_in = super::turn_in(world, player, quest, None);
@@ -301,7 +296,7 @@ impl EffectDef<RiftScripting> for Decide {
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
-        vec![Reach::Completes(self.quest)]
+        vec![Reach::Decides(self.quest)]
     }
 }
 
@@ -310,13 +305,7 @@ fn offer_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer> {
     let def = quest.get(content);
     let open = super::open_to(world, player, quest);
     let chips = match def.requires().filter(|_| def.reveals(ChoiceReveal::Needs)) {
-        Some(requires) => condition::parts(requires)
-            .into_iter()
-            .map(|part| ChoiceChip::Needs {
-                what: condition::describe(content, part),
-                met: condition::holds(world, player, part),
-            })
-            .collect(),
+        Some(requires) => ChoiceChip::needs(world, player, requires),
         None => Vec::new(),
     };
     vec![

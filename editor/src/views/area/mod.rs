@@ -50,7 +50,8 @@ use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_fi
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
-use crate::{play, user, value};
+use crate::views::navigation;
+use crate::{play, user};
 
 pub const TILE_PX: f32 = 16.0;
 pub const MIN_ZOOM: f32 = 0.125;
@@ -76,7 +77,7 @@ pub struct AreaViews {
     pub requests: Vec<scene::AreaSceneRequest>,
     pub views: HashMap<String, AreaViewState>,
     pub hover: Option<AreaHover>,
-    pub generation: u64,
+    pub active: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -162,20 +163,11 @@ impl AreaTool {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct InPlaceBlueprint {
-    pub blueprint: String,
-    pub module: usize,
-    pub at: Pos<Tiles>,
-    pub flip: area::Flip,
-    pub values: Value,
-}
-
 #[derive(Default)]
 pub struct AreaViewState {
     pub area: String,
     pub blueprint: Option<String>,
-    pub in_place: Vec<InPlaceBlueprint>,
+    pub in_place: Vec<usize>,
     pub center: Pos<Tiles>,
     pub zoom: f32,
     pub tool: AreaTool,
@@ -189,12 +181,10 @@ pub struct AreaViewState {
     pub overlay_modules: bool,
     pub overlay_surfaces: bool,
     pub overlay_sort_lines: bool,
-    pub drag: Option<AreaDrag>,
-    pub stroke: Option<brush::BrushStroke>,
+    pub gesture: Option<Gesture>,
     pub pick: brush::TilePick,
     pub terrain: brush::TerrainPick,
     pub stamp: Option<String>,
-    pub stamp_values: Value,
     pub listener: Option<Pos<Tiles>>,
     pub paste: Option<PasteGhost>,
     pub cursor_cell: Option<CellPos>,
@@ -205,8 +195,7 @@ pub struct AreaViewState {
     pub deferred: Vec<DeferredAreaAction>,
     pub menu: Option<modules::AreaMenuAnchor>,
     pub ghost: Option<Pos<Tiles>>,
-    pub population_hidden: HashSet<usize>,
-    pub population_seed: HashMap<usize, u64>,
+    pub population_previews: HashMap<String, PopulationPreview>,
     pub walk_value: Option<bool>,
     pub preview_area: Option<String>,
     pub skipped: Option<String>,
@@ -221,7 +210,6 @@ impl AreaViewState {
             show_blueprints: true,
             show_scenery: true,
             overlay_modules: true,
-            stamp_values: value::empty_object(),
             walk_value: Some(false),
             ..AreaViewState::default()
         }
@@ -238,23 +226,76 @@ impl AreaViewState {
         ))
     }
 
-    pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
-        match self.in_place.last() {
-            Some(place) => (place.at, place.flip),
-            None => (self.center_of_preview(), area::Flip::None),
+    pub fn drag(&self) -> Option<&AreaDrag> {
+        match &self.gesture {
+            Some(Gesture::Drag(drag)) => Some(drag),
+            _ => None,
         }
     }
 
-    fn center_of_preview(&self) -> Pos<Tiles> {
-        Pos::new(self.center.x.round(), self.center.y.round())
+    pub fn drag_mut(&mut self) -> Option<&mut AreaDrag> {
+        match &mut self.gesture {
+            Some(Gesture::Drag(drag)) => Some(drag),
+            _ => None,
+        }
     }
+
+    pub fn set_drag(&mut self, drag: AreaDrag) {
+        self.gesture = Some(Gesture::Drag(drag));
+    }
+
+    pub fn take_drag(&mut self) -> Option<AreaDrag> {
+        match self.gesture.take() {
+            Some(Gesture::Drag(drag)) => Some(drag),
+            other => {
+                self.gesture = other;
+                None
+            }
+        }
+    }
+
+    pub fn stroke(&self) -> Option<&brush::BrushStroke> {
+        match &self.gesture {
+            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            _ => None,
+        }
+    }
+
+    pub fn stroke_mut(&mut self) -> Option<&mut brush::BrushStroke> {
+        match &mut self.gesture {
+            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            _ => None,
+        }
+    }
+
+    pub fn set_stroke(&mut self, stroke: brush::BrushStroke) {
+        self.gesture = Some(Gesture::Stroke(stroke));
+    }
+
+    pub fn take_stroke(&mut self) -> Option<brush::BrushStroke> {
+        match self.gesture.take() {
+            Some(Gesture::Stroke(stroke)) => Some(stroke),
+            other => {
+                self.gesture = other;
+                None
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PopulationPreview {
+    pub hidden: bool,
+    pub seed: u64,
+}
+
+pub enum Gesture {
+    Drag(AreaDrag),
+    Stroke(brush::BrushStroke),
 }
 
 #[derive(Clone, Debug)]
 pub enum AreaDrag {
-    Pan {
-        last: Pos2,
-    },
     Box {
         from: Pos<Tiles>,
     },
@@ -276,7 +317,6 @@ pub enum AreaDrag {
         placed: Vec<Pos<Tiles>>,
         last: Pos<Tiles>,
     },
-    Listener,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -336,13 +376,14 @@ impl AreaViews {
     pub fn close(&mut self) {
         self.views.clear();
         self.requests.clear();
+        self.active = None;
     }
 
     pub fn camera_state(&self) -> Option<AreaCameraState> {
-        let hover = self.hover.as_ref()?;
-        let view = self.views.get(&area_view_key(&hover.area))?;
+        let area = self.active.as_ref()?;
+        let view = self.views.get(&area_view_key(area))?;
         Some(AreaCameraState {
-            area: hover.area.clone(),
+            area: area.clone(),
             center: view.center,
             zoom: view.zoom,
         })
@@ -356,7 +397,11 @@ impl AreaViews {
     }
 
     pub fn content_changed(&mut self) {
-        self.generation += 1;
+        for view in self.views.values_mut() {
+            if matches!(view.gesture, Some(Gesture::Stroke(_))) {
+                view.gesture = None;
+            }
+        }
     }
 
     pub fn ensure_view(&mut self, key: &str, area: &str) -> &mut AreaViewState {
@@ -394,7 +439,9 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
     let Some(layers) = row["map"]["ground"].as_array_mut() else {
         return;
     };
+    let removed = layers.iter().position(|name| name.as_str() == Some(layer));
     layers.retain(|name| name.as_str() != Some(layer));
+    let remaining = layers.len();
     let mut edit = ContentEdit::new(format!("Remove layer {layer} of {area}"));
     edit.write_json(row_file("area", area), &row);
     edit.remove(format!(
@@ -402,10 +449,20 @@ pub fn remove_layer(editor: &mut Editor, area: &str, layer: &str) {
         area::grid::folder(area),
         area::grid::layer_file(layer)
     ));
-    if editor.apply(edit)
-        && let Some(view) = editor.views.area.views.get_mut(&area_view_key(area))
-    {
-        view.layer = view.layer.saturating_sub(1);
+    if editor.apply(edit) {
+        for view in editor
+            .views
+            .area
+            .views
+            .values_mut()
+            .filter(|view| view.area == area)
+        {
+            view.hidden_ground.remove(layer);
+            if removed.is_some_and(|index| index < view.layer) {
+                view.layer -= 1;
+            }
+            view.layer = view.layer.min(remaining.saturating_sub(1));
+        }
     }
 }
 
@@ -494,9 +551,11 @@ fn show_canvas(
         if !view.fitted {
             let size = area::load(&content, area_id).size;
             view.center = Pos::new(size.width / 2.0, size.height / 2.0);
-            let fit = (canvas_rect.width() / (size.width * TILE_PX))
-                .min(canvas_rect.height() / (size.height * TILE_PX))
-                * FIT_MARGIN;
+            let fit = navigation::fit_zoom(
+                canvas_rect.size(),
+                Vec2::new(size.width, size.height),
+                TILE_PX,
+            ) * FIT_MARGIN;
             view.zoom = fit.clamp(MIN_ZOOM, MAX_FIT_ZOOM);
             view.fitted = true;
             if let Some(camera) = editor.settings.cameras.get(&camera_key(project, view_key)) {
@@ -505,6 +564,7 @@ fn show_canvas(
             }
         }
     }
+    let in_place = resolve_in_place(editor, content, view_key, area_key);
     let mut canvas_ui = ui.new_child(egui::UiBuilder::new().max_rect(canvas_rect));
     canvas(
         editor,
@@ -513,8 +573,9 @@ fn show_canvas(
         content,
         area_id,
         generation,
+        in_place.clone(),
     );
-    banners(editor, ui, view_key, content, canvas_rect);
+    banners(editor, ui, view_key, content, canvas_rect, &in_place);
     let mut rail_ui = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rail)
@@ -539,11 +600,37 @@ fn show_canvas(
     }
 }
 
-fn banners(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, canvas_rect: ERect) {
-    let (in_place, blueprint, area_key, preview_area) = {
+fn resolve_in_place(
+    editor: &mut Editor,
+    content: Content,
+    view_key: &str,
+    area_key: &str,
+) -> Vec<placement::Placement> {
+    let path = editor.views.area.view(view_key).in_place.clone();
+    if path.is_empty() {
+        return Vec::new();
+    }
+    let modules = modules::area_modules(editor, area_key);
+    match placement::resolve_in_place(content, &modules, &path) {
+        Some(chain) => chain,
+        None => {
+            editor.views.area.view_mut(view_key).in_place.clear();
+            Vec::new()
+        }
+    }
+}
+
+fn banners(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    view_key: &str,
+    content: Content,
+    canvas_rect: ERect,
+    in_place: &[placement::Placement],
+) {
+    let (blueprint, area_key, preview_area) = {
         let view = editor.views.area.view(view_key);
         (
-            view.in_place.clone(),
             view.blueprint.clone(),
             view.area.clone(),
             view.preview_area.clone(),
@@ -651,6 +738,7 @@ fn canvas(
     content: Content,
     area_id: AreaId,
     generation: u64,
+    in_place: Vec<placement::Placement>,
 ) {
     let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
     let painter = ui.painter_at(rect);
@@ -667,8 +755,8 @@ fn canvas(
                 ground: area_key.clone(),
                 scenery: scene::SceneryOf::Parts {
                     blueprint: blueprint.clone(),
-                    at: view.origin().0,
-                    values: view.stamp_values.clone(),
+                    at: origin_of(view.center, &in_place).0,
+                    values: stamp::stamp_values(editor, view.stamp.as_deref()),
                 },
                 hidden_ground,
                 show_blueprints: true,
@@ -724,6 +812,7 @@ fn canvas(
         area_id,
         area_key: area_key.clone(),
         modules,
+        in_place,
         placement_bounds,
         pointer: hovered,
         pointer_tile,
@@ -738,6 +827,9 @@ fn canvas(
     );
     tools::input(editor, ui, &painter, view_key, &frame);
     let blueprint_tab = editor.views.area.view(view_key).blueprint.is_some();
+    if !blueprint_tab {
+        editor.views.area.active = Some(area_key.clone());
+    }
     for deferred in std::mem::take(&mut editor.views.area.view_mut(view_key).deferred) {
         run_deferred(editor, &frame, deferred);
     }
@@ -760,8 +852,8 @@ fn canvas(
     if !blueprint_tab && (view.overlay_modules || !editor.selection.parts.is_empty()) {
         overlay_modules(editor, &painter, view_key, &frame);
     }
-    if let Some(place) = editor.views.area.view(view_key).in_place.last().cloned() {
-        placement::overlay_in_place(editor, &painter, &frame, &place);
+    if let Some(place) = frame.in_place.last() {
+        placement::overlay_in_place(editor, &painter, &frame, place);
     }
     if !blueprint_tab {
         pins::draw_arrivals(editor, &painter, &frame);
@@ -781,6 +873,7 @@ pub struct AreaFrame<'a> {
     pub area_id: AreaId,
     pub area_key: String,
     pub modules: Vec<Value>,
+    pub in_place: Vec<placement::Placement>,
     pub placement_bounds: HashMap<usize, Rect<Tiles>>,
     pub pointer: Option<Pos2>,
     pub pointer_tile: Option<Pos<Tiles>>,
@@ -795,6 +888,10 @@ impl AreaFrame<'_> {
 
     pub fn size(&self) -> Size<Tiles> {
         self.area().size
+    }
+
+    pub fn origin(&self) -> (Pos<Tiles>, area::Flip) {
+        origin_of(self.canvas.center, &self.in_place)
     }
 
     pub fn in_map(&self, tile: Pos<Tiles>) -> bool {
@@ -829,6 +926,24 @@ impl AreaFrame<'_> {
 
     pub fn pointer_cell(&self) -> Option<CellPos> {
         self.pointer_tile.map(|t| t.cell())
+    }
+
+    pub fn drag_tile(&self) -> Option<Pos<Tiles>> {
+        self.pointer_tile.or_else(|| {
+            self.response
+                .interact_pointer_pos()
+                .map(|p| self.canvas.to_tile(p))
+        })
+    }
+}
+
+fn origin_of(center: Pos<Tiles>, in_place: &[placement::Placement]) -> (Pos<Tiles>, area::Flip) {
+    match in_place.last() {
+        Some(place) => (place.at, place.flip),
+        None => (
+            Pos::new(center.x.round(), center.y.round()),
+            area::Flip::None,
+        ),
     }
 }
 
@@ -872,7 +987,7 @@ pub fn inspect_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection)
         let indices: Vec<usize> = selection
             .parts
             .iter()
-            .filter_map(|p| p.strip_prefix("/parts/")?.parse().ok())
+            .filter_map(|p| blueprint_part_index(p))
             .collect();
         parts::show_blueprint(editor, ui, &key, &indices);
         return;
@@ -908,4 +1023,28 @@ pub(super) fn run_deferred(editor: &mut Editor, frame: &AreaFrame, deferred: Def
         DeferredAreaAction::ReturnDoor(index) => scenery::return_door(editor, frame, index),
         DeferredAreaAction::AdoptBlocks(index) => scenery::adopt_blocks(editor, frame, index),
     }
+}
+
+fn module_part(index: usize) -> String {
+    format!("/modules/{index}")
+}
+
+fn module_index(part: &str) -> Option<usize> {
+    part.strip_prefix("/modules/")?.parse().ok()
+}
+
+fn blueprint_part(index: usize) -> String {
+    format!("/parts/{index}")
+}
+
+fn blueprint_part_index(part: &str) -> Option<usize> {
+    part.strip_prefix("/parts/")?.parse().ok()
+}
+
+fn remove_indices<T>(items: &mut Vec<T>, indices: &[usize]) {
+    let mut position = 0;
+    items.retain(|_| {
+        position += 1;
+        !indices.contains(&(position - 1))
+    });
 }

@@ -32,9 +32,6 @@ const chromiumArgs = [
 // needs a display to render through.
 const browsers = {
   chrome: { browserName: "chromium", channel: "chrome", headless: false, launchOptions: { args: chromiumArgs } },
-  // Edge is the same engine as Chrome (Chromium) — off for now to save a CI project. Re-add for
-  // Edge-channel-specific coverage.
-  // edge: { browserName: "chromium", channel: "msedge", headless: false, launchOptions: { args: chromiumArgs } },
   firefox: {
     browserName: "firefox",
     headless: false,
@@ -59,8 +56,6 @@ const browsers = {
 // cheapest for software WebGL to render, by several times.
 const resolutions = {
   smallest: { width: 640, height: 400 },
-  // Mobile portrait is off for now (halves the matrix). Re-add for mobile-viewport coverage.
-  // portrait: { width: 480, height: 844 },
 } as const;
 
 type BrowserName = keyof typeof browsers;

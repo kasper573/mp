@@ -118,8 +118,9 @@ pub fn coordinate(
                 Some(watched) => Spectating::Player(watched),
                 None => Spectating::Nobody,
             };
+            aim(world, client, spectator.watching);
             if spectator.told != Some(status) {
-                tell(world, client, status);
+                announce(world, client, status);
                 spectator.told = Some(status);
             }
             match spectator
@@ -238,22 +239,31 @@ fn pick(roster: &Roster, watching: Option<ClientId>, step: Option<Step>) -> Opti
     Some(roster.0[index].player)
 }
 
-fn tell(world: &mut World, client: ClientId, status: Spectating) {
-    let conns: Vec<Entity> = world
+fn connections(world: &mut World, client: ClientId) -> Vec<Entity> {
+    world
         .query::<(Entity, &ClientId)>()
         .iter(world)
         .filter(|(_, id)| **id == client)
         .map(|(conn, _)| conn)
-        .collect();
-    let watching = match status {
-        Spectating::Nobody => None,
-        Spectating::Player(watched) => Some(watched.player),
+        .collect()
+}
+
+/// The filter's view of a spectator's watch, mirrored from `Spectator::watching` on every coordination.
+/// Inserting only on a change keeps `Changed<PrivateSight>` meaning "the watched player changed".
+fn aim(world: &mut World, client: ClientId, watching: Option<ClientId>) {
+    let sight = PrivateSight {
+        own: client,
+        watching,
     };
-    for conn in conns {
-        world.entity_mut(conn).insert(PrivateSight {
-            own: client,
-            watching,
-        });
+    for conn in connections(world, client) {
+        if world.get::<PrivateSight>(conn) != Some(&sight) {
+            world.entity_mut(conn).insert(sight);
+        }
+    }
+}
+
+fn announce(world: &mut World, client: ClientId, status: Spectating) {
+    for conn in connections(world, client) {
         visibility::send_to(world, conn, status);
     }
 }

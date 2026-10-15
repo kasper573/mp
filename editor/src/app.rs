@@ -547,6 +547,7 @@ impl Editor {
     }
 
     pub fn close_project(&mut self) {
+        self.save_settings();
         if let Some(mut play) = self.play.running.take() {
             play.stop();
         }
@@ -595,7 +596,6 @@ impl Editor {
         if let Some(project) = &mut self.project
             && project.has_retired()
         {
-            self.views.content_changed();
             project.release_retired();
         }
     }

@@ -1,14 +1,10 @@
-use std::collections::HashMap;
-
 use egui::Ui;
-use game::core::audio::loader;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems::area::{self, AreaId};
 
 use crate::app::Editor;
-use crate::project::ProjectFiles;
 use crate::ui::theme;
 
 #[derive(Clone, Debug, Default)]
@@ -23,13 +19,7 @@ pub struct HeardModule {
     pub module: usize,
     pub gain: f32,
     pub outside: f32,
-    pub channels: Vec<(u32, String, f32, Option<IntegratedLoudness>)>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct IntegratedLoudness {
-    pub integrated: f64,
-    pub peak_dbfs: f64,
+    pub channels: Vec<(u32, String, f32)>,
 }
 
 pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Tiles>) {
@@ -44,21 +34,7 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Ti
         let channels = zone
             .channels
             .iter()
-            .map(|(channel, layer)| {
-                let loudness = editor
-                    .project
-                    .as_ref()
-                    .and_then(|project| {
-                        project.files.get(&format!("assets/{}", layer.src.as_str()))
-                    })
-                    .and_then(|bytes| measure(bytes));
-                (
-                    channel.0,
-                    layer.src.as_str().to_owned(),
-                    layer.volume,
-                    loudness,
-                )
-            })
+            .map(|(channel, layer)| (channel.0, layer.src.as_str().to_owned(), layer.volume))
             .collect();
         heard.push(HeardModule {
             module: index,
@@ -72,50 +48,6 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Ti
         at: (at.x, at.y),
         heard,
     });
-}
-
-/// Measuring decodes the whole file, so each version of a file is measured once.
-#[derive(Default)]
-pub struct LoudnessCache {
-    measured: HashMap<String, (String, Option<IntegratedLoudness>)>,
-}
-
-impl LoudnessCache {
-    pub fn of(&mut self, files: &ProjectFiles, file: &str) -> Option<IntegratedLoudness> {
-        let hash = files.hash_of(file)?;
-        if let Some((seen, loudness)) = self.measured.get(file)
-            && seen == hash
-        {
-            return *loudness;
-        }
-        let loudness = files.get(file).and_then(|bytes| measure(bytes));
-        self.measured
-            .insert(file.to_owned(), (hash.to_owned(), loudness));
-        loudness
-    }
-}
-
-pub fn measure(bytes: &[u8]) -> Option<IntegratedLoudness> {
-    let decoded = loader::decode(bytes.to_vec()).ok()?;
-    let channels = decoded.channels as u32;
-    let mut meter = ebur128::EbuR128::new(
-        channels,
-        decoded.sample_rate,
-        ebur128::Mode::I | ebur128::Mode::TRUE_PEAK,
-    )
-    .ok()?;
-    meter.add_frames_f32(&decoded.samples).ok()?;
-    let integrated = meter.loudness_global().ok()?;
-    let mut peak: f64 = f64::NEG_INFINITY;
-    for channel in 0..channels {
-        if let Ok(p) = meter.true_peak(channel) {
-            peak = peak.max(p);
-        }
-    }
-    Some(IntegratedLoudness {
-        integrated,
-        peak_dbfs: 20.0 * peak.max(1e-9).log10(),
-    })
 }
 
 #[derive(Default)]
@@ -139,7 +71,7 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
     let mut rows: Vec<(u32, String, String, String)> = Vec::new();
     for heard in &listening.heard {
         let from = soundscape_name(editor, &listening.area, heard.module);
-        for (channel, file, volume, _) in &heard.channels {
+        for (channel, file, volume) in &heard.channels {
             let where_ = if heard.outside <= 0.0 {
                 "inside".to_owned()
             } else {

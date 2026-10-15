@@ -8,7 +8,7 @@ use game::systems::movement::{MoveRequest, MoveSeq, Position, position};
 use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct, Tether};
 
-use crate::support::{Sim, row, spawn_area};
+use testkit::{Sim, row, spawn_area};
 
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {

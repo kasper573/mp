@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use renet2::RenetClient;
 
 use crate::core::gui::{self, Band};
+use crate::core::math::Rng;
 use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
@@ -16,6 +17,28 @@ const SERVER_RETRY: Backoff = Backoff {
     first: Seconds(1.0),
     longest: Seconds(30.0),
 };
+
+/// How many tries at the server have failed in a row, and when the next one is due. A due time of
+/// `None` means the next try waits for the player.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq)]
+pub struct Retry {
+    pub failures: u32,
+    pub due: Option<Seconds>,
+}
+
+impl Retry {
+    pub fn failed(self, now: Seconds, rng: &mut Rng) -> Retry {
+        let failures = self.failures + 1;
+        Retry {
+            failures,
+            due: Some(now + SERVER_RETRY.after(failures, rng)),
+        }
+    }
+
+    pub fn is_due(self, now: Seconds) -> bool {
+        self.due.is_some_and(|due| now >= due)
+    }
+}
 
 #[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ClientScreen {

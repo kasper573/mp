@@ -28,7 +28,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         ui.label(theme::muted(format!("{} is gone", owner.title())));
         return;
     };
-    super::ensure_catalogue(editor);
+    super::sync_with_content(editor);
     let names: Vec<String> = selection
         .parts
         .iter()
@@ -94,7 +94,7 @@ fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
 }
 
 pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    super::ensure_catalogue(editor);
+    super::sync_with_content(editor);
     if super::run::inspector(editor, ui, doc) {
         return;
     }
@@ -1259,9 +1259,8 @@ fn dialogue_form(
         .on_hover_text("Enter on the card")
         .clicked()
     {
-        let speaker = doc.default_speaker().json();
         if let Some(lines) = node["lines"].as_array_mut() {
-            lines.push(serde_json::json!({ "by": speaker, "text": [""] }));
+            lines.push(doc.default_speaker().blank_line());
         }
         changed = FormChange::at(path);
         *label = format!("Add a line in {}", doc.owner.title());
@@ -1788,7 +1787,6 @@ pub fn make_shared_body(
     mut dialog: MakeSharedDialog,
 ) -> Option<MakeSharedDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let owner = dialog
         .owner
         .title()
@@ -1806,6 +1804,7 @@ pub fn make_shared_body(
         .is_none_or(|problem| problem.contains("already exists"));
     let free = problem.is_none();
     dialogs::card(ctx, "make-shared", 620.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(RichText::new("Make shared").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(
@@ -1907,11 +1906,11 @@ pub fn make_shared_body(
                 })
                 .inner
                 .clicked()
-                || (enter && valid && free)
+                || (pressed.enter && valid && free)
             {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });
@@ -2045,7 +2044,6 @@ pub fn make_inline_body(
     mut dialog: MakeInlineDialog,
 ) -> Option<MakeInlineDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let count = editor
         .row_value("script", &dialog.key)
         .map_or(0, |script| script["nodes"].as_object().map_or(0, Map::len));
@@ -2064,6 +2062,7 @@ pub fn make_inline_body(
         })
         .collect();
     dialogs::card(ctx, "make-inline", 620.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(RichText::new("Make inline").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(theme::muted(format!("The {count} nodes of script/{} are copied into one owner's row, its values written in. The script row stays.", dialog.key)).size(13.5));
@@ -2123,10 +2122,10 @@ pub fn make_inline_body(
         );
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if widgets::primary(ui, "Make inline · one step").clicked() || enter {
+            if widgets::primary(ui, "Make inline · one step").clicked() || pressed.enter {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });

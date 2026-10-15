@@ -4,7 +4,7 @@ pub mod present;
 pub mod screen;
 pub mod transition;
 
-pub use camera::{WorldToWindow, cursor_tile, tile_to_window};
+pub use camera::{cursor_tile, tile_to_window};
 pub use screen::ToScreen;
 
 use std::collections::HashMap;
@@ -19,8 +19,10 @@ use crate::core::time::Seconds;
 
 pub const TILE: WorldPx = WorldPx(16.0);
 
-pub fn sprite_transform(pos: Pos<Tiles>, z: f32) -> Transform {
-    Transform::from_translation(pos.to_screen().extend(z))
+pub fn place_sprite(transform: &mut Transform, pos: Pos<Tiles>) {
+    let screen = pos.to_screen();
+    transform.translation.x = screen.x;
+    transform.translation.y = screen.y;
 }
 
 pub fn snap_to_screen(at: Vec2) -> Vec2 {

@@ -31,6 +31,7 @@ pub struct Desktop {
     observer: Option<Observer>,
     folder: PathBuf,
     seen: ProbeInputSeen,
+    cursor: Option<Pos<WindowPx>>,
     frame: u32,
     steps: File,
 }
@@ -106,6 +107,7 @@ impl Desktop {
             observer: None,
             folder: folder.to_path_buf(),
             seen: ProbeInputSeen::default(),
+            cursor: None,
             frame: 0,
             steps: File::create(folder.join("steps.log")).expect("a steps log"),
         };
@@ -144,11 +146,16 @@ impl Desktop {
         }
         let snapshot: ProbeSnapshot = from_json(&line);
         self.seen = snapshot.input.seen;
+        self.cursor = snapshot.input.cursor;
         self.frame = snapshot.frame;
         if let Some(observer) = self.observer.as_mut() {
             observer(&snapshot);
         }
         snapshot
+    }
+
+    pub fn cursor(&self) -> Option<Pos<WindowPx>> {
+        self.cursor
     }
 
     pub fn frame(&self) -> u32 {

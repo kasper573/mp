@@ -20,26 +20,29 @@ struct WalkState {
 }
 
 impl Gesture for WalkGesture {
-    fn claim(&self, world: &mut World) -> Option<ClickClaim> {
+    fn claim(&self, world: &mut World, tile: Option<Pos<Tiles>>) -> Option<ClickClaim> {
         if !session::is_alive(world) {
             return None;
         }
-        target(world).map(ClickClaim::Walk)
+        let tile = tile?.snap();
+        area::walkable(world, tile).then_some(ClickClaim::Walk(tile))
     }
 
-    fn drive(&self, world: &mut World, start: bool) {
+    fn drive(&self, world: &mut World, claim: Option<ClickClaim>, start: bool) {
         if !start {
             repeat(world);
             return;
         }
-        if let Some(tile) = target(world) {
+        if let Some(ClickClaim::Walk(tile)) = claim {
             movement::request_walk(world, tile);
             stamp(world, tile);
         }
     }
 
-    fn cursor(&self, world: &mut World) -> Option<Cursor> {
-        target(world)?;
+    fn cursor(&self, world: &mut World, claim: ClickClaim) -> Option<Cursor> {
+        let ClickClaim::Walk(_) = claim else {
+            return None;
+        };
         let shape = if map::pressed(world, InputAction::Interact) {
             CursorShape::WalkHeld
         } else {
@@ -48,19 +51,16 @@ impl Gesture for WalkGesture {
         Some(Cursor::Shaped(shape))
     }
 
-    fn tile_highlight(&self, world: &mut World) -> Option<ActiveTileHighlight> {
-        let pos = target(world)?;
+    fn tile_highlight(&self, world: &mut World, claim: ClickClaim) -> Option<ActiveTileHighlight> {
+        let ClickClaim::Walk(pos) = claim else {
+            return None;
+        };
         let target = &InterfaceIcon::WalkTarget
             .get(world.resource::<Content>())
             .image;
         let image = world.resource::<AssetServer>().load(target.path());
         Some(ActiveTileHighlight { pos, image })
     }
-}
-
-fn target(world: &mut World) -> Option<Pos<Tiles>> {
-    let tile = render::cursor_tile(world)?.snap();
-    area::walkable(world, tile).then_some(tile)
 }
 
 fn repeat(world: &mut World) {

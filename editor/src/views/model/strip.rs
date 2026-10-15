@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
 use game::core::math::Direction;
 use serde_json::Value;
@@ -961,20 +959,8 @@ pub fn keys(
                 };
             }
         }
-        let mut edit = ContentEdit::new(format!("Retime {name} of {key}"));
-        if editor
-            .views
-            .model
-            .view(key)
-            .last_nudge
-            .is_some_and(|at| at.elapsed().as_secs_f32() < 1.0)
-        {
-            edit = edit.merging();
-        }
-        if super::write_strip(editor, key, strip, &nudged, edit) {
-            let view = editor.views.model.view_mut(key);
-            view.last_nudge = Some(Instant::now());
-        }
+        let edit = ContentEdit::new(format!("Retime {name} of {key}")).merging();
+        super::write_strip(editor, key, strip, &nudged, edit);
         return;
     }
     if ctrl && (left || right) && selected.len() == 1 {

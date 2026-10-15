@@ -7,7 +7,7 @@ use game::systems::npc::NpcId;
 use game::systems::script::Speaker;
 use game::systems::shop::{ShopId, ShopRequest, ShopView};
 
-use crate::support::{
+use testkit::{
     Sim, content, conversation, count, give, later, leave, object, pick, place, row, slot_of,
     spawn_area, talk, townsperson,
 };

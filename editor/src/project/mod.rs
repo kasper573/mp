@@ -64,6 +64,24 @@ impl ContentEdit {
         self.write(file, json_bytes(value))
     }
 
+    pub fn update_json(
+        &mut self,
+        files: &ProjectFiles,
+        file: &str,
+        update: impl FnOnce(&mut serde_json::Value) -> Option<()>,
+    ) -> Option<()> {
+        let mut json = match self.changes.iter().find(|change| change.file == file) {
+            Some(FileChange {
+                bytes: Some(bytes), ..
+            }) => serde_json::from_slice(bytes).ok()?,
+            Some(FileChange { bytes: None, .. }) => return None,
+            None => files.json_owned(file)?,
+        };
+        update(&mut json)?;
+        self.write_json(file, &json);
+        Some(())
+    }
+
     pub fn write_row<T: serde::Serialize>(
         &mut self,
         file: impl Into<String>,
@@ -143,12 +161,10 @@ pub struct Project {
     pub root: PathBuf,
     pub files: ProjectFiles,
     pub disk: BTreeMap<String, String>,
-    unsaved: Vec<String>,
     pub content: Option<Content>,
     retired: Vec<Content>,
     pub report: Option<LoadReport>,
     pub history: EditHistory,
-    pub saved_at: Option<usize>,
     pub usages: ContentUsages,
     pub shapes: Arc<SchemaShapes>,
     pub read_only: Option<String>,
@@ -170,12 +186,10 @@ impl Project {
             root: root.to_path_buf(),
             files,
             disk,
-            unsaved: Vec::new(),
             content: None,
             retired: Vec::new(),
             report: None,
             history: EditHistory::default(),
-            saved_at: Some(0),
             usages: ContentUsages::default(),
             shapes,
             read_only: None,
@@ -184,7 +198,6 @@ impl Project {
             generation: 0,
             outside_rewrote: 0,
         };
-        project.refresh_unsaved();
         project.reload();
         Ok(project)
     }
@@ -334,45 +347,31 @@ impl Project {
         let (content, took) = load(&next, &self.root.display().to_string())
             .map_err(|report| Box::new(EditRefusal::of(&report)))?;
         self.files = next;
-        self.refresh_unsaved();
         self.last_load = Some(took);
         self.report = None;
         self.swap(content);
         Ok(())
     }
 
-    pub fn unsaved(&self) -> &[String] {
-        &self.unsaved
+    pub fn unsaved(&self) -> Vec<String> {
+        self.files
+            .paths()
+            .chain(self.disk.keys())
+            .filter(|path| self.is_unsaved(path))
+            .cloned()
+            .collect::<std::collections::BTreeSet<String>>()
+            .into_iter()
+            .collect()
     }
 
     pub fn is_unsaved(&self, path: &str) -> bool {
-        self.unsaved
-            .binary_search_by(|p| p.as_str().cmp(path))
-            .is_ok()
-    }
-
-    fn refresh_unsaved(&mut self) {
-        let mut paths: Vec<String> = self
-            .files
-            .paths()
-            .filter(|path| self.files.hash_of(path) != self.disk.get(*path).map(String::as_str))
-            .cloned()
-            .collect();
-        paths.extend(
-            self.disk
-                .keys()
-                .filter(|path| self.files.get(path).is_none())
-                .cloned(),
-        );
-        paths.sort();
-        self.unsaved = paths;
+        self.files.hash_of(path) != self.disk.get(path).map(String::as_str)
     }
 
     pub fn save(&mut self) -> Result<save::SaveOutcome, save::SaveError> {
         let outcome = save::save(&self.root, &self.files, &mut self.disk);
-        self.refresh_unsaved();
         if outcome.is_ok() {
-            self.saved_at = Some(self.history.applied());
+            self.history.mark_saved();
         }
         outcome
     }
@@ -418,9 +417,8 @@ impl Project {
                 taken.push(path);
             }
         }
-        self.refresh_unsaved();
         if !taken.is_empty() {
-            self.history.clear();
+            self.history.reset();
             self.reload();
             self.outside_rewrote = match self.report {
                 Some(_) => taken.len(),
@@ -435,9 +433,7 @@ impl Project {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
             None => self.files.remove(&conflict.file),
         }
-        self.refresh_unsaved();
-        self.history.clear();
-        self.saved_at = Some(0);
+        self.history.reset();
         self.reload();
     }
 

@@ -4,7 +4,7 @@ use game::systems::movement::position;
 use game::systems::npc::{self, Pack};
 use game::systems::stat::{self, StatKind};
 
-use crate::support::{Sim, row, spawn_area};
+use testkit::{Sim, row, spawn_area};
 
 #[test]
 fn an_attack_walks_into_range_and_strikes() {

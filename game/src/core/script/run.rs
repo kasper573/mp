@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use bevy_ecs::prelude::*;
@@ -70,6 +70,7 @@ pub enum BoxEnding {
 
 pub type Locals = SmallVec<[Value; 2]>;
 
+#[derive(Clone)]
 pub struct FlowCx {
     pub owner: Option<Entity>,
     pub subject: Option<Entity>,
@@ -90,7 +91,7 @@ impl FlowCx {
     }
 
     pub fn event_field(&self, index: usize) -> Value {
-        self.event.get(index).cloned().unwrap_or(Value::Int(0))
+        self.event[index].clone()
     }
 }
 
@@ -168,7 +169,6 @@ enum Queued<V: Vocabulary> {
 struct Instance<V: Vocabulary> {
     procedures: Vec<Arc<Procedure<V>>>,
     may_do: MayDo<V>,
-    answered: Vec<<V::Event as EventDef<V>>::Kind>,
     state: HashMap<ProcedureId, Vec<Value>>,
     flows: Vec<FlowSlot>,
 }
@@ -243,7 +243,7 @@ impl<V: Vocabulary> Instances<V> {
     pub fn answers(&self, owner: Owner<V>, kind: <V::Event as EventDef<V>>::Kind) -> bool {
         self.instances
             .get(&owner)
-            .is_some_and(|instance| instance.answered.contains(&kind))
+            .is_some_and(|instance| instance.may_do.answers(kind))
     }
 
     pub fn entries(
@@ -277,22 +277,8 @@ impl<V: Vocabulary> Instances<V> {
         let mut found = Vec::new();
         for procedure in &instance.procedures {
             for (entry, _) in procedure.entry(kind) {
-                let cx = FlowCx {
-                    owner: owner.entity(),
-                    subject: Some(subject),
-                    locals: procedure.locals.iter().map(|(_, ty)| ty.zero()).collect(),
-                    state: instance
-                        .state
-                        .get(&procedure.id)
-                        .cloned()
-                        .unwrap_or_else(|| {
-                            procedure.state.iter().map(|(_, ty)| ty.zero()).collect()
-                        }),
-                    event: Vec::new(),
-                };
-                if let Some(node) = peek_dialogue(world, procedure, entry, cx) {
-                    found.push((procedure.label.clone(), procedure.name(node)));
-                }
+                let cx = fresh_cx(instance, procedure, owner.entity(), Some(subject));
+                peek_dialogues(world, instance, procedure, entry, cx, &mut found);
             }
         }
         found
@@ -449,15 +435,22 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
                     entry,
                     subject,
                     event,
-                }) => instances
-                    .start_flow(owner, procedure, entry, subject, event)
-                    .map(|(key, flow)| Picked::Start(key, flow)),
+                }) => {
+                    if instances.is_full(owner) {
+                        Some(Picked::Dropped(owner))
+                    } else {
+                        instances
+                            .start_flow(owner, procedure, entry, subject, event)
+                            .map(|(key, flow)| Picked::Start(key, flow))
+                    }
+                }
                 Some(Queued::Resume { key, answer }) => instances
                     .take_flow(key)
                     .map(|flow| Picked::Resume(key, flow, answer)),
             }
         };
         match picked {
+            Some(Picked::Dropped(owner)) => V::log_dropped_flow(world, &owner, "32 live flows"),
             Some(Picked::Start(key, flow)) => run_flow::<V>(world, key, flow, clock),
             Some(Picked::Resume(key, flow, answer)) => {
                 if let Some(flow) = resume::<V>(world, key, flow, answer) {
@@ -480,6 +473,7 @@ struct TickClock {
 }
 
 enum Picked<V: Vocabulary> {
+    Dropped(Owner<V>),
     Start(FlowKey<V>, Flow<V>),
     Resume(FlowKey<V>, Flow<V>, Answer),
 }
@@ -522,6 +516,12 @@ impl<V: Vocabulary> Instances<V> {
         Some((FlowKey { owner, flow: id }, flow))
     }
 
+    fn is_full(&self, owner: Owner<V>) -> bool {
+        self.instances
+            .get(&owner)
+            .is_some_and(|instance| instance.flows.len() >= MAX_LIVE_FLOWS)
+    }
+
     fn take_flow(&mut self, key: FlowKey<V>) -> Option<Flow<V>> {
         let slot = *self.by_id.get(&key.flow)?;
         self.flows.get_mut(slot)?.take()
@@ -542,21 +542,16 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
     while let Some(op) = world.resource_mut::<Instances<V>>().ops.pop_front() {
         match op {
             Op::Spawn { owner, procedures } => {
+                close_instance(world, owner);
                 let mut may_do = MayDo::default();
-                let mut answered = Vec::new();
                 for procedure in &procedures {
                     may_do.absorb(&procedure.may_do);
                     may_do
                         .answers
                         .extend(procedure.may_do.answers.iter().copied());
-                    for (_, event) in &procedure.entries {
-                        if !answered.contains(&event.kind()) {
-                            answered.push(event.kind());
-                        }
-                    }
                 }
                 let mut instances = world.resource_mut::<Instances<V>>();
-                for kind in &answered {
+                for kind in &may_do.answers {
                     let owners = instances.answering.entry(*kind).or_default();
                     if !owners.contains(&owner) {
                         owners.push(owner);
@@ -567,53 +562,12 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
                     Instance {
                         procedures,
                         may_do,
-                        answered,
                         state: HashMap::new(),
                         flows: Vec::new(),
                     },
                 );
             }
-            Op::Remove { owner } => {
-                let removed = {
-                    let mut instances = world.resource_mut::<Instances<V>>();
-                    instances
-                        .queue
-                        .retain(|queued| queued_owner(queued) != owner);
-                    let removed = instances.instances.remove(&owner);
-                    if let Some(instance) = &removed {
-                        for kind in &instance.answered {
-                            if let Some(owners) = instances.answering.get_mut(kind) {
-                                owners.retain(|known| *known != owner);
-                            }
-                        }
-                    }
-                    removed
-                };
-                let closing: Vec<(FlowKey<V>, Entity)> =
-                    removed.map_or_else(Vec::new, |instance| {
-                        let mut instances = world.resource_mut::<Instances<V>>();
-                        let mut closing = Vec::new();
-                        for &slot in &instance.flows {
-                            let Some(flow) = instances.flows.remove(slot).flatten() else {
-                                continue;
-                            };
-                            instances.by_id.remove(&flow.id);
-                            if flow.box_open
-                                && let Some(subject) = flow.subject
-                            {
-                                let key = FlowKey {
-                                    owner,
-                                    flow: flow.id,
-                                };
-                                closing.push((key, subject));
-                            }
-                        }
-                        closing
-                    });
-                for (key, subject) in closing {
-                    V::close_dialogue(world, key, subject, BoxEnding::Gone);
-                }
-            }
+            Op::Remove { owner } => close_instance(world, owner),
             Op::Raise {
                 owner,
                 kind,
@@ -662,14 +616,6 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
                     starts
                 };
                 for (procedure, entry) in starts {
-                    let full = world.resource::<Instances<V>>().instances[&owner]
-                        .flows
-                        .len()
-                        >= MAX_LIVE_FLOWS;
-                    if full {
-                        V::log_dropped_flow(world, &owner, "32 live flows");
-                        continue;
-                    }
                     world
                         .resource_mut::<Instances<V>>()
                         .queue
@@ -694,6 +640,47 @@ fn apply_ops<V: Vocabulary>(world: &mut World) {
                 }
             }
         }
+    }
+}
+
+fn close_instance<V: Vocabulary>(world: &mut World, owner: Owner<V>) {
+    let removed = {
+        let mut instances = world.resource_mut::<Instances<V>>();
+        instances
+            .queue
+            .retain(|queued| queued_owner(queued) != owner);
+        let removed = instances.instances.remove(&owner);
+        if let Some(instance) = &removed {
+            for kind in &instance.may_do.answers {
+                if let Some(owners) = instances.answering.get_mut(kind) {
+                    owners.retain(|known| *known != owner);
+                }
+            }
+        }
+        removed
+    };
+    let closing: Vec<(FlowKey<V>, Entity)> = removed.map_or_else(Vec::new, |instance| {
+        let mut instances = world.resource_mut::<Instances<V>>();
+        let mut closing = Vec::new();
+        for &slot in &instance.flows {
+            let Some(flow) = instances.flows.remove(slot).flatten() else {
+                continue;
+            };
+            instances.by_id.remove(&flow.id);
+            if flow.box_open
+                && let Some(subject) = flow.subject
+            {
+                let key = FlowKey {
+                    owner,
+                    flow: flow.id,
+                };
+                closing.push((key, subject));
+            }
+        }
+        closing
+    });
+    for (key, subject) in closing {
+        V::close_dialogue(world, key, subject, BoxEnding::Gone);
     }
 }
 
@@ -962,6 +949,7 @@ fn run_flow_traced<V: Vocabulary>(
             Step::Dialogue {
                 node: dialogue,
                 values,
+                labels,
                 requires,
                 choices,
                 next,
@@ -974,7 +962,7 @@ fn run_flow_traced<V: Vocabulary>(
                     continue;
                 };
                 let mut offers = Vec::new();
-                for (index, choice) in dialogue.choices.iter().enumerate() {
+                for (index, (choice, label)) in dialogue.choices.iter().zip(labels).enumerate() {
                     let met = match &requires[index] {
                         Some(requires) => requires(world, &cx).truthy(),
                         None => true,
@@ -1004,6 +992,7 @@ fn run_flow_traced<V: Vocabulary>(
                     offers.push(ChoiceOffer {
                         index,
                         label: &choice.label,
+                        label_values: label.iter().map(|eval| eval(world, &cx)).collect(),
                         locked: !met,
                         requires: choice.requires.as_ref(),
                         reveal: choice.reveal.as_slice(),
@@ -1169,23 +1158,26 @@ fn end_flow<V: Vocabulary>(world: &mut World, key: FlowKey<V>, flow: Flow<V>, en
     }
 }
 
-fn peek_dialogue<V: Vocabulary>(
+fn peek_dialogues<V: Vocabulary>(
     world: &World,
+    instance: &Instance<V>,
     procedure: &Procedure<V>,
     entry: StepIndex,
-    mut cx: FlowCx,
-) -> Option<StepIndex> {
-    let mut at = Some(entry);
-    for _ in 0..procedure.steps.len() {
-        let node = at?;
-        at = match procedure.step(node) {
-            Step::On { next } => *next,
+    cx: FlowCx,
+    found: &mut Vec<(String, Name)>,
+) {
+    let mut todo = vec![(entry, cx)];
+    let mut visited = HashSet::new();
+    while let Some((node, mut cx)) = todo.pop() {
+        if !visited.insert(node) {
+            continue;
+        }
+        match procedure.step(node) {
+            Step::Dialogue { .. } => found.push((procedure.label.clone(), procedure.name(node))),
+            Step::Return { .. } => {}
             Step::If { test, yes, no } => {
-                if test(world, &cx).truthy() {
-                    *yes
-                } else {
-                    *no
-                }
+                let next = if test(world, &cx).truthy() { *yes } else { *no };
+                todo.extend(next.map(|next| (next, cx)));
             }
             Step::Set { values, next } => {
                 for (slot, to) in values {
@@ -1195,14 +1187,43 @@ fn peek_dialogue<V: Vocabulary>(
                         Slot::State(index) => cx.state[*index] = value,
                     }
                 }
-                *next
+                todo.extend(next.map(|next| (next, cx)));
             }
-            Step::Effect {
-                outputs, pauses, ..
-            } if !*pauses => outputs.first().and_then(|(_, to)| *to),
-            Step::Dialogue { .. } => return Some(node),
-            _ => return None,
-        };
+            Step::Run {
+                callee,
+                entry,
+                next,
+                ..
+            } => {
+                let callee_cx = fresh_cx(instance, callee, cx.owner, cx.subject);
+                peek_dialogues(world, instance, callee, *entry, callee_cx, found);
+                todo.extend(next.map(|next| (next, cx)));
+            }
+            _ => todo.extend(
+                procedure
+                    .successors(node)
+                    .into_iter()
+                    .map(|next| (next, cx.clone())),
+            ),
+        }
     }
-    None
+}
+
+fn fresh_cx<V: Vocabulary>(
+    instance: &Instance<V>,
+    procedure: &Procedure<V>,
+    owner: Option<Entity>,
+    subject: Option<Entity>,
+) -> FlowCx {
+    FlowCx {
+        owner,
+        subject,
+        locals: procedure.locals.iter().map(|(_, ty)| ty.zero()).collect(),
+        state: instance
+            .state
+            .get(&procedure.id)
+            .cloned()
+            .unwrap_or_else(|| procedure.state.iter().map(|(_, ty)| ty.zero()).collect()),
+        event: Vec::new(),
+    }
 }

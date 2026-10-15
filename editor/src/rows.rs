@@ -876,7 +876,9 @@ fn unpack_entry(project: &Project, value: &mut Value, pointer: &str) {
     if index >= list.len() {
         return;
     }
-    let parts = placement::unpacked(content, &list[index]);
+    let Some(parts) = placement::unpacked(content, &list[index]) else {
+        return;
+    };
     list.remove(index);
     for (offset, part) in parts.into_iter().enumerate() {
         list.insert(index + offset, part);

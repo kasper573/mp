@@ -116,11 +116,6 @@ impl<Row: ContentRow> Table<Row> {
         self.keys
             .binary_search_by(|candidate| candidate.as_bytes().cmp(key.as_bytes()))
             .ok()
-            .or_else(|| {
-                self.keys
-                    .iter()
-                    .position(|candidate| candidate.eq_ignore_ascii_case(key))
-            })
             .map(|index| ContentId::new(index as u32))
     }
 }
@@ -242,10 +237,6 @@ pub struct ContentBuilder {
 }
 
 impl ContentBuilder {
-    pub fn table<Row: ContentRow>(&mut self, rows: Vec<(String, Row)>) -> &mut ContentBuilder {
-        self.insert_table(Table::new(rows))
-    }
-
     pub fn insert_table<Row: ContentRow>(&mut self, table: Table<Row>) -> &mut ContentBuilder {
         let table: &'static Table<Row> = Box::leak(Box::new(table));
         self.tables.insert(TypeId::of::<Row>(), table);

@@ -50,12 +50,7 @@ impl Plugin for PlatePlugin {
 }
 
 pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
-    let plate = world
-        .resource::<Plates>()
-        .0
-        .get(&actor)
-        .copied()
-        .filter(|rect| rect.height() > 0.0);
+    let plate = world.resource::<Plates>().0.get(&actor).copied();
     match plate {
         Some(rect) => Some(Vec2::new(rect.center().x, rect.min.y)),
         None => {
@@ -132,6 +127,9 @@ fn draw_plates(world: &mut World) {
                 .into_iter()
                 .map(|mark| gui::image(world, &mark.get(&content).icon))
                 .collect();
+            if label.name.is_none() && label.role.is_none() && icons.is_empty() {
+                return None;
+            }
             let size = plate_size(&gui, &label, &icons);
             let rect = egui::Rect::from_min_size(
                 egui::pos2(

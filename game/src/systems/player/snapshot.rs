@@ -8,6 +8,7 @@ use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, ke
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::GameSettings;
+use crate::systems::actor::Name;
 use crate::systems::area::{self, AreaId, transition::Discovered};
 use crate::systems::dialogue::Heard;
 use crate::systems::effect::{Effect, TimedEffect, TimedEffects};
@@ -16,7 +17,7 @@ use crate::systems::history::{History, HistoryEntry};
 use crate::systems::item::{INVENTORY_MAX, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::job::{Job, JobId};
 use crate::systems::memory::{Memory, MemoryId};
-use crate::systems::player::{CharacterState, Xp, def, player_stats};
+use crate::systems::player::{CharacterState, SpawnPoint, Xp, def, player_stats};
 use crate::systems::quest::{ActiveQuest, FinishedQuest, Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::Place;
 use crate::systems::shop::{Sale, ShopId, ShopLedger};
@@ -226,8 +227,10 @@ pub fn materialize(
         }
     }
     CharacterState {
-        name: snapshot.name.clone(),
-        spawn: start.at,
+        name: Name {
+            name: snapshot.name.clone(),
+        },
+        spawn: SpawnPoint(start.at),
         discovered,
         stats: player_stats(&stats, immortal),
         inventory: Inventory {
@@ -320,7 +323,6 @@ fn quest_log(content: &Content, snapshot: &CharacterSnapshot, clock: WallClock) 
                     *count = *given;
                 }
                 active.deadline = entry.left.map(|left| clock.now.after(left));
-                active.left = entry.left;
                 active.decided = entry.decided.clone();
                 log.active.push(active);
                 log.tracked.push(entry.quest);

@@ -42,9 +42,10 @@ impl JsonIndex {
         }
     }
 
-    // In the order they're written.
     pub fn strings(&self) -> impl Iterator<Item = &IndexedValue> {
-        self.values.iter().filter(|value| value.string.is_some())
+        self.values
+            .iter()
+            .filter(|value| !value.key && value.string.is_some())
     }
 
     fn visit(&mut self, value: &Value, pointer: String, lines: &Lines) {

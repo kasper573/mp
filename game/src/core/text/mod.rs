@@ -236,18 +236,14 @@ fn advance_typewriters(
         if line.is_changed() && !line.is_added() {
             *typewriter = Typewriter::default();
         }
-        let times = reveal_times(&line.pieces, *speed);
         let shown = if typewriter.finished {
-            times.len()
+            reveal_times(&line.pieces, *speed).len()
         } else {
             typewriter.elapsed += time.delta();
-            if typewriter.elapsed >= times.last().copied().unwrap_or_default() {
+            if typewriter.elapsed >= reveal_duration(&line.pieces, *speed) {
                 typewriter.finished = true;
             }
-            times
-                .iter()
-                .take_while(|at| **at <= typewriter.elapsed)
-                .count()
+            revealed(&line.pieces, *speed, typewriter.elapsed)
         };
         if shown > typewriter.shown {
             let newly = typewriter.shown..shown;

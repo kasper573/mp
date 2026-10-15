@@ -29,10 +29,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, 
         .map(|(id, def)| (id.key(&content).to_owned(), def))
         .collect();
     let used = area::load(&content, area_id).grids.tilesets();
-    let mut lens = editor.views.area.view(view_key).palette_lens;
-    if editor.views.area.view(view_key).tool == super::AreaTool::Terrain {
-        lens = PaletteLens::Terrains;
-    }
+    let view = editor.views.area.view(view_key);
+    let stored = view.palette_lens;
+    let lens = if view.tool == super::AreaTool::Terrain {
+        PaletteLens::Terrains
+    } else {
+        stored
+    };
+    let mut picked = stored;
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         for (value, label) in [
@@ -41,7 +45,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, 
         ] {
             let on = lens == value;
             if widgets::toggle_chip(ui, label, on).clicked() {
-                lens = value;
+                picked = value;
             }
         }
         ui.add_space(12.0);
@@ -50,7 +54,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: Content, 
             PaletteLens::Terrains => terrain_chips(editor, ui, view_key, &tilesets, &used),
         }
     });
-    editor.views.area.view_mut(view_key).palette_lens = lens;
+    editor.views.area.view_mut(view_key).palette_lens = picked;
     ui.add_space(6.0);
     match lens {
         PaletteLens::Tiles => tile_sheet(editor, ui, view_key, content, &tilesets),

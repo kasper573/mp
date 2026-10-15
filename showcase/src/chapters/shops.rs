@@ -38,9 +38,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("The list stays as narrow as its wares, and browsing never shifts it");
     let listed = row_x(&mut me, "Bone Shield");
     for ware in ["Bone Shield", "Health Potion", "Greater Health Potion"] {
-        me.click_ui(UiTarget::text(ware).and("in the list", move |element, _| {
-            element.rect.min_x() <= listed + 1.0
-        }));
+        me.click_ui(UiTarget::button(ware));
         me.settled();
         assert_eq!(
             row_x(&mut me, "Bone Shield"),
@@ -146,10 +144,9 @@ fn shop_is(snapshot: &ProbeSnapshot, shop: &str) -> bool {
 // The ware's row in the list, rather than its name repeated on the details beside it.
 fn row_x(me: &mut Player, ware: &str) -> f32 {
     let seen = me.settled();
-    seen.ui
-        .iter()
-        .filter(|element| element.text.as_deref() == Some(ware))
-        .map(|element| element.rect.min_x())
-        .min_by(f32::total_cmp)
+    UiTarget::button(ware)
+        .find(&seen)
         .unwrap_or_else(|| panic!("{ware} is not listed"))
+        .rect
+        .min_x()
 }

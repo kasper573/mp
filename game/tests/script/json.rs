@@ -3,7 +3,7 @@ use game::systems::script::{RiftEffect, ScriptModule};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::support::content;
+use testkit::content;
 
 /// Reads a value as the loader would, with every row key resolved against the shipped content.
 pub fn parse<T: DeserializeOwned>(value: Value) -> T {

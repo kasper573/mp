@@ -43,7 +43,16 @@ pub struct SpreadsheetState {
     pub editing: Option<String>,
     pub form: FormState,
     pub last_edit: Option<(String, String, String)>,
+    focus_editor: bool,
     columns: Option<(u64, Arc<Vec<SpreadsheetColumn>>)>,
+}
+
+impl SpreadsheetState {
+    fn open_cell(&mut self, column: String) {
+        self.editing = Some(column);
+        self.form = FormState::default();
+        self.focus_editor = true;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -905,8 +914,7 @@ fn table_body(
             state.editing = None;
         }
         if hit.double || (same && hit.column != "key") {
-            state.editing = Some(hit.column.clone());
-            state.form = FormState::default();
+            state.open_cell(hit.column.clone());
         }
         editor.select(RowSelection {
             table: table.to_owned(),
@@ -993,22 +1001,16 @@ fn edit_cell(
         return CellEdit::Cancelled;
     };
     let state = views.spreadsheet.state_mut(table);
+    let autofocus = std::mem::take(&mut state.focus_editor);
     let mut cx = FormCx::new(project, root, shapes, &mut state.form, &mut actions)
         .owned_by(table, Some(&row.key));
-    let first_frame = !cx
-        .state
-        .drafts
-        .contains_key(&ui.id().with(&path).with("number"))
-        && !cx.state.drafts.contains_key(&ui.id().with(&path));
+    cx.autofocus = autofocus;
     let changed = ui
         .push_id(("sheet-cell", &row.key, &column.id), |ui| {
             ui.set_width(ui.available_width());
             forms::value(ui, &mut cx, &schema, &mut value, &path)
         })
         .inner;
-    if first_frame {
-        ui.memory_mut(|m| m.request_focus(ui.id().with(&path).with("number")));
-    }
     match changed.0 {
         Some(label) => CellEdit::Committed(value, format!("{label} of {}", row.key)),
         None => CellEdit::Open,
@@ -1159,8 +1161,7 @@ fn keys(
         state.selected = Some((rows[target.0].key.clone(), shown[target.1].id.clone()));
         state.anchor = None;
         if tab && shown[target.1].source != ColumnSource::Key {
-            state.editing = Some(shown[target.1].id.clone());
-            state.form = FormState::default();
+            state.open_cell(shown[target.1].id.clone());
         }
         editor.select(RowSelection {
             table: table.to_owned(),
@@ -1170,8 +1171,7 @@ fn keys(
         return;
     }
     if enter && shown[column_index].source != ColumnSource::Key {
-        state.editing = Some(column_id.clone());
-        state.form = FormState::default();
+        state.open_cell(column_id.clone());
         return;
     }
     if copy {

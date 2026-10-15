@@ -178,63 +178,6 @@ pub fn holes_in(value: &Value, pointer: &str) -> Vec<HoleSite> {
     out
 }
 
-pub fn strip_holes(value: &mut Value) {
-    if let Some(name) = hole_name(value) {
-        *value = Value::String(format!("◇ {name}"));
-        return;
-    }
-    match value {
-        Value::Object(map) => {
-            for v in map.values_mut() {
-                strip_holes(v);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                strip_holes(item);
-            }
-        }
-        _ => {}
-    }
-}
-
-pub fn merge_keeping_holes(part: &mut Value, plain: &Value) {
-    match (part, plain) {
-        (part @ Value::Object(_), Value::Object(edited)) if hole_name(part).is_none() => {
-            let Value::Object(map) = part else {
-                return;
-            };
-            let keys: Vec<String> = map.keys().cloned().collect();
-            for key in keys {
-                match edited.get(&key) {
-                    Some(value) => merge_keeping_holes(&mut map[&key], value),
-                    None => {
-                        map.remove(&key);
-                    }
-                }
-            }
-            for (key, value) in edited {
-                if !map.contains_key(key) {
-                    map.insert(key.clone(), value.clone());
-                }
-            }
-        }
-        (Value::Array(items), Value::Array(edited)) if items.len() == edited.len() => {
-            for (item, value) in items.iter_mut().zip(edited) {
-                merge_keeping_holes(item, value);
-            }
-        }
-        (part, plain) => {
-            if let Value::String(text) = plain
-                && text.starts_with("◇ ")
-            {
-                return;
-            }
-            *part = plain.clone();
-        }
-    }
-}
-
 pub struct HoleableField {
     pub pointer: String,
     pub kind: VariableType,

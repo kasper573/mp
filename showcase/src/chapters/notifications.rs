@@ -1,11 +1,10 @@
 use std::time::{Duration, Instant};
 
 use driver::{
-    Player, UiTarget, area_key, arrived_in, content, erred, holding, hunting_ground, in_feed,
-    marker_at, nearest_npc, npc_is, portal, told_by,
+    Player, UiTarget, arrived_in, content, erred, holding, marker_at, nearest_npc, noticed, npc_is,
+    portal, told_by,
 };
-use game::core::math::{Offset, Pos};
-use game::core::tiling::Tiles;
+use game::core::math::Offset;
 use game::systems::history::HistoryTopic;
 use game::systems::input::map::InputAction;
 use game::systems::probe::ProbeSnapshot;
@@ -47,7 +46,7 @@ fn play(shoot: &mut Shoot) {
     me.pick("Would a fish change your mind?");
     me.on_stage("fish");
     me.wait_until("the pass in the feed", |snapshot| {
-        in_feed(snapshot, "+1 Road Pass")
+        noticed(snapshot, "+1 Road Pass")
     });
     me.caption_top("The trade shows in the corner, over her bust: the fish goes, the pass arrives");
     me.read_to_choices();
@@ -172,24 +171,19 @@ fn yelled(snapshot: &ProbeSnapshot, npc: &str) -> bool {
 }
 
 fn fight_until(me: &mut Player, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) {
-    look_out(me, npc, &done);
+    me.look_out(npc, |snapshot| {
+        done(snapshot) || nearest_npc(snapshot, npc).is_some()
+    });
     me.fight(|_, body| npc_is(body, npc), done);
 }
 
 // Walks toward the nearest of them until `done`.
 fn seek(me: &mut Player, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) {
-    let ground = look_out(me, npc, &done);
+    let ground = me.look_out(npc, |snapshot| {
+        done(snapshot) || nearest_npc(snapshot, npc).is_some()
+    });
     me.travel_to(
         |snapshot| Some(nearest_npc(snapshot, npc).map_or(ground, |foe| foe.at)),
         done,
     );
-}
-
-fn look_out(me: &mut Player, npc: &str, done: &impl Fn(&ProbeSnapshot) -> bool) -> Pos<Tiles> {
-    let area = area_key(&me.snapshot()).expect("an area");
-    let ground = hunting_ground(area, npc);
-    me.look_for(&format!("{npc} in sight"), ground, |snapshot| {
-        done(snapshot) || nearest_npc(snapshot, npc).is_some()
-    });
-    ground
 }

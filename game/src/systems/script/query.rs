@@ -510,7 +510,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                         character(world, cx, &of)
                             .and_then(|who| quest::log_of(world, who))
                             .and_then(|log| log.finished(quest))
-                            .and_then(|done| done.resets_in)
+                            .and_then(|done| done.resets_in(world.resource::<WallClock>().now))
                             .map(Seconds::in_words)
                             .unwrap_or_default(),
                     )

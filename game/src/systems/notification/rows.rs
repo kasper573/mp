@@ -10,7 +10,7 @@ use egui::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::NotificationSent;
+use super::{NotificationSent, window_visible};
 use crate::core::gui::{self, Band};
 use crate::core::text::{
     self, KeyNames, MotionPreference, StyledLine, TextLook, TextPiece, TextShadow,
@@ -97,7 +97,19 @@ pub struct NotificationRow {
 
 pub(super) fn plugin<P: RowPlace>(app: &mut App) {
     app.init_resource::<PlacedRows<P>>()
-        .add_systems(Update, tick::<P>.run_if(in_state(ClientScreen::Area)));
+        .add_systems(
+            Update,
+            tick::<P>
+                .run_if(in_state(ClientScreen::Area))
+                .run_if(window_visible),
+        )
+        .add_systems(OnExit(ClientScreen::Area), forget::<PlacedRows<P>>);
+}
+
+/// Everything a notification place or row keeps is about the area it was raised in, so each one
+/// starts empty when that area is left.
+pub(super) fn forget<R: Resource + Default>(world: &mut World) {
+    world.insert_resource(R::default());
 }
 
 pub(super) fn join<P: RowPlace>(
@@ -308,6 +320,17 @@ pub(super) fn hovered(world: &World, rects: &[Rect]) -> bool {
     pointer.is_some_and(|at| rects.iter().any(|rect| rect.contains(at)))
 }
 
+const BUMP_SCALE: f32 = 1.08;
+const BUMP_SECONDS: f64 = 0.25;
+
+/// How far a toast swells after it is bumped by a repeat, easing back to its size.
+pub(super) fn bump(bumped_at: Option<f64>, now: f64, still: bool) -> f32 {
+    bumped_at.filter(|_| !still).map_or(1.0, |at| {
+        let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
+        1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
+    })
+}
+
 pub(super) fn clock(world: &World, gui: &egui::Context) -> (f64, bool) {
     (
         gui.input(|input| input.time),
@@ -342,8 +365,8 @@ impl<T> Default for Fades<T> {
 }
 
 impl<T: Clone> Fades<T> {
-    /// Brings the place up to what it shows now, and how far along each item is in coming or
-    /// going, in the order they first came.
+    /// Brings the place up to what it shows now, in the order given. An item that just left keeps
+    /// the slot it had while it fades out.
     pub(super) fn sync(
         &mut self,
         now: f64,
@@ -351,36 +374,45 @@ impl<T: Clone> Fades<T> {
         still: bool,
         current: impl IntoIterator<Item = (u64, T)>,
     ) -> Vec<(T, Look)> {
-        let current: Vec<(u64, T)> = current.into_iter().collect();
-        for fading in &mut self.items {
-            match current.iter().find(|(key, _)| *key == fading.key) {
-                Some((_, item)) => {
-                    fading.item = item.clone();
+        let mut previous: Vec<Option<Fading<T>>> = std::mem::take(&mut self.items)
+            .into_iter()
+            .map(Some)
+            .collect();
+        let mut items: Vec<Fading<T>> = Vec::new();
+        for (key, item) in current {
+            let kept = previous
+                .iter_mut()
+                .find_map(|slot| slot.take_if(|fading| fading.key == key));
+            items.push(match kept {
+                Some(mut fading) => {
+                    fading.item = item;
                     if fading.leaving {
                         fading.leaving = false;
                         fading.since = now;
                     }
+                    fading
                 }
-                None if !fading.leaving => {
-                    fading.leaving = true;
-                    fading.since = now;
-                }
-                None => {}
-            }
-        }
-        self.items.retain(|fading| {
-            !fading.leaving || (!still && now - fading.since < presence.exit.seconds)
-        });
-        for (key, item) in current {
-            if !self.items.iter().any(|fading| fading.key == key) {
-                self.items.push(Fading {
+                None => Fading {
                     key,
                     item,
                     since: now,
                     leaving: false,
-                });
+                },
+            });
+        }
+        for (index, slot) in previous.into_iter().enumerate() {
+            let Some(mut fading) = slot else {
+                continue;
+            };
+            if !fading.leaving {
+                fading.leaving = true;
+                fading.since = now;
+            }
+            if !still && now - fading.since < presence.exit.seconds {
+                items.insert(index.min(items.len()), fading);
             }
         }
+        self.items = items;
         self.items
             .iter()
             .map(|fading| (fading.item.clone(), fading.look(now, presence, still)))

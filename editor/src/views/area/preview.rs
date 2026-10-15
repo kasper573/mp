@@ -8,6 +8,7 @@ use super::{pins, select};
 use crate::app::Editor;
 use crate::forms;
 use crate::ui::{theme, widgets};
+use crate::views::navigation;
 
 pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
     let Some(clip) = &editor.clipboard else {
@@ -88,8 +89,11 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let height = (width * area.size.height / area.size.width.max(1.0)).clamp(80.0, 360.0);
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
     let ppp = ui.ctx().pixels_per_point();
-    let zoom = (rect.width() / (area.size.width * super::TILE_PX))
-        .min(rect.height() / (area.size.height * super::TILE_PX));
+    let zoom = navigation::fit_zoom(
+        rect.size(),
+        Vec2::new(area.size.width, area.size.height),
+        super::TILE_PX,
+    );
     let center = Pos::new(area.size.width / 2.0 - 0.5, area.size.height / 2.0 - 0.5);
     let view_key = format!("pick:{area_key}");
     editor

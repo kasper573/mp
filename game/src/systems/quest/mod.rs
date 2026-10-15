@@ -542,6 +542,7 @@ pub struct QuestLog {
     pub active: Vec<ActiveQuest>,
     pub finished: Vec<FinishedQuest>,
     pub tracked: Vec<QuestId>,
+    pub told_ready: Vec<QuestId>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -549,8 +550,6 @@ pub struct ActiveQuest {
     pub quest: QuestId,
     pub counts: Vec<u32>,
     pub deadline: Option<UnixMillis>,
-    pub left: Option<Seconds>,
-    pub ready: bool,
     pub dry_kills: u32,
     pub decided: Option<String>,
 }
@@ -560,7 +559,7 @@ pub struct FinishedQuest {
     pub quest: QuestId,
     pub result: QuestResult,
     pub day: GameDay,
-    pub resets_in: Option<Seconds>,
+    pub resets_at: Option<UnixMillis>,
     pub offered_again: bool,
 }
 
@@ -577,13 +576,27 @@ pub enum QuestRequest {
 }
 
 impl ActiveQuest {
+    pub fn left(&self, now: UnixMillis) -> Option<Seconds> {
+        self.deadline
+            .map(|deadline| Seconds(deadline.since(now).0.ceil()))
+    }
+
+    pub fn ready(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        inventory: Option<&Inventory>,
+    ) -> bool {
+        self.quest
+            .get(content)
+            .complete(content, parties, self, inventory)
+    }
+
     pub fn fresh(content: &Content, quest: QuestId) -> ActiveQuest {
         ActiveQuest {
             quest,
             counts: vec![0; quest.get(content).objectives().count()],
             deadline: None,
-            left: None,
-            ready: false,
             dry_kills: 0,
             decided: None,
         }
@@ -618,10 +631,14 @@ impl QuestLog {
         })
     }
 
-    fn finish(&mut self, quest: QuestId, result: QuestResult, day: GameDay) {
+    fn finish(&mut self, quest: QuestId, result: QuestResult, clock: WallClock) {
         self.active.retain(|active| active.quest != quest);
+        self.told_ready.retain(|told| *told != quest);
         self.finished.retain(|finished| finished.quest != quest);
-        self.finished.push(FinishedQuest::new(quest, result, day));
+        let mut finished = FinishedQuest::new(quest, result, clock.day());
+        finished.resets_at =
+            (result == QuestResult::Completed).then(|| clock.now.after(clock.until_next_day()));
+        self.finished.push(finished);
     }
 }
 
@@ -631,9 +648,15 @@ impl FinishedQuest {
             quest,
             result,
             day,
-            resets_in: None,
+            resets_at: None,
             offered_again: false,
         }
+    }
+
+    pub fn resets_in(&self, now: UnixMillis) -> Option<Seconds> {
+        self.resets_at
+            .filter(|at| now < *at)
+            .map(|at| Seconds((at.since(now).0 / 60.0).ceil() * 60.0))
     }
 }
 
@@ -659,11 +682,7 @@ pub fn ready_to_hand_in(world: &World, player: Entity, quest: QuestId) -> bool {
     let parties = world.resource::<Parties>();
     log_of(world, player)
         .and_then(|log| log.active(quest))
-        .is_some_and(|active| {
-            quest
-                .get(content)
-                .complete(content, parties, active, world.get::<Inventory>(player))
-        })
+        .is_some_and(|active| active.ready(content, parties, world.get::<Inventory>(player)))
 }
 
 pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), String> {
@@ -686,7 +705,6 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         .retain(|finished| finished.quest != quest || finished.result == QuestResult::Completed);
     log.active.push(ActiveQuest {
         deadline: def.time_limit().map(|limit| clock.now.after(limit)),
-        left: def.time_limit(),
         ..ActiveQuest::fresh(&content, quest)
     });
     if !log.tracked.contains(&quest) {
@@ -700,8 +718,12 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         Some(InterfaceSound::QuestAccepted.id(&content)),
     );
     raise(world, quest, EventKind::Accepted, player);
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
     Ok(())
+}
+
+pub fn not_ready(content: &Content, quest: QuestId) -> String {
+    format!("{} isn't ready to hand in", quest.get(content).title)
 }
 
 pub fn turn_in(
@@ -713,7 +735,7 @@ pub fn turn_in(
     let content = *world.resource::<Content>();
     let def = quest.get(&content);
     if !ready_to_hand_in(world, player, quest) {
-        return Err(format!("{} isn't ready to hand in", def.title));
+        return Err(not_ready(&content, quest));
     }
     let gives: Vec<ItemStack> = def.rewards().iter().copied().chain(pick).collect();
     let mut inventory = world
@@ -736,7 +758,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
     if log.active(quest).is_none() {
         return;
     }
-    log.finish(quest, QuestResult::Completed, clock.day());
+    log.finish(quest, QuestResult::Completed, clock);
     if !def.daily() {
         log.tracked.retain(|&tracked| tracked != quest);
     }
@@ -754,7 +776,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
         ),
     );
     raise(world, quest, EventKind::Completed, player);
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
 }
 
 pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
@@ -766,7 +788,7 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
     if log.active(quest).is_none() {
         return;
     }
-    log.finish(quest, QuestResult::Failed, clock.day());
+    log.finish(quest, QuestResult::Failed, clock);
     take_back(world, player, quest.get(&content).grants());
     let failed = Notification::new(
         NotificationKind::Feed {
@@ -834,7 +856,7 @@ pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: u
             Some(InterfaceSound::TallyTick.id(&content)),
         );
     }
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
 }
 
 pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: Name) {
@@ -895,7 +917,7 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
     let clock = *world.resource::<WallClock>();
     let players: Vec<Entity> = logs.iter(world).collect();
     for player in players {
-        refresh_log(world, player, clock);
+        announce(world, player, clock);
     }
 }
 
@@ -1128,7 +1150,10 @@ fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
     }
 }
 
-fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
+/// Time-driven and news-bearing changes to a player's quests: expiries, and the moment a quest
+/// becomes ready or a daily quest is open again. What the log shows is read from the state
+/// itself, so this only runs where something may have changed.
+fn announce(world: &mut World, player: Entity, clock: WallClock) {
     let content = *world.resource::<Content>();
     let parties = world.resource::<Parties>().clone();
     let Some(log) = log_of(world, player) else {
@@ -1155,37 +1180,34 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
         return;
     };
     let mut told: Vec<(String, &AssetRef, Option<SfxId>)> = Vec::new();
-    for active in &mut log.active {
-        let def = active.quest.get(&content);
-        active.left = active
-            .deadline
-            .map(|deadline| Seconds(deadline.since(clock.now).0.ceil()));
-        let ready = def.complete(&content, &parties, active, inventory.as_ref());
-        if ready && !active.ready {
+    let ready: Vec<QuestId> = log
+        .active
+        .iter()
+        .filter(|active| active.ready(&content, &parties, inventory.as_ref()))
+        .map(|active| active.quest)
+        .collect();
+    for &quest in &ready {
+        if !log.told_ready.contains(&quest) {
+            log.told_ready.push(quest);
+            let def = quest.get(&content);
             told.push((
-                format!("Quest ready · {}", def.hand_in_hint(&parties, active.quest)),
+                format!("Quest ready · {}", def.hand_in_hint(&parties, quest)),
                 &ready_mark(def).get(&content).icon,
                 Some(InterfaceSound::UiChime.id(&content)),
             ));
         }
-        active.ready = ready;
     }
-    let today = clock.day();
+    log.told_ready.retain(|quest| ready.contains(quest));
     for finished in &mut log.finished {
         let def = finished.quest.get(&content);
-        let resets =
-            def.daily() && finished.result == QuestResult::Completed && finished.day == today;
-        if finished.resets_in.is_some() && !resets {
+        if finished.resets_at.is_some_and(|at| clock.now >= at) {
+            finished.resets_at = None;
             told.push((
                 format!("{} is open again", def.title),
                 &AttentionMark::RepeatableOffered.get(&content).icon,
                 Some(InterfaceSound::UiPage.id(&content)),
             ));
         }
-        finished.resets_in = resets.then(|| {
-            let minutes = (clock.until_next_day().0 / 60.0).ceil();
-            Seconds(minutes * 60.0)
-        });
         finished.offered_again =
             finished.result == QuestResult::Failed && shown_to(world, player, finished.quest);
     }
@@ -1261,6 +1283,8 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
         }
     });
     world.entity_mut(player).insert(log);
+    let clock = *world.resource::<WallClock>();
+    announce(world, player, clock);
     for notification in counted {
         notification::notify(world, player, notification);
     }
@@ -1347,7 +1371,9 @@ fn marks(
         for check in &checks {
             let def = check.quest.get(content);
             let kind = match log.active(check.quest) {
-                Some(active) if check.takes && active.ready => ready_mark(def),
+                Some(_) if check.takes && ready_to_hand_in(world, player, check.quest) => {
+                    ready_mark(def)
+                }
                 Some(_) if check.takes => AttentionMark::QuestInProgress,
                 Some(_) => continue,
                 None if check.gives

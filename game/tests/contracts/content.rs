@@ -1,4 +1,4 @@
-use crate::support::content;
+use testkit::content;
 
 #[test]
 fn shipped_content_loads() {

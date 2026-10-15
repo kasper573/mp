@@ -79,6 +79,7 @@ pub type SpokenValues = Vec<super::Value>;
 pub struct ChoiceOffer<'a, V: Vocabulary> {
     pub index: usize,
     pub label: &'static V::Text,
+    pub label_values: SpokenValues,
     pub locked: bool,
     pub requires: Option<&'static Expr<V>>,
     pub reveal: &'static [ChoiceReveal],

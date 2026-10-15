@@ -112,17 +112,11 @@ pub fn show(
         editor.panels.right = RightTab::Inspector;
     }
     if keys.tab {
-        let catalogue = &editor.views.script.catalogue;
         let link = match row.choice {
             Some(index) => target
                 .is_none()
                 .then(|| (row.name.clone(), format!("/choices/{index}/to"))),
-            None => doc.nodes().get(&row.name).and_then(|node| {
-                nodes::ports(node, catalogue)
-                    .into_iter()
-                    .find(|port| port.target.is_none())
-                    .map(|port| (row.name.clone(), port.field))
-            }),
+            None => super::free_port_link(doc, &editor.views.script.catalogue, &row.name),
         };
         actions.push(ScriptGraphAction::Palette(NodePaletteOpen {
             at: ui.max_rect().left_top() + egui::vec2(60.0 + row.depth as f32 * INDENT, 40.0),

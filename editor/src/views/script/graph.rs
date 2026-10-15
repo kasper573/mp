@@ -62,10 +62,6 @@ pub enum ScriptGraphAction {
     Rename(String),
     Duplicate(String),
     Palette(NodePaletteOpen),
-    Select {
-        name: String,
-        extend: bool,
-    },
     AddLine(String),
     AddChoice(String),
     EditLine {
@@ -175,9 +171,15 @@ pub struct ScriptGraphViewer<'a> {
     pub faces: &'a SpeakerFaces,
     pub drafts: &'a mut HashMap<egui::Id, String>,
     pub actions: Vec<ScriptGraphAction>,
+    pub clicks: Vec<NodeClick>,
     pub to_global: TSTransform,
     pub rects: HashMap<String, Rect>,
     pub fit: Option<(Rect, Rect)>,
+}
+
+pub struct NodeClick {
+    pub name: String,
+    pub extend: bool,
 }
 
 pub fn ports_of(doc: &ScriptDoc, catalogue: &NodeCatalogue) -> HashMap<String, Vec<NodePort>> {
@@ -208,7 +210,7 @@ impl ScriptGraphViewer<'_> {
     fn click_to_select(&mut self, ui: &mut Ui, name: &str) {
         let response = ui.interact(ui.max_rect(), ui.id().with("select"), egui::Sense::click());
         if response.clicked() {
-            self.actions.push(ScriptGraphAction::Select {
+            self.clicks.push(NodeClick {
                 name: name.to_owned(),
                 extend: ui.input(|i| i.modifiers.shift || i.modifiers.command),
             });

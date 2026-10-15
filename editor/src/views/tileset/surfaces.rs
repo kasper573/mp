@@ -5,10 +5,11 @@ use game::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
+use crate::audio::Waveform;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{inspector, theme, widgets};
-use crate::views::model::sounds::{self, Waveform};
+use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
 
 const TABLE: &str = "surface";
@@ -135,16 +136,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         (Some(loudness), Some(role)) => {
             let verdict = sounds::verdict(loudness, gain, &role.def);
             widgets::kv(ui, "loudness", |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new(if verdict.ok { "✓" } else { "!" }).color(if verdict.ok {
-                            theme::OK
-                        } else {
-                            theme::WARN
-                        }),
-                    );
-                    ui.label(RichText::new(&verdict.loudness).size(12.5));
-                });
+                widgets::verdict(ui, verdict.ok, &verdict.loudness);
             });
         }
         (None, _) => widgets::kv_text(ui, "loudness", "not measured"),

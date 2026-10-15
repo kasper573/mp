@@ -7,7 +7,7 @@ use game::systems::player::Xp;
 use game::systems::quest::{self, QuestLog, QuestRequest, QuestResult};
 use game::systems::shop::ShopRequest;
 
-use crate::support::{
+use testkit::{
     Sim, content, conversation, count, errors, give, heard_the_news, labels, later, leave, locked,
     object, open_with, pick, remembered, row, settle, slay, slot_of, spawn_area, talk,
 };
@@ -323,12 +323,20 @@ fn exploring_the_marked_spot_readies_the_quest_for_the_object_there() {
     give(&mut sim, player, row("TatteredMap"), 1);
     quest::accept(sim.world(), player, row("XMarksTheSpot")).expect("accepted");
     settle(&mut sim);
-    assert!(!log(&mut sim, player).active[0].ready);
+    assert!(!quest::ready_to_hand_in(
+        sim.world(),
+        player,
+        row("XMarksTheSpot")
+    ));
 
     let stone = object(&mut sim, "standing-stone");
     open_with(&mut sim, 1, player, stone);
     settle(&mut sim);
-    assert!(log(&mut sim, player).active[0].ready);
+    assert!(quest::ready_to_hand_in(
+        sim.world(),
+        player,
+        row("XMarksTheSpot")
+    ));
     assert_eq!(
         conversation(&mut sim, player).and_then(|now| now.panel),
         Some(ConversationPanel::QuestTurnIn(row("XMarksTheSpot")))

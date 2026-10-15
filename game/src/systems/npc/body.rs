@@ -255,7 +255,7 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             None
         }
         Act::Attack { target, within } => {
-            if !running.started {
+            if reach::intent(world, npc, ReachAct::Attack) != Some(target) {
                 reach::intend(world, npc, target, ReachAct::Attack);
             }
             if world.get_entity(target).is_err() || stat::is_dead(world, target) {
@@ -276,9 +276,6 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             .unwrap_or(true);
             if lost {
                 return Some(Outcome::Lost);
-            }
-            if reach::intent(world, npc, ReachAct::Attack) != Some(target) {
-                reach::intend(world, npc, target, ReachAct::Attack);
             }
             None
         }

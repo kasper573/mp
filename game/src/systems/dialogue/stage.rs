@@ -176,8 +176,16 @@ pub fn choice_rects(world: &World) -> HashMap<usize, Rect> {
     world.resource::<StageDrawn>().choices.clone()
 }
 
+pub fn leavable(world: &World) -> bool {
+    *world.resource::<ClientMode>() == ClientMode::Play && world.resource::<Stage>().shown.is_some()
+}
+
+pub fn layer() -> egui::LayerId {
+    egui::LayerId::new(Band::Stage.order(), egui::Id::new("stage"))
+}
+
 pub fn leave(world: &mut World) -> bool {
-    if *world.resource::<ClientMode>() != ClientMode::Play {
+    if !leavable(world) {
         return false;
     }
     let Some(step) = world
@@ -578,7 +586,7 @@ fn babble_along(world: &mut World, by: Speaker, line: Entity) {
         world.entity_mut(line).insert(Babbling {
             babble,
             place: SfxPlace::Interface,
-            rank: BabbleRank::DIALOGUE_BOX,
+            rank: BabbleRank::Foremost,
         });
     }
 }

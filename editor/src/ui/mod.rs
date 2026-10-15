@@ -29,8 +29,6 @@ pub fn show(editor: &mut Editor, ctx: &Context) {
     if !editor.themed {
         theme::apply(ctx);
         editor.themed = true;
-        ctx.request_repaint();
-        return;
     }
     editor.status.right.clear();
     shortcuts(editor, ctx);

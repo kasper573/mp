@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::AreaObject;
 use crate::core::content::Content;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{RowDepth, TILE, dynamic_z, sprite_transform};
+use crate::core::render::{RowDepth, TILE, dynamic_z, place_sprite};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Hitbox;
 use crate::systems::area::{self, AreaTag};
@@ -65,6 +65,6 @@ fn place_objects(
             Tiles(position.pos.y),
         ));
         let center = position.pos.hitbox(hitbox.size).center();
-        *transform = sprite_transform(center, depth.0);
+        place_sprite(&mut transform, center);
     }
 }

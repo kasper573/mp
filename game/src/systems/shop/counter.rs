@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use design_tokens::{CHIP_RADIUS, TextRole, color, widgets};
 use egui::{Align, Id, Layout, RichText, Sense, Stroke, Ui, UiBuilder};
 
-use super::{OfferView, Sale, ShopId, ShopRequest, ShopView, WareRefusal};
+use super::{OfferView, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::content::Content;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
@@ -80,7 +80,6 @@ struct Browse {
 
 struct Shelf {
     shown: ShopView,
-    inventory: Inventory,
     tab: ShopTab,
     selected: usize,
     playing: bool,
@@ -90,6 +89,7 @@ struct Ware {
     item: ItemId,
     count: u32,
     price: Vec<ItemStack>,
+    held: Vec<u32>,
     note: Option<String>,
     refusal: Option<WareRefusal>,
 }
@@ -135,16 +135,9 @@ fn show_counter(ui: &mut Ui, world: &mut World) {
 
 fn shelf(world: &World) -> Option<Shelf> {
     let shown = view(world)?.clone();
-    let inventory = world
-        .resource::<Viewpoint>()
-        .0
-        .and_then(|seen| world.get::<Inventory>(seen))
-        .cloned()
-        .unwrap_or_else(Inventory::empty);
     let browse = world.resource::<Browse>();
     Some(Shelf {
         shown,
-        inventory,
         tab: browse.tab,
         selected: browse.selected,
         playing: *world.resource::<ClientMode>() == ClientMode::Play,
@@ -223,7 +216,7 @@ fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected:
     for (index, ware) in wares.iter().enumerate() {
         let response = ui
             .push_id(("ware", index), |ui| {
-                row(ui, world, shelf, ware, index == selected)
+                row(ui, world, ware, index == selected)
             })
             .inner;
         if map::clicked(world, InputAction::Select, &response) {
@@ -232,13 +225,7 @@ fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected:
     }
 }
 
-fn row(
-    ui: &mut Ui,
-    world: &mut World,
-    shelf: &Shelf,
-    ware: &Ware,
-    selected: bool,
-) -> egui::Response {
+fn row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui::Response {
     let content = *world.resource::<Content>();
     let def = ware.item.get(&content);
     let name = counted(&def.name, ware.count);
@@ -258,8 +245,8 @@ fn row(
                     ui.horizontal(|ui| {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             ui.with_layout(Layout::top_down(Align::Max), |ui| {
-                                for stack in &ware.price {
-                                    price_chip(ui, world, &shelf.inventory, *stack);
+                                for (stack, have) in ware.price.iter().zip(&ware.held) {
+                                    price_chip(ui, world, *have, *stack);
                                 }
                             });
                             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
@@ -314,8 +301,7 @@ fn detail(ui: &mut Ui, world: &mut World, shelf: &Shelf, ware: &Ware, index: usi
                     .color(color::MUTED)
                     .family(design_tokens::family::medium()),
             );
-            for stack in &ware.price {
-                let have = shelf.inventory.count(stack.item);
+            for (stack, &have) in ware.price.iter().zip(&ware.held) {
                 let ink = if have >= stack.count {
                     color::TEXT
                 } else {
@@ -381,8 +367,8 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
     InterfaceSound::UiPick.play(world);
 }
 
-fn price_chip(ui: &mut Ui, world: &mut World, inventory: &Inventory, stack: ItemStack) {
-    let covered = inventory.count(stack.item) >= stack.count;
+fn price_chip(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
+    let covered = have >= stack.count;
     let ink = if covered { color::WARN } else { color::DANGER };
     let icon = stack.item.get(world.resource::<Content>()).icon.clone();
     egui::Frame::new()
@@ -429,6 +415,7 @@ impl Shelf {
                     item: offer.item,
                     count: offer.count,
                     price: offer.price.to_vec(),
+                    held: view.held.clone(),
                     note: stock_note(view),
                     refusal: view.refusal.clone(),
                 })
@@ -437,12 +424,13 @@ impl Shelf {
                 .shown
                 .buyback
                 .iter()
-                .map(|sale: &Sale| Ware {
-                    item: sale.item,
-                    count: sale.count,
-                    price: sale.paid.clone(),
+                .map(|buyback| Ware {
+                    item: buyback.sale.item,
+                    count: buyback.sale.count,
+                    price: buyback.sale.paid.clone(),
+                    held: buyback.held.clone(),
                     note: None,
-                    refusal: missing(content, &self.inventory, &sale.paid),
+                    refusal: buyback.refusal.clone(),
                 })
                 .collect(),
         }
@@ -458,14 +446,6 @@ fn stock_note(view: &OfferView) -> Option<String> {
         ),
         None => format!("{left} left"),
     })
-}
-
-fn missing(content: &Content, inventory: &Inventory, price: &[ItemStack]) -> Option<WareRefusal> {
-    let mut trial = inventory.clone();
-    trial
-        .exchange(content, price, &[])
-        .err()
-        .map(|refusal| WareRefusal::of(refusal, content))
 }
 
 fn wants_note(wants: &[String]) -> String {

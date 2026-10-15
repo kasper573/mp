@@ -88,10 +88,6 @@ impl HistoryBook {
     }
 }
 
-pub fn close(world: &mut World) -> bool {
-    hud::close_window(world, HistoryWindow.title())
-}
-
 pub fn shown_tab(world: &World) -> Option<HistoryTab> {
     hud::window_open(world, HistoryWindow.title()).then(|| world.resource::<HistoryBook>().tab)
 }
@@ -137,9 +133,9 @@ impl HudWindow for HistoryWindow {
                     .inner_margin(egui::Margin::symmetric(0, PADDING))
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing.y = 3.0;
-                        for row in &rows {
-                            let id = ui.id().with(row.key());
-                            lazily(ui, id, |ui| show_row(ui, world, row, clock));
+                        for (index, row) in rows.iter().enumerate() {
+                            let id = ui.id().with(index);
+                            lazily(ui, id, row, |ui| show_row(ui, world, row, clock));
                         }
                     });
             });
@@ -164,25 +160,12 @@ pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: b
     }
 }
 
+#[derive(Clone, PartialEq)]
 enum Row {
     Watching { name: String, count: usize },
     Trimmed,
     Empty(HistoryTab),
     Record(HistoryRecord),
-}
-
-impl Row {
-    fn key(&self) -> String {
-        match self {
-            Row::Watching { name, count } => format!("watching {name} {count}"),
-            Row::Trimmed => "trimmed".to_owned(),
-            Row::Empty(tab) => format!("empty {}", tab.title()),
-            Row::Record(record) => format!(
-                "record {} {:?} {}",
-                record.nth, record.entry.tally, record.entry.repeats
-            ),
-        }
-    }
 }
 
 fn receive_news(mut news: MessageReader<HistoryNews>, mut book: ResMut<HistoryBook>) {
@@ -211,17 +194,33 @@ fn forget(mut book: ResMut<HistoryBook>) {
 }
 
 // A history holds hundreds of rows, so only those in sight are laid out; the rest keep the height
-// they had when last drawn.
-fn lazily(ui: &mut Ui, id: Id, add: impl FnOnce(&mut Ui)) {
-    if let Some(height) = ui.data(|data| data.get_temp::<f32>(id)) {
-        let rect = Rect::from_min_size(ui.cursor().min, Vec2::new(ui.available_width(), height));
+// they had when last drawn, for as long as they and the width they wrap to stay the same.
+#[derive(Clone)]
+struct Measured {
+    row: Row,
+    width: f32,
+    height: f32,
+}
+
+fn lazily(ui: &mut Ui, id: Id, row: &Row, add: impl FnOnce(&mut Ui)) {
+    let width = ui.available_width();
+    let known = ui
+        .data(|data| data.get_temp::<Measured>(id))
+        .filter(|measured| measured.row == *row && measured.width == width);
+    if let Some(measured) = known {
+        let rect = Rect::from_min_size(ui.cursor().min, Vec2::new(width, measured.height));
         if !ui.is_rect_visible(rect) {
             ui.allocate_space(rect.size());
             return;
         }
     }
     let height = ui.scope(add).response.rect.height();
-    ui.data_mut(|data| data.insert_temp(id, height));
+    let measured = Measured {
+        row: row.clone(),
+        width,
+        height,
+    };
+    ui.data_mut(|data| data.insert_temp(id, measured));
 }
 
 fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {

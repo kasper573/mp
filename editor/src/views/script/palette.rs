@@ -12,8 +12,7 @@ use crate::ui::{theme, widgets};
 pub struct NodePalette {
     open: NodePaletteOpen,
     search: String,
-    fresh: bool,
-    age: u32,
+    frames: u32,
     cursor: usize,
     unfolded: HashSet<&'static str>,
 }
@@ -23,8 +22,7 @@ impl NodePalette {
         NodePalette {
             open,
             search: String::new(),
-            fresh: true,
-            age: 0,
+            frames: 0,
             cursor: 0,
             unfolded: HashSet::from(["flow"]),
         }
@@ -180,9 +178,8 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
                     let response = widgets::search_box(ui, &mut palette.search, &hint, None);
-                    if palette.fresh {
+                    if palette.frames == 0 {
                         response.request_focus();
-                        palette.fresh = false;
                     }
                     if response.changed() {
                         palette.cursor = 0;
@@ -282,10 +279,10 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
             palette.unfolded.remove(system);
         }
     }
-    if palette.age > 0 && area.response.clicked_elsewhere() {
+    if palette.frames > 0 && area.response.clicked_elsewhere() {
         close = true;
     }
-    palette.age += 1;
+    palette.frames += 1;
     if let Some(kind) = picked {
         let at = palette.open.placed.then_some(palette.open.at);
         add_node(editor, doc, &kind, at, palette.open.link.clone());

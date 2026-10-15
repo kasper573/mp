@@ -1,6 +1,24 @@
+use game::systems::item::effects::move_between;
 use game::systems::item::{ExchangeRefusal, Inventory, ItemStack};
 
-use crate::support::{content, row};
+use testkit::{Sim, content, count, give, row, spawn_area};
+
+#[test]
+fn moving_items_onto_the_same_character_changes_nothing() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    give(&mut sim, player, row("Gold"), 10);
+
+    let result = move_between(
+        sim.world(),
+        player,
+        player,
+        &[ItemStack::new(row("Gold"), 4)],
+    );
+
+    assert!(result.is_err());
+    assert_eq!(count(&mut sim, player, row("Gold")), 10);
+}
 
 #[test]
 fn a_hand_in_frees_the_slot_its_reward_needs() {

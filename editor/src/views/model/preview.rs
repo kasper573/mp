@@ -95,9 +95,7 @@ pub fn tick(
                 }
                 lap += 1.0;
             }
-            if after > total * 1000.0 {
-                preview.position = after.rem_euclid(total);
-            }
+            preview.position = after.rem_euclid(total);
         }
     }
     PreviewTick {

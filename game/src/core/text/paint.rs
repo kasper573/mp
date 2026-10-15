@@ -46,7 +46,7 @@ pub fn show(
     }
     let origin = rect.min - galley.rect.min.to_vec2();
     let placed = place(&galley, &plan, origin);
-    let shown = shown.unwrap_or(usize::MAX);
+    let shown = shown.unwrap_or(plan.units);
     let time = if still {
         0.0
     } else {
@@ -126,6 +126,7 @@ struct Plan {
     letters: Vec<Letter>,
     words: Vec<Word>,
     caps: Vec<Cap>,
+    units: usize,
     pad: f32,
 }
 
@@ -162,6 +163,7 @@ impl Plan {
             letters: Vec::new(),
             words: Vec::new(),
             caps: Vec::new(),
+            units: 0,
             pad,
         };
         let mut letter = 0;
@@ -230,6 +232,7 @@ impl Plan {
                 }
             }
         }
+        plan.units = letter;
         plan
     }
 

@@ -12,6 +12,7 @@ use super::{
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::script::ChoiceReveal;
+use crate::core::time::UnixMillis;
 use crate::systems::hud::{self, Confirm, HudAudience, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
@@ -107,6 +108,7 @@ struct Page {
     tab: LogTab,
     log: QuestLog,
     inventory: Inventory,
+    now: UnixMillis,
     selected: Option<QuestId>,
     playing: bool,
 }
@@ -129,6 +131,7 @@ impl Page {
                 .and_then(|seen| world.get::<Inventory>(seen))
                 .cloned()
                 .unwrap_or_else(Inventory::empty),
+            now: super::card::clock_now(world),
             selected: world.resource::<Browse>().of(tab),
             playing: *world.resource::<ClientMode>() == ClientMode::Play,
         }
@@ -297,11 +300,13 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
         if def.decision().is_some() {
             return ("choice".to_owned(), color::WARN);
         }
-        if active.ready {
+        if active.ready(content, &page.parties, Some(&page.inventory)) {
             return ("ready".to_owned(), color::WARN);
         }
-        if active.left.is_some() {
-            let left = Countdown::Left.label(&page.log, quest).unwrap_or_default();
+        if active.deadline.is_some() {
+            let left = Countdown::Left
+                .label(&page.log, quest, page.now)
+                .unwrap_or_default();
             return (left, color::WARN);
         }
         let counted = def
@@ -316,9 +321,9 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
         Some(finished) if finished.result == QuestResult::Failed => {
             ("failed".to_owned(), color::DANGER)
         }
-        Some(finished) if finished.resets_in.is_some() => (
+        Some(finished) if finished.resets_in(page.now).is_some() => (
             Countdown::Resets
-                .label(&page.log, quest)
+                .label(&page.log, quest, page.now)
                 .unwrap_or_default(),
             ink,
         ),
@@ -338,7 +343,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     caption(ui, def.meta(&page.parties, quest));
     if page
         .active(quest)
-        .is_some_and(|active| active.left.is_some())
+        .is_some_and(|active| active.deadline.is_some())
     {
         timer(ui, world, page, quest);
     }
@@ -391,9 +396,9 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     }
     if let Some(finished) = finished {
         let (outcome, colour) = match finished.result {
-            QuestResult::Completed if finished.resets_in.is_some() => (
+            QuestResult::Completed if finished.resets_in(page.now).is_some() => (
                 Countdown::ResetsDetail
-                    .label(&page.log, quest)
+                    .label(&page.log, quest, page.now)
                     .unwrap_or_default(),
                 color::OK,
             ),
@@ -420,7 +425,7 @@ fn timer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     ui.horizontal(|ui| {
         hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 16.0);
         let left = Countdown::LeftDetail
-            .label(&page.log, quest)
+            .label(&page.log, quest, page.now)
             .unwrap_or_default();
         ui.label(
             RichText::new(left)
@@ -428,7 +433,7 @@ fn timer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
                 .color(color::WARN),
         );
         ui.add(
-            egui::ProgressBar::new(time_left(&content, &page.log, quest))
+            egui::ProgressBar::new(time_left(&content, &page.log, quest, page.now))
                 .desired_height(6.0)
                 .fill(color::WARN),
         );

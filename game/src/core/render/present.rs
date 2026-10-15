@@ -21,11 +21,40 @@ const PRESENT_LAYER: usize = 1;
 #[derive(Component)]
 pub(super) struct Screen;
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub(super) struct WorldTargets {
     live: Handle<Image>,
     held: Handle<Image>,
     size: (u32, u32),
+    held_size: (u32, u32),
+}
+
+impl WorldTargets {
+    fn new(images: &mut Assets<Image>, (width, height): (u32, u32)) -> WorldTargets {
+        WorldTargets {
+            live: images.add(world_target(width, height)),
+            held: images.add(world_target(width, height)),
+            size: (width, height),
+            held_size: (width, height),
+        }
+    }
+
+    fn render_target(&self) -> RenderTarget {
+        RenderTarget::Image(self.live.clone().into())
+    }
+
+    fn show(&self, material: &mut Present) {
+        material.world = self.live.clone();
+        material.snapshot = self.held.clone();
+    }
+
+    fn swap_held(&mut self, images: &mut Assets<Image>) {
+        std::mem::swap(&mut self.live, &mut self.held);
+        let held_was = std::mem::replace(&mut self.held_size, self.size);
+        if held_was != self.size {
+            self.live = images.add(world_target(self.size.0, self.size.1));
+        }
+    }
 }
 
 #[derive(Resource, Default, Clone, Copy)]
@@ -65,13 +94,16 @@ pub(super) fn setup(
     mut materials: ResMut<Assets<Present>>,
 ) {
     let (target_w, target_h) = target_size(&window);
-    let target = images.add(world_target(target_w, target_h));
-    let held = images.add(world_target(target_w, target_h));
-    commands.insert_resource(WorldTargets {
-        live: target.clone(),
-        held: held.clone(),
-        size: (target_w, target_h),
-    });
+    let targets = WorldTargets::new(&mut images, (target_w, target_h));
+    let mut camera_target = targets.render_target();
+    let mut material = Present {
+        world: targets.live.clone(),
+        tint: Vec4::ZERO,
+        snapshot: targets.held.clone(),
+        cut: CutUniform::IDLE,
+    };
+    targets.show(&mut material);
+    commands.insert_resource(targets);
 
     commands.spawn((
         Camera2d,
@@ -79,7 +111,7 @@ pub(super) fn setup(
             order: 0,
             ..default()
         },
-        RenderTarget::Image(target.clone().into()),
+        std::mem::take(&mut camera_target),
         world_projection(target_w, target_h),
         Msaa::Off,
         WorldCamera,
@@ -98,12 +130,7 @@ pub(super) fn setup(
 
     commands.spawn((
         Mesh2d(meshes.add(Rectangle::new(1.0, 1.0))),
-        MeshMaterial2d(materials.add(Present {
-            world: target,
-            tint: Vec4::ZERO,
-            snapshot: held,
-            cut: CutUniform::IDLE,
-        })),
+        MeshMaterial2d(materials.add(material)),
         Transform::from_scale(Vec3::new(
             window.resolution.width(),
             window.resolution.height(),
@@ -134,20 +161,19 @@ pub(super) fn fit(
     let (target_w, target_h) = target_size(&window);
     viewport.scale = height / target_h as f32;
     if targets.size != (target_w, target_h) {
-        // Fresh textures rather than resized ones: the screen's bind group would keep the old
-        // texture otherwise and show a frozen frame stretched to the new window.
+        // A fresh live texture rather than a resized one: the screen's bind group would keep the old
+        // texture otherwise. The held frame keeps its size and is stretched over the window, so a
+        // transition in progress plays on from the frame it covered.
         targets.size = (target_w, target_h);
         targets.live = images.add(world_target(target_w, target_h));
-        targets.held = images.add(world_target(target_w, target_h));
         if let Ok((mut target, mut projection)) = camera.single_mut() {
-            *target = RenderTarget::Image(targets.live.clone().into());
+            *target = targets.render_target();
             *projection = world_projection(target_w, target_h);
         }
         if let Ok((_, material)) = quad.single()
             && let Some(mut material) = materials.get_mut(&material.0)
         {
-            material.world = targets.live.clone();
-            material.snapshot = targets.held.clone();
+            targets.show(&mut material);
         }
     }
     if let Ok((mut transform, _)) = quad.single_mut() {
@@ -182,15 +208,14 @@ pub(super) fn apply_present(
 }
 
 pub(super) fn hold_frame(world: &mut World) {
-    let (live, held) = {
-        let mut targets = world.resource_mut::<WorldTargets>();
-        let targets = &mut *targets;
-        std::mem::swap(&mut targets.live, &mut targets.held);
-        (targets.live.clone(), targets.held.clone())
-    };
+    world.resource_scope(|world, mut targets: Mut<WorldTargets>| {
+        let mut images = world.resource_mut::<Assets<Image>>();
+        targets.swap_held(&mut images);
+    });
+    let targets = world.resource::<WorldTargets>().clone();
     let mut cameras = world.query_filtered::<&mut RenderTarget, With<WorldCamera>>();
     for mut target in cameras.iter_mut(world) {
-        *target = RenderTarget::Image(live.clone().into());
+        *target = targets.render_target();
     }
     let screens: Vec<Handle<Present>> = world
         .query_filtered::<&MeshMaterial2d<Present>, With<Screen>>()
@@ -200,8 +225,7 @@ pub(super) fn hold_frame(world: &mut World) {
     let mut materials = world.resource_mut::<Assets<Present>>();
     for handle in screens {
         if let Some(mut material) = materials.get_mut(&handle) {
-            material.world = live.clone();
-            material.snapshot = held.clone();
+            targets.show(&mut material);
         }
     }
 }

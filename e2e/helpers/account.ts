@@ -40,6 +40,6 @@ function email(account: Account): string {
 async function fillIfPresent(page: Page, selector: string, value: string): Promise<void> {
   const field = page.locator(selector);
   if ((await field.count()) > 0) {
-    await field.fill(value).catch(() => {});
+    await field.fill(value);
   }
 }

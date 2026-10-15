@@ -167,6 +167,7 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 # The gameplay tests play through the same driver as the showcase.
 [dev-dependencies]
 driver = { path = "../driver" }
+testkit = { path = "../testkit" }
 tempfile = "3"
 
 # Wasm-only features: `reflect_auto_register`'s #[used] registration slices defeat --gc-sections,

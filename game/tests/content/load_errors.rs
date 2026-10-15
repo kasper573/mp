@@ -109,3 +109,29 @@ fn a_malformed_palette_names_the_row_and_column_of_each_bad_cell() {
         ]
     );
 }
+
+#[test]
+fn a_bust_listed_before_the_generic_ones_is_placed_at_its_own_line() {
+    let folder = TempFolder::of_template();
+    let model = folder.path().join("tables/model/adventurer.json");
+    let text = std::fs::read_to_string(&model).expect("read");
+    let busts = r#"{ "modules": [{ "type": "bust", "own": [{ "name": "Scar", "file": "busts/adventurer/scar.png" }], "neutral": "busts/adventurer/neutral.png", "happy": "busts/adventurer/happy.png", "sad": "busts/adventurer/sad.png", "angry": "busts/adventurer/angry.png", "surprised": "busts/adventurer/surprised.png", "thinking": "busts/adventurer/thinking.png" }],"#;
+    let edited = text.replacen('{', busts, 1);
+    std::fs::write(&model, edited).expect("written");
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let own = report
+        .errors
+        .iter()
+        .find(|error| {
+            error.file == "tables/model/adventurer.json" && error.problem.found.contains("scar.png")
+        })
+        .expect("the own bust is refused");
+    assert_eq!(own.problem.rule, "missing file");
+    assert!(
+        matches!(&own.at, ErrorPlace::Json { pointer, .. } if pointer == "/modules/0/own/0/file"),
+        "{:?}",
+        own.at
+    );
+}

@@ -12,7 +12,7 @@ use crate::core::tiling::{
 };
 use crate::core::time::Seconds;
 use crate::systems::actor::{Action, Actor, ActorModel, set_facing};
-use crate::systems::player::{commands_locked, sender_player};
+use crate::systems::player::{may_command, sender_player};
 use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
 use crate::systems::{area, drain_requests};
@@ -131,7 +131,7 @@ pub fn move_request(world: &mut World) {
         if let Some(mut heard) = world.get_mut::<HeardMove>(player) {
             heard.0 = heard.0.max(request.message.seq);
         }
-        if stat::is_dead(world, player) || commands_locked(world, player) {
+        if !may_command(world, player) {
             continue;
         }
         reach::drop_intent(world, player);

@@ -106,6 +106,18 @@ pub enum ChoiceChip {
     Gets { item: ItemId, count: u32 },
 }
 
+impl ChoiceChip {
+    pub fn needs(world: &World, player: Entity, requires: &'static Condition) -> Vec<ChoiceChip> {
+        condition::parts(requires)
+            .into_iter()
+            .map(|part| ChoiceChip::Needs {
+                what: condition::describe(world.resource::<Content>(), part),
+                met: condition::holds(world, player, part),
+            })
+            .collect()
+    }
+}
+
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ConversationRequest {
     Pick { step: ConversationStep, choice: u32 },
@@ -280,7 +292,7 @@ pub fn close_for(world: &mut World, player: Entity) {
     drop_session(world, player);
 }
 
-pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
+pub fn remark(world: &mut World, player: Entity, to: Entity, line: &'static Line) {
     let Some(session) = world.get::<ConversationSession>(player) else {
         return;
     };
@@ -291,7 +303,7 @@ pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
     let line = SpokenLine {
         by: line.by,
         face: line.face.clone(),
-        text: LineText::of(&line.text),
+        text: condition::spoken(world, player, &line.text),
     };
     record_line(world, player, &line);
     if let Some(mut session) = world.get_mut::<ConversationSession>(player) {
@@ -540,12 +552,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
     if choice.reveal.contains(&ChoiceReveal::Needs)
         && let Some(requires) = choice.requires
     {
-        for part in condition::parts(requires) {
-            chips.push(ChoiceChip::Needs {
-                what: condition::describe(world.resource::<Content>(), part),
-                met: condition::holds(world, player, part),
-            });
-        }
+        chips.extend(ChoiceChip::needs(world, player, requires));
     }
     let items = choice.leads.iter().find_map(|effect| match effect {
         RiftEffect::Items(items) => Some(items),
@@ -571,7 +578,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
         }
     }
     ChoiceView {
-        label: LineText::of(choice.label),
+        label: LineText::spoken(choice.label, &choice.label_values),
         tag: ChoiceTag::Dialogue,
         icon: None,
         chips,

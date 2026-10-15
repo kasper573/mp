@@ -14,7 +14,6 @@ use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use game::systems::TICK_HZ;
 use game::systems::area::{self, Area, AreaId, AreaObject};
-use game::systems::combat::Died;
 use game::systems::dialogue::{Conversation, ConversationRequest};
 use game::systems::input::map::InputMap;
 use game::systems::interact::InteractRequest;
@@ -375,10 +374,7 @@ pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
     let area = world.resource::<WorldArea>().0;
     let victim = npc::spawn(world, what, at, area, Pack(u32::MAX));
     item::reserve(world, victim, player, Seconds(0.0));
-    world.write_message(Died {
-        entity: victim,
-        killer: Some(player),
-    });
+    game::systems::combat::inflict(world, victim, Some(player), 1_000_000.0);
     sim.run_until(0.2, |_| false);
 }
 

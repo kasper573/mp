@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use driver::{
-    Player, UiTarget, WaitBudget, content, erred, finished, holding, in_feed, marked, on_quest,
+    Player, UiTarget, WaitBudget, content, erred, finished, holding, marked, noticed, on_quest,
     told_by,
 };
 use game::systems::attention::AttentionMark;
@@ -44,7 +44,7 @@ fn play(shoot: &mut Shoot) {
         on_quest(snapshot, "letter_for_the_captain").is_some()
     });
     me.wait_until("the accepted quest in the feed", |snapshot| {
-        in_feed(snapshot, "Quest accepted · A Letter for the Captain")
+        noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
     me.caption_top(
         "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
@@ -130,7 +130,7 @@ fn play(shoot: &mut Shoot) {
         finished(snapshot, "letter_for_the_captain") == Some(QuestResult::Completed)
     });
     me.wait_until("the pay in the feed", |snapshot| {
-        in_feed(snapshot, "+10 Gold")
+        noticed(snapshot, "+10 Gold")
     });
     me.caption_top(
         "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
@@ -252,7 +252,6 @@ fn hear_out_tobb(me: &mut Player, within: Duration) {
     }
 }
 
-// Says whether his news came up on the way to his topics.
 // A choice shows its item beside its words too; the reward is the chip that counts it.
 fn reward_on(choice: &str) -> UiTarget {
     let choice = choice.to_owned();

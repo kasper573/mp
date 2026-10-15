@@ -9,6 +9,7 @@ use crate::app::{Editor, ModalDialog};
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
+use crate::views::navigation;
 
 const GAP: f32 = 18.75;
 const MARGIN: f32 = 16.0;
@@ -60,7 +61,7 @@ pub fn arrange_everything(editor: &mut Editor) {
     };
     let after = solve(&map, &map.layout, true, true);
     if map.write(editor, ContentEdit::new("Arrange the world map"), &after) {
-        editor.views.world.fitted = false;
+        editor.views.world.request_fit();
     }
 }
 
@@ -154,7 +155,7 @@ pub fn dialog(
                     after,
                 )
             {
-                editor.views.world.fitted = false;
+                editor.views.world.request_fit();
             }
             None
         }
@@ -211,8 +212,10 @@ fn preview(ui: &mut Ui, map: &OpenWorldMap, layout: &WorldMapDef) {
     let Some(bounds) = map.bounds(layout) else {
         return;
     };
-    let scale = ((rect.width() - 24.0) / bounds.width().max(1.0))
-        .min((rect.height() - 24.0) / bounds.height().max(1.0));
+    let scale = navigation::pixels_per_unit(
+        rect.size() - Vec2::splat(24.0),
+        Vec2::new(bounds.width(), bounds.height()),
+    );
     let to_screen = |p: Pos2| rect.center() + (p - bounds.center()) * scale;
     for warp in &map.atlas.warps {
         let (Some(a), Some(b)) = (layout.cards.get(&warp.from), layout.cards.get(&warp.to)) else {

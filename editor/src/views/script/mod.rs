@@ -362,7 +362,6 @@ pub struct ScriptViews {
     pub fire: Option<ScriptOwner>,
     pub pending: Option<(ScriptOwner, PendingScriptAction)>,
     pub callout: Option<ScriptCallout>,
-    pub generation: u64,
 }
 
 impl ScriptViews {
@@ -380,11 +379,6 @@ impl ScriptViews {
 
     pub fn run_of_mut(&mut self, owner: &ScriptOwner) -> Option<&mut run::ScriptRun> {
         self.run.as_mut().filter(|run| run.doc_owner == *owner)
-    }
-
-    pub fn content_changed(&mut self) {
-        self.generation += 1;
-        self.run = None;
     }
 
     pub fn close(&mut self) {
@@ -433,7 +427,7 @@ pub struct LinkNodeDialog {
     pub port: usize,
 }
 
-pub fn ensure_catalogue(editor: &mut Editor) {
+pub fn sync_with_content(editor: &mut Editor) {
     let (generation, content) = editor
         .project
         .as_ref()
@@ -443,6 +437,13 @@ pub fn ensure_catalogue(editor: &mut Editor) {
     if views.catalogue_for != Some(generation) {
         views.catalogue = NodeCatalogue::build(editor.shapes.shape_of("script"), content);
         views.catalogue_for = Some(generation);
+    }
+    if views
+        .run
+        .as_ref()
+        .is_some_and(|run| run.generation != generation)
+    {
+        views.run = None;
     }
 }
 
@@ -473,7 +474,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner) {
     {
         editor.dock.main_surface_mut().set_focused_node(path.node);
     }
-    ensure_catalogue(editor);
+    sync_with_content(editor);
     {
         let Editor {
             user,
@@ -517,7 +518,7 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: Bottom
     let Some(doc) = ScriptDoc::load(editor, owner) else {
         return;
     };
-    ensure_catalogue(editor);
+    sync_with_content(editor);
     let panel = match tab {
         BottomTab::UsedBy => ScriptPanel::UsedBy,
         BottomTab::Run => ScriptPanel::Run,
@@ -527,7 +528,10 @@ pub fn bottom(editor: &mut Editor, ui: &mut Ui, owner: &ScriptOwner, tab: Bottom
 }
 
 fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<ScriptGraphAction>) {
-    let generation = editor.views.script.generation;
+    let generation = editor
+        .project
+        .as_ref()
+        .map_or(0, |project| project.generation);
     let owner = doc.owner.clone();
     let (lit, current): (HashSet<String>, Option<String>) = editor
         .views
@@ -570,7 +574,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
     };
     let faces = faces(editor, ui.ctx(), doc);
     let id = snarl_id(&owner);
-    let (positions, to_global, mut taken, rects) = {
+    let (positions, to_global, mut taken, clicked, rects) = {
         let views = &mut editor.views.script;
         let catalogue = &views.catalogue;
         let view = views.views.entry(owner.clone()).or_default();
@@ -586,6 +590,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
             faces: &faces,
             drafts: &mut editor.form.drafts,
             actions: Vec::new(),
+            clicks: Vec::new(),
             to_global: TSTransform::IDENTITY,
             rects: HashMap::new(),
             fit: None,
@@ -607,20 +612,13 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
             graph::positions(graph),
             viewer.to_global,
             viewer.actions,
+            viewer.clicks,
             viewer.rects,
         )
     };
     header_chip(editor, ui, doc);
     editor.views.script.view_mut(&owner).rects = rects;
     run::conversation_box(editor, ui, doc);
-    let mut clicked: Vec<(String, bool)> = Vec::new();
-    taken.retain(|action| match action {
-        ScriptGraphAction::Select { name, extend } => {
-            clicked.push((name.clone(), *extend));
-            false
-        }
-        _ => true,
-    });
     actions.append(&mut taken);
     let selected: Vec<String> = {
         let view = editor.views.script.view_mut(&owner);
@@ -641,7 +639,7 @@ fn canvas(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<S
         } else {
             selected_before.clone()
         };
-        for (name, extend) in clicked {
+        for graph::NodeClick { name, extend } in clicked {
             if !extend {
                 names.clear();
             }
@@ -954,25 +952,19 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
     let views = &mut editor.views.script;
     let catalogue = &views.catalogue;
     let view = views.views.entry(owner.clone()).or_default();
-    if view.layout.outline {
-        if keys.outline {
-            view.toggle_outline();
-        }
+    let in_outline = view.layout.outline;
+    if keys.outline {
+        view.toggle_outline();
+    }
+    if in_outline {
         return;
     }
     let selected = view.selected.clone();
     let first = selected.first().cloned();
-    if keys.outline {
-        view.toggle_outline();
-    }
     if keys.tab {
-        let link = first.as_ref().and_then(|name| {
-            let node = doc.nodes().get(name)?;
-            nodes::ports(node, catalogue)
-                .into_iter()
-                .find(|port| port.target.is_none())
-                .map(|port| (name.clone(), port.field))
-        });
+        let link = first
+            .as_ref()
+            .and_then(|name| free_port_link(doc, catalogue, name));
         let beside_node = first
             .as_ref()
             .and_then(|name| view.rects.get(name))
@@ -1015,6 +1007,18 @@ fn keys(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, actions: &mut Vec<Scr
     {
         link_by_name(editor, &owner, name);
     }
+}
+
+pub fn free_port_link(
+    doc: &ScriptDoc,
+    catalogue: &NodeCatalogue,
+    name: &str,
+) -> Option<(String, String)> {
+    let node = doc.nodes().get(name)?;
+    nodes::ports(node, catalogue)
+        .into_iter()
+        .find(|port| port.target.is_none())
+        .map(|port| (name.to_owned(), port.field))
 }
 
 pub fn link_by_name(editor: &mut Editor, owner: &ScriptOwner, from: String) {
@@ -1072,21 +1076,10 @@ pub fn act(editor: &mut Editor, doc: &ScriptDoc, action: ScriptGraphAction) {
         ScriptGraphAction::Palette(open) => {
             editor.views.script.view_mut(&owner).palette = Some(palette::NodePalette::new(open));
         }
-        ScriptGraphAction::Select { name, extend } => {
-            let mut names = if extend {
-                editor.views.script.view_mut(&owner).selected.clone()
-            } else {
-                Vec::new()
-            };
-            if !names.contains(&name) {
-                names.push(name);
-            }
-            select_nodes(editor, doc, &names);
-        }
         ScriptGraphAction::AddLine(name) => {
             let mut script = doc.script.clone();
             if let Some(lines) = script["nodes"][&name]["lines"].as_array_mut() {
-                lines.push(serde_json::json!({ "by": doc.default_speaker().json(), "text": [""] }));
+                lines.push(doc.default_speaker().blank_line());
             }
             let label = format!("Add a line to {name} in {}", owner.title());
             write(editor, doc, script, label);
@@ -1222,7 +1215,7 @@ pub fn add_node(
         return;
     };
     if nodes::is_dialogue(&node) {
-        node["lines"] = serde_json::json!([{ "by": doc.default_speaker().json(), "text": [""] }]);
+        node["lines"] = serde_json::json!([doc.default_speaker().blank_line()]);
     }
     if let (Some(schema), Some(project)) = (nodes::node_schema(root), editor.project.as_ref()) {
         nodes::fill_references(root, schema, &mut node, &project.files);
@@ -1311,9 +1304,9 @@ pub fn rename_node_dialog(
     mut dialog: RenameNodeDialog,
 ) -> Option<RenameNodeDialog> {
     let doc = ScriptDoc::load(editor, &dialog.owner)?;
-    let (enter, escape) = dialogs::keys(ctx);
     let mut outcome: Option<Option<String>> = None;
     dialogs::card(ctx, "rename-node", 360.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(RichText::new("Rename node").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(theme::muted(format!("{} becomes:", dialog.old)).size(13.5));
@@ -1344,10 +1337,10 @@ pub fn rename_node_dialog(
                 .all(|c| c.is_ascii_alphanumeric() || c == '_');
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if ui.add_enabled(ok, egui::Button::new("Rename")).clicked() || (ok && enter) {
+            if ui.add_enabled(ok, egui::Button::new("Rename")).clicked() || (ok && pressed.enter) {
                 outcome = Some(Some(dialog.draft.clone()));
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(None);
             }
         });
@@ -1387,7 +1380,6 @@ pub fn link_node_dialog(
     mut dialog: LinkNodeDialog,
 ) -> Option<LinkNodeDialog> {
     let doc = ScriptDoc::load(editor, &dialog.owner)?;
-    let (enter, escape) = dialogs::keys(ctx);
     let ports = doc
         .nodes()
         .get(&dialog.from)
@@ -1395,6 +1387,7 @@ pub fn link_node_dialog(
         .unwrap_or_default();
     let mut outcome: Option<Option<String>> = None;
     dialogs::card(ctx, "link-node", 360.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(
             RichText::new(format!("Link {} to…", dialog.from))
                 .strong()
@@ -1432,10 +1425,12 @@ pub fn link_node_dialog(
                     }
                 }
             });
-        if enter && let Some(name) = matches.first() {
+        if pressed.enter
+            && let Some(name) = matches.first()
+        {
             outcome = Some(Some((*name).clone()));
         }
-        if escape {
+        if pressed.escape {
             outcome = Some(None);
         }
     });
@@ -1509,7 +1504,7 @@ pub fn inspect_row(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(RichText::new(format!("script/{key} is gone")).weak());
         return;
     };
-    ensure_catalogue(editor);
+    sync_with_content(editor);
     let open = !editor
         .dock
         .iter_all_tabs()

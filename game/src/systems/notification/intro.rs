@@ -7,14 +7,14 @@ use egui::{Align, Color32, FontId, Layout, Rect, Sense, Stroke, UiBuilder, Vec2}
 use serde::{Deserialize, Serialize};
 
 use super::rows::{self, Fades, Move, Presence};
-use super::{Notification, NotificationKind, NotificationSent};
+use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxPlace};
 use crate::core::gui;
-use crate::core::render::transition::ScreenTransitionPhase;
 use crate::core::text::{self, TextShadow};
 use crate::systems::actor::Rgba;
 use crate::systems::screen::ClientScreen;
+use crate::systems::screen::area;
 use crate::systems::text::Motion;
 
 const TITLE_SIZE: f32 = 44.0;
@@ -29,7 +29,9 @@ const SHADOW: TextShadow = TextShadow {
     offset: Vec2::new(0.0, 2.0),
     color: Color32::from_black_alpha(204),
 };
-const AFTER_SETTLING: Duration = Duration::from_millis(300);
+/// The breathing room after an area settles before its intro lands: a deliberate pause, so the
+/// title and its sound do not arrive on the same frame as the transition ends.
+const BREATH_AFTER_TRANSITION: Duration = Duration::from_millis(300);
 const PRESENCE: Presence = Presence {
     enter: Move::new(Vec2::new(0.0, 14.0), 0.94, 0.8),
     exit: Move::new(Vec2::new(0.0, -8.0), 1.04, 0.6),
@@ -46,19 +48,26 @@ pub struct IntroPlugin;
 
 impl Plugin for IntroPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ShownIntro>().add_systems(
-            Update,
-            (reveal_when_settled, age).run_if(in_state(ClientScreen::Area)),
-        );
+        app.init_resource::<ShownIntro>()
+            .add_systems(
+                Update,
+                reveal_when_settled
+                    .after(area::carry_view_across)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(
+                Update,
+                age.run_if(in_state(ClientScreen::Area))
+                    .run_if(window_visible),
+            )
+            .add_systems(OnExit(ClientScreen::Area), rows::forget::<ShownIntro>);
     }
 }
 
 /// An intro arrives with the area it introduces, while the transition into it still plays, so it
-/// waits for the view to settle.
+/// waits until the view is revealed.
 pub fn show(world: &mut World, notification_sent: NotificationSent) {
-    let mut shown = world.resource_mut::<ShownIntro>();
-    shown.waiting = Some(notification_sent.notification);
-    shown.settled_for = Duration::ZERO;
+    world.resource_mut::<ShownIntro>().waiting = Some(notification_sent.notification);
 }
 
 pub fn shown(world: &World) -> Option<(String, String)> {
@@ -193,15 +202,15 @@ struct ShowingIntro {
 }
 
 fn reveal_when_settled(world: &mut World) {
-    let settled = *world.resource::<ScreenTransitionPhase>() == ScreenTransitionPhase::Idle;
     let delta = world.resource::<Time>().delta();
+    let settled = area::settled(world);
     let mut shown = world.resource_mut::<ShownIntro>();
     shown.settled_for = if settled {
         shown.settled_for + delta
     } else {
         Duration::ZERO
     };
-    if shown.settled_for < AFTER_SETTLING {
+    if shown.settled_for < BREATH_AFTER_TRANSITION || shown.waiting.is_none() {
         return;
     }
     let Some(notification) = shown.waiting.take() else {

@@ -1,5 +1,4 @@
-use driver::{area_key, at_rest, beside_object, beside_resident, clickable_point, ground_near};
-use game::core::math::Pos;
+use driver::{at_rest, beside_object, beside_resident, open_ground_beside};
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::input::gestures::ClickClaim;
 use game::systems::input::map::InputAction;
@@ -21,7 +20,7 @@ fn a_conversation_drops_world_clicks_until_it_is_left() {
     });
     let talking_at = talking.me.as_ref().expect("the player").at;
 
-    let ground = open_ground(&talking)
+    let ground = open_ground_beside(&talking)
         .into_iter()
         .find(|tile| player.point_at_tile(*tile).claim == ClickClaim::Locked)
         .expect("open ground in view beside the conversation");
@@ -81,23 +80,4 @@ fn selected(snapshot: &ProbeSnapshot) -> Option<String> {
     let stage = snapshot.stage.as_ref()?;
     let choice = stage.choices.iter().find(|choice| choice.selected)?;
     Some(choice.label.clone())
-}
-
-// Farthest from anyone first, so nobody strolls under the pointer.
-fn open_ground(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
-    let me = snapshot.me.as_ref().expect("the player").at;
-    let area = area_key(snapshot).expect("an area");
-    let room = |tile: &Pos<Tiles>| {
-        snapshot
-            .actors
-            .iter()
-            .map(|actor| actor.at.distance_to(*tile))
-            .fold(f32::INFINITY, f32::min)
-    };
-    let mut ground: Vec<Pos<Tiles>> = ground_near(area, me, Tiles(2.0)..=Tiles(4.0))
-        .into_iter()
-        .filter(|tile| clickable_point(snapshot, *tile).is_some())
-        .collect();
-    ground.sort_by(|a, b| room(b).total_cmp(&room(a)));
-    ground
 }

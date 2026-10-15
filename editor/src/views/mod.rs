@@ -2,6 +2,7 @@ pub mod area;
 pub mod character;
 pub mod job;
 pub mod model;
+pub mod navigation;
 pub mod script;
 pub mod sound;
 pub mod spreadsheet;
@@ -38,7 +39,6 @@ pub struct EditorViews {
     pub character: character::CharacterView,
     pub assets: crate::ui::assets::AssetsState,
     pub preview: crate::ui::inspector::preview::InspectorPreviewState,
-    pub generation_seen: u64,
 }
 
 impl EditorViews {
@@ -59,7 +59,6 @@ impl EditorViews {
 
     pub fn content_changed(&mut self) {
         self.area.content_changed();
-        self.script.content_changed();
     }
 }
 

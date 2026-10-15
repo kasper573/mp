@@ -14,9 +14,9 @@ use game::systems::stat::{self, StatKind};
 use serde_json::{Value, json};
 
 use crate::json::{inline, inline_with};
-use crate::support::{
-    Sim, content, conversation, count, errors, give, health, later, leave, pick, place, remembered,
-    row, spawn_area, spoken,
+use testkit::{
+    Sim, content, conversation, count, errors, give, health, labels, later, leave, pick, place,
+    remembered, row, spawn_area, spoken,
 };
 
 #[test]
@@ -235,6 +235,27 @@ fn an_npc_can_be_the_subject_of_a_flow() {
     assert_eq!(health(&mut sim, patient), full);
 }
 
+#[test]
+fn a_choice_label_fills_its_values_like_a_line_does() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let script = inline(json!({
+        "talk": interacted("hello"),
+        "hello": {
+            "type": "dialogue",
+            "lines": [{ "by": { "type": "narrator" }, "text": ["Pay ", { "value": "Gold" }, " or go."] }],
+            "choices": [{ "label": ["Pay ", { "value": "Gold" }] }]
+        },
+    }));
+    let (_, healer) = scripted_npc(&mut sim, player, &[script]);
+
+    raise(&mut sim, healer, EventKind::Interacted, player);
+    sim.tick();
+
+    let conversation = conversation(&mut sim, player).expect("in conversation");
+    assert_eq!(labels(&conversation), vec!["Pay Gold".to_owned()]);
+}
+
 fn say(text: &str, choices: Vec<(&str, Option<&str>)>) -> Value {
     let choices: Vec<Value> = choices
         .into_iter()
@@ -308,4 +329,27 @@ fn notified(sim: &Sim, client: u32, ids: &[NotificationId]) -> Vec<NotificationI
                 .find(|id| sent.notification.text == spoken(*id).text)
         })
         .collect()
+}
+
+#[test]
+fn a_dialogue_behind_a_random_pick_is_found_before_it_is_heard() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let script = inline(json!({
+        "interacted": interacted("roll"),
+        "roll": { "type": "random", "weights": [1, 1], "outputs": ["hello", "bye"] },
+        "hello": say("Hi.", vec![("Bye.", None)]),
+        "bye": { "type": "wait", "seconds": 1, "at_most": 5.0 },
+    }));
+    let (_, owner) = scripted_npc(&mut sim, player, &[script]);
+
+    let world: &World = sim.world();
+    let found = world.resource::<RiftInstances>().next_dialogue(
+        world,
+        owner,
+        EventKind::Interacted,
+        player,
+    );
+
+    assert_eq!(found, vec![("test/npc".to_owned(), "hello")]);
 }

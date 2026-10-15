@@ -14,7 +14,8 @@ use super::run::{FlowCx, FlowKey};
 use super::value::{Value, ValueType};
 use super::{
     Arrow, EffectDef, EventDef, Fill, InlineScript, LineDef, Name, OwnerKindDef, QueryDef,
-    ScriptError, ScriptFault, ScriptId, ScriptModule, VarValue, Variable, VariableType, Vocabulary,
+    ScriptError, ScriptFault, ScriptId, ScriptModule, TextDef, VarValue, Variable, VariableType,
+    Vocabulary,
 };
 use crate::core::content::{Content, ContentId, ContentRow};
 
@@ -126,6 +127,7 @@ pub enum Step<V: Vocabulary> {
     Dialogue {
         node: &'static DialogueNode<V>,
         values: Vec<Vec<Eval>>,
+        labels: Vec<Vec<Eval>>,
         requires: Vec<Option<Eval>>,
         choices: Vec<Option<StepIndex>>,
         next: Option<StepIndex>,
@@ -168,6 +170,10 @@ impl<V: Vocabulary> Procedure<V> {
 
     pub fn step(&self, at: StepIndex) -> &Step<V> {
         &self.steps[at.0]
+    }
+
+    pub fn successors(&self, at: StepIndex) -> Vec<StepIndex> {
+        step_successors(self.step(at))
     }
 
     pub fn name(&self, at: StepIndex) -> Name {
@@ -519,20 +525,14 @@ fn compile_source<V: Vocabulary>(
     };
     let mut steps = Vec::with_capacity(source.nodes.len());
     let mut entries = Vec::new();
-    cx.event_fields = source
-        .nodes
-        .values()
-        .find_map(|node| match node {
-            Node::On { event, .. } if !event.fields().is_empty() => Some(event.fields()),
-            _ => None,
-        })
-        .unwrap_or(&[]);
+    let event_fields = event_fields_by_node(source.nodes);
     let mut may_do = MayDo::default();
     let mut needs_subject = vec![false; names.len()];
     let mut returns = Vec::new();
     for (index, (name, node)) in source.nodes.iter().enumerate() {
         let name: Name = name.as_str();
         cx.node = Some(name);
+        cx.event_fields = event_fields.get(name).copied().unwrap_or(&[]);
         let node_fail = |rule: &'static str, expected: String| fail(rule, Some(name), expected);
         let step = match node {
             Node::On { event, next } => {
@@ -779,9 +779,19 @@ fn compile_source<V: Vocabulary>(
                     }
                     values.push(evals);
                 }
+                let mut labels = Vec::new();
                 let mut requires = Vec::new();
                 let mut choices = Vec::new();
                 for choice in &dialogue.choices {
+                    let mut evals = Vec::new();
+                    for value in choice.label.values() {
+                        evals.push(
+                            cx.typed(value)
+                                .map_err(|fault| node_fail(fault.rule, fault.expected))?
+                                .0,
+                        );
+                    }
+                    labels.push(evals);
                     ChoiceReveal::check_unique(&choice.reveal)
                         .map_err(|fault| node_fail(fault.rule, fault.expected))?;
                     if choice
@@ -806,6 +816,7 @@ fn compile_source<V: Vocabulary>(
                 Step::Dialogue {
                     node: dialogue,
                     values,
+                    labels,
                     requires,
                     choices,
                     next: arrow(&dialogue.next, name)?,
@@ -936,6 +947,66 @@ struct Source<V: Vocabulary> {
     locals: Vec<(Name, ValueType)>,
     nodes: &'static BTreeMap<String, Node<V>>,
     label: String,
+}
+
+/// The event fields a node can read: those of the event every entry reaching it raises. A node
+/// reached by entries that raise different fields reads none, since a flow carries only the fields
+/// of the entry that started it.
+fn event_fields_by_node<V: Vocabulary>(
+    nodes: &'static BTreeMap<String, Node<V>>,
+) -> HashMap<&'static str, &'static [(Name, ValueType)]> {
+    let mut fields: HashMap<&'static str, Option<&'static [(Name, ValueType)]>> = HashMap::new();
+    for (entry, node) in nodes {
+        let Node::On { event, .. } = node else {
+            continue;
+        };
+        let raised = event.fields();
+        let mut seen = HashSet::new();
+        let mut todo = vec![entry.as_str()];
+        while let Some(name) = todo.pop() {
+            if !seen.insert(name) {
+                continue;
+            }
+            let slot = fields.entry(name).or_insert(Some(raised));
+            if slot.is_some_and(|known| known != raised) {
+                *slot = None;
+            }
+            if let Some(node) = nodes.get(name) {
+                todo.extend(node_arrows(node));
+            }
+        }
+    }
+    fields
+        .into_iter()
+        .filter_map(|(name, fields)| fields.map(|fields| (name, fields)))
+        .collect()
+}
+
+fn node_arrows<V: Vocabulary>(node: &'static Node<V>) -> Vec<&'static str> {
+    let arrows: Vec<&'static Arrow> = match node {
+        Node::On { next, .. }
+        | Node::Wait { next, .. }
+        | Node::Set { next, .. }
+        | Node::Run { next, .. } => vec![next],
+        Node::If { yes, no, .. } => vec![yes, no],
+        Node::Random { outputs, .. } => outputs.iter().collect(),
+        Node::Repeat { each, then, .. } => vec![each, then],
+        Node::Return { .. } => Vec::new(),
+        Node::Dialogue(dialogue) => dialogue
+            .choices
+            .iter()
+            .map(|choice| &choice.to)
+            .chain([&dialogue.next, &dialogue.left])
+            .collect(),
+        Node::Effect(effect) => {
+            return effect
+                .outputs()
+                .into_iter()
+                .filter_map(|(_, to)| to)
+                .collect();
+        }
+    };
+    arrows.into_iter().filter_map(Option::as_deref).collect()
 }
 
 fn step_successors<V: Vocabulary>(step: &Step<V>) -> Vec<StepIndex> {

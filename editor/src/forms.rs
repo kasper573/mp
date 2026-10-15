@@ -11,8 +11,7 @@ use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
-use crate::views::sound;
-use crate::{condition, picker, spans, thumbs, value};
+use crate::{audio, condition, picker, spans, thumbs, value};
 
 pub struct FormCx<'a> {
     pub root: &'a Value,
@@ -27,6 +26,7 @@ pub struct FormCx<'a> {
     pub owner_table: Option<String>,
     pub owner_key: Option<String>,
     pub holes: Option<FormHoles>,
+    pub autofocus: bool,
 }
 
 impl<'a> FormCx<'a> {
@@ -50,6 +50,7 @@ impl<'a> FormCx<'a> {
             owner_table: None,
             owner_key: None,
             holes: None,
+            autofocus: false,
         }
     }
 
@@ -82,7 +83,7 @@ pub struct FormState {
     pub unfolded: HashSet<String>,
     pub status: Vec<String>,
     pub thumbnails: thumbs::Thumbnails,
-    pub loudness: sound::LoudnessCache,
+    pub audio: audio::WaveformCache,
     catalogue: Option<(u64, NodeCatalogue)>,
 }
 
@@ -1162,6 +1163,9 @@ pub fn number(
                 .desired_width(f32::INFINITY),
         )
     });
+    if std::mem::take(&mut cx.autofocus) {
+        response.request_focus();
+    }
     if response.changed() {
         cx.state.drafts.insert(id, draft.clone());
     }

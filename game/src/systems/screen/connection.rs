@@ -6,7 +6,7 @@ use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
 
 use super::mode::ClientMode;
-use super::{ClientScreen, SERVER_RETRY, system_screen};
+use super::{ClientScreen, Retry, system_screen};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
 use crate::core::gui::{self, Band};
@@ -24,7 +24,7 @@ pub struct ConnectionPlugin;
 
 impl Plugin for ConnectionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Reconnect>()
+        app.init_resource::<Retry>()
             .init_resource::<Backdrop>()
             .add_systems(OnEnter(ClientScreen::Connecting), (veil, begin_session))
             .add_systems(OnEnter(ClientScreen::Lost), (veil, lost))
@@ -50,12 +50,6 @@ pub struct Announce {
 pub struct PendingSession {
     task: Task<Result<String, FetchFailure>>,
     spectate: bool,
-}
-
-#[derive(Resource, Default)]
-struct Reconnect {
-    failures: u32,
-    due: Option<Seconds>,
 }
 
 pub fn open_session(world: &mut World, spectate: bool) {
@@ -142,12 +136,9 @@ fn connecting(world: &mut World) {
 
 fn lost(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let failures = world.resource::<Reconnect>().failures + 1;
-    let wait = SERVER_RETRY.after(failures, &mut world.resource_mut::<Rng>());
-    *world.resource_mut::<Reconnect>() = Reconnect {
-        failures,
-        due: Some(now + wait),
-    };
+    let retry = *world.resource::<Retry>();
+    let next = retry.failed(now, &mut world.resource_mut::<Rng>());
+    world.insert_resource(next);
     world
         .resource::<ClientPlatform>()
         .0
@@ -165,25 +156,25 @@ fn connection_lost(world: &mut World) {
     })
     .inner;
     if retry {
-        world.resource_mut::<Reconnect>().due = None;
+        world.resource_mut::<Retry>().due = None;
         world
             .resource_mut::<NextState<ClientScreen>>()
             .set(ClientScreen::Loading);
     }
 }
 
-fn settle(mut reconnect: ResMut<Reconnect>) {
-    *reconnect = Reconnect::default();
+fn settle(mut retry: ResMut<Retry>) {
+    *retry = Retry::default();
 }
 
 fn retry_when_due(
     time: Res<Time>,
-    mut reconnect: ResMut<Reconnect>,
+    mut retry: ResMut<Retry>,
     mut next: ResMut<NextState<ClientScreen>>,
 ) {
     let now = Seconds(time.elapsed_secs());
-    if reconnect.due.is_some_and(|due| now >= due) {
-        reconnect.due = None;
+    if retry.is_due(now) {
+        retry.due = None;
         next.set(ClientScreen::Loading);
     }
 }

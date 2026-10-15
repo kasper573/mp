@@ -11,6 +11,7 @@ use crate::core::assets::AssetRef;
 use crate::core::content::Content;
 use crate::core::math::{Offset, Pos, Rect, Size};
 use crate::core::tiling::{Cell, CellPos, TilePos, Tiles};
+use crate::systems::WorldArea;
 use crate::systems::actor::{Hitbox, Name as ActorName};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::interact::Interactive;
@@ -23,7 +24,6 @@ use crate::systems::script::{
     ScriptModule,
 };
 use crate::systems::visibility::Presence;
-use crate::systems::{WorldArea, dialogue};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -204,11 +204,11 @@ pub struct AreaObject {
     pub warp: Option<Place>,
 }
 
-#[derive(Component, Default)]
-pub struct InsideObjects(Vec<Entity>);
-
-#[derive(Component, Default)]
-pub struct StandingOn(Vec<Entity>);
+#[derive(Component, Default, Clone, PartialEq)]
+pub struct Underfoot {
+    inside: Vec<Entity>,
+    standing: Vec<Entity>,
+}
 
 pub fn spawn_all(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
@@ -356,37 +356,45 @@ pub fn track(
                 .map(|object| object.entity),
         );
         now.sort_unstable();
-        let talking = dialogue::in_conversation(world, actor);
         let is_npc = world.get::<Npc>(actor).is_some();
-        if !talking {
-            stand(world, &placed, &watchers, actor, &now, is_npc);
+        let before = world.get::<Underfoot>(actor).cloned().unwrap_or_default();
+        let standing = standing_on(world, actor, &before.standing, &now);
+        for object in standing
+            .iter()
+            .filter(|object| !before.standing.contains(object))
+        {
+            raise_standing(world, &placed, &watchers, *object, actor, is_npc);
         }
-        let unchanged = world
-            .get::<InsideObjects>(actor)
-            .map_or(now.is_empty(), |inside| inside.0 == *now);
-        if unchanged {
-            continue;
-        }
-        let before: Vec<Entity> = world
-            .get::<InsideObjects>(actor)
-            .map(|inside| inside.0.clone())
-            .unwrap_or_default();
-        let mut after = before.clone();
-        for object in now.iter().filter(|object| !before.contains(object)) {
-            if talking {
-                continue;
-            }
-            after.push(*object);
+        for object in now.iter().filter(|object| !before.inside.contains(object)) {
             raise_crossing(world, *object, EventKind::Entered, actor, is_npc);
         }
-        for object in before.iter().filter(|object| !now.contains(object)) {
-            after.retain(|kept| kept != object);
+        for object in before.inside.iter().filter(|object| !now.contains(object)) {
             raise_crossing(world, *object, EventKind::Left, actor, is_npc);
         }
-        after.sort_unstable();
+        let after = Underfoot {
+            inside: now.clone(),
+            standing,
+        };
         if after != before {
-            world.entity_mut(actor).insert(InsideObjects(after));
+            world.entity_mut(actor).insert(after);
         }
+    }
+}
+
+fn standing_on(
+    world: &World,
+    actor: Entity,
+    standing: &[Entity],
+    inside: &[Entity],
+) -> Vec<Entity> {
+    if crate::systems::movement::moving(world, actor) {
+        standing
+            .iter()
+            .copied()
+            .filter(|object| inside.contains(object))
+            .collect()
+    } else {
+        inside.to_vec()
     }
 }
 
@@ -424,36 +432,6 @@ fn watchers(world: &World) -> Vec<Watcher> {
         }
     }
     watchers
-}
-
-fn stand(
-    world: &mut World,
-    placed: &[Placed],
-    watchers: &[Watcher],
-    actor: Entity,
-    inside: &[Entity],
-    is_npc: bool,
-) {
-    let before: Vec<Entity> = world
-        .get::<StandingOn>(actor)
-        .map(|on| on.0.clone())
-        .unwrap_or_default();
-    let standing: Vec<Entity> = if crate::systems::movement::moving(world, actor) {
-        before
-            .iter()
-            .copied()
-            .filter(|object| inside.contains(object))
-            .collect()
-    } else {
-        inside.to_vec()
-    };
-    if standing == before {
-        return;
-    }
-    for object in standing.iter().filter(|object| !before.contains(object)) {
-        raise_standing(world, placed, watchers, *object, actor, is_npc);
-    }
-    world.entity_mut(actor).insert(StandingOn(standing));
 }
 
 fn raise_standing(

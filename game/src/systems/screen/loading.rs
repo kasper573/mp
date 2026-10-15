@@ -8,7 +8,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color};
 use egui::RichText;
 
-use super::{ClientScreen, SERVER_RETRY, system_screen};
+use super::{ClientScreen, Retry, system_screen};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
@@ -48,14 +48,13 @@ impl Plugin for LoadingPlugin {
 struct Syncing {
     task: Task<Result<SyncedContent, SyncError>>,
     status: SyncStatus,
-    failures: u32,
+    retry: Retry,
 }
 
 #[derive(Resource, Clone, PartialEq)]
 struct LoadingFailure {
     reason: String,
-    retry_at: Option<Seconds>,
-    failures: u32,
+    retry: Retry,
 }
 
 #[derive(Resource, Default)]
@@ -98,7 +97,7 @@ fn begin(world: &mut World) {
         focused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
         unfocused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
     });
-    start(world, 0);
+    start(world, Retry::default());
 }
 
 fn forget(world: &mut World) {
@@ -108,7 +107,7 @@ fn forget(world: &mut World) {
     *world.resource_mut::<Shown>() = Shown::default();
 }
 
-fn start(world: &mut World, failures: u32) {
+fn start(world: &mut World, retry: Retry) {
     let platform = world.resource::<ClientPlatform>().0.clone();
     let base = world.resource::<StartParams>().game_server_url.clone();
     let status = SyncStatus::default();
@@ -133,7 +132,7 @@ fn start(world: &mut World, failures: u32) {
     world.insert_resource(Syncing {
         task,
         status,
-        failures,
+        retry,
     });
 }
 
@@ -142,9 +141,9 @@ fn poll(world: &mut World) {
     let Some(mut syncing) = world.remove_resource::<Syncing>() else {
         let due = world
             .get_resource::<LoadingFailure>()
-            .is_some_and(|failure| failure.retry_at.is_some_and(|at| now >= at));
+            .is_some_and(|failure| failure.retry.is_due(now));
         if due && let Some(failure) = world.remove_resource::<LoadingFailure>() {
-            start(world, failure.failures);
+            start(world, failure.retry);
         }
         return;
     };
@@ -157,7 +156,7 @@ fn poll(world: &mut World) {
                     let next = world.resource::<AfterLoading>().0.clone();
                     world.resource_mut::<NextState<ClientScreen>>().set(next);
                 }
-                Err(report) => fail(world, report.to_string(), now, syncing.failures + 1),
+                Err(report) => fail(world, report.to_string(), now, syncing.retry),
             }
         }
         Some(Err(SyncError::OtherBuild { server })) => {
@@ -165,25 +164,23 @@ fn poll(world: &mut World) {
             if let Err(reason) = world.resource::<ClientPlatform>().0.relaunch(&server) {
                 world.insert_resource(LoadingFailure {
                     reason,
-                    retry_at: None,
-                    failures: syncing.failures,
+                    retry: Retry {
+                        due: None,
+                        ..syncing.retry
+                    },
                 });
             }
         }
         Some(Err(SyncError::Failed(reason))) => {
             world.resource_mut::<Shown>().progress = syncing.status.latest();
-            fail(world, reason, now, syncing.failures + 1);
+            fail(world, reason, now, syncing.retry);
         }
     }
 }
 
-fn fail(world: &mut World, reason: String, now: Seconds, failures: u32) {
-    let wait = SERVER_RETRY.after(failures, &mut world.resource_mut::<Rng>());
-    world.insert_resource(LoadingFailure {
-        reason,
-        retry_at: Some(now + wait),
-        failures,
-    });
+fn fail(world: &mut World, reason: String, now: Seconds, retry: Retry) {
+    let retry = retry.failed(now, &mut world.resource_mut::<Rng>());
+    world.insert_resource(LoadingFailure { reason, retry });
 }
 
 fn show(world: &mut World) {
@@ -243,7 +240,7 @@ fn card_model(
                 megabytes(progress.read.bytes_total)
             ));
         }
-        SyncPhase::Downloading { changes } => {
+        SyncPhase::Downloading { updating } => {
             lines.push("Content checked".to_owned());
             let fetched = progress.fetched;
             if fetched.files_total == 0 && !progress.rows_changed {
@@ -252,7 +249,7 @@ fn card_model(
                     "Read from this device {} MB",
                     megabytes(progress.read.bytes_total)
                 ));
-            } else if *changes {
+            } else if *updating {
                 lines.push("Downloading changes".to_owned());
                 lines.push(format!(
                     "{} of {} MB",
@@ -313,7 +310,8 @@ fn card_model(
     if let Some(failure) = failure {
         lines = vec!["Download failed".to_owned(), failure.reason.clone()];
         retry_in = failure
-            .retry_at
+            .retry
+            .due
             .map(|at| format!("Retrying in {}", (at - now).in_words()));
     }
     CardModel {
@@ -392,10 +390,10 @@ fn loading_card(world: &mut World) {
     })
     .inner;
     if retry && world.get_resource::<Syncing>().is_none() {
-        let failures = world
+        let retry = world
             .remove_resource::<LoadingFailure>()
-            .map_or(0, |failure| failure.failures);
-        start(world, failures);
+            .map_or(Retry::default(), |failure| failure.retry);
+        start(world, retry);
     }
 }
 

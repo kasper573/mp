@@ -13,6 +13,7 @@ use std::borrow::Cow;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
+use bevy::window::WindowOccluded;
 use bevy_egui::EguiPrimaryContextPass;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,6 @@ use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
 use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
-use crate::core::platform::ClientPlatform;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -31,7 +31,6 @@ use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, Rec
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
 use crate::systems::npc::{Npc, NpcDef, NpcId};
-use crate::systems::player::Players;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
@@ -42,7 +41,6 @@ pub type NotificationId = ContentId<NotificationDef>;
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
-const LATE_AFTER: Seconds = Seconds(2.0);
 const LONGEST_ROW_WORDS: usize = 30;
 const COLUMN_TOP: f32 = 16.0;
 const GROUP_GAP: f32 = 8.0;
@@ -52,8 +50,7 @@ const CENTRE_GAP: f32 = 16.0;
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.add_mapped_server_message::<NotificationSent>(Channel::Ordered)
-        .add_server_message::<SoundPlayed>(Channel::Ordered)
-        .init_resource::<Broadcasts>();
+        .add_server_message::<SoundPlayed>(Channel::Ordered);
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -152,7 +149,7 @@ pub fn notify_from(
     });
     let live = match notification.kind {
         NotificationKind::Feed { .. } | NotificationKind::Error { .. } => true,
-        _ => budget::admit(world, player, &notification, speaker, at) == budget::Admit::Live,
+        _ => budget::admit(world, player, &notification, speaker, at),
     };
     if live {
         visibility::send_private(
@@ -391,13 +388,6 @@ pub fn play_sound(
     }
 }
 
-pub fn speakers(content: &Content) -> impl Iterator<Item = NpcId> + '_ {
-    content
-        .table::<NotificationDef>()
-        .rows()
-        .filter_map(NotificationDef::speaker)
-}
-
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
     for (id, def) in loading.rows::<NotificationDef>() {
@@ -445,32 +435,6 @@ pub fn check_all(loading: &mut Loading) {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct Broadcasts(Vec<Notification>);
-
-pub fn broadcast(world: &mut World, notification: Notification) {
-    world.resource_mut::<Broadcasts>().0.push(notification);
-}
-
-pub fn relay(worlds: &mut [&mut World]) {
-    let raised: Vec<Notification> = worlds
-        .iter_mut()
-        .flat_map(|world| std::mem::take(&mut world.resource_mut::<Broadcasts>().0))
-        .collect();
-    for notification in &raised {
-        notify_everywhere(worlds, notification);
-    }
-}
-
-pub fn notify_everywhere(worlds: &mut [&mut World], notification: &Notification) {
-    for world in worlds.iter_mut() {
-        let players: Vec<Entity> = world.resource::<Players>().0.values().copied().collect();
-        for player in players {
-            notify(world, player, notification.clone());
-        }
-    }
-}
-
 pub struct NotificationPlugin;
 
 impl Plugin for NotificationPlugin {
@@ -480,6 +444,8 @@ impl Plugin for NotificationPlugin {
         rows::plugin::<rows::Milestones>(app);
         error::plugin(app);
         app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
+            .init_resource::<Occlusion>()
+            .add_systems(Update, track_occlusion)
             .add_systems(
                 Update,
                 (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
@@ -507,18 +473,30 @@ fn draw_column(world: &mut World) {
 }
 
 fn deliver(world: &mut World, mut cursor: Local<MessageCursor<NotificationSent>>) {
-    let paused = world.resource::<Time<Real>>().delta_secs() > LATE_AFTER.0;
-    let now = world.resource::<ClientPlatform>().0.local_clock().now;
     let fresh: Vec<NotificationSent> = cursor
         .read(world.resource::<Messages<NotificationSent>>())
         .cloned()
         .collect();
     for notification_sent in fresh {
-        if paused && !notification_sent.outlives_pause(now) {
-            continue;
-        }
         show(world, notification_sent);
     }
+}
+
+#[derive(Resource, Default)]
+pub(super) struct Occlusion {
+    occluded: bool,
+}
+
+fn track_occlusion(mut events: MessageReader<WindowOccluded>, mut occlusion: ResMut<Occlusion>) {
+    for event in events.read() {
+        occlusion.occluded = event.occluded;
+    }
+}
+
+/// Notifications age only while the game window is on screen, so one that was raised before the
+/// window was hidden still has its full time when it comes back.
+pub(super) fn window_visible(occlusion: Res<Occlusion>) -> bool {
+    !occlusion.occluded
 }
 
 fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter<PlaySfx>) {
@@ -557,15 +535,5 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
         }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
-    }
-}
-
-impl NotificationSent {
-    fn outlives_pause(&self, now: UnixMillis) -> bool {
-        match (&self.notification.kind, self.notification.lasts) {
-            (NotificationKind::Feed { .. }, _) => true,
-            (_, Some(lasts)) => now < self.at.after(lasts),
-            (_, None) => false,
-        }
     }
 }

@@ -10,7 +10,6 @@ pub mod strip;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::Instant;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
 use game::core::math::Direction;
@@ -33,7 +32,7 @@ pub const MAX_FRAME_MS: u32 = 60_000;
 #[derive(Default)]
 pub struct ModelViews {
     pub views: HashMap<String, ModelView>,
-    pub bank: sounds::WaveformCache,
+    pub bank: crate::audio::WaveformCache,
     pub sfx_to_play: Vec<String>,
     pub drops: Vec<PathBuf>,
     pub reimports: HashMap<String, import::ModelReimport>,
@@ -111,7 +110,6 @@ pub struct ModelView {
     pub preview: preview::StripPreview,
     pub timing: strip::TimingDraft,
     pub edge_drag: Option<strip::FrameEdgeDrag>,
-    pub last_nudge: Option<Instant>,
     pub surface: Option<String>,
     pub sheet_pick: Option<u32>,
     pub face: Option<String>,

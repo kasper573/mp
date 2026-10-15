@@ -7,7 +7,8 @@ use game::systems::area::world_map::WorldMapDef;
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
-use crate::project::{GAME_FILE, Project, RowSelection, row_file, row_of};
+use crate::picker::{self, PictureFrame};
+use crate::project::{GAME_FILE, Project, RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
@@ -232,20 +233,12 @@ pub fn row_icon(
     key: &str,
     budget: &mut u32,
 ) -> Option<IconImage> {
-    match table {
-        "npc" | "player" | "model" => {
-            let model_key = if table == "model" {
-                key.to_owned()
-            } else {
-                project.files.json(&row_file(table, key))?["model"]
-                    .as_str()?
-                    .to_owned()
-            };
-            let model = project.files.json(&row_file("model", &model_key))?;
-            let image = model["sprites"]["image"].as_str()?;
+    let picture = picker::picture_of(&project.files, table, key)?;
+    match picture.frame {
+        PictureFrame::Sprite(model) => {
             let thumb = form
                 .thumbnails
-                .image_within(ctx, &project.files, image, budget)?;
+                .image_within(ctx, &project.files, &picture.path, budget)?;
             let frame = thumbs::model_frame(&model, &thumb);
             let scale = 18.0 / frame.size.y.max(1.0);
             Some(IconImage {
@@ -254,13 +247,13 @@ pub fn row_icon(
                 size: frame.size * scale,
             })
         }
-        "item" | "interface_icon" | "cursor" | "attention" => {
-            let row = project.files.json(&row_file(table, key))?;
-            let path = row["icon"].as_str().or_else(|| row["image"].as_str())?;
-            let thumb = form.thumbnails.icon(ctx, &project.files, path, budget)?;
+        PictureFrame::Whole => {
+            let thumb = form
+                .thumbnails
+                .icon(ctx, &project.files, &picture.path, budget)?;
             Some(super::assets::icon_image(&thumb))
         }
-        _ => None,
+        PictureFrame::Tile(_) => None,
     }
 }
 

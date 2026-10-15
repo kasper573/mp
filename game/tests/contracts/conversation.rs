@@ -9,7 +9,7 @@ use game::systems::player::commands_locked;
 use game::systems::script::{self, EventKind, RiftInstances};
 use game::systems::stat::{self, StatKind};
 
-use crate::support::{
+use testkit::{
     Sim, choice, content, conversation, count, counted, errors, give, place, row, spawn_area, talk,
     townsperson,
 };
@@ -215,8 +215,9 @@ fn an_npc_shows_news_only_to_those_who_have_not_heard_him_out() {
     let marks = |sim: &mut Sim, player: Entity| -> Vec<AttentionId> {
         sim.world()
             .get::<Attention>(player)
-            .map(|attention| attention.of(tobb).to_vec())
-            .unwrap_or_default()
+            .expect("attention")
+            .of(tobb)
+            .to_vec()
     };
     sim.run_until(0.5, |_| false);
 

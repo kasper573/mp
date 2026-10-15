@@ -69,7 +69,7 @@ pub fn tile_count(module: &Value) -> usize {
 pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     let indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
         .iter()
-        .filter_map(|p| p.strip_prefix("/modules/")?.parse().ok())
+        .filter_map(|p| super::module_index(p))
         .collect();
     let sceneries: Vec<&Value> = indices
         .iter()
@@ -136,23 +136,25 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     if !blocks.is_empty() {
         joined["blocks"] = Value::Array(blocks);
     }
-    let mut modules = frame.modules.clone();
     let mut sorted = indices.clone();
     sorted.sort_unstable();
-    for i in sorted.iter().rev() {
-        if frame.modules[*i].is_module(AreaModuleKind::Scenery) {
-            modules.remove(*i);
-        }
-    }
-    let at = sorted[0].min(modules.len());
-    modules.insert(at, joined);
-    if modules::write_modules(
-        editor,
-        &frame.area_key,
-        modules,
-        &format!("Join {} sceneries in {}", sceneries.len(), frame.area_key),
-    ) {
-        editor.selection.parts = vec![format!("/modules/{at}")];
+    let mut at = 0;
+    let applied = modules::change_modules(editor, &frame.area_key, |modules| {
+        let mut position = 0;
+        modules.retain(|module| {
+            position += 1;
+            !(sorted.contains(&(position - 1)) && module.is_module(AreaModuleKind::Scenery))
+        });
+        at = sorted[0].min(modules.len());
+        modules.insert(at, joined);
+        Some(format!(
+            "Join {} sceneries in {}",
+            sceneries.len(),
+            frame.area_key
+        ))
+    });
+    if applied {
+        editor.selection.parts = vec![super::module_part(at)];
     }
 }
 
@@ -194,22 +196,21 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
         editor.toast("No free cell under the scenery on the active layer");
         return;
     }
-    let mut modules = frame.modules.clone();
     let all_gone = kept.iter().all(|row| row.iter().all(Value::is_null));
-    if all_gone {
-        modules.remove(index);
-    } else {
-        modules[index]["tiles"] = Value::Array(kept.into_iter().map(Value::Array).collect());
-    }
-    let Some(mut row) = editor.row_value("area", &frame.area_key) else {
+    let Some(mut edit) = modules::module_edit(editor, &frame.area_key, |modules| {
+        modules.get(index)?;
+        if all_gone {
+            modules.remove(index);
+        } else {
+            modules[index]["tiles"] = Value::Array(kept.into_iter().map(Value::Array).collect());
+        }
+        Some(format!(
+            "Split scenery into {placed} tiles in {}",
+            frame.area_key
+        ))
+    }) else {
         return;
     };
-    row["modules"] = Value::Array(modules);
-    let mut edit = ContentEdit::new(format!(
-        "Split scenery into {placed} tiles in {}",
-        frame.area_key
-    ));
-    edit.write_json(row_file("area", &frame.area_key), &row);
     draft.write_into(&mut edit);
     if editor.apply(edit) && all_gone {
         editor.selection.parts.clear();
@@ -419,17 +420,15 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize)
         editor.toast("Nothing under the scenery is blocked on the walk grid");
         return;
     }
-    let mut modules = frame.modules.clone();
-    modules[index]["blocks"] = Value::Array(adopted);
-    let Some(mut row) = editor.row_value("area", &frame.area_key) else {
+    let Some(mut edit) = modules::module_edit(editor, &frame.area_key, |modules| {
+        modules.get_mut(index)?["blocks"] = Value::Array(adopted);
+        Some(format!(
+            "Give {count} blocked cells to the scenery in {}",
+            frame.area_key
+        ))
+    }) else {
         return;
     };
-    row["modules"] = Value::Array(modules);
-    let mut edit = ContentEdit::new(format!(
-        "Give {count} blocked cells to the scenery in {}",
-        frame.area_key
-    ));
-    edit.write_json(row_file("area", &frame.area_key), &row);
     draft.write_into(&mut edit);
     editor.apply(edit);
 }
@@ -439,11 +438,6 @@ pub fn selected_scenery(editor: &Editor, frame: &super::AreaFrame) -> Option<usi
     if parts.len() != 1 {
         return None;
     }
-    let index: usize = parts
-        .iter()
-        .next()?
-        .strip_prefix("/modules/")?
-        .parse()
-        .ok()?;
+    let index = super::module_index(parts.iter().next()?)?;
     (frame.modules.get(index)?.is_module(AreaModuleKind::Scenery)).then_some(index)
 }

@@ -143,6 +143,10 @@ impl LineSpeaker {
         serde_json::to_value(self).expect("a speaker serialises")
     }
 
+    pub fn blank_line(&self) -> Value {
+        serde_json::json!({ "by": self.json(), "text": [""] })
+    }
+
     pub fn kind(&self) -> &'static str {
         match self {
             LineSpeaker::Npc { .. } => "npc",
@@ -576,8 +580,7 @@ pub fn template(root: &Value, kind: &str) -> Option<Value> {
     let mut value = schema::variant_template(root, variant);
     match flow {
         Some(FlowKind::Dialogue) => {
-            value["lines"] =
-                serde_json::json!([{ "by": LineSpeaker::Narrator.json(), "text": [""] }]);
+            value["lines"] = serde_json::json!([LineSpeaker::Narrator.blank_line()]);
         }
         Some(FlowKind::Random) => {
             value["weights"] = serde_json::json!([1, 1]);

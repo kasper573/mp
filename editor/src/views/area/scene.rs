@@ -118,11 +118,11 @@ pub fn sync(
             None => true,
         };
         if respawn {
-            despawn(scenes, &request.key, world);
             if spawned == SPAWNS_PER_FRAME {
                 continue;
             }
             spawned += 1;
+            despawn(scenes, &request.key, world);
             spawn(scenes, &request, content, files, world);
         }
         let Some(scene) = scenes.by_key.get_mut(&request.key) else {

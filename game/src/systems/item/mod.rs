@@ -28,7 +28,7 @@ use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
 use crate::systems::movement::{Position, position};
 use crate::systems::notification;
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, Players, commands_locked, sender_player};
+use crate::systems::player::{self, ClientId, Owner, Players, sender_player};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
@@ -605,8 +605,7 @@ pub fn pickup_request(world: &mut World) {
             continue;
         };
         let target = request.message.target;
-        if stat::is_dead(world, player)
-            || commands_locked(world, player)
+        if !player::may_command(world, player)
             || world.get::<DroppedItem>(target).is_none()
             || !visibility::present(world, target, player)
         {

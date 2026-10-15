@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
+use crate::views::character::Standing;
 use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
@@ -95,6 +96,7 @@ impl RunLogLine {
 
 pub struct ScriptRun {
     pub doc_owner: ScriptOwner,
+    pub generation: u64,
     pub label: String,
     world: World,
     owner: Owner,
@@ -848,6 +850,7 @@ fn quests_card(
             | Reach::Accepts(q)
             | Reach::TurnsIn(q)
             | Reach::Completes(q)
+            | Reach::Decides(q)
             | Reach::Fails(q) => Some(q.key(content).to_owned()),
             _ => None,
         })
@@ -876,17 +879,17 @@ fn quests_card(
             let Some(id) = content.by_key::<QuestDef>(key) else {
                 continue;
             };
-            let standing = quest_standing(&log, id);
+            let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("quest/ {key}"), "", true).clicked() {
                     *open = Some(EditorTab::for_row("quest", key));
                 }
                 let mut picked = standing;
                 widgets::combo_box(("run-quest", key))
-                    .selected_text(theme::mono(standing.label()))
+                    .selected_text(theme::mono(run_label(standing)))
                     .show_ui(ui, |ui| {
-                        for option in QuestStanding::ALL {
-                            ui.selectable_value(&mut picked, option, option.label());
+                        for option in Standing::ALL {
+                            ui.selectable_value(&mut picked, option, run_label(option));
                         }
                     });
                 if picked != standing {
@@ -996,40 +999,10 @@ fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Opti
     add
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum QuestStanding {
-    NotTaken,
-    Active,
-    Completed,
-    Failed,
-}
-
-impl QuestStanding {
-    const ALL: [QuestStanding; 4] = [
-        QuestStanding::NotTaken,
-        QuestStanding::Active,
-        QuestStanding::Completed,
-        QuestStanding::Failed,
-    ];
-
-    fn label(self) -> &'static str {
-        match self {
-            QuestStanding::NotTaken => "not taken",
-            QuestStanding::Active => "active",
-            QuestStanding::Completed => "completed",
-            QuestStanding::Failed => "failed",
-        }
-    }
-}
-
-fn quest_standing(log: &QuestLog, quest: QuestId) -> QuestStanding {
-    if log.active(quest).is_some() {
-        return QuestStanding::Active;
-    }
-    match log.finished(quest).map(|finished| finished.result) {
-        Some(QuestResult::Completed) => QuestStanding::Completed,
-        Some(QuestResult::Failed) => QuestStanding::Failed,
-        None => QuestStanding::NotTaken,
+fn run_label(standing: Standing) -> &'static str {
+    match standing {
+        Standing::Active => "active",
+        other => other.label(),
     }
 }
 
@@ -1038,7 +1011,7 @@ fn set_quest_standing(
     subject: Entity,
     content: &Content,
     quest: QuestId,
-    standing: QuestStanding,
+    standing: Standing,
 ) {
     let day = world.resource::<WallClock>().day();
     let Some(mut log) = world.get_mut::<QuestLog>(subject) else {
@@ -1048,16 +1021,15 @@ fn set_quest_standing(
     log.finished.retain(|finished| finished.quest != quest);
     log.tracked.retain(|tracked| *tracked != quest);
     match standing {
-        QuestStanding::NotTaken => {}
-        QuestStanding::Active => log.active.push(ActiveQuest::fresh(content, quest)),
-        QuestStanding::Completed => {
+        Standing::NotTaken => {}
+        Standing::Active => log.active.push(ActiveQuest::fresh(content, quest)),
+        Standing::Completed => {
             log.finished
                 .push(FinishedQuest::new(quest, QuestResult::Completed, day))
         }
-        QuestStanding::Failed => {
-            log.finished
-                .push(FinishedQuest::new(quest, QuestResult::Failed, day))
-        }
+        Standing::Failed => log
+            .finished
+            .push(FinishedQuest::new(quest, QuestResult::Failed, day)),
     }
 }
 
@@ -1086,6 +1058,7 @@ fn start_run(
 ) -> Result<ScriptRun, String> {
     let project = editor.project.as_ref().ok_or("no project")?;
     let content = project.content.ok_or("the folder does not load")?;
+    let generation = project.generation;
     let (area_id, near) = area_for(&content, owner).ok_or("no area to run in")?;
     let clock = WallClock {
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
@@ -1128,6 +1101,7 @@ fn start_run(
     let inputs = InputMap::new(&content);
     let mut run = ScriptRun {
         doc_owner: doc.owner.clone(),
+        generation,
         label: format!("{} · {}", owner.label, setup.event),
         world,
         owner: world_owner,

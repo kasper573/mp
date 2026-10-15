@@ -227,6 +227,10 @@ impl OpenWorldMap {
 }
 
 impl WorldView {
+    pub fn request_fit(&mut self) {
+        self.fitted = false;
+    }
+
     pub fn look_at(&mut self, map: &OpenWorldMap, area: AreaId, zoom: f32) {
         if let Some(card) = map.layout.cards.get(&area) {
             self.center = map.card_rect(area, card).center();

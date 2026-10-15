@@ -253,12 +253,12 @@ fn drive(
     else {
         return set(SocketState::Closed);
     };
-    let nonblocking = match ws.get_ref() {
-        MaybeTlsStream::Plain(tcp) => tcp.set_nonblocking(true),
-        MaybeTlsStream::Rustls(stream) => stream.sock.set_nonblocking(true),
+    let polling = match ws.get_ref() {
+        MaybeTlsStream::Plain(tcp) => tcp.set_read_timeout(Some(READ_POLL)),
+        MaybeTlsStream::Rustls(stream) => stream.sock.set_read_timeout(Some(READ_POLL)),
         _ => Ok(()),
     };
-    if nonblocking.is_err() {
+    if polling.is_err() {
         return set(SocketState::Closed);
     }
     set(SocketState::Open);
@@ -285,10 +285,11 @@ fn drive(
             }
             Ok(Message::Close(_)) => return closed(),
             Ok(_) => {}
-            Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(1));
-            }
+            Err(tungstenite::Error::Io(error))
+                if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
             Err(_) => return closed(),
         }
     }
 }
+
+const READ_POLL: Duration = Duration::from_millis(1);

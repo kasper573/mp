@@ -6,7 +6,7 @@ use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::AreaModuleKind;
 use serde_json::Value;
 
-use super::modules::{append_modules, write_modules};
+use super::modules::{append_modules, change_modules};
 use super::{AreaDrag, AreaFrame, AreaTool, AreaViewState, PasteGhost, ResizeCorner, pins, shapes};
 use super::{pick, placement};
 use crate::app::{Clipboard, Editor, RightTab};
@@ -17,7 +17,7 @@ use crate::value::RowValue;
 pub(super) fn selected_indices(editor: &Editor, area_key: &str) -> Vec<usize> {
     let mut indices: Vec<usize> = super::selected_parts(editor, area_key)
         .iter()
-        .filter_map(|part| part.strip_prefix("/modules/")?.parse().ok())
+        .filter_map(|part| super::module_index(part))
         .collect();
     indices.sort_unstable();
     indices
@@ -49,44 +49,39 @@ pub(super) fn select_input(
         return;
     }
     let selected = selected_indices(editor, &frame.area_key);
-    let editing = editor
-        .views
-        .area
-        .view(view_key)
-        .in_place
-        .last()
-        .map(|p| p.module);
     if response.drag_started_by(egui::PointerButton::Primary) {
         let on_handle = selected
             .iter()
             .find_map(|&index| handle_at(frame, index, frame.pointer?));
-        let hit = frame
-            .hit(tile)
-            .filter(|hit| editing.is_none_or(|e| e == *hit));
+        let hit = frame.hit(tile);
         let pin = pins::pin_at(editor, frame, frame.pointer.unwrap_or_default());
         let view = editor.views.area.view_mut(view_key);
         if let Some((index, corner, start)) = on_handle {
-            view.drag = Some(AreaDrag::Resize {
-                part: format!("/modules/{index}"),
+            view.set_drag(AreaDrag::Resize {
+                part: super::module_part(index),
                 corner,
                 start,
             });
         } else if let Some(pin) = pin {
-            view.drag = Some(match pin {
+            view.set_drag(match pin {
                 pins::PinHit::InitialSpawn => AreaDrag::InitialSpawn,
                 pins::PinHit::Place { file, pointer } => AreaDrag::Pin { file, pointer },
             });
         } else if let Some(hit) = hit {
             if !selected.contains(&hit) {
                 editor.selection =
-                    RowSelection::parts("area", &frame.area_key, vec![format!("/modules/{hit}")]);
+                    RowSelection::parts("area", &frame.area_key, vec![super::module_part(hit)]);
             }
-            editor.views.area.view_mut(view_key).drag = Some(AreaDrag::Move {
-                from: tile,
-                moved: false,
-            });
+            editor
+                .views
+                .area
+                .view_mut(view_key)
+                .set_drag(AreaDrag::Move {
+                    from: tile,
+                    moved: false,
+                });
         } else {
-            view.drag = Some(AreaDrag::Box { from: tile });
+            view.set_drag(AreaDrag::Box { from: tile });
         }
         return;
     }
@@ -113,16 +108,13 @@ pub(super) fn select_input(
             pins::open_pin(editor, pin);
             return;
         }
-        let hit = frame
-            .hit(tile)
-            .filter(|hit| editing.is_none_or(|e| e == *hit));
-        match hit {
+        match frame.hit(tile) {
             Some(index) => {
                 let parts = toggled(
                     editor,
                     "area",
                     &frame.area_key,
-                    format!("/modules/{index}"),
+                    super::module_part(index),
                     modifiers,
                 );
                 editor.selection = RowSelection::parts("area", &frame.area_key, parts);
@@ -138,7 +130,7 @@ pub(super) fn select_input(
 }
 
 pub(super) fn track_move(view: &mut AreaViewState, tile: Pos<Tiles>) {
-    if let Some(AreaDrag::Move { from, moved }) = &mut view.drag
+    if let Some(AreaDrag::Move { from, moved }) = view.drag_mut()
         && (tile.x - from.x).abs() + (tile.y - from.y).abs() > 0.25
     {
         *moved = true;
@@ -215,31 +207,16 @@ pub(super) fn finish_select_drag(
     frame: &AreaFrame,
     modifiers: egui::Modifiers,
 ) {
-    let Some(drag) = editor.views.area.view_mut(view_key).drag.take() else {
+    let Some(drag) = editor.views.area.view_mut(view_key).take_drag() else {
         return;
     };
-    let Some(tile) = frame.pointer_tile.or_else(|| {
-        frame
-            .response
-            .interact_pointer_pos()
-            .map(|p| frame.canvas.to_tile(p))
-    }) else {
+    let Some(tile) = frame.drag_tile() else {
         return;
     };
     match drag {
         AreaDrag::Box { from } => {
             let rect = Rect::from_points([from, tile]);
-            let editing = editor
-                .views
-                .area
-                .view(view_key)
-                .in_place
-                .last()
-                .map(|p| p.module);
             let hits = (0..frame.modules.len()).filter(|&index| {
-                if editing.is_some_and(|e| e != index) {
-                    return false;
-                }
                 if frame.modules[index].is_module(AreaModuleKind::Population)
                     && frame.modules[index]["roams"].is_null()
                 {
@@ -253,7 +230,7 @@ pub(super) fn finish_select_drag(
                 editor,
                 "area",
                 &frame.area_key,
-                hits.map(|index| format!("/modules/{index}")),
+                hits.map(super::module_part),
                 modifiers,
             );
             editor.selection = RowSelection::parts("area", &frame.area_key, parts);
@@ -266,17 +243,14 @@ pub(super) fn finish_select_drag(
             if dx == 0.0 && dy == 0.0 {
                 return;
             }
-            move_selection(editor, view_key, frame, dx, dy);
+            move_selection(editor, frame, dx, dy);
         }
         AreaDrag::Resize {
             part,
             corner,
             start,
         } => {
-            let Some(index) = part
-                .strip_prefix("/modules/")
-                .and_then(|i| i.parse::<usize>().ok())
-            else {
+            let Some(index) = super::module_index(&part) else {
                 return;
             };
             let (min, max) = (start.min(), start.max());
@@ -289,12 +263,16 @@ pub(super) fn finish_select_drag(
             };
             let w = (new_max.x - new_min.x).max(1.0);
             let h = (new_max.y - new_min.y).max(1.0);
-            let mut modules = frame.modules.clone();
-            let module = &mut modules[index];
-            shapes::shift(module, new_min.x - min.x, new_min.y - min.y);
-            shapes::resize(module, w, h);
-            let label = format!("Resize {} in {}", shapes::label(module), frame.area_key);
-            write_modules(editor, &frame.area_key, modules, &label);
+            change_modules(editor, &frame.area_key, |modules| {
+                let module = modules.get_mut(index)?;
+                shapes::shift(module, new_min.x - min.x, new_min.y - min.y);
+                shapes::resize(module, w, h);
+                Some(format!(
+                    "Resize {} in {}",
+                    shapes::label(module),
+                    frame.area_key
+                ))
+            });
         }
         AreaDrag::Pin { file, pointer } => {
             let at = snap_to(tile, modifiers.alt);
@@ -329,29 +307,29 @@ fn sixteenth(v: f32) -> f32 {
     (v * 16.0).round() / 16.0
 }
 
-pub fn move_selection(editor: &mut Editor, view_key: &str, frame: &AreaFrame, dx: f32, dy: f32) {
+pub fn move_selection(editor: &mut Editor, frame: &AreaFrame, dx: f32, dy: f32) {
     let indices = selected_indices(editor, &frame.area_key);
     if indices.is_empty() {
         return;
     }
-    if let Some(place) = editor.views.area.view(view_key).in_place.last().cloned() {
+    if let Some(place) = frame.in_place.last().cloned() {
         placement::move_parts_in_place(editor, frame, &place, &indices, dx, dy);
         return;
     }
-    let mut modules = frame.modules.clone();
-    for &index in &indices {
-        shapes::shift(&mut modules[index], dx, dy);
-    }
-    let label = if indices.len() == 1 {
-        format!(
-            "Move {} in {}",
-            shapes::label(&modules[indices[0]]),
-            frame.area_key
-        )
-    } else {
-        format!("Move {} modules in {}", indices.len(), frame.area_key)
-    };
-    write_modules(editor, &frame.area_key, modules, &label);
+    change_modules(editor, &frame.area_key, |modules| {
+        for &index in &indices {
+            shapes::shift(modules.get_mut(index)?, dx, dy);
+        }
+        Some(if indices.len() == 1 {
+            format!(
+                "Move {} in {}",
+                shapes::label(&modules[indices[0]]),
+                frame.area_key
+            )
+        } else {
+            format!("Move {} modules in {}", indices.len(), frame.area_key)
+        })
+    });
 }
 
 pub fn copy_selection(editor: &mut Editor, frame: &AreaFrame) {
@@ -418,20 +396,14 @@ pub(super) fn paste_anchor(tile: Pos<Tiles>) -> Pos<Tiles> {
     Pos::new(tile.x.round() - 0.5, tile.y.round() - 0.5)
 }
 
-pub(super) fn paste_at(
-    editor: &mut Editor,
-    frame: &AreaFrame,
-    modules: Vec<Value>,
-    at: Pos<Tiles>,
-) {
-    let taken: HashSet<String> = frame
-        .modules
+pub(super) fn paste_at(editor: &mut Editor, frame: &AreaFrame, pasted: Vec<Value>, at: Pos<Tiles>) {
+    let taken: HashSet<String> = super::modules::area_modules(editor, &frame.area_key)
         .iter()
         .filter_map(|m| m["name"].as_str().map(str::to_owned))
         .collect();
     let mut placed = Vec::new();
     let mut names = taken.clone();
-    for mut module in modules {
+    for mut module in pasted {
         shapes::shift(&mut module, at.x, at.y);
         if let Some(name) = module["name"].as_str().map(str::to_owned)
             && names.contains(&name)
@@ -456,16 +428,17 @@ pub fn duplicate_selection(editor: &mut Editor, frame: &AreaFrame) {
     if indices.is_empty() {
         return;
     }
-    let names: HashSet<String> = frame
-        .modules
+    let modules = super::modules::area_modules(editor, &frame.area_key);
+    let names: HashSet<String> = modules
         .iter()
         .filter_map(|m| m["name"].as_str().map(str::to_owned))
         .collect();
     let mut taken = names.clone();
     let copies: Vec<Value> = indices
         .iter()
-        .map(|&i| {
-            let mut module = frame.modules[i].clone();
+        .filter_map(|&i| modules.get(i))
+        .map(|module| {
+            let mut module = module.clone();
             shapes::shift(&mut module, 1.0, 1.0);
             if let Some(name) = module["name"].as_str().map(str::to_owned) {
                 let fresh = rows::free_name(&name, &taken);
@@ -486,12 +459,7 @@ pub fn duplicate_selection(editor: &mut Editor, frame: &AreaFrame) {
 
 pub fn delete_selection(editor: &mut Editor, frame: &AreaFrame) {
     if editor.selection.table == "blueprint"
-        && let Some(place) = editor
-            .views
-            .area
-            .views
-            .get(&super::area_view_key(&frame.area_key))
-            .and_then(|v| v.in_place.last().cloned())
+        && let Some(place) = frame.in_place.last().cloned()
     {
         placement::delete_parts_in_place(editor, frame, &place);
         return;
@@ -500,20 +468,20 @@ pub fn delete_selection(editor: &mut Editor, frame: &AreaFrame) {
     if indices.is_empty() {
         return;
     }
-    let mut modules = frame.modules.clone();
-    for &index in indices.iter().rev() {
-        modules.remove(index);
-    }
-    let label = if indices.len() == 1 {
-        format!(
-            "Remove {} from {}",
-            shapes::label(&frame.modules[indices[0]]),
-            frame.area_key
-        )
-    } else {
-        format!("Remove {} modules from {}", indices.len(), frame.area_key)
-    };
-    if write_modules(editor, &frame.area_key, modules, &label) {
+    let applied = change_modules(editor, &frame.area_key, |modules| {
+        let label = if indices.len() == 1 {
+            format!(
+                "Remove {} from {}",
+                shapes::label(modules.get(indices[0])?),
+                frame.area_key
+            )
+        } else {
+            format!("Remove {} modules from {}", indices.len(), frame.area_key)
+        };
+        super::remove_indices(modules, &indices);
+        Some(label)
+    });
+    if applied {
         editor.selection.parts.clear();
     }
 }

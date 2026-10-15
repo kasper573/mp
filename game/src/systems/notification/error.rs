@@ -1,18 +1,16 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use egui::emath::{TSTransform, easing};
+use egui::emath::TSTransform;
 use egui::{Rect, Vec2};
 
 use super::rows::{self, Fades, Move, Presence};
-use super::{Notification, NotificationSent};
+use super::{Notification, NotificationSent, window_visible};
 use crate::core::text;
 use crate::systems::screen::ClientScreen;
 
 const WIDEST: f32 = 356.0;
 const SIZE: f32 = 16.0;
-const BUMP_SCALE: f32 = 1.08;
-const BUMP_SECONDS: f64 = 0.25;
 const PRESENCE: Presence = Presence {
     enter: Move::new(Vec2::new(0.0, -100.0), 0.9, 0.25),
     exit: Move::new(Vec2::new(0.0, -30.0), 0.94, 0.2),
@@ -49,8 +47,12 @@ pub fn shown(world: &World) -> Option<String> {
 
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Errors>()
-        .add_systems(Update, age.run_if(in_state(ClientScreen::Area)))
-        .add_systems(OnExit(ClientScreen::Area), forget);
+        .add_systems(
+            Update,
+            age.run_if(in_state(ClientScreen::Area))
+                .run_if(window_visible),
+        )
+        .add_systems(OnExit(ClientScreen::Area), rows::forget::<Errors>);
 }
 
 pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
@@ -66,10 +68,7 @@ pub(super) fn draw(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
         .as_ref()
         .map(|shown| (shown.key, (shown.key, shown.notification.clone())));
     let toasts = errors.fades.sync(now, PRESENCE, still, current);
-    let bump = errors.bumped_at.filter(|_| !still).map_or(1.0, |at| {
-        let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
-        1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
-    });
+    let bump = rows::bump(errors.bumped_at, now, still);
     let width = gui.content_rect().width();
     let mut drawn: Vec<Rect> = Vec::new();
     for ((key, notification), look) in toasts {
@@ -135,8 +134,4 @@ fn age(world: &mut World) {
     if over {
         errors.shown = None;
     }
-}
-
-fn forget(mut errors: ResMut<Errors>) {
-    *errors = Errors::default();
 }

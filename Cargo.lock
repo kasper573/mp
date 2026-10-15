@@ -4134,6 +4134,7 @@ dependencies = [
  "syn 3.0.9",
  "tar",
  "tempfile",
+ "testkit",
  "thread_local",
  "tokio",
  "tokio-tungstenite",
@@ -8762,6 +8763,16 @@ dependencies = [
  "once_cell",
  "rustix 1.1.5",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "testkit"
+version = "0.1.0"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_replicon",
+ "game",
 ]
 
 [[package]]

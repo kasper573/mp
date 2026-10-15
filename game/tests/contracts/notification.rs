@@ -1,5 +1,5 @@
 use bevy_ecs::prelude::*;
-use game::core::math::Offset;
+use game::core::math::{Offset, Pos};
 use game::systems::area::AreaId;
 use game::systems::area::transition::{self, Crossing};
 use game::systems::dialogue::Conversation;
@@ -12,9 +12,9 @@ use game::systems::player::{AreaDrawn, Xp, commands_locked};
 use game::systems::quest::{self, QuestId};
 use game::systems::text::LineText;
 
-use crate::support::{
-    Sim, content, later, object_center, place, remembered, row, settle, spawn_area, spoken, told,
-    townsperson,
+use testkit::{
+    Sim, content, conversation, later, object_center, open_with, place, remembered, row, settle,
+    spawn_area, spoken, told, townsperson,
 };
 
 #[test]
@@ -37,6 +37,34 @@ fn stepping_onto_the_pier_narrates_the_gulls_once() {
     settle(&mut sim);
     assert_eq!(told(&sim, 1), Vec::new());
     assert!(remembered(&mut sim, player, row("HeardGulls")));
+}
+
+#[test]
+fn an_object_crossing_fires_once_per_crossing_even_during_a_conversation() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let beside_pier = Pos::new(44.8, 26.0);
+    let on_pier = Pos::new(46.0, 26.0);
+    let npc = townsperson(&mut sim, row("Tobb"));
+    place(&mut sim, npc, beside_pier);
+    place(&mut sim, player, beside_pier);
+    settle(&mut sim);
+    open_with(&mut sim, 1, player, npc);
+    assert!(conversation(&mut sim, player).is_some());
+
+    place(&mut sim, player, on_pier);
+    settle(&mut sim);
+    assert_eq!(told(&sim, 1), vec![spoken(row("Gulls"))]);
+
+    later(&mut sim, 30.0);
+    sim.forget_notified();
+    place(&mut sim, player, beside_pier);
+    settle(&mut sim);
+    place(&mut sim, player, on_pier);
+    settle(&mut sim);
+    assert_eq!(told(&sim, 1), Vec::new());
+    assert!(remembered(&mut sim, player, row("HeardGulls")));
+    assert!(conversation(&mut sim, player).is_some());
 }
 
 #[test]

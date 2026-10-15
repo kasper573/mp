@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use game::core::content::{Content, ContentBuilder, ContentScope, with_content};
+use game::core::content::{Content, ContentBuilder, ContentScope, Table, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
 use game::core::script::{EffectDef, ScriptError};
@@ -12,8 +12,8 @@ use game::systems::script::{
 use game::systems::shop::ShopId;
 use serde_json::{Value, json};
 
-use crate::json::{effect, inline, parse};
-use crate::support::{content, row};
+use crate::json::{effect, inline, inline_with, parse};
+use testkit::{content, row};
 
 const OWNERS: [OwnerKind; 6] = [
     OwnerKind::Object,
@@ -128,6 +128,30 @@ fn too_many_steps_between_pauses_are_refused() {
     let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
 
     assert_eq!(error.rule, "too many steps");
+}
+
+#[test]
+fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
+    let script = inline(json!({
+        "on": entry(OwnerKind::Npc, "decide"),
+        "decide": {
+            "type": "decide",
+            "quest": "shamans_plea",
+            "path": "Keep them",
+        },
+    }));
+
+    let procedures = compile(OwnerKind::Npc, &[script]).expect("compiles");
+    let reaches = &procedures[0].may_do.reaches;
+
+    assert!(
+        reaches.contains(&Reach::Decides(row("ShamansPlea"))),
+        "{reaches:?}"
+    );
+    assert!(
+        !reaches.contains(&Reach::Completes(row("ShamansPlea"))),
+        "{reaches:?}"
+    );
 }
 
 #[test]
@@ -295,10 +319,10 @@ fn functions() -> Content {
         }
     }));
     let mut tables = ContentBuilder::default();
-    tables.table::<ScriptDef>(vec![
+    tables.insert_table(Table::new(vec![
         ("helper".to_owned(), helper),
         ("loops".to_owned(), loops),
-    ]);
+    ]));
     tables.build()
 }
 
@@ -315,4 +339,36 @@ fn calling(script: &str) -> &'static ScriptModule {
         }))
     });
     Box::leak(Box::new(parsed.expect("a module")))
+}
+
+#[test]
+fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
+    let script = inline_with(
+        json!({ "price": "integer" }),
+        json!({
+            "on": { "type": "on", "event": "bought", "next": "read" },
+            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+        }),
+    );
+
+    compile(OwnerKind::Shop, &[script]).expect("compiles");
+}
+
+#[test]
+fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
+    let script = inline_with(
+        json!({ "price": "integer" }),
+        json!({
+            "on": { "type": "on", "event": "started", "next": "read" },
+            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+        }),
+    );
+
+    let error = compile(OwnerKind::Object, &[script])
+        .err()
+        .expect("refused");
+
+    assert_eq!(error.rule, "unknown field");
 }

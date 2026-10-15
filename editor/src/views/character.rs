@@ -7,7 +7,7 @@ use game::systems::GameSettings;
 use game::systems::area::{self, AreaDef, AreaModule};
 use game::systems::job::{JobDef, JobLevel};
 use game::systems::npc::NpcId;
-use game::systems::quest::{Objective, Parties, Party, QuestDef};
+use game::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use game::systems::script::RiftScripts;
 use game::systems::stat::StatKind;
 use serde_json::{Map, Value};
@@ -693,7 +693,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Standing {
+pub enum Standing {
     NotTaken,
     Active,
     Completed,
@@ -701,19 +701,30 @@ enum Standing {
 }
 
 impl Standing {
-    const ALL: [Standing; 4] = [
+    pub const ALL: [Standing; 4] = [
         Standing::NotTaken,
         Standing::Active,
         Standing::Completed,
         Standing::Failed,
     ];
 
-    fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Standing::NotTaken => "not taken",
             Standing::Active => "in progress",
             Standing::Completed => "completed",
             Standing::Failed => "failed",
+        }
+    }
+
+    pub fn of_log(log: &QuestLog, quest: QuestId) -> Standing {
+        if log.active(quest).is_some() {
+            return Standing::Active;
+        }
+        match log.finished(quest).map(|finished| finished.result) {
+            Some(QuestResult::Completed) => Standing::Completed,
+            Some(QuestResult::Failed) => Standing::Failed,
+            None => Standing::NotTaken,
         }
     }
 
