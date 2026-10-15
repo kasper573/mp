@@ -349,7 +349,7 @@ pub(super) fn eyedrop(
         view.layer = layer;
         editor.settings.brush.flip_x = entry.flip.horizontal();
         editor.settings.brush.flip_y = entry.flip.vertical();
-        view.tool = AreaTool::Paint;
+        view.set_tool(AreaTool::Paint);
         return;
     }
     editor.toast("Nothing on that layer here");

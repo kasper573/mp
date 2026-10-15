@@ -154,7 +154,7 @@ pub fn stamp_panel(
     });
     if let Some(key) = picked {
         let view = editor.views.area.view_mut(view_key);
-        view.tool = super::AreaTool::Stamp;
+        view.set_tool(super::AreaTool::Stamp);
         view.stamp = Some(key);
     }
 }

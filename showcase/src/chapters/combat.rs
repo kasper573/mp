@@ -56,17 +56,10 @@ fn play(shoot: &mut Shoot) {
 
     me.caption("Press I to open the inventory");
     me.act(InputAction::ToggleInventory);
-    let potion = UiTarget::new("a potion", |element, _| {
-        element
-            .image
-            .as_deref()
-            .is_some_and(|image| image.contains("potion"))
-    });
     me.find_ui("Inventory");
-    if potion.find(&me.snapshot()).is_some() {
-        me.caption("Double-click a potion to drink it");
-        me.act_on_ui(InputAction::UseItem, potion);
-    }
+    me.find_ui(potion());
+    me.caption("Double-click a potion to drink it");
+    me.act_on_ui(InputAction::UseItem, potion());
     me.caption("Kills earn experience — see the xp under your name");
     me.hold();
     me.act(InputAction::ToggleInventory);
@@ -76,6 +69,15 @@ fn play(shoot: &mut Shoot) {
     run_to_town(&mut me);
     me.caption("It gives up the chase at the edge: monsters never set foot in a safe zone");
     chase_ends(&mut me, &chaser);
+}
+
+fn potion() -> UiTarget {
+    UiTarget::new("a potion", |element, _| {
+        element
+            .image
+            .as_deref()
+            .is_some_and(|image| image.contains("potion"))
+    })
 }
 
 // Loot lying under a monster can't be clicked until it moves or falls, so it's given a while.

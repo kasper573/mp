@@ -1,3 +1,4 @@
+use bevy_ecs::change_detection::DetectChanges;
 use bevy_ecs::prelude::*;
 use game::systems::equipment::{self, Equipment, EquipmentSlot, UnequipRequest};
 use game::systems::item::ItemId;
@@ -17,6 +18,25 @@ fn a_lowered_maximum_pulls_health_down_to_it() {
 
     assert_eq!(stat::max_health(sim.world(), player), 20.0);
     assert_eq!(stat::current_health(sim.world(), player), 20.0);
+}
+
+#[test]
+fn a_tick_without_a_vitals_change_leaves_stats_untouched() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    set_vitals(&mut sim, player, 30.0, 30.0);
+    sim.tick();
+
+    let since = sim.world().change_tick();
+    sim.tick();
+
+    let now = sim.world().change_tick();
+    let stats = sim
+        .world()
+        .entity(player)
+        .get_ref::<Stats>()
+        .expect("stats");
+    assert!(!stats.last_changed().is_newer_than(since, now));
 }
 
 #[test]

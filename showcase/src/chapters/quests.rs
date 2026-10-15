@@ -75,7 +75,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("L opens the quest log, grouped by category");
     me.act(InputAction::ToggleQuestLog);
     me.find_ui("Active quests");
-    me.click_ui(log_row("Low Tide"));
+    me.click_ui(UiTarget::button("Low Tide"));
     me.caption_top("Right-click a reward for its item card");
     me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
     me.wait_until("the bait's card", |snapshot| {
@@ -89,9 +89,9 @@ fn play(shoot: &mut Shoot) {
         snapshot.item_card.is_none()
     });
     me.caption_top("A quest can keep its rewards to itself: the letter's entry has none to show");
-    me.click_ui(log_row("A Letter for the Captain"));
+    me.click_ui(UiTarget::button("A Letter for the Captain"));
     me.hold();
-    me.click_ui(log_row("Low Tide"));
+    me.click_ui(UiTarget::button("Low Tide"));
     me.caption_top("Abandoning always asks, and Keep quest is the default — Enter keeps it");
     me.click_ui("Abandon");
     me.find_ui("Abandon Low Tide?");
@@ -220,19 +220,6 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::Dismiss);
 }
 
-// The same title shows on the tracker and in the log's details; a row sits in the list, under its
-// header.
-fn log_row(title: &str) -> UiTarget {
-    UiTarget::text(title).and("in the quest log", |element, snapshot| {
-        UiTarget::text("Active quests")
-            .find(snapshot)
-            .is_some_and(|header| {
-                element.rect.min_y() > header.rect.min_y()
-                    && (element.rect.min_x() - header.rect.min_x()).abs() < 64.0
-            })
-    })
-}
-
 // Once a day Tobb calls over whoever comes near him after a first visit, holding his news while they
 // talk: it shows when he strolls back, or opens the next talk with him instead.
 fn hear_out_tobb(me: &mut Player, within: Duration) {
@@ -248,7 +235,7 @@ fn hear_out_tobb(me: &mut Player, within: Duration) {
             .then_some(())
     });
     if news.is_some() {
-        answer_news(me);
+        me.answer_first_choices();
     }
 }
 
@@ -274,13 +261,7 @@ fn talk_past_news(me: &mut Player) -> bool {
         if me.read_to_choices().node != "news" {
             return heard;
         }
-        answer_news(me);
+        me.answer_first_choices();
         heard = true;
     }
-}
-
-fn answer_news(me: &mut Player) {
-    me.read_to_choices();
-    me.act(InputAction::Choice1);
-    me.conversation_over();
 }

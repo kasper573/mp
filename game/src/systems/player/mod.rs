@@ -32,13 +32,13 @@ use crate::systems::job::{Job, JobId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{HeardMove, Position};
 use crate::systems::quest::QuestLog;
-use crate::systems::script::EventKind;
+use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::spectate::Spectators;
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
-use snapshot::JoinAs;
+use snapshot::{CharacterSnapshot, JoinAs};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -250,7 +250,7 @@ pub(crate) fn last_connection(
     (!elsewhere).then_some(id)
 }
 
-#[derive(Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpawnPolicy {
     Map,
@@ -291,7 +291,10 @@ pub fn join(world: &mut World) {
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let at = spawn_position(world, policy, zone, area);
-                (at, fresh_state(&content, zone, at, name, immortal))
+                let fresh = CharacterSnapshot::fresh(&name, def(&content).job);
+                let start = Place { area: zone, at };
+                let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
+                (at, state)
             }
         };
         let entity = place(world, client, zone, at, state);
@@ -363,32 +366,6 @@ impl CharacterState {
             quests: world.get::<QuestLog>(entity).cloned().unwrap_or_default(),
             history: world.get::<History>(entity).cloned().unwrap_or_default(),
         })
-    }
-}
-
-fn fresh_state(
-    content: &Content,
-    zone: AreaId,
-    at: Pos<Tiles>,
-    name: String,
-    immortal: bool,
-) -> CharacterState {
-    let def = def(content);
-    CharacterState {
-        name: Name { name },
-        spawn: SpawnPoint(at),
-        discovered: Discovered::starting_in(zone),
-        stats: player_stats(&def.stats, immortal),
-        inventory: Inventory::empty(),
-        xp: Xp { amount: 0 },
-        equipment: Equipment::default(),
-        job: Job { def: def.job },
-        timed: TimedEffects::default(),
-        memory: Memory::default(),
-        heard: Heard::default(),
-        ledger: ShopLedger::default(),
-        quests: QuestLog::default(),
-        history: History::default(),
     }
 }
 

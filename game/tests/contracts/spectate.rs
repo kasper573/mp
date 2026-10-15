@@ -1,7 +1,7 @@
 use game::systems::account::{AccountId, Identity, Role};
 use game::systems::player::{ClientId, Players};
 use game::systems::spectate::{self, SpectateRequest, Spectators};
-use game::systems::visibility;
+use game::systems::visibility::{self, PrivateSight};
 
 use testkit::{Sim, spawn_area};
 
@@ -42,4 +42,35 @@ fn watching(sim: &Sim) -> Option<ClientId> {
         .0
         .get(&ClientId(3))
         .and_then(|spectator| spectator.watching())
+}
+
+#[test]
+fn a_spectator_arriving_from_another_world_sees_the_watched_player_at_once() {
+    let mut origin = Sim::area(spawn_area());
+    let mut far = Sim::area(spawn_area());
+    far.join(1);
+    let arrived = far.connect(3);
+    let conn = origin.connect(3);
+    origin.world().entity_mut(conn).insert(Identity {
+        id: AccountId("spectator".to_owned()),
+        name: "spectator".to_owned(),
+        roles: vec![Role::Spectate],
+    });
+    origin.send(3, SpectateRequest::Start);
+    origin.tick();
+    let mut worlds = [origin.app, far.app];
+
+    let transfers = spectate::coordinate(&mut worlds, std::iter::empty());
+    assert_eq!(transfers.len(), 1);
+    let transfer = transfers
+        .into_iter()
+        .next()
+        .expect("the spectator changes worlds");
+    spectate::arrive(worlds[1].world_mut(), transfer);
+
+    let sight = worlds[1]
+        .world()
+        .get::<PrivateSight>(arrived)
+        .expect("the connection sees");
+    assert_eq!(sight.watching, Some(ClientId(1)));
 }

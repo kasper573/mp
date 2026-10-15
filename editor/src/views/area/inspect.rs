@@ -882,7 +882,7 @@ fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
         .interact(Sense::click());
     if response.clicked() {
         let view = editor.views.area.view_mut(view_key);
-        view.tool = AreaTool::Module;
+        view.set_tool(AreaTool::Module);
         editor.toast("Click the map to add a module there, or right-click anywhere");
     }
 }

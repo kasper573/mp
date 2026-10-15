@@ -515,7 +515,7 @@ pub fn use_item(world: &mut World) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
         };
-        if stat::is_dead(world, entity) {
+        if !player::may_command(world, entity) {
             continue;
         }
         if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
@@ -579,7 +579,7 @@ pub fn drop_item(world: &mut World) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
-        if stat::is_dead(world, player) {
+        if !player::may_command(world, player) {
             continue;
         }
         let slot = request.message.slot as usize;

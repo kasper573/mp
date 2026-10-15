@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use design_tokens::{CHIP_RADIUS, TextRole, color, widgets};
 use egui::{Align, Id, Layout, RichText, Sense, Stroke, Ui, UiBuilder};
 
-use super::{OfferView, ShopId, ShopRequest, ShopView, WareRefusal};
+use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::content::Content;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
@@ -473,19 +473,17 @@ fn counted(name: &str, count: u32) -> String {
 
 fn verdict(world: &World, stack: ItemStack) -> Option<SlotVerdict> {
     let content = world.resource::<Content>();
-    let shown = view(world)?;
-    Some(
-        match shown
-            .shop
-            .get(content)
-            .pays_for(content, stack.item, &shown.declined)
-        {
-            Ok(pays) => {
-                SlotVerdict::Wanted(format!("sells for {}", paid(content, pays, stack.count)))
-            }
-            Err(refusal) => SlotVerdict::Refused(refusal),
-        },
-    )
+    let quote = quote(view(world)?, stack.item)?;
+    Some(match &quote.verdict {
+        SaleVerdict::Pays(pays) => {
+            SlotVerdict::Wanted(format!("sells for {}", paid(content, pays, stack.count)))
+        }
+        SaleVerdict::Refused(refusal) => SlotVerdict::Refused(refusal.clone()),
+    })
+}
+
+fn quote(shown: &ShopView, item: ItemId) -> Option<&SaleQuote> {
+    shown.quotes.iter().find(|quote| quote.item == item)
 }
 
 fn paid(content: &Content, pays: &[ItemStack], count: u32) -> String {
@@ -504,10 +502,10 @@ fn request_sale(world: &mut World, slot: u32) {
     if *world.resource::<ClientMode>() != ClientMode::Play {
         return;
     }
-    let Some((shop, declined)) = view(world).map(|shown| (shown.shop, shown.declined.clone()))
-    else {
+    let Some(shown) = view(world) else {
         return;
     };
+    let shop = shown.shop;
     let Some(stack) = world
         .resource::<Viewpoint>()
         .0
@@ -516,11 +514,16 @@ fn request_sale(world: &mut World, slot: u32) {
     else {
         return;
     };
-    match shop.get(&content).pays_for(&content, stack.item, &declined) {
-        Ok(pays) if stack.item.get(&content).category() == ItemCategory::Equipment => {
-            confirm_sale(world, shop, stack, pays, slot);
+    let Some(verdict) = quote(shown, stack.item).map(|quote| quote.verdict.clone()) else {
+        return;
+    };
+    match verdict {
+        SaleVerdict::Pays(pays)
+            if stack.item.get(&content).category() == ItemCategory::Equipment =>
+        {
+            confirm_sale(world, shop, stack, &pays, slot);
         }
-        _ => sell(world, slot, stack),
+        SaleVerdict::Pays(_) | SaleVerdict::Refused(_) => sell(world, slot, stack),
     }
 }
 

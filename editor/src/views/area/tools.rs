@@ -51,8 +51,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
             .on_hover_text(format!("{} ({})", tool.label(), tool.icon()))
             .clicked()
         {
-            view.tool = tool;
-            view.take_drag();
+            view.set_tool(tool);
             switched = Some(tool);
         }
         ui.add_space(2.0);
@@ -384,8 +383,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         if !modifiers.ctrl && !modifiers.alt {
             for tool in AreaTool::ALL {
                 if plain_key(tool.key()) {
-                    view.tool = tool;
-                    view.take_drag();
+                    view.set_tool(tool);
                     switched = tool.bottom_tab();
                 }
             }
@@ -438,11 +436,8 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     }
     if input.key_pressed(egui::Key::Escape) {
         let view = editor.views.area.view_mut(view_key);
-        if view.drag().is_some() {
-            view.take_drag();
-        } else if view.paste.is_some() {
-            view.paste = None;
-        } else if view.in_place.pop().is_some() || !editor.selection.parts.is_empty() {
+        if !view.cancel_gesture() && view.paste.take().is_none() {
+            view.in_place.pop();
             editor.selection.parts.clear();
         }
         return;

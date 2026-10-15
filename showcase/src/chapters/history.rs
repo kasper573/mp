@@ -1,4 +1,4 @@
-use driver::{Player, UiTarget, on_quest, told_by};
+use driver::{UiTarget, on_quest, told_by};
 use game::core::tiling::Tiles;
 use game::systems::history::HistoryMark;
 use game::systems::input::map::InputAction;
@@ -43,7 +43,8 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the letter quest", |snapshot| {
         on_quest(snapshot, "letter_for_the_captain").is_some()
     });
-    leave_tobb(&mut me);
+    // Accepting leads on to a last word, and Tobb may follow it with news he held while you talked.
+    me.answer_first_choices();
 
     me.walk_into("ferry-pier", Tiles(1.0));
     me.wait_until("the gulls to squabble", |snapshot| {
@@ -83,23 +84,4 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.act(InputAction::ToggleHistory);
     me.wait_until("the history to close", |snapshot| !snapshot.history.open);
-}
-
-// Accepting leads on to a last word, and Tobb may follow it with news he held while you talked:
-// each answered with its first choice.
-fn leave_tobb(me: &mut Player) {
-    for _ in 0..3 {
-        let Some(before) = me.snapshot().stage else {
-            return;
-        };
-        me.read_to_choices();
-        me.act(InputAction::Choice1);
-        me.wait_until("the conversation to move on", |snapshot| {
-            snapshot
-                .stage
-                .as_ref()
-                .is_none_or(|now| now.node != before.node)
-        });
-    }
-    me.conversation_over();
 }

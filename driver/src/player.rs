@@ -643,6 +643,23 @@ impl Player {
         });
     }
 
+    pub fn answer_first_choices(&mut self) {
+        for _ in 0..FIRST_CHOICES {
+            let Some(before) = self.snapshot().stage else {
+                return;
+            };
+            self.read_to_choices();
+            self.act(InputAction::Choice1);
+            self.wait_until("the conversation to move on", |snapshot| {
+                snapshot
+                    .stage
+                    .as_ref()
+                    .is_none_or(|now| now.node != before.node)
+            });
+        }
+        self.conversation_over();
+    }
+
     // Lingers on what's on screen until then, a frame at a time, so every observer sees each frame.
     pub fn linger_until(&mut self, until: SystemTime) {
         while until.duration_since(SystemTime::now()).is_ok() {
@@ -806,6 +823,7 @@ const TYPING: Duration = Duration::from_millis(45);
 const AIM_ATTEMPTS: u32 = 60;
 const NEAR: Tiles = Tiles(1.5);
 const SCROLLS: u32 = 12;
+const FIRST_CHOICES: u32 = 3;
 const SET_OFF: WaitBudget = WaitBudget {
     time: Duration::from_secs(2),
     frames: 120,

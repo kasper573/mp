@@ -59,6 +59,16 @@ pub fn settle_health(world: &mut World) {
 
 fn set_health(world: &mut World, entity: Entity, f: impl Fn(f32, f32) -> f32) {
     let max = max_health(world, entity);
+    let Some(stats) = world.get::<Stats>(entity) else {
+        return;
+    };
+    let changes = stats
+        .0
+        .iter()
+        .any(|stat| stat.kind == StatKind::Health && f(stat.value.min(max), max) != stat.value);
+    if !changes {
+        return;
+    }
     if let Some(mut stats) = world.get_mut::<Stats>(entity) {
         for stat in stats
             .0

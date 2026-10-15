@@ -20,7 +20,6 @@ use crate::systems::script::{
     Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
 };
 use crate::systems::stat;
-use crate::systems::visibility;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Priority(pub u8);
@@ -268,9 +267,8 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
                 let sheltered = area::wild(world, npc)
                     && area::of(world, npc).is_some_and(|area| area.safe(there));
                 Some(
-                    !area::same_area(world, npc, target)
+                    !reach::pursuable(world, npc, target)
                         || at.distance(there) > within
-                        || !visibility::coexist(world, npc, target)
                         || sheltered,
                 )
             })()

@@ -4,13 +4,13 @@ use bevy_time::Time;
 use crate::core::content::Content;
 use crate::core::interpolate::{Jumps, Predicted};
 use crate::core::math::{Direction, Offset, Pos};
-use crate::core::tiling::{Cell, TilePos, Tiles};
+use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::render::RenderActor;
 use crate::systems::actor::{Action, Actor};
 use crate::systems::movement::{
     HeardMove, MoveRequest, MoveSeq, MoveTarget, Navigator, Path, Position, RenderPosition, gait,
-    halted, speed_of, stepping_off, walk,
+    halt_walk, speed_of, stepping_off, walk,
 };
 use crate::systems::player::{commands_locked, session};
 use crate::systems::stat;
@@ -145,16 +145,7 @@ impl Stride {
     }
 
     fn halt(&mut self) {
-        match halted(self.at, &self.path) {
-            Some(next) => {
-                self.path = Path { tiles: vec![next] };
-                self.target = Some(next.center());
-            }
-            None => {
-                self.path = Path::default();
-                self.target = None;
-            }
-        }
+        self.target = halt_walk(&mut self.at, &mut self.path);
     }
 
     /// Heads where the server's walk ends, or with none, where the server has the character stand.

@@ -281,6 +281,14 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
         .response
         .interact(Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::SelectableLabel,
+            true,
+            selected,
+            &def.title,
+        )
+    });
     if response.hovered() && !selected {
         ui.painter().rect_filled(
             response.rect,

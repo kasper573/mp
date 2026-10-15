@@ -430,7 +430,7 @@ pub fn start_in_place(editor: &mut Editor, view_key: &str, area_key: &str, index
     let blueprint = module.text("blueprint").to_owned();
     let view = editor.views.area.ensure_view(view_key, area_key);
     view.in_place = vec![index];
-    view.tool = super::AreaTool::Select;
+    view.set_tool(super::AreaTool::Select);
     editor.selection = RowSelection::row("blueprint", &blueprint);
 }
 

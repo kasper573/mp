@@ -530,7 +530,7 @@ pub fn start_paste(editor: &mut Editor, view_key: &str) {
         return;
     };
     let view = editor.views.area.view_mut(view_key);
-    view.tool = AreaTool::Select;
+    view.set_tool(AreaTool::Select);
     view.paste = Some(PasteGhost {
         modules: clip.modules,
         at: None,

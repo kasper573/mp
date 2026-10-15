@@ -247,6 +247,15 @@ impl AreaViewState {
         self.gesture = Some(Gesture::Drag(drag));
     }
 
+    pub fn set_tool(&mut self, tool: AreaTool) {
+        self.tool = tool;
+        self.cancel_gesture();
+    }
+
+    pub fn cancel_gesture(&mut self) -> bool {
+        self.gesture.take().is_some()
+    }
+
     pub fn take_drag(&mut self) -> Option<AreaDrag> {
         match self.gesture.take() {
             Some(Gesture::Drag(drag)) => Some(drag),

@@ -149,22 +149,23 @@ pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
 
 /// Stops the actor's walk at the tile it stands on, or mid-step, at the end of the step.
 pub fn halt(world: &mut World, entity: Entity) {
-    let Some(at) = position(world, entity) else {
+    let Some(mut at) = position(world, entity) else {
         return;
     };
-    match world.get::<Path>(entity).and_then(|path| halted(at, path)) {
+    let mut path = world.entity_mut(entity).take::<Path>().unwrap_or_default();
+    let turn = halt_walk(&mut at, &mut path);
+    if position(world, entity) != Some(at)
+        && let Some(mut position) = world.get_mut::<Position>(entity)
+    {
+        position.pos = at;
+    }
+    match turn {
         Some(next) => {
-            world.entity_mut(entity).insert(Path { tiles: vec![next] });
-            goto(world, entity, next.center());
+            world.entity_mut(entity).insert(path);
+            goto(world, entity, next);
         }
         None => {
-            world.entity_mut(entity).remove::<(MoveTarget, Path)>();
-            if let Some(mut position) = world.get_mut::<Position>(entity)
-                && at.on_center()
-                && at != at.snap()
-            {
-                position.pos = at.snap();
-            }
+            world.entity_mut(entity).remove::<MoveTarget>();
         }
     }
 }
@@ -625,9 +626,22 @@ impl<'c> Navigator<'c> {
     }
 }
 
-/// Where a walk halted at `at` stops: at the end of the step it's on, if it's mid-step.
-fn halted(at: Pos<Tiles>, path: &Path) -> Option<CellPos> {
-    path.next().filter(|_| !at.on_center())
+/// Stops a walk at `at`: at the end of the step it's on if it's mid-step, where it turns to the
+/// returned goal, or else on the tile it stands on, where the walk ends.
+fn halt_walk(at: &mut Pos<Tiles>, path: &mut Path) -> Option<Pos<Tiles>> {
+    match path.next().filter(|_| !at.on_center()) {
+        Some(next) => {
+            *path = Path { tiles: vec![next] };
+            Some(next.center())
+        }
+        None => {
+            path.tiles.clear();
+            if at.on_center() {
+                *at = at.snap();
+            }
+            None
+        }
+    }
 }
 
 /// The cell an actor at `at`, mid-step toward `next`, is stepping off.

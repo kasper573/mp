@@ -64,7 +64,7 @@ pub struct TestCharacterRequest {
     pub start: Option<Place>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ServerConfig {
     pub bind: IpAddr,
     pub port: u16,
@@ -82,21 +82,21 @@ pub struct ServerConfig {
     pub pyroscope_sample_hz: u32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthMode {
     Oidc,
     Fake,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Switch {
     On,
     Off,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ClientConfig {
     pub game_server_url: String,
     pub game_server_ws_url: String,

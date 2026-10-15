@@ -238,7 +238,19 @@ pub struct ShopView {
     pub shop: ShopId,
     pub offers: Vec<OfferView>,
     pub buyback: Vec<BuybackView>,
-    pub declined: Vec<u32>,
+    pub quotes: Vec<SaleQuote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub struct SaleQuote {
+    pub item: ItemId,
+    pub verdict: SaleVerdict,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub enum SaleVerdict {
+    Pays(Vec<ItemStack>),
+    Refused(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -764,15 +776,40 @@ fn refresh_view(world: &mut World, player: Entity) {
                 .collect()
         })
         .unwrap_or_default();
+    let quotes = sale_quotes(&content, shop, &declined(world, player, shop), &inventory);
     let view = ShopView {
         shop,
         offers,
         buyback,
-        declined: declined(world, player, shop),
+        quotes,
     };
     if world.get::<ShopView>(player) != Some(&view) {
         world.entity_mut(player).insert(view);
     }
+}
+
+fn sale_quotes(
+    content: &Content,
+    shop: ShopId,
+    declined: &[u32],
+    inventory: &Inventory,
+) -> Vec<SaleQuote> {
+    let mut items: Vec<ItemId> = Vec::new();
+    for stack in &inventory.slots {
+        if !items.contains(&stack.item) {
+            items.push(stack.item);
+        }
+    }
+    items
+        .into_iter()
+        .map(|item| SaleQuote {
+            item,
+            verdict: match shop.get(content).pays_for(content, item, declined) {
+                Ok(pays) => SaleVerdict::Pays(pays.to_vec()),
+                Err(refusal) => SaleVerdict::Refused(refusal),
+            },
+        })
+        .collect()
 }
 
 fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {

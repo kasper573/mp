@@ -150,6 +150,7 @@ pub fn arrive(world: &mut World, transfer: SpectatorTransfer) {
         told: None,
         ..transfer.spectator
     };
+    aim(world, transfer.client, spectator.watching);
     world
         .resource_mut::<Spectators>()
         .0

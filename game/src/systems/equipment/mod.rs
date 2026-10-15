@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
+use crate::systems::drain_requests;
 use crate::systems::effect::{self, Effect};
 use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::notification;
+use crate::systems::player::{may_command, sender_player};
 use crate::systems::script::{EventKind, condition};
-use crate::systems::stat;
-use crate::systems::{drain_requests, player::sender_player};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -138,7 +138,7 @@ pub fn unequip(world: &mut World) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
-        if stat::is_dead(world, player) {
+        if !may_command(world, player) {
             continue;
         }
         if let Err(refusal) = unequip_slot(world, player, request.message.slot) {

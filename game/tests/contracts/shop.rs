@@ -5,7 +5,7 @@ use game::systems::item::{ItemId, ItemStack};
 use game::systems::movement::position;
 use game::systems::npc::NpcId;
 use game::systems::script::Speaker;
-use game::systems::shop::{ShopId, ShopRequest, ShopView};
+use game::systems::shop::{SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView};
 
 use testkit::{
     Sim, content, conversation, count, give, later, leave, object, pick, place, row, slot_of,
@@ -141,6 +141,25 @@ fn a_collector_pays_in_his_own_currency_and_buyback_costs_exactly_what_he_paid()
 }
 
 #[test]
+fn the_view_quotes_what_each_bag_item_fetches_or_why_it_does_not_sell() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    give(&mut sim, player, row("Bone"), 7);
+    give(&mut sim, player, row("OrcTusk"), 1);
+
+    browse(&mut sim, 1, player, row("Wren"));
+
+    let view = shown(&mut sim, player).expect("open");
+    let bone = quote(&view, row("Bone")).expect("quoted");
+    assert!(matches!(
+        &bone.verdict,
+        SaleVerdict::Pays(pays) if pays.iter().any(|stack| stack.item == row("BoneToken"))
+    ));
+    let tusk = quote(&view, row("OrcTusk")).expect("quoted");
+    assert!(matches!(tusk.verdict, SaleVerdict::Refused(_)));
+}
+
+#[test]
 fn walking_out_of_reach_closes_the_shop() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
@@ -196,6 +215,10 @@ fn a_map_object_can_keep_a_shop() {
     sim.tick();
     assert_eq!(count(&mut sim, player, row("FishSteak")), 1);
     assert_eq!(count(&mut sim, player, row("Gold")), 0);
+}
+
+fn quote(view: &ShopView, item: ItemId) -> Option<&SaleQuote> {
+    view.quotes.iter().find(|quote| quote.item == item)
 }
 
 fn shown(sim: &mut Sim, player: Entity) -> Option<ShopView> {
