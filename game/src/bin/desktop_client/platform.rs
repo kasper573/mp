@@ -268,8 +268,7 @@ fn drive(
             match outgoing.try_recv() {
                 Ok(packet) => match ws.send(Message::Binary(packet.into())) {
                     Ok(()) => {}
-                    Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {
-                    }
+                    Err(tungstenite::Error::Io(error)) if retryable(&error) => {}
                     Err(_) => return closed(),
                 },
                 Err(TryRecvError::Empty) => break,
@@ -285,11 +284,20 @@ fn drive(
             }
             Ok(Message::Close(_)) => return closed(),
             Ok(_) => {}
-            Err(tungstenite::Error::Io(error))
-                if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
+            Err(tungstenite::Error::Io(error)) if retryable(&error) => {}
             Err(_) => return closed(),
         }
     }
+}
+
+// A socket call with a timeout fails as interrupted when the process is stopped and resumed (a
+// debugger, a suspended terminal job), so that is no more the connection's end than a poll that
+// found nothing.
+fn retryable(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::Interrupted
+    )
 }
 
 const READ_POLL: Duration = Duration::from_millis(1);
