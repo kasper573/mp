@@ -412,7 +412,7 @@ pub(crate) fn place(
         .spawn((
             Character {
                 replicated: Replicated,
-                position: Position { pos: at },
+                position: Position::at(at),
                 actor: Actor {
                     color: def.tint(),
                     dir: Direction::S,

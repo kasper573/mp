@@ -5,7 +5,7 @@ use bevy_time::Time;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
-use crate::core::interpolate::{Interpolate, InterpolatePlugin, RenderValueSystems};
+use crate::core::interpolate::{Interpolate, InterpolatePlugin, Jumps, RenderValueSystems};
 use crate::core::math::{Direction, Offset, Pos, Rect, Rng, Size};
 use crate::core::tiling::{
     Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, TileRect, Tiles, TilesPerSec,
@@ -33,6 +33,18 @@ pub fn register(app: &mut App) {
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Position {
     pub pos: Pos<Tiles>,
+    /// Counts each time the server put the entity somewhere rather than walked it there, so a client
+    /// shows it there at once rather than a walk that never happened.
+    pub jumps: Jumps,
+}
+
+impl Position {
+    pub fn at(pos: Pos<Tiles>) -> Position {
+        Position {
+            pos,
+            jumps: Jumps::default(),
+        }
+    }
 }
 
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -69,10 +81,6 @@ impl Plugin for MovementPlugin {
 #[derive(Component, Clone, Copy, PartialEq)]
 pub struct RenderPosition(pub Pos<Tiles>);
 
-/// A jump larger than this between consecutive snapshots is a teleport (portal, respawn) and is
-/// snapped rather than interpolated.
-const SNAP: Tiles = Tiles(2.0);
-
 impl Interpolate for RenderPosition {
     type Source = Position;
 
@@ -84,8 +92,8 @@ impl Interpolate for RenderPosition {
         RenderPosition(self.0 + (next.0 - self.0) * t)
     }
 
-    fn discontinuous(&self, next: &RenderPosition) -> bool {
-        self.0.distance(next.0) > SNAP
+    fn jumps(position: &Position) -> Jumps {
+        position.jumps
     }
 }
 
@@ -135,6 +143,7 @@ pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
     world.entity_mut(entity).remove::<(MoveTarget, Path)>();
     if let Some(mut position) = world.get_mut::<Position>(entity) {
         position.pos = pos;
+        position.jumps = position.jumps.next();
     }
 }
 

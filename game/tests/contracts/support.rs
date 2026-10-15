@@ -344,7 +344,7 @@ pub fn health(sim: &mut Sim, who: Entity) -> f32 {
 }
 
 pub fn place(sim: &mut Sim, entity: Entity, at: Pos<Tiles>) {
-    sim.world().entity_mut(entity).insert(Position { pos: at });
+    sim.world().entity_mut(entity).insert(Position::at(at));
 }
 
 pub fn spoken(id: NotificationId) -> Notification {

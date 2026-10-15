@@ -454,7 +454,7 @@ pub fn approach(world: &mut World) {
 fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Character {
     Character {
         replicated: Replicated,
-        position: Position { pos: at },
+        position: Position::at(at),
         actor: Actor {
             color: def.tint(),
             dir: Direction::S,

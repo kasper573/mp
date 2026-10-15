@@ -1,9 +1,11 @@
+use std::f32::consts::TAU;
+
 use driver::{Player, UiTarget, content, holding};
-use game::core::math::Offset;
+use game::core::math::{Offset, Pos, WindowPx};
 use game::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
-use crate::shoot::Shoot;
+use crate::shoot::{Shoot, Star};
 
 pub const CHAPTER: Chapter = Chapter {
     name: "windows",
@@ -30,6 +32,7 @@ fn play(shoot: &mut Shoot) {
     for (toggle, title, (x, y)) in LAYOUT {
         me.act(toggle);
         if title == "Inventory" {
+            fling_and_resize(&mut me);
             me.caption("Drag a window by its title to move it");
         }
         me.drag_ui(title, Offset::new(x, y));
@@ -127,6 +130,27 @@ fn play(shoot: &mut Shoot) {
     me.caption("…and with voice turned down, the same greeting is silent");
     hear_out_greeting(&mut me);
 }
+
+fn fling_and_resize(me: &mut Star) {
+    me.caption("Grab a window by its title and fling it about: the spot you grabbed stays under the pointer");
+    me.dragging_ui("Inventory", |me| {
+        let grabbed = me.snapshot().input.cursor.expect("the pointer");
+        let path: Vec<Pos<WindowPx>> = (1..=FLING_STEPS)
+            .map(|step| {
+                let turn = TAU * 2.0 * step as f32 / FLING_STEPS as f32;
+                grabbed + Offset::new(240.0 * turn.sin(), 140.0 * (turn * 1.5).sin())
+            })
+            .collect();
+        me.sweep_pointer(&path)
+    });
+    me.hold();
+    me.caption("Pull its corner to resize it");
+    me.drag_ui("Resize", Offset::new(120.0, 90.0));
+    me.hold();
+    me.drag_ui("Resize", Offset::new(-120.0, -90.0));
+}
+
+const FLING_STEPS: usize = 240;
 
 fn inspect(me: &mut Player, icon: &str, item: &str) {
     me.act_on_ui(InputAction::InspectItem, outside_card(icon));

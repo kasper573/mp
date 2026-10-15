@@ -87,7 +87,7 @@ fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
 fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
     sim.world()
         .spawn((
-            Position { pos: at },
+            Position::at(at),
             AreaTag { area: spawn_area() },
             DroppedItem {
                 item: row("Bone"),

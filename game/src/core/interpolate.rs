@@ -5,6 +5,7 @@ use bevy_app::{App, Plugin, Update};
 use bevy_ecs::component::Mutable;
 use bevy_ecs::prelude::*;
 use bevy_time::Time;
+use serde::{Deserialize, Serialize};
 
 use crate::core::time::Seconds;
 
@@ -12,9 +13,9 @@ use crate::core::time::Seconds;
 /// only updates every few ticks. Implement it on the component your renderers read (a sprite
 /// position, a facing); registering an [`InterpolatePlugin`] for it then keeps it filled in on its
 /// own — one snapshot stream buffered per entity, advanced every frame. The provided methods suit
-/// discrete values (a facing, an animation): they switch as their segment starts and never snap.
-/// Continuous values (a position) override `interpolate` to blend and `discontinuous` to snap over
-/// jumps too large to play through.
+/// discrete values (a facing, an animation): they switch as their segment starts and never jump.
+/// Continuous values (a position) override `interpolate` to blend, and `jumps` so playback cuts
+/// to where the source jumped rather than playing through the jump.
 pub trait Interpolate: Component<Mutability = Mutable> + Clone + PartialEq {
     /// The replicated component this value is sampled from.
     type Source: Component;
@@ -27,10 +28,20 @@ pub trait Interpolate: Component<Mutability = Mutable> + Clone + PartialEq {
         next.clone()
     }
 
-    /// Whether `self` to `next` is a discontinuity (a teleport, a respawn) that playback must snap
-    /// over instead of interpolating through.
-    fn discontinuous(&self, _next: &Self) -> bool {
-        false
+    /// How many times the source has jumped rather than moved: a teleport, a respawn.
+    fn jumps(_source: &Self::Source) -> Jumps {
+        Jumps::default()
+    }
+}
+
+/// A count of the times a value jumped rather than moved, kept by whatever makes it jump. However
+/// far apart the frames that see it, a change in the count tells a jump from a quick move.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Jumps(pub u32);
+
+impl Jumps {
+    pub fn next(self) -> Jumps {
+        Jumps(self.0.wrapping_add(1))
     }
 }
 
@@ -92,11 +103,11 @@ fn drive<T: Interpolate>(
         let at = T::sample(source);
         commands
             .entity(entity)
-            .insert((at.clone(), Playback::new(at, period.0)));
+            .insert((at.clone(), Playback::new(at, T::jumps(source), period.0)));
     }
     for (source, mut render, mut playback) in &mut playing {
         if source.is_changed() {
-            playback.push(T::sample(&source));
+            playback.push(T::sample(&source), T::jumps(&source));
         }
         *render = playback.advance(dt, period.0);
     }
@@ -108,7 +119,7 @@ fn drive<T: Interpolate>(
 /// bracket the segment currently playing and `elapsed` is how far playback has travelled into it;
 /// reaching `to` pulls the next snapshot from the queue, so playback always heads toward a real
 /// future sample — linear, never eased, and kept a snapshot or two behind so one late arrival can't
-/// stall it.
+/// stall it. A snapshot of a source that jumped cuts straight to it.
 #[derive(Component)]
 struct Playback<T: Interpolate> {
     queue: VecDeque<T>,
@@ -116,24 +127,27 @@ struct Playback<T: Interpolate> {
     to: T,
     elapsed: Seconds,
     lead: Seconds,
+    jumps: Jumps,
 }
 
 impl<T: Interpolate> Playback<T> {
-    fn new(at: T, period: Seconds) -> Playback<T> {
+    fn new(at: T, jumps: Jumps, period: Seconds) -> Playback<T> {
         Playback {
             queue: VecDeque::new(),
             from: at.clone(),
             to: at,
             elapsed: Seconds(0.0),
             lead: target_lead(period),
+            jumps,
         }
     }
 
-    fn push(&mut self, snapshot: T) {
-        if snapshot == self.to {
+    fn push(&mut self, snapshot: T, jumps: Jumps) {
+        let jumped = std::mem::replace(&mut self.jumps, jumps) != jumps;
+        if snapshot == self.to && !jumped {
             return;
         }
-        if self.to.discontinuous(&snapshot) || self.queue.len() >= MAX_QUEUE {
+        if jumped || self.queue.len() >= MAX_QUEUE {
             self.queue.clear();
             self.from = snapshot.clone();
             self.to = snapshot;

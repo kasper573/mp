@@ -721,7 +721,7 @@ pub fn scatter_at(
         let entity = world
             .spawn((
                 Replicated,
-                Position { pos },
+                Position::at(pos),
                 AreaTag { area: area_id },
                 DroppedItem { item, count: stack },
                 Reservation {

@@ -1,15 +1,15 @@
 use bevy_ecs::prelude::*;
 use bevy_time::Time;
 
-use crate::core::interpolate::Predicted;
+use crate::core::interpolate::{Jumps, Predicted};
 use crate::core::math::{Direction, Offset, Pos};
 use crate::core::tiling::{Cell, TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::render::RenderActor;
 use crate::systems::actor::{Action, Actor};
 use crate::systems::movement::{
-    HeardMove, MoveRequest, MoveSeq, MoveTarget, Navigator, Path, RenderPosition, SNAP, gait,
-    halted, position, speed_of, stepping_off, walk,
+    HeardMove, MoveRequest, MoveSeq, MoveTarget, Navigator, Path, Position, RenderPosition, gait,
+    halted, speed_of, stepping_off, walk,
 };
 use crate::systems::player::{commands_locked, session};
 use crate::systems::stat;
@@ -50,15 +50,17 @@ pub(super) struct Stride {
     facing: Direction,
     /// The latest [`MoveRequest`] sent for this character, to compare with its [`HeardMove`].
     sent: MoveSeq,
-    /// Where the server last had the character.
-    seen: Pos<Tiles>,
+    /// The server's count of the character's jumps when the stride last looked.
+    jumps: Jumps,
 }
 
 pub(super) fn walk_ahead(world: &mut World) {
     let Some(me) = predicted_character(world) else {
         return;
     };
-    let (Some(server), Some(navigator)) = (position(world, me), Navigator::of(world, me)) else {
+    let (Some(server), Some(navigator)) =
+        (world.get::<Position>(me).cloned(), Navigator::of(world, me))
+    else {
         return;
     };
     let heard = world
@@ -74,14 +76,14 @@ pub(super) fn walk_ahead(world: &mut World) {
     let Some(mut stride) = world.get_mut::<Stride>(me) else {
         return;
     };
-    stride.track(server);
+    stride.track(&server);
     let heading = if alive {
         if heard >= stride.sent {
-            stride.follow(&navigator, server_goal, server);
+            stride.follow(&navigator, server_goal, server.pos);
         }
         stride.advance(speed * dt)
     } else {
-        stride.snap(server);
+        stride.snap(server.pos);
         None
     };
     let pose = stride.pose(heading, gait(speed), shown);
@@ -95,14 +97,14 @@ pub(super) fn walk_ahead(world: &mut World) {
 }
 
 impl Stride {
-    fn new(at: Pos<Tiles>, facing: Direction) -> Stride {
+    fn new(server: &Position, facing: Direction) -> Stride {
         Stride {
-            at,
+            at: server.pos,
             path: Path::default(),
             target: None,
             facing,
             sent: MoveSeq::default(),
-            seen: at,
+            jumps: server.jumps,
         }
     }
 
@@ -168,13 +170,12 @@ impl Stride {
         }
     }
 
-    /// Catches the server moving the character further than it could walk between two snapshots: a
-    /// portal, a respawn. Walking there would only show a walk that never happened.
-    fn track(&mut self, server: Pos<Tiles>) {
-        if self.seen.distance(server) > SNAP {
-            self.snap(server);
+    /// Shows the character where the server put it, should it have jumped: walking there would only
+    /// show a walk that never happened.
+    fn track(&mut self, server: &Position) {
+        if std::mem::replace(&mut self.jumps, server.jumps) != server.jumps {
+            self.snap(server.pos);
         }
-        self.seen = server;
     }
 
     fn snap(&mut self, to: Pos<Tiles>) {
@@ -226,16 +227,16 @@ impl Stride {
 fn predicted_character(world: &mut World) -> Option<Entity> {
     let me = session::my_character(world)?.id();
     if !world.entity(me).contains::<Stride>() {
-        let at = position(world, me)?;
+        let server = world.get::<Position>(me)?.clone();
         let actor = world.get::<Actor>(me)?;
         let pose = RenderActor {
             dir: actor.dir,
             action: actor.action,
         };
         world.entity_mut(me).insert((
-            Stride::new(at, pose.dir),
+            Stride::new(&server, pose.dir),
             Predicted,
-            RenderPosition(at),
+            RenderPosition(server.pos),
             pose,
         ));
     }

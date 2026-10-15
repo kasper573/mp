@@ -4,7 +4,7 @@ use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::transition::Crossing;
 use game::systems::area::warp::warp;
 use game::systems::dialogue::Conversation;
-use game::systems::movement::{MoveRequest, MoveSeq, moving, on_tile, position};
+use game::systems::movement::{MoveRequest, MoveSeq, Position, moving, on_tile, position};
 use game::systems::player::commands_locked;
 use game::systems::script::Place;
 
@@ -40,6 +40,35 @@ fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
     later(&mut sim, 2.0);
     assert_eq!(position(sim.world(), player), Some(there));
     assert!(!moving(sim.world(), player));
+}
+
+#[test]
+fn a_warp_counts_as_a_jump_where_a_walk_does_not() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let start = position(sim.world(), player).expect("placed");
+    let away = sim.walkable_near(start, Tiles(2.0), Tiles(3.0));
+    let jumps = |sim: &mut Sim| sim.world().get::<Position>(player).expect("placed").jumps;
+    let before = jumps(&mut sim);
+
+    sim.send(
+        1,
+        MoveRequest {
+            pos: away,
+            seq: MoveSeq(1),
+        },
+    );
+    assert!(
+        sim.run_until(5.0, |world| position(world, player) == Some(away)),
+        "you never got there"
+    );
+    assert_eq!(jumps(&mut sim), before, "the walk counted as a jump");
+    let back = Place {
+        area: spawn_area(),
+        at: start,
+    };
+    warp(sim.world(), player, back).expect("a warp within the area");
+    assert_ne!(jumps(&mut sim), before, "the warp went uncounted");
 }
 
 #[test]

@@ -239,15 +239,13 @@ pub fn spawn_all(world: &mut World) {
         });
         let bounds = object.shape.bounds();
         let mut entity = world.spawn((
-            Position {
-                pos: match object.shape {
-                    ObjectShape::Point(point) => point,
-                    ObjectShape::Rect(rect) => Pos::new(
-                        rect.origin.x + rect.size.width / 2.0 - 0.5,
-                        rect.origin.y + rect.size.height - 1.0,
-                    ),
-                },
-            },
+            Position::at(match object.shape {
+                ObjectShape::Point(point) => point,
+                ObjectShape::Rect(rect) => Pos::new(
+                    rect.origin.x + rect.size.width / 2.0 - 0.5,
+                    rect.origin.y + rect.size.height - 1.0,
+                ),
+            }),
             AreaTag { area: zone },
             AreaObject {
                 index: index as u32,
