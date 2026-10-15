@@ -70,6 +70,10 @@ impl Platform for WebPlatform {
         }
     }
 
+    fn uncaps_frames(&self) -> bool {
+        false
+    }
+
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
         Box::pin(async move {
             let response = gloo_net::http::Request::get(&url)

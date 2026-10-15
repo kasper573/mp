@@ -1,8 +1,7 @@
 use bevy::prelude::*;
-use bevy::window::CursorIcon;
 
 use crate::core::render;
-use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Cursor, Gesture};
 use crate::systems::interface::CursorShape;
 use crate::systems::item::{self, PickupRequest};
 use crate::systems::player::session;
@@ -24,7 +23,7 @@ impl Gesture for PickupGesture {
         }
     }
 
-    fn cursor(&self, world: &mut World) -> Option<CursorIcon> {
-        Some(content_cursor(world, CursorShape::PickUp))
+    fn cursor(&self, _world: &mut World) -> Option<Cursor> {
+        Some(Cursor::Shaped(CursorShape::PickUp))
     }
 }

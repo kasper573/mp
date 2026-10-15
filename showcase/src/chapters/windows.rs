@@ -81,6 +81,12 @@ fn play(shoot: &mut Shoot) {
     me.click_ui(UiTarget::starting("Show FPS"));
     me.find_ui(UiTarget::containing(" FPS ("));
     me.hold();
+    me.caption("Max FPS holds the frame rate to the screen's refresh rate…");
+    pick_max_fps(&mut me, "Uncapped", "Refresh rate");
+    me.hold();
+    me.caption("…or leaves it uncapped, drawing as fast as the machine can");
+    pick_max_fps(&mut me, "Refresh rate", "Uncapped");
+    me.hold();
     me.click_ui(UiTarget::starting("Show FPS"));
     me.wait_until("the meter to go", |snapshot| {
         UiTarget::containing(" FPS (").find(snapshot).is_none()
@@ -144,6 +150,17 @@ fn outside_card(icon: &str) -> UiTarget {
             .item_card
             .is_none_or(|card| !card.rect.contains(element.rect.center()))
     })
+}
+
+fn pick_max_fps(me: &mut Player, current: &str, next: &str) {
+    me.scroll_until("Audio", current);
+    me.click_ui(current);
+    me.hover_ui(next);
+    me.click_ui(next);
+    me.wait_until(&format!("{next} to be picked"), |snapshot| {
+        UiTarget::text(next).find(snapshot).is_some()
+            && UiTarget::text(current).find(snapshot).is_none()
+    });
 }
 
 fn hear_out_greeting(me: &mut Player) {

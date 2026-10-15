@@ -25,6 +25,8 @@ pub enum Band {
     System,
     Modal,
     Pointer,
+    /// The cursor itself, when the frame draws it, over whatever follows the pointer.
+    Cursor,
 }
 
 impl Band {
@@ -34,6 +36,7 @@ impl Band {
             Band::Hud => Order::Middle,
             Band::Notices | Band::System | Band::Modal => Order::Foreground,
             Band::Pointer => Order::Tooltip,
+            Band::Cursor => Order::Debug,
         }
     }
 }
@@ -89,6 +92,7 @@ impl Plugin for GuiPlugin {
                     Band::System,
                     Band::Modal,
                     Band::Pointer,
+                    Band::Cursor,
                 )
                     .chain(),
             )
@@ -214,6 +218,11 @@ pub fn pointer_claimed(world: &World) -> bool {
 pub fn layer_at(gui: &egui::Context, at: egui::Pos2) -> Option<LayerId> {
     gui.layer_id_at(at)
         .filter(|&layer| layer != LayerId::background())
+}
+
+/// Whether the interface is dragging something, which follows the pointer while it lasts.
+pub fn dragging(world: &World) -> bool {
+    context(world).is_some_and(|gui| gui.dragged_id().is_some())
 }
 
 pub fn cursor(world: &World) -> egui::CursorIcon {

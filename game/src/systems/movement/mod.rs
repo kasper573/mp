@@ -591,18 +591,7 @@ impl Navigator {
         else {
             return vec![(here, at.distance(here.center()))];
         };
-        let toward = |cell: i32, from: f32| {
-            let gap = cell as f32 - from;
-            if gap > 1e-4 {
-                1
-            } else if gap < -1e-4 {
-                -1
-            } else {
-                0
-            }
-        };
-        let left = CellPos::new(next.x - toward(next.x, at.x), next.y - toward(next.y, at.y));
-        [next, left]
+        [next, stepping_off(at, next)]
             .into_iter()
             .filter(|&cell| self.grid.cell_walkable(cell))
             .map(|cell| (cell, at.distance(cell.center())))
@@ -616,6 +605,21 @@ impl Navigator {
                 .cell_walkable(from.lerp(to, i as f32 / samples as f32).cell())
         })
     }
+}
+
+/// The cell an actor at `at`, mid-step toward `next`, is stepping off.
+fn stepping_off(at: Pos<Tiles>, next: CellPos) -> CellPos {
+    let toward = |cell: i32, from: f32| {
+        let gap = cell as f32 - from;
+        if gap > 1e-4 {
+            1
+        } else if gap < -1e-4 {
+            -1
+        } else {
+            0
+        }
+    };
+    CellPos::new(next.x - toward(next.x, at.x), next.y - toward(next.y, at.y))
 }
 
 fn octile(from: CellPos, to: CellPos) -> u64 {

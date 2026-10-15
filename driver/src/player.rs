@@ -142,19 +142,38 @@ impl Player {
 
     // Whatever the action's pointer binding is, where the pointer is.
     pub fn act_here(&mut self, action: InputAction) -> ProbeSnapshot {
-        let (button, times, held) = bindings(action)
-            .iter()
-            .find_map(|binding| match *binding {
-                InputBinding::Mouse { button, modifiers } => Some((button, 1, modifiers)),
-                InputBinding::Click(gesture) => {
-                    Some((gesture.button, gesture.times, gesture.modifiers))
-                }
-                _ => None,
-            })
-            .unwrap_or_else(|| panic!("no click is bound to {action:?}"));
+        let (button, times, held) = pointer_binding(action);
         self.with_held(held, |player| {
             player.desktop.click(button_of(button), times)
         })
+    }
+
+    // The action's pointer button kept down where the pointer is while `during` plays.
+    pub fn holding_down<T>(
+        &mut self,
+        action: InputAction,
+        during: impl FnOnce(&mut Player) -> T,
+    ) -> T {
+        let (button, _, held) = pointer_binding(action);
+        self.with_held(held, |player| {
+            player.desktop.button_down(button_of(button));
+            let done = during(player);
+            player.desktop.button_up(button_of(button));
+            done
+        })
+    }
+
+    // The interface's drag of `ui`, held while `during` plays and let go after it.
+    pub fn dragging_ui<T>(
+        &mut self,
+        ui: impl Into<UiTarget>,
+        during: impl FnOnce(&mut Player) -> T,
+    ) -> T {
+        self.aim_at_ui(&ui.into(), Aim::Click);
+        self.desktop.button_down(Button::Left);
+        let done = during(self);
+        self.desktop.button_up(Button::Left);
+        done
     }
 
     pub fn click(&mut self) -> ProbeSnapshot {
@@ -842,6 +861,19 @@ fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos
         .copied()
         .filter(|node| grid.component(*node) == Some(region))
         .min_by(|a, b| a.distance_to(goal).total_cmp(&b.distance_to(goal)))
+}
+
+fn pointer_binding(action: InputAction) -> (MouseButton, u8, KeyModifiers) {
+    bindings(action)
+        .iter()
+        .find_map(|binding| match *binding {
+            InputBinding::Mouse { button, modifiers } => Some((button, 1, modifiers)),
+            InputBinding::Click(gesture) => {
+                Some((gesture.button, gesture.times, gesture.modifiers))
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no click is bound to {action:?}"))
 }
 
 fn button_of(button: MouseButton) -> Button {

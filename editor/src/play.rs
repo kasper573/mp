@@ -872,7 +872,6 @@ fn spawn_client(
         access_token: fake_token(character, &[]),
         profile_dir: profile,
         exit_on_stdin_eof: true,
-        vsync: true,
         probe: None,
     };
     let mut command = Command::new(binaries.join(CLIENT));

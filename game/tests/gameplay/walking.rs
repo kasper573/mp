@@ -3,10 +3,12 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use driver::{
-    WaitBudget, area_key, area_named, beside_resident, clickable_point, ground_near, in_warp, taken,
+    Player, WaitBudget, area_key, area_named, beside_resident, clickable_point, ground_near,
+    in_warp, taken,
 };
 use game::core::math::{Offset, Pos, WindowPx};
 use game::core::tiling::Tiles;
+use game::systems::input::map::InputAction;
 use game::systems::probe::ProbeSnapshot;
 
 use crate::playtest;
@@ -16,32 +18,19 @@ const LINE: usize = 12;
 // aimed mid-walk lands up to this many tiles further along than aimed.
 const DRIFT: usize = 2;
 const CLEARANCE: f32 = 3.0;
+// How far the walk goes with the button held, short enough that the pointer leading it stays on
+// the line.
+const HELD_FOR: f32 = 5.0;
 
 // Where the player showed on screen, frame by frame.
-type Frames = Vec<(u32, Pos<Tiles>)>;
+type Frames = Rc<RefCell<Vec<(u32, Pos<Tiles>)>>>;
 
 #[test]
 fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_for() {
     let mut playtest = playtest();
-    let mut player = playtest.join_as(
-        "traveler",
-        Some(beside_resident("glimmercap", "gnome_alchemist")),
-    );
-    player.in_world();
-    let (step, tiles) = player.wait_for("a quiet straight line of ground", quiet_line);
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
     let start = player.walk_to(tiles[0]);
-    let drawn: Rc<RefCell<Frames>> = Rc::default();
-    let log = drawn.clone();
-    player.observe(move |snapshot| {
-        if let Some(me) = &snapshot.me
-            && log
-                .borrow()
-                .last()
-                .is_none_or(|&(frame, _)| frame < snapshot.frame)
-        {
-            log.borrow_mut().push((snapshot.frame, me.drawn));
-        }
-    });
+    let drawn = record_drawn(&mut player);
 
     let (first_goal, at) =
         player.wait_for("the line in view", |seen| farthest_in_view(seen, &tiles, 1));
@@ -73,10 +62,105 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
         "the walk ended at {end:?}, not on the line past {:?}",
         tiles[first_goal]
     );
+    assert_unbroken(&drawn, clicked, start, end, step);
+}
+
+#[test]
+fn asking_again_for_tiles_along_the_way_walks_on_to_the_end_as_one_ask_does() {
+    let mut playtest = playtest();
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let start = player.walk_to(tiles[0]);
+    let drawn = record_drawn(&mut player);
+
+    let (goal, at) = player.wait_for("the line in view", |seen| farthest_in_view(seen, &tiles, 1));
+    player.point_at(at);
+    let clicked = player.click().frame;
+    loop {
+        let seen = player.snapshot();
+        let walked = (seen.me.as_ref().expect("the player").drawn - tiles[0]).dot(step);
+        let ahead = walked.round() as usize + 1 + DRIFT;
+        if ahead >= goal {
+            break;
+        }
+        player.point_at_tile(tiles[ahead]);
+        player.click();
+    }
+    let end = player.come_to_rest();
+
+    assert_eq!(end, tiles[goal]);
+    assert_unbroken(&drawn, clicked, start, end, step);
+}
+
+#[test]
+fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
+    let mut playtest = playtest();
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let start = player.walk_to(tiles[0]);
+    let drawn = record_drawn(&mut player);
+
+    let at = player.wait_for("the line in view", |seen| clickable_point(seen, tiles[1]));
+    player.point_at(at);
+    let pressed = player.snapshot().frame;
+    player.holding_down(InputAction::Interact, |player| {
+        let mut last = start;
+        loop {
+            let seen = player.snapshot();
+            let me = seen.me.as_ref().expect("the player").drawn;
+            if (me - tiles[0]).dot(step) >= HELD_FOR {
+                break;
+            }
+            // A tile ahead, and twice the last frame's walk more, so the walk doesn't overtake the
+            // pointer before the game sees it there, however few frames come.
+            let lead = 1.0 + 2.0 * me.distance_to(last);
+            last = me;
+            player.point_at(seen.view.expect("a view").window_point(me + step * lead));
+        }
+    });
+    let end = player.come_to_rest();
+
+    assert!(tiles.contains(&end), "the walk left its line, for {end:?}");
+    assert_unbroken(&drawn, pressed, start, end, step);
+}
+
+fn on_a_quiet_line(playtest: &mut driver::Playtest) -> (Player, Offset<Tiles>, Vec<Pos<Tiles>>) {
+    let mut player = playtest.join_as(
+        "traveler",
+        Some(beside_resident("glimmercap", "gnome_alchemist")),
+    );
+    player.in_world();
+    let (step, tiles) = player.wait_for("a quiet straight line of ground", quiet_line);
+    (player, step, tiles)
+}
+
+fn record_drawn(player: &mut Player) -> Frames {
+    let drawn: Frames = Rc::default();
+    let log = drawn.clone();
+    player.observe(move |snapshot| {
+        if let Some(me) = &snapshot.me
+            && log
+                .borrow()
+                .last()
+                .is_none_or(|&(frame, _)| frame < snapshot.frame)
+        {
+            log.borrow_mut().push((snapshot.frame, me.drawn));
+        }
+    });
+    drawn
+}
+
+// From where it set off after `since` to where it came to rest, the walk moved on along `step` in
+// every frame it showed.
+fn assert_unbroken(
+    drawn: &Frames,
+    since: u32,
+    start: Pos<Tiles>,
+    end: Pos<Tiles>,
+    step: Offset<Tiles>,
+) {
     let drawn = drawn.borrow();
     let way: Vec<Pos<Tiles>> = drawn
         .iter()
-        .filter(|(frame, at)| *frame > clicked && *at != start)
+        .filter(|(frame, at)| *frame > since && *at != start)
         .map(|&(_, at)| at)
         .take_while(|&at| at != end)
         .collect();

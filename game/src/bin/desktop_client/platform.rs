@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
@@ -13,13 +12,13 @@ use bevy::window::Window;
 use game::core::content::store::ContentStore;
 use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, SocketState};
 use game::core::time::{LocalClock, Seconds, UnixMillis};
+use game::systems::launch::{profile_settings, save_profile_settings};
 use game::systems::probe::ProbeChannel;
 use tungstenite::Message;
 use tungstenite::stream::MaybeTlsStream;
 
 use crate::store::FileStore;
 
-const SETTINGS: &str = "settings.json";
 const CACHE: &str = "cache";
 
 pub struct DesktopPlatform {
@@ -45,32 +44,26 @@ impl DesktopPlatform {
             agent: ureq::Agent::new_with_config(config),
         }
     }
-
-    fn settings(&self) -> BTreeMap<String, String> {
-        std::fs::read_to_string(self.profile.join(SETTINGS))
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default()
-    }
 }
 
 impl Platform for DesktopPlatform {
     fn load(&self, key: &str) -> Option<String> {
-        self.settings().remove(key)
+        profile_settings(&self.profile).remove(key)
     }
 
     fn save(&self, key: &str, value: &str) {
-        let mut settings = self.settings();
+        let mut settings = profile_settings(&self.profile);
         settings.insert(key.to_owned(), value.to_owned());
-        let text = serde_json::to_string_pretty(&settings).expect("settings serialize");
-        if std::fs::create_dir_all(&self.profile).is_ok()
-            && let Err(error) = std::fs::write(self.profile.join(SETTINGS), text)
-        {
+        if let Err(error) = save_profile_settings(&self.profile, &settings) {
             eprintln!("settings not saved: {error}");
         }
     }
 
     fn sync_window(&self, _window: &mut Window) {}
+
+    fn uncaps_frames(&self) -> bool {
+        true
+    }
 
     // Rendering a frame alongside the next update puts the interface on screen a frame later,
     // trailing the system cursor, and the client's frames are cheap enough to render in turn.

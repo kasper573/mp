@@ -1,15 +1,18 @@
+use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::content::version;
 use crate::core::net::auth::{RealmAccess, TokenClaims};
+use crate::core::render::present::MaxFps;
 use crate::core::time::UtcHour;
 use crate::systems::account::Role;
 use crate::systems::player::SpawnPolicy;
 use crate::systems::script::Place;
+use crate::systems::settings;
 
 pub const BUILD_INFO_FLAG: &str = "--build-info";
 pub const SERVER_ENV_PREFIX: &str = "RIFT_GAME_SERVER_";
@@ -137,8 +140,32 @@ pub struct ClientConfig {
     pub access_token: String,
     pub profile_dir: PathBuf,
     pub exit_on_stdin_eof: bool,
-    pub vsync: bool,
     pub probe: Option<SocketAddr>,
+}
+
+/// What a desktop client keeps in its profile between runs, by key.
+pub fn profile_settings(profile: &Path) -> BTreeMap<String, String> {
+    std::fs::read_to_string(profile.join(PROFILE_SETTINGS))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_profile_settings(
+    profile: &Path,
+    settings: &BTreeMap<String, String>,
+) -> std::io::Result<()> {
+    let text = serde_json::to_string_pretty(settings).expect("settings serialize");
+    std::fs::create_dir_all(profile)?;
+    std::fs::write(profile.join(PROFILE_SETTINGS), text)
+}
+
+/// Starts a desktop client's profile with frames coming at `max_fps`, as a player who picked it in
+/// the settings would have left it.
+pub fn seed_max_fps(profile: &Path, max_fps: MaxFps) {
+    let mut stored = profile_settings(profile);
+    settings::seed_max_fps(&mut stored, max_fps);
+    save_profile_settings(profile, &stored).expect("the profile's settings written");
 }
 
 pub fn env_of<T: Serialize>(prefix: &str, config: &T) -> Vec<(String, String)> {
@@ -160,3 +187,5 @@ pub fn env_of<T: Serialize>(prefix: &str, config: &T) -> Vec<(String, String)> {
 pub fn build_info_line() -> String {
     serde_json::to_string(&BuildInfo::current()).expect("a build info line")
 }
+
+const PROFILE_SETTINGS: &str = "settings.json";

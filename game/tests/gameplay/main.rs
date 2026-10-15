@@ -5,6 +5,7 @@ mod stage;
 mod terminal;
 mod travel;
 mod walking;
+mod windows;
 
 use std::path::Path;
 

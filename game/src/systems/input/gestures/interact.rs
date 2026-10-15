@@ -1,8 +1,7 @@
 use bevy::prelude::*;
-use bevy::window::CursorIcon;
 
 use crate::core::render;
-use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Cursor, Gesture};
 use crate::systems::interact::{self, InteractRequest};
 use crate::systems::player::session;
 
@@ -22,10 +21,10 @@ impl Gesture for InteractGesture {
         }
     }
 
-    fn cursor(&self, world: &mut World) -> Option<CursorIcon> {
+    fn cursor(&self, world: &mut World) -> Option<Cursor> {
         let target = target(world)?;
         let verb = interact::interaction_of(world, target)?.verb;
-        Some(content_cursor(world, verb.cursor()))
+        Some(Cursor::Shaped(verb.cursor()))
     }
 }
 

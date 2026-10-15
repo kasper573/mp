@@ -1,10 +1,9 @@
 mod platform;
 mod store;
 
-use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use bevy::window::{PresentMode, Window};
+use bevy::window::Window;
 use game::core::platform::{StartParams, exit_when_stdin_closes};
 use game::systems::launch::{BUILD_INFO_FLAG, CLIENT_ENV_PREFIX, ClientConfig, build_info_line};
 use game::systems::{client_app, probe};
@@ -28,33 +27,10 @@ fn main() {
     let mut app = client_app(
         Arc::new(platform::DesktopPlatform::new(config.profile_dir)),
         params,
-        window(config.vsync),
+        Window::default(),
     );
     if let Some(driver) = config.probe {
         probe::install(&mut app, platform::SocketProbe::connect(driver));
     }
     app.run();
 }
-
-fn window(vsync: bool) -> Window {
-    Window {
-        present_mode: if vsync {
-            PresentMode::AutoVsync
-        } else {
-            PresentMode::AutoNoVsync
-        },
-        desired_maximum_frame_latency: Some(if vsync {
-            SYNCED_FRAMES_IN_FLIGHT
-        } else {
-            UNSYNCED_FRAMES_IN_FLIGHT
-        }),
-        ..Default::default()
-    }
-}
-
-// With a frame queued behind the one on screen, everything drawn reaches the screen a refresh after
-// the system cursor does.
-const SYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(1).unwrap();
-// A compositor hands a frame's buffer back only when it next refreshes, so without vsync it's the
-// frames in flight, not the client, that would otherwise cap the frame rate at a few per refresh.
-const UNSYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(8).unwrap();

@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use game::core::math::{Pos, WindowPx};
+use game::core::render::present::MaxFps;
 use game::systems::launch::{self, CLIENT_ENV_PREFIX, ClientConfig};
 use game::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
@@ -79,9 +80,11 @@ impl Desktop {
             access_token: token,
             profile_dir: folder.join("profile"),
             exit_on_stdin_eof: true,
-            vsync: false,
             probe: Some(listener.local_addr().expect("a bound probe port")),
         };
+        // A playtest waits on frames and the client bench counts them, so they come as fast as the
+        // client draws them rather than at the virtual screen's refresh.
+        launch::seed_max_fps(&config.profile_dir, MaxFps::Uncapped);
         let log = File::create(folder.join("client.log")).expect("a client log");
         let mut client = Command::new(binary)
             .envs(launch::env_of(CLIENT_ENV_PREFIX, &config))

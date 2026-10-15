@@ -1,8 +1,8 @@
 use bevy::prelude::*;
-use bevy::window::{CursorIcon, SystemCursorIcon};
+use bevy::window::SystemCursorIcon;
 
 use crate::core::gui;
-use crate::systems::input::gestures::{ClickClaim, Gesture, content_cursor};
+use crate::systems::input::gestures::{ClickClaim, Cursor, Gesture};
 use crate::systems::interface::CursorShape;
 
 pub struct InterfaceGesture;
@@ -14,7 +14,7 @@ impl Gesture for InterfaceGesture {
 
     fn drive(&self, _world: &mut World, _start: bool) {}
 
-    fn cursor(&self, world: &mut World) -> Option<CursorIcon> {
+    fn cursor(&self, world: &mut World) -> Option<Cursor> {
         use egui::CursorIcon as Asked;
         let shape = match gui::cursor(world) {
             Asked::PointingHand => CursorShape::Pointer,
@@ -35,10 +35,10 @@ impl Gesture for InterfaceGesture {
             | Asked::ResizeColumn
             | Asked::ResizeRow => CursorShape::Resize,
             Asked::Text | Asked::VerticalText => {
-                return Some(CursorIcon::System(SystemCursorIcon::Text));
+                return Some(Cursor::System(SystemCursorIcon::Text));
             }
             _ => CursorShape::Default,
         };
-        Some(content_cursor(world, shape))
+        Some(Cursor::Shaped(shape))
     }
 }

@@ -51,6 +51,8 @@ pub trait Platform: Send + Sync + 'static {
     fn load(&self, key: &str) -> Option<String>;
     fn save(&self, key: &str, value: &str);
     fn sync_window(&self, window: &mut Window);
+    /// Whether frames can come faster than the display refreshes: a browser hands out one a refresh.
+    fn uncaps_frames(&self) -> bool;
     /// The engine's default plugins as this platform runs them.
     fn engine(&self, plugins: PluginGroupBuilder) -> PluginGroupBuilder;
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>>;

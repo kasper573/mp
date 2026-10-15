@@ -9,27 +9,33 @@ use crate::systems::actor::render::RenderActor;
 use crate::systems::actor::{Action, Actor};
 use crate::systems::movement::{
     HeardMoves, MoveRequest, MoveTarget, Navigator, Path, RenderPosition, SNAP, gait, position,
-    speed_of, walk,
+    speed_of, stepping_off, walk,
 };
 use crate::systems::player::{commands_locked, session};
 use crate::systems::stat;
 
 /// Asks the server to walk the client's own character to `goal`, and sets off on screen at once
-/// rather than a round trip later, when the server's walk shows up.
+/// rather than a round trip later, when the server's walk shows up. A goal the walk already passes,
+/// the tile it's stepping off included, carries the walk on to its end: asking again along the way
+/// keeps a walk going, so asking for every tile of a line as the walk crosses them walks it exactly
+/// as asking once for its end does.
 pub fn request_walk(world: &mut World, goal: Pos<Tiles>) {
-    world.write_message(MoveRequest { pos: goal });
     let Some(me) = predicted_character(world) else {
+        world.write_message(MoveRequest { pos: goal });
         return;
     };
     let free = !stat::is_dead(world, me) && !commands_locked(world, me);
     let navigator = Navigator::of(world, me);
     let Some(mut stride) = world.get_mut::<Stride>(me) else {
+        world.write_message(MoveRequest { pos: goal });
         return;
     };
+    let goal = stride.end_through(goal);
     stride.sent += 1;
     if free && let Some(navigator) = navigator {
         stride.head_for(&navigator, goal);
     }
+    world.write_message(MoveRequest { pos: goal });
 }
 
 /// The client's own character as it walks on screen. It runs ahead of the server, which hears of
@@ -96,6 +102,23 @@ impl Stride {
             facing,
             sent: 0,
             seen: at,
+        }
+    }
+
+    /// Where a walk through `goal` ends: at the stride's own end when `goal` lies on the way to it.
+    fn end_through(&self, goal: Pos<Tiles>) -> Pos<Tiles> {
+        let Some(end) = self.target else {
+            return goal;
+        };
+        let cell = goal.cell();
+        let underfoot = match self.path.next() {
+            Some(next) if !self.at.on_center() => stepping_off(self.at, next),
+            _ => self.at.cell(),
+        };
+        if cell == underfoot || self.path.tiles.contains(&cell) {
+            end
+        } else {
+            goal
         }
     }
 

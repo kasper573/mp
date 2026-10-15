@@ -5,7 +5,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::{MouseButtonInput, MouseWheel};
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
+use bevy::window::{CursorOptions, PrimaryWindow};
 use bevy_egui::{EguiOutput, EguiPostUpdateSet, PrimaryEguiContext};
 use serde::{Deserialize, Serialize};
 
@@ -96,6 +96,8 @@ pub struct ProbeSnapshot {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct ProbeInput {
     pub cursor: Option<Pos<WindowPx>>,
+    /// Whether the system draws the cursor, rather than the frame or nothing.
+    pub system_cursor: bool,
     #[serde(flatten)]
     pub seen: ProbeInputSeen,
 }
@@ -434,6 +436,10 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
         .single(world)
         .ok()
         .cloned();
+    let system_cursor = world
+        .query_filtered::<&CursorOptions, With<PrimaryWindow>>()
+        .single(world)
+        .is_ok_and(|options| options.visible);
     ProbeSnapshot {
         frame: world.resource::<FrameCount>().0,
         input: ProbeInput {
@@ -441,6 +447,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 .as_ref()
                 .and_then(Window::cursor_position)
                 .map(|at| Pos::new(at.x, at.y)),
+            system_cursor,
             seen: *world.resource::<ProbeInputSeen>(),
         },
         screen: window
