@@ -89,6 +89,8 @@ impl ContentSource for ServerContent {
 // The card only needs a few frames a second, and every frame a software renderer draws is main-thread
 // time the download's fetches and cache writes can't have.
 const CARD_FRAME: Duration = Duration::from_millis(100);
+// Room for the most the card ever says, so it keeps one size as its lines come and go.
+const CARD_SIZE: egui::Vec2 = egui::Vec2::new(320.0, 200.0);
 
 fn begin(world: &mut World) {
     world.remove_resource::<LoadingFailure>();
@@ -363,7 +365,8 @@ fn loading_card(world: &mut World) {
         egui::Frame::popup(ui.style())
             .inner_margin(egui::Margin::symmetric(24, 18))
             .show(ui, |ui| {
-                ui.set_min_width(280.0);
+                ui.set_width(CARD_SIZE.x);
+                ui.set_height(CARD_SIZE.y);
                 ui.vertical_centered(|ui| {
                     ui.spacing_mut().item_spacing.y = 4.0;
                     ui.heading(&model.title);

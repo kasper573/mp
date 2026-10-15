@@ -29,7 +29,7 @@ const SHADOW: TextShadow = TextShadow {
     offset: Vec2::new(0.0, 2.0),
     color: Color32::from_black_alpha(204),
 };
-const AFTER_SETTLING: Duration = Duration::from_secs(1);
+const AFTER_SETTLING: Duration = Duration::from_millis(300);
 const PRESENCE: Presence = Presence {
     enter: Move::new(Vec2::new(0.0, 14.0), 0.94, 0.8),
     exit: Move::new(Vec2::new(0.0, -8.0), 1.04, 0.6),
