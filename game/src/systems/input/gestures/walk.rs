@@ -10,9 +10,8 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::input::gestures::{ActiveTileHighlight, ClickClaim, Gesture, content_cursor};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::{CursorShape, InterfaceIcon};
-use crate::systems::movement::MoveRequest;
 use crate::systems::player::session;
-use crate::systems::{area, combat};
+use crate::systems::{area, combat, movement};
 
 const MOVE_REPEAT: Duration = Duration::from_millis(333);
 
@@ -38,7 +37,7 @@ impl Gesture for WalkGesture {
             return;
         }
         if let Some(tile) = target(world) {
-            world.write_message(MoveRequest { pos: tile });
+            movement::request_walk(world, tile);
             stamp(world, tile);
         }
     }
@@ -89,7 +88,7 @@ fn repeat(world: &mut World) {
     if !area::walkable(world, tile) || last_tile == Some(tile) {
         return;
     }
-    world.write_message(MoveRequest { pos: tile });
+    movement::request_walk(world, tile);
     stamp(world, tile);
 }
 

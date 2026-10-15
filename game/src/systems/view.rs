@@ -3,6 +3,7 @@ use bevy::window::PrimaryWindow;
 
 use crate::core::audio::playback::Listener;
 use crate::core::content::Content;
+use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::Pos;
 use crate::core::render::camera::WorldCamera;
 use crate::core::render::present::{SCALE, target_size};
@@ -27,8 +28,12 @@ pub struct ViewPlugin;
 
 impl Plugin for ViewPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<FollowCenter>()
-            .add_systems(Update, track_player.run_if(in_state(ClientScreen::Area)));
+        app.init_resource::<FollowCenter>().add_systems(
+            Update,
+            track_player
+                .after(RenderValueSystems)
+                .run_if(in_state(ClientScreen::Area)),
+        );
     }
 }
 

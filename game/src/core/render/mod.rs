@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy::sprite_render::Material2dPlugin;
 
+use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Pos, Rect as WorldRect, WorldPx};
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
@@ -81,7 +82,9 @@ impl Plugin for RenderPlugin {
             )
             .configure_sets(
                 Update,
-                transition::WorldViewSystems.run_if(not(transition::covering)),
+                transition::WorldViewSystems
+                    .run_if(not(transition::covering))
+                    .after(RenderValueSystems),
             )
             .add_systems(Startup, present::setup)
             .add_systems(Update, (present::match_display, present::fit).chain())

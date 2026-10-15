@@ -21,3 +21,4 @@ mod support;
 mod templates;
 mod travel;
 mod typewriter;
+mod walking;

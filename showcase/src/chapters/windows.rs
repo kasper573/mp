@@ -76,6 +76,16 @@ fn play(shoot: &mut Shoot) {
     me.caption("Reduced motion is a setting too");
     me.click_ui(UiTarget::starting("Reduced motion"));
     me.caption(
+        "Show FPS puts a meter in the corner: the frame rate now, and over the last ten seconds",
+    );
+    me.click_ui(UiTarget::starting("Show FPS"));
+    me.find_ui(UiTarget::containing(" FPS ("));
+    me.hold();
+    me.click_ui(UiTarget::starting("Show FPS"));
+    me.wait_until("the meter to go", |snapshot| {
+        UiTarget::containing(" FPS (").find(snapshot).is_none()
+    });
+    me.caption(
         "Sound has a volume each: master, music, ambience, effects and voice, all halfway to start",
     );
     me.scroll_until("Audio", "Voice");

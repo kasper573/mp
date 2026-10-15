@@ -10,6 +10,7 @@ use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
 use crate::core::content::media::ImageSizes;
 use crate::core::gui::{self, Band};
+use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
@@ -38,7 +39,9 @@ impl Plugin for AreaPlugin {
             .add_systems(
                 Update,
                 (
-                    carry_view_across.before(WorldViewSystems),
+                    carry_view_across
+                        .after(RenderValueSystems)
+                        .before(WorldViewSystems),
                     (spawn_area_tiles, play_area_soundscape).in_set(WorldViewSystems),
                     retain_loaded_images,
                 )

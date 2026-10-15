@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color, widgets};
-use egui::{Color32, CursorIcon, Pos2, Rect, Response, RichText, Ui, Vec2};
+use egui::{Color32, Pos2, Rect, Response, RichText, Ui, Vec2};
 
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
@@ -54,7 +54,6 @@ pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response 
     if map::clicked(world, InputAction::InspectItem, &response) {
         open(world, item);
     }
-    let response = response.on_hover_cursor(CursorIcon::PointingHand);
     tooltip(world, &response, item);
     response
 }

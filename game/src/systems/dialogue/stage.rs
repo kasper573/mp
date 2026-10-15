@@ -680,7 +680,6 @@ fn docked_panels(
                                     );
                                 });
                             });
-                        ui.add(egui::Separator::default().spacing(0.0));
                         (panel.show)(ui, world);
                     })
                 })
@@ -779,7 +778,7 @@ fn choices(ui: &mut Ui, world: &mut World) {
     if !shown.choosing() {
         return;
     }
-    let rows: Vec<(ChoiceView, bool, f32)> = {
+    let rows: Vec<(ChoiceView, f32)> = {
         let now = world.resource::<Time>().elapsed();
         shown
             .choices
@@ -790,38 +789,48 @@ fn choices(ui: &mut Ui, world: &mut World) {
                     .shaken
                     .filter(|(shaken, _)| *shaken == index)
                     .map_or(0.0, |(_, since)| shake_offset(now.saturating_sub(since)));
-                (choice.clone(), index == shown.selected, offset)
+                (choice.clone(), offset)
             })
             .collect()
     };
     let moved = ui.input(|input| input.pointer.delta() != Vec2::ZERO);
     let mut pointed = None;
+    let mut drawn = Vec::new();
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
-        for (index, (choice, selected, offset)) in rows.into_iter().enumerate() {
-            let (response, chip_item) = ui
+        for (index, (choice, offset)) in rows.into_iter().enumerate() {
+            let row = ui
                 .push_id(("choice", index), |ui| {
-                    choice_row(ui, world, &choice, index, selected, offset)
+                    choice_row(ui, world, &choice, index, offset)
                 })
                 .inner;
-            if response.hovered() {
+            if row.response.hovered() {
                 pointed = Some(index);
             }
-            if map::clicked(world, InputAction::PickChoice, &response) {
+            if map::clicked(world, InputAction::PickChoice, &row.response) {
                 pick_at(world, index);
             }
-            if let Some(item) = chip_item
-                && map::clicked(world, InputAction::InspectItem, &response)
+            if let Some(item) = row.chip_item
+                && map::clicked(world, InputAction::InspectItem, &row.response)
             {
                 card::open(world, item);
             }
             world
                 .resource_mut::<StageDrawn>()
                 .choices
-                .insert(index, response.rect);
+                .insert(index, row.response.rect);
+            drawn.push(row);
         }
     });
     point_at(world, pointed, moved);
+    let selected = world
+        .resource::<Stage>()
+        .shown
+        .as_ref()
+        .map(|shown| shown.selected);
+    for (index, row) in drawn.iter().enumerate() {
+        highlight(ui, row, selected == Some(index));
+    }
 }
 
 /// The pointer takes the choice only by moving onto a row, so the keys keep it from a pointer at
@@ -848,14 +857,20 @@ fn shake_offset(age: Duration) -> f32 {
     (age.as_secs_f32() * 70.0).sin() * 6.0 * fade
 }
 
+struct ChoiceRow {
+    response: egui::Response,
+    label: String,
+    background: egui::layers::ShapeIdx,
+    chip_item: Option<ItemId>,
+}
+
 fn choice_row(
     ui: &mut Ui,
     world: &mut World,
     choice: &ChoiceView,
     index: usize,
-    selected: bool,
     offset: f32,
-) -> (egui::Response, Option<ItemId>) {
+) -> ChoiceRow {
     let keys = world.resource::<InputMap>();
     let shortcut = CHOICE_SHORTCUTS
         .get(index)
@@ -905,23 +920,34 @@ fn choice_row(
                 });
         },
     );
-    let response = row.response;
-    response
-        .widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, selected, &label));
-    let visuals = ui.style().interact_selectable(&response, selected);
-    if selected {
-        ui.painter().set(
-            background,
-            egui::epaint::RectShape::new(
-                response.rect,
-                4.0,
-                visuals.weak_bg_fill,
-                visuals.bg_stroke,
-                StrokeKind::Inside,
-            ),
-        );
+    ChoiceRow {
+        response: row.response,
+        label,
+        background,
+        chip_item,
     }
-    (response, chip_item)
+}
+
+/// Painted once the pass has moved the selection, so a row lights up on the frame the pointer
+/// reaches it.
+fn highlight(ui: &Ui, row: &ChoiceRow, selected: bool) {
+    row.response.widget_info(|| {
+        WidgetInfo::selected(WidgetType::SelectableLabel, true, selected, &row.label)
+    });
+    if !selected {
+        return;
+    }
+    let visuals = ui.style().interact_selectable(&row.response, selected);
+    ui.painter().set(
+        row.background,
+        egui::epaint::RectShape::new(
+            row.response.rect,
+            4.0,
+            visuals.weak_bg_fill,
+            visuals.bg_stroke,
+            StrokeKind::Inside,
+        ),
+    );
 }
 
 /// The row takes every click, so it is handed the item of the chip under the pointer to inspect.

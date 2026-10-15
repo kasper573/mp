@@ -86,6 +86,10 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     if ui.checkbox(&mut reduced, "Reduced motion").changed() {
         settings.toggle_reduced_motion();
     }
+    let mut frame_rate = settings.frame_rate_shown();
+    if ui.checkbox(&mut frame_rate, "Show FPS").changed() {
+        settings.toggle_frame_rate();
+    }
     ui.add_space(4.0);
     form(ui, "interface", |ui| {
         let label = ui.label("Text speed");
@@ -222,6 +226,14 @@ impl UserSettings {
         self.screen.transition = transition;
     }
 
+    pub(crate) fn frame_rate_shown(&self) -> bool {
+        self.screen.frame_rate
+    }
+
+    pub(crate) fn toggle_frame_rate(&mut self) {
+        self.screen.frame_rate = !self.screen.frame_rate;
+    }
+
     pub(crate) fn widget_pos(&self, id: &str) -> Option<Pos<WindowPx>> {
         self.ui.widgets.get(id).copied()
     }
@@ -309,6 +321,8 @@ struct TextSettings {
 struct ScreenSettings {
     #[serde(default)]
     transition: ScreenTransition,
+    #[serde(default)]
+    frame_rate: bool,
 }
 
 /// Saved on change rather than at each place that changes a setting. The initial load counts as a

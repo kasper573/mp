@@ -52,11 +52,12 @@ pub fn draw_actor_frame(
 /// movement every tick, so they ride the same replication cadence as [`RenderPosition`]: the legs go
 /// idle, and the heading turns, as the on-screen motion stops or changes course — not the snapshot
 /// earlier they would if read live, which reads as the actor sliding or drifting. Discrete values,
-/// so they switch as their segment starts rather than blending.
+/// so they switch as their segment starts rather than blending. The client's own character, walked
+/// ahead of the snapshots, takes them from its own walk.
 #[derive(Component, Clone, Copy, PartialEq)]
-struct RenderActor {
-    dir: Direction,
-    action: Action,
+pub struct RenderActor {
+    pub dir: Direction,
+    pub action: Action,
 }
 
 impl Interpolate for RenderActor {

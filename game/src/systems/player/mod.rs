@@ -30,7 +30,7 @@ use crate::systems::history::History;
 use crate::systems::item::Inventory;
 use crate::systems::job::{Job, JobId};
 use crate::systems::memory::Memory;
-use crate::systems::movement::{self, Position};
+use crate::systems::movement::{self, HeardMoves, Position};
 use crate::systems::quest::QuestLog;
 use crate::systems::reach;
 use crate::systems::script::EventKind;
@@ -430,6 +430,7 @@ pub(crate) fn place(
             OwnedBy(client),
             Owner { client },
             SpawnPoint(state.spawn),
+            HeardMoves::default(),
             ArrivalHold {
                 until: now + ARRIVAL_HOLD,
             },

@@ -125,13 +125,10 @@ fn show_counter(ui: &mut Ui, world: &mut World) {
     let Some(shelf) = shelf(world) else {
         return;
     };
-    if !shelf.playing {
-        counter(ui, world, &shelf);
-        return;
-    }
-    let zone = egui::Frame::new();
-    let (_, dropped) = ui.dnd_drop_zone::<CarriedSlot, _>(zone, |ui| counter(ui, world, &shelf));
-    if let Some(dropped) = dropped {
+    let shown = ui.scope(|ui| counter(ui, world, &shelf)).response;
+    if shelf.playing
+        && let Some(dropped) = shown.dnd_release_payload::<CarriedSlot>()
+    {
         request_sale(world, dropped.0);
     }
 }

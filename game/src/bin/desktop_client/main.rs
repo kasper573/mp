@@ -43,11 +43,18 @@ fn window(vsync: bool) -> Window {
         } else {
             PresentMode::AutoNoVsync
         },
-        desired_maximum_frame_latency: (!vsync).then_some(UNSYNCED_FRAMES_IN_FLIGHT),
+        desired_maximum_frame_latency: Some(if vsync {
+            SYNCED_FRAMES_IN_FLIGHT
+        } else {
+            UNSYNCED_FRAMES_IN_FLIGHT
+        }),
         ..Default::default()
     }
 }
 
+// With a frame queued behind the one on screen, everything drawn reaches the screen a refresh after
+// the system cursor does.
+const SYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(1).unwrap();
 // A compositor hands a frame's buffer back only when it next refreshes, so without vsync it's the
 // frames in flight, not the client, that would otherwise cap the frame rate at a few per refresh.
 const UNSYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(8).unwrap();

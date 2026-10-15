@@ -110,6 +110,11 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
 }
 
 pub fn forget(world: &mut World, actor: Entity) {
-    world.entity_mut(actor).remove::<ReachIntent>();
+    drop_intent(world, actor);
     movement::halt(world, actor);
+}
+
+/// Gives up reaching for anything, leaving the actor's walk as it is.
+pub fn drop_intent(world: &mut World, actor: Entity) {
+    world.entity_mut(actor).remove::<ReachIntent>();
 }

@@ -1,8 +1,10 @@
 mod conversation;
 mod items;
+mod settings;
 mod stage;
 mod terminal;
 mod travel;
+mod walking;
 
 use std::path::Path;
 

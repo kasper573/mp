@@ -32,7 +32,7 @@ use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::interact;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
-use crate::systems::movement::Position;
+use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro};
 use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
@@ -133,6 +133,9 @@ pub struct ProbeBody {
     pub flies: bool,
     pub player: bool,
     pub at: Pos<Tiles>,
+    /// Where it shows on screen, which runs behind `at` for others and ahead of it for the player's
+    /// own walk.
+    pub drawn: Pos<Tiles>,
     /// Where a click takes it rather than whatever stands in front of it.
     pub aim: Pos<Tiles>,
     pub hitbox: Rect<Tiles>,
@@ -655,6 +658,7 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
         flies,
         player: entity.contains::<Owner>(),
         at,
+        drawn: entity.get::<RenderPosition>().map_or(at, |drawn| drawn.0),
         aim: hitbox.center(),
         hitbox,
         action: actor.action,

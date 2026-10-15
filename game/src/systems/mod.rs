@@ -8,6 +8,7 @@ pub mod combat;
 pub mod dialogue;
 pub mod effect;
 pub mod equipment;
+pub mod frame_rate;
 pub mod history;
 pub mod hud;
 pub mod input;
@@ -302,16 +303,18 @@ pub fn client_app(
         files.source(),
     )
     .add_plugins(
-        DefaultPlugins
-            .set(bevy::log::LogPlugin {
-                filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
-                ..default()
-            })
-            .set(WindowPlugin {
-                primary_window: Some(window),
-                ..default()
-            })
-            .set(ImagePlugin::default_nearest()),
+        platform.engine(
+            DefaultPlugins
+                .set(bevy::log::LogPlugin {
+                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(window),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        ),
     );
     if let Some(credentials) = credentials {
         app.insert_resource(credentials);
@@ -354,6 +357,7 @@ pub fn client_app(
             quest::tracker::QuestTrackerPlugin,
             spectate::widget::SpectatorPlugin,
             terminal::TerminalPlugin,
+            frame_rate::FrameRatePlugin,
         ));
     app
 }

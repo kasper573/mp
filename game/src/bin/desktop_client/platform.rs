@@ -7,6 +7,8 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
+use bevy::app::PluginGroupBuilder;
+use bevy::render::pipelined_rendering::PipelinedRenderingPlugin;
 use bevy::window::Window;
 use game::core::content::store::ContentStore;
 use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, SocketState};
@@ -69,6 +71,12 @@ impl Platform for DesktopPlatform {
     }
 
     fn sync_window(&self, _window: &mut Window) {}
+
+    // Rendering a frame alongside the next update puts the interface on screen a frame later,
+    // trailing the system cursor, and the client's frames are cheap enough to render in turn.
+    fn engine(&self, plugins: PluginGroupBuilder) -> PluginGroupBuilder {
+        plugins.disable::<PipelinedRenderingPlugin>()
+    }
 
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
         let agent = self.agent.clone();

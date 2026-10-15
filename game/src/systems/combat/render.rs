@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
+use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Size, WorldPx};
 use crate::core::render::present::ScreenTint;
 use crate::core::render::screen::ToScreen;
@@ -16,7 +17,9 @@ impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_bar).add_systems(
             Update,
-            (healthbar, death_tint).run_if(in_state(ClientScreen::Area)),
+            (healthbar, death_tint)
+                .after(RenderValueSystems)
+                .run_if(in_state(ClientScreen::Area)),
         );
     }
 }

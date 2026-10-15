@@ -1,12 +1,11 @@
-use bevy_app::{App, Plugin};
+use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
-use bevy_replicon::prelude::ClientId as Sender;
 use bevy_time::Time;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
-use crate::core::interpolate::{Interpolate, InterpolatePlugin};
+use crate::core::interpolate::{Interpolate, InterpolatePlugin, RenderValueSystems};
 use crate::core::math::{Direction, Offset, Pos, Rect, Rng, Size};
 use crate::core::tiling::{
     Cell, CellPos, GridDims, GridSize, NEIGHBORS_8, TilePos, TileRect, Tiles, TilesPerSec,
@@ -18,10 +17,16 @@ use crate::systems::reach;
 use crate::systems::stat::{self, StatKind};
 use crate::systems::{area, drain_requests};
 
+mod predict;
+
+pub use predict::request_walk;
+
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
 
     app.replicate::<Position>()
+        .replicate_filtered::<MoveTarget, With<HeardMoves>>()
+        .replicate::<HeardMoves>()
         .add_client_message::<MoveRequest>(Channel::Ordered);
 }
 
@@ -35,6 +40,11 @@ pub struct MoveRequest {
     pub pos: Pos<Tiles>,
 }
 
+/// How many [`MoveRequest`]s the server has heard from a player, heeded or not. Its client counts the
+/// ones it sends, so it can tell when the server's walk accounts for all of them.
+#[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq)]
+pub struct HeardMoves(pub u32);
+
 pub fn position(world: &World, entity: Entity) -> Option<Pos<Tiles>> {
     world.get::<Position>(entity).map(|p| p.pos)
 }
@@ -43,12 +53,14 @@ pub struct MovementPlugin;
 
 impl Plugin for MovementPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(InterpolatePlugin::<RenderPosition>::default());
+        app.add_plugins(InterpolatePlugin::<RenderPosition>::default())
+            .add_systems(Update, predict::walk_ahead.in_set(RenderValueSystems));
     }
 }
 
-/// Interpolated between replication snapshots rather than read live, so every client-side depiction
-/// of an entity (sprite, camera, health bar, hitbox, positional audio) reads this, never [`Position`].
+/// Played back between replication snapshots, or for the client's own character walked ahead of
+/// them, rather than read live, so every client-side depiction of an entity (sprite, camera, health
+/// bar, hitbox, positional audio) reads this, never [`Position`].
 #[derive(Component, Clone, Copy, PartialEq)]
 pub struct RenderPosition(pub Pos<Tiles>);
 
@@ -76,19 +88,41 @@ const RUN_SPEED: TilesPerSec = TilesPerSec(Tiles(2.0));
 
 /// Remaining waypoints, stored back-to-front: the next cell to walk is `tiles.last()`, so advancing
 /// pops it off the end in O(1) instead of shifting the whole vec from the front.
-#[derive(Component, Clone, Debug, PartialEq)]
+#[derive(Component, Clone, Debug, Default, PartialEq)]
 pub struct Path {
     pub tiles: Vec<CellPos>,
 }
 
-#[derive(Component, Clone, Debug, PartialEq)]
+impl Path {
+    pub fn next(&self) -> Option<CellPos> {
+        self.tiles.last().copied()
+    }
+
+    pub fn end(&self) -> Option<CellPos> {
+        self.tiles.first().copied()
+    }
+}
+
+/// Where an actor's walk ends. An actor walks for as long as it has one, along a [`Path`] planned to
+/// it whenever the path ends elsewhere. Only a player's goes out, for its own client to follow.
+#[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct MoveTarget {
     pub pos: Pos<Tiles>,
 }
 
 pub fn move_request(world: &mut World) {
     for request in drain_requests::<MoveRequest>(world) {
-        retarget(world, request.client_id, request.message.pos);
+        let Some(player) = sender_player(world, request.client_id) else {
+            continue;
+        };
+        if let Some(mut heard) = world.get_mut::<HeardMoves>(player) {
+            heard.0 += 1;
+        }
+        if stat::is_dead(world, player) || commands_locked(world, player) {
+            continue;
+        }
+        reach::drop_intent(world, player);
+        goto(world, player, request.message.pos);
     }
 }
 
@@ -99,44 +133,45 @@ pub fn relocate(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
     }
 }
 
+/// Stops the actor's walk at the tile it stands on, or mid-step, at the end of the step.
 pub fn halt(world: &mut World, entity: Entity) {
-    world.entity_mut(entity).remove::<MoveTarget>();
-    if on_tile(world, entity) {
-        if let Some(at) = position(world, entity) {
-            world.entity_mut(entity).insert(Position { pos: at.snap() });
+    let Some(at) = position(world, entity) else {
+        return;
+    };
+    match world.get::<Path>(entity).and_then(Path::next) {
+        Some(next) if !at.on_center() => {
+            world.entity_mut(entity).insert(Path { tiles: vec![next] });
+            goto(world, entity, next.center());
         }
-        world.entity_mut(entity).remove::<Path>();
-    } else if let Some(mut path) = world.get_mut::<Path>(entity) {
-        let next = path.tiles.last().copied();
-        path.tiles.clear();
-        path.tiles.extend(next);
+        _ => {
+            world.entity_mut(entity).remove::<(MoveTarget, Path)>();
+            if let Some(mut position) = world.get_mut::<Position>(entity)
+                && at.on_center()
+                && at != at.snap()
+            {
+                position.pos = at.snap();
+            }
+        }
     }
 }
 
 pub fn moving(world: &World, entity: Entity) -> bool {
-    world.get::<MoveTarget>(entity).is_some() || world.get::<Path>(entity).is_some()
+    world.get::<MoveTarget>(entity).is_some()
 }
 
 pub fn on_tile(world: &World, entity: Entity) -> bool {
     position(world, entity).is_some_and(|p| p.on_center())
 }
 
-fn retarget(world: &mut World, sender: Sender, pos: Pos<Tiles>) {
-    let Some(entity) = sender_player(world, sender) else {
-        return;
-    };
-    if stat::is_dead(world, entity) || commands_locked(world, entity) {
-        return;
-    }
-    reach::forget(world, entity);
-    goto(world, entity, pos);
-}
-
+/// Sends the actor walking to `pos`. A walk already headed there carries on untouched, and one heading
+/// elsewhere turns toward it without dropping the step it's on.
 pub fn goto(world: &mut World, entity: Entity, pos: Pos<Tiles>) {
-    world
-        .entity_mut(entity)
-        .remove::<Path>()
-        .insert(MoveTarget { pos });
+    if world
+        .get::<MoveTarget>(entity)
+        .is_none_or(|target| target.pos != pos)
+    {
+        world.entity_mut(entity).insert(MoveTarget { pos });
+    }
 }
 
 pub fn approach(world: &mut World, entity: Entity, target: Pos<Tiles>, range: Tiles) -> bool {
@@ -151,10 +186,7 @@ pub fn approach(world: &mut World, entity: Entity, target: Pos<Tiles>, range: Ti
         .is_some_and(|goal| goal.pos.distance(target) <= range);
     if !heading {
         let dest = approach_tile(world, entity, at, target, range).unwrap_or(target);
-        world
-            .entity_mut(entity)
-            .remove::<Path>()
-            .insert(MoveTarget { pos: dest });
+        goto(world, entity, dest);
     }
     false
 }
@@ -190,7 +222,7 @@ fn approach_tile(
     best.map(|(center, _)| center)
 }
 
-type Movers = QueryState<Entity, Or<(With<MoveTarget>, With<Path>)>>;
+type Movers = QueryState<Entity, With<MoveTarget>>;
 type StepQuery = QueryState<(
     &'static mut Position,
     &'static mut Path,
@@ -205,67 +237,38 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
             world.entity_mut(id).remove::<(MoveTarget, Path)>();
             continue;
         }
-        if world.get::<Path>(id).is_none() {
-            let Some(goal) = world.get::<MoveTarget>(id).map(|m| m.pos) else {
-                continue;
-            };
-            match route(world, id, goal) {
+        let Some(goal) = world.get::<MoveTarget>(id).map(|target| target.pos) else {
+            continue;
+        };
+        let planned = world
+            .get::<Path>(id)
+            .is_some_and(|path| path.end() == Some(goal.cell()));
+        if !planned {
+            match plan(world, id, goal) {
                 Some(tiles) => {
                     world.entity_mut(id).insert(Path { tiles });
                 }
                 None => {
-                    world.entity_mut(id).remove::<MoveTarget>();
-                    continue;
+                    halt(world, id);
+                    if !world.entity(id).contains::<Path>() {
+                        continue;
+                    }
                 }
             }
         }
 
-        let speed = TilesPerSec(Tiles(stat::effective(world, id, StatKind::MovementSpeed)));
+        let speed = speed_of(world, id);
         let Ok((mut position, mut path, mut actor)) = step_query.get_mut(world, id) else {
             continue;
         };
         let mut at = position.pos;
-        let mut heading: Option<Offset<Tiles>> = None;
-        let tiles = &mut path.tiles;
-        let mut remaining = speed * dt;
-        while remaining > Tiles(1e-6) {
-            let target = match tiles.last() {
-                Some(cell) => cell.center(),
-                None => break,
-            };
-            let step = target - at;
-            let distance = at.distance(target);
-            if distance < Tiles(1e-4) {
-                at = target;
-                tiles.pop();
-                continue;
-            }
-            if distance <= remaining {
-                at = target;
-                remaining -= distance;
-                heading = Some(step);
-                tiles.pop();
-            } else {
-                at = at.toward(target, remaining);
-                heading = Some(step);
-                remaining = Tiles(0.0);
-            }
-        }
-        let arrived = tiles.is_empty();
-
+        let heading = walk(&mut at, &mut path, speed * dt);
+        let arrived = path.tiles.is_empty();
         position.pos = at;
         if let Some(step) = heading
             && let Some(actor) = actor.as_mut()
         {
-            set_facing(
-                actor,
-                Direction::from(step),
-                if speed >= RUN_SPEED {
-                    Action::Run
-                } else {
-                    Action::Walk
-                },
-            );
+            set_facing(actor, Direction::from(step), gait(speed));
         }
         if arrived {
             world.entity_mut(id).remove::<(MoveTarget, Path)>();
@@ -273,23 +276,65 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     }
 }
 
-fn route(world: &World, entity: Entity, goal: Pos<Tiles>) -> Option<Vec<CellPos>> {
-    let navigator = Navigator::of(world, entity)?;
-    let at = position(world, entity)?;
-    if navigator.flies && navigator.clear(at, goal) {
-        return Some(vec![goal.cell()]);
-    }
-    let mut path = navigator.grid.path(at.cell(), goal.cell())?;
-    if path.len() > 1 {
-        path.remove(0);
-    }
-    path.reverse();
-    Some(path)
+fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
+    TilesPerSec(Tiles(stat::effective(
+        world,
+        entity,
+        StatKind::MovementSpeed,
+    )))
 }
 
-const ORTHOGONAL: u32 = 1000;
-const DIAGONAL: u32 = 1414;
+fn gait(speed: TilesPerSec) -> Action {
+    if speed >= RUN_SPEED {
+        Action::Run
+    } else {
+        Action::Walk
+    }
+}
+
+/// Walks `at` along `path` for `distance`, dropping each waypoint it reaches. Returns the heading of
+/// the last stretch walked, if it walked at all.
+fn walk(at: &mut Pos<Tiles>, path: &mut Path, distance: Tiles) -> Option<Offset<Tiles>> {
+    let mut heading = None;
+    let mut remaining = distance;
+    while remaining > Tiles(1e-6)
+        && let Some(next) = path.next()
+    {
+        let target = next.center();
+        let gap = at.distance(target);
+        if gap < Tiles(1e-4) {
+            *at = target;
+            path.tiles.pop();
+            continue;
+        }
+        heading = Some(target - *at);
+        if gap <= remaining {
+            *at = target;
+            remaining -= gap;
+            path.tiles.pop();
+        } else {
+            *at = at.toward(target, remaining);
+            remaining = Tiles(0.0);
+        }
+    }
+    heading
+}
+
+fn plan(world: &World, entity: Entity, goal: Pos<Tiles>) -> Option<Vec<CellPos>> {
+    let at = position(world, entity)?;
+    Navigator::of(world, entity)?.plan(at, world.get::<Path>(entity), goal)
+}
+
+const ORTHOGONAL: u64 = 1000;
+const DIAGONAL: u64 = 1414;
 const FLIGHT_SAMPLE: Tiles = Tiles(0.25);
+
+/// Route costs are scaled by this, leaving the bits below it to break ties between equally cheap
+/// routes without ever outweighing a real difference in cost.
+const TIE: u64 = 1 << 20;
+
+/// How much a tile of distance from the straight line to the goal counts toward breaking ties.
+const LEAN_PER_TILE: f32 = 1024.0;
 
 #[derive(Clone)]
 pub struct Grid {
@@ -401,30 +446,60 @@ impl Grid {
 
     /// The cheapest walk between two cells, both ends included.
     pub fn path(&self, start: CellPos, goal: CellPos) -> Option<Vec<CellPos>> {
-        if !self.connects(start, goal) {
+        self.route(start.center(), &[(start, Tiles(0.0))], goal)
+    }
+
+    /// The cheapest walk to `goal` for an actor at `at` setting off from one of `footing`'s cells,
+    /// each that far from it; the walk starts with the cell it sets off from. Of equally cheap walks
+    /// it takes the one keeping closest to the straight line from `at` to the goal, so a walk looks
+    /// straight wherever the grid allows, and a walk continued along that line stays on it.
+    pub fn route(
+        &self,
+        at: Pos<Tiles>,
+        footing: &[(CellPos, Tiles)],
+        goal: CellPos,
+    ) -> Option<Vec<CellPos>> {
+        if !footing.iter().any(|&(cell, _)| self.connects(cell, goal)) {
             return None;
         }
+        let line = goal.center() - at;
+        let length = line.length();
+        let lean = |cell: CellPos| {
+            if length < 1e-6 {
+                return 0;
+            }
+            let off = cell.center() - at;
+            let distance = (off.x * line.y - off.y * line.x).abs() / length;
+            ((distance * LEAN_PER_TILE) as u64).min(TIE - 1)
+        };
         let (path, _cost) = pathfinding::prelude::astar(
-            &start,
-            |&c| {
-                NEIGHBORS_8.iter().filter_map(move |&(dx, dy)| {
-                    let next = c.step((dx, dy));
-                    let cost = if dx != 0 && dy != 0 {
-                        DIAGONAL
-                    } else {
-                        ORTHOGONAL
-                    };
-                    self.cell_walkable(next).then_some((next, cost))
-                })
+            &None,
+            |&node: &Option<CellPos>| {
+                let setting_off =
+                    footing
+                        .iter()
+                        .filter(move |_| node.is_none())
+                        .map(|&(cell, distance)| {
+                            let cost = (distance.0 * ORTHOGONAL as f32).round() as u64;
+                            (Some(cell), cost * TIE)
+                        });
+                let stepping = node.into_iter().flat_map(move |cell| {
+                    NEIGHBORS_8.iter().filter_map(move |&(dx, dy)| {
+                        let next = cell.step((dx, dy));
+                        let cost = if dx != 0 && dy != 0 {
+                            DIAGONAL
+                        } else {
+                            ORTHOGONAL
+                        };
+                        self.cell_walkable(next).then_some((Some(next), cost * TIE))
+                    })
+                });
+                setting_off.chain(stepping)
             },
-            |&c| {
-                let dx = (c.x - goal.x).unsigned_abs();
-                let dy = (c.y - goal.y).unsigned_abs();
-                (dx.max(dy) - dx.min(dy)) * ORTHOGONAL + dx.min(dy) * DIAGONAL
-            },
-            |&node| node == goal,
+            |&node| node.map_or(0, |cell| octile(cell, goal) * TIE + lean(cell)),
+            |&node| node == Some(goal),
         )?;
-        Some(path)
+        Some(path.into_iter().flatten().collect())
     }
 
     pub fn nearest_walkable(&self, p: Pos<Tiles>) -> Option<Pos<Tiles>> {
@@ -485,6 +560,55 @@ impl Navigator {
         })
     }
 
+    /// The waypoints, back to front, of a walk to `goal` by an actor at `at` walking `path`. A goal
+    /// the walk already passes keeps the walk as it is up to there; any other is routed afresh from
+    /// where the actor stands.
+    fn plan(&self, at: Pos<Tiles>, path: Option<&Path>, goal: Pos<Tiles>) -> Option<Vec<CellPos>> {
+        let end = goal.cell();
+        if let Some(path) = path
+            && let Some(on_the_way) = path.tiles.iter().position(|&cell| cell == end)
+        {
+            return Some(path.tiles[on_the_way..].to_vec());
+        }
+        if self.flies && self.clear(at, goal) {
+            return Some(vec![end]);
+        }
+        let mut tiles = self.grid.route(at, &self.footing(at, path), end)?;
+        if at.on_center() {
+            tiles.remove(0);
+        }
+        tiles.reverse();
+        Some(tiles)
+    }
+
+    /// The cells an actor at `at` can set off from, each with how far it is: the one it stands on,
+    /// or mid-step on foot, both ends of the step, so it can carry on or turn straight back.
+    fn footing(&self, at: Pos<Tiles>, path: Option<&Path>) -> Vec<(CellPos, Tiles)> {
+        let here = at.cell();
+        let Some(next) = path
+            .and_then(Path::next)
+            .filter(|_| !self.flies && !at.on_center())
+        else {
+            return vec![(here, at.distance(here.center()))];
+        };
+        let toward = |cell: i32, from: f32| {
+            let gap = cell as f32 - from;
+            if gap > 1e-4 {
+                1
+            } else if gap < -1e-4 {
+                -1
+            } else {
+                0
+            }
+        };
+        let left = CellPos::new(next.x - toward(next.x, at.x), next.y - toward(next.y, at.y));
+        [next, left]
+            .into_iter()
+            .filter(|&cell| self.grid.cell_walkable(cell))
+            .map(|cell| (cell, at.distance(cell.center())))
+            .collect()
+    }
+
     fn clear(&self, from: Pos<Tiles>, to: Pos<Tiles>) -> bool {
         let samples = (from.distance(to).0 / FLIGHT_SAMPLE.0).ceil().max(1.0) as u32;
         (0..=samples).all(|i| {
@@ -492,6 +616,12 @@ impl Navigator {
                 .cell_walkable(from.lerp(to, i as f32 / samples as f32).cell())
         })
     }
+}
+
+fn octile(from: CellPos, to: CellPos) -> u64 {
+    let dx = u64::from((from.x - to.x).unsigned_abs());
+    let dy = u64::from((from.y - to.y).unsigned_abs());
+    (dx.max(dy) - dx.min(dy)) * ORTHOGONAL + dx.min(dy) * DIAGONAL
 }
 
 fn airborne(world: &World, entity: Entity) -> bool {

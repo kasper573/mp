@@ -34,6 +34,16 @@ pub trait Interpolate: Component<Mutability = Mutable> + Clone + PartialEq {
     }
 }
 
+/// Marks an entity whose render values the client simulates itself rather than plays back from
+/// snapshots. Playback leaves it alone, so whatever predicts it must keep its render values filled in.
+#[derive(Component)]
+pub struct Predicted;
+
+/// The systems that fill in render values each frame, whether played back or predicted. Whatever
+/// draws from render values runs after them, so a frame never shows some of them a frame old.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RenderValueSystems;
+
 pub struct SnapshotPlugin {
     pub period: Seconds,
 }
@@ -57,7 +67,7 @@ impl<T> Default for InterpolatePlugin<T> {
 
 impl<T: Interpolate> Plugin for InterpolatePlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, drive::<T>);
+        app.add_systems(Update, drive::<T>.in_set(RenderValueSystems));
     }
 }
 
@@ -75,7 +85,7 @@ fn drive<T: Interpolate>(
     period: Res<SnapshotPeriod>,
     mut commands: Commands,
     spawned: Query<(Entity, &T::Source), Without<T>>,
-    mut playing: Query<Playing<T>>,
+    mut playing: Query<Playing<T>, Without<Predicted>>,
 ) {
     let dt = Seconds(time.delta_secs());
     for (entity, source) in &spawned {

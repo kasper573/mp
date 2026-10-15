@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use design_tokens::{HAIRLINE, WIDGET_RADIUS, color};
 use egui::{
-    Align, Color32, CursorIcon, Id, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind,
-    Ui, UiBuilder, Vec2,
+    Align, Color32, Id, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
+    Vec2,
 };
 
 use crate::core::assets::AssetRef;
@@ -222,7 +222,6 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         .chain(verdict)
         .collect();
     let hint = StyledLine::new(hint_pieces(&filled.hints));
-    let response = response.on_hover_cursor(CursorIcon::Grab);
     hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
 }
 

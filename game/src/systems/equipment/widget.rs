@@ -90,6 +90,5 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
             .collect(),
     );
     let lines = [card::overview(def)];
-    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
     hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
 }

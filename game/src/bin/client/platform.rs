@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::Rc;
 
+use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 use game::core::content::store::ContentStore;
 use game::core::platform::{
@@ -28,6 +29,10 @@ impl Platform for WebPlatform {
         if let Some(storage) = storage() {
             let _ = storage.set_item(key, value);
         }
+    }
+
+    fn engine(&self, plugins: PluginGroupBuilder) -> PluginGroupBuilder {
+        plugins
     }
 
     fn sync_window(&self, window: &mut Window) {
