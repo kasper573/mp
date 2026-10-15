@@ -26,10 +26,6 @@ use crate::views::{area, character, model, script, spreadsheet, tileset, world};
 use crate::{import, play, views};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
-    if !editor.themed {
-        theme::apply(ctx);
-        editor.themed = true;
-    }
     editor.status.right.clear();
     shortcuts(editor, ctx);
     play::status(editor);

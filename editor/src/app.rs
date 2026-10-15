@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use bevy::prelude::*;
-use bevy_egui::{EguiContext, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
+use bevy_egui::{
+    EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
+};
 use egui_dock::DockState;
 use game::core::content::{Content, ContentRegistry, version};
 use game::core::math::Pos;
@@ -69,6 +71,10 @@ impl Plugin for EditorPlugin {
         app.add_plugins((EguiPlugin::default(), bevy_tilemap::TilemapPlugin))
             .insert_resource(editor)
             .add_systems(Startup, setup_camera)
+            .add_systems(
+                PreUpdate,
+                theme_context.after(EguiPreUpdateSet::InitContexts),
+            )
             .add_systems(EguiPrimaryContextPass, editor_ui)
             .add_systems(Update, background);
     }
@@ -76,6 +82,13 @@ impl Plugin for EditorPlugin {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, PrimaryEguiContext, EditorCamera));
+}
+
+// egui takes up new fonts as a pass begins, so they must be set before the first pass draws text.
+fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>>) {
+    for mut context in &mut contexts {
+        ui::theme::apply(context.get_mut());
+    }
 }
 
 pub const REFUSED: &str = "refused; see the output";
@@ -94,7 +107,6 @@ pub struct Editor {
     pub status: StatusBar,
     pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
-    pub themed: bool,
     pub selection: RowSelection,
     pub form: FormState,
     pub output: OutputLog,
@@ -393,7 +405,6 @@ impl Editor {
             status: StatusBar::default(),
             last_refusal: None,
             history_focus: None,
-            themed: false,
             selection: RowSelection::default(),
             form: FormState::default(),
             output: OutputLog::default(),
