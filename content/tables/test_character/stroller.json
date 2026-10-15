@@ -1,0 +1,8 @@
+{
+  "name": "Stroller",
+  "job": "adventurer",
+  "stats": {
+    "movement_speed": 1.5
+  },
+  "start": "initial_spawn"
+}

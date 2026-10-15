@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use driver::{
     Player, WaitBudget, area_key, area_named, beside_resident, clickable_point, ground_near,
@@ -22,6 +22,9 @@ const CLEARANCE: f32 = 3.0;
 // the line.
 const HELD_FOR: f32 = 5.0;
 const HITCH: Duration = Duration::from_millis(400);
+// Slow enough on foot that a walk is still going when the driver asks again, however few frames a
+// slow machine draws.
+const SLOW: &str = "stroller";
 
 // Where the player showed on screen, and where the server had them, frame by frame.
 type Frames = Rc<RefCell<Vec<Shown>>>;
@@ -35,7 +38,7 @@ struct Shown {
 #[test]
 fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_for() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, SLOW);
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
@@ -61,7 +64,12 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
         farthest_in_view(seen, &tiles, first_goal + 1)
     });
     player.point_at(at);
-    player.click();
+    let asked_again = player.click();
+    let walking = asked_again.me.as_ref().expect("the player").drawn;
+    assert!(
+        (tiles[first_goal] - walking).dot(step) > 0.0,
+        "the walk was at {walking:?}, done, before it was asked for more"
+    );
     let end = player.come_to_rest();
 
     assert!(
@@ -75,7 +83,7 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
 #[test]
 fn asking_again_for_tiles_along_the_way_walks_on_to_the_end_as_one_ask_does() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
@@ -101,26 +109,36 @@ fn asking_again_for_tiles_along_the_way_walks_on_to_the_end_as_one_ask_does() {
 #[test]
 fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
-    let at = player.wait_for("the line in view", |seen| clickable_point(seen, tiles[1]));
-    player.point_at(at);
-    let pressed = player.snapshot().frame;
+    // The pointer leads the walk by a tile, and by twice the walk one look takes more, so the walk
+    // doesn't overtake it before the game sees it there, however few frames come. Before the walk,
+    // a look is timed to judge the first lead by.
+    let looking = Instant::now();
+    let seen = player.wait_for("the line in view", |seen| {
+        clickable_point(seen, tiles[1]).map(|_| seen.clone())
+    });
+    player.point_at(clickable_point(&seen, tiles[1]).expect("the line in view"));
+    let look = looking.elapsed().as_secs_f32();
+    let speed = seen.me.as_ref().expect("the player").speed.0.0;
+    let first = on_the_line(&seen, &tiles, step, start, 1.0 + 2.0 * speed * look);
+    let pressed = player.point_at(first.expect("the line in view")).frame;
     player.holding_down(InputAction::Interact, |player| {
         let mut last = start;
         loop {
             let seen = player.snapshot();
             let me = seen.me.as_ref().expect("the player").drawn;
-            if (me - tiles[0]).dot(step) >= HELD_FOR {
+            let walked = (me - tiles[0]).dot(step);
+            if walked >= HELD_FOR {
                 break;
             }
-            // A tile ahead, and twice the last frame's walk more, so the walk doesn't overtake the
-            // pointer before the game sees it there, however few frames come.
             let lead = 1.0 + 2.0 * me.distance_to(last);
             last = me;
-            player.point_at(seen.view.expect("a view").window_point(me + step * lead));
+            if let Some(at) = on_the_line(&seen, &tiles, step, me, walked + lead) {
+                player.point_at(at);
+            }
         }
     });
     let end = player.come_to_rest();
@@ -132,7 +150,7 @@ fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
 #[test]
 fn a_walk_held_up_along_the_way_shows_at_its_end_no_later_than_the_server_has_it_there() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest);
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
@@ -172,9 +190,12 @@ fn a_walk_held_up_along_the_way_shows_at_its_end_no_later_than_the_server_has_it
     );
 }
 
-fn on_a_quiet_line(playtest: &mut driver::Playtest) -> (Player, Offset<Tiles>, Vec<Pos<Tiles>>) {
+fn on_a_quiet_line(
+    playtest: &mut driver::Playtest,
+    character: &str,
+) -> (Player, Offset<Tiles>, Vec<Pos<Tiles>>) {
     let mut player = playtest.join_as(
-        "traveler",
+        character,
         Some(beside_resident("glimmercap", "gnome_alchemist")),
     );
     player.in_world();
@@ -228,6 +249,25 @@ fn assert_unbroken(
             pair[1]
         );
     }
+}
+
+// Where on screen the line lies `along` tiles on from its first tile, or, past its end or out of
+// view, its farthest tile in view still ahead of `me`.
+fn on_the_line(
+    seen: &ProbeSnapshot,
+    tiles: &[Pos<Tiles>],
+    step: Offset<Tiles>,
+    me: Pos<Tiles>,
+    along: f32,
+) -> Option<Pos<WindowPx>> {
+    let along = along.min((tiles.len() - 1) as f32);
+    clickable_point(seen, tiles[0] + step * along).or_else(|| {
+        tiles
+            .iter()
+            .rev()
+            .filter(|&&tile| (tile - me).dot(step) > 0.0)
+            .find_map(|&tile| clickable_point(seen, tile))
+    })
 }
 
 // The farthest tile of the line from `from` on that a click can reach now, and where to click it,

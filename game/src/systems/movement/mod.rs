@@ -291,7 +291,7 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     }
 }
 
-fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
+pub(crate) fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
     TilesPerSec(Tiles(stat::effective(
         world,
         entity,

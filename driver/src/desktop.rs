@@ -450,8 +450,18 @@ const SWEEP_STEP: &str = "0.004";
 // on Xvfb, a GPU's driver hands it frames without copying each one through the CPU.
 struct Screen {
     display: String,
-    x: Child,
-    compositor: Child,
+    _x: ScreenServer,
+    _compositor: ScreenServer,
+}
+
+// Ended when dropped, so a screen set up halfway, when the next step fails, leaves nothing running.
+struct ScreenServer(Child);
+
+impl Drop for ScreenServer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
 }
 
 impl Screen {
@@ -463,52 +473,47 @@ impl Screen {
         );
         let ready = SocketAddr::from_abstract_name(&name).expect("a short enough socket name");
         let notices = UnixDatagram::bind_addr(&ready).expect("a socket to hear the compositor on");
-        let mut compositor = Command::new("weston")
-            .args([
-                "--backend=headless",
-                "--renderer=gl",
-                "--shell=kiosk",
-                "--no-config",
-                // Input goes to Xwayland, out of weston's sight: idle, it would blank the screen.
-                "--idle-time=0",
-                "--modules=systemd-notify.so",
-            ])
-            .arg(format!("--width={}", size.0))
-            .arg(format!("--height={}", size.1))
-            .arg(format!("--socket={name}"))
-            .arg(format!("--log={}", folder.join("compositor.log").display()))
-            .env("NOTIFY_SOCKET", format!("@{name}"))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("weston runs");
-        await_ready(&notices, &mut compositor, folder);
-        let mut x = Command::new("Xwayland")
-            .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
-            .arg(format!("{}x{}", size.0, size.1))
-            .env("WAYLAND_DISPLAY", &name)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("Xwayland runs");
+        let mut compositor = ScreenServer(
+            Command::new("weston")
+                .args([
+                    "--backend=headless",
+                    "--renderer=gl",
+                    "--shell=kiosk",
+                    "--no-config",
+                    // Input goes to Xwayland, out of weston's sight: idle, it would blank the screen.
+                    "--idle-time=0",
+                    "--modules=systemd-notify.so",
+                ])
+                .arg(format!("--width={}", size.0))
+                .arg(format!("--height={}", size.1))
+                .arg(format!("--socket={name}"))
+                .arg(format!("--log={}", folder.join("compositor.log").display()))
+                .env("NOTIFY_SOCKET", format!("@{name}"))
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("weston runs"),
+        );
+        await_ready(&notices, &mut compositor.0, folder);
+        let mut x = ScreenServer(
+            Command::new("Xwayland")
+                .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
+                .arg(format!("{}x{}", size.0, size.1))
+                .env("WAYLAND_DISPLAY", &name)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("Xwayland runs"),
+        );
         let mut number = String::new();
-        let named = BufReader::new(x.stdout.take().expect("a piped stdout"))
+        let named = BufReader::new(x.0.stdout.take().expect("a piped stdout"))
             .read_line(&mut number)
             .expect("Xwayland names its display");
         assert!(named > 0, "Xwayland exited before naming its display");
         Screen {
             display: format!(":{}", number.trim()),
-            x,
-            compositor,
-        }
-    }
-}
-
-impl Drop for Screen {
-    fn drop(&mut self) {
-        for server in [&mut self.x, &mut self.compositor] {
-            let _ = server.kill();
-            let _ = server.wait();
+            _x: x,
+            _compositor: compositor,
         }
     }
 }
