@@ -22,8 +22,8 @@ const CLEARANCE: f32 = 3.0;
 // the line.
 const HELD_FOR: f32 = 5.0;
 const HITCH: Duration = Duration::from_millis(400);
-// Slow enough on foot that a walk is still going when the driver asks again, however few frames a
-// slow machine draws.
+// Slow enough on foot that a walk is still going, and seen going, when the driver looks and asks
+// again, however few frames a slow machine draws.
 const SLOW: &str = "stroller";
 
 // Where the player showed on screen, and where the server had them, frame by frame.
@@ -83,7 +83,7 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
 #[test]
 fn asking_again_for_tiles_along_the_way_walks_on_to_the_end_as_one_ask_does() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, SLOW);
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
@@ -150,7 +150,7 @@ fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
 #[test]
 fn a_walk_held_up_along_the_way_shows_at_its_end_no_later_than_the_server_has_it_there() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, SLOW);
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
@@ -252,7 +252,7 @@ fn assert_unbroken(
 }
 
 // Where on screen the line lies `along` tiles on from its first tile, or, past its end or out of
-// view, its farthest tile in view still ahead of `me`.
+// view, its farthest tile in view still ahead of `me`, leaving room past it for the pointer to drift.
 fn on_the_line(
     seen: &ProbeSnapshot,
     tiles: &[Pos<Tiles>],
@@ -260,9 +260,10 @@ fn on_the_line(
     me: Pos<Tiles>,
     along: f32,
 ) -> Option<Pos<WindowPx>> {
-    let along = along.min((tiles.len() - 1) as f32);
+    let within = &tiles[..tiles.len() - DRIFT];
+    let along = along.min((within.len() - 1) as f32);
     clickable_point(seen, tiles[0] + step * along).or_else(|| {
-        tiles
+        within
             .iter()
             .rev()
             .filter(|&&tile| (tile - me).dot(step) > 0.0)
