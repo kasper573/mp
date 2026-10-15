@@ -165,6 +165,22 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Tusks for the Chief");
     me.caption_top("Rewards can include a pick, chosen when you hand in");
+    me.caption_top("Rest the pointer on a reward to see what it is");
+    me.hover_ui(reward_on("I'll take the Bone Shield."));
+    me.hold();
+    me.caption_top("Right-click it for its card");
+    me.act_on_ui(
+        InputAction::InspectItem,
+        reward_on("I'll take the Bone Shield."),
+    );
+    me.wait_until("the shield's card", |snapshot| {
+        snapshot
+            .item_card
+            .is_some_and(|card| card.item.key(content()) == "bone_shield")
+    });
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.wait_until("the card to close", |snapshot| snapshot.item_card.is_none());
     me.caption_top(
         "With a full bag the pick is refused with an error — space is counted after the tusks are handed in",
     );
@@ -237,6 +253,21 @@ fn hear_out_tobb(me: &mut Player, within: Duration) {
 }
 
 // Says whether his news came up on the way to his topics.
+// A choice shows its item beside its words too; the reward is the chip that counts it.
+fn reward_on(choice: &str) -> UiTarget {
+    let choice = choice.to_owned();
+    UiTarget::text("+1").and(&format!("on {choice:?}"), move |element, snapshot| {
+        snapshot.stage.as_ref().is_some_and(|stage| {
+            stage.choices.iter().any(|shown| {
+                shown.label == choice
+                    && shown
+                        .rect
+                        .is_some_and(|rect| rect.contains(element.rect.center()))
+            })
+        })
+    })
+}
+
 fn talk_past_news(me: &mut Player) -> bool {
     let mut heard = false;
     loop {

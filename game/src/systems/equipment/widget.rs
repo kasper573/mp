@@ -3,6 +3,7 @@ use egui::{Sense, Ui, Vec2};
 use strum::VariantArray;
 
 use crate::core::content::Content;
+use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
 use crate::systems::equipment::{Equipment, EquipmentSlot, UnequipRequest};
 use crate::systems::hud::{self, HudAudience, Window};
@@ -57,7 +58,10 @@ fn worn(world: &World) -> Vec<(EquipmentSlot, Option<ItemId>)> {
 }
 
 fn empty_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot) {
-    slot(ui, world, SlotLook::EMPTY, Sense::hover()).on_hover_text(kind.label());
+    let response = slot(ui, world, SlotLook::EMPTY, Sense::hover());
+    gui::tooltip(&response, |ui| {
+        ui.label(kind.label());
+    });
 }
 
 fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) {
@@ -86,7 +90,6 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
             .collect(),
     );
     let lines = [card::overview(def)];
-    response
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_ui(|ui| hud::tooltip(ui, world, &def.name, &lines, Some(&hint)));
+    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+    hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
 }

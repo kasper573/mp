@@ -1,4 +1,5 @@
 mod conversation;
+mod items;
 mod stage;
 mod terminal;
 mod travel;

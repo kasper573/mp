@@ -297,32 +297,34 @@ pub(crate) fn keyed_window<R>(
 }
 
 pub(crate) fn tooltip(
-    ui: &mut Ui,
+    response: &egui::Response,
     world: &World,
     title: &str,
     lines: &[String],
     hint: Option<&StyledLine>,
 ) {
-    ui.set_max_width(TOOLTIP_WIDTH);
-    ui.label(
-        egui::RichText::new(title)
-            .family(design_tokens::family::medium())
-            .color(color::TEXT),
-    );
-    for line in lines {
+    gui::tooltip(response, |ui| {
+        ui.set_max_width(TOOLTIP_WIDTH);
         ui.label(
-            egui::RichText::new(line)
-                .size(TextRole::Small.size())
-                .color(color::TEXT.gamma_multiply(0.85)),
+            egui::RichText::new(title)
+                .family(design_tokens::family::medium())
+                .color(color::TEXT),
         );
-    }
-    if let Some(hint) = hint {
-        let look = TextLook {
-            size: TextRole::Small.size(),
-            color: color::MUTED,
-        };
-        text::show(ui, world, hint, look, None);
-    }
+        for line in lines {
+            ui.label(
+                egui::RichText::new(line)
+                    .size(TextRole::Small.size())
+                    .color(color::TEXT.gamma_multiply(0.85)),
+            );
+        }
+        if let Some(hint) = hint {
+            let look = TextLook {
+                size: TextRole::Small.size(),
+                color: color::MUTED,
+            };
+            text::show(ui, world, hint, look, None);
+        }
+    });
 }
 
 pub(crate) fn file_icon(ui: &mut Ui, world: &mut World, file: &str, size: f32) -> egui::Response {
@@ -435,7 +437,10 @@ fn launcher(world: &mut World, gui: &egui::Context, window: &'static dyn Window,
             ui.put(at, icon.widget(Vec2::splat(LAUNCHER_ICON)));
         }
         key_badge(ui, response.rect, &key);
-        response.on_hover_text(title)
+        gui::tooltip(&response, |ui| {
+            ui.label(title);
+        });
+        response
     });
     if shown.inner.clicked() {
         world.resource_mut::<Open>().0.insert(title);

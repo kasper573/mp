@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -142,6 +143,32 @@ pub fn show_anchored<R>(
     shown
 }
 
+/// A widget's tooltip opens once the pointer has been on it a moment, however the pointer moves or
+/// clicks there, and at once while another has only just closed. egui's own waits for the pointer to
+/// rest, and after a click to move again, so it never opened on a widget the player clicks.
+pub fn tooltip(response: &egui::Response, add: impl FnOnce(&mut egui::Ui)) {
+    let gui = &response.ctx;
+    let key = response.id.with("tooltip");
+    if !response.contains_pointer() || gui.dragged_id().is_some() {
+        gui.data_mut(|data| data.remove::<Pointed>(key));
+        return;
+    }
+    let (now, pass) = (gui.input(|input| input.time), gui.cumulative_pass_nr());
+    let since = gui.data_mut(|data| {
+        let since = data
+            .get_temp::<Pointed>(key)
+            .filter(|pointed| pointed.pass + 1 >= pass)
+            .map_or(now, |pointed| pointed.since);
+        data.insert_temp(key, Pointed { since, pass });
+        since
+    });
+    let follows_another =
+        egui::Tooltip::seconds_since_last_tooltip(gui) < TOOLTIP_FOLLOW.as_secs_f32();
+    if follows_another || now - since >= TOOLTIP_DELAY.as_secs_f64() {
+        egui::Tooltip::for_widget(response).show(add);
+    }
+}
+
 /// An image is kept from the first ask on, so one shown again never waits on a fresh load.
 pub fn image(world: &mut World, asset: &AssetRef) -> Option<GuiImage> {
     image_file(world, &asset.path())
@@ -191,6 +218,15 @@ pub fn layer_at(gui: &egui::Context, at: egui::Pos2) -> Option<LayerId> {
 
 pub fn cursor(world: &World) -> egui::CursorIcon {
     world.resource::<GuiCursor>().0
+}
+
+const TOOLTIP_DELAY: Duration = Duration::from_millis(400);
+const TOOLTIP_FOLLOW: Duration = Duration::from_millis(300);
+
+#[derive(Clone, Copy)]
+struct Pointed {
+    since: f64,
+    pass: u64,
 }
 
 #[derive(Resource, Default)]

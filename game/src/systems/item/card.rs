@@ -54,13 +54,17 @@ pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response 
     if map::clicked(world, InputAction::InspectItem, &response) {
         open(world, item);
     }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    tooltip(world, &response, item);
+    response
+}
+
+pub fn tooltip(world: &World, response: &Response, item: ItemId) {
     let content = *world.resource::<Content>();
     let def = item.get(&content);
     let lines = [overview(def)];
     let hint = StyledLine::new(inspect_hint());
-    response
-        .on_hover_cursor(CursorIcon::PointingHand)
-        .on_hover_ui(|ui| hud::tooltip(ui, world, &def.name, &lines, Some(&hint)))
+    hud::tooltip(response, world, &def.name, &lines, Some(&hint));
 }
 
 pub fn overview(def: &ItemDef) -> String {

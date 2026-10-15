@@ -25,7 +25,7 @@ use crate::systems::actor::{ActorModel, Name};
 use crate::systems::hud;
 use crate::systems::input::map::{self, InputAction, InputMap};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
-use crate::systems::item::card;
+use crate::systems::item::{ItemId, card};
 use crate::systems::npc::Npc;
 use crate::systems::player;
 use crate::systems::player::session::Viewpoint;
@@ -799,7 +799,7 @@ fn choices(ui: &mut Ui, world: &mut World) {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         for (index, (choice, selected, offset)) in rows.into_iter().enumerate() {
-            let response = ui
+            let (response, chip_item) = ui
                 .push_id(("choice", index), |ui| {
                     choice_row(ui, world, &choice, index, selected, offset)
                 })
@@ -809,6 +809,11 @@ fn choices(ui: &mut Ui, world: &mut World) {
             }
             if map::clicked(world, InputAction::PickChoice, &response) {
                 pick_at(world, index);
+            }
+            if let Some(item) = chip_item
+                && map::clicked(world, InputAction::InspectItem, &response)
+            {
+                card::open(world, item);
             }
             world
                 .resource_mut::<StageDrawn>()
@@ -850,7 +855,7 @@ fn choice_row(
     index: usize,
     selected: bool,
     offset: f32,
-) -> egui::Response {
+) -> (egui::Response, Option<ItemId>) {
     let keys = world.resource::<InputMap>();
     let shortcut = CHOICE_SHORTCUTS
         .get(index)
@@ -866,6 +871,7 @@ fn choice_row(
         Vec2::new(ui.available_width(), 0.0),
     );
     let background = ui.painter().add(egui::Shape::Noop);
+    let mut chip_item = None;
     let row = ui.scope_builder(
         UiBuilder::new()
             .max_rect(room.with_max_y(ui.max_rect().max.y))
@@ -878,7 +884,7 @@ fn choice_row(
                     ui.set_width(room.width() - 16.0);
                     ui.horizontal(|ui| {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            chips(ui, world, choice);
+                            chip_item = chips(ui, world, choice);
                             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                                 if let Some(shortcut) = &shortcut {
                                     widgets::key_hint(ui, shortcut);
@@ -915,11 +921,13 @@ fn choice_row(
             ),
         );
     }
-    response
+    (response, chip_item)
 }
 
-fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) {
+/// The row takes every click, so it is handed the item of the chip under the pointer to inspect.
+fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) -> Option<ItemId> {
     let content = *world.resource::<Content>();
+    let mut pointed = None;
     if let Some(warn) = &choice.warn {
         chip(ui, world, None, warn, color::DANGER);
     }
@@ -946,10 +954,14 @@ fn chips(ui: &mut Ui, world: &mut World, choice: &ChoiceView) {
             ChoiceChip::Gets { item, count } => {
                 let icon = item.get(&content).icon.clone();
                 let response = chip(ui, world, Some(&icon), &format!("+{count}"), color::OK);
-                card::inspect(world, response, *item);
+                card::tooltip(world, &response, *item);
+                if response.contains_pointer() {
+                    pointed = Some(*item);
+                }
             }
         }
     }
+    pointed
 }
 
 fn chip(

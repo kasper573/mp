@@ -34,6 +34,9 @@ fn play(shoot: &mut Shoot) {
         }
         me.drag_ui(title, Offset::new(x, y));
     }
+    me.caption("Rest the pointer on an item to see what it is");
+    me.hover_ui(outside_card(SHIELD));
+    me.hold();
     me.caption("Right-click an item for its card: what it does, and a line of lore");
     inspect(&mut me, SHIELD, "bone_shield");
     me.caption("One card at a time: right-click another item and the card follows");

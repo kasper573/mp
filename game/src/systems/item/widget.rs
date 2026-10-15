@@ -222,9 +222,8 @@ fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
         .chain(verdict)
         .collect();
     let hint = StyledLine::new(hint_pieces(&filled.hints));
-    response
-        .on_hover_cursor(CursorIcon::Grab)
-        .on_hover_ui(|ui| hud::tooltip(ui, world, &def.name, &lines, Some(&hint)));
+    let response = response.on_hover_cursor(CursorIcon::Grab);
+    hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
 }
 
 fn carried_ghost(gui: &egui::Context, world: &mut World) {
