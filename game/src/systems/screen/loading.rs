@@ -6,7 +6,7 @@ use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color};
-use egui::RichText;
+use egui::{RichText, TextStyle, Ui};
 
 use super::{ClientScreen, Retry, system_screen};
 use crate::core::content::sync::{
@@ -88,8 +88,11 @@ impl ContentSource for ServerContent {
 // The card only needs a few frames a second, and every frame a software renderer draws is main-thread
 // time the download's fetches and cache writes can't have.
 const CARD_FRAME: Duration = Duration::from_millis(100);
-// Room for the most the card ever says, so it keeps one size as its lines come and go.
-const CARD_SIZE: egui::Vec2 = egui::Vec2::new(320.0, 200.0);
+const CARD_WIDTH: f32 = 320.0;
+// The most lines a load shows on its way, so the card keeps one height as they come and go. Notes
+// and a failure are rare, and grow it instead.
+const CARD_LINES: usize = 4;
+const LINE_GAP: f32 = 4.0;
 
 #[derive(Resource)]
 struct PacingBeforeLoading(WinitSettings);
@@ -370,10 +373,10 @@ fn loading_card(world: &mut World) {
         egui::Frame::popup(ui.style())
             .inner_margin(egui::Margin::symmetric(24, 18))
             .show(ui, |ui| {
-                ui.set_width(CARD_SIZE.x);
-                ui.set_height(CARD_SIZE.y);
+                ui.set_width(CARD_WIDTH);
+                ui.set_min_height(card_height(ui));
                 ui.vertical_centered(|ui| {
-                    ui.spacing_mut().item_spacing.y = 4.0;
+                    ui.spacing_mut().item_spacing.y = LINE_GAP;
                     ui.heading(&model.title);
                     for line in &model.lines {
                         ui.label(line);
@@ -402,6 +405,11 @@ fn loading_card(world: &mut World) {
             .map_or(Retry::default(), |failure| failure.retry);
         start(world, retry);
     }
+}
+
+fn card_height(ui: &Ui) -> f32 {
+    let line = ui.text_style_height(&TextStyle::Body) + LINE_GAP;
+    ui.text_style_height(&TextStyle::Heading) + CARD_LINES as f32 * line
 }
 
 fn megabytes(bytes: u64) -> String {
