@@ -271,7 +271,7 @@ fn draw_hud(world: &mut World) {
         );
         let frame = WindowFrame {
             key: title,
-            title,
+            title: Some(title),
             start: centered,
             sizing: Sizing::Resizable,
         };

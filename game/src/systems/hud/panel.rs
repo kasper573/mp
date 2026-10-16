@@ -8,7 +8,7 @@ use crate::systems::settings::{Placement, UserSettings};
 
 pub(crate) struct WindowFrame<'a> {
     pub key: &'static str,
-    pub title: &'a str,
+    pub title: Option<&'a str>,
     pub start: Rect,
     pub sizing: Sizing,
 }
@@ -252,15 +252,17 @@ fn snapped(world: &World, rect: Rect, grip: Grip) -> Rect {
     }
 }
 
-fn title_bar(ui: &mut Ui, title: &str, open: &mut bool) -> Rect {
+fn title_bar(ui: &mut Ui, title: Option<&str>, open: &mut bool) -> Rect {
     let height = ui.text_style_height(&egui::TextStyle::Heading);
     let (_, bar) = ui.allocate_space(Vec2::new(ui.available_width(), height));
-    ui.put(
-        bar.shrink2(Vec2::new(height, 0.0)),
-        egui::Label::new(RichText::new(title).heading())
-            .selectable(false)
-            .truncate(),
-    );
+    if let Some(title) = title {
+        ui.put(
+            bar.shrink2(Vec2::new(height, 0.0)),
+            egui::Label::new(RichText::new(title).heading())
+                .selectable(false)
+                .truncate(),
+        );
+    }
     let close = Rect::from_min_size(
         bar.right_top() - Vec2::new(height, 0.0),
         Vec2::splat(height),

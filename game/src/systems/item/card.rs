@@ -186,7 +186,6 @@ fn draw_card(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let content = world.resource::<Content>().clone();
     let screen = gui.content_rect();
     let start = Rect::from_min_size(
         Pos2::new(
@@ -198,7 +197,7 @@ fn draw_card(world: &mut World) {
     let mut open = true;
     let frame = WindowFrame {
         key: WINDOW_KEY,
-        title: &item.get(&content).name,
+        title: None,
         start,
         sizing: Sizing::FitsContent,
     };
