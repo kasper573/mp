@@ -302,8 +302,15 @@ fn body<R>(ui: &mut Ui, bottom: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
 // An area lays its content out within the size it last had, which would hold a fitted window's
 // scrolling content to its height for the item it showed before.
 fn fitted<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
-    ui.set_max_height(ui.ctx().content_rect().bottom() - ui.max_rect().top());
-    add(ui)
+    let top = ui.cursor().min;
+    let room = Rect::from_min_max(
+        top,
+        Pos2::new(
+            top.x + ui.available_width(),
+            ui.ctx().content_rect().bottom().max(top.y),
+        ),
+    );
+    ui.scope_builder(UiBuilder::new().max_rect(room), add).inner
 }
 
 fn corner_grip(ui: &mut Ui, id: Id, window: Rect) -> egui::Response {
