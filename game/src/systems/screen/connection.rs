@@ -6,7 +6,7 @@ use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
 
 use super::mode::ClientMode;
-use super::{ClientScreen, Retry, system_screen};
+use super::{ClientScreen, Notice, Retry, notice_screen};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
 use crate::core::gui::{self, Band};
@@ -129,9 +129,13 @@ fn connecting(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    system_screen(&gui, "connecting", world.resource::<Backdrop>().0, |ui| {
-        ui.label("Connecting…");
-    });
+    let notice = Notice {
+        title: "Connecting…",
+        lines: &[],
+        notes: &[],
+        action: None,
+    };
+    notice_screen(&gui, "connecting", world.resource::<Backdrop>().0, notice);
 }
 
 fn lost(world: &mut World) {
@@ -149,12 +153,13 @@ fn connection_lost(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let retry = system_screen(&gui, "lost", world.resource::<Backdrop>().0, |ui| {
-        ui.heading("Connection lost");
-        ui.label("Reconnecting…");
-        ui.button("Retry now").clicked()
-    })
-    .inner;
+    let notice = Notice {
+        title: "Connection lost",
+        lines: &["Reconnecting…".to_owned()],
+        notes: &[],
+        action: Some("Retry now"),
+    };
+    let retry = notice_screen(&gui, "lost", world.resource::<Backdrop>().0, notice);
     if retry {
         world.resource_mut::<Retry>().due = None;
         world

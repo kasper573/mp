@@ -5,10 +5,8 @@ use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{TextRole, color};
-use egui::{RichText, TextStyle, Ui};
 
-use super::{ClientScreen, Retry, system_screen};
+use super::{ClientScreen, Notice, Retry, notice_screen};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
@@ -88,11 +86,6 @@ impl ContentSource for ServerContent {
 // The card only needs a few frames a second, and every frame a software renderer draws is main-thread
 // time the download's fetches and cache writes can't have.
 const CARD_FRAME: Duration = Duration::from_millis(100);
-const CARD_WIDTH: f32 = 320.0;
-// The most lines a load shows on its way, so the card keeps one height as they come and go. Notes
-// and a failure are rare, and grow it instead.
-const CARD_LINES: usize = 4;
-const LINE_GAP: f32 = 4.0;
 
 #[derive(Resource)]
 struct PacingBeforeLoading(WinitSettings);
@@ -369,47 +362,20 @@ fn loading_card(world: &mut World) {
         return;
     };
     let backdrop = (!model.veiled).then_some(super::connection::OVERLAY_BG);
-    let retry = system_screen(&gui, "loading", backdrop, |ui| {
-        egui::Frame::popup(ui.style())
-            .inner_margin(egui::Margin::symmetric(24, 18))
-            .show(ui, |ui| {
-                ui.set_width(CARD_WIDTH);
-                ui.set_min_height(card_height(ui));
-                ui.vertical_centered(|ui| {
-                    ui.spacing_mut().item_spacing.y = LINE_GAP;
-                    ui.heading(&model.title);
-                    for line in &model.lines {
-                        ui.label(line);
-                    }
-                    let small = |text: &str| {
-                        RichText::new(text)
-                            .size(TextRole::Small.size())
-                            .color(color::MUTED)
-                    };
-                    for note in &model.notes {
-                        ui.label(small(note));
-                    }
-                    model.retry_in.as_ref().is_some_and(|retry_in| {
-                        ui.label(small(retry_in));
-                        ui.button("Retry").clicked()
-                    })
-                })
-                .inner
-            })
-            .inner
-    })
-    .inner;
+    let notes: Vec<String> = model.notes.iter().chain(&model.retry_in).cloned().collect();
+    let notice = Notice {
+        title: &model.title,
+        lines: &model.lines,
+        notes: &notes,
+        action: model.retry_in.is_some().then_some("Retry"),
+    };
+    let retry = notice_screen(&gui, "loading", backdrop, notice);
     if retry && world.get_resource::<Syncing>().is_none() {
         let retry = world
             .remove_resource::<LoadingFailure>()
             .map_or(Retry::default(), |failure| failure.retry);
         start(world, retry);
     }
-}
-
-fn card_height(ui: &Ui) -> f32 {
-    let line = ui.text_style_height(&TextStyle::Body) + LINE_GAP;
-    ui.text_style_height(&TextStyle::Heading) + CARD_LINES as f32 * line
 }
 
 fn megabytes(bytes: u64) -> String {

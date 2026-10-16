@@ -4,6 +4,8 @@ pub mod loading;
 pub mod mode;
 
 use bevy::prelude::*;
+use design_tokens::{TextRole, color};
+use egui::{RichText, TextStyle, Ui};
 use renet2::RenetClient;
 
 use crate::core::gui::{self, Band};
@@ -12,6 +14,12 @@ use crate::core::time::{Backoff, Seconds};
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
+
+const NOTICE_WIDTH: f32 = 320.0;
+// The most lines a load shows on its way, so the notice keeps one height as the screens and their
+// lines come and go. Notes and a failure are rare, and grow it instead.
+const NOTICE_LINES: usize = 4;
+const LINE_GAP: f32 = 4.0;
 
 const SERVER_RETRY: Backoff = Backoff {
     first: Seconds(1.0),
@@ -117,6 +125,24 @@ fn announce(world: &mut World) {
     world.remove_resource::<Announce>();
 }
 
+/// What a screen between screens says, always in one panel.
+pub(crate) struct Notice<'a> {
+    pub title: &'a str,
+    pub lines: &'a [String],
+    pub notes: &'a [String],
+    pub action: Option<&'a str>,
+}
+
+/// Returns whether the notice's action was taken.
+pub(crate) fn notice_screen(
+    gui: &egui::Context,
+    id: &str,
+    backdrop: Option<egui::Color32>,
+    notice: Notice,
+) -> bool {
+    system_screen(gui, id, backdrop, |ui| notice_panel(ui, notice)).inner
+}
+
 pub(crate) fn system_screen<R>(
     gui: &egui::Context,
     id: &str,
@@ -150,4 +176,37 @@ pub(crate) fn system_screen<R>(
         None => gui.move_to_top(content),
     }
     shown
+}
+
+fn notice_panel(ui: &mut Ui, notice: Notice) -> bool {
+    egui::Frame::popup(ui.style())
+        .inner_margin(egui::Margin::symmetric(24, 18))
+        .show(ui, |ui| {
+            ui.set_width(NOTICE_WIDTH);
+            ui.set_min_height(notice_height(ui));
+            ui.vertical_centered(|ui| {
+                ui.spacing_mut().item_spacing.y = LINE_GAP;
+                ui.heading(notice.title);
+                for line in notice.lines {
+                    ui.label(line);
+                }
+                for note in notice.notes {
+                    ui.label(
+                        RichText::new(note)
+                            .size(TextRole::Small.size())
+                            .color(color::MUTED),
+                    );
+                }
+                notice
+                    .action
+                    .is_some_and(|action| ui.button(action).clicked())
+            })
+            .inner
+        })
+        .inner
+}
+
+fn notice_height(ui: &Ui) -> f32 {
+    let line = ui.text_style_height(&TextStyle::Body) + LINE_GAP;
+    ui.text_style_height(&TextStyle::Heading) + NOTICE_LINES as f32 * line
 }
