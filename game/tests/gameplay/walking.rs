@@ -3,11 +3,11 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use driver::{
-    Player, WaitBudget, area_key, area_named, beside_resident, clickable_point, ground_near,
-    in_warp, taken,
+    Player, area_key, area_named, beside_resident, clickable_point, ground_near, in_warp, taken,
 };
 use game::core::math::{Offset, Pos, WindowPx};
 use game::core::tiling::Tiles;
+use game::systems::input::gestures::ClickClaim;
 use game::systems::input::map::InputAction;
 use game::systems::probe::ProbeSnapshot;
 
@@ -22,9 +22,11 @@ const CLEARANCE: f32 = 3.0;
 // the line.
 const HELD_FOR: f32 = 5.0;
 const HITCH: Duration = Duration::from_millis(400);
-// Slow enough on foot that a walk is still going, and seen going, when the driver looks and asks
-// again, however few frames a slow machine draws.
+// Slow enough on foot that a walk is still going, and seen going over several frames, when the
+// driver looks and asks again, however few frames a slow machine draws.
 const SLOW: &str = "stroller";
+// Frames a walk may take to show it set off after its click.
+const SETTING_OFF: u32 = 4;
 
 // Where the player showed on screen, and where the server had them, frame by frame.
 type Frames = Rc<RefCell<Vec<Shown>>>;
@@ -42,33 +44,33 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
-    let (first_goal, at) =
-        player.wait_for("the line in view", |seen| farthest_in_view(seen, &tiles, 1));
-    player.point_at(at);
-    let clicked = player.click().frame;
-    player.wait_within(
-        "the walk to set off",
-        WaitBudget {
-            time: Duration::ZERO,
-            frames: 4,
-        },
-        |snapshot| {
-            snapshot
-                .me
-                .as_ref()
-                .is_some_and(|me| me.drawn != start)
-                .then_some(())
-        },
-    );
-    let (_, at) = player.wait_for("more of the line in view", |seen| {
-        farthest_in_view(seen, &tiles, first_goal + 1)
+    // The first ask stops short of the line's farthest tile in view, so more of it is in view to ask
+    // for straight after, before the walk can end on a machine that draws few frames.
+    let (first_goal, at) = player.wait_for("the line in view", |seen| {
+        let (farthest, _) = farthest_in_view(seen, &tiles, 2)?;
+        let first_goal = farthest - 1;
+        clickable_point(seen, tiles[first_goal]).map(|at| (first_goal, at))
     });
+    player.point_at(at);
+    let clicked = player.click();
+    let (_, at) =
+        farthest_in_view(&clicked, &tiles, first_goal + 1).expect("more of the line in view");
     player.point_at(at);
     let asked_again = player.click();
     let walking = asked_again.me.as_ref().expect("the player").drawn;
     assert!(
         (tiles[first_goal] - walking).dot(step) > 0.0,
         "the walk was at {walking:?}, done, before it was asked for more"
+    );
+    let set_off = drawn
+        .borrow()
+        .iter()
+        .find(|shown| shown.frame > clicked.frame && shown.drawn != start)
+        .map(|shown| shown.frame);
+    assert!(
+        set_off.is_some_and(|frame| frame <= clicked.frame + SETTING_OFF),
+        "the walk set off in frame {set_off:?}, asked for in frame {}",
+        clicked.frame
     );
     let end = player.come_to_rest();
 
@@ -77,7 +79,7 @@ fn a_walk_sets_off_at_once_and_carries_on_unbroken_as_more_of_its_line_is_asked_
         "the walk ended at {end:?}, not on the line past {:?}",
         tiles[first_goal]
     );
-    assert_unbroken(&drawn, clicked, start, end, step);
+    assert_unbroken(&drawn, clicked.frame, start, end, step);
 }
 
 #[test]
@@ -109,13 +111,14 @@ fn asking_again_for_tiles_along_the_way_walks_on_to_the_end_as_one_ask_does() {
 #[test]
 fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
     let mut playtest = playtest();
-    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, "traveler");
+    let (mut player, step, tiles) = on_a_quiet_line(&mut playtest, SLOW);
     let start = player.walk_to(tiles[0]);
     let drawn = record_drawn(&mut player);
 
     // The pointer leads the walk by a tile, and by twice the walk one look takes more, so the walk
     // doesn't overtake it before the game sees it there, however few frames come. Before the walk,
-    // a look is timed to judge the first lead by.
+    // a look is timed to judge the first lead by. The pointer moves on at least a tile each look,
+    // faster than the walk, so a held button slow to follow it shows.
     let looking = Instant::now();
     let seen = player.wait_for("the line in view", |seen| {
         clickable_point(seen, tiles[1]).map(|_| seen.clone())
@@ -123,7 +126,8 @@ fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
     player.point_at(clickable_point(&seen, tiles[1]).expect("the line in view"));
     let look = looking.elapsed().as_secs_f32();
     let speed = seen.me.as_ref().expect("the player").speed.0.0;
-    let first = on_the_line(&seen, &tiles, step, start, 1.0 + 2.0 * speed * look);
+    let mut along = 1.0 + 2.0 * speed * look;
+    let first = on_the_line(&seen, &tiles, step, start, along);
     let pressed = player.point_at(first.expect("the line in view")).frame;
     player.holding_down(InputAction::Interact, |player| {
         let mut last = start;
@@ -136,8 +140,9 @@ fn a_held_button_leading_the_walk_keeps_it_going_without_a_pause() {
             }
             let lead = 1.0 + 2.0 * me.distance_to(last);
             last = me;
-            if let Some(at) = on_the_line(&seen, &tiles, step, me, walked + lead) {
-                player.point_at(at);
+            along = (walked + lead).max(along + 1.0);
+            if let Some(at) = on_the_line(&seen, &tiles, step, me, along) {
+                assert_led(&player.point_at(at), step);
             }
         }
     });
@@ -249,6 +254,19 @@ fn assert_unbroken(
             pair[1]
         );
     }
+}
+
+// From the frame the game sees the held button over a tile, the walk heads at least that far, so
+// a walk the pointer leads never catches up with it however fast it goes.
+fn assert_led(seen: &ProbeSnapshot, step: Offset<Tiles>) {
+    let ClickClaim::Walk(over) = seen.claim else {
+        return;
+    };
+    let end = seen.me.as_ref().and_then(|me| me.walking_to);
+    assert!(
+        end.is_some_and(|end| (end - over).dot(step) >= 0.0),
+        "with the button held over {over:?}, the walk headed for {end:?}"
+    );
 }
 
 // Where on screen the line lies `along` tiles on from its first tile, or, past its end or out of

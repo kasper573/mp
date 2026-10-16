@@ -39,6 +39,11 @@ pub fn request_walk(world: &mut World, goal: Pos<Tiles>) {
     world.write_message(MoveRequest { pos: goal, seq });
 }
 
+/// Where the client's own character's walk on screen ends, while it walks.
+pub(crate) fn drawn_walk_end(world: &World, entity: Entity) -> Option<Pos<Tiles>> {
+    world.get::<Stride>(entity)?.target
+}
+
 /// The client's own character as it walks on screen. It runs ahead of the server, which hears of
 /// each walk a trip over the network later, but it plans and walks the same way, so a walk the
 /// client asked for looks on screen as it plays out on the server, only sooner. The server stays the

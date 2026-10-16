@@ -141,6 +141,9 @@ pub struct ProbeBody {
     /// Where it shows on screen, which runs behind `at` for others and ahead of it for the player's
     /// own walk.
     pub drawn: Pos<Tiles>,
+    /// Where its walk on screen ends: the player's own only, which the client walks ahead of the
+    /// server.
+    pub walking_to: Option<Pos<Tiles>>,
     /// Where a click takes it rather than whatever stands in front of it.
     pub aim: Pos<Tiles>,
     pub hitbox: Rect<Tiles>,
@@ -688,6 +691,7 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
         player: entity.contains::<Owner>(),
         at,
         drawn: entity.get::<RenderPosition>().map_or(at, |drawn| drawn.0),
+        walking_to: movement::drawn_walk_end(world, entity.id()),
         aim: hitbox.center(),
         hitbox,
         action: actor.action,

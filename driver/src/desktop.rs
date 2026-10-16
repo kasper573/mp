@@ -26,7 +26,7 @@ pub struct Desktop {
     questions: TcpStream,
     answers: BufReader<TcpStream>,
     screen: Screen,
-    speakers: Speakers,
+    _speakers: Speakers,
     recording: Option<Recording>,
     observer: Option<Observer>,
     folder: PathBuf,
@@ -102,7 +102,7 @@ impl Desktop {
             questions,
             answers,
             screen,
-            speakers,
+            _speakers: speakers,
             recording,
             observer: None,
             folder: folder.to_path_buf(),
@@ -415,7 +415,6 @@ impl Drop for Desktop {
             }
             footage.discard();
         }
-        self.speakers.unplug();
     }
 }
 
@@ -551,8 +550,11 @@ impl Speakers {
     fn monitor(&self) -> String {
         format!("{}.monitor", self.sink)
     }
+}
 
-    fn unplug(&self) {
+// Unplugged when dropped, so a desktop that fails to start leaves no sink behind on the sound server.
+impl Drop for Speakers {
+    fn drop(&mut self) {
         let _ = Command::new("pactl")
             .args(["unload-module", &self.module])
             .status();

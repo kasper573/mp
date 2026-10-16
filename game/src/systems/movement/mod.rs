@@ -19,6 +19,7 @@ use crate::systems::{area, drain_requests};
 
 mod predict;
 
+pub(crate) use predict::drawn_walk_end;
 pub use predict::request_walk;
 
 pub fn register(app: &mut App) {

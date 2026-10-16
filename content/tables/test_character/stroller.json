@@ -2,7 +2,7 @@
   "name": "Stroller",
   "job": "adventurer",
   "stats": {
-    "movement_speed": 1.5
+    "movement_speed": 0.75
   },
   "start": "initial_spawn"
 }
