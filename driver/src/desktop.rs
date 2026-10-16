@@ -63,7 +63,7 @@ impl Desktop {
     pub fn start(
         server: &Server,
         binary: &Path,
-        token: String,
+        token: Option<String>,
         folder: &Path,
         recorded: bool,
         size: (u32, u32),
@@ -78,7 +78,7 @@ impl Desktop {
             game_server_url: server.http_url(),
             game_server_ws_url: server.ws_url(),
             auth: AuthMode::Fake,
-            access_token: Some(token),
+            access_token: token,
             profile_dir: folder.join("profile"),
             exit_on_stdin_eof: true,
             probe: Some(listener.local_addr().expect("a bound probe port")),

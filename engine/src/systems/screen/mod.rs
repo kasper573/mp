@@ -1,7 +1,6 @@
 pub mod area;
 pub mod connection;
 pub mod loading;
-pub mod mode;
 pub mod sign_in;
 
 use std::time::Duration;
@@ -16,9 +15,7 @@ use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
 use crate::core::net::auth::Credentials;
 use crate::core::time::{Backoff, Seconds};
-use crate::systems::account::Role;
 use crate::systems::player::{JoinRequest, session};
-use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
 
 const NOTICE_WIDTH: f32 = 320.0;
@@ -56,34 +53,27 @@ impl Retry {
 
 #[derive(States, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ClientScreen {
-    SigningIn,
     Loading,
-    ChoosingMode,
+    SigningIn,
     Connecting,
     Lost,
     Area,
 }
 
-/// Starts signed in as `credentials`, or on the sign-in screen without them.
+/// Loads the game, then joins signed in as `credentials`, or asks for a sign-in without them.
 pub struct ClientScreenPlugin {
     pub credentials: Option<Credentials>,
 }
 
 impl Plugin for ClientScreenPlugin {
     fn build(&self, app: &mut App) {
-        match &self.credentials {
-            Some(credentials) => {
-                app.insert_state(ClientScreen::Loading);
-                insert_credentials(app.world_mut(), credentials.clone());
-            }
-            None => {
-                app.insert_state(ClientScreen::SigningIn);
-            }
+        app.insert_state(ClientScreen::Loading);
+        if let Some(credentials) = &self.credentials {
+            app.insert_resource(credentials.clone());
         }
         app.add_plugins((
             sign_in::SignInPlugin,
             loading::LoadingPlugin,
-            mode::ClientModePlugin,
             connection::ConnectionPlugin,
             area::AreaPlugin,
         ))
@@ -97,10 +87,8 @@ fn drive(
     scene: Res<State<ClientScreen>>,
     mut next: ResMut<NextState<ClientScreen>>,
 ) {
-    if matches!(
-        scene.get(),
-        ClientScreen::SigningIn | ClientScreen::ChoosingMode | ClientScreen::Loading
-    ) || !matches!(*next, NextState::Unchanged)
+    if matches!(scene.get(), ClientScreen::SigningIn | ClientScreen::Loading)
+        || !matches!(*next, NextState::Unchanged)
     {
         return;
     }
@@ -119,33 +107,12 @@ fn drive(
     }
 }
 
-pub(crate) fn insert_credentials(world: &mut World, credentials: Credentials) {
-    let spectator = credentials
-        .roles
-        .iter()
-        .any(|role| role.parse() == Ok(Role::Spectate));
-    world.insert_resource(loading::AfterLoading(if spectator {
-        ClientScreen::ChoosingMode
-    } else {
-        ClientScreen::Connecting
-    }));
-    world.insert_resource(credentials);
-}
-
 fn announce(world: &mut World) {
     if world.get_resource::<Announce>().is_none() || session::my_id(world).is_none() {
         return;
     }
-    let spectate = world.resource::<Announce>().spectate;
-    info!(
-        "connection welcomed; announcing {}",
-        if spectate { "spectate" } else { "join" }
-    );
-    if spectate {
-        world.write_message(SpectateRequest::Start);
-    } else {
-        world.write_message(JoinRequest);
-    }
+    info!("connection welcomed; joining");
+    world.write_message(JoinRequest);
     world.remove_resource::<Announce>();
 }
 

@@ -4,12 +4,15 @@ use std::collections::HashMap;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use bevy_terminal::{CommandCtx, command};
 use serde::{Deserialize, Serialize};
 
 use crate::systems::account::{Identity, Role};
-use crate::systems::drain_requests;
-use crate::systems::player::{ClientId, Players, last_connection};
+use crate::systems::area::transition::{self, Departures, Traveler};
+use crate::systems::movement::Position;
+use crate::systems::player::{self, ClientId, Players, SpawnPoint, last_connection};
 use crate::systems::visibility::{self, PrivateSight};
+use crate::systems::{WorldArea, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -20,9 +23,9 @@ pub fn register(app: &mut App) {
 
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpectateRequest {
-    Start,
     Next,
     Previous,
+    Stop,
 }
 
 /// Whom a spectator watches, told whenever it changes. A spectator watches nobody only while nobody
@@ -31,6 +34,7 @@ pub enum SpectateRequest {
 pub enum Spectating {
     Nobody,
     Player(Watched),
+    Stopped,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,17 +48,67 @@ pub struct Watched {
 #[derive(Resource, Default)]
 pub struct Spectators(pub HashMap<ClientId, Spectator>);
 
-#[derive(Clone, Copy, Debug, Default)]
 pub struct Spectator {
     watching: Option<ClientId>,
     step: Option<Step>,
     told: Option<Spectating>,
+    character: Box<Traveler>,
 }
 
 impl Spectator {
     pub fn watching(&self) -> Option<ClientId> {
         self.watching
     }
+}
+
+/// Leave your character where it stands to watch the other players, until Exit on the spectator panel.
+#[command(access = may_spectate)]
+fn spectate(world: &mut World, ctx: &CommandCtx) -> Result<String, String> {
+    let client = *world
+        .get::<ClientId>(ctx.conn)
+        .ok_or("You're not connected.")?;
+    if world.resource::<Spectators>().0.contains_key(&client) {
+        return Err("You're spectating already.".to_owned());
+    }
+    let player = world
+        .resource::<Players>()
+        .0
+        .get(&client)
+        .copied()
+        .ok_or("You have no character to leave.")?;
+    if !player::may_command(world, player) {
+        return Err("Your character can't leave right now.".to_owned());
+    }
+    let zone = world.resource::<WorldArea>().0;
+    let at = world
+        .get::<Position>(player)
+        .ok_or("Your character has no place.")?
+        .pos;
+    let spawn = world
+        .get::<SpawnPoint>(player)
+        .ok_or("Your character has no place.")?
+        .0;
+    let character =
+        transition::leave(world, player, zone, at, spawn).ok_or("Your character can't leave.")?;
+    world.resource_mut::<Spectators>().0.insert(
+        client,
+        Spectator {
+            watching: None,
+            step: None,
+            told: None,
+            character: Box::new(character),
+        },
+    );
+    Ok(
+        "You're spectating. Exit on the spectator panel takes you back to your character."
+            .to_owned(),
+    )
+}
+
+fn may_spectate(world: &World, conn: Entity) -> bool {
+    world
+        .get::<Identity>(conn)
+        .is_some_and(|identity| identity.has_role(Role::Spectate))
 }
 
 pub struct SpectatorTransfer {
@@ -72,14 +126,8 @@ pub fn requests(world: &mut World) {
             continue;
         };
         let step = match request.message {
-            SpectateRequest::Start => {
-                if allowed(world, conn, client) {
-                    world
-                        .resource_mut::<Spectators>()
-                        .0
-                        .entry(client)
-                        .or_default();
-                }
+            SpectateRequest::Stop => {
+                stop(world, client);
                 continue;
             }
             SpectateRequest::Next => Step::Next,
@@ -269,10 +317,14 @@ fn announce(world: &mut World, client: ClientId, status: Spectating) {
     }
 }
 
-fn allowed(world: &World, conn: Entity, client: ClientId) -> bool {
-    let playing = world.resource::<Players>().0.contains_key(&client);
-    let entitled = world
-        .get::<Identity>(conn)
-        .is_some_and(|identity| identity.has_role(Role::Spectate));
-    !playing && entitled
+fn stop(world: &mut World, client: ClientId) {
+    let Some(spectator) = world.resource_mut::<Spectators>().0.remove(&client) else {
+        return;
+    };
+    aim(world, client, None);
+    announce(world, client, Spectating::Stopped);
+    world
+        .resource_mut::<Departures>()
+        .0
+        .push(*spectator.character);
 }

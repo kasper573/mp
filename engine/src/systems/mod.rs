@@ -156,6 +156,7 @@ pub fn server_app(
     visibility::register(&mut app);
     app.init_resource::<player::Players>()
         .init_resource::<spectate::Spectators>()
+        .init_resource::<area::transition::Departures>()
         .init_resource::<combat::RegenAt>()
         // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
         // serialization load across ticks instead of spiking every Nth tick in lockstep.

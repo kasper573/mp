@@ -12,13 +12,11 @@ use crate::core::content::sync::{
 use crate::core::content::version;
 use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
+use crate::core::net::auth::Credentials;
 use crate::core::platform::{ClientPlatform, FetchFailure, LocalFuture, Platform, StartParams};
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
 use crate::systems::install_content;
-
-#[derive(Resource)]
-pub struct AfterLoading(pub ClientScreen);
 
 pub struct LoadingPlugin;
 
@@ -140,7 +138,11 @@ fn poll(world: &mut World) {
             world.resource_mut::<Shown>().progress = syncing.status.latest();
             match install_content(world, synced) {
                 Ok(()) => {
-                    let next = world.resource::<AfterLoading>().0.clone();
+                    let next = if world.contains_resource::<Credentials>() {
+                        ClientScreen::Connecting
+                    } else {
+                        ClientScreen::SigningIn
+                    };
                     world.resource_mut::<NextState<ClientScreen>>().set(next);
                 }
                 Err(report) => fail(world, report.to_string(), now, syncing.retry),

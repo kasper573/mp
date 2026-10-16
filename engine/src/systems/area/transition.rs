@@ -42,35 +42,51 @@ pub struct Traveler {
     pub state: CharacterState,
 }
 
+#[derive(Resource, Default)]
+pub struct Departures(pub Vec<Traveler>);
+
 pub fn departing(world: &mut World) -> Vec<Traveler> {
-    let content = world.resource::<Content>().clone();
-    let ids: Vec<Entity> = world
-        .query_filtered::<Entity, With<Crossing>>()
+    let crossings: Vec<(Entity, Crossing)> = world
+        .query::<(Entity, &Crossing)>()
         .iter(world)
+        .map(|(entity, crossing)| (entity, *crossing))
         .collect();
-    let leaving: Vec<(Entity, Traveler)> = ids
+    let mut leaving: Vec<Traveler> = crossings
         .into_iter()
-        .filter_map(|entity| {
-            let crossing = *world.get::<Crossing>(entity)?;
-            let mut state = CharacterState::of(world, entity, crossing.dest)?;
-            state.memory.leave_area(&content);
-            Some((
+        .filter_map(|(entity, crossing)| {
+            leave(
+                world,
                 entity,
-                Traveler {
-                    client: world.get::<Owner>(entity)?.client,
-                    dest_area: crossing.dest_area,
-                    dest: crossing.dest,
-                    state,
-                },
-            ))
+                crossing.dest_area,
+                crossing.dest,
+                crossing.dest,
+            )
         })
         .collect();
-    for (entity, traveler) in &leaving {
-        raise_area(world, EventKind::Left, *entity);
-        world.resource_mut::<Players>().0.remove(&traveler.client);
-        world.despawn(*entity);
-    }
-    leaving.into_iter().map(|(_, traveler)| traveler).collect()
+    leaving.append(&mut world.resource_mut::<Departures>().0);
+    leaving
+}
+
+pub fn leave(
+    world: &mut World,
+    entity: Entity,
+    dest_area: AreaId,
+    dest: Pos<Tiles>,
+    spawn: Pos<Tiles>,
+) -> Option<Traveler> {
+    let content = world.resource::<Content>().clone();
+    let mut state = CharacterState::of(world, entity, spawn)?;
+    state.memory.leave_area(&content);
+    let traveler = Traveler {
+        client: world.get::<Owner>(entity)?.client,
+        dest_area,
+        dest,
+        state,
+    };
+    raise_area(world, EventKind::Left, entity);
+    world.resource_mut::<Players>().0.remove(&traveler.client);
+    world.despawn(entity);
+    Some(traveler)
 }
 
 pub fn arrive(world: &mut World, mut traveler: Traveler) -> Entity {

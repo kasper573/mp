@@ -45,9 +45,31 @@ pub struct MyClient(pub Option<ClientId>);
 #[derive(Resource, Default)]
 struct MyCharacter(Option<Entity>);
 
-/// What the server last told this client about whom it spectates; `None` until it has.
 #[derive(Resource, Default)]
 pub struct SpectateStatus(pub Option<Spectating>);
+
+impl SpectateStatus {
+    pub fn mode(&self) -> ClientMode {
+        match self.0 {
+            Some(_) => ClientMode::Spectate,
+            None => ClientMode::Play,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClientMode {
+    Play,
+    Spectate,
+}
+
+pub fn mode(world: &World) -> ClientMode {
+    world.resource::<SpectateStatus>().mode()
+}
+
+pub fn in_mode(mode: ClientMode) -> impl Fn(Res<SpectateStatus>) -> bool + Clone {
+    move |status| status.mode() == mode
+}
 
 /// The character this client sees the world through: its own, or the one it spectates. There is no
 /// other way to look at the world.
@@ -92,7 +114,7 @@ fn record_welcome(mut welcomes: MessageReader<Welcome>, mut me: ResMut<MyClient>
 
 fn record_spectating(mut told: MessageReader<Spectating>, mut status: ResMut<SpectateStatus>) {
     if let Some(&latest) = told.read().last() {
-        status.0 = Some(latest);
+        status.0 = (latest != Spectating::Stopped).then_some(latest);
     }
 }
 
@@ -100,7 +122,7 @@ fn followed_client(me: &MyClient, status: &SpectateStatus) -> Option<ClientId> {
     match status.0 {
         Some(Spectating::Player(watched)) => Some(watched.player),
         Some(Spectating::Nobody) => None,
-        None => me.0,
+        Some(Spectating::Stopped) | None => me.0,
     }
 }
 

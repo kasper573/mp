@@ -1,5 +1,6 @@
-use driver::{Player, beside_resident, content, noticed, on_quest};
+use driver::{Player, UiTarget, beside_resident, content, noticed, on_quest};
 use engine::core::math::Offset;
+use engine::systems::account::Role;
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::spectate::Spectating;
@@ -20,16 +21,18 @@ fn play(shoot: &mut Shoot) {
         "pass_holder",
         Some(beside_resident("bloomvale", "farmer_girl")),
     );
-    let spectator = shoot.join_spectator();
+    let spectator = shoot.join_with_roles(&[Role::Spectate]);
     let mut me = shoot.roll(spectator);
     let islander_name = name_of(&mut islander);
     let explorer_name = name_of(&mut explorer);
+    let left_at = me.come_to_rest();
 
-    me.caption("Spectators choose between playing and watching");
-    me.hold();
-    me.click_ui("Spectate");
+    me.caption("A player whose account may spectate types /spectate in the terminal");
+    command(&mut me, "/spectate");
     switch_to(&mut me, &islander_name);
-    me.caption("A spectator always follows a player, and sees what they see");
+    me.caption(
+        "Their character steps out of the world, and they follow a player, seeing what they see",
+    );
     islander.walk_by(Offset::new(3.0, 1.0));
     islander.walk_by(Offset::new(-2.0, 2.0));
     me.caption("That includes their conversations, read along without a way to answer");
@@ -102,6 +105,34 @@ fn play(shoot: &mut Shoot) {
     let newcomer_name = name_of(&mut newcomer);
     watching(&mut me, &newcomer_name);
     newcomer.walk_by(Offset::new(-3.0, 1.0));
+    me.caption("Exit on the spectator panel goes back to the character, where it was left");
+    me.click_ui("Exit");
+    me.wait_until("the player back on their character", |snapshot| {
+        snapshot.spectating.is_none() && snapshot.me.as_ref().is_some_and(|me| me.at == left_at)
+    });
+    me.hold();
+}
+
+// Keys typed before the field holds focus would be lost, so typing waits for the game to catch up.
+// The field keeps the keys after a line is sent, until Esc hands them back to the game.
+fn command(me: &mut Player, line: &str) {
+    me.act(InputAction::ToggleTerminal);
+    me.find_ui(UiTarget::typing_field());
+    let field = UiTarget::text_field();
+    me.type_text(line, |snapshot| {
+        field
+            .find(snapshot)
+            .is_some_and(|field| field.text.as_deref() == Some(line))
+    });
+    me.act(InputAction::SubmitText);
+    me.act(InputAction::Dismiss);
+    me.wait_until("the field to let go of the keys", |snapshot| {
+        UiTarget::typing_field().find(snapshot).is_none()
+    });
+    me.act(InputAction::ToggleTerminal);
+    me.wait_until("the terminal to close", |snapshot| {
+        UiTarget::text_field().find(snapshot).is_none()
+    });
 }
 
 fn name_of(player: &mut Player) -> String {

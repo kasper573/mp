@@ -13,9 +13,8 @@ use crate::systems::item::widget::{
     CarriedSlot, SlotAction, SlotVerdict, slot_action, slot_verdict_source,
 };
 use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session::{self, ClientMode, Viewpoint};
 use crate::systems::screen::ClientScreen;
-use crate::systems::screen::mode::ClientMode;
 
 const COUNTER_WIDTH: f32 = 620.0;
 const COUNTER_HEIGHT: f32 = 400.0;
@@ -140,7 +139,7 @@ fn shelf(world: &World) -> Option<Shelf> {
         shown,
         tab: browse.tab,
         selected: browse.selected,
-        playing: *world.resource::<ClientMode>() == ClientMode::Play,
+        playing: session::mode(world) == ClientMode::Play,
     })
 }
 
@@ -352,7 +351,7 @@ fn trade_button(ui: &mut Ui, tab: ShopTab, ware: &Ware) -> egui::Response {
 }
 
 fn trade(world: &mut World, tab: ShopTab, index: usize) {
-    if *world.resource::<ClientMode>() != ClientMode::Play {
+    if session::mode(world) != ClientMode::Play {
         return;
     }
     let index = index as u32;
@@ -494,12 +493,12 @@ fn paid(content: &Content, pays: &[ItemStack], count: u32) -> String {
 }
 
 fn selling(world: &World) -> bool {
-    *world.resource::<ClientMode>() == ClientMode::Play && view(world).is_some()
+    session::mode(world) == ClientMode::Play && view(world).is_some()
 }
 
 fn request_sale(world: &mut World, slot: u32) {
     let content = world.resource::<Content>().clone();
-    if *world.resource::<ClientMode>() != ClientMode::Play {
+    if session::mode(world) != ClientMode::Play {
         return;
     }
     let Some(shown) = view(world) else {

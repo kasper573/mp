@@ -14,9 +14,8 @@ use crate::systems::hud::{self, HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session::{self, ClientMode, Viewpoint};
 use crate::systems::screen::ClientScreen;
-use crate::systems::screen::mode::ClientMode;
 
 const SIZE: Vec2 = Vec2::new(780.0, 460.0);
 const TIME_WIDTH: f32 = 72.0;
@@ -250,7 +249,7 @@ fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {
 }
 
 fn watched_name(world: &World) -> Option<String> {
-    if *world.resource::<ClientMode>() != ClientMode::Spectate {
+    if session::mode(world) != ClientMode::Spectate {
         return None;
     }
     world

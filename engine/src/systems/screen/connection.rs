@@ -5,7 +5,6 @@ use bevy_replicon::prelude::RepliconChannels;
 use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
 
-use super::mode::ClientMode;
 use super::sign_in::SignInFailure;
 use super::{ClientScreen, Notice, Retry, notice_screen};
 use crate::core::content::sync::SyncedContent;
@@ -43,17 +42,14 @@ impl Plugin for ConnectionPlugin {
 }
 
 #[derive(Resource)]
-pub struct Announce {
-    pub spectate: bool,
-}
+pub struct Announce;
 
 #[derive(Resource)]
 pub struct PendingSession {
     task: Task<Result<String, FetchFailure>>,
-    spectate: bool,
 }
 
-pub fn open_session(world: &mut World, spectate: bool) {
+fn begin_session(world: &mut World) {
     let Some(credentials) = world.get_resource::<Credentials>().cloned() else {
         error!("no access token; cannot open a session");
         return;
@@ -71,7 +67,7 @@ pub fn open_session(world: &mut World, spectate: bool) {
         body,
     );
     let task = IoTaskPool::get().spawn_local(fetch);
-    world.insert_resource(PendingSession { task, spectate });
+    world.insert_resource(PendingSession { task });
 }
 
 pub(super) fn poll_session(world: &mut World) {
@@ -81,9 +77,7 @@ pub(super) fn poll_session(world: &mut World) {
     match block_on(future::poll_once(&mut pending.task)) {
         Some(Ok(ticket)) => {
             connect(world, ticket.trim());
-            world.insert_resource(Announce {
-                spectate: pending.spectate,
-            });
+            world.insert_resource(Announce);
         }
         Some(Err(FetchFailure::Status { status: 401, body })) => {
             info!("the server refused the sign-in: {body}");
@@ -105,11 +99,6 @@ pub(super) fn poll_session(world: &mut World) {
         Some(Err(error)) => error!("could not open a session: {error}"),
         None => world.insert_resource(pending),
     }
-}
-
-fn begin_session(world: &mut World) {
-    let spectate = *world.resource::<ClientMode>() == ClientMode::Spectate;
-    open_session(world, spectate);
 }
 
 fn connect(world: &mut World, ticket: &str) {

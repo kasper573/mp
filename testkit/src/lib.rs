@@ -13,6 +13,7 @@ use engine::core::script::Value;
 use engine::core::tiling::{TilePos, Tiles};
 use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
 use engine::systems::TICK_HZ;
+use engine::systems::account::Identity;
 use engine::systems::area::{self, Area, AreaId, AreaObject};
 use engine::systems::dialogue::{Conversation, ConversationRequest};
 use engine::systems::input::map::InputMap;
@@ -124,6 +125,16 @@ impl Sim {
 
     pub fn join(&mut self, client: u32) -> Entity {
         self.connect(client);
+        self.enter(client)
+    }
+
+    pub fn conn(&self, client: u32) -> Entity {
+        self.conns[&client]
+    }
+
+    pub fn join_identified(&mut self, client: u32, identity: Identity) -> Entity {
+        let conn = self.connect(client);
+        self.world().entity_mut(conn).insert(identity);
         self.enter(client)
     }
 

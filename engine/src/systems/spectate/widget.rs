@@ -10,8 +10,8 @@ use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::systems::actor::Name;
 use crate::systems::hud::{self, HudAudience, HudWidget};
 use crate::systems::input::map::{self, InputAction};
-use crate::systems::player::session::{SpectateStatus, Viewpoint};
-use crate::systems::screen::{ClientScreen, mode::ClientMode};
+use crate::systems::player::session::{self, ClientMode, SpectateStatus, Viewpoint};
+use crate::systems::screen::ClientScreen;
 
 const BLANK: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
 const MIN_WIDTH: f32 = 180.0;
@@ -25,14 +25,14 @@ impl Plugin for SpectatorPlugin {
             step_keys
                 .run_if(not(egui_wants_any_keyboard_input))
                 .run_if(in_state(ClientScreen::Area))
-                .run_if(resource_equals(ClientMode::Spectate)),
+                .run_if(session::in_mode(ClientMode::Spectate)),
         )
         .add_systems(
             EguiPrimaryContextPass,
             nobody_playing
                 .in_set(Band::World)
                 .run_if(in_state(ClientScreen::Area))
-                .run_if(resource_equals(ClientMode::Spectate)),
+                .run_if(session::in_mode(ClientMode::Spectate)),
         );
     }
 }
@@ -65,6 +65,13 @@ impl HudWidget for SpectatorWidget {
                 color: color::MUTED,
             };
             text::show(ui, world, &switch_hint(), look, None);
+            if ui
+                .button("Exit")
+                .on_hover_text("Back to your character")
+                .clicked()
+            {
+                world.write_message(SpectateRequest::Stop);
+            }
         });
     }
 }
@@ -90,7 +97,7 @@ fn step_keys(world: &mut World) {
 
 fn panel_text(world: &World) -> (String, String) {
     match world.resource::<SpectateStatus>().0 {
-        None => (String::new(), String::new()),
+        None | Some(Spectating::Stopped) => (String::new(), String::new()),
         Some(Spectating::Nobody) => ("Nobody is playing".to_owned(), String::new()),
         Some(Spectating::Player(watched)) => {
             let name = world

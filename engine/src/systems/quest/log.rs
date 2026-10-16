@@ -18,10 +18,9 @@ use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
 use crate::systems::item::{Inventory, ItemFlag, ItemStack};
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session::{self, ClientMode, Viewpoint};
 use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
-use crate::systems::screen::mode::ClientMode;
 
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
 const LIST_WIDTH: f32 = 250.0;
@@ -133,7 +132,7 @@ impl Page {
                 .unwrap_or_else(Inventory::empty),
             now: super::card::clock_now(world),
             selected: world.resource::<Browse>().of(tab),
-            playing: *world.resource::<ClientMode>() == ClientMode::Play,
+            playing: session::mode(world) == ClientMode::Play,
         }
     }
 

@@ -70,19 +70,24 @@ impl Playtest {
     pub fn join_as(&mut self, character: &str, start: Option<Place>) -> Player {
         let account = self.next_account();
         self.server.hand_over(&account, character, start);
-        self.enter_world(&account, SCREEN)
+        self.enter_world(&account, &[], SCREEN)
     }
 
     // A player new to the game, on a character of their own.
     pub fn join_fresh(&mut self) -> Player {
-        let account = self.next_account();
-        self.enter_world(&account, SCREEN)
+        self.join_with_roles(&[])
     }
 
-    // An account that may watch, at the choice between playing and watching.
-    pub fn join_spectator(&mut self) -> Player {
+    // A player new to the game, whose account holds `roles`.
+    pub fn join_with_roles(&mut self, roles: &[Role]) -> Player {
         let account = self.next_account();
-        self.sign_in(&account, &[Role::Spectate], SCREEN)
+        self.enter_world(&account, roles, SCREEN)
+    }
+
+    // A desktop client started without a sign-in, on the screen that asks for one.
+    pub fn start_signed_out(&mut self) -> Player {
+        let account = self.next_account();
+        self.start_client(&account, None, SCREEN)
     }
 
     // A content deploy: rows of the content change and the server restarts on them, as a deploy does,
@@ -110,19 +115,20 @@ impl Playtest {
         format!("player{}", self.joined)
     }
 
-    fn enter_world(&mut self, account: &str, screen: (u32, u32)) -> Player {
-        let mut player = self.sign_in(account, &[], screen);
+    fn enter_world(&mut self, account: &str, roles: &[Role], screen: (u32, u32)) -> Player {
+        let token = launch::fake_token(account, roles);
+        let mut player = self.start_client(account, Some(token), screen);
         player.wait_within("the player to stand in the world", JOINING, |snapshot| {
             in_world(snapshot).then_some(())
         });
         player
     }
 
-    fn sign_in(&mut self, account: &str, roles: &[Role], screen: (u32, u32)) -> Player {
+    fn start_client(&mut self, account: &str, token: Option<String>, screen: (u32, u32)) -> Player {
         let desktop = Desktop::start(
             &self.server,
             &self.client_binary,
-            launch::fake_token(account, roles),
+            token,
             &self.folder.join(account),
             self.recorded,
             screen,

@@ -10,6 +10,7 @@ mod notifications;
 mod quest_choices;
 mod quests;
 mod shops;
+mod sign_in;
 mod soundscape;
 mod spectate;
 mod townsfolk;
@@ -28,6 +29,7 @@ pub struct Chapter {
 
 // In the showcase's order.
 pub const CHAPTERS: &[Chapter] = &[
+    sign_in::CHAPTER,
     explore::CHAPTER,
     soundscape::CHAPTER,
     combat::CHAPTER,

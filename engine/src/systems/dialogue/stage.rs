@@ -28,9 +28,8 @@ use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::{ItemId, card};
 use crate::systems::npc::Npc;
 use crate::systems::player;
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session::{self, ClientMode, Viewpoint};
 use crate::systems::screen::ClientScreen;
-use crate::systems::screen::mode::ClientMode;
 
 const READ_ALONG: Duration = Duration::from_millis(1800);
 const CHOICE_SHORTCUTS: [InputAction; 9] = [
@@ -76,8 +75,8 @@ impl Plugin for StagePlugin {
                     follow_conversation,
                     stage_keys
                         .run_if(not(egui_wants_any_keyboard_input))
-                        .run_if(resource_equals(ClientMode::Play)),
-                    read_along.run_if(resource_equals(ClientMode::Spectate)),
+                        .run_if(session::in_mode(ClientMode::Play)),
+                    read_along.run_if(session::in_mode(ClientMode::Spectate)),
                     track_typing,
                 )
                     .chain()
@@ -177,7 +176,7 @@ pub fn choice_rects(world: &World) -> HashMap<usize, Rect> {
 }
 
 pub fn leavable(world: &World) -> bool {
-    *world.resource::<ClientMode>() == ClientMode::Play && world.resource::<Stage>().shown.is_some()
+    session::mode(world) == ClientMode::Play && world.resource::<Stage>().shown.is_some()
 }
 
 pub fn layer() -> egui::LayerId {
@@ -542,7 +541,7 @@ fn track_typing(world: &mut World) {
 }
 
 fn request_pick(world: &mut World, index: usize) -> bool {
-    if *world.resource::<ClientMode>() != ClientMode::Play {
+    if session::mode(world) != ClientMode::Play {
         return false;
     }
     let mut stage = world.resource_mut::<Stage>();
@@ -715,7 +714,7 @@ fn dialogue_box(ui: &mut Ui, world: &mut World, screen: Rect) -> Rect {
             BOX_PADDING.x as i8,
             BOX_PADDING.y as i8,
         ));
-    let playing = *world.resource::<ClientMode>() == ClientMode::Play;
+    let playing = session::mode(world) == ClientMode::Play;
     let held = ui.scope_builder(
         UiBuilder::new().id_salt("dialogue").sense(Sense::click()),
         |ui| {

@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::time::SystemTime;
 
 use driver::{ContentEdit, Pace, Player, Playtest, PlaytestSetup};
+use engine::systems::account::Role;
 use engine::systems::script::Place;
 
 use crate::chapters::Chapter;
@@ -58,8 +59,12 @@ impl Shoot {
         self.playtest.join_fresh()
     }
 
-    pub fn join_spectator(&mut self) -> Player {
-        self.playtest.join_spectator()
+    pub fn join_with_roles(&mut self, roles: &[Role]) -> Player {
+        self.playtest.join_with_roles(roles)
+    }
+
+    pub fn start_signed_out(&mut self) -> Player {
+        self.playtest.start_signed_out()
     }
 
     pub fn deploy(&mut self, edits: &[ContentEdit], while_down: impl FnOnce()) -> usize {

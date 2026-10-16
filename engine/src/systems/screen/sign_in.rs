@@ -5,12 +5,12 @@ use design_tokens::widgets;
 use strum::VariantArray;
 
 use super::connection::OVERLAY_BG;
-use super::{
-    ClientScreen, insert_credentials, note, pace_as_before, pace_slowly, panel, system_screen,
-};
+use super::{ClientScreen, note, pace_as_before, pace_slowly, panel, system_screen};
+use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::net::auth::Credentials;
 use crate::core::platform::{ProviderPage, SignIn, StartParams};
+use crate::systems::GameSettings;
 use crate::systems::account::Role;
 use crate::systems::launch::fake_token;
 
@@ -59,9 +59,14 @@ fn sign_in_screen(world: &mut World) {
         .get_resource::<SignInFailure>()
         .map(|failure| failure.0.clone());
     let waiting = world.get_resource::<Waiting>().map(|waiting| waiting.page);
+    let game = world
+        .resource::<Content>()
+        .built::<GameSettings>()
+        .name
+        .clone();
     let mut name = std::mem::take(&mut world.resource_mut::<AccountName>().0);
     let choice = system_screen(&gui, "sign-in", Some(OVERLAY_BG), |ui| {
-        panel(ui, "Welcome", |ui| match (&sign_in, waiting) {
+        panel(ui, &game, |ui| match (&sign_in, waiting) {
             (_, Some(page)) => browser_waits(ui, page),
             (SignIn::AnyAccount, None) => any_account(ui, &mut name, failure.as_deref()),
             (SignIn::Provider(_), None) => provider(ui, failure.as_deref()),
@@ -147,10 +152,10 @@ fn poll(world: &mut World) {
 }
 
 fn signed_in(world: &mut World, token: &str) {
-    insert_credentials(world, Credentials::from_access_token(token));
+    world.insert_resource(Credentials::from_access_token(token));
     world
         .resource_mut::<NextState<ClientScreen>>()
-        .set(ClientScreen::Loading);
+        .set(ClientScreen::Connecting);
 }
 
 fn forget(world: &mut World) {

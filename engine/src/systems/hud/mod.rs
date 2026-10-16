@@ -15,7 +15,8 @@ use crate::core::math::WindowPx;
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::input::map::{ActionInput, InputAction, InputMap};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::screen::{ClientScreen, mode::ClientMode};
+use crate::systems::player::session::{ClientMode, SpectateStatus};
+use crate::systems::screen::ClientScreen;
 use crate::systems::settings;
 use crate::systems::{equipment, history, item, player, quest, spectate, stat, terminal};
 
@@ -251,7 +252,7 @@ fn draw_hud(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let mode = *world.resource::<ClientMode>();
+    let mode = world.resource::<SpectateStatus>().mode();
     let screen = gui.content_rect();
     for (name, shown) in widgets(mode) {
         widget(world, &gui, name, shown.fallback(screen), |ui, world| {
@@ -376,8 +377,8 @@ fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {
     )
 }
 
-fn toggle_keys(input: ActionInput, mode: Res<ClientMode>, mut open: ResMut<Open>) {
-    for window in windows(*mode) {
+fn toggle_keys(input: ActionInput, status: Res<SpectateStatus>, mut open: ResMut<Open>) {
+    for window in windows(status.mode()) {
         let title = window.title();
         if input.just_pressed(window.toggle()) && !open.0.remove(title) {
             open.0.insert(title);
