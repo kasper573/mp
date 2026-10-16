@@ -25,8 +25,9 @@ use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::account::{AccountId, Identity, Role};
 use engine::systems::area::{self, AreaDef, AreaId, transition};
 use engine::systems::launch::{
-    AuthMode, BUILD_INFO_FLAG, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
-    TEST_CHARACTER_ROUTE, TestCharacterRequest, build_info_line,
+    AuthMode, BUILD_INFO_FLAG, LaunchSettings, OIDC_ENV_PREFIX, OidcConfig, ReadyLine,
+    SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch, TEST_CHARACTER_ROUTE,
+    TestCharacterRequest, build_info_line,
 };
 use engine::systems::player::snapshot::{self, CharacterSnapshot, JoinAs};
 use engine::systems::player::{ClientId, SpawnPolicy, SpawnRules};
@@ -36,7 +37,6 @@ use engine::systems::{REPLICATION_INTERVAL, TICK_HZ};
 use metrics::{counter, gauge, histogram};
 use rand::Rng as _;
 use renet2::{ConnectionConfig, DisconnectReason, RenetServer, ServerEvent};
-use serde::Deserialize;
 
 use transport::WsTransport;
 
@@ -49,9 +49,9 @@ fn main() {
         println!("{}", build_info_line());
         return;
     }
-    let config: ServerConfig = envy::prefixed(SERVER_ENV_PREFIX)
-        .from_env()
-        .expect("RIFT_GAME_SERVER_* environment");
+    let launch = LaunchSettings::of_this_binary();
+    let mut config: ServerConfig = launch.get(SERVER_ENV_PREFIX);
+    config.content_dir = launch.path(&config.content_dir);
     let _profiler = service::profiler(
         "rift-game-server",
         config.pyroscope_enabled,
@@ -94,7 +94,7 @@ fn main() {
     let http = Http {
         sessions: sessions.clone(),
         auth: match config.auth {
-            AuthMode::Oidc => Auth::Oidc(verifier()),
+            AuthMode::Oidc => Auth::Oidc(verifier(launch.get(OIDC_ENV_PREFIX))),
             AuthMode::Fake => Auth::Fake,
         },
         test_characters: match config.test_characters {
@@ -778,16 +778,7 @@ async fn health(State(http): State<Http>) -> Response {
     }
 }
 
-fn verifier() -> Arc<Mutex<auth::Verifier>> {
-    #[derive(Deserialize)]
-    struct AuthConfig {
-        issuer: String,
-        audience: String,
-        jwks_uri: String,
-    }
-    let config: AuthConfig = envy::prefixed("RIFT_AUTH_")
-        .from_env()
-        .expect("RIFT_AUTH_* environment");
+fn verifier(config: OidcConfig) -> Arc<Mutex<auth::Verifier>> {
     let mut verifier = auth::Verifier::new(&config.issuer, &config.audience, &config.jwks_uri);
     match verifier.warm() {
         Ok(()) => println!("auth enabled, issuer {}", config.issuer),

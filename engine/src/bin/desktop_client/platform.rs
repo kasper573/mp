@@ -28,22 +28,8 @@ pub struct DesktopPlatform {
 }
 
 impl DesktopPlatform {
-    pub fn new(profile: PathBuf) -> DesktopPlatform {
-        // TLS against the OS trust store, so a locally trusted CA works like any public one; a
-        // refused status is a reply to read, not a transport failure.
-        let config = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(30)))
-            .http_status_as_error(false)
-            .tls_config(
-                ureq::tls::TlsConfig::builder()
-                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .build();
-        DesktopPlatform {
-            profile,
-            agent: ureq::Agent::new_with_config(config),
-        }
+    pub fn new(profile: PathBuf, agent: ureq::Agent) -> DesktopPlatform {
+        DesktopPlatform { profile, agent }
     }
 
     fn settings(&self) -> BTreeMap<String, String> {
@@ -144,6 +130,21 @@ impl Platform for DesktopPlatform {
             "The server runs build {build}. Start a desktop client of that build to play."
         ))
     }
+}
+
+// TLS against the OS trust store, so a locally trusted CA works like any public one; a refused status
+// is a reply to read, not a transport failure.
+pub fn agent() -> ureq::Agent {
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .http_status_as_error(false)
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .build();
+    ureq::Agent::new_with_config(config)
 }
 
 // The driver asks with a line, and each line asked is answered with the snapshot of a frame after it.

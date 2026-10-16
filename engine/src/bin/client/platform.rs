@@ -6,7 +6,7 @@ use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 use engine::core::content::store::ContentStore;
 use engine::core::platform::{
-    FetchFailure, LocalFuture, Platform, ServerSocket, SocketState, StartParams,
+    FetchFailure, LocalFuture, Platform, ServerSocket, SignIn, SocketState, StartParams,
 };
 use engine::core::time::{LocalClock, Seconds, UnixMillis};
 use wasm_bindgen::JsCast;
@@ -170,9 +170,7 @@ pub fn read_start_params() -> StartParams {
             .unwrap_or_else(|| panic!("canvas needs a {name} attribute"))
     };
     StartParams {
-        access_token: canvas
-            .get_attribute("data-access-token")
-            .filter(|token| !token.is_empty()),
+        sign_in: SignIn::Token(attribute("data-access-token")),
         game_server_url: attribute("data-game-server-url"),
         game_server_ws_url: attribute("data-game-server-ws-url"),
     }

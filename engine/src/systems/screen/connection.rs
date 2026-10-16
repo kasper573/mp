@@ -6,6 +6,7 @@ use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
 
 use super::mode::ClientMode;
+use super::sign_in::SignInFailure;
 use super::{ClientScreen, Notice, Retry, notice_screen};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
@@ -83,6 +84,16 @@ pub(super) fn poll_session(world: &mut World) {
             world.insert_resource(Announce {
                 spectate: pending.spectate,
             });
+        }
+        Some(Err(FetchFailure::Status { status: 401, body })) => {
+            info!("the server refused the sign-in: {body}");
+            world.remove_resource::<Credentials>();
+            world.insert_resource(SignInFailure(
+                "The server didn't take your sign-in.".to_owned(),
+            ));
+            world
+                .resource_mut::<NextState<ClientScreen>>()
+                .set(ClientScreen::SigningIn);
         }
         // Loading again finds out what changed, and catches the client up or relaunches it.
         Some(Err(FetchFailure::Status { status: 409, body })) => {

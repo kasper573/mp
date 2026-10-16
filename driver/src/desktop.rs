@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use engine::core::math::{Pos, WindowPx};
-use engine::systems::launch::{self, CLIENT_ENV_PREFIX, ClientConfig};
+use engine::systems::launch::{self, AuthMode, CLIENT_ENV_PREFIX, ClientConfig};
 use engine::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
 use crate::content::{from_json, to_json};
@@ -77,7 +77,8 @@ impl Desktop {
         let config = ClientConfig {
             game_server_url: server.http_url(),
             game_server_ws_url: server.ws_url(),
-            access_token: token,
+            auth: AuthMode::Fake,
+            access_token: Some(token),
             profile_dir: folder.join("profile"),
             exit_on_stdin_eof: true,
             probe: Some(listener.local_addr().expect("a bound probe port")),

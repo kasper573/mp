@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -14,6 +16,8 @@ use crate::systems::script::Place;
 pub const BUILD_INFO_FLAG: &str = "--build-info";
 pub const SERVER_ENV_PREFIX: &str = "RIFT_GAME_SERVER_";
 pub const CLIENT_ENV_PREFIX: &str = "RIFT_CLIENT_";
+pub const OIDC_ENV_PREFIX: &str = "RIFT_AUTH_";
+pub const SETTINGS_FILE: &str = "rift.env";
 pub const TEST_CHARACTER_ROUTE: &str = "/test/character";
 
 /// What a server on fake auth takes as an account's sign-in.
@@ -27,6 +31,60 @@ pub fn fake_token(account: &str, roles: &[Role]) -> String {
         },
     }
     .unsigned()
+}
+
+/// What a binary starts with: its environment, over the [`SETTINGS_FILE`] beside it.
+pub struct LaunchSettings {
+    folder: PathBuf,
+    vars: BTreeMap<String, String>,
+}
+
+impl LaunchSettings {
+    pub fn of_this_binary() -> LaunchSettings {
+        let binary = std::env::current_exe().expect("the binary's own path");
+        let folder = binary.parent().expect("the binary's folder");
+        LaunchSettings::read(folder, std::env::vars())
+    }
+
+    pub fn read(
+        folder: &Path,
+        environment: impl IntoIterator<Item = (String, String)>,
+    ) -> LaunchSettings {
+        let file = folder.join(SETTINGS_FILE);
+        let mut vars = BTreeMap::new();
+        match dotenvy::from_path_iter(&file) {
+            Ok(lines) => {
+                for line in lines {
+                    let (key, value) =
+                        line.unwrap_or_else(|error| panic!("{}: {error}", file.display()));
+                    vars.insert(key, value);
+                }
+            }
+            Err(error) if error.not_found() => {}
+            Err(error) => panic!("{}: {error}", file.display()),
+        }
+        vars.extend(environment);
+        LaunchSettings {
+            folder: folder.to_path_buf(),
+            vars,
+        }
+    }
+
+    pub fn get<T: DeserializeOwned>(&self, prefix: &str) -> T {
+        envy::prefixed(prefix)
+            .from_iter(self.vars.clone())
+            .unwrap_or_else(|error| {
+                panic!(
+                    "{prefix}* settings, from the environment or {}: {error}",
+                    self.folder.join(SETTINGS_FILE).display()
+                )
+            })
+    }
+
+    /// Relative to the binary's folder, so a binary finds its files however it's started.
+    pub fn path(&self, path: &Path) -> PathBuf {
+        self.folder.join(path)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -89,6 +147,15 @@ pub enum AuthMode {
     Fake,
 }
 
+/// Where an identity provider is, for the server to verify its tokens and a client to sign in on it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OidcConfig {
+    pub issuer: String,
+    pub audience: String,
+    pub jwks_uri: String,
+    pub token_uri: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Switch {
@@ -100,7 +167,9 @@ pub enum Switch {
 pub struct ClientConfig {
     pub game_server_url: String,
     pub game_server_ws_url: String,
-    pub access_token: String,
+    pub auth: AuthMode,
+    /// Signs in as this token, without asking the player.
+    pub access_token: Option<String>,
     pub profile_dir: PathBuf,
     pub exit_on_stdin_eof: bool,
     pub probe: Option<SocketAddr>,

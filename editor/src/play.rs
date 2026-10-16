@@ -890,7 +890,8 @@ fn spawn_client(
     let config = ClientConfig {
         game_server_url: format!("http://{LOCALHOST}:{}", ports.http),
         game_server_ws_url: format!("ws://{LOCALHOST}:{}", ports.ws),
-        access_token: fake_token(character, &[]),
+        auth: launch::AuthMode::Fake,
+        access_token: Some(fake_token(character, &[])),
         profile_dir: profile,
         exit_on_stdin_eof: true,
         probe: None,

@@ -35,6 +35,49 @@ archive out="target/archive":
     cp target/release/{editor,game-server,desktop-client}{{ if os_family() == "windows" { ".exe" } else { "" } }} {{quote(out)}}
     cp -r example_game {{quote(out / "content")}}
 
+# The archive's pieces as separate downloads: the editor, game server and desktop client, stripped of
+# the symbol tables a profiler reads, the example game's content folder as rift-example-game.zip, and
+# the rift.env that sets the server and client up to play on DOMAIN.
+release-files domain out="target/release-files": (archive "target/archive")
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -n {{quote(domain)}} ] || { echo "release-files: no domain" >&2; exit 1; }
+    rm -rf {{quote(out)}} && mkdir -p {{quote(out)}}
+    out=$(cd {{quote(out)}} && pwd)
+    cd target/archive
+    cp editor* game-server* desktop-client* "$out"
+    {{ if os_family() == "windows" { "" } else { 'strip "$out/editor" "$out/game-server" "$out/desktop-client"' } }}
+    {{ if os_family() == "windows" { '7z a -tzip -bso0 -bsp0 "$(cygpath -w "$out/rift-example-game.zip")" content' } else { 'zip -qr "$out/rift-example-game.zip" content' } }}
+    cat > "$out/rift.env" <<'EOF'
+    # Read by desktop-client and game-server in this folder, set up to play on {{domain}}.
+    # Every line is explained at https://{{domain}}/downloads#rift-env
+
+    RIFT_CLIENT_GAME_SERVER_URL=https://game-server.{{domain}}
+    RIFT_CLIENT_GAME_SERVER_WS_URL=wss://game-server.{{domain}}
+    RIFT_CLIENT_AUTH=oidc
+    RIFT_CLIENT_PROFILE_DIR=profile
+    RIFT_CLIENT_EXIT_ON_STDIN_EOF=false
+
+    RIFT_AUTH_ISSUER=https://auth.{{domain}}/realms/rift
+    RIFT_AUTH_AUDIENCE=rift
+    RIFT_AUTH_JWKS_URI=https://auth.{{domain}}/realms/rift/protocol/openid-connect/certs
+    RIFT_AUTH_TOKEN_URI=https://auth.{{domain}}/realms/rift/protocol/openid-connect/token
+
+    RIFT_GAME_SERVER_BIND=0.0.0.0
+    RIFT_GAME_SERVER_PORT=9998
+    RIFT_GAME_SERVER_WS_PORT=9999
+    RIFT_GAME_SERVER_MAX_CLIENTS=8192
+    RIFT_GAME_SERVER_CONTENT_DIR=content
+    RIFT_GAME_SERVER_PLAYER_SPAWN_TYPE=map
+    RIFT_GAME_SERVER_PLAYER_IMMORTAL=false
+    RIFT_GAME_SERVER_DAILY_RESET_UTC_HOUR=4
+    RIFT_GAME_SERVER_AUTH=oidc
+    RIFT_GAME_SERVER_TEST_CHARACTERS=off
+    RIFT_GAME_SERVER_EXIT_ON_STDIN_EOF=false
+    RIFT_GAME_SERVER_PYROSCOPE_ENABLED=false
+    RIFT_GAME_SERVER_PYROSCOPE_SAMPLE_HZ=99
+    EOF
+
 # The local stack, with its observability services.
 stack: build wasm (up "--profile dev")
 

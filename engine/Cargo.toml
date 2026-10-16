@@ -112,6 +112,8 @@ bevy_replicon_renet2.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error = "0.1"
+envy.workspace = true
+dotenvy = "0.15"
 jsonc-parser = "0.34"
 blake3 = "1"
 schemars = "1"
@@ -146,7 +148,9 @@ bevy = { workspace = true, features = ["x11", "multi_threaded"] }
 axum.workspace = true
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 ctrlc.workspace = true
-envy.workspace = true
+oauth2 = { version = "5", default-features = false }
+opener = "0.9"
+tiny_http = "0.12"
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 metrics = "0.24"
 rand = "0.10"

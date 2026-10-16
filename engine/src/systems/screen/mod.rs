@@ -2,15 +2,21 @@ pub mod area;
 pub mod connection;
 pub mod loading;
 pub mod mode;
+pub mod sign_in;
+
+use std::time::Duration;
 
 use bevy::prelude::*;
+use bevy::winit::{UpdateMode, WinitSettings};
 use design_tokens::{TextRole, color};
 use egui::{RichText, TextStyle, Ui};
 use renet2::RenetClient;
 
 use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
+use crate::core::net::auth::Credentials;
 use crate::core::time::{Backoff, Seconds};
+use crate::systems::account::Role;
 use crate::systems::player::{JoinRequest, session};
 use crate::systems::spectate::SpectateRequest;
 use connection::{Announce, PendingSession};
@@ -48,9 +54,9 @@ impl Retry {
     }
 }
 
-#[derive(States, Default, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(States, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ClientScreen {
-    #[default]
+    SigningIn,
     Loading,
     ChoosingMode,
     Connecting,
@@ -58,25 +64,30 @@ pub enum ClientScreen {
     Area,
 }
 
+/// Starts signed in as `credentials`, or on the sign-in screen without them.
 pub struct ClientScreenPlugin {
-    pub spectator: bool,
+    pub credentials: Option<Credentials>,
 }
 
 impl Plugin for ClientScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.init_state::<ClientScreen>()
-            .insert_resource(loading::AfterLoading(if self.spectator {
-                ClientScreen::ChoosingMode
-            } else {
-                ClientScreen::Connecting
-            }))
-            .add_plugins((
-                loading::LoadingPlugin,
-                mode::ClientModePlugin,
-                connection::ConnectionPlugin,
-                area::AreaPlugin,
-            ))
-            .add_systems(Update, (connection::poll_session, drive, announce).chain());
+        match &self.credentials {
+            Some(credentials) => {
+                app.insert_state(ClientScreen::Loading);
+                insert_credentials(app.world_mut(), credentials.clone());
+            }
+            None => {
+                app.insert_state(ClientScreen::SigningIn);
+            }
+        }
+        app.add_plugins((
+            sign_in::SignInPlugin,
+            loading::LoadingPlugin,
+            mode::ClientModePlugin,
+            connection::ConnectionPlugin,
+            area::AreaPlugin,
+        ))
+        .add_systems(Update, (connection::poll_session, drive, announce).chain());
     }
 }
 
@@ -88,7 +99,7 @@ fn drive(
 ) {
     if matches!(
         scene.get(),
-        ClientScreen::ChoosingMode | ClientScreen::Loading
+        ClientScreen::SigningIn | ClientScreen::ChoosingMode | ClientScreen::Loading
     ) || !matches!(*next, NextState::Unchanged)
     {
         return;
@@ -106,6 +117,19 @@ fn drive(
     if *scene.get() != target {
         next.set(target);
     }
+}
+
+pub(crate) fn insert_credentials(world: &mut World, credentials: Credentials) {
+    let spectator = credentials
+        .roles
+        .iter()
+        .any(|role| role.parse() == Ok(Role::Spectate));
+    world.insert_resource(loading::AfterLoading(if spectator {
+        ClientScreen::ChoosingMode
+    } else {
+        ClientScreen::Connecting
+    }));
+    world.insert_resource(credentials);
 }
 
 fn announce(world: &mut World) {
@@ -178,7 +202,8 @@ pub(crate) fn system_screen<R>(
     shown
 }
 
-fn notice_panel(ui: &mut Ui, notice: Notice) -> bool {
+/// The panel every screen between screens speaks in, under its `title`.
+pub(crate) fn panel<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
     egui::Frame::popup(ui.style())
         .inner_margin(egui::Margin::symmetric(24, 18))
         .show(ui, |ui| {
@@ -186,24 +211,56 @@ fn notice_panel(ui: &mut Ui, notice: Notice) -> bool {
             ui.set_min_height(notice_height(ui));
             ui.vertical_centered(|ui| {
                 ui.spacing_mut().item_spacing.y = LINE_GAP;
-                ui.heading(notice.title);
-                for line in notice.lines {
-                    ui.label(line);
-                }
-                for note in notice.notes {
-                    ui.label(
-                        RichText::new(note)
-                            .size(TextRole::Small.size())
-                            .color(color::MUTED),
-                    );
-                }
-                notice
-                    .action
-                    .is_some_and(|action| ui.button(action).clicked())
+                ui.heading(title);
+                add(ui)
             })
             .inner
         })
         .inner
+}
+
+pub(crate) fn note(ui: &mut Ui, text: &str) {
+    ui.label(
+        RichText::new(text)
+            .size(TextRole::Small.size())
+            .color(color::MUTED),
+    );
+}
+
+/// A screen that waits needs only a few frames a second, and every frame beyond those is time the
+/// work it waits on can't have.
+fn pace_slowly(world: &mut World) {
+    let before = world.resource::<WinitSettings>().clone();
+    world.insert_resource(PacedFrom(before));
+    world.insert_resource(WinitSettings {
+        focused_mode: UpdateMode::reactive_low_power(WAITING_FRAME),
+        unfocused_mode: UpdateMode::reactive_low_power(WAITING_FRAME),
+    });
+}
+
+fn pace_as_before(world: &mut World) {
+    if let Some(PacedFrom(before)) = world.remove_resource::<PacedFrom>() {
+        world.insert_resource(before);
+    }
+}
+
+#[derive(Resource)]
+struct PacedFrom(WinitSettings);
+
+const WAITING_FRAME: Duration = Duration::from_millis(100);
+
+fn notice_panel(ui: &mut Ui, notice: Notice) -> bool {
+    panel(ui, notice.title, |ui| {
+        for line in notice.lines {
+            ui.label(line);
+        }
+        for text in notice.notes {
+            note(ui, text);
+        }
+        notice
+            .action
+            .is_some_and(|action| ui.button(action).clicked())
+    })
 }
 
 fn notice_height(ui: &Ui) -> f32 {

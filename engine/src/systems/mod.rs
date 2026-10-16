@@ -49,7 +49,7 @@ use crate::core::content::{
     Content, ContentFolder, ContentProblem, ContentRegistry, ContentVersion, GAME_FILE, LoadReport,
     Loading, Settings,
 };
-use crate::core::platform::{ClientPlatform, Platform, StartParams};
+use crate::core::platform::{ClientPlatform, Platform, SignIn, StartParams};
 use crate::core::time::{Hertz, Seconds, WallClock};
 use crate::systems::area::AreaId;
 use crate::systems::player::PlayerDefId;
@@ -284,16 +284,12 @@ pub fn client_app(
 ) -> App {
     use bevy::prelude::*;
 
-    let credentials = params
-        .access_token
-        .as_deref()
-        .map(crate::core::net::auth::Credentials::from_access_token);
-    let spectator = credentials.as_ref().is_some_and(|credentials| {
-        credentials
-            .roles
-            .iter()
-            .any(|role| role.parse() == Ok(account::Role::Spectate))
-    });
+    let credentials = match &params.sign_in {
+        SignIn::Token(token) => Some(crate::core::net::auth::Credentials::from_access_token(
+            token,
+        )),
+        SignIn::AnyAccount | SignIn::Provider(_) => None,
+    };
 
     let mut app = App::new();
     let files = SyncedFiles::default();
@@ -324,9 +320,6 @@ pub fn client_app(
     app.world_mut()
         .resource_mut::<Time<Virtual>>()
         .set_max_delta(std::time::Duration::MAX);
-    if let Some(credentials) = credentials {
-        app.insert_resource(credentials);
-    }
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
@@ -342,7 +335,7 @@ pub fn client_app(
             crate::core::babble::BabblePlugin,
         ))
         .add_plugins((
-            screen::ClientScreenPlugin { spectator },
+            screen::ClientScreenPlugin { credentials },
             actor::render::ActorPlugin,
             actor::plate::PlatePlugin,
             movement::MovementPlugin,

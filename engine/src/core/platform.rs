@@ -12,9 +12,30 @@ pub type LocalFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 #[derive(Resource)]
 pub struct StartParams {
-    pub access_token: Option<String>,
+    pub sign_in: SignIn,
     pub game_server_url: String,
     pub game_server_ws_url: String,
+}
+
+#[derive(Clone)]
+pub enum SignIn {
+    /// Signed in before the client started, as this access token.
+    Token(String),
+    /// Signs in as any account name the player gives, as a server on fake auth takes it.
+    AnyAccount,
+    Provider(Arc<dyn IdentityProvider>),
+}
+
+/// Signs players in on the identity provider's own pages.
+pub trait IdentityProvider: Send + Sync + 'static {
+    /// Resolves to the player's access token once they're through the `page`. Dropping it gives up.
+    fn sign_in(&self, page: ProviderPage) -> LocalFuture<Result<String, String>>;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProviderPage {
+    SignIn,
+    CreateAccount,
 }
 
 /// Carries opaque renet packets with no netcode layer, so frames are buffered and drained each tick.

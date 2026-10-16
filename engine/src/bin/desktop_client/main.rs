@@ -1,12 +1,16 @@
 mod platform;
+mod sign_in;
 mod store;
 
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use bevy::window::{PresentMode, Window};
-use engine::core::platform::{StartParams, exit_when_stdin_closes};
-use engine::systems::launch::{BUILD_INFO_FLAG, CLIENT_ENV_PREFIX, ClientConfig, build_info_line};
+use engine::core::platform::{SignIn, StartParams, exit_when_stdin_closes};
+use engine::systems::launch::{
+    AuthMode, BUILD_INFO_FLAG, CLIENT_ENV_PREFIX, ClientConfig, LaunchSettings, OIDC_ENV_PREFIX,
+    build_info_line,
+};
 use engine::systems::{client_app, probe};
 
 fn main() {
@@ -14,19 +18,30 @@ fn main() {
         println!("{}", build_info_line());
         return;
     }
-    let config: ClientConfig = envy::prefixed(CLIENT_ENV_PREFIX)
-        .from_env()
-        .expect("RIFT_CLIENT_* environment");
+    let settings = LaunchSettings::of_this_binary();
+    let config: ClientConfig = settings.get(CLIENT_ENV_PREFIX);
     if config.exit_on_stdin_eof {
         exit_when_stdin_closes();
     }
+    let agent = platform::agent();
+    let sign_in = match (config.access_token, config.auth) {
+        (Some(token), _) => SignIn::Token(token),
+        (None, AuthMode::Fake) => SignIn::AnyAccount,
+        (None, AuthMode::Oidc) => SignIn::Provider(Arc::new(sign_in::BrowserSignIn::new(
+            settings.get(OIDC_ENV_PREFIX),
+            agent.clone(),
+        ))),
+    };
     let params = StartParams {
-        access_token: Some(config.access_token),
+        sign_in,
         game_server_url: config.game_server_url,
         game_server_ws_url: config.game_server_ws_url,
     };
     let mut app = client_app(
-        Arc::new(platform::DesktopPlatform::new(config.profile_dir)),
+        Arc::new(platform::DesktopPlatform::new(
+            settings.path(&config.profile_dir),
+            agent,
+        )),
         params,
         window(),
     );

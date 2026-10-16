@@ -1,12 +1,10 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
-use bevy::winit::{UpdateMode, WinitSettings};
 use bevy_egui::EguiPrimaryContextPass;
 
-use super::{ClientScreen, Notice, Retry, notice_screen};
+use super::{ClientScreen, Notice, Retry, notice_screen, pace_as_before, pace_slowly};
 use crate::core::content::sync::{
     ContentSource, Counted, SyncError, SyncPhase, SyncPolicy, SyncProgress, SyncStatus,
     SyncedContent, sync,
@@ -83,30 +81,16 @@ impl ContentSource for ServerContent {
     }
 }
 
-// The card only needs a few frames a second, and every frame a software renderer draws is main-thread
-// time the download's fetches and cache writes can't have.
-const CARD_FRAME: Duration = Duration::from_millis(100);
-
-#[derive(Resource)]
-struct PacingBeforeLoading(WinitSettings);
-
 fn begin(world: &mut World) {
     world.remove_resource::<LoadingFailure>();
-    let before = world.resource::<WinitSettings>().clone();
-    world.insert_resource(PacingBeforeLoading(before));
-    world.insert_resource(WinitSettings {
-        focused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
-        unfocused_mode: UpdateMode::reactive_low_power(CARD_FRAME),
-    });
+    pace_slowly(world);
     start(world, Retry::default());
 }
 
 fn forget(world: &mut World) {
     world.remove_resource::<Syncing>();
     world.remove_resource::<LoadingFailure>();
-    if let Some(PacingBeforeLoading(before)) = world.remove_resource::<PacingBeforeLoading>() {
-        world.insert_resource(before);
-    }
+    pace_as_before(world);
     *world.resource_mut::<Shown>() = Shown::default();
 }
 

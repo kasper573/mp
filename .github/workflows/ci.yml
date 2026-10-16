@@ -20,7 +20,7 @@ env:
   CARGO_INCREMENTAL: "0"
 
 # Every push runs lint, test, e2e and the per-platform archive side by side, each on a runner of its
-# own; main deploys once lint, test and e2e pass.
+# own; main deploys once lint, test and e2e pass, and releases the downloads once the archive does too.
 jobs:
   lint:
     runs-on: ubuntu-24.04
@@ -259,15 +259,17 @@ jobs:
           echo "🚨 Deployment failed — see deploy-failure-logs artifact for details."
           exit 1
 
-  # The archive a release ships, per platform from the same commit: editor, game-server,
-  # desktop-client and the example content (`just archive`). Every push builds it, so a change that
-  # breaks a platform fails on its branch; main's runs carry it as an artifact.
+  # The downloads a release ships, per platform from the same commit: editor, game-server,
+  # desktop-client, the example content and the rift.env that plays on production, each its own file
+  # (`just release-files`). Every push builds them, so a change that breaks a platform fails on its
+  # branch; main's runs hand them on to the release. Linux builds on the oldest supported runner, as
+  # a binary needs at least the glibc it was linked against.
   archive:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-26.04
+          - os: ubuntu-24.04
             platform: linux-x86_64
           - os: windows-2022
             platform: windows-x86_64
@@ -281,11 +283,48 @@ jobs:
         with:
           cache: archive-${{ matrix.platform }}
           recipes: archive
-      - name: Build the archive
+      - name: Build the downloads
         shell: bash
-        run: just archive target/archive
+        run: just release-files "${{ vars.RIFT_DOMAIN }}" target/release-files
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ github.ref == 'refs/heads/main' }}
         with:
-          name: rift-${{ matrix.platform }}-${{ github.sha }}
-          path: target/archive/
+          name: release-files-${{ matrix.platform }}
+          path: target/release-files/
+          compression-level: 0
+
+  # main's downloads, one release per platform, tagged with the platform's name, which the website's
+  # downloads page links to by file name. Each is drafted with every file before it replaces the last,
+  # so a release is always a whole set from one commit, and each editor finds the binaries of its own
+  # build beside it.
+  release:
+    needs: [lint, test, e2e, archive]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-files-*
+          path: release-files
+      - name: Publish the releases
+        run: |
+          for files in release-files/release-files-*; do
+            platform=${files#release-files/release-files-}
+            draft="$platform-${GITHUB_SHA::8}"
+            gh release list --limit 100 --json tagName,isDraft \
+              --jq ".[] | select(.isDraft and (.tagName | startswith(\"$platform-\"))) | .tagName" \
+              | xargs -r -n1 gh release delete --yes
+            gh release create "$draft" "$files"/* --draft --target "$GITHUB_SHA" \
+              --title "Rift for $platform" \
+              --notes "The editor, game server, desktop client, example game and rift.env for $platform, built from $GITHUB_SHA."
+            if gh release view "$platform" > /dev/null 2>&1; then
+              gh release delete "$platform" --cleanup-tag --yes
+            fi
+            gh release edit "$draft" --tag "$platform" --draft=false --latest=false
+          done
