@@ -10,6 +10,7 @@ use engine::systems::npc::NpcDef;
 use engine::systems::quest::QuestDef;
 use engine::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
 use engine::systems::shop::ShopDef;
+use engine::systems::skill::SkillDef;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};
@@ -152,6 +153,7 @@ fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
         OwnerKind::Item => content.by_key::<ItemDef>(key)?.raw(),
         OwnerKind::Quest => content.by_key::<QuestDef>(key)?.raw(),
         OwnerKind::Shop => content.by_key::<ShopDef>(key)?.raw(),
+        OwnerKind::Skill => content.by_key::<SkillDef>(key)?.raw(),
         OwnerKind::Area | OwnerKind::Object => content.by_key::<AreaDef>(key)?.raw(),
         OwnerKind::Blueprint => content.by_key::<BlueprintDef>(key)?.raw(),
         OwnerKind::Any => return None,
@@ -490,7 +492,10 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
         Reach::Heals => Some("heals".to_owned()),
         Reach::Buffs => Some("buffs".to_owned()),
         Reach::GrantsXp => Some("grants xp".to_owned()),
-        Reach::SetsJob(job) => Some(format!("sets job {}", job.key(content))),
+        Reach::Casts(skill) => Some(format!("casts {}", skill.key(content))),
+        Reach::ResetsSkills => Some("resets skills".to_owned()),
+        Reach::Animates => Some("plays an action".to_owned()),
+        Reach::ShowsVfx => Some("shows vfx".to_owned()),
         Reach::Plays(sfx) => Some(format!("plays {}", sfx.key(content))),
         Reach::Says => Some("says a chat line".to_owned()),
         _ => None,
@@ -624,7 +629,10 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
         Reach::Heals => "heals".to_owned(),
         Reach::Buffs => "buffs".to_owned(),
         Reach::GrantsXp => "grants xp".to_owned(),
-        Reach::SetsJob(job) => format!("sets job {}", job.key(content)),
+        Reach::Casts(skill) => format!("casts {}", skill.key(content)),
+        Reach::ResetsSkills => "resets skills".to_owned(),
+        Reach::Animates => "plays an action".to_owned(),
+        Reach::ShowsVfx => "shows vfx".to_owned(),
         Reach::Notifies(notification) => format!("notifies {}", notification.key(content)),
         Reach::Says => "says".to_owned(),
         Reach::Plays(sfx) => format!("plays {}", sfx.key(content)),

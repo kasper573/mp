@@ -238,7 +238,7 @@ impl NodeEntry {
             "area" => "object",
             "npc body" | "notification" | "chat" => "npc",
             "audio" => "sfx",
-            "stat" | "job" => "respawn",
+            "stat" | "class" => "respawn",
             other => other,
         }
     }
@@ -954,7 +954,7 @@ impl NodeReads {
     }
 }
 
-const EFFECT_BLURBS: [(&str, &str, &str); 35] = [
+const EFFECT_BLURBS: [(&str, &str, &str); 34] = [
     (
         "warp",
         "area",
@@ -988,8 +988,7 @@ const EFFECT_BLURBS: [(&str, &str, &str); 35] = [
         "Removes ground items in range",
     ),
     ("move_items", "item", "Moves items from one bag to another"),
-    ("grant_xp", "job", "Grants experience as kills do"),
-    ("set_job", "job", "Sets the job"),
+    ("grant_xp", "class", "Grants experience as kills do"),
     ("remember", "memory", "Sets a memory, timed now"),
     ("forget", "memory", "Sets memories back to zero"),
     ("offer_quest", "quest", "Shows the offer card and pauses"),

@@ -1,0 +1,50 @@
+{
+  "name": "War Cry",
+  "icon": "icons/weapon_and_tool/torch.png",
+  "sfx": "rising_chime",
+  "target": "area_ally",
+  "range": 4.0,
+  "area": {
+    "type": "circle",
+    "radius": 4.0
+  },
+  "cooldown": 45.0,
+  "levels": [
+    {
+      "cost": 2,
+      "stats": {
+        "power": 0.3,
+        "duration": 8.0
+      }
+    }
+  ],
+  "modules": [
+    {
+      "type": "inline_script",
+      "nodes": {
+        "roar": {
+          "type": "buff",
+          "who": {
+            "type": "skill_targets"
+          },
+          "stat": "attack_speed",
+          "by": {
+            "type": "skill_stat",
+            "skill": "warcry",
+            "stat": "power"
+          },
+          "seconds": {
+            "type": "skill_stat",
+            "skill": "warcry",
+            "stat": "duration"
+          }
+        },
+        "used": {
+          "type": "on",
+          "event": "used",
+          "next": "roar"
+        }
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@ pub mod area;
 pub mod attention;
 pub mod belongings;
 pub mod chat;
+pub mod class;
 pub mod combat;
 pub mod dialogue;
 pub mod effect;
@@ -15,7 +16,6 @@ pub mod input;
 pub mod interact;
 pub mod interface;
 pub mod item;
-pub mod job;
 pub mod launch;
 pub mod memory;
 pub mod movement;
@@ -30,6 +30,7 @@ pub mod screen;
 pub mod script;
 pub mod settings;
 pub mod shop;
+pub mod skill;
 pub mod spectate;
 pub mod stat;
 pub mod terminal;
@@ -79,7 +80,8 @@ pub fn protocol(app: &mut App) {
     equipment::register(app);
     history::register(app);
     item::register(app);
-    job::register(app);
+    class::register(app);
+    skill::register(app);
     movement::register(app);
     interact::register(app);
     npc::register(app);
@@ -442,7 +444,7 @@ pub fn registry() -> ContentRegistry {
         .row::<interface::InterfaceIconDef>()
         .row::<item::ItemDef>()
         .modules::<item::ItemDef>()
-        .row::<job::JobDef>()
+        .row::<class::ClassDef>()
         .row::<memory::MemoryDef>()
         .row::<notification::NotificationDef>()
         .row::<npc::NpcDef>()
@@ -455,6 +457,8 @@ pub fn registry() -> ContentRegistry {
         .row::<script::ScriptDef>()
         .row::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
+        .row::<skill::SkillDef>()
+        .modules::<skill::SkillDef>()
         .list_kind("modules", "unknown module type", "a module type")
         .fixture::<input::map::InputAction>()
         .fixture::<attention::AttentionMark>()
@@ -474,6 +478,8 @@ pub fn registry() -> ContentRegistry {
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)
+        .hook(LoadStep::Across, class::check_all)
+        .hook(LoadStep::Across, skill::check_all)
         .hook(LoadStep::Across, player::snapshot::check_all)
         .hook(LoadStep::Settings, check_settings);
     registry

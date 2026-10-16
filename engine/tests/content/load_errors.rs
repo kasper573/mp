@@ -19,7 +19,7 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
             .to_string(),
     );
     folder.remove("tables/input/interact.json");
-    folder.write("tables/job/apprentice.json", "{ \"name\": 3 }");
+    folder.write("tables/class/apprentice.json", "{ \"name\": 3 }");
     folder.write(
         "tables/area/cove.json",
         &serde_json::to_string_pretty(&json!({
@@ -47,7 +47,7 @@ fn every_rule_names_its_file_line_pointer_and_nearest_value() {
         "tables/test_character/lost.json",
         &serde_json::to_string_pretty(&json!({
             "name": "Lost",
-            "job": "adventurer",
+            "class": "adventurer",
             "known_areas": ["cove"],
             "start": { "area": "start", "x": 40.0, "y": 40.0 }
         }))

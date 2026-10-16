@@ -15,7 +15,10 @@
         "type": "level"
       },
       "b": 3
-    }
+    },
+    "grants": [
+      "slash"
+    ]
   },
   "modules": [
     {

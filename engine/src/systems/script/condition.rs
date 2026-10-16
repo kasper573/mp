@@ -135,7 +135,12 @@ pub fn describe(content: &Content, condition: &Condition) -> String {
 fn describe_query(content: &Content, query: &RiftQuery) -> String {
     match query {
         RiftQuery::Level { .. } => "Level".to_owned(),
-        RiftQuery::IsJob { job, .. } => job.get(content).name.to_owned(),
+        RiftQuery::IsClass { class, .. } => format!("a {}", class.get(content).name),
+        RiftQuery::SkillRank { skill, .. } => format!("{} rank", skill.get(content).name),
+        RiftQuery::SkillStat { skill, stat, .. } => {
+            format!("{} {}", skill.get(content).name, stat.label())
+        }
+        RiftQuery::SpentSkillPoints { .. } => "skill points spent".to_owned(),
         RiftQuery::Stat { stat, .. } => stat_label(*stat).to_owned(),
         RiftQuery::Buffed { stat, .. } => format!("{} buffed", stat_label(*stat)),
         RiftQuery::Holding { item, .. } => item.get(content).name.to_owned(),
@@ -164,6 +169,9 @@ fn describe_query(content: &Content, query: &RiftQuery) -> String {
         RiftQuery::Walking { .. } => "walking".to_owned(),
         RiftQuery::Hostile { .. } => "hostile".to_owned(),
         RiftQuery::GroundItems { item, .. } => format!("{} on the ground", item.get(content).name),
+        RiftQuery::SkillTargets => "the skill's targets".to_owned(),
+        RiftQuery::SkillArea => "the skill's area".to_owned(),
+        RiftQuery::AimedPoint => "the aimed point".to_owned(),
     }
 }
 

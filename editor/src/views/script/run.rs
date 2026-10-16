@@ -15,10 +15,10 @@ use engine::core::tiling::Tiles;
 use engine::core::time::{UnixMillis, UtcHour, WallClock};
 use engine::systems::actor::Name;
 use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
+use engine::systems::class::{self, Class, ClassDef, ClassId};
 use engine::systems::dialogue::{self, Conversation, ConversationRequest};
 use engine::systems::input::map::InputMap;
 use engine::systems::item::{Inventory, ItemDef, ItemStack};
-use engine::systems::job::{self, Job, JobDef, JobId};
 use engine::systems::memory::{Memory, MemoryDef};
 use engine::systems::notification::NotificationSent;
 use engine::systems::npc::{Npc, NpcId};
@@ -652,14 +652,16 @@ fn character_card(
         .get::<Name>(subject)
         .map(|n| n.name.clone())
         .unwrap_or_else(|| "character".to_owned());
-    let job = run.world().get::<Job>(subject).map(|job| job.def);
-    let level = job::level(run.world(), subject);
-    let jobs: Vec<(JobId, String)> = content
-        .table::<JobDef>()
+    let class = run.world().get::<Class>(subject).map(|class| class.def);
+    let level = class::level(run.world(), subject);
+    let classes: Vec<(ClassId, String)> = content
+        .table::<ClassDef>()
         .ids()
         .map(|id| (id, id.key(content).to_owned()))
         .collect();
-    let tiers = job.map(|job| job.get(content).levels.len()).unwrap_or(0);
+    let tiers = class
+        .map(|class| class.get(content).levels.len())
+        .unwrap_or(0);
     let area_key = run.area.key(content).to_owned();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
@@ -675,30 +677,30 @@ fn character_card(
                     }
                 });
             if picked != level {
-                let xp = job
-                    .and_then(|job| job.get(content).levels.get(picked as usize - 1))
+                let xp = class
+                    .and_then(|class| class.get(content).levels.get(picked as usize - 1))
                     .map_or(0, |tier| tier.xp);
                 if let Some(mut held) = run.world_mut().get_mut::<Xp>(subject) {
                     held.amount = xp;
                 }
             }
         });
-        widgets::kv(ui, "job", |ui| {
-            let current = job
-                .map(|job| job.key(content).to_owned())
+        widgets::kv(ui, "class", |ui| {
+            let current = class
+                .map(|class| class.key(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
-            let mut picked = job;
-            widgets::combo_box("run-job")
+            let mut picked = class;
+            widgets::combo_box("run-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current))
                 .show_ui(ui, |ui| {
-                    for (id, key) in &jobs {
+                    for (id, key) in &classes {
                         ui.selectable_value(&mut picked, Some(*id), key);
                     }
                 });
-            if picked != job
+            if picked != class
                 && let (Some(def), Some(mut held)) =
-                    (picked, run.world_mut().get_mut::<Job>(subject))
+                    (picked, run.world_mut().get_mut::<Class>(subject))
             {
                 held.def = def;
             }
@@ -1204,11 +1206,12 @@ fn snapshot_for(
     files: &ProjectFiles,
 ) -> Result<CharacterSnapshot, String> {
     let Some(key) = key else {
-        let job = content
-            .ids::<JobDef>()
-            .next()
-            .ok_or("no job row for a fresh character")?;
-        return Ok(CharacterSnapshot::fresh("Tester", job));
+        let settings = content.built::<GameSettings>();
+        return Ok(CharacterSnapshot::fresh(
+            content,
+            "Tester",
+            settings.player.get(content),
+        ));
     };
     let json = files
         .json_owned(&row_file("test_character", key))

@@ -6,7 +6,7 @@ use strum::VariantArray;
 use crate::forms::{self, FormChange, FormCx};
 use crate::ui::{theme, widgets};
 
-pub const TABLE: &str = "job";
+pub const TABLE: &str = "class";
 
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
@@ -36,7 +36,7 @@ pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             .last()
             .and_then(|level| level["xp"].as_u64())
             .map_or(0, |xp| xp + 100);
-        levels.push(serde_json::json!({ "xp": xp, "stats": {} }));
+        levels.push(serde_json::json!({ "xp": xp, "stats": {}, "skill_points": 1 }));
         changed = FormChange::at("/levels");
     }
     changed
@@ -83,20 +83,19 @@ fn level_card(
                 true,
             );
         });
-        field_row(ui, "chasing", |ui| {
-            let mut on = level["chasing"].as_bool().unwrap_or(false);
-            if ui
-                .checkbox(&mut on, "")
-                .on_hover_text("From this level the character chases what it attacks")
-                .changed()
-            {
-                if on {
-                    level["chasing"] = Value::Bool(true);
-                } else if let Some(fields) = level.as_object_mut() {
-                    fields.remove("chasing");
-                }
-                *changed = FormChange::at(&format!("{path}/chasing"));
+        field_row(ui, "skill points", |ui| {
+            let schema = serde_json::json!({ "type": "integer", "minimum": 0 });
+            if !level["skill_points"].is_number() {
+                level["skill_points"] = Value::from(0);
             }
+            *changed |= forms::number(
+                ui,
+                cx,
+                &schema,
+                &mut level["skill_points"],
+                &format!("{path}/skill_points"),
+                true,
+            );
         });
         widgets::section(ui, "stats");
         if !level["stats"].is_object() {

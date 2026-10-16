@@ -33,6 +33,7 @@ use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
 };
+use crate::systems::skill::SkillId;
 use crate::systems::stat::{StatMap, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
@@ -90,6 +91,9 @@ pub struct NpcDef {
     pub name: String,
     pub model: ModelId,
     pub stats: StatMap,
+    #[schemars(extend("x-usage" = "the skill a click on a target uses"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basic_attack: Option<SkillId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,
 }

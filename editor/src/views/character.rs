@@ -5,7 +5,7 @@ use engine::core::math::Pos;
 use engine::core::tiling::Tiles;
 use engine::systems::GameSettings;
 use engine::systems::area::{self, AreaDef, AreaModule};
-use engine::systems::job::{JobDef, JobLevel};
+use engine::systems::class::{ClassDef, ClassLevel};
 use engine::systems::npc::NpcId;
 use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use engine::systems::script::RiftScripts;
@@ -297,27 +297,27 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
 
 fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
-    let jobs: Vec<String> = cx.files.keys_of("job").map(str::to_owned).collect();
+    let classes: Vec<String> = cx.files.keys_of("class").map(str::to_owned).collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
-    let level = level_of(cx, value.text("job"), xp);
+    let level = level_of(cx, value.text("class"), xp);
     card(ui, "player", "Identity", |ui| {
         widgets::kv(ui, "name", |ui| {
             changed |= forms::text(ui, cx, &mut value["name"], "/name");
         });
-        widgets::kv(ui, "job", |ui| {
-            let current = value.text("job").to_owned();
+        widgets::kv(ui, "class", |ui| {
+            let current = value.text("class").to_owned();
             let mut picked = current.clone();
-            widgets::combo_box("character-job")
+            widgets::combo_box("character-class")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current).size(13.0))
                 .show_ui(ui, |ui| {
-                    for job in &jobs {
-                        ui.selectable_value(&mut picked, job.clone(), job);
+                    for class in &classes {
+                        ui.selectable_value(&mut picked, class.clone(), class);
                     }
                 });
             if picked != current {
-                value["job"] = Value::String(picked);
-                changed = FormChange::at("/job");
+                value["class"] = Value::String(picked);
+                changed = FormChange::at("/class");
             }
         });
         widgets::kv(ui, "xp", |ui| {
@@ -1339,17 +1339,17 @@ fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
         .map(|max| max as u32)
 }
 
-pub fn level_of(cx: &FormCx, job: &str, xp: u32) -> u32 {
+pub fn level_of(cx: &FormCx, class: &str, xp: u32) -> u32 {
     let Some(content) = cx.content.clone() else {
         return 0;
     };
     content
-        .by_key::<JobDef>(job)
-        .map(|job| levels_reached(&job.get(&content).levels, xp))
+        .by_key::<ClassDef>(class)
+        .map(|class| levels_reached(&class.get(&content).levels, xp))
         .unwrap_or(0)
 }
 
-fn levels_reached(tiers: &[JobLevel], xp: u32) -> u32 {
+fn levels_reached(tiers: &[ClassLevel], xp: u32) -> u32 {
     tiers.iter().filter(|tier| tier.xp <= xp).count() as u32
 }
 
@@ -1361,9 +1361,9 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;
-    let job = row.text("job");
+    let class = row.text("class");
     let tiers = content
-        .by_key::<JobDef>(job)
+        .by_key::<ClassDef>(class)
         .map(|id| id.get(&content).levels.clone())
         .unwrap_or_default();
     let level = levels_reached(&tiers, xp);

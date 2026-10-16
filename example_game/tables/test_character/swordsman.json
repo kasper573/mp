@@ -1,6 +1,6 @@
 {
   "name": "Swordsman",
-  "job": "adventurer",
+  "class": "fighter",
   "bag": [
     {
       "item": "rusty_sword"

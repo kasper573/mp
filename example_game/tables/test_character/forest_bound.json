@@ -1,6 +1,6 @@
 {
   "name": "Forest Bound",
-  "job": "adventurer",
+  "class": "fighter",
   "xp": 80,
   "bag": [
     {

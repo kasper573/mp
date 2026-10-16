@@ -22,18 +22,19 @@ use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint}
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::belongings;
+use crate::systems::class::{Class, ClassId};
 use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
 use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
-use crate::systems::item::Inventory;
-use crate::systems::job::{Job, JobId};
+use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{HeardMove, Position};
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
+use crate::systems::skill::{BasicAttack, Cooldowns, Hotbar, Learned};
 use crate::systems::spectate::Spectators;
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
@@ -121,8 +122,11 @@ pub type PlayerDefId = ContentId<PlayerDef>;
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct PlayerDef {
     pub model: ModelId,
-    pub job: JobId,
+    pub class: ClassId,
     pub stats: StatMap,
+    #[schemars(extend("x-usage" = "worn at creation"))]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wearing: Vec<ItemId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<PlayerModule>,
 }
@@ -291,7 +295,7 @@ pub fn join(world: &mut World) {
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let at = spawn_position(world, policy, zone, area);
-                let fresh = CharacterSnapshot::fresh(&name, def(&content).job);
+                let fresh = CharacterSnapshot::fresh(&content, &name, def(&content));
                 let start = Place { area: zone, at };
                 let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
                 (at, state)
@@ -336,7 +340,11 @@ pub struct CharacterState {
     pub inventory: Inventory,
     pub xp: Xp,
     pub equipment: Equipment,
-    pub job: Job,
+    pub class: Class,
+    pub learned: Learned,
+    pub cooldowns: Cooldowns,
+    pub hotbar: Hotbar,
+    pub basic_attack: BasicAttack,
     pub timed: TimedEffects,
     pub memory: Memory,
     pub heard: Heard,
@@ -355,7 +363,14 @@ impl CharacterState {
             inventory: world.get::<Inventory>(entity)?.clone(),
             xp: world.get::<Xp>(entity)?.clone(),
             equipment: world.get::<Equipment>(entity)?.clone(),
-            job: *world.get::<Job>(entity)?,
+            class: *world.get::<Class>(entity)?,
+            learned: world.get::<Learned>(entity).cloned().unwrap_or_default(),
+            cooldowns: world.get::<Cooldowns>(entity).cloned().unwrap_or_default(),
+            hotbar: world.get::<Hotbar>(entity).cloned().unwrap_or_default(),
+            basic_attack: world
+                .get::<BasicAttack>(entity)
+                .copied()
+                .unwrap_or_default(),
             timed: world
                 .get::<TimedEffects>(entity)
                 .cloned()

@@ -1,0 +1,16 @@
+{
+  "name": "Unspent",
+  "class": "fighter",
+  "xp": 90,
+  "basic_attack": "slash",
+  "bag": [
+    {
+      "item": "gold",
+      "count": 60
+    }
+  ],
+  "equipment": {
+    "weapon": "iron_sword"
+  },
+  "start": "initial_spawn"
+}

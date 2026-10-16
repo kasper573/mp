@@ -11,10 +11,10 @@ use crate::core::script::{
 };
 use crate::systems::area::warp::Warp;
 use crate::systems::chat::Say;
+use crate::systems::class::GrantXp;
 use crate::systems::item::effects::{
     ClearGroundItems, DropItems, Equip, Items, MoveItems, SpawnGroundItems, Unequip, UseItem,
 };
-use crate::systems::job::{GrantXp, SetJob};
 use crate::systems::memory::{Forget, Remember};
 use crate::systems::notification::{self, Notify};
 use crate::systems::npc::body::{Attack, FaceToward, Stop, WalkTo, Wander};
@@ -83,7 +83,6 @@ effects! {
     ClearGroundItems(ClearGroundItems),
     MoveItems(MoveItems),
     GrantXp(GrantXp),
-    SetJob(SetJob),
     Remember(Remember),
     Forget(Forget),
     OfferQuest(OfferQuest),
@@ -116,6 +115,17 @@ pub fn aimed(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity> {
 
 pub fn aimed_character(world: &World, cx: &FlowCx, who: &Eval) -> Option<Entity> {
     super::query::character(world, cx, who)
+}
+
+pub fn aim_all<'c>(
+    cx: &mut Compiler<'c, RiftScripting>,
+    who: &'c Aim,
+) -> Result<Eval, ScriptFault> {
+    cx.actors(who.as_ref())
+}
+
+pub fn aimed_all(world: &World, cx: &FlowCx, who: &Eval) -> Vec<Entity> {
+    super::query::actors(world, cx, who)
 }
 
 pub fn settle(

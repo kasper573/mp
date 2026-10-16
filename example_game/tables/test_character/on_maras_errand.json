@@ -1,6 +1,6 @@
 {
   "name": "On Mara's Errand",
-  "job": "adventurer",
+  "class": "fighter",
   "xp": 40,
   "quests": [
     {

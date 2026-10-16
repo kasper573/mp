@@ -11,16 +11,18 @@ use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::area::transition::Discovered;
 use crate::systems::area::{self, Area, AreaId, AreaTag, object};
+use crate::systems::class::{self, ClassId};
 use crate::systems::combat::{Attackers, Attitude};
 use crate::systems::effect::{self, Effect};
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{DroppedItem, Inventory, ItemId};
-use crate::systems::job::{self, Job, JobId};
 use crate::systems::memory::{self, MemoryId};
 use crate::systems::movement::{self, Position};
 use crate::systems::npc::{Npc, NpcId, Pack, body};
 use crate::systems::player::{ArrivalHold, Owner as PlayerOwner};
 use crate::systems::quest::{self, Objective, QuestId};
+use crate::systems::script::OwnerKind;
+use crate::systems::skill::{self, SkillDef, SkillId, SkillStat};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility::{self, Presence};
 
@@ -159,10 +161,25 @@ pub enum RiftQuery {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
     },
-    IsJob {
+    IsClass {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         of: Of,
-        job: JobId,
+        class: ClassId,
+    },
+    SkillRank {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        of: Of,
+        skill: SkillId,
+    },
+    SkillStat {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        of: Of,
+        skill: SkillId,
+        stat: SkillStat,
+    },
+    SpentSkillPoints {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        of: Of,
     },
     Stat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -278,22 +295,31 @@ pub enum RiftQuery {
         at: Option<Box<Condition>>,
         within: Box<Condition>,
     },
+    SkillTargets,
+    SkillArea,
+    AimedPoint,
 }
 
 impl QueryDef<RiftScripting> for RiftQuery {
     fn value_type(&self, cx: &Compiler<RiftScripting>) -> ValueType {
         match self {
             RiftQuery::Level { .. }
+            | RiftQuery::SkillRank { .. }
+            | RiftQuery::SpentSkillPoints { .. }
             | RiftQuery::Holding { .. }
             | RiftQuery::FreeSlots { .. }
             | RiftQuery::Count { .. }
             | RiftQuery::GroundItems { .. } => ValueType::Integer,
-            RiftQuery::Stat { .. } | RiftQuery::Distance { .. } | RiftQuery::Health { .. } => {
-                ValueType::Number
-            }
+            RiftQuery::Stat { .. }
+            | RiftQuery::SkillStat { .. }
+            | RiftQuery::Distance { .. }
+            | RiftQuery::Health { .. } => ValueType::Number,
             RiftQuery::Memory { memory, .. } => memory.get(cx.content).ty,
             RiftQuery::QuestResetsIn { .. } => ValueType::Text,
             RiftQuery::Nearest { .. } | RiftQuery::Target | RiftQuery::Subject => ValueType::Actor,
+            RiftQuery::SkillTargets => ValueType::Actors,
+            RiftQuery::SkillArea => ValueType::Area,
+            RiftQuery::AimedPoint => ValueType::Point,
             _ => ValueType::Boolean,
         }
     }
@@ -301,7 +327,10 @@ impl QueryDef<RiftScripting> for RiftQuery {
     fn reads_subject(&self) -> bool {
         match self {
             RiftQuery::Level { of }
-            | RiftQuery::IsJob { of, .. }
+            | RiftQuery::IsClass { of, .. }
+            | RiftQuery::SkillRank { of, .. }
+            | RiftQuery::SkillStat { of, .. }
+            | RiftQuery::SpentSkillPoints { of }
             | RiftQuery::Stat { of, .. }
             | RiftQuery::Buffed { of, .. }
             | RiftQuery::Holding { of, .. }
@@ -317,6 +346,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
             | RiftQuery::Inside { of, .. }
             | RiftQuery::InArea { of, .. }
             | RiftQuery::KnowsArea { of, .. } => of.is_none(),
+            RiftQuery::SkillTargets | RiftQuery::SkillArea | RiftQuery::AimedPoint => true,
             _ => false,
         }
     }
@@ -328,17 +358,48 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 Box::new(move |world, cx| {
                     Value::Int(
                         character(world, cx, &of)
-                            .map_or(0, |who| i64::from(job::level(world, who))),
+                            .map_or(0, |who| i64::from(class::level(world, who))),
                     )
                 })
             }
-            RiftQuery::IsJob { of, job } => {
-                let job = *job;
+            RiftQuery::IsClass { of, class } => {
+                let class = *class;
                 let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
-                    Value::Bool(character(world, cx, &of).is_some_and(|who| {
-                        world.get::<Job>(who).is_some_and(|held| held.def == job)
-                    }))
+                    Value::Bool(
+                        character(world, cx, &of)
+                            .is_some_and(|who| class::of(world, who) == Some(class)),
+                    )
+                })
+            }
+            RiftQuery::SkillRank { of, skill } => {
+                let skill = *skill;
+                let of = cx.actor(of.as_deref())?;
+                Box::new(move |world, cx| {
+                    Value::Int(
+                        actor(world, cx, &of)
+                            .map_or(0, |who| i64::from(skill::rank_of(world, who, skill).0)),
+                    )
+                })
+            }
+            RiftQuery::SkillStat { of, skill, stat } => {
+                let (skill, stat) = (*skill, *stat);
+                let of = cx.actor(of.as_deref())?;
+                Box::new(move |world, cx| {
+                    let rank = actor(world, cx, &of)
+                        .map_or(skill::Rank::NONE, |who| skill::rank_of(world, who, skill));
+                    Value::Num(f64::from(
+                        skill.get(world.resource::<Content>()).stat(rank, stat),
+                    ))
+                })
+            }
+            RiftQuery::SpentSkillPoints { of } => {
+                let of = cx.actor(of.as_deref())?;
+                Box::new(move |world, cx| {
+                    Value::Int(
+                        character(world, cx, &of)
+                            .map_or(0, |who| i64::from(class::spent_points(world, who).0)),
+                    )
                 })
             }
             RiftQuery::Stat { of, stat } => {
@@ -642,13 +703,45 @@ impl QueryDef<RiftScripting> for RiftQuery {
                     Value::Int(count)
                 })
             }
+            RiftQuery::SkillTargets => {
+                let skill = skill_of(cx)?;
+                Box::new(move |world, cx| Value::Actors(skill::targets(world, cx, skill)))
+            }
+            RiftQuery::SkillArea => {
+                let skill = skill_of(cx)?;
+                Box::new(move |world, cx| Value::Area(skill::footprint(world, cx, skill)))
+            }
+            RiftQuery::AimedPoint => {
+                let skill = skill_of(cx)?;
+                Box::new(move |world, cx| Value::Point(skill::aimed_point(world, cx, skill)))
+            }
         })
     }
+}
+
+fn skill_of(cx: &Compiler<RiftScripting>) -> Result<SkillId, ScriptFault> {
+    cx.owner_row()
+        .filter(|row| row.kind == OwnerKind::Skill)
+        .map(|row| row.id::<SkillDef>())
+        .ok_or_else(|| {
+            ScriptFault::new(
+                "wrong owner",
+                "only a skill's own script knows what it was aimed at",
+            )
+        })
 }
 
 pub fn actor(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {
     let who = eval(world, cx).as_actor()?;
     (world.get_entity(who).is_ok() && !stat::is_dead(world, who)).then_some(who)
+}
+
+pub fn actors(world: &World, cx: &FlowCx, eval: &Eval) -> Vec<Entity> {
+    eval(world, cx)
+        .as_actors()
+        .into_iter()
+        .filter(|who| world.get_entity(*who).is_ok() && !stat::is_dead(world, *who))
+        .collect()
 }
 
 pub fn character(world: &World, cx: &FlowCx, eval: &Eval) -> Option<Entity> {

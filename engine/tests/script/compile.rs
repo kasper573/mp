@@ -29,7 +29,7 @@ const FUNCTIONS: [&str; 2] = ["helper", "loops"];
 #[test]
 fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     let capabilities = every_capability();
-    assert_eq!(capabilities.len(), 35);
+    assert_eq!(capabilities.len(), 34);
     for owner in OWNERS {
         for value in &capabilities {
             let parsed = effect(value.clone());
@@ -271,7 +271,9 @@ fn entry(owner: OwnerKind, next: &str) -> Value {
         OwnerKind::Object | OwnerKind::Npc => json!({
             "type": "on", "event": "interacted", "verb": "talk", "reach": 2.0, "next": next
         }),
-        OwnerKind::Item => json!({ "type": "on", "event": "used", "next": next }),
+        OwnerKind::Item | OwnerKind::Skill => {
+            json!({ "type": "on", "event": "used", "next": next })
+        }
         OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
         OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
         OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
@@ -298,7 +300,6 @@ fn every_capability() -> Vec<Value> {
             "items": [{ "item": "gold" }]
         }),
         json!({ "type": "grant_xp", "xp": 1 }),
-        json!({ "type": "set_job", "job": "adventurer" }),
         json!({ "type": "remember", "memory": "bribed_ilsa" }),
         json!({ "type": "forget", "memories": ["bribed_ilsa"] }),
         json!({ "type": "offer_quest", "quest": "x_marks_the_spot" }),

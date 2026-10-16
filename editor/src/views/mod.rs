@@ -1,6 +1,6 @@
 pub mod area;
 pub mod character;
-pub mod job;
+pub mod class;
 pub mod model;
 pub mod navigation;
 pub mod script;

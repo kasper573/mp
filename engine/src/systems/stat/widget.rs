@@ -2,10 +2,10 @@ use bevy::prelude::*;
 use design_tokens::color;
 use egui::{RichText, Ui, Vec2};
 
+use crate::systems::class;
 use crate::systems::hud::{HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::job;
 use crate::systems::player::session;
 use crate::systems::stat;
 
@@ -57,14 +57,22 @@ fn stat_rows(world: &World) -> Vec<(String, String)> {
     };
     let entity = me.id();
     let stats = stat::effective_all(world, entity);
-    std::iter::once(("Level".to_owned(), job::level(world, entity).to_string()))
-        .chain(
-            stats
-                .0
-                .iter()
-                .map(|stat| (stat.label().to_owned(), shown_value(stat.value))),
-        )
-        .collect()
+    let content = world.resource::<crate::core::content::Content>();
+    let class = class::of(world, entity)
+        .map(|class| class.get(content).name.clone())
+        .unwrap_or_default();
+    [
+        ("Class".to_owned(), class),
+        ("Level".to_owned(), class::level(world, entity).to_string()),
+    ]
+    .into_iter()
+    .chain(
+        stats
+            .0
+            .iter()
+            .map(|stat| (stat.label().to_owned(), shown_value(stat.value))),
+    )
+    .collect()
 }
 
 fn shown_value(value: f32) -> String {

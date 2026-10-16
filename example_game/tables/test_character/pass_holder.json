@@ -1,6 +1,6 @@
 {
   "name": "Pass Holder",
-  "job": "adventurer",
+  "class": "fighter",
   "bag": [
     {
       "item": "road_pass"

@@ -85,6 +85,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     let ItemKind::Equipment {
         slot: into,
         requires,
+        ..
     } = &item.get(&content).kind
     else {
         return Err(format!("{} can't be worn", item.get(&content).name));

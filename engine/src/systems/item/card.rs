@@ -241,7 +241,7 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
                     .map(|stat| plain(format!("{} for {}s", modifier(stat), lasts.0))),
             );
         }
-        ItemKind::Equipment { slot, requires } => {
+        ItemKind::Equipment { slot, requires, .. } => {
             facts.push(plain(format!(
                 "Worn as your {}",
                 slot.label().to_lowercase()

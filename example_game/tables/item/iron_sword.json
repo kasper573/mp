@@ -1,0 +1,27 @@
+{
+  "name": "Iron Sword",
+  "icon": "icons/weapon_and_tool/silver_sword.png",
+  "sfx": {
+    "pickup": "pickup_blade",
+    "trade": "trade_blade",
+    "drop": "block01"
+  },
+  "kind": {
+    "type": "equipment",
+    "slot": "weapon",
+    "grants": [
+      "slash"
+    ]
+  },
+  "modules": [
+    {
+      "type": "flavor",
+      "text": "Honest iron, honestly sharpened."
+    },
+    {
+      "type": "stat",
+      "stat": "damage",
+      "value": 4.0
+    }
+  ]
+}

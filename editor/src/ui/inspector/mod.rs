@@ -35,7 +35,7 @@ use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
 use crate::views::area::{inspect, parts};
 use crate::views::script::{PendingScriptAction, ScriptOwner};
-use crate::views::{job, model, script, tileset, world};
+use crate::views::{class, model, script, tileset, world};
 use crate::{forms, views};
 
 const WIDE: f32 = 760.0;
@@ -461,12 +461,12 @@ fn first_class_card(
         }
         let hidden: &[&str] = match table {
             "input" => &["modules", "bindings"],
-            job::TABLE => &["modules", "levels"],
+            class::TABLE => &["modules", "levels", "tree"],
             _ => &["modules"],
         };
         changed = forms::object_without(ui, cx, schema, value, "", hidden);
-        if table == job::TABLE {
-            changed |= job::levels(ui, cx, value);
+        if table == class::TABLE {
+            changed |= class::levels(ui, cx, value);
         }
     });
     changed

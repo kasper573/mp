@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{Stat, StatKind};
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::core::script::{Compiler, EffectDef, EffectStep, FlowCx, Name, ScriptFault};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::combat;
 use crate::systems::effect::{Effect, TimedEffect, TimedEffects};
@@ -72,13 +72,13 @@ impl EffectDef<RiftScripting> for Heal {
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
     ) -> Result<EffectCall, ScriptFault> {
-        let who = effects::aim(cx, &self.who)?;
+        let who = effects::aim_all(cx, &self.who)?;
         let by = match &self.by {
             HealBy::Amount(amount) => Some(effects::number(cx, amount)?),
             HealBy::Full(_) => None,
         };
         Ok(Box::new(move |world, _, cx| {
-            if let Some(actor) = effects::aimed(world, cx, &who) {
+            for actor in effects::aimed_all(world, cx, &who) {
                 match &by {
                     Some(by) => {
                         let amount = by(world, cx).as_num() as f32;
@@ -106,12 +106,12 @@ impl EffectDef<RiftScripting> for Damage {
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
     ) -> Result<EffectCall, ScriptFault> {
-        let who = effects::aim(cx, &self.who)?;
+        let who = effects::aim_all(cx, &self.who)?;
         let by = effects::number(cx, &self.by)?;
         Ok(Box::new(move |world, _, cx| {
-            if let Some(actor) = effects::aimed(world, cx, &who) {
+            for actor in effects::aimed_all(world, cx, &who) {
                 let amount = by(world, cx).as_num() as f32;
-                let attacker = cx.owner.filter(|owner| world.get::<Npc>(*owner).is_some());
+                let attacker = attacker(world, cx, actor);
                 combat::inflict(world, actor, attacker, amount);
             }
             EffectStep::Done
@@ -133,12 +133,12 @@ impl EffectDef<RiftScripting> for Buff {
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
     ) -> Result<EffectCall, ScriptFault> {
-        let who = effects::aim(cx, &self.who)?;
+        let who = effects::aim_all(cx, &self.who)?;
         let by = effects::number(cx, &self.by)?;
         let seconds = effects::number(cx, &self.seconds)?;
         let stat = self.stat;
         Ok(Box::new(move |world, _, cx| {
-            if let Some(actor) = effects::aimed(world, cx, &who) {
+            for actor in effects::aimed_all(world, cx, &who) {
                 let value = by(world, cx).as_num() as f32;
                 let lasts = Seconds(seconds(world, cx).as_num() as f32);
                 buff(world, actor, Stat { kind: stat, value }, lasts);
@@ -162,12 +162,12 @@ impl EffectDef<RiftScripting> for ClearBuffs {
         &'c self,
         cx: &mut Compiler<'c, RiftScripting>,
     ) -> Result<EffectCall, ScriptFault> {
-        let who = effects::aim(cx, &self.who)?;
+        let who = effects::aim_all(cx, &self.who)?;
         Ok(Box::new(move |world, _, cx| {
-            if let Some(actor) = effects::aimed(world, cx, &who)
-                && let Some(mut timed) = world.get_mut::<TimedEffects>(actor)
-            {
-                timed.0.clear();
+            for actor in effects::aimed_all(world, cx, &who) {
+                if let Some(mut timed) = world.get_mut::<TimedEffects>(actor) {
+                    timed.0.clear();
+                }
             }
             EffectStep::Done
         }))
@@ -175,6 +175,13 @@ impl EffectDef<RiftScripting> for ClearBuffs {
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
         vec![Reach::Buffs]
     }
+}
+
+/// Who the hurt actor holds responsible: an npc's own script, or the caster whose skill ran.
+fn attacker(world: &World, cx: &FlowCx, target: Entity) -> Option<Entity> {
+    cx.owner
+        .filter(|owner| world.get::<Npc>(*owner).is_some())
+        .or_else(|| cx.subject.filter(|subject| *subject != target))
 }
 
 pub fn buff(world: &mut World, actor: Entity, stat: Stat, lasts: Seconds) {

@@ -32,8 +32,32 @@ pub enum Attitude {
     Hostile,
 }
 
+/// How two actors stand to each other. Characters and friendly npcs share a side; every other npc
+/// stands against them. There are no parties yet, so every character is every character's ally.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Relation {
+    Own,
+    Ally,
+    Enemy,
+}
+
+pub fn relation(world: &World, from: Entity, to: Entity) -> Relation {
+    if from == to {
+        Relation::Own
+    } else if with_characters(world, from) == with_characters(world, to) {
+        Relation::Ally
+    } else {
+        Relation::Enemy
+    }
+}
+
+fn with_characters(world: &World, entity: Entity) -> bool {
+    world.get::<Owner>(entity).is_some()
+        || world.get::<Attitude>(entity) == Some(&Attitude::Friendly)
+}
+
 pub fn attackable(world: &World, attacker: Entity, target: Entity) -> bool {
-    world.get::<Attitude>(target) != Some(&Attitude::Friendly)
+    relation(world, attacker, target) == Relation::Enemy
         && !player::held(world, target)
         && visibility::coexist(world, attacker, target)
 }
@@ -45,10 +69,9 @@ pub struct AttackRequest {
 }
 
 pub fn enemy_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
-    let me = session::my_character(world).map(|entity| entity.id());
-    actor::frontmost_at(world, point, me, |world, entity| {
-        world.get::<Actor>(entity).is_some()
-            && world.get::<Attitude>(entity) != Some(&Attitude::Friendly)
+    let me = session::my_character(world).map(|entity| entity.id())?;
+    actor::frontmost_at(world, point, Some(me), |world, entity| {
+        world.get::<Actor>(entity).is_some() && relation(world, me, entity) == Relation::Enemy
     })
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "Chief Fallen",
-  "job": "adventurer",
+  "class": "fighter",
   "xp": 60,
   "bag": [
     {

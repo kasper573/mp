@@ -7,12 +7,12 @@ use engine::systems::GameSettings;
 use engine::systems::actor::Name;
 use engine::systems::area::AreaId;
 use engine::systems::area::transition::Discovered;
+use engine::systems::class::Class;
 use engine::systems::dialogue;
 use engine::systems::effect::{Effect, TimedEffects};
 use engine::systems::equipment::{Equipment, EquipmentSlot};
 use engine::systems::history::{History, HistoryEntry, HistoryTopic};
 use engine::systems::item::{Inventory, ItemStack};
-use engine::systems::job::Job;
 use engine::systems::memory;
 use engine::systems::movement::Position;
 use engine::systems::player::snapshot::{
@@ -62,9 +62,9 @@ fn a_character_joined_from_a_row_is_that_character() {
     );
     assert_eq!(world.get::<Xp>(player), Some(&Xp { amount: 60 }));
     assert_eq!(
-        world.get::<Job>(player),
-        Some(&Job {
-            def: row("adventurer")
+        world.get::<Class>(player),
+        Some(&Class {
+            def: row("fighter")
         })
     );
     let stats = world.get::<Stats>(player).expect("stats");
@@ -175,8 +175,11 @@ fn returning_to(area: AreaId) -> Sim {
 fn tess(start: Place) -> CharacterSnapshot {
     CharacterSnapshot {
         name: "Tess".to_owned(),
-        job: row("adventurer"),
+        class: row("fighter"),
         xp: 60,
+        skills: Vec::new(),
+        hotbar: Vec::new(),
+        basic_attack: None,
         stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
         effects: vec![SnapshotEffect {
             effect: Effect::Chasing,

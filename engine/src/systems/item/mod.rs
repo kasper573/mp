@@ -33,6 +33,7 @@ use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
+use crate::systems::skill::SkillId;
 use crate::systems::stat::{self, Stat};
 use crate::systems::visibility::{self, Presence, seen_by};
 use crate::systems::{drain_requests, equipment};
@@ -490,6 +491,9 @@ pub enum ItemKind {
         slot: equipment::EquipmentSlot,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         requires: Option<Condition>,
+        #[schemars(extend("x-usage" = "known while worn"))]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        grants: Vec<SkillId>,
     },
     Usable,
     Resource,
