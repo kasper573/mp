@@ -180,9 +180,10 @@ fn show(world: &mut World) {
     let failure = world.get_resource::<LoadingFailure>().cloned();
     let veiled = world.resource::<ActiveTransition>().phase() != ScreenTransitionPhase::Idle;
     let now = Seconds(world.resource::<Time>().elapsed_secs());
+    let signed_in = world.contains_resource::<Credentials>();
     let model = {
         let shown = world.resource::<Shown>();
-        card_model(&shown.progress, failure.as_ref(), now, veiled)
+        card_model(&shown.progress, failure.as_ref(), now, veiled, signed_in)
     };
     if world.resource::<Shown>().card.as_ref() == Some(&model) {
         return;
@@ -211,6 +212,7 @@ fn card_model(
     failure: Option<&LoadingFailure>,
     now: Seconds,
     veiled: bool,
+    signed_in: bool,
 ) -> CardModel {
     let title = progress
         .name
@@ -278,7 +280,9 @@ fn card_model(
                     "Downloaded".to_owned()
                 },
             );
-            lines.push("Joining".to_owned());
+            if signed_in {
+                lines.push("Joining".to_owned());
+            }
         }
     }
     if progress.retrying > 0 {
