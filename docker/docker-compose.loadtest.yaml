@@ -6,4 +6,3 @@ services:
     environment:
       RIFT_GAME_SERVER_AUTH: fake
       RIFT_GAME_SERVER_PLAYER_SPAWN_TYPE: dist
-      RIFT_GAME_SERVER_AREAS: bench,333

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::RenderLayers;
@@ -59,10 +60,10 @@ pub struct AreaScene {
     camera: Entity,
     spec: AreaSceneSpec,
     generation: u64,
-    idle: u32,
+    seen_at: Duration,
     zoom: f32,
     center: Pos<Tiles>,
-    fresh: u8,
+    changed_at: Duration,
     active: bool,
 }
 
@@ -89,27 +90,29 @@ pub struct AreaScenes {
     free_layers: Vec<usize>,
 }
 
-pub const IDLE_FRAMES: u32 = 120;
+const IDLE_FOR: Duration = Duration::from_secs(2);
 
 // Spawning a scene builds its tile meshes, so a view asking for many at once (the world map's
 // cards) gets them over a few frames instead of one long one.
 const SPAWNS_PER_FRAME: usize = 6;
 
-// Frames a still scene keeps rendering after a change, so its spawned tiles and uploaded images
-// are all on the target before the camera rests.
-const SETTLE_FRAMES: u8 = 3;
+// A still scene keeps rendering for this long after a change, so its spawned tiles and uploaded
+// images are all on the target before the camera rests.
+const SETTLE_FOR: Duration = Duration::from_millis(50);
 
 pub fn sync(
     scenes: &mut AreaScenes,
     requests: Vec<AreaSceneRequest>,
-    content: Option<Content>,
+    content: Option<&Content>,
     files: &ProjectFiles,
     world: &mut World,
 ) {
-    let mut seen: Vec<String> = Vec::new();
+    let now = world.resource::<Time<Real>>().elapsed();
     let mut spawned = 0;
     for request in requests {
-        seen.push(request.key.clone());
+        if let Some(scene) = scenes.by_key.get_mut(&request.key) {
+            scene.seen_at = now;
+        }
         let Some(content) = content else {
             continue;
         };
@@ -118,29 +121,25 @@ pub fn sync(
             None => true,
         };
         if respawn {
-            despawn(scenes, &request.key, world);
             if spawned == SPAWNS_PER_FRAME {
                 continue;
             }
             spawned += 1;
-            spawn(scenes, &request, content, files, world);
+            despawn(scenes, &request.key, world);
+            spawn(scenes, &request, content, files, world, now);
         }
         let Some(scene) = scenes.by_key.get_mut(&request.key) else {
             continue;
         };
-        scene.idle = 0;
         let wanted = [request.width.max(1), request.height.max(1)];
         let changed = respawn
             || scene.shown != wanted
             || scene.zoom != request.zoom
             || scene.center != request.center;
         if changed {
-            scene.fresh = SETTLE_FRAMES;
+            scene.changed_at = now;
         }
-        let active = request.live || scene.fresh > 0;
-        if !changed {
-            scene.fresh = scene.fresh.saturating_sub(1);
-        }
+        let active = request.live || now.saturating_sub(scene.changed_at) < SETTLE_FOR;
         let rest = !changed && active == scene.active;
         scene.zoom = request.zoom;
         scene.center = request.center;
@@ -187,14 +186,9 @@ pub fn sync(
     }
     let stale: Vec<String> = scenes
         .by_key
-        .iter_mut()
-        .filter_map(|(key, scene)| {
-            if seen.contains(key) {
-                return None;
-            }
-            scene.idle += 1;
-            (scene.idle > IDLE_FRAMES).then(|| key.clone())
-        })
+        .iter()
+        .filter(|(_, scene)| now.saturating_sub(scene.seen_at) > IDLE_FOR)
+        .map(|(key, _)| key.clone())
         .collect();
     for key in stale {
         despawn(scenes, &key, world);
@@ -252,9 +246,10 @@ fn despawn(scenes: &mut AreaScenes, key: &str, world: &mut World) {
 fn spawn(
     scenes: &mut AreaScenes,
     request: &AreaSceneRequest,
-    content: Content,
+    content: &Content,
     files: &ProjectFiles,
     world: &mut World,
+    now: Duration,
 ) {
     let Some(area_id) = content.by_key::<area::AreaDef>(&request.spec.ground) else {
         return;
@@ -287,9 +282,9 @@ fn spawn(
             AreaSceneOf(layer),
         ))
         .id();
-    let area = area::load(&content, area_id);
+    let area = area::load(content, area_id);
     let scenery: Vec<Scenery> = match &request.spec.scenery {
-        SceneryOf::Area => area::placed(&content, area_id)
+        SceneryOf::Area => area::placed(content, area_id)
             .iter()
             .filter(|placed| {
                 if placed.chain.is_empty() {
@@ -309,9 +304,9 @@ fn spawn(
             values,
         } => parts_scenery(content, blueprint, *at, values),
     };
-    let sheets = sheets_for(scenes, content, files, area.grids, &scenery, world);
+    let sheets = sheets_for(scenes, content, files, &area.grids, &scenery, world);
     let spec = SpawnSpec {
-        content,
+        content: content.clone(),
         area: area_id,
         scenery,
         sheets,
@@ -332,10 +327,10 @@ fn spawn(
             camera,
             spec: request.spec.clone(),
             generation: request.generation,
-            idle: 0,
+            seen_at: now,
             zoom: request.zoom,
             center: request.center,
-            fresh: SETTLE_FRAMES,
+            changed_at: now,
             active: true,
         },
     );
@@ -349,7 +344,7 @@ pub fn scenery_extent(sceneries: &[Scenery]) -> Option<Rect<Tiles>> {
 }
 
 pub fn parts_scenery(
-    content: Content,
+    content: &Content,
     blueprint: &str,
     at: Pos<Tiles>,
     values: &serde_json::Value,
@@ -358,7 +353,7 @@ pub fn parts_scenery(
         return Vec::new();
     };
     let mut errors = Vec::new();
-    let flattening = area::blueprint::flatten(&content, &[module], &mut errors);
+    let flattening = area::blueprint::flatten(content, &[module], &mut errors);
     flattening
         .modules
         .into_iter()
@@ -371,14 +366,14 @@ pub fn parts_scenery(
 
 fn sheets_for(
     scenes: &mut AreaScenes,
-    content: Content,
+    content: &Content,
     files: &ProjectFiles,
     grids: &area::AreaGrids,
     scenery: &[Scenery],
     world: &mut World,
 ) -> TileSheets {
     TileSheets::new(
-        &content,
+        content,
         grids,
         scenery.iter().map(|scenery| scenery.tileset),
         |def| image_handle(scenes, files, def.image.as_str(), world),
@@ -441,7 +436,7 @@ fn spawn_tiles(
     mut materials: ResMut<Assets<bevy_tilemap::TilemapMaterial>>,
 ) {
     let area = area::load(&spec.content, spec.area);
-    let grids = area.grids;
+    let grids = area.grids.clone();
     let size = grids.size;
     let origin = area.size.bounds().min().to_screen();
     let scene_tag = (

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use game::core::time::UtcHour;
 use game::systems::launch::{
-    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServedAreas, ServerConfig, ServerReady, Switch,
+    self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
     TEST_CHARACTER_ROUTE, TestCharacterRequest,
 };
 use game::systems::player::SpawnPolicy;
@@ -32,7 +32,6 @@ impl Server {
             port: 0,
             ws_port: 0,
             max_clients: 8,
-            areas: ServedAreas::Real,
             content_dir: content.to_path_buf(),
             player_spawn_type: SpawnPolicy::Map,
             // A playtest plays its story through: monsters met on the way wear players down, never

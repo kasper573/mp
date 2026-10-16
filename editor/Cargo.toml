@@ -10,12 +10,12 @@ path = "src/main.rs"
 
 [dependencies]
 game = { path = "../game" }
-ui = { path = "../ui" }
+design_tokens = { path = "../design_tokens" }
 bevy_tilemap = { path = "../bevy/tilemap" }
 bevy_kira_audio = { version = "0.27", default-features = false }
 bevy = { workspace = true, features = ["x11", "multi_threaded"] }
-bevy_egui = "0.43"
-egui = "0.36"
+bevy_egui.workspace = true
+egui.workspace = true
 egui_dock = "0.21"
 egui-snarl = "0.12"
 bevy_replicon = { workspace = true, features = ["server"] }

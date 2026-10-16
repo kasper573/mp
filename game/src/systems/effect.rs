@@ -71,9 +71,18 @@ pub fn expire(world: &mut World, timed: &mut QueryState<Entity, With<TimedEffect
     }
 }
 
+// Clients keep no wall clock: they show the timed effects the server has not yet swept away.
 fn timed(world: &World, entity: Entity) -> Vec<Effect> {
+    let now = world.get_resource::<WallClock>().map(|clock| clock.now);
     world
         .get::<TimedEffects>(entity)
-        .map(|timed| timed.0.iter().map(|timed| timed.effect).collect())
+        .map(|timed| {
+            timed
+                .0
+                .iter()
+                .filter(|timed| now.is_none_or(|now| timed.until > now))
+                .map(|timed| timed.effect)
+                .collect()
+        })
         .unwrap_or_default()
 }

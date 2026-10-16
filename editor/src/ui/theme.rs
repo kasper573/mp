@@ -1,140 +1,67 @@
-use egui::epaint::Shadow;
-use egui::{
-    Color32, Context, FontData, FontDefinitions, FontFamily, FontId, RichText, Stroke, TextStyle,
-};
+use design_tokens::ThemeFonts;
+use egui::{Color32, Context, FontData, FontDefinitions, FontFamily, RichText};
 
-pub const BG: Color32 = Color32::from_rgb(24, 24, 27);
-pub const PANEL: Color32 = Color32::from_rgb(29, 29, 33);
-pub const RAISED: Color32 = Color32::from_rgb(38, 38, 43);
-pub const INPUT: Color32 = Color32::from_rgb(20, 20, 23);
-pub const BORDER: Color32 = Color32::from_rgb(50, 50, 57);
-pub const TEXT: Color32 = Color32::from_rgb(228, 228, 232);
-pub const MUTED: Color32 = Color32::from_rgb(142, 144, 156);
-pub const FAINT: Color32 = Color32::from_rgb(96, 98, 110);
-pub const ACCENT: Color32 = Color32::from_rgb(46, 110, 235);
-pub const ACCENT_SOFT: Color32 = Color32::from_rgb(30, 50, 96);
-pub const CODE: Color32 = Color32::from_rgb(132, 172, 240);
-pub const WARN: Color32 = Color32::from_rgb(242, 176, 62);
-pub const DANGER: Color32 = Color32::from_rgb(226, 90, 90);
+pub use design_tokens::SHADOW;
+pub use design_tokens::color::{
+    ACCENT, ACCENT_SOFT, BG, BORDER, CODE, DANGER, FAINT, INPUT, MUTED, OK, OVERLAY, PANEL, RAISED,
+    SELECTION, TEXT, WARN,
+};
+pub use design_tokens::family::medium;
+
 pub const VARIABLE: Color32 = Color32::from_rgb(176, 140, 230);
 pub const VARIABLE_FILL: Color32 = Color32::from_rgba_premultiplied(21, 16, 27, 30);
-pub const OK: Color32 = Color32::from_rgb(86, 196, 124);
-pub const SELECTION: Color32 = Color32::from_rgb(120, 170, 250);
 pub const CANVAS: Color32 = Color32::from_rgb(20, 20, 24);
 pub const BLOCKED: Color32 = Color32::from_rgb(220, 60, 60);
 pub const SORT_LINE: Color32 = Color32::from_rgb(120, 170, 255);
-pub const OVERLAY: Color32 = Color32::from_rgba_premultiplied(13, 13, 17, 235);
-pub const SHADOW: Shadow = Shadow {
-    offset: [0, 6],
-    blur: 18,
-    spread: 0,
-    color: Color32::from_black_alpha(140),
-};
 
 pub fn apply(ctx: &Context) {
-    let mut fonts = FontDefinitions::default();
-    fonts.font_data.insert(
-        "circular".to_owned(),
-        FontData::from_static(include_bytes!(
+    ctx.set_fonts(fonts());
+    design_tokens::apply(ctx);
+}
+
+/// The theme's faces, bundled from the new-game template, and a symbols face for the editor's
+/// glyphs (arrows, music notes, box marks). The named families reach it before egui's built-ins.
+fn fonts() -> FontDefinitions {
+    let face = |bytes: &'static [u8]| FontData::from_static(bytes);
+    let mut fonts = design_tokens::fonts(ThemeFonts {
+        circular_400: face(include_bytes!(
             "../../templates/new_game/assets/fonts/circular-400-normal.ttf"
-        ))
-        .into(),
-    );
-    fonts.font_data.insert(
-        "circular-medium".to_owned(),
-        FontData::from_static(include_bytes!(
+        )),
+        circular_500: face(include_bytes!(
             "../../templates/new_game/assets/fonts/circular-500-normal.ttf"
-        ))
-        .into(),
-    );
+        )),
+        circular_700: face(include_bytes!(
+            "../../templates/new_game/assets/fonts/circular-700-normal.ttf"
+        )),
+        lato_400: face(include_bytes!(
+            "../../templates/new_game/assets/fonts/lato-400-normal.ttf"
+        )),
+        lato_400_italic: face(include_bytes!(
+            "../../templates/new_game/assets/fonts/lato-400-italic.ttf"
+        )),
+        lato_700: face(include_bytes!(
+            "../../templates/new_game/assets/fonts/lato-700-normal.ttf"
+        )),
+        lato_700_italic: face(include_bytes!(
+            "../../templates/new_game/assets/fonts/lato-700-italic.ttf"
+        )),
+    });
     fonts.font_data.insert(
         "symbols".to_owned(),
         FontData::from_static(include_bytes!("../../assets/DejaVuSans.ttf")).into(),
     );
-    fonts
-        .families
-        .entry(FontFamily::Proportional)
-        .or_default()
-        .insert(0, "circular".to_owned());
-    fonts
-        .families
-        .entry(FontFamily::Proportional)
-        .or_default()
-        .push("symbols".to_owned());
-    fonts
-        .families
-        .entry(FontFamily::Monospace)
-        .or_default()
-        .push("symbols".to_owned());
-    fonts.families.insert(
-        medium(),
-        vec![
-            "circular-medium".to_owned(),
-            "circular".to_owned(),
-            "symbols".to_owned(),
-        ],
-    );
-    ctx.set_fonts(fonts);
-    ctx.set_theme(egui::Theme::Dark);
-    let mut style = (*ctx.global_style()).clone();
-    style
-        .text_styles
-        .insert(TextStyle::Body, FontId::proportional(14.0));
-    style
-        .text_styles
-        .insert(TextStyle::Button, FontId::proportional(14.0));
-    style
-        .text_styles
-        .insert(TextStyle::Small, FontId::proportional(11.5));
-    style
-        .text_styles
-        .insert(TextStyle::Heading, FontId::new(17.0, medium()));
-    style
-        .text_styles
-        .insert(TextStyle::Monospace, FontId::monospace(13.0));
-    style.spacing.item_spacing = egui::vec2(6.0, 5.0);
-    style.spacing.button_padding = egui::vec2(8.0, 4.0);
-    style.spacing.interact_size.y = 22.0;
-    style.interaction.selectable_labels = false;
-    let visuals = &mut style.visuals;
-    visuals.dark_mode = true;
-    visuals.override_text_color = Some(TEXT);
-    visuals.panel_fill = PANEL;
-    visuals.window_fill = RAISED;
-    visuals.window_stroke = Stroke::new(1.0, BORDER);
-    visuals.extreme_bg_color = INPUT;
-    visuals.faint_bg_color = RAISED;
-    visuals.code_bg_color = INPUT;
-    visuals.hyperlink_color = CODE;
-    visuals.selection.bg_fill = ACCENT_SOFT;
-    visuals.selection.stroke = Stroke::new(1.0, SELECTION);
-    visuals.widgets.noninteractive.bg_fill = PANEL;
-    visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, BORDER);
-    visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, TEXT);
-    visuals.widgets.inactive.bg_fill = RAISED;
-    visuals.widgets.inactive.weak_bg_fill = RAISED;
-    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, BORDER);
-    visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, TEXT);
-    visuals.widgets.hovered.bg_fill = Color32::from_rgb(48, 48, 54);
-    visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(48, 48, 54);
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(80, 80, 90));
-    visuals.widgets.active.bg_fill = ACCENT_SOFT;
-    visuals.widgets.active.weak_bg_fill = ACCENT_SOFT;
-    visuals.widgets.active.bg_stroke = Stroke::new(1.0, ACCENT);
-    visuals.widgets.open.bg_fill = RAISED;
-    visuals.widgets.open.weak_bg_fill = RAISED;
-    visuals.window_corner_radius = 6.0.into();
-    visuals.menu_corner_radius = 6.0.into();
-    for widget in [
-        &mut visuals.widgets.noninteractive,
-        &mut visuals.widgets.inactive,
-        &mut visuals.widgets.hovered,
-        &mut visuals.widgets.active,
-        &mut visuals.widgets.open,
-    ] {
-        widget.corner_radius = 4.0.into();
+    let builtins: Vec<String> = FontDefinitions::default().font_data.into_keys().collect();
+    for (family, faces) in fonts.families.iter_mut() {
+        let at = match family {
+            FontFamily::Name(_) => faces
+                .iter()
+                .position(|face| builtins.contains(face))
+                .unwrap_or(faces.len()),
+            _ => faces.len(),
+        };
+        faces.insert(at, "symbols".to_owned());
     }
-    ctx.all_styles_mut(|target| *target = style.clone());
+    fonts
 }
 
 pub fn ok(text: impl Into<String>) -> RichText {
@@ -163,10 +90,6 @@ pub fn mono(text: impl Into<String>) -> RichText {
 
 pub fn alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
-}
-
-pub fn medium() -> FontFamily {
-    FontFamily::Name("medium".into())
 }
 
 pub fn strong(text: impl Into<String>) -> RichText {

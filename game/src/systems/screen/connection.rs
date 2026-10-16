@@ -1,42 +1,43 @@
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
+use bevy_egui::EguiPrimaryContextPass;
 use bevy_replicon::prelude::RepliconChannels;
 use bevy_replicon_renet2::RenetChannelsExt;
 use renet2::{ConnectionConfig, RenetClient};
-use ui::{Activate, button, text_colored};
 
 use super::mode::ClientMode;
-use super::{ClientScreen, SERVER_RETRY, despawn_all};
+use super::{ClientScreen, Notice, Retry, notice_screen};
 use crate::core::content::sync::SyncedContent;
 use crate::core::content::version;
+use crate::core::gui::{self, Band};
 use crate::core::math::Rng;
 use crate::core::net::SessionRequest;
 use crate::core::net::auth::Credentials;
 use crate::core::net::transport::ClientSocket;
 use crate::core::platform::{ClientPlatform, FetchFailure, StartParams};
-use crate::core::render::transition::ScreenTransitionPhase;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::time::Seconds;
-use crate::systems::hud::spawn_ui;
 
-pub(super) const OVERLAY_BG: Color = Color::srgb(0.07, 0.07, 0.07);
+pub(super) const OVERLAY_BG: egui::Color32 = egui::Color32::from_rgb(18, 18, 18);
 
 pub struct ConnectionPlugin;
 
 impl Plugin for ConnectionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Reconnect>()
-            .add_systems(
-                OnEnter(ClientScreen::Connecting),
-                (connecting, begin_session),
-            )
-            .add_systems(OnEnter(ClientScreen::Lost), lost)
+        app.init_resource::<Retry>()
+            .init_resource::<Backdrop>()
+            .add_systems(OnEnter(ClientScreen::Connecting), (veil, begin_session))
+            .add_systems(OnEnter(ClientScreen::Lost), (veil, lost))
             .add_systems(OnEnter(ClientScreen::Area), settle)
             .add_systems(Update, retry_when_due.run_if(in_state(ClientScreen::Lost)))
             .add_systems(
-                OnExit(ClientScreen::Connecting),
-                despawn_all::<ConnectionUi>,
-            )
-            .add_systems(OnExit(ClientScreen::Lost), despawn_all::<ConnectionUi>);
+                EguiPrimaryContextPass,
+                (
+                    connecting.run_if(in_state(ClientScreen::Connecting)),
+                    connection_lost.run_if(in_state(ClientScreen::Lost)),
+                )
+                    .in_set(Band::System),
+            );
     }
 }
 
@@ -49,12 +50,6 @@ pub struct Announce {
 pub struct PendingSession {
     task: Task<Result<String, FetchFailure>>,
     spectate: bool,
-}
-
-#[derive(Resource, Default)]
-struct Reconnect {
-    failures: u32,
-    due: Option<Seconds>,
 }
 
 pub fn open_session(world: &mut World, spectate: bool) {
@@ -121,81 +116,74 @@ fn connect(world: &mut World, ticket: &str) {
     info!("connection opened");
 }
 
-#[derive(Component, Default, Clone)]
-struct ConnectionUi;
+/// Whether the screen hides the world, decided as it opens: a transition already under way
+/// covers the world itself.
+#[derive(Resource, Default)]
+struct Backdrop(Option<egui::Color32>);
 
-fn connecting(mut commands: Commands, phase: Res<ScreenTransitionPhase>) {
-    let background = overlay(*phase);
-    commands.spawn_scene(bsn! {
-        ConnectionUi
-        super::screen_node()
-        BackgroundColor({background})
-        GlobalZIndex({ui::tokens::layer::SYSTEM})
-        Children [ @{text_colored("Connecting…", Color::WHITE)} ]
-    });
+fn veil(transition: Res<ActiveTransition>, mut backdrop: ResMut<Backdrop>) {
+    backdrop.0 = overlay(transition.phase());
+}
+
+fn connecting(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let notice = Notice {
+        title: "Connecting…",
+        lines: &[],
+        notes: &[],
+        action: None,
+    };
+    notice_screen(&gui, "connecting", world.resource::<Backdrop>().0, notice);
 }
 
 fn lost(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let failures = world.resource::<Reconnect>().failures + 1;
-    let wait = SERVER_RETRY.after(failures, &mut world.resource_mut::<Rng>());
-    *world.resource_mut::<Reconnect>() = Reconnect {
-        failures,
-        due: Some(now + wait),
-    };
+    let retry = *world.resource::<Retry>();
+    let next = retry.failed(now, &mut world.resource_mut::<Rng>());
+    world.insert_resource(next);
     world
         .resource::<ClientPlatform>()
         .0
         .announce("Connection lost. Reconnecting…");
-    let background = overlay(*world.resource::<ScreenTransitionPhase>());
-    spawn_ui(world, connection_lost(background));
 }
 
-fn connection_lost(background: Color) -> impl Scene {
-    bsn! {
-        ConnectionUi
-        super::screen_node()
-        BackgroundColor({background})
-        GlobalZIndex({ui::tokens::layer::SYSTEM})
-        Children [
-            @{text_colored("Connection lost", Color::WHITE)}
-            --
-            @{text_colored("Reconnecting…", Color::WHITE)}
-            --
-            @{button("Retry now")} on(retry_now)
-        ]
+fn connection_lost(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let notice = Notice {
+        title: "Connection lost",
+        lines: &["Reconnecting…".to_owned()],
+        notes: &[],
+        action: Some("Retry now"),
+    };
+    let retry = notice_screen(&gui, "lost", world.resource::<Backdrop>().0, notice);
+    if retry {
+        world.resource_mut::<Retry>().due = None;
+        world
+            .resource_mut::<NextState<ClientScreen>>()
+            .set(ClientScreen::Loading);
     }
 }
 
-fn settle(mut reconnect: ResMut<Reconnect>) {
-    *reconnect = Reconnect::default();
+fn settle(mut retry: ResMut<Retry>) {
+    *retry = Retry::default();
 }
 
 fn retry_when_due(
     time: Res<Time>,
-    mut reconnect: ResMut<Reconnect>,
+    mut retry: ResMut<Retry>,
     mut next: ResMut<NextState<ClientScreen>>,
 ) {
     let now = Seconds(time.elapsed_secs());
-    if reconnect.due.is_some_and(|due| now >= due) {
-        reconnect.due = None;
+    if retry.is_due(now) {
+        retry.due = None;
         next.set(ClientScreen::Loading);
     }
 }
 
-fn retry_now(
-    _: On<Activate>,
-    mut reconnect: ResMut<Reconnect>,
-    mut next: ResMut<NextState<ClientScreen>>,
-) {
-    reconnect.due = None;
-    next.set(ClientScreen::Loading);
-}
-
-fn overlay(phase: ScreenTransitionPhase) -> Color {
-    if phase == ScreenTransitionPhase::Idle {
-        OVERLAY_BG
-    } else {
-        Color::NONE
-    }
+fn overlay(phase: ScreenTransitionPhase) -> Option<egui::Color32> {
+    (phase == ScreenTransitionPhase::Idle).then_some(OVERLAY_BG)
 }

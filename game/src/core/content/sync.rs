@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -168,7 +168,7 @@ pub enum SyncPhase {
     Checking,
     Reading,
     Downloading {
-        changes: bool,
+        updating: bool,
     },
     Done,
 }
@@ -249,7 +249,6 @@ pub async fn sync(
         policy,
         status,
         rng: RefCell::new(Rng::from_entropy()),
-        memory_only: Cell::new(false),
     };
     let mut restarts = 0;
     loop {
@@ -321,7 +320,6 @@ struct Run<'a> {
     policy: SyncPolicy,
     status: SyncStatus,
     rng: RefCell<Rng>,
-    memory_only: Cell<bool>,
 }
 
 enum Attempt {
@@ -387,7 +385,7 @@ impl Run<'_> {
 
         self.status.update(|progress| {
             progress.phase = SyncPhase::Downloading {
-                changes: !stored.is_empty(),
+                updating: !stored.is_empty(),
             };
             progress.rows_changed = !stored.is_empty() && !stored.contains(&manifest.rows.hash);
             progress.fetched = Counted::of(&missing);
@@ -424,8 +422,12 @@ impl Run<'_> {
             index,
             rows,
             assets,
-            memory_only: self.memory_only.get(),
+            memory_only: self.memory_only(),
         })
+    }
+
+    fn memory_only(&self) -> bool {
+        self.status.latest().memory_only
     }
 
     async fn obtain(&self, hash: &str, stored: &HashSet<String>) -> Result<Arc<[u8]>, Attempt> {
@@ -450,8 +452,7 @@ impl Run<'_> {
             self.fetch_with_retries(&format!("/content/files/{hash}"), Some(hash))
                 .await?,
         );
-        if !self.memory_only.get() && self.store.write(hash, bytes.clone()).await.is_err() {
-            self.memory_only.set(true);
+        if !self.memory_only() && self.store.write(hash, bytes.clone()).await.is_err() {
             self.status.update(|progress| progress.memory_only = true);
         }
         Ok(bytes)

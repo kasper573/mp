@@ -9,8 +9,6 @@ use crate::project::watch::FolderWatcher;
 use crate::user::UserFolder;
 use crate::views::model::ModelStrip;
 
-pub const RETRIES: u32 = 3;
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ImportRecord {
     pub export: PathBuf,
@@ -89,6 +87,8 @@ pub fn fingerprint(files: &[PathBuf]) -> (u64, String) {
     }
     (size, hasher.finalize().to_hex()[..16].to_owned())
 }
+
+pub const RETRIES: u32 = 3;
 
 #[derive(Clone, Debug)]
 pub struct DueReimport {

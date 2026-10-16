@@ -7,8 +7,8 @@ use game::core::tiling::Tiles;
 use game::systems::area::{self, AreaModuleKind, Flip};
 use serde_json::Value;
 
-use super::stamp::placed_part;
-use super::{AreaFrame, shapes};
+use super::placement;
+use super::{AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, REFUSED};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{dialogs, theme, widgets};
@@ -33,12 +33,12 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
     }
     let (Some(project), Some(content)) = (
         editor.project.as_ref(),
-        editor.project.as_ref().and_then(|p| p.content),
+        editor.project.as_ref().and_then(|p| p.content.clone()),
     ) else {
         return;
     };
     let name = rows::free_key(&project.files, "blueprint", "new_blueprint");
-    let matches = matching_groups(content, area_key, &modules, &indices);
+    let matches = matching_groups(&content, area_key, &modules, &indices);
     editor
         .dialogs
         .push(ModalDialog::MakeBlueprint(MakeBlueprintDialog {
@@ -51,10 +51,10 @@ pub fn open_make_blueprint(editor: &mut Editor, area_key: &str, indices: Vec<usi
         }));
 }
 
-pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaFrame) {
+pub fn make_blueprint_from_selection(editor: &mut Editor, frame: &AreaSnapshot) {
     let mut indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
         .iter()
-        .filter_map(|p| p.strip_prefix("/modules/")?.parse().ok())
+        .filter_map(|p| super::module_index(p))
         .collect();
     indices.sort_unstable();
     open_make_blueprint(editor, &frame.area_key, indices);
@@ -78,7 +78,7 @@ pub struct BlueprintMatch {
 }
 
 fn matching_groups(
-    content: Content,
+    content: &Content,
     own_area: &str,
     modules: &[Value],
     own_indices: &[usize],
@@ -98,8 +98,8 @@ fn matching_groups(
     let wanted = signature(&relative);
     let mut out = Vec::new();
     for area_id in content.ids::<area::AreaDef>() {
-        let key = area_id.key(&content);
-        let Ok(row) = value::json(area_id.get(&content)) else {
+        let key = area_id.key(content);
+        let Ok(row) = value::json(area_id.get(content)) else {
             continue;
         };
         let all: Vec<Value> = row["modules"].as_array().cloned().unwrap_or_default();
@@ -191,7 +191,6 @@ pub fn make_blueprint_dialog(
     mut dialog: MakeBlueprintDialog,
 ) -> Option<MakeBlueprintDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let row = editor
         .row_value("area", &dialog.area)
         .unwrap_or(Value::Null);
@@ -204,6 +203,7 @@ pub fn make_blueprint_dialog(
         0
     };
     dialogs::card(ctx, "make-blueprint", 560.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.horizontal(|ui| {
             ui.label(RichText::new("▣").color(theme::WARN).size(16.0));
             ui.label(
@@ -261,11 +261,11 @@ pub fn make_blueprint_dialog(
                 ),
             )
             .clicked()
-                || enter
+                || pressed.enter
             {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });
@@ -443,7 +443,7 @@ fn make_blueprint(editor: &mut Editor, dialog: &MakeBlueprintDialog) -> Result<(
         table: "area".to_owned(),
         keys: vec![dialog.area.clone()],
         parts: first_placement
-            .map(|i| format!("/modules/{i}"))
+            .map(super::module_part)
             .into_iter()
             .collect(),
     };
@@ -481,7 +481,7 @@ pub fn delete_blueprint_dialog(
     let others: Vec<String> = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|c| {
             c.table::<area::blueprint::BlueprintDef>()
                 .keys()
@@ -510,7 +510,7 @@ pub fn delete_blueprint_dialog(
                             BlueprintChoice::Replace(k) => k.clone(),
                             _ => String::new(),
                         };
-                        egui::ComboBox::from_id_salt(("replace", index))
+                        widgets::combo_box(("replace", index))
                             .selected_text(if picked.is_empty() { "Replace with…".to_owned() } else { picked.clone() })
                             .show_ui(ui, |ui| {
                                 for other in &others {
@@ -554,12 +554,11 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
     let content = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
-    let id = content
+    content
         .by_key::<area::blueprint::BlueprintDef>(&dialog.blueprint)
         .ok_or("the blueprint is gone")?;
-    let def = id.get(&content);
     let project = editor.project.as_ref().ok_or("no folder")?;
     let mut files: BTreeMap<String, Value> = BTreeMap::new();
     let mut by_file: BTreeMap<String, Vec<&BlueprintUser>> = BTreeMap::new();
@@ -592,28 +591,21 @@ fn delete_blueprint(editor: &mut Editor, dialog: &DeleteBlueprintDialog) -> Resu
                     list.remove(index);
                 }
                 BlueprintChoice::Replace(other) => {
+                    let replacement = content
+                        .by_key::<area::blueprint::BlueprintDef>(other)
+                        .ok_or("a bad replacement")?;
                     let placement = list.get_mut(index).ok_or("a bad pointer")?;
-                    placement["blueprint"] = Value::String(other.clone());
+                    placement::retarget(placement, other, &replacement.get(&content).variables);
                 }
                 BlueprintChoice::Unpack => {
                     if index >= list.len() {
                         return Err("a bad pointer".into());
                     }
-                    let placement = list.remove(index);
-                    let at = shapes::pos_of(&placement["at"]).unwrap_or(Pos::new(0.0, 0.0));
-                    let flip =
-                        serde_json::from_value(placement["flip"].clone()).unwrap_or_default();
-                    for (offset, part) in def.parts.iter().enumerate() {
-                        let placed = placed_part(
-                            content,
-                            part,
-                            &placement["values"],
-                            &def.variables,
-                            at,
-                            flip,
-                        )
+                    let placement_json = list.remove(index);
+                    let unpacked = placement::unpacked(&content, &placement_json)
                         .ok_or("a part the engine refuses")?;
-                        list.insert(index + offset, placed);
+                    for (offset, module) in unpacked.into_iter().enumerate() {
+                        list.insert(index + offset, module);
                     }
                 }
             }

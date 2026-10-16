@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use super::{Objective, QuestId};
 use crate::core::content::{Content, Fixture};
-use crate::core::script::{
-    Answer, ChoiceReveal, Compiler, EffectDef, EffectStep, Name, ScriptFault,
+use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
+use crate::systems::dialogue::{
+    self, CardOffer, ChoiceChip, ChoiceReveal, ChoiceTag, ConversationPanel,
 };
-use crate::systems::dialogue::{self, CardOffer, ChoiceChip, ChoiceTag, ConversationPanel};
 use crate::systems::item::{Inventory, ItemStack};
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
@@ -89,7 +89,7 @@ impl EffectDef<RiftScripting> for OfferQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("accepted", self.accepted.as_deref()),
             ("declined", self.declined.as_deref()),
@@ -102,15 +102,18 @@ impl EffectDef<RiftScripting> for OfferQuest {
     fn keeps_box(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (quest, refused) = (self.quest, self.refused.as_deref());
+        let (quest, refused) = (self.quest, self.refused.clone());
         Ok(Box::new(move |world, flow, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to offer it to");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to offer it to");
             };
             if let Some(reason) = super::offer_refusal(world, player, quest) {
-                return effects::refuse(world, cx, refused, reason);
+                return effects::refuse(world, cx, refused.as_deref(), reason);
             }
             let offers = offer_card(world, player, quest);
             let panel = Some(ConversationPanel::QuestOffer(quest));
@@ -137,21 +140,24 @@ impl EffectDef<RiftScripting> for AcceptQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (quest, refused) = (self.quest, self.refused.as_deref());
+        let (quest, refused) = (self.quest, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to accept it");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to accept it");
             };
             let accepted = super::accept(world, player, quest);
-            effects::settle(world, cx, refused, accepted)
+            effects::settle(world, cx, refused.as_deref(), accepted)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -163,7 +169,7 @@ impl EffectDef<RiftScripting> for TurnIn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
@@ -176,26 +182,24 @@ impl EffectDef<RiftScripting> for TurnIn {
     fn keeps_box(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (quest, refused) = (self.quest, self.refused.as_deref());
+        let (quest, refused) = (self.quest, self.refused.clone());
         let decides = quest.get(cx.content).decision().is_some();
         Ok(Box::new(move |world, flow, cx| {
             let Some(player) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to hand it in");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to hand it in");
             };
             if !super::ready_to_hand_in(world, player, quest) {
-                let title = &quest.get(world.resource::<Content>()).title;
-                return effects::refuse(
-                    world,
-                    cx,
-                    refused,
-                    format!("{title} isn't ready to hand in"),
-                );
+                let message = super::not_ready(world.resource::<Content>(), quest);
+                return effects::refuse(world, cx, refused.as_deref(), message);
             }
             if decides {
                 let handed_in = super::turn_in(world, player, quest, None);
-                return effects::settle(world, cx, refused, handed_in);
+                return effects::settle(world, cx, refused.as_deref(), handed_in);
             }
             let offers = turn_in_card(world, player, quest);
             let panel = Some(ConversationPanel::QuestTurnIn(quest));
@@ -222,10 +226,13 @@ impl EffectDef<RiftScripting> for FailQuest {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let quest = self.quest;
         Ok(Box::new(move |world, _, cx| {
@@ -244,10 +251,13 @@ impl EffectDef<RiftScripting> for CompleteTask {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let quest = self.quest;
         let task = self.task.as_str();
@@ -277,12 +287,15 @@ impl EffectDef<RiftScripting> for Decide {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (quest, path) = (self.quest, self.path.as_str());
+        let (quest, path) = (self.quest, self.path.clone());
         let known = quest
             .get(cx.content)
             .decision()
@@ -295,13 +308,13 @@ impl EffectDef<RiftScripting> for Decide {
         }
         Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
-                super::decide(world, player, quest, path);
+                super::decide(world, player, quest, &path);
             }
             EffectStep::Done
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
-        vec![Reach::Completes(self.quest)]
+        vec![Reach::Decides(self.quest)]
     }
 }
 
@@ -310,20 +323,14 @@ fn offer_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer> {
     let def = quest.get(content);
     let open = super::open_to(world, player, quest);
     let chips = match def.requires().filter(|_| def.reveals(ChoiceReveal::Needs)) {
-        Some(requires) => condition::parts(requires)
-            .into_iter()
-            .map(|part| ChoiceChip::Needs {
-                what: condition::describe(content, part),
-                met: condition::holds(world, player, part),
-            })
-            .collect(),
+        Some(requires) => ChoiceChip::needs(world, player, requires),
         None => Vec::new(),
     };
     vec![
         CardOffer {
             label: LineText::plain(ACCEPT),
             tag: ChoiceTag::Quest,
-            icon: Some(&super::offered_mark(def).get(content).icon),
+            icon: Some(super::offered_mark(def).get(content).icon.clone()),
             chips,
             locked: !open,
             warn: None,
@@ -372,7 +379,7 @@ fn turn_in_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer>
         vec![CardOffer {
             label: condition::spoken(world, player, def.hand_over()),
             tag: ChoiceTag::Quest,
-            icon: Some(&super::ready_mark(def).get(content).icon),
+            icon: Some(super::ready_mark(def).get(content).icon.clone()),
             chips: chips(None),
             locked: false,
             warn: None,
@@ -386,7 +393,7 @@ fn turn_in_card(world: &World, player: Entity, quest: QuestId) -> Vec<CardOffer>
             .map(|&pick| CardOffer {
                 label: LineText::plain(super::pick_label(content, pick)),
                 tag: ChoiceTag::Quest,
-                icon: Some(&pick.item.get(content).icon),
+                icon: Some(pick.item.get(content).icon.clone()),
                 chips: chips(Some(pick)),
                 locked: false,
                 warn: None,

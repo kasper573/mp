@@ -3,21 +3,21 @@ use std::time::{Duration, SystemTime};
 use bevy_ecs::entity::Entity;
 use bevy_input::keyboard::KeyCode;
 use bevy_input::mouse::MouseButton;
-use game::core::math::{Offset, Pos, WindowPx};
+use game::core::math::{Offset, Pos, Rect, WindowPx};
 use game::core::tiling::{Cell, TilePos, Tiles};
 use game::systems::area;
 use game::systems::input::gestures::ClickClaim;
+use game::systems::input::map::KeyModifiers;
 use game::systems::input::map::{InputAction, InputBinding, InputMap};
 use game::systems::movement::Grid;
 use game::systems::probe::{ProbeBody, ProbeShop, ProbeSnapshot, ProbeStage, ProbeUiElement};
-use ui::KeyModifiers;
 
-use crate::content::{content, marker_at};
+use crate::content::{content, hunting_ground, marker_at};
 use crate::desktop::{BUDGET, Button, Deadline, Desktop, WaitBudget};
 use crate::recording::Footage;
 use crate::seen::{
     UiTarget, area_key, at_rest, clickable_point, fixture, in_warp, in_world, me_at_rest, open,
-    portal, taken, townsperson,
+    passed_by, portal, taken, townsperson,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -34,7 +34,6 @@ pub enum Pace {
 pub struct Player {
     desktop: Desktop,
     pace: Pace,
-    pointer: Option<Pos<WindowPx>>,
 }
 
 pub const LONG: WaitBudget = WaitBudget {
@@ -44,11 +43,7 @@ pub const LONG: WaitBudget = WaitBudget {
 
 impl Player {
     pub fn new(desktop: Desktop, pace: Pace) -> Player {
-        Player {
-            desktop,
-            pace,
-            pointer: None,
-        }
+        Player { desktop, pace }
     }
 
     pub fn snapshot(&mut self) -> ProbeSnapshot {
@@ -116,7 +111,7 @@ impl Player {
     // Returns the first frame the game saw the pointer there. On camera it glides over a few frames,
     // as a hand would.
     pub fn point_at(&mut self, to: Pos<WindowPx>) -> ProbeSnapshot {
-        let from = self.pointer.unwrap_or(to);
+        let from = self.desktop.cursor().unwrap_or(to);
         let steps = match self.pace {
             Pace::Viewer if from.distance_to(to) > 4.0 => GLIDE_STEPS,
             _ => 1,
@@ -128,8 +123,11 @@ impl Player {
                     .move_pointer(from.lerp(to, step as f32 / steps as f32)),
             );
         }
-        self.pointer = Some(to);
         seen.expect("at least one step")
+    }
+
+    pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
+        self.desktop.sweep_pointer(through)
     }
 
     pub fn point_at_tile(&mut self, tile: Pos<Tiles>) -> ProbeSnapshot {
@@ -142,19 +140,23 @@ impl Player {
 
     // Whatever the action's pointer binding is, where the pointer is.
     pub fn act_here(&mut self, action: InputAction) -> ProbeSnapshot {
-        let (button, times, held) = bindings(action)
-            .iter()
-            .find_map(|binding| match *binding {
-                InputBinding::Mouse { button, modifiers } => Some((button, 1, modifiers)),
-                InputBinding::Click(gesture) => {
-                    Some((gesture.button, gesture.times, gesture.modifiers))
-                }
-                _ => None,
-            })
-            .unwrap_or_else(|| panic!("no click is bound to {action:?}"));
+        let (button, times, held) = pointer_binding(action);
         self.with_held(held, |player| {
             player.desktop.click(button_of(button), times)
         })
+    }
+
+    // The interface's drag of `ui`, held while `during` plays and let go after it.
+    pub fn dragging_ui<T>(
+        &mut self,
+        ui: impl Into<UiTarget>,
+        during: impl FnOnce(&mut Player) -> T,
+    ) -> T {
+        self.aim_at_ui(&ui.into(), Aim::Click);
+        self.desktop.button_down(Button::Left);
+        let done = during(self);
+        self.desktop.button_up(Button::Left);
+        done
     }
 
     pub fn click(&mut self) -> ProbeSnapshot {
@@ -194,28 +196,30 @@ impl Player {
         item: impl Into<UiTarget>,
         onto: impl Into<UiTarget>,
     ) -> ProbeSnapshot {
-        let (button, held) = bindings(InputAction::CarryItem)
-            .iter()
-            .find_map(|binding| match *binding {
-                InputBinding::Drag(gesture) => Some((gesture.button, gesture.modifiers)),
-                _ => None,
-            })
-            .expect("a drag is bound to carrying items");
+        let (button, held) = carry_binding();
         self.aim_at_ui(&item.into(), Aim::Click);
         let target = self.find_ui(onto);
         self.drag(button_of(button), held, target.rect.center())
     }
 
+    pub fn carrying<T>(
+        &mut self,
+        item: impl Into<UiTarget>,
+        during: impl FnOnce(&mut Player) -> T,
+    ) -> T {
+        let (button, held) = carry_binding();
+        self.aim_at_ui(&item.into(), Aim::Click);
+        self.with_held(held, |player| {
+            player.desktop.button_down(button_of(button));
+            let done = during(player);
+            player.desktop.button_up(button_of(button));
+            done
+        })
+    }
+
     // A tab sits on the row of tabs that "All" heads; the same title can show in the records below it.
     pub fn open_history_tab(&mut self, title: &str) {
-        self.click_ui(UiTarget::text(title).and(
-            "among the history's tabs",
-            |element, snapshot| {
-                UiTarget::text("All")
-                    .find(snapshot)
-                    .is_some_and(|all| (element.rect.min_y() - all.rect.min_y()).abs() < 4.0)
-            },
-        ));
+        self.click_ui(UiTarget::button(title));
         self.wait_until(&format!("the {title} tab"), |snapshot| {
             snapshot.history.tab.as_deref() == Some(title)
         });
@@ -377,7 +381,11 @@ impl Player {
                 .iter()
                 .rev()
                 .map(|cell| cell.center())
-                .find(|tile| open(&seen, *tile) && (!in_warp(&seen, *tile) || *tile == target))
+                .find(|tile| {
+                    open(&seen, *tile)
+                        && !passed_by(&seen, *tile)
+                        && (!in_warp(&seen, *tile) || *tile == target)
+                })
                 .or_else(|| detour(&seen, grid, target, path.len()));
             // Those standing in the way move on, or `arrived` says how close is close enough.
             let Some(hop) = hop else {
@@ -411,6 +419,14 @@ impl Player {
         }
     }
 
+    // Heads for where `npc` roams, and ends once `done` holds.
+    pub fn look_out(&mut self, npc: &str, done: impl Fn(&ProbeSnapshot) -> bool) -> Pos<Tiles> {
+        let area = area_key(&self.snapshot()).expect("an area");
+        let ground = hunting_ground(area, npc);
+        self.look_for(&format!("{npc} in sight"), ground, done);
+        ground
+    }
+
     // Others show only once near enough: the player heads for where they are, and finds them on the
     // way or there.
     pub fn look_for(
@@ -438,52 +454,51 @@ impl Player {
         })
     }
 
-    pub fn talk_to(&mut self, npc: &str) -> ProbeStage {
-        let what = format!("the conversation with {npc}");
-        let stage = self.reach(
-            &what,
+    // Walks up to the target, and clicks it until `done` shows what the click did.
+    fn engage<T>(
+        &mut self,
+        what: &str,
+        locate: impl Fn(&ProbeSnapshot) -> Option<(Entity, Pos<Tiles>, Pos<Tiles>)>,
+        done: impl Fn(&ProbeSnapshot) -> Option<T>,
+    ) -> T {
+        let found = self.reach(
+            what,
             LONG,
-            |snapshot| townsperson(snapshot, npc).map(|body| (body.id, body.at, body.aim)),
+            locate,
             |seen, target| seen.claim == ClickClaim::Interact(target),
+            done,
+        );
+        found.unwrap_or_else(|| self.desktop.give_up(what))
+    }
+
+    pub fn talk_to(&mut self, npc: &str) -> ProbeStage {
+        self.engage(
+            &format!("the conversation with {npc}"),
+            |snapshot| townsperson(snapshot, npc).map(|body| (body.id, body.at, body.aim)),
             |snapshot| {
                 let with = townsperson(snapshot, npc)?.id;
-                snapshot
-                    .stage
-                    .clone()
-                    .filter(|stage| stage.with == Some(with))
+                stage_with(snapshot, with)
             },
-        );
-        stage.unwrap_or_else(|| self.desktop.give_up(&what))
+        )
     }
 
     pub fn interact_with(&mut self, object: &str) -> ProbeStage {
-        let what = format!("using {object}");
-        let stage = self.reach(
-            &what,
-            LONG,
+        self.engage(
+            &format!("using {object}"),
             |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
-            |seen, target| seen.claim == ClickClaim::Interact(target),
             |snapshot| {
                 let with = fixture(snapshot, object)?.id;
-                snapshot
-                    .stage
-                    .clone()
-                    .filter(|stage| stage.with == Some(with))
+                stage_with(snapshot, with)
             },
-        );
-        stage.unwrap_or_else(|| self.desktop.give_up(&what))
+        )
     }
 
     pub fn shop_at(&mut self, object: &str) -> ProbeShop {
-        let what = format!("the shop at {object}");
-        let shop = self.reach(
-            &what,
-            LONG,
+        self.engage(
+            &format!("the shop at {object}"),
             |snapshot| fixture(snapshot, object).map(|prop| (prop.id, prop.at, prop.aim)),
-            |seen, target| seen.claim == ClickClaim::Interact(target),
             |snapshot| snapshot.shop.clone(),
-        );
-        shop.unwrap_or_else(|| self.desktop.give_up(&what))
+        )
     }
 
     // Chases the nearest of `foes` and swings at whichever of them the click lands on, until `done`:
@@ -521,8 +536,9 @@ impl Player {
         }
     }
 
-    // Whether it was picked up within the budget: whatever stands over it takes a click instead.
-    pub fn pick_up(&mut self, item: Entity, budget: WaitBudget) -> bool {
+    // Whatever stands over the item takes a click instead, so it is clicked again as the way clears.
+    pub fn pick_up(&mut self, item: Entity, budget: WaitBudget) {
+        let what = "the pick-up";
         let lying = |snapshot: &ProbeSnapshot| {
             snapshot
                 .items
@@ -531,10 +547,12 @@ impl Player {
                 .map(|lying| (lying.id, lying.at, lying.at))
         };
         let takes = |seen: &ProbeSnapshot, target| seen.claim == ClickClaim::Pickup(target);
-        self.reach("the pick-up", budget, lying, takes, |snapshot| {
+        let picked = self.reach(what, budget, lying, takes, |snapshot| {
             lying(snapshot).is_none().then_some(())
-        })
-        .is_some()
+        });
+        if picked.is_none() {
+            self.desktop.give_up(what);
+        }
     }
 
     // Reads on line by line until the choices show. On camera each line, and then the choices, stay up
@@ -556,7 +574,7 @@ impl Player {
                         .collect();
                     read += reading(&labels.join(" "));
                 }
-                self.linger_until(began + read, false);
+                self.linger_until(began + read);
             }
             if last {
                 return stage;
@@ -610,15 +628,27 @@ impl Player {
         });
     }
 
-    // Lingers on what's on screen until then. Watching takes a snapshot of every frame meanwhile,
-    // so whatever observes them sees it all.
-    pub fn linger_until(&mut self, until: SystemTime, watching: bool) {
-        while let Ok(left) = until.duration_since(SystemTime::now()) {
-            if watching {
-                self.snapshot();
-            } else {
-                std::thread::sleep(left);
-            }
+    pub fn answer_first_choices(&mut self) {
+        for _ in 0..FIRST_CHOICES {
+            let Some(before) = self.snapshot().stage else {
+                return;
+            };
+            self.read_to_choices();
+            self.act(InputAction::Choice1);
+            self.wait_until("the conversation to move on", |snapshot| {
+                snapshot
+                    .stage
+                    .as_ref()
+                    .is_none_or(|now| now.node != before.node)
+            });
+        }
+        self.conversation_over();
+    }
+
+    // Lingers on what's on screen until then, a frame at a time, so every observer sees each frame.
+    pub fn linger_until(&mut self, until: SystemTime) {
+        while until.duration_since(SystemTime::now()).is_ok() {
+            self.snapshot();
         }
     }
 
@@ -700,28 +730,19 @@ impl Player {
     // open, and lists shift as they fill. Clicks pass through some of the interface, so only the rest
     // can be clicked; all of it can be hovered.
     fn aim_at_ui(&mut self, ui: &UiTarget, aim: Aim) -> ProbeSnapshot {
-        let reachable = |element: &ProbeUiElement| aim == Aim::Hover || !element.click_through;
-        let find = |snapshot: &ProbeSnapshot| -> Option<ProbeUiElement> {
+        let found = |snapshot: &ProbeSnapshot| {
             snapshot
                 .ui
                 .iter()
-                .filter(|element| reachable(element))
+                .filter(|element| aim == Aim::Hover || !element.click_through)
                 .find(|element| ui.matches(element, snapshot))
-                .cloned()
+                .map(|element| element.rect)
         };
-        for _ in 0..AIM_ATTEMPTS {
-            let target = self.wait_for(&format!("the interface to show {}", ui.describe()), find);
-            let seen = self.point_at(target.rect.center());
-            let still = find(&seen)
-                .is_some_and(|under| under.rect.center().distance_to(target.rect.center()) <= 1.0);
-            if still && (aim == Aim::Hover || seen.claim == ClickClaim::Interface) {
-                return seen;
-            }
-        }
-        self.desktop.fail(&format!(
-            "{} never held still under the pointer",
-            ui.describe()
-        ));
+        self.aim_at(
+            &format!("the interface to show {}", ui.describe()),
+            aim,
+            found,
+        )
     }
 
     // Choice labels can show elsewhere too (a quest title on the tracker), so only the choice row counts.
@@ -735,24 +756,32 @@ impl Player {
                 .find(|choice| choice.label == label)?
                 .rect
         };
+        self.aim_at(&format!("the choice {label:?}"), Aim::Click, row)
+    }
+
+    fn aim_at(
+        &mut self,
+        what: &str,
+        aim: Aim,
+        find: impl Fn(&ProbeSnapshot) -> Option<Rect<WindowPx>>,
+    ) -> ProbeSnapshot {
         for _ in 0..AIM_ATTEMPTS {
-            let target = self.wait_for(&format!("the choice {label:?}"), row);
+            let target = self.wait_for(what, &find);
             let seen = self.point_at(target.center());
-            let cursor = seen.input.cursor;
-            let still = row(&seen)
-                .zip(cursor)
-                .is_some_and(|(rect, at)| rect.contains(at));
-            if still && seen.claim == ClickClaim::Interface {
+            let still = seen
+                .input
+                .cursor
+                .is_some_and(|at| find(&seen).is_some_and(|rect| rect.contains(at)));
+            if still && (aim == Aim::Hover || seen.claim == ClickClaim::Interface) {
                 return seen;
             }
         }
-        self.desktop.fail(&format!(
-            "the choice {label:?} never held still under the pointer"
-        ));
+        self.desktop
+            .fail(&format!("{what} never held still under the pointer"))
     }
 
     fn drag(&mut self, button: Button, held: KeyModifiers, to: Pos<WindowPx>) -> ProbeSnapshot {
-        let from = self.pointer.expect("the pointer is on the window");
+        let from = self.desktop.cursor().expect("the pointer is on the window");
         self.with_held(held, |player| {
             player.desktop.button_down(button);
             for step in 1..=DRAG_STEPS {
@@ -760,7 +789,6 @@ impl Player {
                     .desktop
                     .move_pointer(from.lerp(to, step as f32 / DRAG_STEPS as f32));
             }
-            player.pointer = Some(to);
             player.desktop.button_up(button)
         })
     }
@@ -780,6 +808,7 @@ const TYPING: Duration = Duration::from_millis(45);
 const AIM_ATTEMPTS: u32 = 60;
 const NEAR: Tiles = Tiles(1.5);
 const SCROLLS: u32 = 12;
+const FIRST_CHOICES: u32 = 3;
 const SET_OFF: WaitBudget = WaitBudget {
     time: Duration::from_secs(2),
     frames: 120,
@@ -788,6 +817,13 @@ const SET_OFF: WaitBudget = WaitBudget {
 // About four words a second, the pace of subtitles, with a moment to find the text first.
 pub fn reading(text: &str) -> Duration {
     Duration::from_millis(800 + 250 * text.split_whitespace().count() as u64)
+}
+
+fn stage_with(snapshot: &ProbeSnapshot, with: Entity) -> Option<ProbeStage> {
+    snapshot
+        .stage
+        .clone()
+        .filter(|stage| stage.with == Some(with))
 }
 
 fn bindings(action: InputAction) -> Vec<InputBinding> {
@@ -820,7 +856,9 @@ fn detour(
     grid.nodes()
         .iter()
         .copied()
-        .filter(|tile| open(snapshot, *tile) && !in_warp(snapshot, *tile))
+        .filter(|tile| {
+            open(snapshot, *tile) && !passed_by(snapshot, *tile) && !in_warp(snapshot, *tile)
+        })
         .filter_map(|tile| Some((tile, grid.path(tile.cell(), target.cell())?.len())))
         .filter(|(_, way)| *way < left)
         .min_by_key(|(_, way)| *way)
@@ -832,7 +870,7 @@ fn detour(
 // An enemy in front of the target takes the click, as it would take a player's: the way to the
 // target leads through it.
 fn in_the_way(seen: &ProbeSnapshot, target: Entity) -> bool {
-    matches!(seen.claim, ClickClaim::Attack(enemy) if enemy != target)
+    matches!(seen.claim, ClickClaim::Attack(other) | ClickClaim::Pickup(other) if other != target)
 }
 
 fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos<Tiles>> {
@@ -842,6 +880,19 @@ fn reachable_near(grid: &Grid, from: Pos<Tiles>, goal: Pos<Tiles>) -> Option<Pos
         .copied()
         .filter(|node| grid.component(*node) == Some(region))
         .min_by(|a, b| a.distance_to(goal).total_cmp(&b.distance_to(goal)))
+}
+
+fn pointer_binding(action: InputAction) -> (MouseButton, u8, KeyModifiers) {
+    bindings(action)
+        .iter()
+        .find_map(|binding| match *binding {
+            InputBinding::Mouse { button, modifiers } => Some((button, 1, modifiers)),
+            InputBinding::Click(gesture) => {
+                Some((gesture.button, gesture.times, gesture.modifiers))
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no click is bound to {action:?}"))
 }
 
 fn button_of(button: MouseButton) -> Button {
@@ -876,4 +927,14 @@ fn keysym(key: KeyCode) -> String {
         _ if name.starts_with("Arrow") => name["Arrow".len()..].to_owned(),
         _ => name,
     }
+}
+
+fn carry_binding() -> (MouseButton, KeyModifiers) {
+    bindings(InputAction::CarryItem)
+        .iter()
+        .find_map(|binding| match *binding {
+            InputBinding::Drag(gesture) => Some((gesture.button, gesture.modifiers)),
+            _ => None,
+        })
+        .expect("a drag is bound to carrying items")
 }

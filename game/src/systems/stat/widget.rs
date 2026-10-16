@@ -1,19 +1,21 @@
 use bevy::prelude::*;
-use ui::text_colored;
+use design_tokens::color;
+use egui::{RichText, Ui, Vec2};
 
-use crate::systems::hud::{HudAudience, Window, single_tab};
+use crate::systems::hud::{HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::job;
 use crate::systems::player::session;
 use crate::systems::stat;
 
-#[derive(Component, Default, Clone)]
-struct StatsText;
+const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 260.0);
+const LABEL_WIDTH: f32 = 140.0;
+const ROW_SPACING: Vec2 = Vec2::new(16.0, 6.0);
 
 pub struct StatsWindow;
 
-impl Window for StatsWindow {
+impl HudWindow for StatsWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }
@@ -26,38 +28,49 @@ impl Window for StatsWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Stats
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        single_tab(self.title(), ui::scrolled(content()))
+    fn size(&self) -> Vec2 {
+        WINDOW_SIZE
     }
-    fn sync(&self, world: &mut World) {
-        sync_stats(world)
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let rows = stat_rows(world);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                egui::Grid::new("stats")
+                    .num_columns(2)
+                    .min_col_width(LABEL_WIDTH)
+                    .spacing(ROW_SPACING)
+                    .show(ui, |ui| {
+                        for (label, value) in rows {
+                            ui.label(RichText::new(label).color(color::MUTED));
+                            ui.label(value);
+                            ui.end_row();
+                        }
+                    });
+            });
     }
 }
 
-fn content() -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node { width: Val::Percent(100.0) }
-        Children [ @{text_colored(String::new(), Color::WHITE)} StatsText ]
-    })
-}
-
-fn sync_stats(world: &mut World) {
-    let text = stats_text(world);
-    let mut query = world.query_filtered::<&mut Text, With<StatsText>>();
-    for mut node in query.iter_mut(world) {
-        node.0 = text.clone();
-    }
-}
-
-fn stats_text(world: &World) -> String {
+fn stat_rows(world: &World) -> Vec<(String, String)> {
     let Some(me) = session::my_character(world) else {
-        return String::new();
+        return Vec::new();
     };
     let entity = me.id();
     let stats = stat::effective_all(world, entity);
-    let mut lines = vec![format!("Level {}", job::level(world, entity))];
-    for stat in &stats.0 {
-        lines.push(format!("{}: {:.1}", stat.label(), stat.value));
+    std::iter::once(("Level".to_owned(), job::level(world, entity).to_string()))
+        .chain(
+            stats
+                .0
+                .iter()
+                .map(|stat| (stat.label().to_owned(), shown_value(stat.value))),
+        )
+        .collect()
+}
+
+fn shown_value(value: f32) -> String {
+    if (value - value.round()).abs() < 0.05 {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
     }
-    lines.join("\n")
 }

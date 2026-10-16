@@ -51,6 +51,6 @@ pub fn picked_row(editor: &mut Editor, then: PickRowThen, picked: &str) {
 }
 
 pub fn listen(editor: &mut Editor, frame: &AreaFrame, tile: Pos<Tiles>) {
-    sound::listen(editor, frame.content, frame.area_id, tile);
+    sound::listen(editor, &frame.content, frame.area_id, tile);
     editor.panels.bottom = BottomTab::Listen;
 }

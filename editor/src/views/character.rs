@@ -7,9 +7,10 @@ use game::systems::GameSettings;
 use game::systems::area::{self, AreaDef, AreaModule};
 use game::systems::job::{JobDef, JobLevel};
 use game::systems::npc::NpcId;
-use game::systems::quest::{Objective, Parties, Party, QuestDef};
+use game::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
 use game::systems::script::RiftScripts;
 use game::systems::stat::StatKind;
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use super::area::scene::{AreaSceneRequest, AreaSceneSpec, SceneryOf};
@@ -35,7 +36,8 @@ pub struct CharacterView {
     pub more_memories: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CharacterSection {
     #[default]
     Identity,
@@ -43,9 +45,11 @@ pub enum CharacterSection {
     Bag,
     Equipment,
     Start,
+    #[serde(rename = "areas")]
     AreasKnown,
     Quests,
     Memories,
+    #[serde(rename = "lines")]
     LinesHeard,
     Shops,
     History,
@@ -303,7 +307,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         widgets::kv(ui, "job", |ui| {
             let current = value.text("job").to_owned();
             let mut picked = current.clone();
-            egui::ComboBox::from_id_salt("character-job")
+            widgets::combo_box("character-job")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current).size(13.0))
                 .show_ui(ui, |ui| {
@@ -446,7 +450,7 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             let current = value["equipment"][slot].as_str().map(str::to_owned);
             widgets::kv(ui, slot, |ui| {
                 let mut picked = current.clone();
-                egui::ComboBox::from_id_salt(("equipment", slot))
+                widgets::combo_box(("equipment", slot))
                     .width(ui.available_width() - 8.0)
                     .selected_text(match &current {
                         Some(item) => theme::mono(format!("item/ {item}")).size(13.0),
@@ -497,7 +501,7 @@ fn start(
         .by_key
         .get(&scene_key)
         .map(|scene| (scene.texture, scene.uv()));
-    let spawn = cx.content.map(|content| {
+    let spawn = cx.content.clone().map(|content| {
         let place = &content.built::<GameSettings>().initial_spawn;
         (place.area.key(&content).to_owned(), place.at)
     });
@@ -548,7 +552,7 @@ fn start(
                 }
             }
         });
-        if let Some(content) = cx.content
+        if let Some(content) = cx.content.clone()
             && let Some(area_id) = content.by_key::<AreaDef>(&area_key)
         {
             let size = area::load(&content, area_id).size;
@@ -693,7 +697,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Standing {
+pub enum Standing {
     NotTaken,
     Active,
     Completed,
@@ -701,19 +705,30 @@ enum Standing {
 }
 
 impl Standing {
-    const ALL: [Standing; 4] = [
+    pub const ALL: [Standing; 4] = [
         Standing::NotTaken,
         Standing::Active,
         Standing::Completed,
         Standing::Failed,
     ];
 
-    fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Standing::NotTaken => "not taken",
             Standing::Active => "in progress",
             Standing::Completed => "completed",
             Standing::Failed => "failed",
+        }
+    }
+
+    pub fn of_log(log: &QuestLog, quest: QuestId) -> Standing {
+        if log.active(quest).is_some() {
+            return Standing::Active;
+        }
+        match log.finished(quest).map(|finished| finished.result) {
+            Some(QuestResult::Completed) => Standing::Completed,
+            Some(QuestResult::Failed) => Standing::Failed,
+            None => Standing::NotTaken,
         }
     }
 
@@ -744,7 +759,7 @@ struct ObjectiveLine {
 }
 
 fn objectives_of(cx: &FormCx, quest: &str) -> Vec<ObjectiveLine> {
-    let Some(content) = cx.content else {
+    let Some(content) = cx.content.clone() else {
         return Vec::new();
     };
     let Some(id) = content.by_key::<QuestDef>(quest) else {
@@ -807,8 +822,9 @@ fn quests(
         .collect();
     let parties = cx
         .content
+        .as_ref()
         .filter(|content| content.has_built::<RiftScripts>())
-        .map(|content| Parties::of(&content, content.built::<RiftScripts>()));
+        .map(|content| Parties::of(content, content.built::<RiftScripts>()));
     let mut order: Vec<String> = in_log.clone();
     let rest: Vec<String> = all
         .iter()
@@ -832,14 +848,15 @@ fn quests(
                     .and_then(|list| list.iter().position(|q| q["quest"].as_str() == Some(quest)));
                 let standing =
                     Standing::of(entry_index.and_then(|i| value["quests"][i]["state"].as_str()));
-                let giver = cx
-                    .content
-                    .zip(parties.as_ref())
-                    .and_then(|(content, parties)| {
-                        content
-                            .by_key::<QuestDef>(quest)
-                            .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
-                    });
+                let giver =
+                    cx.content
+                        .as_ref()
+                        .zip(parties.as_ref())
+                        .and_then(|(content, parties)| {
+                            content
+                                .by_key::<QuestDef>(quest)
+                                .and_then(|id| parties.giver(id).map(|party| party.name.clone()))
+                        });
                 let requires = cx.files.json(&row_file("quest", quest)).and_then(|row| {
                     row["modules"].as_array().and_then(|modules| {
                         modules
@@ -869,7 +886,7 @@ fn quests(
                         });
                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
                             let mut picked = standing;
-                            egui::ComboBox::from_id_salt(("quest-state", quest))
+                            widgets::combo_box(("quest-state", quest))
                                 .selected_text(theme::mono(standing.label()).size(12.5))
                                 .show_ui(ui, |ui| {
                                     for option in Standing::ALL {
@@ -1007,7 +1024,7 @@ fn quests(
 }
 
 fn giver_of<'p>(cx: &FormCx, parties: Option<&'p Parties>, quest: &str) -> Option<&'p Party> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     let id = content.by_key::<QuestDef>(quest)?;
     parties?.giver(id)
 }
@@ -1039,7 +1056,7 @@ enum Moment {
 impl Moment {
     fn all(cx: &FormCx, quest: &str) -> Vec<Moment> {
         let mut moments = vec![Moment::JustOffered, Moment::ObjectivesMet];
-        if let Some(content) = cx.content
+        if let Some(content) = cx.content.clone()
             && let Some(id) = content.by_key::<QuestDef>(quest)
         {
             for objective in id.get(&content).objectives() {
@@ -1152,7 +1169,7 @@ fn give(value: &mut Value, item: &str, count: u32) {
 }
 
 fn npc_place(cx: &FormCx, npc: NpcId) -> Option<(String, Pos<Tiles>)> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     content.ids::<AreaDef>().find_map(|area| {
         area::placed(&content, area)
             .iter()
@@ -1323,7 +1340,7 @@ fn stack_max(cx: &FormCx, item: &str) -> Option<u32> {
 }
 
 pub fn level_of(cx: &FormCx, job: &str, xp: u32) -> u32 {
-    let Some(content) = cx.content else {
+    let Some(content) = cx.content.clone() else {
         return 0;
     };
     content
@@ -1340,7 +1357,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let Some(row) = editor.row_value(TABLE, key) else {
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let xp = row["xp"].as_u64().unwrap_or(0) as u32;

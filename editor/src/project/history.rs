@@ -59,15 +59,28 @@ impl RowSelection {
     }
 }
 
-#[derive(Default)]
 pub struct EditHistory {
     steps: Vec<EditStep>,
     applied: usize,
+    saved: Option<usize>,
+}
+
+impl Default for EditHistory {
+    fn default() -> Self {
+        EditHistory {
+            steps: Vec::new(),
+            applied: 0,
+            saved: Some(0),
+        }
+    }
 }
 
 impl EditHistory {
     pub fn push(&mut self, step: EditStep) {
         self.steps.truncate(self.applied);
+        if self.saved.is_some_and(|at| at > self.applied) {
+            self.saved = None;
+        }
         self.steps.push(step);
         self.applied = self.steps.len();
         self.trim();
@@ -97,9 +110,16 @@ impl EditHistory {
         self.applied
     }
 
-    pub fn clear(&mut self) {
-        self.steps.clear();
-        self.applied = 0;
+    pub fn saved(&self) -> Option<usize> {
+        self.saved
+    }
+
+    pub fn mark_saved(&mut self) {
+        self.saved = Some(self.applied);
+    }
+
+    pub fn reset(&mut self) {
+        *self = EditHistory::default();
     }
 
     pub fn merge_into_last(&mut self, label: &str, after: Vec<FileChange>) -> bool {
@@ -134,6 +154,7 @@ impl EditHistory {
         while self.steps.len() > MAX_STEPS || (self.bytes() > MAX_BYTES && self.steps.len() > 1) {
             self.steps.remove(0);
             self.applied = self.applied.saturating_sub(1);
+            self.saved = self.saved.and_then(|at| at.checked_sub(1));
         }
     }
 

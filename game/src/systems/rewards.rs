@@ -18,7 +18,7 @@ pub struct KillCredited {
 }
 
 pub fn grant(world: &mut World, mut deaths: Local<MessageCursor<Died>>) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let deaths: Vec<Died> = deaths
         .read(world.resource::<Messages<Died>>())

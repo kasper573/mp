@@ -13,6 +13,7 @@ use crate::app::Editor;
 use crate::play;
 use crate::project::ContentEdit;
 use crate::views::area as area_view;
+use crate::views::navigation;
 
 const SNAP_PX: f32 = 8.0;
 const DRAG_SLOP: f32 = 3.0;
@@ -144,7 +145,7 @@ pub fn run(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, canvas: &MapCan
     {
         drag.follow(map, p, canvas.viewport.scale(), modifiers);
     }
-    if (response.drag_stopped() || ui.input(|i| i.pointer.any_released()))
+    if response.drag_stopped()
         && let Some(drag) = editor.views.world.drag.take()
     {
         finish_drag(editor, map, canvas, drag, pointer, modifiers);
@@ -310,8 +311,12 @@ fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers:
         }
         None if !extend => {
             let region = map.layout.regions.iter().position(|region| {
-                map.region_rect(&map.layout, region)
-                    .is_some_and(|rect| canvas.viewport.rect(rect).contains(p))
+                map.region_rect(&map.layout, region).is_some_and(|rect| {
+                    canvas
+                        .viewport
+                        .rect(navigation::rect_from_egui(rect))
+                        .contains(p)
+                })
             });
             select(editor, region.map(MapPart::Region).into_iter().collect());
         }
@@ -403,7 +408,7 @@ fn canvas_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, canvas: &Ma
     if ui.button("Add note here").clicked() {
         let at = ui
             .input(|i| i.pointer.latest_pos())
-            .map_or(canvas.viewport.center, |p| canvas.viewport.to_map(p));
+            .map_or(canvas.viewport.center, |p| canvas.viewport.to_tile(p));
         super::add_note(editor, map, at);
         ui.close();
     }

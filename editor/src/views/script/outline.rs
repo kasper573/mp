@@ -7,7 +7,7 @@ use super::graph::{self, NodePaletteOpen, ScriptGraphAction};
 use super::nodes::{self, LineSpeaker, OutlineRow};
 use super::{ScriptDoc, select_nodes};
 use crate::app::{Editor, RightTab};
-use crate::project::RowSelection;
+use crate::project::{RowSelection, catalogue_of};
 use crate::spans;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -22,7 +22,7 @@ pub fn show(
     actions: &mut Vec<ScriptGraphAction>,
 ) {
     let owner = doc.owner.clone();
-    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), &editor.views.script.catalogue);
+    let rows: Vec<OutlineRow> = nodes::outline(doc.nodes(), catalogue_of(editor.project.as_ref()));
     let summaries = summaries(editor, doc);
     let (focus, folded) = editor
         .views
@@ -84,7 +84,10 @@ pub fn show(
     if let Some(key) = clicked {
         next_focus = Some(key);
     }
-    let view = editor.views.script.view_mut(&owner);
+    let view = editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref());
     if let Some((key, fold)) = fold {
         if fold {
             view.folded.insert(key);
@@ -112,17 +115,11 @@ pub fn show(
         editor.panels.right = RightTab::Inspector;
     }
     if keys.tab {
-        let catalogue = &editor.views.script.catalogue;
         let link = match row.choice {
             Some(index) => target
                 .is_none()
                 .then(|| (row.name.clone(), format!("/choices/{index}/to"))),
-            None => doc.nodes().get(&row.name).and_then(|node| {
-                nodes::ports(node, catalogue)
-                    .into_iter()
-                    .find(|port| port.target.is_none())
-                    .map(|port| (row.name.clone(), port.field))
-            }),
+            None => super::free_port_link(doc, catalogue_of(editor.project.as_ref()), &row.name),
         };
         actions.push(ScriptGraphAction::Palette(NodePaletteOpen {
             at: ui.max_rect().left_top() + egui::vec2(60.0 + row.depth as f32 * INDENT, 40.0),
@@ -300,7 +297,7 @@ fn draw(
 }
 
 fn summaries(editor: &Editor, doc: &ScriptDoc) -> HashMap<String, String> {
-    let catalogue = &editor.views.script.catalogue;
+    let catalogue = catalogue_of(editor.project.as_ref());
     doc.nodes()
         .iter()
         .map(|(name, node)| {
@@ -342,7 +339,7 @@ fn dialogue_summary(editor: &Editor, node: &Value) -> String {
 fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
     match row.choice {
         Some(index) => {
-            editor.views.script.focus = Some(doc.owner.clone());
+            editor.views.script.focus_on(&doc.owner);
             editor.select(RowSelection::parts(
                 doc.owner.table(),
                 doc.owner.key(),
@@ -351,7 +348,11 @@ fn select(editor: &mut Editor, doc: &ScriptDoc, row: &OutlineRow) {
                     format!("choice:{}#{index}", row.name),
                 ],
             ));
-            editor.views.script.view_mut(&doc.owner).selected = vec![row.name.clone()];
+            editor
+                .views
+                .script
+                .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+                .selected = vec![row.name.clone()];
         }
         None if !row.link => select_nodes(editor, doc, std::slice::from_ref(&row.name)),
         None => {}

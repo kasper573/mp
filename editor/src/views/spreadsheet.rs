@@ -43,7 +43,16 @@ pub struct SpreadsheetState {
     pub editing: Option<String>,
     pub form: FormState,
     pub last_edit: Option<(String, String, String)>,
+    focus_editor: bool,
     columns: Option<(u64, Arc<Vec<SpreadsheetColumn>>)>,
+}
+
+impl SpreadsheetState {
+    fn open_cell(&mut self, column: String) {
+        self.editing = Some(column);
+        self.form = FormState::default();
+        self.focus_editor = true;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -262,9 +271,7 @@ fn leaves(
     }
     let schema = schema::resolve(root, schema);
     match schema::kind(root, schema) {
-        SchemaKind::Object
-            if schema::marker(schema).is_none() && forms::geometry_of(root, schema).is_none() =>
-        {
+        SchemaKind::Object if schema::marker(schema).is_none() => {
             for (name, field) in schema::properties(schema) {
                 path.push(name.clone());
                 leaves(root, field, path, out);
@@ -341,8 +348,20 @@ fn save_view(editor: &mut Editor, table: &str, view: SpreadsheetView) {
     editor.save_settings();
 }
 
+fn named_filters(editor: &Editor, table: &str) -> BTreeMap<&'static str, BTreeSet<String>> {
+    let mut named = BTreeMap::new();
+    if table == NpcDef::TABLE {
+        named.insert(CAN_BE_FOUGHT, can_be_fought(editor));
+    }
+    named
+}
+
 fn can_be_fought(editor: &Editor) -> BTreeSet<String> {
-    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
         return BTreeSet::new();
     };
     if !content.has_built::<RiftScripts>() {
@@ -368,11 +387,11 @@ fn filters_of(view: &SpreadsheetView) -> Vec<String> {
 fn passes(
     row: &SpreadsheetRow,
     filter: &str,
-    fought: &BTreeSet<String>,
+    named: &BTreeMap<&'static str, BTreeSet<String>>,
     columns: &[SpreadsheetColumn],
 ) -> bool {
-    if filter == CAN_BE_FOUGHT {
-        return fought.contains(&row.key);
+    if let Some(keys) = named.get(filter) {
+        return keys.contains(&row.key);
     }
     if let Some(tag) = filter.strip_prefix("has ") {
         return row.has_module(tag);
@@ -454,7 +473,7 @@ pub fn shown_rows(
     let all = rows_of(editor, table);
     let columns = columns_cached(editor, table, &all);
     let view = view_of(editor, table, &columns);
-    let fought = can_be_fought(editor);
+    let named = named_filters(editor, table);
     let filters = filters_of(&view);
     let search = editor
         .views
@@ -469,7 +488,7 @@ pub fn shown_rows(
         .filter(|row| {
             filters
                 .iter()
-                .all(|filter| passes(row, filter, &fought, &columns))
+                .all(|filter| passes(row, filter, &named, &columns))
         })
         .filter(|row| matches_search(row, &search, &columns))
         .collect();
@@ -905,8 +924,7 @@ fn table_body(
             state.editing = None;
         }
         if hit.double || (same && hit.column != "key") {
-            state.editing = Some(hit.column.clone());
-            state.form = FormState::default();
+            state.open_cell(hit.column.clone());
         }
         editor.select(RowSelection {
             table: table.to_owned(),
@@ -993,22 +1011,16 @@ fn edit_cell(
         return CellEdit::Cancelled;
     };
     let state = views.spreadsheet.state_mut(table);
+    let autofocus = std::mem::take(&mut state.focus_editor);
     let mut cx = FormCx::new(project, root, shapes, &mut state.form, &mut actions)
         .owned_by(table, Some(&row.key));
-    let first_frame = !cx
-        .state
-        .drafts
-        .contains_key(&ui.id().with(&path).with("number"))
-        && !cx.state.drafts.contains_key(&ui.id().with(&path));
+    cx.autofocus = autofocus;
     let changed = ui
         .push_id(("sheet-cell", &row.key, &column.id), |ui| {
             ui.set_width(ui.available_width());
             forms::value(ui, &mut cx, &schema, &mut value, &path)
         })
         .inner;
-    if first_frame {
-        ui.memory_mut(|m| m.request_focus(ui.id().with(&path).with("number")));
-    }
     match changed.0 {
         Some(label) => CellEdit::Committed(value, format!("{label} of {}", row.key)),
         None => CellEdit::Open,
@@ -1159,8 +1171,7 @@ fn keys(
         state.selected = Some((rows[target.0].key.clone(), shown[target.1].id.clone()));
         state.anchor = None;
         if tab && shown[target.1].source != ColumnSource::Key {
-            state.editing = Some(shown[target.1].id.clone());
-            state.form = FormState::default();
+            state.open_cell(shown[target.1].id.clone());
         }
         editor.select(RowSelection {
             table: table.to_owned(),
@@ -1170,8 +1181,7 @@ fn keys(
         return;
     }
     if enter && shown[column_index].source != ColumnSource::Key {
-        state.editing = Some(column_id.clone());
-        state.form = FormState::default();
+        state.open_cell(column_id.clone());
         return;
     }
     if copy {

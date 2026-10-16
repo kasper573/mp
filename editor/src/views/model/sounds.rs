@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy::prelude::World;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioSource};
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
@@ -11,109 +9,11 @@ use game::core::content::ContentRow;
 use game::core::math::Rng;
 
 use crate::app::Editor;
-use crate::project::{ContentEdit, ProjectFiles, hash, row_file};
+use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};
+use crate::project::{ContentEdit, row_file};
 use crate::ui::{theme, widgets};
 
-const BINS: usize = 160;
-const LOUDEST_WINDOW_MS: u32 = 100;
 pub const PEAK_CEILING_DBFS: f64 = -12.0;
-
-#[derive(Clone)]
-pub struct Waveform {
-    pub bins: Vec<f32>,
-    pub ms: u32,
-    pub loudness: Option<EffectLoudness>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct EffectLoudness {
-    pub loudest: f64,
-    pub peak_dbfs: f64,
-}
-
-impl EffectLoudness {
-    pub fn loudest_at(self, gain: f32) -> f64 {
-        self.loudest + gain_db(gain)
-    }
-}
-
-fn gain_db(gain: f32) -> f64 {
-    f64::from(audio::decibels(gain).0)
-}
-
-#[derive(Default)]
-pub struct WaveformCache {
-    waves: HashMap<String, (String, Option<Waveform>)>,
-}
-
-impl WaveformCache {
-    pub fn wave(&mut self, files: &ProjectFiles, path: &str) -> Option<Waveform> {
-        let file = format!("assets/{path}");
-        let bytes = files.get(&file)?;
-        let hash = hash(bytes);
-        if let Some((seen, wave)) = self.waves.get(&file)
-            && *seen == hash
-        {
-            return wave.clone();
-        }
-        let wave = analyse(bytes);
-        self.waves.insert(file, (hash, wave.clone()));
-        wave
-    }
-}
-
-fn analyse(bytes: &[u8]) -> Option<Waveform> {
-    let decoded = loader::decode(bytes.to_vec()).ok()?;
-    let channels = decoded.channels.max(1);
-    let frames = decoded.samples.len() / channels;
-    let ms = (frames as f64 * 1000.0 / decoded.sample_rate.max(1) as f64).round() as u32;
-    let mut bins = vec![0.0f32; BINS];
-    for (index, sample) in decoded.samples.iter().enumerate() {
-        let bin = (index / channels) * BINS / frames.max(1);
-        let bin = bin.min(BINS - 1);
-        bins[bin] = bins[bin].max(sample.abs());
-    }
-    let peak = bins.iter().cloned().fold(0.0f32, f32::max).max(1e-6);
-    for bin in &mut bins {
-        *bin /= peak;
-    }
-    Some(Waveform {
-        bins,
-        ms,
-        loudness: measure(&decoded),
-    })
-}
-
-fn measure(decoded: &DecodedAudio) -> Option<EffectLoudness> {
-    let channels = decoded.channels as u32;
-    let mut meter = ebur128::EbuR128::new(
-        channels,
-        decoded.sample_rate,
-        ebur128::Mode::M | ebur128::Mode::TRUE_PEAK,
-    )
-    .ok()?;
-    meter.set_max_window(LOUDEST_WINDOW_MS.max(400)).ok()?;
-    let chunk = (decoded.sample_rate as usize / 100).max(1) * decoded.channels;
-    let mut loudest = f64::NEG_INFINITY;
-    for samples in decoded.samples.chunks(chunk) {
-        meter.add_frames_f32(samples).ok()?;
-        if let Ok(window) = meter.loudness_window(LOUDEST_WINDOW_MS)
-            && window.is_finite()
-        {
-            loudest = loudest.max(window);
-        }
-    }
-    let mut peak: f64 = 0.0;
-    for channel in 0..channels {
-        if let Ok(p) = meter.true_peak(channel) {
-            peak = peak.max(p);
-        }
-    }
-    Some(EffectLoudness {
-        loudest,
-        peak_dbfs: 20.0 * peak.max(1e-9).log10(),
-    })
-}
 
 pub fn wave_of_sfx(editor: &mut Editor, sfx: &str) -> Option<Waveform> {
     let path = sfx_file(editor, sfx)?;
@@ -187,7 +87,7 @@ pub struct LoudnessVerdict {
     pub peak: String,
 }
 
-pub fn verdict(loudness: EffectLoudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerdict {
+pub fn verdict(loudness: Loudness, gain: f32, role: &SfxRoleDef) -> LoudnessVerdict {
     let level = loudness.loudest_at(gain);
     let target = role.loudness.0;
     let off = level - target;

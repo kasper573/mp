@@ -7,13 +7,13 @@ use super::graph::NodePaletteOpen;
 use super::nodes::{NodeCatalogue, NodeEntry};
 use super::{ScriptDoc, add_node, nodes};
 use crate::app::Editor;
+use crate::project::catalogue_of;
 use crate::ui::{theme, widgets};
 
 pub struct NodePalette {
     open: NodePaletteOpen,
     search: String,
-    fresh: bool,
-    age: u32,
+    frames: u32,
     cursor: usize,
     unfolded: HashSet<&'static str>,
 }
@@ -23,8 +23,7 @@ impl NodePalette {
         NodePalette {
             open,
             search: String::new(),
-            fresh: true,
-            age: 0,
+            frames: 0,
             cursor: 0,
             unfolded: HashSet::from(["flow"]),
         }
@@ -54,10 +53,16 @@ struct Refused {
 
 pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let owner = doc.owner.clone();
-    let Some(mut palette) = editor.views.script.view_mut(&owner).palette.take() else {
+    let Some(mut palette) = editor
+        .views
+        .script
+        .view_mut(&owner, &editor.user, editor.project.as_ref())
+        .palette
+        .take()
+    else {
         return;
     };
-    let catalogue = &editor.views.script.catalogue;
+    let catalogue = catalogue_of(editor.project.as_ref());
     let needle = palette.search.trim().to_lowercase();
     let linking = palette.open.link.is_some();
     let (fits, refused) = sorted(catalogue, doc, linking);
@@ -180,9 +185,8 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                     ui.set_width(WIDTH);
                     ui.spacing_mut().item_spacing = egui::vec2(6.0, 4.0);
                     let response = widgets::search_box(ui, &mut palette.search, &hint, None);
-                    if palette.fresh {
+                    if palette.frames == 0 {
                         response.request_focus();
-                        palette.fresh = false;
                     }
                     if response.changed() {
                         palette.cursor = 0;
@@ -282,17 +286,21 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
             palette.unfolded.remove(system);
         }
     }
-    if palette.age > 0 && area.response.clicked_elsewhere() {
+    if palette.frames > 0 && area.response.clicked_elsewhere() {
         close = true;
     }
-    palette.age += 1;
+    palette.frames += 1;
     if let Some(kind) = picked {
         let at = palette.open.placed.then_some(palette.open.at);
         add_node(editor, doc, &kind, at, palette.open.link.clone());
         return;
     }
     if !close {
-        editor.views.script.view_mut(&owner).palette = Some(palette);
+        editor
+            .views
+            .script
+            .view_mut(&owner, &editor.user, editor.project.as_ref())
+            .palette = Some(palette);
     }
 }
 

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::AreaObject;
 use crate::core::content::Content;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{TILE, dynamic_z, sprite_transform};
+use crate::core::render::{RowDepth, TILE, dynamic_z, place_sprite};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::actor::Hitbox;
 use crate::systems::area::{self, AreaTag};
@@ -45,18 +45,26 @@ fn attach_look(
             ..default()
         },
         Transform::default(),
+        RowDepth::default(),
         Visibility::default(),
     ));
 }
 
 fn place_objects(
     content: Res<Content>,
-    mut objects: Query<(&Position, &Hitbox, &AreaTag, &mut Transform), With<AreaObject>>,
+    mut objects: Query<
+        (&Position, &Hitbox, &AreaTag, &mut Transform, &mut RowDepth),
+        With<AreaObject>,
+    >,
 ) {
-    for (position, hitbox, tag, mut transform) in &mut objects {
+    for (position, hitbox, tag, mut transform, mut depth) in &mut objects {
         let area = area::load(&content, tag.area);
-        let z = dynamic_z(area.size.height, area.sort_base(), Tiles(position.pos.y));
+        *depth = RowDepth(dynamic_z(
+            area.size.height,
+            area.sort_base(),
+            Tiles(position.pos.y),
+        ));
         let center = position.pos.hitbox(hitbox.size).center();
-        *transform = sprite_transform(center, z);
+        place_sprite(&mut transform, center);
     }
 }

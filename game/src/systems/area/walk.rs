@@ -20,7 +20,7 @@ pub struct WalkGrids {
 pub fn grids(
     content: &Content,
     grids: &AreaGrids,
-    scenery: &[&Scenery],
+    scenery: &[Scenery],
     safe_zones: &[Rect<Tiles>],
 ) -> WalkGrids {
     let size = grids.size;
@@ -48,21 +48,8 @@ pub fn grids(
 }
 
 pub fn tile_square(scenery: &Scenery, column: usize, row: usize) -> Rect<Tiles> {
-    let x = column as f32;
-    let y = row as f32;
-    let origin = Pos::new(
-        if scenery.flip.horizontal() {
-            scenery.at.x - x - 1.0
-        } else {
-            scenery.at.x + x
-        },
-        if scenery.flip.vertical() {
-            scenery.at.y - y - 1.0
-        } else {
-            scenery.at.y + y
-        },
-    );
-    Rect::new(origin, Size::splat(1.0))
+    let cell = Rect::new(Pos::new(column as f32, row as f32), Size::splat(1.0));
+    scenery.flip.place(cell, scenery.at)
 }
 
 pub fn in_map(size: GridSize, at: Pos<Tiles>) -> bool {
@@ -93,7 +80,7 @@ impl CellVotes {
     }
 }
 
-fn votes(content: &Content, grids: &AreaGrids, scenery: &[&Scenery]) -> Vec<CellVotes> {
+fn votes(content: &Content, grids: &AreaGrids, scenery: &[Scenery]) -> Vec<CellVotes> {
     let size = grids.size;
     let mut votes: Vec<CellVotes> = grids
         .walk

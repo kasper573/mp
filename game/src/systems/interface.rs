@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use bevy_ecs::world::World;
+use design_tokens::ThemeFonts;
+use egui::{FontData, FontDefinitions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::VariantArray;
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
@@ -19,7 +23,9 @@ impl ContentRow for CursorDef {
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hotspot {
+    #[schemars(extend("x-unit" = "px"))]
     pub x: u16,
+    #[schemars(extend("x-unit" = "px"))]
     pub y: u16,
 }
 
@@ -109,11 +115,23 @@ impl Fixture for FontFace {
     type Row = FontDef;
 }
 
-pub fn font_files(content: &Content) -> Vec<String> {
-    FontFace::VARIANTS
-        .iter()
-        .map(|face| face.get(content).file.path())
-        .collect()
+pub fn theme_fonts(
+    content: &Content,
+    files: &HashMap<String, Arc<[u8]>>,
+) -> Option<FontDefinitions> {
+    let face = |face: FontFace| -> Option<FontData> {
+        let bytes = files.get(&face.get(content).file.path())?;
+        Some(FontData::from_owned(bytes.to_vec()))
+    };
+    Some(design_tokens::fonts(ThemeFonts {
+        circular_400: face(FontFace::Circular400)?,
+        circular_500: face(FontFace::Circular500)?,
+        circular_700: face(FontFace::Circular700)?,
+        lato_400: face(FontFace::Lato400)?,
+        lato_400_italic: face(FontFace::Lato400Italic)?,
+        lato_700: face(FontFace::Lato700)?,
+        lato_700_italic: face(FontFace::Lato700Italic)?,
+    }))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]

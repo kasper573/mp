@@ -2,11 +2,11 @@ use bevy_ecs::prelude::*;
 use game::core::math::Pos;
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::{self, Area, Wild};
-use game::systems::movement::{self, MoveRequest, position};
+use game::systems::movement::{self, MoveRequest, MoveSeq, position};
 use game::systems::npc::{self, NpcId, Pack};
 use game::systems::reach::{self, ReachAct};
 
-use crate::support::{Sim, content, place, row, spawn_area};
+use testkit::{Sim, content, place, row, spawn_area};
 
 #[test]
 fn wild_monsters_never_set_foot_in_a_safe_zone() {
@@ -39,7 +39,13 @@ fn a_wild_monster_gives_up_a_player_who_reaches_a_safe_zone() {
     let skeleton = wild(&mut sim, row("Skeleton"), edge.lair);
     assert!(hunted_by(&mut sim, skeleton, player));
 
-    sim.send(1, MoveRequest { pos: edge.refuge });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: edge.refuge,
+            seq: MoveSeq(1),
+        },
+    );
     let mut trespassed = false;
     sim.run_until(10.0, |world| {
         trespassed |= on_safe_ground(world, skeleton);
@@ -60,7 +66,13 @@ fn a_summoned_monster_follows_its_target_into_a_safe_zone() {
     let guard = summon(&mut sim, player, row("Skeleton"));
     assert!(hunted_by(&mut sim, guard, player));
 
-    sim.send(1, MoveRequest { pos: edge.refuge });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: edge.refuge,
+            seq: MoveSeq(1),
+        },
+    );
 
     assert!(sim.run_until(10.0, |world| on_safe_ground(world, guard)));
     assert_eq!(

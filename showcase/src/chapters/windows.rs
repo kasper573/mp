@@ -1,9 +1,12 @@
+use std::f32::consts::TAU;
+
 use driver::{Player, UiTarget, content, holding};
-use game::core::math::Offset;
+use game::core::math::{Offset, Pos, WindowPx};
 use game::systems::input::map::InputAction;
+use game::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
-use crate::shoot::Shoot;
+use crate::shoot::{Shoot, Star};
 
 pub const CHAPTER: Chapter = Chapter {
     name: "windows",
@@ -30,10 +33,14 @@ fn play(shoot: &mut Shoot) {
     for (toggle, title, (x, y)) in LAYOUT {
         me.act(toggle);
         if title == "Inventory" {
+            fling_and_resize(&mut me);
             me.caption("Drag a window by its title to move it");
         }
         me.drag_ui(title, Offset::new(x, y));
     }
+    me.caption("Rest the pointer on an item to see what it is");
+    me.hover_ui(outside_card(SHIELD));
+    me.hold();
     me.caption("Right-click an item for its card: what it does, and a line of lore");
     inspect(&mut me, SHIELD, "bone_shield");
     me.caption("One card at a time: right-click another item and the card follows");
@@ -51,50 +58,59 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the sword to be taken off", |snapshot| {
         holding(snapshot, "rusty_sword") == 1
     });
-    me.caption("Esc closes the card before any window");
+    me.caption("A right-click brings the card in front, and Esc closes what's in front");
+    inspect(&mut me, SHIELD, "bone_shield");
+    me.wait_until("the card in front", card_in_front);
+    me.hold();
     me.act(InputAction::Dismiss);
     me.wait_until("the item card to close", |snapshot| {
         snapshot.item_card.is_none()
     });
 
     me.caption("Windows snap to a grid — toggle it in Settings");
-    me.click_ui(UiTarget::starting("ui snapping"));
+    me.click_ui(UiTarget::starting("UI snapping"));
     me.hold();
-    me.click_ui(UiTarget::starting("ui snapping"));
+    me.click_ui(UiTarget::starting("UI snapping"));
     me.caption("Text speed is a slider, in letters a second");
-    let before = me.find_ui(UiTarget::starting("text speed")).text;
-    me.drag_ui(
-        UiTarget::new("a slider", |element, _| element.slider.is_some()),
-        Offset::new(70.0, 0.0),
-    );
+    let before = me.find_ui(slider("Text speed")).slider;
+    me.drag_ui(slider("Text speed"), Offset::new(70.0, 0.0));
     me.wait_until("the text speed to change", |snapshot| {
-        UiTarget::starting("text speed")
+        slider("Text speed")
             .find(snapshot)
-            .map(|speed| &speed.text)
-            != Some(&before)
+            .map(|speed| speed.slider)
+            != Some(before)
     });
     me.caption("Reduced motion is a setting too");
-    me.click_ui(UiTarget::starting("reduced motion"));
+    me.click_ui(UiTarget::starting("Reduced motion"));
+    me.caption(
+        "Show FPS puts a meter in the corner: the frame rate now, and over the last ten seconds",
+    );
+    me.click_ui(UiTarget::starting("Show FPS"));
+    me.find_ui(UiTarget::containing(" FPS ("));
+    me.hold();
+    me.click_ui(UiTarget::starting("Show FPS"));
+    me.wait_until("the meter to go", |snapshot| {
+        UiTarget::containing(" FPS (").find(snapshot).is_none()
+    });
     me.caption(
         "Sound has a volume each: master, music, ambience, effects and voice, all halfway to start",
     );
-    me.scroll_until(UiTarget::starting("reduced motion"), "Voice");
+    me.scroll_until("Audio", "Voice");
     me.caption("Halfway is the mix as balanced, with room to turn any of them up or down");
     me.show_mixer();
-    let mut faders = Faders::default();
     me.caption("Music is the soundscape's first channel: turned down, the harbour theme fades out");
-    faders.set(&mut me, "Music", 0.0);
+    set_fader(&mut me, "Music", 0.0);
     me.caption("Ambience is every other channel: down goes the surf, and the island falls silent");
-    faders.set(&mut me, "Ambience", 0.0);
+    set_fader(&mut me, "Ambience", 0.0);
     me.caption("Effects are the game's sounds: in the quiet, your footsteps…");
     let home = me.come_to_rest();
     me.walk_by(Offset::new(3.0, 0.0));
     me.caption("…which go quiet too with effects turned down");
-    faders.set(&mut me, "Effects", 0.0);
+    set_fader(&mut me, "Effects", 0.0);
     me.walk_to(home);
     me.caption("Back to halfway, everything plays as balanced again");
     for fader in ["Music", "Ambience", "Effects"] {
-        faders.set(&mut me, fader, 0.5);
+        set_fader(&mut me, fader, 0.5);
     }
     me.hold();
     me.hide_mixer();
@@ -112,12 +128,33 @@ fn play(shoot: &mut Shoot) {
     me.caption("Voice is how characters speak: at halfway, Grisha's greeting babbles…");
     hear_out_greeting(&mut me);
     me.act(InputAction::ToggleSettings);
-    me.scroll_until(UiTarget::starting("reduced motion"), "Voice");
-    faders.set(&mut me, "Voice", 0.0);
+    me.scroll_until("Audio", "Voice");
+    set_fader(&mut me, "Voice", 0.0);
     me.act(InputAction::Dismiss);
     me.caption("…and with voice turned down, the same greeting is silent");
     hear_out_greeting(&mut me);
 }
+
+fn fling_and_resize(me: &mut Star) {
+    me.caption("Grab a window by its title and fling it about: the spot you grabbed stays under the pointer");
+    me.dragging_ui("Inventory", |me| {
+        let grabbed = me.snapshot().input.cursor.expect("the pointer");
+        let path: Vec<Pos<WindowPx>> = (1..=FLING_STEPS)
+            .map(|step| {
+                let turn = TAU * 2.0 * step as f32 / FLING_STEPS as f32;
+                grabbed + Offset::new(240.0 * turn.sin(), 140.0 * (turn * 1.5).sin())
+            })
+            .collect();
+        me.sweep_pointer(&path)
+    });
+    me.hold();
+    me.caption("Pull its corner to resize it");
+    me.drag_ui("Resize", Offset::new(120.0, 90.0));
+    me.hold();
+    me.drag_ui("Resize", Offset::new(-120.0, -90.0));
+}
+
+const FLING_STEPS: usize = 240;
 
 fn inspect(me: &mut Player, icon: &str, item: &str) {
     me.act_on_ui(InputAction::InspectItem, outside_card(icon));
@@ -126,6 +163,18 @@ fn inspect(me: &mut Player, icon: &str, item: &str) {
             .item_card
             .is_some_and(|card| card.item.key(content()) == item)
     });
+}
+
+fn card_in_front(snapshot: &ProbeSnapshot) -> bool {
+    snapshot.item_card.is_some_and(|card| {
+        let name = &card.item.get(content()).name;
+        snapshot
+            .ui
+            .iter()
+            .filter(|element| element.text.as_ref() == Some(name))
+            .filter(|element| card.rect.contains(element.rect.center()))
+            .all(|element| !element.click_through)
+    })
 }
 
 // The item card repeats the icon of the item it shows; only the copies outside it count.
@@ -143,53 +192,37 @@ fn hear_out_greeting(me: &mut Player) {
     me.leave_conversation();
 }
 
-// A thumb sits over its value along the track, so the track's width turns a value into a drag
-// distance. Dragging one all the way down measures it.
-#[derive(Default)]
-struct Faders {
-    track: Option<f32>,
-}
-
-const PAST_EMPTY: f32 = 300.0;
+// Pressing a slider moves it to the press, so a drag from the middle of its track lands a value
+// at the same share of the track's width away.
 const TOLERANCE: f32 = 0.02;
 
-impl Faders {
-    fn set(&mut self, me: &mut Player, fader: &str, value: f32) {
-        let before = me.find_ui(thumb(fader));
-        let at = before.slider.expect("a slider");
-        let by = match self.track {
-            _ if value == 0.0 => -PAST_EMPTY,
-            Some(track) => (value - at) * track,
-            None => panic!("a fader is turned all the way down before any is set between"),
-        };
-        me.drag_ui(thumb(fader), Offset::new(by, 0.0));
-        let reached = thumb(fader);
-        let after = me.wait_for(
-            &format!("the {fader} volume to reach {value}"),
-            |snapshot| {
-                reached
-                    .find(snapshot)
-                    .filter(|thumb| {
-                        thumb
-                            .slider
-                            .is_some_and(|now| (now - value).abs() <= TOLERANCE)
-                    })
-                    .cloned()
-            },
-        );
-        if value == 0.0 && at > 0.0 && self.track.is_none() {
-            self.track = Some((before.rect.origin.x - after.rect.origin.x) / at);
-        }
-    }
+fn set_fader(me: &mut Player, fader: &str, value: f32) {
+    let track = me.find_ui(slider(fader)).rect.size.width;
+    let by = match value {
+        0.0 => -track,
+        1.0 => track,
+        _ => (value - 0.5) * track,
+    };
+    me.drag_ui(slider(fader), Offset::new(by, 0.0));
+    let reached = slider(fader);
+    me.wait_for(
+        &format!("the {fader} volume to reach {value}"),
+        |snapshot| {
+            reached
+                .find(snapshot)
+                .filter(|track| {
+                    track
+                        .slider
+                        .is_some_and(|now| (now - value).abs() <= TOLERANCE)
+                })
+                .cloned()
+        },
+    );
 }
 
-// The slider thumb on the fader's row.
-fn thumb(fader: &str) -> UiTarget {
-    let label = UiTarget::text(fader);
-    UiTarget::new(format!("the {fader} thumb"), move |element, snapshot| {
-        element.slider.is_some()
-            && label
-                .find(snapshot)
-                .is_some_and(|label| (element.rect.center().y - label.rect.center().y).abs() < 12.0)
+fn slider(name: &str) -> UiTarget {
+    let name = name.to_owned();
+    UiTarget::new(format!("the {name} slider"), move |element, _| {
+        element.slider.is_some() && element.text.as_deref() == Some(name.as_str())
     })
 }

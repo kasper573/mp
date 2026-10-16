@@ -14,7 +14,7 @@ use crate::project::{ProjectFiles, row_of};
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
 use crate::value::RowValue;
-use crate::{condition, forms, spans};
+use crate::{condition, spans};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, VariantArray)]
 #[strum(serialize_all = "snake_case")]
@@ -143,6 +143,10 @@ impl LineSpeaker {
         serde_json::to_value(self).expect("a speaker serialises")
     }
 
+    pub fn blank_line(&self) -> Value {
+        serde_json::json!({ "by": self.json(), "text": [""] })
+    }
+
     pub fn kind(&self) -> &'static str {
         match self {
             LineSpeaker::Npc { .. } => "npc",
@@ -181,16 +185,16 @@ pub fn speaker_name(by: &Value) -> String {
     LineSpeaker::of(by).map_or_else(|| "?".to_owned(), |speaker| speaker.name())
 }
 
-pub fn bust_file(content: Option<Content>, speaker: &LineSpeaker) -> Option<String> {
+pub fn bust_file(content: Option<&Content>, speaker: &LineSpeaker) -> Option<String> {
     let content = content?;
     let LineSpeaker::Npc { npc, face } = speaker else {
         return None;
     };
     let busts = content
         .by_key::<NpcDef>(npc)?
-        .get(&content)
+        .get(content)
         .model
-        .get(&content)
+        .get(content)
         .busts()?;
     let face = face
         .as_deref()
@@ -274,7 +278,7 @@ pub struct NodeCatalogue {
 }
 
 impl NodeCatalogue {
-    pub fn build(root: &Value, content: Option<Content>) -> NodeCatalogue {
+    pub fn build(root: &Value, content: Option<&Content>) -> NodeCatalogue {
         let mut entries: Vec<NodeEntry> = FlowKind::VARIANTS
             .iter()
             .map(|&kind| NodeEntry {
@@ -287,7 +291,7 @@ impl NodeCatalogue {
                 pauses: kind.pauses(),
             })
             .collect();
-        let scope = content.map(|content| ContentScope::of(&content));
+        let scope = content.map(ContentScope::of);
         let parse = |template: Value| -> Option<Node> {
             let scope = scope.clone()?;
             let (parsed, _) = with_content(scope, || serde_json::from_value::<Node>(template));
@@ -576,8 +580,7 @@ pub fn template(root: &Value, kind: &str) -> Option<Value> {
     let mut value = schema::variant_template(root, variant);
     match flow {
         Some(FlowKind::Dialogue) => {
-            value["lines"] =
-                serde_json::json!([{ "by": LineSpeaker::Narrator.json(), "text": [""] }]);
+            value["lines"] = serde_json::json!([LineSpeaker::Narrator.blank_line()]);
         }
         Some(FlowKind::Random) => {
             value["weights"] = serde_json::json!([1, 1]);
@@ -621,7 +624,7 @@ pub fn fill_references(root: &Value, schema: &Value, value: &mut Value, files: &
         schema::SchemaKind::Choice(alternatives) => {
             if let Some(alternative) = alternatives
                 .iter()
-                .find(|alternative| forms::fits(root, alternative, value))
+                .find(|alternative| schema::fits(root, alternative, value))
             {
                 fill_references(root, alternative, value, files);
             }

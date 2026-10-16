@@ -53,7 +53,7 @@ Code must not depend on arbitrary game content, so the same server and client ca
 - Only rows name assets; another game reskins with its own rows and files.
 - Integration tests look rows up by key.
 
-2. The ui and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
+2. The design_tokens and bevy/* crates may not depend on other crates in this repo. They may depend on third party crates.
 
 ## Comments
 
@@ -77,7 +77,6 @@ Everything you build gets shown to the user on video, from a player's point of v
 - The showcase is the `showcase` crate: one chapter per file in `showcase/src/chapters/`, played in the order of `CHAPTERS` (`showcase/src/chapters/mod.rs`) and narrated with `caption()` (`showcase/src/shoot.rs`). A chapter plays through the `driver` crate, as the gameplay tests do: real mouse and keyboard input through the game's own bindings, finding what to click through the client's probe of the world and UI (`walk_to`, `travel_to`, `talk_to`, `fight`, `click_ui`, …). Never hardcode screen positions — monsters wander and windows move. Never roam or search either: a chapter heads straight for where what it needs is (`resident_home`, `hunting_ground`, markers) and asserts it's there. When a chapter needs to see something the probe doesn't report, extend the probe (`game/src/systems/probe.rs`).
 - After every change, show it in the chapter it belongs to: extend that chapter, or add one where it fits the story. Record with `just showcase <chapter>…`, check the result with `just contact-sheet target/showcase/<NN-chapter>.mp4`, and share the video path(s) with the user when you report back. This is not optional. When a change has nothing new to show (a refactor, a fix with no visible effect), record the chapters covering what it touched to show they still work.
 - Chapters show the game's mechanics, never its content. New or changed content (maps, areas, actors, busts, items, dialogue) is reviewed in one-off recordings shared with the user, which are never committed as chapters. Content that brings no new mechanic adds nothing to the showcase.
-- A change to the `ui` crate on its own is shown in its component gallery: `just gallery-showcase "<scene>" [seconds] [xdotool input]` records `target/showcase/gallery-<scene>.webm`.
 - The full showcase, `just showcase` with no chapter named → `target/showcase/showcase.mp4`, is only recorded when the user explicitly asks for it. It is every chapter stitched in order, so keeping the chapters current is what keeps it complete: never show a feature outside a chapter.
 
 ## Tests

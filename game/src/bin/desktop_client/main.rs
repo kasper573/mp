@@ -28,7 +28,7 @@ fn main() {
     let mut app = client_app(
         Arc::new(platform::DesktopPlatform::new(config.profile_dir)),
         params,
-        window(config.vsync),
+        window(),
     );
     if let Some(driver) = config.probe {
         probe::install(&mut app, platform::SocketProbe::connect(driver));
@@ -36,18 +36,16 @@ fn main() {
     app.run();
 }
 
-fn window(vsync: bool) -> Window {
+// Frames go out without waiting on the display's refresh. A desktop may hold that wait up, as some
+// do for tens of milliseconds at every mouse press and release, and the whole frame would wait too.
+fn window() -> Window {
     Window {
-        present_mode: if vsync {
-            PresentMode::AutoVsync
-        } else {
-            PresentMode::AutoNoVsync
-        },
-        desired_maximum_frame_latency: (!vsync).then_some(UNSYNCED_FRAMES_IN_FLIGHT),
+        present_mode: PresentMode::AutoNoVsync,
+        desired_maximum_frame_latency: Some(FRAMES_IN_FLIGHT),
         ..Default::default()
     }
 }
 
-// A compositor hands a frame's buffer back only when it next refreshes, so without vsync it's the
-// frames in flight, not the client, that would otherwise cap the frame rate at a few per refresh.
-const UNSYNCED_FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(8).unwrap();
+// A compositor hands a frame's buffer back only when it next refreshes, so it's the frames in
+// flight, not the client, that would otherwise cap the frame rate at a few per refresh.
+const FRAMES_IN_FLIGHT: NonZeroU32 = NonZeroU32::new(8).unwrap();

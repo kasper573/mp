@@ -14,7 +14,7 @@ pub(super) fn status_bar(
 ) {
     let view = editor.views.area.view(view_key);
     let mut left: Vec<String> = Vec::new();
-    if let Some(place) = view.in_place.last() {
+    if let Some(place) = frame.in_place.last() {
         let parts = part_count(frame, &place.blueprint);
         let picked = placement::selected_part_indices(editor, &place.blueprint);
         match picked.as_slice() {
@@ -29,7 +29,7 @@ pub(super) fn status_bar(
             widgets::plural(parts)
         ));
         left.push(
-            placement::placement_count(frame.content, blueprint)
+            placement::placement_count(&frame.content, blueprint)
                 .trim_end_matches('.')
                 .to_lowercase(),
         );
@@ -101,7 +101,7 @@ pub(super) fn status_bar(
             }
         }
     }
-    if let Some(stroke) = &view.stroke {
+    if let Some(stroke) = view.stroke() {
         left.push(format!(
             "stroke: {} {}",
             stroke.cells.len(),
@@ -141,7 +141,7 @@ pub(super) fn status_bar(
             (zoom * 100.0).round()
         );
         let galley = painter.layout_no_wrap(text, egui::FontId::monospace(12.0), theme::TEXT);
-        let at = frame.canvas.rect.min + Vec2::new(16.0, 12.0);
+        let at = frame.canvas.screen.min + Vec2::new(16.0, 12.0);
         let back = ERect::from_min_size(at, galley.size() + Vec2::new(12.0, 6.0));
         painter.rect_filled(back, 4.0, Color32::from_rgba_unmultiplied(20, 22, 26, 220));
         painter.galley(at + Vec2::new(6.0, 3.0), galley, theme::TEXT);

@@ -4,16 +4,22 @@ use egui::{Align, Layout, Modifiers, Sense, Ui};
 
 use super::theme;
 
-pub struct TreeNode {
+pub struct TreeNode<A> {
     pub id: String,
     pub label: String,
     pub icon: TreeIcon,
-    pub children: Option<Vec<TreeNode>>,
+    pub children: Option<Vec<TreeNode<A>>>,
     pub selected: bool,
     pub unsaved: bool,
-    pub locked: bool,
-    pub adds: bool,
-    pub table: bool,
+    pub note: Option<String>,
+    pub actions: Vec<TreeAction<A>>,
+}
+
+pub struct TreeAction<A> {
+    pub glyph: &'static str,
+    pub tip: String,
+    pub menu_label: String,
+    pub action: A,
 }
 
 pub enum TreeIcon {
@@ -34,15 +40,23 @@ pub struct TreeState {
     pub open: HashSet<String>,
 }
 
-#[derive(Default)]
-pub struct TreeOutput {
+pub struct TreeOutput<A> {
     pub clicked: Option<(String, Modifiers)>,
     pub double_clicked: Option<String>,
-    pub add: Option<String>,
-    pub open_table: Option<String>,
+    pub action: Option<(String, A)>,
 }
 
-pub type TreeLeafMenu<'a> = dyn FnMut(&mut Ui, &TreeNode) + 'a;
+impl<A> Default for TreeOutput<A> {
+    fn default() -> Self {
+        TreeOutput {
+            clicked: None,
+            double_clicked: None,
+            action: None,
+        }
+    }
+}
+
+pub type TreeLeafMenu<'a> = dyn FnMut(&mut Ui, &str) + 'a;
 pub type TreeThumbs<'a> = dyn FnMut(&egui::Context, &str) -> Option<IconImage> + 'a;
 
 #[derive(Default)]
@@ -51,8 +65,8 @@ pub struct TreeHooks<'a, 'b> {
     pub thumbs: Option<&'a mut TreeThumbs<'b>>,
 }
 
-impl TreeNode {
-    pub fn leaf(id: impl Into<String>, label: impl Into<String>) -> TreeNode {
+impl<A> TreeNode<A> {
+    pub fn leaf(id: impl Into<String>, label: impl Into<String>) -> TreeNode<A> {
         TreeNode {
             id: id.into(),
             label: label.into(),
@@ -60,17 +74,16 @@ impl TreeNode {
             children: None,
             selected: false,
             unsaved: false,
-            locked: false,
-            adds: false,
-            table: false,
+            note: None,
+            actions: Vec::new(),
         }
     }
 
     pub fn folder(
         id: impl Into<String>,
         label: impl Into<String>,
-        children: Vec<TreeNode>,
-    ) -> TreeNode {
+        children: Vec<TreeNode<A>>,
+    ) -> TreeNode<A> {
         TreeNode {
             children: Some(children),
             ..TreeNode::leaf(id, label)
@@ -78,11 +91,11 @@ impl TreeNode {
     }
 }
 
-pub fn from_paths<'a>(
+pub fn from_paths<'a, A>(
     paths: impl IntoIterator<Item = &'a str>,
-    leaf: &mut dyn FnMut(&str) -> Option<TreeNode>,
-    folder: &mut dyn FnMut(&mut TreeNode),
-) -> Vec<TreeNode> {
+    leaf: &mut dyn FnMut(&str) -> Option<TreeNode<A>>,
+    folder: &mut dyn FnMut(&mut TreeNode<A>),
+) -> Vec<TreeNode<A>> {
     let mut root = Dir::default();
     for path in paths {
         let mut dir = &mut root;
@@ -98,13 +111,13 @@ pub fn from_paths<'a>(
     root.into_nodes("", leaf, folder)
 }
 
-pub fn show(
+pub fn show<A: Clone>(
     ui: &mut Ui,
     state: &mut TreeState,
-    nodes: &[TreeNode],
+    nodes: &[TreeNode<A>],
     open_all: bool,
     mut hooks: TreeHooks<'_, '_>,
-) -> TreeOutput {
+) -> TreeOutput<A> {
     let mut walk = Walk {
         state,
         open_all,
@@ -128,15 +141,20 @@ const LINE: f32 = 22.0;
 const INDENT: f32 = 14.0;
 const BUTTON: f32 = 18.0;
 
-struct Walk<'a, 'b, 'c> {
+struct Walk<'a, 'b, 'c, A> {
     state: &'a TreeState,
     open_all: bool,
-    out: TreeOutput,
+    out: TreeOutput<A>,
     toggle: Vec<String>,
     hooks: &'a mut TreeHooks<'b, 'c>,
 }
 
-fn node_line(ui: &mut Ui, walk: &mut Walk, node: &TreeNode, depth: usize) {
+fn node_line<A: Clone>(
+    ui: &mut Ui,
+    walk: &mut Walk<'_, '_, '_, A>,
+    node: &TreeNode<A>,
+    depth: usize,
+) {
     let full = ui.available_rect_before_wrap();
     let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), LINE), Sense::click());
     let visible = ui.clip_rect().intersects(rect);
@@ -162,7 +180,7 @@ fn node_line(ui: &mut Ui, walk: &mut Walk, node: &TreeNode, depth: usize) {
             if response.clicked() {
                 walk.toggle.push(node.id.clone());
             }
-            if node.adds || node.table {
+            if !node.actions.is_empty() {
                 response.context_menu(|ui| folder_menu(ui, node, &mut walk.out));
             }
             if open {
@@ -189,42 +207,39 @@ fn node_line(ui: &mut Ui, walk: &mut Walk, node: &TreeNode, depth: usize) {
                 walk.out.double_clicked = Some(node.id.clone());
             }
             if let Some(menu) = walk.hooks.menu.as_deref_mut() {
-                response.context_menu(|ui| menu(ui, node));
+                response.context_menu(|ui| menu(ui, &node.id));
             }
         }
     }
 }
 
-fn folder_line(ui: &mut Ui, node: &TreeNode, open: bool, out: &mut TreeOutput) {
+fn folder_line<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, open: bool, out: &mut TreeOutput<A>) {
     ui.label(theme::muted(if open { "▾" } else { "▸" }).size(11.0));
-    let label = ui.label(theme::mono(&node.label).color(if node.locked {
+    let label = ui.label(theme::mono(&node.label).color(if node.note.is_some() {
         theme::MUTED
     } else {
         theme::CODE
     }));
-    if node.locked {
-        label.on_hover_text("Fixtures: the engine names these rows, so none can be added");
+    if let Some(note) = &node.note {
+        label.on_hover_text(note);
     }
     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
         ui.add_space(4.0);
         ui.spacing_mut().item_spacing.x = 4.0;
-        if node.adds && line_button(ui, "+", &format!("New {}", node.label)).clicked() {
-            out.add = Some(node.id.clone());
-        }
-        if node.table && line_button(ui, "▦", "Open table").clicked() {
-            out.open_table = Some(node.id.clone());
+        for action in &node.actions {
+            if line_button(ui, action.glyph, &action.tip).clicked() {
+                out.action = Some((node.id.clone(), action.action.clone()));
+            }
         }
     });
 }
 
-fn folder_menu(ui: &mut Ui, node: &TreeNode, out: &mut TreeOutput) {
-    if node.adds && ui.button(format!("New {}…", node.label)).clicked() {
-        out.add = Some(node.id.clone());
-        ui.close();
-    }
-    if node.table && ui.button("Open table").clicked() {
-        out.open_table = Some(node.id.clone());
-        ui.close();
+fn folder_menu<A: Clone>(ui: &mut Ui, node: &TreeNode<A>, out: &mut TreeOutput<A>) {
+    for action in &node.actions {
+        if ui.button(&action.menu_label).clicked() {
+            out.action = Some((node.id.clone(), action.action.clone()));
+            ui.close();
+        }
     }
 }
 
@@ -240,7 +255,7 @@ fn line_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
     .on_hover_text(tip)
 }
 
-fn leaf_line(ui: &mut Ui, node: &TreeNode, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
+fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
     let colour = if node.selected {
         theme::TEXT
     } else {
@@ -273,13 +288,13 @@ struct Dir {
 }
 
 impl Dir {
-    fn into_nodes(
+    fn into_nodes<A>(
         self,
         prefix: &str,
-        leaf: &mut dyn FnMut(&str) -> Option<TreeNode>,
-        folder: &mut dyn FnMut(&mut TreeNode),
-    ) -> Vec<TreeNode> {
-        let mut nodes: Vec<TreeNode> = self
+        leaf: &mut dyn FnMut(&str) -> Option<TreeNode<A>>,
+        folder: &mut dyn FnMut(&mut TreeNode<A>),
+    ) -> Vec<TreeNode<A>> {
+        let mut nodes: Vec<TreeNode<A>> = self
             .dirs
             .into_iter()
             .map(|(name, dir)| {

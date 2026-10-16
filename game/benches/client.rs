@@ -101,7 +101,7 @@ impl Scene {
 fn watch(me: &mut Player, name: &'static str, lasting: Duration) -> Scene {
     let first = me.snapshot().frame;
     let since = Instant::now();
-    me.linger_until(SystemTime::now() + lasting, false);
+    me.linger_until(SystemTime::now() + lasting);
     let last = me.snapshot().frame;
     Scene {
         name,

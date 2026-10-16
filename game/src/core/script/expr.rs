@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use super::Vocabulary;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(into = "ExprRow<V>", from = "ExprRow<V>", bound = "")]
 pub enum Expr<V: Vocabulary> {
     Bool(bool),
     Int(i64),
@@ -36,60 +36,6 @@ pub enum Expr<V: Vocabulary> {
     Join(Vec<Expr<V>>),
 }
 
-impl<V: Vocabulary> Serialize for Expr<V> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Expr::Bool(value) => serializer.serialize_bool(*value),
-            Expr::Int(value) => serializer.serialize_i64(*value),
-            Expr::Num(value) => serializer.serialize_f64(*value),
-            Expr::Text(value) => serializer.serialize_str(value),
-            Expr::Var(name) => {
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("var", name)?;
-                map.end()
-            }
-            Expr::Local(name) => tagged(serializer, "local", "local", name),
-            Expr::State(name) => tagged(serializer, "state", "state", name),
-            Expr::Event(name) => tagged(serializer, "event", "event", name),
-            Expr::Query(query) => query.serialize(serializer),
-            Expr::All(list) | Expr::Any(list) | Expr::Join(list) => {
-                tagged(serializer, self.kind(), "of", list)
-            }
-            Expr::Not(of) | Expr::Round(of) => tagged(serializer, self.kind(), "of", of),
-            Expr::Equal(a, b)
-            | Expr::NotEqual(a, b)
-            | Expr::Less(a, b)
-            | Expr::AtMost(a, b)
-            | Expr::More(a, b)
-            | Expr::AtLeast(a, b)
-            | Expr::Add(a, b)
-            | Expr::Subtract(a, b)
-            | Expr::Multiply(a, b)
-            | Expr::Divide(a, b)
-            | Expr::Min(a, b)
-            | Expr::Max(a, b) => {
-                let mut map = serializer.serialize_map(Some(3))?;
-                map.serialize_entry("type", self.kind())?;
-                map.serialize_entry("a", a)?;
-                map.serialize_entry("b", b)?;
-                map.end()
-            }
-        }
-    }
-}
-
-fn tagged<S: Serializer, T: Serialize + ?Sized>(
-    serializer: S,
-    kind: &str,
-    field: &str,
-    value: &T,
-) -> Result<S::Ok, S::Error> {
-    let mut map = serializer.serialize_map(Some(2))?;
-    map.serialize_entry("type", kind)?;
-    map.serialize_entry(field, value)?;
-    map.end()
-}
-
 impl<V: Vocabulary> JsonSchema for Expr<V> {
     fn schema_name() -> Cow<'static, str> {
         Cow::Borrowed("Expr")
@@ -102,9 +48,9 @@ impl<V: Vocabulary> JsonSchema for Expr<V> {
     }
 }
 
-impl<'de, V: Vocabulary> Deserialize<'de> for Expr<V> {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Expr<V>, D::Error> {
-        Ok(match ExprRow::<V>::deserialize(deserializer)? {
+impl<V: Vocabulary> From<ExprRow<V>> for Expr<V> {
+    fn from(row: ExprRow<V>) -> Self {
+        match row {
             ExprRow::Bool(value) => Expr::Bool(value),
             ExprRow::Int(value) => Expr::Int(value),
             ExprRow::Num(value) => Expr::Num(value),
@@ -133,11 +79,45 @@ impl<'de, V: Vocabulary> Deserialize<'de> for Expr<V> {
                 Tagged::Max { a, b } => Expr::Max(a, b),
                 Tagged::Query(query) => Expr::Query(query),
             },
-        })
+        }
     }
 }
 
-#[derive(JsonSchema, Deserialize)]
+impl<V: Vocabulary> From<Expr<V>> for ExprRow<V> {
+    fn from(expr: Expr<V>) -> Self {
+        let tagged = ExprRow::Tagged;
+        match expr {
+            Expr::Bool(value) => ExprRow::Bool(value),
+            Expr::Int(value) => ExprRow::Int(value),
+            Expr::Num(value) => ExprRow::Num(value),
+            Expr::Text(value) => ExprRow::Text(value),
+            Expr::Var(var) => ExprRow::Var { var },
+            Expr::Local(local) => tagged(Tagged::Local { local }),
+            Expr::State(state) => tagged(Tagged::State { state }),
+            Expr::Event(event) => tagged(Tagged::Event { event }),
+            Expr::Query(query) => tagged(Tagged::Query(query)),
+            Expr::All(of) => tagged(Tagged::All { of }),
+            Expr::Any(of) => tagged(Tagged::Any { of }),
+            Expr::Join(of) => tagged(Tagged::Join { of }),
+            Expr::Not(of) => tagged(Tagged::Not { of }),
+            Expr::Round(of) => tagged(Tagged::Round { of }),
+            Expr::Equal(a, b) => tagged(Tagged::Equal { a, b }),
+            Expr::NotEqual(a, b) => tagged(Tagged::NotEqual { a, b }),
+            Expr::Less(a, b) => tagged(Tagged::Less { a, b }),
+            Expr::AtMost(a, b) => tagged(Tagged::AtMost { a, b }),
+            Expr::More(a, b) => tagged(Tagged::More { a, b }),
+            Expr::AtLeast(a, b) => tagged(Tagged::AtLeast { a, b }),
+            Expr::Add(a, b) => tagged(Tagged::Add { a, b }),
+            Expr::Subtract(a, b) => tagged(Tagged::Subtract { a, b }),
+            Expr::Multiply(a, b) => tagged(Tagged::Multiply { a, b }),
+            Expr::Divide(a, b) => tagged(Tagged::Divide { a, b }),
+            Expr::Min(a, b) => tagged(Tagged::Min { a, b }),
+            Expr::Max(a, b) => tagged(Tagged::Max { a, b }),
+        }
+    }
+}
+
+#[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(untagged, bound = "")]
 #[schemars(bound = "")]
 enum ExprRow<V: Vocabulary> {
@@ -149,7 +129,7 @@ enum ExprRow<V: Vocabulary> {
     Tagged(Tagged<V>),
 }
 
-#[derive(JsonSchema, Deserialize)]
+#[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", bound = "")]
 #[schemars(bound = "")]
 enum Tagged<V: Vocabulary> {

@@ -8,6 +8,7 @@ use super::{pins, select};
 use crate::app::Editor;
 use crate::forms;
 use crate::ui::{theme, widgets};
+use crate::views::navigation;
 
 pub(super) fn clipboard_panel(editor: &Editor, ui: &mut Ui) {
     let Some(clip) = &editor.clipboard else {
@@ -40,7 +41,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let Some(project) = editor.project.as_ref() else {
         return;
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     let generation = project.generation;
@@ -55,7 +56,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         .collect();
     areas.sort();
     widgets::section(ui, "Pick a place");
-    egui::ComboBox::from_id_salt("pick-area")
+    widgets::combo_box("pick-area")
         .width(ui.available_width())
         .selected_text(theme::mono(
             area_key
@@ -88,8 +89,11 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     let height = (width * area.size.height / area.size.width.max(1.0)).clamp(80.0, 360.0);
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click());
     let ppp = ui.ctx().pixels_per_point();
-    let zoom = (rect.width() / (area.size.width * super::TILE_PX))
-        .min(rect.height() / (area.size.height * super::TILE_PX));
+    let zoom = navigation::fit_zoom(
+        rect.size(),
+        Vec2::new(area.size.width, area.size.height),
+        super::TILE_PX,
+    );
     let center = Pos::new(area.size.width / 2.0 - 0.5, area.size.height / 2.0 - 0.5);
     let view_key = format!("pick:{area_key}");
     editor
@@ -117,7 +121,11 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     if let Some(scene) = editor.views.area.scenes.by_key.get(&view_key) {
         painter.image(scene.texture, rect, scene.uv(), egui::Color32::WHITE);
     }
-    let canvas = super::AreaCanvas { rect, center, zoom };
+    let canvas = navigation::Viewport {
+        screen: rect,
+        center,
+        zoom,
+    };
     for arrival in pins::arrivals(editor, &area_key) {
         let at = canvas.to_screen(arrival.at);
         painter.circle_filled(at, 3.0, egui::Color32::from_rgb(255, 190, 90));

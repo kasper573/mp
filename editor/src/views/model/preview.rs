@@ -95,9 +95,7 @@ pub fn tick(
                 }
                 lap += 1.0;
             }
-            if after > total * 1000.0 {
-                preview.position = after.rem_euclid(total);
-            }
+            preview.position = after.rem_euclid(total);
         }
     }
     PreviewTick {
@@ -242,7 +240,7 @@ pub struct SpawnGround {
 }
 
 pub fn spawn_ground(editor: &Editor) -> Option<SpawnGround> {
-    let content = editor.project.as_ref()?.content?;
+    let content = editor.project.as_ref()?.content.clone()?;
     let place = &content.built::<GameSettings>().initial_spawn;
     Some(SpawnGround {
         area: place.area.key(&content).to_owned(),

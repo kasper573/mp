@@ -9,11 +9,12 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
+use crate::systems::drain_requests;
 use crate::systems::effect::{self, Effect};
 use crate::systems::item::{self, Inventory, ItemId, ItemKind, ItemStack};
 use crate::systems::notification;
+use crate::systems::player::{may_command, sender_player};
 use crate::systems::script::{EventKind, condition};
-use crate::systems::{drain_requests, player::sender_player};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -76,7 +77,7 @@ pub fn equip_held(world: &mut World, player: Entity, item: ItemId) -> Result<(),
 }
 
 pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Inventory>(player)
         .and_then(|inventory| inventory.slots.get(inv_slot).map(|slot| slot.item))
@@ -94,14 +95,15 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
     let occupant = world
         .get::<Equipment>(player)
         .and_then(|equipment| equipment.slots.get(into).copied());
-    if let Some(mut inventory) = world.get_mut::<Inventory>(player) {
-        inventory.slots.remove(inv_slot);
-        if let Some(occupant) = occupant {
-            inventory
-                .exchange(&content, &[], &[ItemStack::new(occupant, 1)])
-                .expect("the equipped item's slot was just freed");
-        }
-    }
+    let returned: Vec<ItemStack> = occupant
+        .map(|occupant| ItemStack::new(occupant, 1))
+        .into_iter()
+        .collect();
+    world
+        .get_mut::<Inventory>(player)
+        .ok_or_else(|| "Has no bag".to_owned())?
+        .exchange(&content, &[ItemStack::new(item, 1)], &returned)
+        .map_err(|refusal| refusal.describe(&content))?;
     if let Some(mut equipment) = world.get_mut::<Equipment>(player) {
         equipment.slots.insert(*into, item);
     }
@@ -113,7 +115,7 @@ pub fn equip(world: &mut World, player: Entity, inv_slot: usize) -> Result<(), S
 }
 
 pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Equipment>(player)
         .and_then(|equipment| equipment.slots.get(&slot).copied())
@@ -136,6 +138,9 @@ pub fn unequip(world: &mut World) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
+        if !may_command(world, player) {
+            continue;
+        }
         if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
             notification::error(world, player, refusal);
         }

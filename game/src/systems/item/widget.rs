@@ -1,23 +1,29 @@
-use bevy::ecs::template::template;
 use bevy::prelude::*;
-use ui::RichPiece;
-use ui::tokens::palette;
-use ui::{Align, Carriable, Side, TooltipText, text_colored, tooltip, tooltip_content};
-
-use crate::core::content::Content;
-use crate::systems::hud::{
-    HudAudience, SLOT_BG, SLOT_BORDER, Window, reconcile_children, single_tab, slot_node,
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::{HAIRLINE, WIDGET_RADIUS, color};
+use egui::{
+    Align, Color32, Id, Layout, Rect, Response, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder,
+    Vec2,
 };
-use crate::systems::input::map::{ActionInput, InputAction, InputMap, input};
+
+use crate::core::assets::AssetRef;
+use crate::core::content::Content;
+use crate::core::gui::{self, Band};
+use crate::core::text::{StyledLine, TextPiece};
+use crate::systems::hud::{self, HudAudience, HudWindow};
+use crate::systems::input::map::{self, InputAction, InputMap, input};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::{
     DropItemRequest, INVENTORY_MAX, Inventory, ItemDef, ItemFlag, ItemId, ItemStack,
     UseItemRequest, card,
 };
 use crate::systems::player::session;
+use crate::systems::screen::ClientScreen;
 
-#[derive(Component, Default, Clone)]
-struct InventoryGrid;
+pub(crate) const SLOT: f32 = 36.0;
+const SLOT_ICON: f32 = 32.0;
+const CARRIED: f32 = 40.0;
+const SLOT_GAP: f32 = 2.0;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SlotVerdict {
@@ -27,9 +33,6 @@ pub enum SlotVerdict {
 
 pub type SlotVerdictSource = fn(&World, ItemStack) -> Option<SlotVerdict>;
 
-#[derive(Resource, Default)]
-struct SlotVerdicts(Vec<SlotVerdictSource>);
-
 pub fn slot_verdict_source(app: &mut App, source: SlotVerdictSource) {
     app.world_mut()
         .get_resource_or_init::<SlotVerdicts>()
@@ -38,9 +41,6 @@ pub fn slot_verdict_source(app: &mut App, source: SlotVerdictSource) {
 }
 
 pub type SlotNoteSource = fn(&World, ItemStack) -> Option<String>;
-
-#[derive(Resource, Default)]
-struct SlotNotes(Vec<SlotNoteSource>);
 
 pub fn slot_note_source(app: &mut App, source: SlotNoteSource) {
     app.world_mut()
@@ -57,9 +57,6 @@ pub struct SlotAction {
     pub verb: &'static str,
 }
 
-#[derive(Resource, Default)]
-struct SlotActions(Vec<SlotAction>);
-
 pub fn slot_action(app: &mut App, slot_action: SlotAction) {
     app.world_mut()
         .get_resource_or_init::<SlotActions>()
@@ -67,9 +64,25 @@ pub fn slot_action(app: &mut App, slot_action: SlotAction) {
         .push(slot_action);
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CarriedSlot(pub u32);
+
+pub struct CarryPlugin;
+
+impl Plugin for CarryPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            EguiPrimaryContextPass,
+            draw_carried
+                .in_set(Band::Pointer)
+                .run_if(in_state(ClientScreen::Area)),
+        );
+    }
+}
+
 pub struct InventoryWindow;
 
-impl Window for InventoryWindow {
+impl HudWindow for InventoryWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }
@@ -82,57 +95,180 @@ impl Window for InventoryWindow {
     fn icon(&self) -> InterfaceIcon {
         InterfaceIcon::Bag
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        single_tab(self.title(), ui::scrolled(content()))
-    }
-    fn sync(&self, world: &mut World) {
-        sync_inventory(world)
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let cells = inventory_cells(world);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing = Vec2::splat(SLOT_GAP);
+                ui.horizontal_wrapped(|ui| {
+                    for cell in &cells {
+                        bag_slot(ui, world, cell);
+                    }
+                });
+            });
     }
 }
 
-fn content() -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: Val::Percent(100.0),
-            flex_wrap: FlexWrap::Wrap,
-            align_content: AlignContent::FlexStart,
+pub(crate) struct SlotLook<'a> {
+    pub icon: Option<&'a AssetRef>,
+    pub count: u32,
+    pub outline: Option<Color32>,
+    pub faded: bool,
+}
+
+impl SlotLook<'_> {
+    pub(crate) const EMPTY: SlotLook<'static> = SlotLook {
+        icon: None,
+        count: 0,
+        outline: None,
+        faded: false,
+    };
+}
+
+pub(crate) fn slot(ui: &mut Ui, world: &mut World, look: SlotLook, sense: Sense) -> Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(SLOT), sense);
+    let stroke = match look.outline {
+        Some(outline) => Stroke::new(1.5, outline),
+        None if response.hovered() && sense != Sense::hover() => {
+            Stroke::new(1.0, color::HOVER_LINE)
         }
-        InventoryGrid
-    })
+        None => HAIRLINE,
+    };
+    ui.painter().rect(
+        rect,
+        WIDGET_RADIUS,
+        color::INPUT,
+        stroke,
+        StrokeKind::Inside,
+    );
+    if let Some(image) = look.icon.and_then(|icon| gui::image(world, icon)) {
+        let tint = if look.faded {
+            Color32::from_white_alpha(77)
+        } else {
+            Color32::WHITE
+        };
+        ui.place(
+            Rect::from_center_size(rect.center(), Vec2::splat(SLOT_ICON)),
+            image.widget(Vec2::splat(SLOT_ICON)).tint(tint),
+        );
+    }
+    if look.count > 1 {
+        let corner = Rect::from_min_max(rect.center(), rect.max - Vec2::new(3.0, 0.0));
+        ui.new_child(
+            UiBuilder::new()
+                .max_rect(corner)
+                .layout(Layout::bottom_up(Align::Max)),
+        )
+        .label(
+            RichText::new(look.count.to_string())
+                .size(11.0)
+                .color(color::TEXT),
+        );
+    }
+    response
 }
 
-#[derive(Hash)]
+#[derive(Resource, Default)]
+struct SlotVerdicts(Vec<SlotVerdictSource>);
+
+#[derive(Resource, Default)]
+struct SlotNotes(Vec<SlotNoteSource>);
+
+#[derive(Resource, Default)]
+struct SlotActions(Vec<SlotAction>);
+
 struct CellData {
     slot: u32,
     filled: Option<Filled>,
 }
 
-#[derive(Hash)]
 struct Filled {
-    item: ItemId,
+    stack: ItemStack,
     hints: Vec<(InputAction, String)>,
-    icon: Handle<Image>,
-    count: u32,
     notes: Vec<String>,
     verdict: Option<SlotVerdict>,
 }
 
-fn sync_inventory(world: &mut World) {
-    let cells = inventory_cells(world);
-    let mut grids = world.query_filtered::<Entity, With<InventoryGrid>>();
-    let Some(grid) = grids.iter(world).next() else {
+const BUILT_IN: [InputAction; 3] = [
+    InputAction::DropItem,
+    InputAction::UseItem,
+    InputAction::InspectItem,
+];
+
+fn bag_slot(ui: &mut Ui, world: &mut World, cell: &CellData) {
+    let Some(filled) = &cell.filled else {
+        slot(ui, world, SlotLook::EMPTY, Sense::hover());
         return;
     };
-    reconcile_children(world, grid, &cells, |world, index| {
-        slot(world.resource::<Content>(), &cells[index])
-    });
+    let content = world.resource::<Content>().clone();
+    let def = filled.stack.item.get(&content);
+    let (outline, faded, verdict) = match &filled.verdict {
+        None => (None, false, None),
+        Some(SlotVerdict::Wanted(note)) => (Some(color::WARN), false, Some(note.clone())),
+        Some(SlotVerdict::Refused(reason)) => (None, true, Some(reason.clone())),
+    };
+    let look = SlotLook {
+        icon: Some(&def.icon),
+        count: filled.stack.count,
+        outline,
+        faded,
+    };
+    let response = slot(ui, world, look, Sense::click_and_drag());
+    let candidates: Vec<InputAction> = world
+        .get_resource::<SlotActions>()
+        .into_iter()
+        .flat_map(|actions| actions.0.iter().map(|action| action.action))
+        .chain(BUILT_IN)
+        .collect();
+    let matched: Vec<InputAction> = candidates
+        .into_iter()
+        .filter(|action| map::clicked(world, *action, &response))
+        .collect();
+    if !matched.is_empty() {
+        act(world, cell.slot, filled.stack.item, &matched);
+    }
+    if map::drag_started(world, InputAction::CarryItem, &response) {
+        egui::DragAndDrop::set_payload(ui.ctx(), CarriedSlot(cell.slot));
+    }
+    let lines: Vec<String> = std::iter::once(card::overview(def))
+        .chain(filled.notes.iter().cloned())
+        .chain(verdict)
+        .collect();
+    let hint = StyledLine::new(hint_pieces(&filled.hints));
+    hud::tooltip(&response, world, &def.name, &lines, Some(&hint));
+}
+
+fn draw_carried(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let Some(carried) = egui::DragAndDrop::payload::<CarriedSlot>(&gui) else {
+        return;
+    };
+    let content = world.resource::<Content>().clone();
+    let Some(stack) = session::my_character(world)
+        .and_then(|me| me.get::<Inventory>())
+        .and_then(|inventory| inventory.slots.get(carried.0 as usize).copied())
+    else {
+        return;
+    };
+    let Some(image) = gui::image(world, &stack.item.get(&content).icon) else {
+        return;
+    };
+    gui::at_pointer(
+        &gui,
+        Id::new("carried item"),
+        Band::Pointer,
+        -Vec2::splat(CARRIED / 2.0),
+        |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
+    );
 }
 
 fn inventory_cells(world: &World) -> Vec<CellData> {
     let content = world.resource::<Content>();
     let inventory = session::my_character(world).and_then(|me| me.get::<Inventory>());
     let max = inventory.map_or(INVENTORY_MAX, |inventory| inventory.max);
-    let assets = world.resource::<AssetServer>();
     let verdicts = world
         .get_resource::<SlotVerdicts>()
         .map(|verdicts| verdicts.0.as_slice())
@@ -151,10 +287,8 @@ fn inventory_cells(world: &World) -> Vec<CellData> {
                 .map(|&stack| {
                     let def = stack.item.get(content);
                     Filled {
-                        item: stack.item,
+                        stack,
                         hints: hints(map, &takeovers, def),
-                        icon: assets.load(def.icon.path()),
-                        count: stack.count,
                         notes: bound_note(def)
                             .into_iter()
                             .chain(notes.iter().filter_map(|source| source(world, stack)))
@@ -170,93 +304,6 @@ fn bound_note(def: &ItemDef) -> Option<String> {
     def.has(ItemFlag::Bound)
         .then(|| "bound · can't be sold or dropped".to_owned())
 }
-
-fn slot(content: &Content, cell: &CellData) -> Box<dyn Scene> {
-    match &cell.filled {
-        Some(filled) => Box::new(filled_slot(content, cell.slot, filled)),
-        None => Box::new(empty_slot()),
-    }
-}
-
-fn empty_slot() -> impl Scene {
-    bsn! {
-        slot_node()
-        BackgroundColor({SLOT_BG})
-        BorderColor::all(SLOT_BORDER)
-    }
-}
-
-fn filled_slot(content: &Content, slot: u32, filled: &Filled) -> impl Scene {
-    let count = if filled.count > 1 {
-        filled.count.to_string()
-    } else {
-        String::new()
-    };
-    let def = filled.item.get(content);
-    let (border, tint, verdict) = match &filled.verdict {
-        None => (SLOT_BORDER, Color::WHITE, None),
-        Some(SlotVerdict::Wanted(note)) => (palette::AMBER_70, Color::WHITE, Some(note.clone())),
-        Some(SlotVerdict::Refused(reason)) => (
-            SLOT_BORDER,
-            Color::WHITE.with_alpha(0.3),
-            Some(reason.clone()),
-        ),
-    };
-    let tip = TooltipText {
-        title: def.name.to_owned(),
-        lines: std::iter::once(card::overview(def))
-            .chain(filled.notes.iter().cloned())
-            .chain(verdict)
-            .map(|line| vec![RichPiece::text(line)])
-            .collect(),
-        hint: Some(hint_pieces(&filled.hints)),
-    };
-    let item = filled.item;
-    let carriable = Carriable {
-        image: filled.icon.clone(),
-        payload: slot as u64,
-        input: InputAction::CarryItem.into(),
-    };
-    bsn! {
-        slot_node()
-        BackgroundColor({SLOT_BG})
-        BorderColor::all(border)
-        @{tooltip(false)}
-        template(move |_| Ok(carriable.clone()))
-        on(move |click: On<PointerClick>, input: ActionInput, actions: Option<Res<SlotActions>>, mut commands: Commands| {
-            let candidates = actions
-                .iter()
-                .flat_map(|actions| actions.0.iter().map(|action| action.action))
-                .chain(BUILT_IN);
-            let matched: Vec<InputAction> = candidates.filter(|action| input.clicked(*action, &click)).collect();
-            if !matched.is_empty() {
-                commands.queue(move |world: &mut World| act(world, slot, item, &matched));
-            }
-        })
-        Children [
-            Node { width: Val::Px(32.0), height: Val::Px(32.0) }
-            ImageNode { image: {filled.icon.clone()}, color: tint }
-            Pickable { should_block_lower: false, is_hoverable: false }
-            --
-            @{tooltip_content(Side::Bottom, Align::Start, 0.0)}
-            Children [ @{ui::tooltip_text(tip)} ]
-            --
-            Node {
-                position_type: PositionType::Absolute,
-                right: Val::Px(2.0),
-                bottom: Val::Px(0.0),
-            }
-            Pickable { should_block_lower: false, is_hoverable: false }
-            Children [ @{text_colored(count, Color::WHITE)} ]
-        ]
-    }
-}
-
-const BUILT_IN: [InputAction; 3] = [
-    InputAction::DropItem,
-    InputAction::UseItem,
-    InputAction::InspectItem,
-];
 
 fn act(world: &mut World, slot: u32, item: ItemId, matched: &[InputAction]) {
     let takeover = active_slot_actions(world)
@@ -313,15 +360,15 @@ fn hints(map: &InputMap, takeovers: &[SlotAction], def: &ItemDef) -> Vec<(InputA
         .collect()
 }
 
-fn hint_pieces(hints: &[(InputAction, String)]) -> Vec<RichPiece> {
+fn hint_pieces(hints: &[(InputAction, String)]) -> Vec<TextPiece> {
     hints
         .iter()
         .enumerate()
         .flat_map(|(index, (action, purpose))| {
-            let separator = (index > 0).then(|| RichPiece::text(" · "));
+            let separator = (index > 0).then(|| TextPiece::text(" · "));
             separator
                 .into_iter()
-                .chain([input(*action), RichPiece::text(purpose.clone())])
+                .chain([input(*action), TextPiece::text(purpose.clone())])
         })
         .collect()
 }

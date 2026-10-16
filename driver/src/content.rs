@@ -9,7 +9,10 @@ use game::core::math::{Pos, Rect};
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::{self, Area, AreaDef, AreaModule};
 use game::systems::load_content;
+use game::systems::probe::ProbeSnapshot;
 use game::systems::script::Place;
+
+use crate::seen::{area_key, clickable_point};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -93,18 +96,35 @@ pub fn beside_object(area: &str, object: &str) -> Place {
 }
 
 pub fn object_at(area: &str, object: &str) -> Pos<Tiles> {
-    area::objects(area::placed(content(), id(area)))
-        .find(|(_, def)| def.name.as_deref() == Some(object))
-        .map(|(_, def)| def.shape.center())
+    placed_object(area, object)
         .unwrap_or_else(|| panic!("no object named {object} is placed in {area}"))
 }
 
 // A marked spot: a named object, or where a townsperson lives.
 pub fn marker_at(area: &str, name: &str) -> Pos<Tiles> {
-    let named_object = area::objects(area::placed(content(), id(area)))
-        .find(|(_, def)| def.name.as_deref() == Some(name))
-        .map(|(_, def)| def.shape.center());
-    named_object.unwrap_or_else(|| resident_home(area, name).at)
+    placed_object(area, name).unwrap_or_else(|| resident_home(area, name).at)
+}
+
+// Ground in view beside the player, farthest from anyone first, so nobody strolls under the pointer.
+pub fn open_ground_beside(snapshot: &ProbeSnapshot) -> Vec<Pos<Tiles>> {
+    let me = snapshot.me.as_ref().expect("the player").at;
+    let room = |tile: &Pos<Tiles>| {
+        snapshot
+            .actors
+            .iter()
+            .map(|actor| actor.at.distance_to(*tile))
+            .fold(f32::INFINITY, f32::min)
+    };
+    let mut ground: Vec<Pos<Tiles>> = ground_near(
+        area_key(snapshot).expect("an area"),
+        me,
+        Tiles(2.0)..=Tiles(4.0),
+    )
+    .into_iter()
+    .filter(|tile| clickable_point(snapshot, *tile).is_some())
+    .collect();
+    ground.sort_by(|a, b| room(b).total_cmp(&room(a)));
+    ground
 }
 
 // Nearest first, and only what can be walked to from the spot.
@@ -131,4 +151,10 @@ fn beside(area: &str, at: Pos<Tiles>) -> Place {
         area: id(area),
         at: tile,
     }
+}
+
+fn placed_object(area: &str, object: &str) -> Option<Pos<Tiles>> {
+    area::objects(area::placed(content(), id(area)))
+        .find(|(_, def)| def.name.as_deref() == Some(object))
+        .map(|(_, def)| def.shape.center())
 }

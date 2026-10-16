@@ -7,8 +7,6 @@ use bevy_terminal::{AvailableTerminals, Terminal, TerminalLine};
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
-use crate::systems::hud::{RefreshWindows, Window};
-
 #[derive(
     Serialize,
     Deserialize,
@@ -51,6 +49,7 @@ pub struct TerminalPlugin;
 impl Plugin for TerminalPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Terminals>()
+            .init_resource::<widget::TerminalView>()
             .add_systems(Update, receive);
     }
 }
@@ -74,12 +73,10 @@ fn receive(
     mut available: MessageReader<AvailableTerminals<TerminalKind>>,
     mut lines: MessageReader<TerminalLine<TerminalKind>>,
     mut terminals: ResMut<Terminals>,
-    mut refresh: ResMut<RefreshWindows>,
 ) {
     for message in available.read() {
         if terminals.tabs != message.terminals {
             terminals.tabs = message.terminals.clone();
-            refresh.0.insert(widget::TerminalWindow.title());
         }
     }
     for line in lines.read() {

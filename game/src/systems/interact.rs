@@ -12,7 +12,7 @@ use crate::systems::attention::{self, AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
-use crate::systems::player::{commands_locked, sender_player, session};
+use crate::systems::player::{self, sender_player, session};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::{self, EventKind, RiftEvent, RiftInstances};
 use crate::systems::stat;
@@ -80,8 +80,7 @@ pub fn interact_request(world: &mut World) {
             continue;
         };
         let target = request.message.target;
-        if stat::is_dead(world, player)
-            || commands_locked(world, player)
+        if !player::may_command(world, player)
             || world.get_entity(target).is_err()
             || stat::is_dead(world, target)
             || interaction_of(world, target).is_none()

@@ -1,5 +1,4 @@
 use egui::Ui;
-use game::core::audio::loader;
 use game::core::content::Content;
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
@@ -20,18 +19,12 @@ pub struct HeardModule {
     pub module: usize,
     pub gain: f32,
     pub outside: f32,
-    pub channels: Vec<(u32, String, f32, Option<IntegratedLoudness>)>,
+    pub channels: Vec<(u32, String, f32)>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct IntegratedLoudness {
-    pub integrated: f64,
-    pub peak_dbfs: f64,
-}
-
-pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Tiles>) {
-    let area = area::load(&content, area_id);
-    let key = area_id.key(&content).to_owned();
+pub fn listen(editor: &mut Editor, content: &Content, area_id: AreaId, at: Pos<Tiles>) {
+    let area = area::load(content, area_id);
+    let key = area_id.key(content).to_owned();
     let mut heard = Vec::new();
     for (index, zone) in area.soundscape.iter().enumerate() {
         let Some(positional) = zone.heard_from(at) else {
@@ -41,21 +34,7 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Ti
         let channels = zone
             .channels
             .iter()
-            .map(|(channel, layer)| {
-                let loudness = editor
-                    .project
-                    .as_ref()
-                    .and_then(|project| {
-                        project.files.get(&format!("assets/{}", layer.src.as_str()))
-                    })
-                    .and_then(|bytes| measure(bytes));
-                (
-                    channel.0,
-                    layer.src.as_str().to_owned(),
-                    layer.volume,
-                    loudness,
-                )
-            })
+            .map(|(channel, layer)| (channel.0, layer.src.as_str().to_owned(), layer.volume))
             .collect();
         heard.push(HeardModule {
             module: index,
@@ -69,29 +48,6 @@ pub fn listen(editor: &mut Editor, content: Content, area_id: AreaId, at: Pos<Ti
         at: (at.x, at.y),
         heard,
     });
-}
-
-pub fn measure(bytes: &[u8]) -> Option<IntegratedLoudness> {
-    let decoded = loader::decode(bytes.to_vec()).ok()?;
-    let channels = decoded.channels as u32;
-    let mut meter = ebur128::EbuR128::new(
-        channels,
-        decoded.sample_rate,
-        ebur128::Mode::I | ebur128::Mode::TRUE_PEAK,
-    )
-    .ok()?;
-    meter.add_frames_f32(&decoded.samples).ok()?;
-    let integrated = meter.loudness_global().ok()?;
-    let mut peak: f64 = f64::NEG_INFINITY;
-    for channel in 0..channels {
-        if let Ok(p) = meter.true_peak(channel) {
-            peak = peak.max(p);
-        }
-    }
-    Some(IntegratedLoudness {
-        integrated,
-        peak_dbfs: 20.0 * peak.max(1e-9).log10(),
-    })
 }
 
 #[derive(Default)]
@@ -115,7 +71,7 @@ pub fn panel(editor: &Editor, ui: &mut Ui) {
     let mut rows: Vec<(u32, String, String, String)> = Vec::new();
     for heard in &listening.heard {
         let from = soundscape_name(editor, &listening.area, heard.module);
-        for (channel, file, volume, _) in &heard.channels {
+        for (channel, file, volume) in &heard.channels {
             let where_ = if heard.outside <= 0.0 {
                 "inside".to_owned()
             } else {

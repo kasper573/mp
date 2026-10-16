@@ -3,7 +3,7 @@ use game::systems::dialogue::Conversation;
 use game::systems::interact::InteractRequest;
 use game::systems::player::commands_locked;
 
-use crate::support::{Sim, conversation, count, leave, object, open_with, row, spawn_area};
+use testkit::{Sim, conversation, count, leave, object, open_with, row, spawn_area};
 
 const DAY: u64 = 24 * 3_600_000;
 

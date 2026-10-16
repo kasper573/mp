@@ -38,9 +38,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("The list stays as narrow as its wares, and browsing never shifts it");
     let listed = row_x(&mut me, "Bone Shield");
     for ware in ["Bone Shield", "Health Potion", "Greater Health Potion"] {
-        me.click_ui(UiTarget::text(ware).and("in the list", move |element, _| {
-            element.rect.min_x() <= listed + 1.0
-        }));
+        me.click_ui(UiTarget::button(ware));
         me.settled();
         assert_eq!(
             row_x(&mut me, "Bone Shield"),
@@ -100,6 +98,7 @@ fn play(shoot: &mut Shoot) {
         holding(snapshot, "rusty_sword") == 1
     });
 
+    close_bag(&mut me);
     me.caption_top("Leaving the conversation closes the shop with it");
     me.act(InputAction::Dismiss);
     me.conversation_over();
@@ -115,6 +114,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top(
         "Her shop has no reactions: trades pass in silence, and your bag lights up what she takes",
     );
+    me.act(InputAction::ToggleInventory);
     me.hold();
     me.act_on_ui(
         InputAction::SellItem,
@@ -123,9 +123,9 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("the bones to sell", |snapshot| {
         holding(snapshot, "bone_token") == 4
     });
+    close_bag(&mut me);
     me.act(InputAction::Dismiss);
     me.wait_until("the exchange to close", |snapshot| snapshot.shop.is_none());
-    me.act(InputAction::ToggleInventory);
 
     me.caption("Even a box on the pier can keep a shop, inside a conversation of its own");
     me.shop_at("honesty-box");
@@ -143,13 +143,20 @@ fn shop_is(snapshot: &ProbeSnapshot, shop: &str) -> bool {
         .is_some_and(|open| open.shop.key(content()) == shop)
 }
 
+// Esc closes the bag before the conversation under it.
+fn close_bag(me: &mut Player) {
+    me.act(InputAction::ToggleInventory);
+    me.wait_until("the bag to close", |snapshot| {
+        UiTarget::text("Inventory").find(snapshot).is_none()
+    });
+}
+
 // The ware's row in the list, rather than its name repeated on the details beside it.
 fn row_x(me: &mut Player, ware: &str) -> f32 {
     let seen = me.settled();
-    seen.ui
-        .iter()
-        .filter(|element| element.text.as_deref() == Some(ware))
-        .map(|element| element.rect.min_x())
-        .min_by(f32::total_cmp)
+    UiTarget::button(ware)
+        .find(&seen)
         .unwrap_or_else(|| panic!("{ware} is not listed"))
+        .rect
+        .min_x()
 }

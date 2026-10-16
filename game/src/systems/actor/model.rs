@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use rayon::prelude::*;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
@@ -8,7 +9,7 @@ use strum::{AsRefStr, EnumString, VariantArray};
 use super::Action;
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::SfxId;
-use crate::core::content::media::ImageSizes;
+use crate::core::content::media::{ImageSizes, VisiblePixelColumns, visible_columns};
 use crate::core::content::{
     Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
 };
@@ -125,7 +126,10 @@ pub struct SheetFrame {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ModelModule {
     Bust(Busts),
-    Scale { factor: f32 },
+    Scale {
+        factor: f32,
+    },
+    /// Walks ignore blocked cells; wild ones keep out of safe zones.
     Airborne,
 }
 
@@ -295,7 +299,9 @@ pub fn build_all(loading: &mut Loading) {
     let content = loading.content();
     let sizes = content.built::<ImageSizes>();
     let mut models: Vec<Option<ActorModel>> = content.ids::<ModelDef>().map(|_| None).collect();
-    for (id, def) in loading.rows::<ModelDef>() {
+    let rows = loading.rows::<ModelDef>(&content);
+    let figures = bust_figures(loading, &rows);
+    for ((id, def), figure) in rows.into_iter().zip(figures) {
         let mut check = RowCheck::default();
         let sheet = def.sheet();
         let image = sizes.0.get(sheet.image.as_str()).copied();
@@ -411,7 +417,7 @@ pub fn build_all(loading: &mut Loading) {
             }
         }
         if check.is_empty() {
-            models[id.index()] = Some(ActorModel::new(def, image));
+            models[id.index()] = Some(ActorModel::new(def, image, figure));
         } else {
             loading.row_errors(id, check);
             loading.fail(id);
@@ -421,13 +427,22 @@ pub fn build_all(loading: &mut Loading) {
 }
 
 pub struct ActorModel {
-    def: &'static ModelDef,
+    def: ModelDef,
     columns: u32,
-    strips: Vec<Vec<&'static [SheetFrame]>>,
+    strips: Vec<Vec<Vec<SheetFrame>>>,
+    figure: Option<BustFigure>,
+}
+
+/// Busts carry wide transparent margins, so a bust is placed by its figure; taking the span over
+/// all expressions keeps a new face from moving it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BustFigure {
+    pub left: f32,
+    pub right: f32,
 }
 
 impl ActorModel {
-    pub fn get(content: &Content, model: ModelId) -> &'static ActorModel {
+    pub fn get(content: &Content, model: ModelId) -> &ActorModel {
         content
             .built::<Models>()
             .0
@@ -437,7 +452,7 @@ impl ActorModel {
     }
 
     // Only a sheet that passed the load checks, with frames for every action and direction, gets here.
-    fn new(def: &'static ModelDef, image: Option<(u32, u32)>) -> ActorModel {
+    fn new(def: &ModelDef, image: Option<(u32, u32)>, figure: Option<BustFigure>) -> ActorModel {
         let sheet = def.sheet();
         let columns = image
             .map_or(1, |(width, _)| width / sheet.frame_size.width.max(1))
@@ -447,22 +462,27 @@ impl ActorModel {
             .map(|action| {
                 Direction::VARIANTS
                     .iter()
-                    .map(|direction| sheet.actions[action][direction].as_slice())
+                    .map(|direction| sheet.actions[action][direction].clone())
                     .collect()
             })
             .collect();
         ActorModel {
-            def,
+            def: def.clone(),
             columns,
             strips,
+            figure,
         }
+    }
+
+    pub fn bust_figure(&self) -> Option<BustFigure> {
+        self.figure
     }
 
     pub fn hitbox(&self) -> Size<Tiles> {
         self.def.hitbox.tiles()
     }
 
-    pub fn sheet(&self) -> &'static crate::core::assets::AssetRef {
+    pub fn sheet(&self) -> &crate::core::assets::AssetRef {
         &self.def.sheet().image
     }
 
@@ -485,7 +505,7 @@ impl ActorModel {
         let elapsed = (t.millis() * rate(action, attack_speed)).max(Millis(0.0));
         let total = total_ms(strip);
         let position = if action == Action::Dead {
-            elapsed.min(total - Millis(1.0))
+            elapsed
         } else {
             elapsed % total
         };
@@ -542,8 +562,8 @@ impl ActorModel {
         (sfx, stepped)
     }
 
-    fn strip(&self, action: Action, dir: Direction) -> &'static [SheetFrame] {
-        self.strips[action as usize][dir as usize]
+    fn strip(&self, action: Action, dir: Direction) -> &[SheetFrame] {
+        &self.strips[action as usize][dir as usize]
     }
 
     fn region(&self, frame: u32) -> Rect<WorldPx> {
@@ -588,4 +608,28 @@ fn crossed(once: bool, total: Millis, at: Millis, prev: Option<Millis>, now: Mil
         }
     };
     count(now) > prev.map_or(0, count)
+}
+
+fn bust_figures(loading: &Loading, rows: &[(ModelId, &ModelDef)]) -> Vec<Option<BustFigure>> {
+    let folder = loading.folder();
+    rows.par_iter()
+        .map(|(_, def)| {
+            let spans: Vec<VisiblePixelColumns> = def
+                .busts()?
+                .all()
+                .filter_map(|bust| folder.read(&bust.path()).ok())
+                .filter_map(|bytes| visible_columns(&bytes).ok().flatten())
+                .collect();
+            let left = spans
+                .iter()
+                .map(|span| span.first as f32 / span.image_width as f32);
+            let right = spans
+                .iter()
+                .map(|span| (span.last + 1) as f32 / span.image_width as f32);
+            Some(BustFigure {
+                left: left.reduce(f32::min)?,
+                right: right.reduce(f32::max)?,
+            })
+        })
+        .collect()
 }

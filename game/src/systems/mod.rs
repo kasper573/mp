@@ -8,6 +8,7 @@ pub mod combat;
 pub mod dialogue;
 pub mod effect;
 pub mod equipment;
+pub mod frame_rate;
 pub mod history;
 pub mod hud;
 pub mod input;
@@ -127,7 +128,7 @@ pub fn server_app(
     app.insert_resource(WorldArea(area));
     app.insert_resource(assets.built::<GameSettings>().clone());
     app.insert_resource(clock);
-    app.insert_resource(*assets);
+    app.insert_resource(assets.clone());
     app.insert_resource(assets.built::<quest::Parties>().clone());
     app.insert_resource(assets.built::<script::RiftScripts>().clone());
     app.insert_resource(input::map::InputMap::new(assets));
@@ -185,6 +186,7 @@ pub fn server_app(
             Update,
             (
                 (
+                    effect::expire,
                     player::arrival_holds,
                     combat::regen,
                     movement::move_request,
@@ -197,14 +199,13 @@ pub fn server_app(
                     shop::requests,
                     quest::requests,
                     equipment::unequip,
-                    effect::expire,
                     combat::combat,
                 )
                     .chain(),
                 (
                     (rewards::grant, quest::credit, npc::defeated).chain(),
                     (
-                        script::query::index_actors,
+                        script::query::take_tick_roster,
                         (area::object::track, npc::approach)
                             .chain()
                             .run_if(on_replication_tick),
@@ -230,6 +231,8 @@ pub fn server_app(
                 )
                     .chain(),
                 (
+                    stat::settle_health,
+                    combat::defeats,
                     actor::settle,
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,
@@ -302,24 +305,33 @@ pub fn client_app(
         files.source(),
     )
     .add_plugins(
-        DefaultPlugins
-            .set(bevy::log::LogPlugin {
-                filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
-                ..default()
-            })
-            .set(WindowPlugin {
-                primary_window: Some(window),
-                ..default()
-            })
-            .set(ImagePlugin::default_nearest()),
+        platform.engine(
+            DefaultPlugins
+                .set(bevy::log::LogPlugin {
+                    filter: format!("{},symphonia=warn", bevy::log::DEFAULT_FILTER),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(window),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        ),
     );
+    // The client shows a world the server plays out in real time, so a frame however long moves it
+    // on by all the time the frame took, as the server's world moved on, rather than by the most the
+    // engine otherwise lets one frame take.
+    app.world_mut()
+        .resource_mut::<Time<Virtual>>()
+        .set_max_delta(std::time::Duration::MAX);
     if let Some(credentials) = credentials {
         app.insert_resource(credentials);
     }
     app.insert_resource(params)
         .insert_resource(ClientPlatform(platform))
         .add_plugins((
-            ui::UiPlugin,
+            crate::core::gui::GuiPlugin,
+            crate::core::text::TextPlugin,
             crate::core::net::transport::SocketClientPlugin,
             crate::core::interpolate::SnapshotPlugin {
                 period: REPLICATION_PERIOD,
@@ -348,13 +360,14 @@ pub fn client_app(
             history::widget::HistoryPlugin,
             shop::counter::ShopCounterPlugin,
             item::card::ItemCardPlugin,
+            item::widget::CarryPlugin,
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,
             quest::tracker::QuestTrackerPlugin,
             spectate::widget::SpectatorPlugin,
             terminal::TerminalPlugin,
+            frame_rate::FrameRatePlugin,
         ));
-    ui::theme::set_theme(ui::themes::dark::THEME);
     app
 }
 
@@ -413,7 +426,9 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     world.insert_resource(content.built::<quest::Parties>().clone());
     world.insert_resource(content.built::<script::RiftScripts>().clone());
     world.insert_resource(content.built::<GameSettings>().clone());
-    world.insert_resource(ui::FontFiles(interface::font_files(&content)));
+    if let Some(fonts) = interface::theme_fonts(&content, &synced.assets) {
+        world.insert_resource(crate::core::gui::GuiFonts(fonts));
+    }
     world.insert_resource(input::map::InputMap::new(&content));
     world.insert_resource(content);
     world.insert_resource(synced);
@@ -446,6 +461,7 @@ pub fn registry() -> ContentRegistry {
         .row::<script::ScriptDef>()
         .row::<shop::ShopDef>()
         .modules::<shop::ShopDef>()
+        .list_kind("modules", "unknown module type", "a module type")
         .fixture::<input::map::InputAction>()
         .fixture::<attention::AttentionMark>()
         .fixture::<interface::InterfaceSound>()
@@ -460,6 +476,7 @@ pub fn registry() -> ContentRegistry {
     registry
         .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)
+        .hook(LoadStep::Across, input::map::check_all)
         .hook(LoadStep::Across, quest::check_all)
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)

@@ -9,13 +9,12 @@ use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::population::NpcSprite;
-use super::{
-    AreaCanvas, AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes,
-};
+use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
 use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
+use crate::views::navigation::Viewport;
 
 const LABEL_GAP: f32 = 2.0;
 const LABEL_SHIFTS: u32 = 3;
@@ -69,7 +68,7 @@ pub(super) fn overlay_walk(painter: &egui::Painter, frame: &AreaFrame, area: &ar
     let canvas = frame.canvas;
     let visible = canvas.visible();
     let size = area.size.grid();
-    let grids = area.grids;
+    let grids = area.grids.clone();
     for cell in size.cells() {
         let bounds = cell.bounds();
         if !visible.intersects(&bounds) {
@@ -124,7 +123,7 @@ pub(super) fn overlay_modules(
     let canvas = frame.canvas;
     let selected: HashSet<String> = selected_parts(editor, &frame.area_key);
     let view = editor.views.area.view(view_key);
-    let editing = view.in_place.last().map(|p| p.module);
+    let editing = view.in_place.first().copied();
     let visible = canvas.visible();
     let hovered = match view.tool {
         AreaTool::Select | AreaTool::Module => frame.pointer_tile.and_then(|tile| frame.hit(tile)),
@@ -143,7 +142,7 @@ pub(super) fn overlay_modules(
         if kind == AreaModuleKind::Population && module["roams"].is_null() {
             continue;
         }
-        let part = format!("/modules/{index}");
+        let part = super::module_part(index);
         let is_selected = selected.contains(&part);
         let is_hovered = hovered == Some(index);
         if matches!(kind, AreaModuleKind::Blueprint | AreaModuleKind::Scenery)
@@ -213,7 +212,7 @@ pub(super) fn overlay_modules(
         }
     }
     if view.blueprint.is_some() {
-        let (origin, _) = view.origin();
+        let (origin, _) = frame.origin();
         let at = canvas.to_screen(origin);
         let color = Color32::from_rgb(90, 220, 220);
         painter.line_segment(
@@ -246,7 +245,7 @@ pub(super) fn overlay_selected_scenery(
         return;
     };
     let canvas = frame.canvas;
-    let grids = area.grids;
+    let grids = area.grids.clone();
     let size = area.size.grid();
     for cell in rect.tiles() {
         if let Some(cell_index) = cell.index(size)
@@ -314,14 +313,13 @@ pub(super) fn overlay_selected_scenery(
         };
         let new_sort = snapped.clamp(0.0, height);
         if (new_sort - sort).abs() > f32::EPSILON {
-            let mut modules = frame.modules.clone();
-            modules[index]["sort"] = Value::from(new_sort as f64);
-            modules::write_modules(
-                editor,
-                &frame.area_key,
-                modules,
-                &format!("Move the sort line of the scenery in {}", frame.area_key),
-            );
+            modules::change_modules(editor, &frame.area_key, |modules| {
+                modules.get_mut(index)?["sort"] = Value::from(new_sort as f64);
+                Some(format!(
+                    "Move the sort line of the scenery in {}",
+                    frame.area_key
+                ))
+            });
         }
     }
     editor.status.left.push(format!(
@@ -342,10 +340,7 @@ pub(super) fn overlay_soundscape_reach(
 ) {
     let canvas = frame.canvas;
     for part in selected_parts(editor, &frame.area_key) {
-        let Some(index) = part
-            .strip_prefix("/modules/")
-            .and_then(|i| i.parse::<usize>().ok())
-        else {
+        let Some(index) = super::module_index(&part) else {
             continue;
         };
         let Some(module) = frame.modules.get(index) else {
@@ -392,10 +387,10 @@ pub(super) fn overlay_blueprint_ghost(
         if view.blueprint.is_none() {
             return;
         }
-        view.origin().0
+        frame.origin().0
     };
     let ctx = ui.ctx().clone();
-    let Some(sprite) = population::player_sprite(editor, &ctx, frame.content) else {
+    let Some(sprite) = population::player_sprite(editor, &ctx, &frame.content) else {
         return;
     };
     let view = editor.views.area.view_mut(view_key);
@@ -452,21 +447,33 @@ pub(super) fn overlay_populations(
 ) {
     let canvas = frame.canvas;
     let ctx = ui.ctx().clone();
-    let hidden = editor.views.area.view(view_key).population_hidden.clone();
-    let seeds = editor.views.area.view(view_key).population_seed.clone();
-    for (index, module) in frame.modules.iter().enumerate() {
-        if !module.is_module(AreaModuleKind::Population) || hidden.contains(&index) {
+    let live: std::collections::HashSet<String> = frame
+        .modules
+        .iter()
+        .filter(|module| module.is_module(AreaModuleKind::Population))
+        .map(Value::to_string)
+        .collect();
+    let view = editor.views.area.view_mut(view_key);
+    view.population_previews.retain(|key, _| live.contains(key));
+    let previews = view.population_previews.clone();
+    for module in frame.modules.iter() {
+        if !module.is_module(AreaModuleKind::Population) {
+            continue;
+        }
+        let preview = previews
+            .get(&module.to_string())
+            .copied()
+            .unwrap_or_default();
+        if preview.hidden {
             continue;
         }
         let Some(npc) = module["npc"].as_str() else {
             continue;
         };
-        let Some(sprite) = population::npc_sprite(editor, &ctx, frame.content, npc) else {
+        let Some(sprite) = population::npc_sprite(editor, &ctx, &frame.content, npc) else {
             continue;
         };
-        for at in
-            population::population_places(area, module, seeds.get(&index).copied().unwrap_or(0))
-        {
+        for at in population::population_places(area, module, preview.seed) {
             draw_sprite(painter, canvas, at, &sprite, 200);
         }
     }
@@ -559,7 +566,7 @@ pub(super) fn overlay_surfaces(painter: &egui::Painter, frame: &AreaFrame, area:
 
 fn draw_sprite(
     painter: &egui::Painter,
-    canvas: AreaCanvas,
+    canvas: Viewport<Tiles>,
     at: Pos<Tiles>,
     sprite: &NpcSprite,
     alpha: u8,

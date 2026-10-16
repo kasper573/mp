@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::{Condition, RiftScripting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
-use crate::core::script::{Compiler, Eval, FlowCx, Name, QueryDef, ScriptFault, Value, ValueType};
+use crate::core::script::{Compiler, Eval, FlowCx, QueryDef, ScriptFault, Value, ValueType};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::area::transition::Discovered;
@@ -24,13 +24,14 @@ use crate::systems::quest::{self, Objective, QuestId};
 use crate::systems::stat::{self, StatKind, Stats};
 use crate::systems::visibility::{self, Presence};
 
+/// Who stood where as the tick began. Every script in a tick counts the same actors, whatever order
+/// the scripts run in.
 #[derive(Resource, Default)]
-pub struct ActorRoster {
+pub struct TickRoster {
     listed: Vec<Listed>,
     characters: usize,
     character_bounds: Option<Bounds>,
     npc_bounds: Option<Bounds>,
-    areas: Vec<(AreaId, &'static Area)>,
 }
 
 #[derive(Clone, Copy)]
@@ -75,7 +76,7 @@ pub struct Listed {
     pub presence: bool,
 }
 
-impl ActorRoster {
+impl TickRoster {
     pub fn iter(&self) -> impl Iterator<Item = &Listed> {
         self.listed.iter()
     }
@@ -86,13 +87,6 @@ impl ActorRoster {
             Among::Npcs => &self.listed[self.characters..],
             Among::Anyone | Among::Attackers | Among::PackAttackers => &self.listed,
         }
-    }
-
-    fn area(&self, id: AreaId) -> Option<&'static Area> {
-        self.areas
-            .iter()
-            .find(|(known, _)| *known == id)
-            .map(|(_, area)| *area)
     }
 
     fn may_reach(&self, among: Among, from: Pos<Tiles>, within: Tiles) -> bool {
@@ -122,8 +116,8 @@ type RosterQuery = QueryState<
     Or<(With<PlayerOwner>, With<Npc>)>,
 >;
 
-pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
-    let mut listed = std::mem::take(&mut world.get_resource_or_init::<ActorRoster>().listed);
+pub fn take_tick_roster(world: &mut World, query: &mut RosterQuery) {
+    let mut listed = std::mem::take(&mut world.get_resource_or_init::<TickRoster>().listed);
     listed.clear();
     listed.extend(query.iter(world).map(
         |(entity, at, tag, npc, stats, character, held, presence)| Listed {
@@ -137,21 +131,13 @@ pub fn index_actors(world: &mut World, query: &mut RosterQuery) {
             presence,
         },
     ));
-    let mut areas = std::mem::take(&mut world.resource_mut::<ActorRoster>().areas);
-    let assets = world.resource::<Content>();
-    for entry in &listed {
-        if !areas.iter().any(|(id, _)| *id == entry.area) {
-            areas.push((entry.area, area::load(assets, entry.area)));
-        }
-    }
     listed.sort_by_key(|entry| !entry.character);
     let characters = listed.iter().take_while(|entry| entry.character).count();
-    let mut roster = world.resource_mut::<ActorRoster>();
+    let mut roster = world.resource_mut::<TickRoster>();
     roster.character_bounds = Bounds::around(&listed[..characters]);
     roster.npc_bounds = Bounds::around(&listed[characters..]);
     roster.listed = listed;
     roster.characters = characters;
-    roster.areas = areas;
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -335,7 +321,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
         }
     }
 
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<Eval, ScriptFault> {
+    fn compile<'c>(&'c self, cx: &mut Compiler<'c, RiftScripting>) -> Result<Eval, ScriptFault> {
         Ok(match self {
             RiftQuery::Level { of } => {
                 let of = cx.actor(of.as_deref())?;
@@ -510,18 +496,19 @@ impl QueryDef<RiftScripting> for RiftQuery {
                         character(world, cx, &of)
                             .and_then(|who| quest::log_of(world, who))
                             .and_then(|log| log.finished(quest))
-                            .and_then(|done| done.resets_in)
+                            .and_then(|done| done.resets_in(world.resource::<WallClock>().now))
                             .map(Seconds::in_words)
                             .unwrap_or_default(),
                     )
                 })
             }
             RiftQuery::Inside { of, object } => {
-                let object: Name = object;
+                let object = object.clone();
                 let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Bool(
-                        actor(world, cx, &of).is_some_and(|who| object::inside(world, who, object)),
+                        actor(world, cx, &of)
+                            .is_some_and(|who| object::inside(world, who, &object)),
                     )
                 })
             }
@@ -728,11 +715,11 @@ pub fn around<'w>(
 }
 
 struct Scan<'w> {
-    roster: &'w ActorRoster,
+    roster: &'w TickRoster,
     owner: Entity,
     from: Pos<Tiles>,
     area: AreaId,
-    shelter: Option<&'static Area>,
+    shelter: Option<&'w Area>,
     attackers: Vec<Entity>,
     owner_presence: bool,
 }
@@ -742,13 +729,12 @@ impl<'w> Scan<'w> {
         let owner = cx.owner?;
         let from = movement::position(world, owner)?;
         let area = world.get::<AreaTag>(owner)?.area;
-        let roster = world.get_resource::<ActorRoster>()?;
+        let roster = world.get_resource::<TickRoster>()?;
         if !roster.may_reach(among, from, within) {
             return None;
         }
-        let shelter = area::wild(world, owner)
-            .then(|| roster.area(area))
-            .flatten();
+        let shelter =
+            area::wild(world, owner).then(|| area::load(world.resource::<Content>(), area));
         let attackers: Vec<Entity> = match among {
             Among::Attackers => world
                 .get::<Attackers>(owner)

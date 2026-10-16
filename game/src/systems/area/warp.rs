@@ -26,10 +26,13 @@ impl EffectDef<RiftScripting> for Warp {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let to = cx.place(&self.to)?;
         Ok(Box::new(move |world, _, cx| {

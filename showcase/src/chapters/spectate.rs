@@ -1,6 +1,8 @@
-use driver::{Player, beside_resident, content, in_feed, on_quest};
+use driver::{Player, beside_resident, content, noticed, on_quest};
 use game::core::math::Offset;
 use game::systems::input::map::InputAction;
+use game::systems::probe::ProbeSnapshot;
+use game::systems::spectate::Spectating;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -45,7 +47,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.caption_top("Their quest tracker follows along, and so does their feed in the corner");
     me.wait_until("the quest in the watched feed", |snapshot| {
-        in_feed(snapshot, "Quest accepted · A Letter for the Captain")
+        noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
     me.caption_top("H opens their history, and says whose it is");
     me.act(InputAction::ToggleHistory);
@@ -106,26 +108,30 @@ fn name_of(player: &mut Player) -> String {
     player.snapshot().me.expect("a player in the world").name
 }
 
-// Others may be online too, so the spectator steps on until the wanted player shows.
+// The spectator steps through everyone online in turn, so one full turn reaches each of them.
 fn switch_to(me: &mut Player, name: &str) {
-    let mut watched = me.wait_for("the spectator to follow someone", |snapshot| {
-        snapshot.viewpoint.as_ref().map(|body| body.name.clone())
-    });
-    for _ in 0..10 {
-        if watched == name {
+    let online = me.wait_for(
+        "the spectator to follow someone",
+        |snapshot| match snapshot.spectating {
+            Some(Spectating::Player(watched)) => Some(watched.online),
+            _ => None,
+        },
+    );
+    for _ in 0..online {
+        let before = me.wait_for("the spectator to watch someone", watched_name);
+        if before == name {
             return;
         }
         me.act(InputAction::SpectateNext);
-        let before = watched.clone();
-        watched = me.wait_for("the spectator to switch", |snapshot| {
-            snapshot
-                .viewpoint
-                .as_ref()
-                .map(|body| body.name.clone())
-                .filter(|now| *now != before)
+        me.wait_until("the spectator to switch", |snapshot| {
+            watched_name(snapshot).is_some_and(|now| now != before)
         });
     }
     panic!("never got to watch {name}");
+}
+
+fn watched_name(snapshot: &ProbeSnapshot) -> Option<String> {
+    snapshot.viewpoint.as_ref().map(|body| body.name.clone())
 }
 
 fn watching(me: &mut Player, name: &str) {

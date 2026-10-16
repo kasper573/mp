@@ -5,18 +5,19 @@ use game::core::content::Content;
 use game::core::script::VariableType;
 use serde_json::{Map, Value};
 
+use crate::drafts;
 use crate::project::{Project, ProjectFiles, row_file};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
 use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
 use crate::views::script::nodes::NodeCatalogue;
-use crate::{condition, picker, spans, thumbs, value};
+use crate::{audio, condition, picker, spans, thumbs, value};
 
 pub struct FormCx<'a> {
     pub root: &'a Value,
     pub content: Option<Content>,
-    pub generation: u64,
+    pub catalogue: &'a NodeCatalogue,
     pub files: &'a ProjectFiles,
     pub usages: &'a ContentUsages,
     pub shapes: &'a SchemaShapes,
@@ -26,6 +27,7 @@ pub struct FormCx<'a> {
     pub owner_table: Option<String>,
     pub owner_key: Option<String>,
     pub holes: Option<FormHoles>,
+    pub autofocus: bool,
 }
 
 impl<'a> FormCx<'a> {
@@ -38,8 +40,8 @@ impl<'a> FormCx<'a> {
     ) -> FormCx<'a> {
         FormCx {
             root,
-            content: project.content,
-            generation: project.generation,
+            content: project.content.clone(),
+            catalogue: &project.catalogue,
             files: &project.files,
             usages: &project.usages,
             shapes,
@@ -49,6 +51,7 @@ impl<'a> FormCx<'a> {
             owner_table: None,
             owner_key: None,
             holes: None,
+            autofocus: false,
         }
     }
 
@@ -61,10 +64,15 @@ impl<'a> FormCx<'a> {
 
 #[derive(Default)]
 pub struct FormHoles {
-    pub filled: Vec<(String, String)>,
-    pub open: Vec<(String, VariableType)>,
+    pub fields: HashMap<String, FieldHole>,
     pub variables: Vec<(String, VariableType)>,
     pub requests: Vec<HoleRequest>,
+}
+
+#[derive(Clone)]
+pub enum FieldHole {
+    Filled(String),
+    Open(VariableType),
 }
 
 pub enum HoleRequest {
@@ -75,34 +83,12 @@ pub enum HoleRequest {
 
 #[derive(Default)]
 pub struct FormState {
-    pub drafts: HashMap<egui::Id, String>,
     pub errors: HashMap<String, String>,
     pub folded: HashSet<String>,
     pub unfolded: HashSet<String>,
     pub status: Vec<String>,
     pub thumbnails: thumbs::Thumbnails,
-    catalogue: Option<(u64, NodeCatalogue)>,
-}
-
-impl FormState {
-    pub fn catalogue(
-        &mut self,
-        generation: u64,
-        root: &Value,
-        content: Option<Content>,
-    ) -> &NodeCatalogue {
-        if self
-            .catalogue
-            .as_ref()
-            .is_some_and(|(built, _)| *built != generation)
-        {
-            self.catalogue = None;
-        }
-        &self
-            .catalogue
-            .get_or_insert_with(|| (generation, NodeCatalogue::build(root, content)))
-            .1
-    }
+    pub audio: audio::WaveformCache,
 }
 
 pub enum FormAction {
@@ -159,22 +145,17 @@ pub fn value(
     value: &mut Value,
     path: &str,
 ) -> FormChange {
-    let filled = cx
+    let hole = cx
         .holes
         .as_ref()
-        .and_then(|holes| holes.filled.iter().find(|(field, _)| field == path))
-        .map(|(_, name)| name.clone());
-    if let Some(name) = filled {
-        hole_chip(ui, cx, path, &name);
-        return FormChange::default();
-    }
-    let open = cx
-        .holes
-        .as_ref()
-        .and_then(|holes| holes.open.iter().find(|(field, _)| field == path))
-        .map(|(_, kind)| *kind);
-    let Some(kind) = open else {
-        return plain(ui, cx, schema, value, path);
+        .and_then(|holes| holes.fields.get(path).cloned());
+    let kind = match hole {
+        None => return plain(ui, cx, schema, value, path),
+        Some(FieldHole::Filled(name)) => {
+            hole_chip(ui, cx, path, &name);
+            return FormChange::default();
+        }
+        Some(FieldHole::Open(kind)) => kind,
     };
     let mut changed = FormChange::default();
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
@@ -339,8 +320,20 @@ fn plain(
     path: &str,
 ) -> FormChange {
     let schema = schema::resolve(cx.root, schema);
-    if path.ends_with("/chance") && matches!(schema::kind(cx.root, schema), SchemaKind::Choice(_)) {
-        return chance(ui, cx, value, path);
+    if let Some(kind) = geometry_of(schema) {
+        return geometry(ui, cx, kind, value, path);
+    }
+    if let Some(blank) = schema.get("x-blank").and_then(Value::as_str) {
+        let present = schema::non_null(cx.root, schema);
+        match schema::kind(cx.root, present) {
+            SchemaKind::Integer => {
+                return number_field(ui, cx, present, value, path, true, Some(blank));
+            }
+            SchemaKind::Number => {
+                return number_field(ui, cx, present, value, path, false, Some(blank));
+            }
+            _ => {}
+        }
     }
     if let Some(marker) = schema::marker(schema) {
         match marker {
@@ -367,10 +360,7 @@ fn plain(
         SchemaKind::Enum(options) => enum_combo(ui, &options, value, path),
         SchemaKind::Union(variants) => union(ui, cx, &variants, value, path),
         SchemaKind::Choice(alternatives) => choice(ui, cx, &alternatives, value, path),
-        SchemaKind::Object => match geometry_of(cx.root, schema) {
-            Some(kind) => geometry(ui, cx, kind, value, path),
-            None => object(ui, cx, schema, value, path),
-        },
+        SchemaKind::Object => object(ui, cx, schema, value, path),
         SchemaKind::Array(items) => array(ui, cx, items, value, path),
         SchemaKind::Map(values) => map(ui, cx, values, value, path),
         SchemaKind::Text => text(ui, cx, value, path),
@@ -420,8 +410,7 @@ pub fn object_without(
         let resolved = schema::resolve(cx.root, field);
         let nested = present
             && schema::marker(resolved).is_none()
-            && matches!(schema::kind(cx.root, resolved), SchemaKind::Object)
-            && geometry_of(cx.root, resolved).is_none();
+            && matches!(schema::kind(cx.root, resolved), SchemaKind::Object);
         let list_of_objects = present
             && match schema::kind(cx.root, resolved) {
                 SchemaKind::Array(items) => matches!(
@@ -554,7 +543,7 @@ fn union(
         .map(|variant| variant.field.clone())
         .unwrap_or_else(|| "type".to_owned());
     let mut picked = current.clone();
-    egui::ComboBox::from_id_salt(ui.id().with(path).with("variant"))
+    widgets::combo_box(ui.id().with(path).with("variant"))
         .selected_text(
             current
                 .as_deref()
@@ -587,7 +576,7 @@ fn union(
     }
     if let Some(variant) = schema::variant_of(variants, value) {
         let schema = variant.schema;
-        if let Some(kind) = geometry_of(cx.root, schema) {
+        if let Some(kind) = geometry_of(schema) {
             changed |= geometry(ui, cx, kind, value, path);
         } else if schema::properties(schema).len() > 1 {
             changed |= object(ui, cx, schema, value, path);
@@ -602,26 +591,13 @@ pub enum FieldGeometry {
     Rect,
 }
 
-pub fn geometry_of(root: &Value, schema: &Value) -> Option<FieldGeometry> {
-    let schema = schema::resolve(root, schema);
-    let tag = schema::tag_of(schema).map(|(tag, _)| tag);
-    let mut names: Vec<&str> = schema::properties(schema)
-        .iter()
-        .filter(|(name, _)| tag.as_deref() != Some(name.as_str()))
-        .filter(|(_, field)| {
-            matches!(
-                schema::kind(root, schema::resolve(root, field)),
-                SchemaKind::Number | SchemaKind::Integer
-            )
-        })
-        .map(|(name, _)| name.as_str())
-        .collect();
-    names.sort_unstable();
-    let count = schema::properties(schema).len() - usize::from(tag.is_some());
-    match names.as_slice() {
-        ["x", "y"] if count == 2 => Some(FieldGeometry::Pos),
-        ["h", "w", "x", "y"] if count == 4 => Some(FieldGeometry::Rect),
-        _ => None,
+pub fn geometry_of(schema: &Value) -> Option<FieldGeometry> {
+    if schema.get("x-pos").is_some() {
+        Some(FieldGeometry::Pos)
+    } else if schema.get("x-rect").is_some() {
+        Some(FieldGeometry::Rect)
+    } else {
+        None
     }
 }
 
@@ -649,12 +625,7 @@ fn geometry(
             number("h")
         ),
     };
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = drafts::draft_or(ui, id, current.clone());
     let response = boxed_input(ui, Some("tiles"), |ui| {
         ui.add(
             egui::TextEdit::singleline(&mut draft)
@@ -664,11 +635,11 @@ fn geometry(
         )
     });
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        drafts::set_draft(ui, id, &draft.clone());
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        drafts::clear_draft(ui, id);
         let numbers: Vec<f64> = draft
             .split(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-'))
             .filter(|part| !part.is_empty())
@@ -738,10 +709,10 @@ fn choice(
     }
     let current = alternatives
         .iter()
-        .position(|alternative| fits(cx.root, alternative, value));
+        .position(|alternative| schema::fits(cx.root, alternative, value));
     let mut picked = current;
     if alternatives.len() > 1 {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("choice"))
+        widgets::combo_box(ui.id().with(path).with("choice"))
             .selected_text(current.map(|at| names[at].as_str()).unwrap_or("pick…"))
             .show_ui(ui, |ui| {
                 for (at, name) in names.iter().enumerate() {
@@ -779,53 +750,6 @@ fn describe(schema: &Value) -> String {
         Some(name) => schema::title(name),
         None => "value".to_owned(),
     }
-}
-
-pub fn fits(root: &Value, schema: &Value, value: &Value) -> bool {
-    let schema = schema::resolve(root, schema);
-    if let Some(constant) = schema.get("const") {
-        return constant == value;
-    }
-    if let Some(options) = schema.get("enum").and_then(Value::as_array) {
-        return options.contains(value);
-    }
-    if let Some(alternatives) = schema
-        .get("oneOf")
-        .or_else(|| schema.get("anyOf"))
-        .and_then(Value::as_array)
-    {
-        return alternatives
-            .iter()
-            .any(|alternative| fits(root, alternative, value));
-    }
-    let types = schema::type_names(schema);
-    if types.is_empty() {
-        return true;
-    }
-    types.iter().any(|name| match *name {
-        "null" => value.is_null(),
-        "boolean" => value.is_boolean(),
-        "integer" => value.is_i64() || value.is_u64(),
-        "number" => value.is_number(),
-        "string" => value.is_string(),
-        "array" => value.is_array(),
-        "object" => {
-            value.is_object()
-                && schema::required(schema)
-                    .iter()
-                    .all(|name| value.get(name).is_some())
-                && schema
-                    .get("properties")
-                    .and_then(Value::as_object)
-                    .is_none_or(|properties| {
-                        properties
-                            .iter()
-                            .filter(|(name, _)| value.get(*name).is_some())
-                            .all(|(name, field)| fits(root, field, &value[name]))
-                    })
-        }
-        _ => true,
-    })
 }
 
 fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &str) -> FormChange {
@@ -918,13 +842,16 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                             } else {
                                 let mut draft = if present {
                                     item[*name].clone()
-                                } else if (*name) == "chance" {
+                                } else if field.get("x-blank").is_some() {
                                     Value::Null
                                 } else {
                                     schema::template(cx.root, field)
                                 };
                                 ui.allocate_ui_with_layout(
-                                    egui::vec2(64.0, ui.spacing().interact_size.y),
+                                    egui::vec2(
+                                        inline_width(ui, field),
+                                        ui.spacing().interact_size.y,
+                                    ),
                                     egui::Layout::left_to_right(egui::Align::Center),
                                     |ui| {
                                         if !present {
@@ -979,43 +906,6 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
     changed
 }
 
-fn chance(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
-    let id = ui.id().with(path).with("chance");
-    let current = value
-        .as_f64()
-        .map(|number| number.to_string())
-        .unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
-    let response = boxed_input(ui, Some("%"), |ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut draft)
-                .frame(egui::Frame::NONE)
-                .font(egui::TextStyle::Monospace)
-                .hint_text(theme::muted("always"))
-                .desired_width(f32::INFINITY),
-        )
-    });
-    if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
-    }
-    if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
-        if draft.trim() != current.trim() {
-            *value = match draft.trim().parse::<f64>() {
-                Ok(number) => Value::from(number),
-                Err(_) => Value::Null,
-            };
-            return FormChange::at(path);
-        }
-    }
-    FormChange::default()
-}
-
 fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &str) -> FormChange {
     if !value.is_object() {
         *value = Value::Object(Map::new());
@@ -1032,18 +922,13 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                     remove = Some(key.clone());
                 }
                 let id = ui.id().with(&item_path).with("key");
-                let mut draft = cx
-                    .state
-                    .drafts
-                    .get(&id)
-                    .cloned()
-                    .unwrap_or_else(|| key.clone());
+                let mut draft = drafts::draft_or(ui, id, key.clone());
                 let response = ui.add(egui::TextEdit::singleline(&mut draft).desired_width(110.0));
                 if response.changed() {
-                    cx.state.drafts.insert(id, draft.clone());
+                    drafts::set_draft(ui, id, &draft.clone());
                 }
                 if committed(ui, &response) {
-                    cx.state.drafts.remove(&id);
+                    drafts::clear_draft(ui, id);
                     if draft != *key && !draft.is_empty() {
                         rename = Some((key.clone(), draft));
                     }
@@ -1065,20 +950,20 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
         }
         ui.horizontal(|ui| {
             let id = ui.id().with(path).with("new-key");
-            let mut draft = cx.state.drafts.get(&id).cloned().unwrap_or_default();
+            let mut draft = drafts::draft_of(ui, id).unwrap_or_default();
             let response = ui.add(
                 egui::TextEdit::singleline(&mut draft)
                     .hint_text("new key")
                     .desired_width(110.0),
             );
             if response.changed() {
-                cx.state.drafts.insert(id, draft.clone());
+                drafts::set_draft(ui, id, &draft.clone());
             }
             let add = ui.small_button("+ add").clicked()
                 || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
             if add && !draft.is_empty() && !entries.contains_key(&draft) {
                 entries.insert(draft, schema::template(cx.root, values));
-                cx.state.drafts.remove(&id);
+                drafts::clear_draft(ui, id);
                 changed = FormChange::at(path);
             }
         });
@@ -1089,12 +974,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
 pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("text");
     let current = value.as_str().unwrap_or_default().to_owned();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = drafts::draft_or(ui, id, current.clone());
     let multiline = current.len() > 60 || current.contains('\n');
     let response = boxed_input(ui, None, |ui| {
         if multiline {
@@ -1113,16 +993,16 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
         }
     });
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        drafts::set_draft(ui, id, &draft.clone());
     }
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
-        cx.state.drafts.remove(&id);
+        drafts::clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        drafts::clear_draft(ui, id);
         if draft != current {
             *value = Value::String(draft);
             changed = FormChange::at(path);
@@ -1140,38 +1020,56 @@ pub fn number(
     path: &str,
     integer: bool,
 ) -> FormChange {
+    number_field(ui, cx, schema, value, path, integer, None)
+}
+
+fn number_field(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    schema: &Value,
+    value: &mut Value,
+    path: &str,
+    integer: bool,
+    blank: Option<&str>,
+) -> FormChange {
     let id = ui.id().with(path).with("number");
     let current = value
         .as_f64()
         .map(|number| number.to_string())
         .unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = drafts::draft_or(ui, id, current.clone());
     let unit = schema["x-unit"].as_str().map(str::to_owned);
     let response = boxed_input(ui, unit.as_deref(), |ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut draft)
-                .frame(egui::Frame::NONE)
-                .font(egui::TextStyle::Monospace)
-                .desired_width(f32::INFINITY),
-        )
+        let mut edit = egui::TextEdit::singleline(&mut draft)
+            .frame(egui::Frame::NONE)
+            .font(egui::TextStyle::Monospace)
+            .desired_width(f32::INFINITY);
+        if let Some(blank) = blank {
+            edit = edit.hint_text(theme::muted(blank));
+        }
+        ui.add(edit)
     });
+    if std::mem::take(&mut cx.autofocus) {
+        response.request_focus();
+    }
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        drafts::set_draft(ui, id, &draft.clone());
     }
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
-        cx.state.drafts.remove(&id);
+        drafts::clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
     }
     let mut changed = FormChange::default();
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
-        if draft.trim() != current {
+        drafts::clear_draft(ui, id);
+        if blank.is_some() && draft.trim().is_empty() {
+            if !value.is_null() {
+                *value = Value::Null;
+                cx.state.errors.remove(path);
+                changed = FormChange::at(path);
+            }
+        } else if draft.trim() != current {
             match draft.trim().parse::<f64>() {
                 Ok(parsed) => {
                     let min = schema::minimum(schema);
@@ -1212,6 +1110,23 @@ pub fn number(
 
 pub fn tiles(value: f32) -> String {
     ((value as f64 * 1000.0).round() / 1000.0).to_string()
+}
+
+const INLINE_WIDTH: f32 = 64.0;
+const BOXED_INPUT_AROUND_TEXT: f32 = 40.0;
+
+fn inline_width(ui: &Ui, field: &Value) -> f32 {
+    let Some(blank) = field.get("x-blank").and_then(Value::as_str) else {
+        return INLINE_WIDTH;
+    };
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    let hint = ui.fonts_mut(|fonts| {
+        fonts
+            .layout_no_wrap(blank.to_owned(), font, theme::MUTED)
+            .size()
+            .x
+    });
+    INLINE_WIDTH.max(hint + BOXED_INPUT_AROUND_TEXT)
 }
 
 pub fn boxed_input(
@@ -1263,7 +1178,7 @@ fn boolean(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) -> FormChange {
     let current = value.as_str().unwrap_or_default().to_owned();
     let mut picked = current.clone();
-    egui::ComboBox::from_id_salt(ui.id().with(path).with("enum"))
+    widgets::combo_box(ui.id().with(path).with("enum"))
         .selected_text(schema::title(&current))
         .show_ui(ui, |ui| {
             for option in options {
@@ -1307,22 +1222,17 @@ fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
 pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
     let id = ui.id().with(path).with("json");
     let current = serde_json::to_string(value).unwrap_or_default();
-    let mut draft = cx
-        .state
-        .drafts
-        .get(&id)
-        .cloned()
-        .unwrap_or_else(|| current.clone());
+    let mut draft = drafts::draft_or(ui, id, current.clone());
     let response = ui.add(
         egui::TextEdit::singleline(&mut draft)
             .desired_width(f32::INFINITY)
             .font(egui::TextStyle::Monospace),
     );
     if response.changed() {
-        cx.state.drafts.insert(id, draft.clone());
+        drafts::set_draft(ui, id, &draft.clone());
     }
     if committed(ui, &response) {
-        cx.state.drafts.remove(&id);
+        drafts::clear_draft(ui, id);
         if draft != current {
             match serde_json::from_str::<Value>(&draft) {
                 Ok(parsed) => {
@@ -1428,19 +1338,16 @@ pub fn drafted(
     current: &str,
     input: impl FnOnce(&mut Ui, &mut String) -> egui::Response,
 ) -> Option<String> {
-    let mut draft = ui
-        .ctx()
-        .data(|d| d.get_temp::<String>(id))
-        .unwrap_or_else(|| current.to_owned());
+    let mut draft = drafts::draft_or(ui, id, current.to_owned());
     let response = input(ui, &mut draft);
     if committed(ui, &response) {
-        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+        drafts::clear_draft(ui, id);
         return (draft != current).then_some(draft);
     }
     if response.has_focus() {
-        ui.ctx().data_mut(|d| d.insert_temp(id, draft));
+        drafts::set_draft(ui, id, &draft);
     } else {
-        ui.ctx().data_mut(|d| d.remove_temp::<String>(id));
+        drafts::clear_draft(ui, id);
     }
     None
 }

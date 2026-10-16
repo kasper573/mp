@@ -3,7 +3,6 @@ use bevy_kira_audio::prelude::AudioSource;
 use bevy_replicon::prelude::AppRuleExt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use ui::{RichPiece, RichText, TextVoice, Typewriter, TypewriterReveal};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::mix::AudioCategory;
@@ -12,6 +11,7 @@ use crate::core::content::{
     Content, ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck,
 };
 use crate::core::math::Rng;
+use crate::core::text::{StyledLine, TextPiece, TextVoice, Typewriter, TypewriterReveal};
 use crate::core::time::{Hertz, PlaybackRate, Seconds};
 
 pub type BabbleId = ContentId<BabbleDef>;
@@ -62,7 +62,8 @@ pub fn content(registry: &mut ContentRegistry) {
 }
 
 fn check_banks(loading: &mut Loading) {
-    for (id, bank) in loading.rows::<BabbleBankDef>() {
+    let content = loading.content();
+    for (id, bank) in loading.rows::<BabbleBankDef>(&content) {
         let mut check = RowCheck::default();
         check.range("/volume", bank.volume, 0.0, 4.0, "a volume");
         for letter in letter_files(bank) {
@@ -98,11 +99,11 @@ pub struct Babbling {
     pub rank: BabbleRank,
 }
 
+/// The voice that babbles when several speak at once: the foremost one, else the highest rank.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BabbleRank(pub u32);
-
-impl BabbleRank {
-    pub const DIALOGUE_BOX: BabbleRank = BabbleRank(u32::MAX);
+pub enum BabbleRank {
+    Ranked(u32),
+    Foremost,
 }
 
 pub fn register(app: &mut App) {
@@ -141,11 +142,11 @@ impl BabbleClips {
 }
 
 fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut<BabbleClips>) {
-    clips.0 = content
-        .table::<BabbleBankDef>()
-        .rows()
-        .map(|bank| {
-            letter_files(bank)
+    let table = content.table::<BabbleBankDef>();
+    clips.0 = table
+        .ids()
+        .map(|id| {
+            letter_files(table.row(id))
                 .map(|file| assets.load(file.path()))
                 .collect()
         })
@@ -155,7 +156,7 @@ fn load_clips(assets: Res<AssetServer>, content: Res<Content>, mut clips: ResMut
 fn babble(
     content: Res<Content>,
     mut revealed: MessageReader<TypewriterReveal>,
-    typing: Query<(Entity, &Babbling, &Typewriter, &RichText)>,
+    typing: Query<(Entity, &Babbling, &Typewriter, &StyledLine)>,
     clips: Res<BabbleClips>,
     time: Res<Time>,
     mut free_at: Local<Seconds>,
@@ -248,7 +249,7 @@ impl Glyph {
 }
 
 impl Syllable {
-    fn at(text: &RichText, index: usize) -> Option<Syllable> {
+    fn at(text: &StyledLine, index: usize) -> Option<Syllable> {
         let spoken = spoken(text);
         let here = *spoken.get(index)?;
         let word_start = spoken[..index]
@@ -303,11 +304,11 @@ impl Syllable {
     }
 }
 
-fn spoken(text: &RichText) -> Vec<Spoken> {
+fn spoken(text: &StyledLine) -> Vec<Spoken> {
     text.pieces
         .iter()
         .flat_map(|piece| match piece {
-            RichPiece::Span(span) => span
+            TextPiece::Span(span) => span
                 .text
                 .chars()
                 .map(|ch| Spoken {
@@ -315,11 +316,11 @@ fn spoken(text: &RichText) -> Vec<Spoken> {
                     voice: span.voice,
                 })
                 .collect(),
-            RichPiece::Input(_) => vec![Spoken {
+            TextPiece::Key(_) => vec![Spoken {
                 glyph: Glyph::Input,
                 voice: TextVoice::Normal,
             }],
-            RichPiece::Pause(_) => Vec::new(),
+            TextPiece::Pause(_) => Vec::new(),
         })
         .collect()
 }

@@ -7,6 +7,8 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
+use bevy::app::PluginGroupBuilder;
+use bevy::render::pipelined_rendering::PipelinedRenderingPlugin;
 use bevy::window::Window;
 use game::core::content::store::ContentStore;
 use game::core::platform::{FetchFailure, LocalFuture, Platform, ServerSocket, SocketState};
@@ -69,6 +71,12 @@ impl Platform for DesktopPlatform {
     }
 
     fn sync_window(&self, _window: &mut Window) {}
+
+    // Rendering a frame alongside the next update puts the interface on screen a frame later,
+    // trailing the system cursor, and the client's frames are cheap enough to render in turn.
+    fn engine(&self, plugins: PluginGroupBuilder) -> PluginGroupBuilder {
+        plugins.disable::<PipelinedRenderingPlugin>()
+    }
 
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>> {
         let agent = self.agent.clone();
@@ -245,12 +253,12 @@ fn drive(
     else {
         return set(SocketState::Closed);
     };
-    let nonblocking = match ws.get_ref() {
-        MaybeTlsStream::Plain(tcp) => tcp.set_nonblocking(true),
-        MaybeTlsStream::Rustls(stream) => stream.sock.set_nonblocking(true),
+    let polling = match ws.get_ref() {
+        MaybeTlsStream::Plain(tcp) => tcp.set_read_timeout(Some(READ_POLL)),
+        MaybeTlsStream::Rustls(stream) => stream.sock.set_read_timeout(Some(READ_POLL)),
         _ => Ok(()),
     };
-    if nonblocking.is_err() {
+    if polling.is_err() {
         return set(SocketState::Closed);
     }
     set(SocketState::Open);
@@ -260,8 +268,7 @@ fn drive(
             match outgoing.try_recv() {
                 Ok(packet) => match ws.send(Message::Binary(packet.into())) {
                     Ok(()) => {}
-                    Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {
-                    }
+                    Err(tungstenite::Error::Io(error)) if retryable(&error) => {}
                     Err(_) => return closed(),
                 },
                 Err(TryRecvError::Empty) => break,
@@ -277,10 +284,20 @@ fn drive(
             }
             Ok(Message::Close(_)) => return closed(),
             Ok(_) => {}
-            Err(tungstenite::Error::Io(error)) if error.kind() == ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(1));
-            }
+            Err(tungstenite::Error::Io(error)) if retryable(&error) => {}
             Err(_) => return closed(),
         }
     }
 }
+
+// A socket call with a timeout fails as interrupted when the process is stopped and resumed (a
+// debugger, a suspended terminal job), so that is no more the connection's end than a poll that
+// found nothing.
+fn retryable(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::Interrupted
+    )
+}
+
+const READ_POLL: Duration = Duration::from_millis(1);

@@ -4,11 +4,11 @@ use game::core::tiling::Tiles;
 use game::core::time::Seconds;
 use game::systems::area::AreaTag;
 use game::systems::item::{DroppedItem, Inventory, PickupRequest, Reservation};
-use game::systems::movement::{MoveRequest, Position, position};
+use game::systems::movement::{MoveRequest, MoveSeq, Position, position};
 use game::systems::npc::{self, Pack};
 use game::systems::reach::{self, ReachAct, Tether};
 
-use crate::support::{Sim, row, spawn_area};
+use testkit::{Sim, row, spawn_area};
 
 #[test]
 fn a_pickup_walks_into_reach_and_then_collects() {
@@ -34,7 +34,13 @@ fn walking_away_cancels_the_intent() {
 
     sim.send(1, PickupRequest { target: item });
     sim.tick();
-    sim.send(1, MoveRequest { pos: start });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: start,
+            seq: MoveSeq(1),
+        },
+    );
 
     assert!(!sim.run_until(10.0, |world| bones(world, player) > 0));
     assert!(sim.world().get_entity(item).is_ok());
@@ -81,7 +87,7 @@ fn a_tether_holds_while_its_owner_stays_in_reach_of_a_living_npc() {
 fn drop_bone(sim: &mut Sim, at: Pos<Tiles>) -> Entity {
     sim.world()
         .spawn((
-            Position { pos: at },
+            Position::at(at),
             AreaTag { area: spawn_area() },
             DroppedItem {
                 item: row("Bone"),

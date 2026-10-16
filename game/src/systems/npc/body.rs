@@ -3,6 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::IntoStaticStr;
 
+use crate::core::content::Content;
 use crate::core::math::{Pos, Rng};
 use crate::core::script::{
     Answer, Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
@@ -19,7 +20,6 @@ use crate::systems::script::{
     Condition, EffectCall, FlowKey, OwnerKind, Place, Reach, RiftInstances, RiftScripting, query,
 };
 use crate::systems::stat;
-use crate::systems::visibility;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Priority(pub u8);
@@ -255,7 +255,7 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             None
         }
         Act::Attack { target, within } => {
-            if !running.started {
+            if reach::intent(world, npc, ReachAct::Attack) != Some(target) {
                 reach::intend(world, npc, target, ReachAct::Attack);
             }
             if world.get_entity(target).is_err() || stat::is_dead(world, target) {
@@ -267,18 +267,14 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
                 let sheltered = area::wild(world, npc)
                     && area::of(world, npc).is_some_and(|area| area.safe(there));
                 Some(
-                    !area::same_area(world, npc, target)
+                    !reach::pursuable(world, npc, target)
                         || at.distance(there) > within
-                        || !visibility::coexist(world, npc, target)
                         || sheltered,
                 )
             })()
             .unwrap_or(true);
             if lost {
                 return Some(Outcome::Lost);
-            }
-            if reach::intent(world, npc, ReachAct::Attack) != Some(target) {
-                reach::intend(world, npc, target, ReachAct::Attack);
             }
             None
         }
@@ -305,7 +301,8 @@ fn wander(world: &mut World, npc: Entity, leash: Option<Tiles>) {
     let Some(at) = movement::position(world, npc) else {
         return;
     };
-    let Some(area) = area::of(world, npc) else {
+    let content = world.resource::<Content>().clone();
+    let Some(area) = area::of_in(&content, world, npc) else {
         return;
     };
     let grid = area.grid_for(area::wild(world, npc));
@@ -399,10 +396,13 @@ impl EffectDef<RiftScripting> for Wander {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         let leash = cx.opt_expr(self.leash.as_ref(), ValueType::Number)?;
         Ok(Box::new(move |world, _, cx| {
@@ -427,7 +427,7 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             (Outcome::Arrived.name(), self.arrived.as_deref()),
             (Outcome::Blocked.name(), self.blocked.as_deref()),
@@ -437,7 +437,10 @@ impl EffectDef<RiftScripting> for WalkTo {
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         let within = cx.expr(&self.within, ValueType::Number)?;
         let to: Aimed<Destination> = match &self.to {
@@ -446,10 +449,10 @@ impl EffectDef<RiftScripting> for WalkTo {
                 Box::new(move |_, _| Some(Destination::Place(at)))
             }
             WalkTarget::Object(name) => {
-                let name = name.as_str();
+                let name = name.clone();
                 Box::new(move |world, cx| {
                     let area = cx.owner.and_then(|npc| world.get::<AreaTag>(npc))?.area;
-                    object::named(world, area, name).map(Destination::Object)
+                    object::named(world, area, &name).map(Destination::Object)
                 })
             }
             WalkTarget::Actor(actor) => {
@@ -481,7 +484,7 @@ impl EffectDef<RiftScripting> for Attack {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             (Outcome::Defeated.name(), self.defeated.as_deref()),
             (Outcome::Lost.name(), self.lost.as_deref()),
@@ -491,7 +494,10 @@ impl EffectDef<RiftScripting> for Attack {
     fn pauses(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         let target = cx.expr(&self.target, ValueType::Actor)?;
         let within = cx.expr(&self.within, ValueType::Number)?;
@@ -525,13 +531,10 @@ impl EffectDef<RiftScripting> for Stop {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn compile(
-        &'static self,
-        _cx: &mut Compiler<RiftScripting>,
-    ) -> Result<EffectCall, ScriptFault> {
+    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let priority = Priority::checked(self.priority)?;
         Ok(Box::new(move |world, _, cx| {
             if let Some(npc) = cx.owner {
@@ -552,10 +555,13 @@ impl EffectDef<RiftScripting> for FaceToward {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![(Outcome::Next.name(), self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let toward: Aimed<Pos<Tiles>> = match &self.toward {
             FaceTarget::Place(place) => {
                 let at = place.at;

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
+use crate::views::character::Standing;
 use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
 use bevy::prelude::{Entity, World};
@@ -34,9 +35,9 @@ use game::systems::{self, GameSettings, TICK_HZ, memory, npc};
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};
-use super::{ScriptDoc, ScriptOwner, inspect};
+use super::{ScriptDoc, ScriptSessionId, inspect};
 use crate::app::Editor;
-use crate::project::{ProjectFiles, RowSelection, row_file, row_of};
+use crate::project::{ProjectFiles, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
@@ -94,7 +95,8 @@ impl RunLogLine {
 }
 
 pub struct ScriptRun {
-    pub doc_owner: ScriptOwner,
+    pub doc: ScriptSessionId,
+    pub generation: u64,
     pub label: String,
     world: World,
     owner: Owner,
@@ -122,13 +124,7 @@ struct Watched {
 pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let bound = bindings(editor, doc);
     let owner_key = doc.owner.clone();
-    let mut setup: RunSetup = editor
-        .views
-        .script
-        .setups
-        .get(&owner_key)
-        .cloned()
-        .unwrap_or_default();
+    let mut setup: RunSetup = editor.views.script.setup_of(&owner_key);
     let events: Vec<String> = doc
         .nodes()
         .values()
@@ -149,7 +145,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let characters: Vec<(String, String)> = editor
         .project
         .as_ref()
-        .and_then(|project| project.content)
+        .and_then(|project| project.content.clone())
         .map(|content| {
             content
                 .ids::<CharacterSnapshot>()
@@ -158,12 +154,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         })
         .unwrap_or_default();
     let running = editor.views.script.run_of(&doc.owner).is_some();
-    let mut start = editor
-        .views
-        .script
-        .fire
-        .take()
-        .is_some_and(|fired| fired == doc.owner);
+    let mut start = editor.views.script.take_fire(&doc.owner);
     let mut stop = false;
     let mut open_owner: Option<String> = None;
     let mut step = false;
@@ -177,7 +168,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         {
             start = true;
         }
-        egui::ComboBox::from_id_salt(("run-event", doc.owner.slug()))
+        widgets::combo_box(("run-event", doc.owner.slug()))
             .selected_text(theme::mono(&setup.event).size(13.0))
             .show_ui(ui, |ui| {
                 for event in &events {
@@ -214,7 +205,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 }
             }
             _ => {
-                egui::ComboBox::from_id_salt(("run-owner", doc.owner.slug()))
+                widgets::combo_box(("run-owner", doc.owner.slug()))
                     .selected_text(
                         theme::mono(
                             bound
@@ -232,7 +223,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         ui.label(theme::muted("by").size(13.0));
-        egui::ComboBox::from_id_salt(("run-character", doc.owner.slug()))
+        widgets::combo_box(("run-character", doc.owner.slug()))
             .selected_text(
                 theme::mono(
                     setup
@@ -285,7 +276,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                 ui.horizontal(|ui| {
                     ui.label(theme::muted(format!("{name} takes")));
                     let pick = setup.random.get(name).copied();
-                    egui::ComboBox::from_id_salt(("run-random", doc.owner.slug(), name))
+                    widgets::combo_box(("run-random", doc.owner.slug(), name))
                         .selected_text(pick.map_or("its weights".to_owned(), |index| {
                             format!("output {}", index + 1)
                         }))
@@ -312,11 +303,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         });
     });
-    editor
-        .views
-        .script
-        .setups
-        .insert(owner_key.clone(), setup.clone());
+    editor.views.script.set_setup(&owner_key, setup.clone());
     if let Some(file) = open_owner
         && let Some((table, key)) = row_of(&file)
     {
@@ -349,7 +336,7 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .map(|(name, node)| NodeCard {
             name: name.clone(),
             title: super::graph::card_title(name, node),
-            detail: nodes::summary(node, &editor.views.script.catalogue),
+            detail: nodes::summary(node, catalogue_of(editor.project.as_ref())),
         })
         .collect();
     let owner_label = bound
@@ -586,17 +573,11 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
     if editor.views.script.run_of(&owner_key).is_none() {
         return false;
     }
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return false;
     };
     let bound = bindings(editor, doc);
-    let setup = editor
-        .views
-        .script
-        .setups
-        .get(&owner_key)
-        .cloned()
-        .unwrap_or_default();
+    let setup = editor.views.script.setup_of(&owner_key);
     let reaches: Vec<Reach> = bound
         .get(setup.owner)
         .or(bound.first())
@@ -683,7 +664,7 @@ fn character_card(
         widgets::card_title(ui, "player", &name);
         widgets::kv(ui, "level", |ui| {
             let mut picked = level;
-            egui::ComboBox::from_id_salt("run-level")
+            widgets::combo_box("run-level")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(level.to_string()))
                 .show_ui(ui, |ui| {
@@ -705,7 +686,7 @@ fn character_card(
                 .map(|job| job.key(content).to_owned())
                 .unwrap_or_else(|| "none".to_owned());
             let mut picked = job;
-            egui::ComboBox::from_id_salt("run-job")
+            widgets::combo_box("run-job")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&current))
                 .show_ui(ui, |ui| {
@@ -848,6 +829,7 @@ fn quests_card(
             | Reach::Accepts(q)
             | Reach::TurnsIn(q)
             | Reach::Completes(q)
+            | Reach::Decides(q)
             | Reach::Fails(q) => Some(q.key(content).to_owned()),
             _ => None,
         })
@@ -876,17 +858,17 @@ fn quests_card(
             let Some(id) = content.by_key::<QuestDef>(key) else {
                 continue;
             };
-            let standing = quest_standing(&log, id);
+            let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
                 if widgets::keyed_button(ui, &format!("quest/ {key}"), "", true).clicked() {
                     *open = Some(EditorTab::for_row("quest", key));
                 }
                 let mut picked = standing;
-                egui::ComboBox::from_id_salt(("run-quest", key))
-                    .selected_text(theme::mono(standing.label()))
+                widgets::combo_box(("run-quest", key))
+                    .selected_text(theme::mono(run_label(standing)))
                     .show_ui(ui, |ui| {
-                        for option in QuestStanding::ALL {
-                            ui.selectable_value(&mut picked, option, option.label());
+                        for option in Standing::ALL {
+                            ui.selectable_value(&mut picked, option, run_label(option));
                         }
                     });
                 if picked != standing {
@@ -996,40 +978,10 @@ fn add_popup(ui: &mut Ui, label: &str, all: &[String], shown: &[String]) -> Opti
     add
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum QuestStanding {
-    NotTaken,
-    Active,
-    Completed,
-    Failed,
-}
-
-impl QuestStanding {
-    const ALL: [QuestStanding; 4] = [
-        QuestStanding::NotTaken,
-        QuestStanding::Active,
-        QuestStanding::Completed,
-        QuestStanding::Failed,
-    ];
-
-    fn label(self) -> &'static str {
-        match self {
-            QuestStanding::NotTaken => "not taken",
-            QuestStanding::Active => "active",
-            QuestStanding::Completed => "completed",
-            QuestStanding::Failed => "failed",
-        }
-    }
-}
-
-fn quest_standing(log: &QuestLog, quest: QuestId) -> QuestStanding {
-    if log.active(quest).is_some() {
-        return QuestStanding::Active;
-    }
-    match log.finished(quest).map(|finished| finished.result) {
-        Some(QuestResult::Completed) => QuestStanding::Completed,
-        Some(QuestResult::Failed) => QuestStanding::Failed,
-        None => QuestStanding::NotTaken,
+fn run_label(standing: Standing) -> &'static str {
+    match standing {
+        Standing::Active => "active",
+        other => other.label(),
     }
 }
 
@@ -1038,7 +990,7 @@ fn set_quest_standing(
     subject: Entity,
     content: &Content,
     quest: QuestId,
-    standing: QuestStanding,
+    standing: Standing,
 ) {
     let day = world.resource::<WallClock>().day();
     let Some(mut log) = world.get_mut::<QuestLog>(subject) else {
@@ -1048,16 +1000,15 @@ fn set_quest_standing(
     log.finished.retain(|finished| finished.quest != quest);
     log.tracked.retain(|tracked| *tracked != quest);
     match standing {
-        QuestStanding::NotTaken => {}
-        QuestStanding::Active => log.active.push(ActiveQuest::fresh(content, quest)),
-        QuestStanding::Completed => {
+        Standing::NotTaken => {}
+        Standing::Active => log.active.push(ActiveQuest::fresh(content, quest)),
+        Standing::Completed => {
             log.finished
                 .push(FinishedQuest::new(quest, QuestResult::Completed, day))
         }
-        QuestStanding::Failed => {
-            log.finished
-                .push(FinishedQuest::new(quest, QuestResult::Failed, day))
-        }
+        Standing::Failed => log
+            .finished
+            .push(FinishedQuest::new(quest, QuestResult::Failed, day)),
     }
 }
 
@@ -1084,8 +1035,10 @@ fn start_run(
     owner: &ScriptBinding,
     setup: &RunSetup,
 ) -> Result<ScriptRun, String> {
+    let doc_session = editor.views.script.session(&doc.owner);
     let project = editor.project.as_ref().ok_or("no project")?;
-    let content = project.content.ok_or("the folder does not load")?;
+    let content = project.content.clone().ok_or("the folder does not load")?;
+    let generation = project.generation;
     let (area_id, near) = area_for(&content, owner).ok_or("no area to run in")?;
     let clock = WallClock {
         now: UnixMillis((setup.hour * 3600.0) as u64 * 1000),
@@ -1127,7 +1080,8 @@ fn start_run(
     let world_owner = locate_owner(&mut world, owner, area_id, at)?;
     let inputs = InputMap::new(&content);
     let mut run = ScriptRun {
-        doc_owner: doc.owner.clone(),
+        doc: doc_session,
+        generation,
         label: format!("{} · {}", owner.label, setup.event),
         world,
         owner: world_owner,
@@ -1257,7 +1211,7 @@ fn snapshot_for(
     let json = files
         .json_owned(&row_file("test_character", key))
         .ok_or_else(|| format!("no test character {key}"))?;
-    value::typed(*content, json).ok_or_else(|| format!("test character {key} does not read"))
+    value::typed(content, json).ok_or_else(|| format!("test character {key} does not read"))
 }
 
 fn step(world: &mut World) {

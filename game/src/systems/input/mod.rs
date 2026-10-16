@@ -6,6 +6,7 @@ use bevy::input::ButtonState;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
 use bevy::window::{CursorMoved, PrimaryWindow};
+use bevy_egui::input::egui_wants_any_keyboard_input;
 
 use crate::core::content::Content;
 use crate::core::math::Pos;
@@ -29,7 +30,7 @@ impl Plugin for InputPlugin {
             .add_systems(
                 Update,
                 (
-                    respawn_when_dead.run_if(not(ui::typing)),
+                    respawn_when_dead.run_if(not(egui_wants_any_keyboard_input)),
                     update_tile_highlight,
                 )
                     .run_if(in_state(ClientScreen::Area)),

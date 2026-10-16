@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use driver::{
-    Player, UiTarget, WaitBudget, content, erred, finished, holding, in_feed, marked, on_quest,
+    Player, UiTarget, WaitBudget, content, erred, finished, holding, marked, noticed, on_quest,
     told_by,
 };
 use game::systems::attention::AttentionMark;
@@ -44,7 +44,7 @@ fn play(shoot: &mut Shoot) {
         on_quest(snapshot, "letter_for_the_captain").is_some()
     });
     me.wait_until("the accepted quest in the feed", |snapshot| {
-        in_feed(snapshot, "Quest accepted · A Letter for the Captain")
+        noticed(snapshot, "Quest accepted · A Letter for the Captain")
     });
     me.caption_top(
         "Accepted: the corner says so, the letter is in your bag, the quest on your tracker",
@@ -75,7 +75,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("L opens the quest log, grouped by category");
     me.act(InputAction::ToggleQuestLog);
     me.find_ui("Active quests");
-    me.click_ui(log_row("Low Tide"));
+    me.click_ui(UiTarget::button("Low Tide"));
     me.caption_top("Right-click a reward for its item card");
     me.act_on_ui(InputAction::InspectItem, UiTarget::image(BAIT));
     me.wait_until("the bait's card", |snapshot| {
@@ -89,9 +89,9 @@ fn play(shoot: &mut Shoot) {
         snapshot.item_card.is_none()
     });
     me.caption_top("A quest can keep its rewards to itself: the letter's entry has none to show");
-    me.click_ui(log_row("A Letter for the Captain"));
+    me.click_ui(UiTarget::button("A Letter for the Captain"));
     me.hold();
-    me.click_ui(log_row("Low Tide"));
+    me.click_ui(UiTarget::button("Low Tide"));
     me.caption_top("Abandoning always asks, and Keep quest is the default — Enter keeps it");
     me.click_ui("Abandon");
     me.find_ui("Abandon Low Tide?");
@@ -130,7 +130,7 @@ fn play(shoot: &mut Shoot) {
         finished(snapshot, "letter_for_the_captain") == Some(QuestResult::Completed)
     });
     me.wait_until("the pay in the feed", |snapshot| {
-        in_feed(snapshot, "+10 Gold")
+        noticed(snapshot, "+10 Gold")
     });
     me.caption_top(
         "Delivered: the letter goes and the pay arrives in the corner, the finished quest lands in the middle",
@@ -165,6 +165,22 @@ fn play(shoot: &mut Shoot) {
     me.read_to_choices();
     me.pick("Tusks for the Chief");
     me.caption_top("Rewards can include a pick, chosen when you hand in");
+    me.caption_top("Rest the pointer on a reward to see what it is");
+    me.hover_ui(reward_on("I'll take the Bone Shield."));
+    me.hold();
+    me.caption_top("Right-click it for its card");
+    me.act_on_ui(
+        InputAction::InspectItem,
+        reward_on("I'll take the Bone Shield."),
+    );
+    me.wait_until("the shield's card", |snapshot| {
+        snapshot
+            .item_card
+            .is_some_and(|card| card.item.key(content()) == "bone_shield")
+    });
+    me.hold();
+    me.act(InputAction::Dismiss);
+    me.wait_until("the card to close", |snapshot| snapshot.item_card.is_none());
     me.caption_top(
         "With a full bag the pick is refused with an error — space is counted after the tusks are handed in",
     );
@@ -204,19 +220,6 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::Dismiss);
 }
 
-// The same title shows on the tracker and in the log's details; a row sits in the list, under its
-// header.
-fn log_row(title: &str) -> UiTarget {
-    UiTarget::text(title).and("in the quest log", |element, snapshot| {
-        UiTarget::text("Active quests")
-            .find(snapshot)
-            .is_some_and(|header| {
-                element.rect.min_y() > header.rect.min_y()
-                    && (element.rect.min_x() - header.rect.min_x()).abs() < 64.0
-            })
-    })
-}
-
 // Once a day Tobb calls over whoever comes near him after a first visit, holding his news while they
 // talk: it shows when he strolls back, or opens the next talk with him instead.
 fn hear_out_tobb(me: &mut Player, within: Duration) {
@@ -232,11 +235,25 @@ fn hear_out_tobb(me: &mut Player, within: Duration) {
             .then_some(())
     });
     if news.is_some() {
-        answer_news(me);
+        me.answer_first_choices();
     }
 }
 
-// Says whether his news came up on the way to his topics.
+// A choice shows its item beside its words too; the reward is the chip that counts it.
+fn reward_on(choice: &str) -> UiTarget {
+    let choice = choice.to_owned();
+    UiTarget::text("+1").and(&format!("on {choice:?}"), move |element, snapshot| {
+        snapshot.stage.as_ref().is_some_and(|stage| {
+            stage.choices.iter().any(|shown| {
+                shown.label == choice
+                    && shown
+                        .rect
+                        .is_some_and(|rect| rect.contains(element.rect.center()))
+            })
+        })
+    })
+}
+
 fn talk_past_news(me: &mut Player) -> bool {
     let mut heard = false;
     loop {
@@ -244,13 +261,7 @@ fn talk_past_news(me: &mut Player) -> bool {
         if me.read_to_choices().node != "news" {
             return heard;
         }
-        answer_news(me);
+        me.answer_first_choices();
         heard = true;
     }
-}
-
-fn answer_news(me: &mut Player) {
-    me.read_to_choices();
-    me.act(InputAction::Choice1);
-    me.conversation_over();
 }

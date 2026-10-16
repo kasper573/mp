@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use bevy_ecs::entity::Entity;
 use driver::{
-    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, hunting_ground,
-    npc_is, resident_home,
+    Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding, npc_is,
+    resident_home,
 };
 use game::core::math::{Offset, Pos};
 use game::core::tiling::{TilePos, Tiles};
@@ -32,16 +32,15 @@ fn play(shoot: &mut Shoot) {
     me.caption("Town is a safe zone: monsters roam the wilds beyond it");
     // Read in town: out there, monsters don't wait for the viewer.
     me.hold();
-    look_out(&mut me, "a monster in sight");
+    me.look_out(PREY, |snapshot| nearest_prey(snapshot).is_some());
     me.caption("Hover a monster to target it, click to attack");
     let loot = slay(&mut me);
     me.wait_until("the kill's XP in the feed", |snapshot| {
-        let records = snapshot.history.records.iter().map(|record| &record.text);
         snapshot
-            .feed
+            .history
+            .records
             .iter()
-            .chain(records)
-            .any(|row| row.ends_with(" XP"))
+            .any(|record| record.text.ends_with(" XP"))
     });
     me.caption("Small news collects in the corner: experience, loot, gone in a few seconds");
     me.caption(
@@ -57,17 +56,14 @@ fn play(shoot: &mut Shoot) {
 
     me.caption("Press I to open the inventory");
     me.act(InputAction::ToggleInventory);
-    let potion = UiTarget::new("a potion", |element, _| {
-        element
-            .image
-            .as_deref()
-            .is_some_and(|image| image.contains("potion"))
-    });
     me.find_ui("Inventory");
-    if potion.find(&me.snapshot()).is_some() {
-        me.caption("Double-click a potion to drink it");
-        me.act_on_ui(InputAction::UseItem, potion);
-    }
+    me.find_ui(UiTarget::image(GREATER_POTION));
+    let potions = holding(&me.snapshot(), "greater_health_potion");
+    me.caption("Double-click a potion to drink it");
+    me.act_on_ui(InputAction::UseItem, UiTarget::image(GREATER_POTION));
+    me.wait_until("the potion drunk", |snapshot| {
+        holding(snapshot, "greater_health_potion") < potions
+    });
     me.caption("Kills earn experience — see the xp under your name");
     me.hold();
     me.act(InputAction::ToggleInventory);
@@ -78,6 +74,8 @@ fn play(shoot: &mut Shoot) {
     me.caption("It gives up the chase at the edge: monsters never set foot in a safe zone");
     chase_ends(&mut me, &chaser);
 }
+
+const GREATER_POTION: &str = "icons/potion/red_potion_3.png";
 
 // Loot lying under a monster can't be clicked until it moves or falls, so it's given a while.
 const LOOTING: WaitBudget = WaitBudget {
@@ -96,14 +94,17 @@ const DROPPING: WaitBudget = WaitBudget {
 fn slay(me: &mut Player) -> Vec<ProbeGroundItem> {
     let fallen = fallen(&me.snapshot());
     let fell = Cell::new(None);
-    me.fight(is_prey, |snapshot| {
-        let felled = snapshot
-            .actors
-            .iter()
-            .find(|actor| actor.health <= 0.0 && !actor.player && !fallen.contains(&actor.id));
-        fell.set(felled.map(|it| it.at));
-        felled.is_some()
-    });
+    me.fight(
+        |_, actor| is_prey(actor),
+        |snapshot| {
+            let felled = snapshot
+                .actors
+                .iter()
+                .find(|actor| actor.health <= 0.0 && !actor.player && !fallen.contains(&actor.id));
+            fell.set(felled.map(|it| it.at));
+            felled.is_some()
+        },
+    );
     let fell = fell.get().expect("a monster fell");
     me.wait_within("what it dropped", DROPPING, |snapshot| {
         let near: Vec<ProbeGroundItem> = snapshot
@@ -118,23 +119,19 @@ fn slay(me: &mut Player) -> Vec<ProbeGroundItem> {
 
 // Swings at the nearest monster once, so it gives chase, and returns the one that does.
 fn provoke(me: &mut Player) -> ProbeBody {
-    look_out(me, "a monster to provoke");
-    me.fight(is_prey, |snapshot| {
-        snapshot
-            .me
-            .as_ref()
-            .is_some_and(|me| me.action == Action::Attack)
-    });
+    me.look_out(PREY, |snapshot| nearest_prey(snapshot).is_some());
+    me.fight(
+        |_, actor| is_prey(actor),
+        |snapshot| {
+            snapshot
+                .me
+                .as_ref()
+                .is_some_and(|me| me.action == Action::Attack)
+        },
+    );
     me.wait_for("the monster that gives chase", |snapshot| {
         nearest_prey(snapshot).cloned()
     })
-}
-
-fn look_out(me: &mut Player, what: &str) {
-    let area = area_key(&me.snapshot()).expect("an area");
-    me.look_for(what, hunting_ground(area, PREY), |snapshot| {
-        nearest_prey(snapshot).is_some()
-    });
 }
 
 fn run_to_town(me: &mut Player) {
@@ -174,11 +171,11 @@ fn prey(snapshot: &ProbeSnapshot) -> Vec<&ProbeBody> {
     snapshot
         .actors
         .iter()
-        .filter(|actor| is_prey(snapshot, actor) && clickable_point(snapshot, actor.aim).is_some())
+        .filter(|actor| is_prey(actor) && clickable_point(snapshot, actor.aim).is_some())
         .collect()
 }
 
-fn is_prey(_: &ProbeSnapshot, actor: &ProbeBody) -> bool {
+fn is_prey(actor: &ProbeBody) -> bool {
     npc_is(actor, PREY) && actor.health > 0.0
 }
 

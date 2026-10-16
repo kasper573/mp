@@ -11,7 +11,6 @@ pub use filters::{ColourBy, ColourField, MapLens};
 pub use inspect::inspect_parts;
 
 use std::fmt;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
@@ -20,12 +19,15 @@ use game::core::math::{Pos, Size};
 use game::core::tiling::Tiles;
 use game::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
 use game::systems::area::{self, AreaDef, AreaId};
+use serde::Deserialize;
+use std::str::FromStr;
 
 use crate::app::Editor;
 use crate::project::{ContentEdit, Project, RowSelection, row_file};
 use crate::ui::theme;
 use crate::value;
 use crate::views::area::TILE_PX;
+use crate::views::navigation;
 use atlas::WorldAtlas;
 
 const AREA_PX_PER_TILE: f32 = 2.0;
@@ -38,7 +40,7 @@ const MAX_ZOOM: f32 = 8.0;
 
 #[derive(Default)]
 pub struct WorldView {
-    pub center: Pos2,
+    pub center: Pos<Tiles>,
     pub zoom: f32,
     pub fitted: bool,
     pub lenses: Vec<MapLens>,
@@ -55,7 +57,7 @@ pub struct WorldView {
     drag: Option<interact::MapDrag>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct MapRoute {
     pub from: String,
     pub to: String,
@@ -93,7 +95,8 @@ impl Default for MapLayers {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MapPart {
     Card(String),
     Edge(String, String),
@@ -155,8 +158,8 @@ pub struct OpenWorldMap {
 impl OpenWorldMap {
     pub fn of(editor: &mut Editor) -> Option<OpenWorldMap> {
         let project = editor.project.as_ref()?;
-        let content = project.content?;
-        let atlas = editor.views.world.atlas(project, content);
+        let content = project.content.clone()?;
+        let atlas = editor.views.world.atlas(project, &content);
         let layout = laid_out(&atlas, WorldMap::World.get(&content));
         Some(OpenWorldMap {
             content,
@@ -218,7 +221,7 @@ impl OpenWorldMap {
     }
 
     pub fn write(&self, editor: &mut Editor, mut edit: ContentEdit, layout: &WorldMapDef) -> bool {
-        let Some(json) = value::untyped(self.content, layout) else {
+        let Some(json) = value::untyped(&self.content, layout) else {
             return false;
         };
         edit.write_json(layout_file(), &json);
@@ -227,15 +230,19 @@ impl OpenWorldMap {
 }
 
 impl WorldView {
+    pub fn request_fit(&mut self) {
+        self.fitted = false;
+    }
+
     pub fn look_at(&mut self, map: &OpenWorldMap, area: AreaId, zoom: f32) {
         if let Some(card) = map.layout.cards.get(&area) {
-            self.center = map.card_rect(area, card).center();
+            self.center = navigation::pos_from_egui(map.card_rect(area, card).center());
             self.zoom = zoom;
             self.fitted = true;
         }
     }
 
-    fn atlas(&mut self, project: &Project, content: Content) -> Arc<WorldAtlas> {
+    fn atlas(&mut self, project: &Project, content: &Content) -> Arc<WorldAtlas> {
         match &self.atlas {
             Some(atlas) if atlas.generation == project.generation => atlas.clone(),
             _ => {
@@ -289,7 +296,7 @@ pub fn select(editor: &mut Editor, parts: Vec<MapPart>) {
 }
 
 pub fn card_beside(project: &Project, edit: &mut ContentEdit, original: &str, copy: &str) {
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return;
     };
     let Some(area) = content.by_key::<AreaDef>(original) else {
@@ -430,7 +437,7 @@ fn region_from_selection(editor: &mut Editor, map: &OpenWorldMap) {
     }
 }
 
-fn add_note(editor: &mut Editor, map: &OpenWorldMap, at: Pos2) {
+fn add_note(editor: &mut Editor, map: &OpenWorldMap, at: Pos<Tiles>) {
     let index = map.layout.notes.len();
     let added = map.change(editor, ContentEdit::new("Add a note"), |layout| {
         layout.notes.push(Note {

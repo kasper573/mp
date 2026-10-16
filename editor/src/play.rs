@@ -35,10 +35,27 @@ const LOCALHOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 pub struct PlayTest {
     pub running: Option<RunningPlayTest>,
     pub character: Option<String>,
-    pub failure: Option<String>,
+    pub failure: Option<PlayFailure>,
     pub last_start: Option<Place>,
     pub binaries: Option<GameBinaries>,
     pub checking: Option<ChannelInbox<GameBinaries>>,
+}
+
+pub enum PlayFailure {
+    SaveFailed,
+    NotStarted(String),
+    Stopped(String),
+}
+
+impl PlayFailure {
+    pub fn reason(&self) -> String {
+        match self {
+            PlayFailure::SaveFailed => {
+                "saving failed, so the server would read stale rows.".to_owned()
+            }
+            PlayFailure::NotStarted(reason) | PlayFailure::Stopped(reason) => reason.clone(),
+        }
+    }
 }
 
 pub struct RunningPlayTest {
@@ -148,7 +165,7 @@ pub fn poll(editor: &mut Editor) {
     }
     let server_exit = running.server.exited;
     let client_exit = running.client.as_ref().and_then(|client| client.exited);
-    let mut failure: Option<String> = None;
+    let mut failure: Option<PlayFailure> = None;
     let mut done = false;
     let mut to_spawn: Option<SpawnJob> = None;
     match running.phase {
@@ -159,9 +176,9 @@ pub fn poll(editor: &mut Editor) {
         }
         Phase::Starting => {
             if let Some(code) = server_exit {
-                failure = Some(format!(
+                failure = Some(PlayFailure::Stopped(format!(
                     "{SERVER} exited with code {code} before it was ready."
-                ));
+                )));
             } else if let Some(ports) = running.ports.filter(|_| running.client.is_none()) {
                 to_spawn = Some(SpawnJob {
                     ports,
@@ -170,21 +187,21 @@ pub fn poll(editor: &mut Editor) {
                     sender: running.sender.clone(),
                 });
             } else if running.started.elapsed() > READY_WITHIN {
-                failure = Some(format!(
+                failure = Some(PlayFailure::Stopped(format!(
                     "no ready line from {SERVER} in {} s.",
                     READY_WITHIN.as_secs()
-                ));
+                )));
             }
         }
         Phase::Playing => {
             if let Some(code) = client_exit {
-                failure = Some(format!(
+                failure = Some(PlayFailure::Stopped(format!(
                     "{CLIENT} exited with code {code}. The server was stopped too."
-                ));
+                )));
             } else if let Some(code) = server_exit {
-                failure = Some(format!(
+                failure = Some(PlayFailure::Stopped(format!(
                     "{SERVER} exited with code {code} during play. The client was stopped too."
-                ));
+                )));
             }
         }
     }
@@ -195,8 +212,11 @@ pub fn poll(editor: &mut Editor) {
         sender,
     }) = to_spawn
     {
-        let content = editor.project.as_ref().and_then(|project| project.content);
-        match hand_over(content, ports.http, &character, start) {
+        let content = editor
+            .project
+            .as_ref()
+            .and_then(|project| project.content.clone());
+        match hand_over(content.as_ref(), ports.http, &character, start) {
             Ok(()) => {
                 editor.output.say(
                     "editor",
@@ -209,21 +229,22 @@ pub fn poll(editor: &mut Editor) {
                             running.phase = Phase::Playing;
                         }
                     }
-                    Err(error) => failure = Some(format!("{CLIENT} did not start: {error}")),
+                    Err(error) => {
+                        failure = Some(PlayFailure::Stopped(format!(
+                            "{CLIENT} did not start: {error}"
+                        )))
+                    }
                 }
             }
-            Err(error) => failure = Some(format!("the server refused the test character: {error}")),
+            Err(error) => {
+                failure = Some(PlayFailure::Stopped(format!(
+                    "the server refused the test character: {error}"
+                )))
+            }
         }
     }
-    if let Some(reason) = failure {
-        editor
-            .output
-            .say("editor", format!("play-test stopped: {reason}"));
-        if let Some(running) = editor.play.running.as_mut() {
-            running.stop();
-        }
-        editor.play.failure = Some(reason);
-        editor.toast("The play-test stopped; see Output");
+    if let Some(failure) = failure {
+        fail(editor, failure);
     }
     if done && let Some(running) = editor.play.running.take() {
         for line in running.lines.drain() {
@@ -264,8 +285,7 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
     };
     editor.play.failure = None;
     if editor.has_unsaved() && !editor.save() {
-        editor.play.failure =
-            Some("saving failed, so the server would read stale rows.".to_owned());
+        fail(editor, PlayFailure::SaveFailed);
         return;
     }
     editor.play.binaries = Some(binaries.clone());
@@ -278,10 +298,10 @@ pub fn start(editor: &mut Editor, start: Option<Place>) {
     let server = match spawn_server(&binaries.folder, &folder, sender.clone()) {
         Ok(process) => process,
         Err(error) => {
-            editor
-                .output
-                .say("editor", format!("{SERVER} did not start: {error}"));
-            editor.play.failure = Some(format!("{SERVER} did not start: {error}"));
+            fail(
+                editor,
+                PlayFailure::NotStarted(format!("{SERVER} did not start: {error}")),
+            );
             return;
         }
     };
@@ -463,7 +483,7 @@ pub fn banner(editor: &mut Editor, ui: &mut Ui) {
     let Some(failure) = editor.play.failure.as_ref() else {
         return;
     };
-    let reason = failure.clone();
+    let reason = failure.reason();
     let mut copy = false;
     let mut save = false;
     let mut again = false;
@@ -540,9 +560,10 @@ pub fn status(editor: &mut Editor) {
         };
         editor.status.right.push(text);
     } else if let Some(failure) = editor.play.failure.as_ref() {
+        let reason = failure.reason();
         editor.status.right.push(format!(
             "play-test stopped · {}",
-            failure.split('.').next().unwrap_or("")
+            reason.split('.').next().unwrap_or("")
         ));
     }
 }
@@ -551,13 +572,13 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
     let Some(project) = editor.project.as_ref() else {
         return Vec::new();
     };
-    let content = project.content;
-    let spawn_area = content.map(|content| {
+    let content = project.content.clone();
+    let spawn_area = content.as_ref().map(|content| {
         content
             .built::<GameSettings>()
             .initial_spawn
             .area
-            .key(&content)
+            .key(content)
             .to_owned()
     });
     let mut characters: Vec<TestCharacter> = project
@@ -568,12 +589,13 @@ pub fn test_characters(editor: &Editor) -> Vec<TestCharacter> {
             let row = project.files.json(file)?;
             let xp = row["xp"].as_u64().unwrap_or(0) as u32;
             let level = content
+                .as_ref()
                 .and_then(|content| {
                     row["job"]
                         .as_str()
                         .and_then(|job| content.by_key::<JobDef>(job))
                         .map(|job| {
-                            job.get(&content)
+                            job.get(content)
                                 .levels
                                 .iter()
                                 .filter(|tier| tier.xp <= xp)
@@ -680,7 +702,7 @@ pub fn binaries_body(editor: &mut Editor, ui: &mut Ui) -> bool {
     let folder_version = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|c| c.built::<GameSettings>().content_version.0.clone());
     let ok = checked
         .as_ref()
@@ -840,7 +862,6 @@ fn spawn_server(binaries: &Path, folder: &Path, sender: Sender<OutputLine>) -> i
         port: 0,
         ws_port: 0,
         max_clients: 8,
-        areas: launch::ServedAreas::Real,
         content_dir: folder.to_path_buf(),
         player_spawn_type: SpawnPolicy::Map,
         player_immortal: false,
@@ -872,7 +893,6 @@ fn spawn_client(
         access_token: fake_token(character, &[]),
         profile_dir: profile,
         exit_on_stdin_eof: true,
-        vsync: true,
         probe: None,
     };
     let mut command = Command::new(binaries.join(CLIENT));
@@ -930,7 +950,7 @@ fn ready_ports(line: &str) -> Option<ServerPorts> {
 }
 
 fn hand_over(
-    content: Option<Content>,
+    content: Option<&Content>,
     http: u16,
     character: &str,
     start: Option<Place>,
@@ -941,7 +961,7 @@ fn hand_over(
     };
     let body = match content {
         Some(content) => {
-            with_content(ContentScope::of(&content), || {
+            with_content(ContentScope::of(content), || {
                 serde_json::to_string(&request)
             })
             .0
@@ -982,4 +1002,24 @@ fn as_one(wrap: &mut CommandWrap) {
 
 fn plain(line: &str) -> String {
     String::from_utf8_lossy(&strip_ansi_escapes::strip(line)).into_owned()
+}
+
+fn fail(editor: &mut Editor, failure: PlayFailure) {
+    let stopped = matches!(failure, PlayFailure::Stopped(_));
+    match &failure {
+        PlayFailure::SaveFailed => {}
+        PlayFailure::NotStarted(reason) => editor.output.say("editor", reason.clone()),
+        PlayFailure::Stopped(reason) => {
+            editor
+                .output
+                .say("editor", format!("play-test stopped: {reason}"));
+            if let Some(running) = editor.play.running.as_mut() {
+                running.stop();
+            }
+        }
+    }
+    editor.play.failure = Some(failure);
+    if stopped {
+        editor.toast("The play-test stopped; see Output");
+    }
 }

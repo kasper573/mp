@@ -1,11 +1,11 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
 use game::core::content::Content;
 use game::core::math::Direction;
-use game::core::script::dialogue::ChoiceReveal;
 use game::core::time::{PlaybackRate, Seconds};
 use game::systems::GameSettings;
 use game::systems::actor::model::ModelDef;
 use game::systems::actor::{Action, ActorModel};
+use game::systems::dialogue::ChoiceReveal;
 use game::systems::quest::{ActiveQuest, Parties, QuestDef};
 use game::systems::script::{Reach, RiftScripts};
 use serde_json::Value;
@@ -98,7 +98,7 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
     if matches!(selection.table.as_str(), "npc" | "player" | "model") {
         ui.horizontal(|ui| {
             let state = &mut editor.views.preview;
-            egui::ComboBox::from_id_salt("preview-action")
+            widgets::combo_box("preview-action")
                 .selected_text(state.action.as_ref())
                 .width(80.0)
                 .show_ui(ui, |ui| {
@@ -106,7 +106,7 @@ pub fn show_preview(editor: &mut Editor, ui: &mut Ui) {
                         ui.selectable_value(&mut state.action, action, action.as_ref());
                     }
                 });
-            egui::ComboBox::from_id_salt("preview-direction")
+            widgets::combo_box("preview-direction")
                 .selected_text(state.direction.as_ref())
                 .width(56.0)
                 .show_ui(ui, |ui| {
@@ -139,7 +139,11 @@ pub(super) fn draw_preview(
     pose: &Pose,
 ) {
     let ctx = ui.ctx().clone();
-    let Some(content) = editor.project.as_ref().and_then(|project| project.content) else {
+    let Some(content) = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.content.clone())
+    else {
         return;
     };
     if table == "quest" {
@@ -147,7 +151,7 @@ pub(super) fn draw_preview(
         let project = project.as_ref().expect("a project");
         ui.vertical(|ui| {
             ui.set_width(size.x);
-            quest_card(ui, &ctx, form, &project.files, content, key, size.x);
+            quest_card(ui, &ctx, form, &project.files, &content, key, size.x);
         });
         return;
     }
@@ -238,8 +242,8 @@ pub(super) fn draw_preview(
     );
     painter.image(thumb.texture.id(), sprite, uv, tint);
     if let Some(name) = value["name"].as_str() {
-        let colour = match attitude(content, table, key, value) {
-            Some(true) => game_colour(ui::tokens::palette::CRIMSON_80),
+        let colour = match attitude(&content, table, key, value) {
+            Some(true) => design_tokens::ink::DANGER,
             _ => Color32::WHITE,
         };
         painter.text(
@@ -252,22 +256,12 @@ pub(super) fn draw_preview(
     }
 }
 
-pub(super) fn game_colour(colour: bevy::prelude::Color) -> Color32 {
-    let srgba = colour.to_srgba();
-    Color32::from_rgba_unmultiplied(
-        (srgba.red * 255.0) as u8,
-        (srgba.green * 255.0) as u8,
-        (srgba.blue * 255.0) as u8,
-        (srgba.alpha * 255.0) as u8,
-    )
-}
-
 pub(super) fn quest_card(
     ui: &mut Ui,
     ctx: &egui::Context,
     form: &mut forms::FormState,
     files: &ProjectFiles,
-    content: Content,
+    content: &Content,
     key: &str,
     width: f32,
 ) {
@@ -277,9 +271,9 @@ pub(super) fn quest_card(
     if !content.has_built::<RiftScripts>() {
         return;
     }
-    let def = id.get(&content);
-    let parties = Parties::of(&content, content.built::<RiftScripts>());
-    let progress = def.progress(&content, &parties, &ActiveQuest::fresh(&content, id), None);
+    let def = id.get(content);
+    let parties = Parties::of(content, content.built::<RiftScripts>());
+    let progress = def.progress(content, &parties, &ActiveQuest::fresh(content, id), None);
     let ink = Color32::from_rgb(236, 230, 214);
     let soft = Color32::from_rgba_unmultiplied(236, 230, 214, 150);
     let mut icon = |ui: &mut Ui, path: &str, size: f32| {
@@ -301,7 +295,7 @@ pub(super) fn quest_card(
             ui.set_width(width - 28.0);
             ui.spacing_mut().item_spacing.y = 8.0;
             ui.horizontal(|ui| {
-                icon(ui, def.icon(&content).as_str(), 28.0);
+                icon(ui, def.icon(content).as_str(), 28.0);
                 ui.label(RichText::new(&def.title).size(17.0).color(ink).strong());
             });
             ui.label(
@@ -313,7 +307,7 @@ pub(super) fn quest_card(
             ui.label(RichText::new("OBJECTIVES").size(11.0).color(soft));
             for (objective, progress) in def.objectives().zip(&progress) {
                 ui.horizontal(|ui| {
-                    icon(ui, objective.icon(&content).as_str(), 20.0);
+                    icon(ui, objective.icon(content).as_str(), 20.0);
                     ui.label(RichText::new(&progress.label).size(13.0).color(ink));
                     if progress.counted {
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -338,7 +332,7 @@ pub(super) fn quest_card(
                         );
                     }
                     for stack in def.rewards() {
-                        let item = stack.item.get(&content);
+                        let item = stack.item.get(content);
                         ui.horizontal(|ui| {
                             icon(ui, item.icon.as_str(), 16.0);
                             let label = if stack.count == 1 {
@@ -358,7 +352,7 @@ pub(super) fn quest_card(
                     );
                     ui.horizontal(|ui| {
                         for stack in def.pick_one() {
-                            icon(ui, stack.item.get(&content).icon.as_str(), 28.0);
+                            icon(ui, stack.item.get(content).icon.as_str(), 28.0);
                         }
                     });
                 }
@@ -371,7 +365,7 @@ pub(super) fn quest_card(
         });
 }
 
-fn attitude(content: Content, table: &str, key: &str, value: &Value) -> Option<bool> {
+fn attitude(content: &Content, table: &str, key: &str, value: &Value) -> Option<bool> {
     if !content.has_built::<RiftScripts>() {
         return None;
     }
@@ -389,7 +383,7 @@ fn attitude(content: Content, table: &str, key: &str, value: &Value) -> Option<b
         {
             continue;
         }
-        let Some(bound) = panel::owner_row(&content, table, key, &format!("/modules/{index}"))
+        let Some(bound) = panel::owner_row(content, table, key, &format!("/modules/{index}"))
         else {
             continue;
         };

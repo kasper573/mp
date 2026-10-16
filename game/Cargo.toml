@@ -39,7 +39,7 @@ harness = false
 profiling = ["dep:pprof", "bevy/debug"]
 
 # One dependency set for every target keeps the source tree free of #[cfg] gates: the browser-only
-# crates (bevy's render stack, ui, web-sys, kira, …) also compile natively — wasm imports become
+# crates (bevy's render stack, egui, web-sys, kira, …) also compile natively — wasm imports become
 # panicking stubs and the linker strips what the native binaries never call.
 [dependencies]
 bevy = { workspace = true, features = [
@@ -69,18 +69,10 @@ bevy = { workspace = true, features = [
     "bevy_window",
     "hdr",
     "png",
-    "bevy_input_focus",
-    "bevy_ui",
-    "bevy_ui_render",
-    "bevy_ui_widgets",
-    "bevy_scene",
-    "bevy_picking",
-    "sprite_picking",
-    "ui_picking",
     "webgl2",
     "web",
 ] }
-ui = { path = "../ui" }
+design_tokens = { path = "../design_tokens" }
 bevy_tilemap = { path = "../bevy/tilemap" }
 bevy_terminal = { path = "../bevy/terminal" }
 bevy_app.workspace = true
@@ -88,10 +80,13 @@ bevy_ecs.workspace = true
 bevy_platform.workspace = true
 slotmap.workspace = true
 smallvec.workspace = true
-bevy_picking.workspace = true
+bevy_egui.workspace = true
+egui.workspace = true
+accesskit = "0.24"
 bevy_replicon = { workspace = true, features = ["client", "server"] }
 bevy_state.workspace = true
 bevy_time = { workspace = true, features = ["std"] }
+bevy_input = { workspace = true, features = ["serialize"] }
 bevy_kira_audio = { version = "0.27", default-features = false }
 # bevy_kira_audio fails to build without kira's symphonia feature, which otherwise only its own audio
 # loaders turn on.
@@ -102,7 +97,6 @@ csv = "1"
 futures-timer = { version = "3", features = ["wasm-bindgen"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 derive_more = { version = "2", features = ["add", "add_assign"] }
-thread_local = "1"
 euclid = { version = "0.22", features = ["serde"] }
 pathfinding = "4"
 fixedbitset = "0.5"
@@ -146,7 +140,7 @@ web-sys = { version = "0.3", features = [
 ] }
 
 # Native-only: crates the server/bench/lint binaries need that have no wasm build (tokio, axum, …),
-# plus the desktop windowing features the client code needs to compile natively (mirrors ui's split).
+# plus the desktop windowing features the client code needs to compile natively.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 bevy = { workspace = true, features = ["x11", "multi_threaded"] }
 axum.workspace = true
@@ -172,6 +166,7 @@ proc-macro2 = { workspace = true, features = ["span-locations"] }
 # The gameplay tests play through the same driver as the showcase.
 [dev-dependencies]
 driver = { path = "../driver" }
+testkit = { path = "../testkit" }
 tempfile = "3"
 
 # Wasm-only features: `reflect_auto_register`'s #[used] registration slices defeat --gc-sections,

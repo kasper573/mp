@@ -118,30 +118,30 @@ pub struct NpcSprite {
 pub fn npc_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
-    content: Content,
+    content: &Content,
     npc: &str,
 ) -> Option<NpcSprite> {
-    let def = content.by_key::<NpcDef>(npc)?.get(&content);
+    let def = content.by_key::<NpcDef>(npc)?.get(content);
     model_sprite(editor, ctx, content, def.model)
 }
 
 pub fn player_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
-    content: Content,
+    content: &Content,
 ) -> Option<NpcSprite> {
     let player = content.table::<PlayerDef>().keys().first().cloned()?;
-    let def = content.by_key::<PlayerDef>(&player)?.get(&content);
+    let def = content.by_key::<PlayerDef>(&player)?.get(content);
     model_sprite(editor, ctx, content, def.model)
 }
 
 pub fn model_sprite(
     editor: &mut Editor,
     ctx: &egui::Context,
-    content: Content,
+    content: &Content,
     model: ModelId,
 ) -> Option<NpcSprite> {
-    let model = ActorModel::get(&content, model);
+    let model = ActorModel::get(content, model);
     let project = editor.project.as_ref()?;
     let thumb = editor
         .form

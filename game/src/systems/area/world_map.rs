@@ -115,7 +115,7 @@ pub struct Note {
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, def) in loading.rows::<WorldMapDef>() {
+    for (id, def) in loading.rows::<WorldMapDef>(&content) {
         for (area, card) in &def.cards {
             if !(MIN_SIZE..=MAX_SIZE).contains(&card.size) {
                 loading.row_error(

@@ -6,21 +6,23 @@ pub mod intro;
 mod rows;
 
 pub use intro::IntroAppearance;
-pub use rows::{NotificationRow, NotificationRows, RowPlace, shown as shown_rows};
+pub use rows::{NotificationRow, NotificationRows};
 
 use std::borrow::Cow;
 
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::message::MessageCursor;
 use bevy::prelude::*;
+use bevy::window::WindowOccluded;
+use bevy_egui::EguiPrimaryContextPass;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
 use crate::core::audio::playback::{PlaySfx, SfxId, SfxPlace};
 use crate::core::content::{Content, ContentId, ContentRow, Fixture, Loading, RowCheck};
+use crate::core::gui::{self, Band};
 use crate::core::math::Pos;
-use crate::core::platform::ClientPlatform;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, UnixMillis, WallClock};
@@ -29,8 +31,7 @@ use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic, Rec
 use crate::systems::interface::InterfaceSound;
 use crate::systems::movement::position;
 use crate::systems::npc::{Npc, NpcDef, NpcId};
-use crate::systems::player::Players;
-use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::screen::ClientScreen;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
 use crate::systems::script::{EffectCall, Reach, RiftScripting, condition};
 use crate::systems::text::{self, LineText, Motion, Span};
@@ -40,14 +41,16 @@ pub type NotificationId = ContentId<NotificationDef>;
 
 const READING_BASE: Seconds = Seconds(2.0);
 const READING_PER_WORD: Seconds = Seconds(0.3);
-const LATE_AFTER: Seconds = Seconds(2.0);
 const LONGEST_ROW_WORDS: usize = 30;
+const COLUMN_TOP: f32 = 16.0;
+const GROUP_GAP: f32 = 8.0;
+const CENTRE_BELOW: f32 = 0.15;
+const CENTRE_GAP: f32 = 16.0;
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.add_mapped_server_message::<NotificationSent>(Channel::Ordered)
-        .add_server_message::<SoundPlayed>(Channel::Ordered)
-        .init_resource::<Broadcasts>();
+        .add_server_message::<SoundPlayed>(Channel::Ordered);
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -146,7 +149,7 @@ pub fn notify_from(
     });
     let live = match notification.kind {
         NotificationKind::Feed { .. } | NotificationKind::Error { .. } => true,
-        _ => budget::admit(world, player, &notification, speaker, at) == budget::Admit::Live,
+        _ => budget::admit(world, player, &notification, speaker, at),
     };
     if live {
         visibility::send_private(
@@ -166,6 +169,18 @@ pub fn record(world: &mut World, player: Entity, notification: &Notification) {
     history::record(world, player, entry);
 }
 
+pub fn captions(world: &World) -> NotificationRows {
+    rows::shown::<rows::Captions>(world)
+}
+
+pub fn alerts(world: &World) -> NotificationRows {
+    rows::shown::<rows::Alerts>(world)
+}
+
+pub fn milestones(world: &World) -> NotificationRows {
+    rows::shown::<rows::Milestones>(world)
+}
+
 impl Notification {
     pub fn new(kind: NotificationKind, text: LineText) -> Notification {
         Notification {
@@ -176,10 +191,8 @@ impl Notification {
     }
 
     pub fn stays(&self) -> Seconds {
-        self.lasts.unwrap_or_else(|| {
-            let words = self.text.word_count() as f32;
-            Seconds(READING_BASE.0 + READING_PER_WORD.0 * words)
-        })
+        self.lasts
+            .unwrap_or_else(|| reading(self.text.word_count()))
     }
 
     fn spoken_by(&self, world: &World, npc: Entity) -> bool {
@@ -258,7 +271,7 @@ impl ContentRow for NotificationDef {
 }
 
 impl NotificationDef {
-    pub fn notification(&'static self, text: LineText) -> Notification {
+    pub fn notification(&self, text: LineText) -> Notification {
         Notification {
             kind: (&self.kind).into(),
             text,
@@ -274,14 +287,14 @@ impl NotificationDef {
     }
 }
 
-impl From<&'static NotificationDefKind> for NotificationKind {
-    fn from(kind: &'static NotificationDefKind) -> NotificationKind {
+impl From<&NotificationDefKind> for NotificationKind {
+    fn from(kind: &NotificationDefKind) -> NotificationKind {
         match kind {
             NotificationDefKind::Speech { speaker } => {
                 NotificationKind::Speech { speaker: *speaker }
             }
             NotificationDefKind::Narration { label, sfx } => NotificationKind::Narration {
-                label: Cow::Borrowed(label),
+                label: Cow::Owned(label.clone()),
                 sfx: *sfx,
             },
             NotificationDefKind::Intro {
@@ -291,7 +304,7 @@ impl From<&'static NotificationDefKind> for NotificationKind {
                 emblem,
                 sfx,
             } => NotificationKind::Intro {
-                title: Cow::Borrowed(title),
+                title: Cow::Owned(title.clone()),
                 appearance: IntroAppearance {
                     tint: *tint,
                     motion: *motion,
@@ -316,16 +329,20 @@ impl EffectDef<RiftScripting> for Notify {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let def = self.notification.get(cx.content);
-        let values = text::values(&def.text)
+        let row = self.notification.get(cx.content);
+        let values = text::values(&row.text)
             .into_iter()
             .map(|value| cx.expr(value, ValueType::Text))
             .collect::<Result<Vec<_>, _>>()?;
+        let def = row.clone();
         Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
                 let spoken: Vec<_> = values.iter().map(|value| value(world, cx)).collect();
@@ -373,16 +390,9 @@ pub fn play_sound(
     }
 }
 
-pub fn speakers(content: &Content) -> impl Iterator<Item = NpcId> + '_ {
-    content
-        .table::<NotificationDef>()
-        .rows()
-        .filter_map(NotificationDef::speaker)
-}
-
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, def) in loading.rows::<NotificationDef>() {
+    for (id, def) in loading.rows::<NotificationDef>(&content) {
         let mut check = RowCheck::default();
         for (index, span) in def.text.iter().enumerate() {
             if let Span::Value { value, .. } = span
@@ -427,116 +437,68 @@ pub fn check_all(loading: &mut Loading) {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct Broadcasts(Vec<Notification>);
-
-pub fn broadcast(world: &mut World, notification: Notification) {
-    world.resource_mut::<Broadcasts>().0.push(notification);
-}
-
-pub fn relay(worlds: &mut [&mut World]) {
-    let raised: Vec<Notification> = worlds
-        .iter_mut()
-        .flat_map(|world| std::mem::take(&mut world.resource_mut::<Broadcasts>().0))
-        .collect();
-    for notification in &raised {
-        notify_everywhere(worlds, notification);
-    }
-}
-
-pub fn notify_everywhere(worlds: &mut [&mut World], notification: &Notification) {
-    for world in worlds.iter_mut() {
-        let players: Vec<Entity> = world.resource::<Players>().0.values().copied().collect();
-        for player in players {
-            notify(world, player, notification.clone());
-        }
-    }
-}
-
 pub struct NotificationPlugin;
 
 impl Plugin for NotificationPlugin {
     fn build(&self, app: &mut App) {
-        rows::plugin::<ui::Captions>(app);
-        rows::plugin::<ui::AlertBar>(app);
-        rows::plugin::<ui::Milestones>(app);
+        rows::plugin::<rows::Captions>(app);
+        rows::plugin::<rows::Alerts>(app);
+        rows::plugin::<rows::Milestones>(app);
+        error::plugin(app);
         app.add_plugins((bubble::BubblePlugin, intro::IntroPlugin, feed::FeedPlugin))
-            .add_observer(rows::close_alert)
-            .add_systems(OnEnter(ClientScreen::Area), spawn_places)
-            .add_systems(OnExit(ClientScreen::Area), despawn_all::<PlacesRoot>)
+            .init_resource::<Occlusion>()
+            .add_systems(Update, track_occlusion)
             .add_systems(
                 Update,
                 (deliver, deliver_sounds).run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                draw_column
+                    .in_set(Band::Notices)
+                    .run_if(in_state(ClientScreen::Area)),
             );
     }
 }
 
-#[derive(Component, Default, Clone)]
-struct PlacesRoot;
-
-const CENTRE_BELOW: f32 = 15.0;
-
-fn spawn_places(mut commands: Commands) {
-    commands.spawn_scene(bsn! {
-        PlacesRoot
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            padding: {UiRect::top(Val::Px(ui::tokens::spacing::XL))},
-        }
-        Pickable::IGNORE
-        GlobalZIndex({ui::tokens::layer::NOTIFICATIONS})
-        Children [
-            Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px({ui::tokens::spacing::L}),
-                width: Val::Percent(100.0),
-            }
-            Pickable::IGNORE
-            Children [
-                @{ui::alert_bar()}
-                --
-                @{ui::captions()}
-                --
-                @{ui::toaster(ui::SonnerPosition::TopCenter)}
-                error::ErrorToaster
-                Node { position_type: PositionType::Relative, top: Val::Auto, left: Val::Auto, margin: UiRect::ZERO }
-            ]
-            --
-            Node {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px({ui::tokens::spacing::XL}),
-                width: Val::Percent(100.0),
-                margin: {UiRect::top(Val::Vh(CENTRE_BELOW))},
-            }
-            Pickable::IGNORE
-            Children [
-                intro::IntroHost Node { display: Display::Grid, justify_items: JustifyItems::Center } Pickable::IGNORE
-                --
-                @{ui::milestones()}
-            ]
-        ]
-    });
+fn draw_column(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let screen = gui.content_rect();
+    let alerts = rows::draw_alerts(world, &gui, screen.top() + COLUMN_TOP);
+    let captions = rows::draw_captions(world, &gui, alerts + GROUP_GAP);
+    let error = error::draw(world, &gui, captions + GROUP_GAP);
+    let centre = error + screen.height() * CENTRE_BELOW;
+    let intro = intro::draw(world, &gui, centre);
+    rows::draw_milestones(world, &gui, intro + CENTRE_GAP);
 }
 
 fn deliver(world: &mut World, mut cursor: Local<MessageCursor<NotificationSent>>) {
-    let paused = world.resource::<Time<Real>>().delta_secs() > LATE_AFTER.0;
-    let now = world.resource::<ClientPlatform>().0.local_clock().now;
     let fresh: Vec<NotificationSent> = cursor
         .read(world.resource::<Messages<NotificationSent>>())
         .cloned()
         .collect();
     for notification_sent in fresh {
-        if paused && !notification_sent.outlives_pause(now) {
-            continue;
-        }
         show(world, notification_sent);
     }
+}
+
+#[derive(Resource, Default)]
+pub(super) struct Occlusion {
+    occluded: bool,
+}
+
+fn track_occlusion(mut events: MessageReader<WindowOccluded>, mut occlusion: ResMut<Occlusion>) {
+    for event in events.read() {
+        occlusion.occluded = event.occluded;
+    }
+}
+
+/// Notifications age only while the game window is on screen, so one that was raised before the
+/// window was hidden still has its full time when it comes back.
+pub(super) fn window_visible(occlusion: Res<Occlusion>) -> bool {
+    !occlusion.occluded
 }
 
 fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter<PlaySfx>) {
@@ -549,7 +511,13 @@ fn deliver_sounds(mut played: MessageReader<SoundPlayed>, mut sfx: MessageWriter
 }
 
 fn show(world: &mut World, notification_sent: NotificationSent) {
-    if let Some(id) = notification_sent.notification.kind.sfx() {
+    let intro = matches!(
+        notification_sent.notification.kind,
+        NotificationKind::Intro { .. }
+    );
+    if let Some(id) = notification_sent.notification.kind.sfx()
+        && !intro
+    {
         world.write_message(PlaySfx {
             id,
             place: SfxPlace::Interface,
@@ -558,26 +526,20 @@ fn show(world: &mut World, notification_sent: NotificationSent) {
     match &notification_sent.notification.kind {
         NotificationKind::Speech { .. } => bubble::say(world, notification_sent),
         NotificationKind::Narration { label, .. } => {
-            rows::join::<ui::Captions>(world, label.clone(), notification_sent)
+            rows::join::<rows::Captions>(world, label.clone(), notification_sent)
         }
         NotificationKind::Alert { label, .. } => {
-            rows::join::<ui::AlertBar>(world, label.clone(), notification_sent)
+            rows::join::<rows::Alerts>(world, label.clone(), notification_sent)
         }
         NotificationKind::Error { .. } => error::toast(world, notification_sent),
         NotificationKind::Milestone { label, .. } => {
-            rows::join::<ui::Milestones>(world, label.clone(), notification_sent)
+            rows::join::<rows::Milestones>(world, label.clone(), notification_sent)
         }
         NotificationKind::Intro { .. } => intro::show(world, notification_sent),
         NotificationKind::Feed { .. } => feed::show(world, notification_sent),
     }
 }
 
-impl NotificationSent {
-    fn outlives_pause(&self, now: UnixMillis) -> bool {
-        match (&self.notification.kind, self.notification.lasts) {
-            (NotificationKind::Feed { .. }, _) => true,
-            (_, Some(lasts)) => now < self.at.after(lasts),
-            (_, None) => false,
-        }
-    }
+fn reading(words: usize) -> Seconds {
+    Seconds(READING_BASE.0 + READING_PER_WORD.0 * words as f32)
 }

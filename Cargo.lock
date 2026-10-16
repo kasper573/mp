@@ -1112,7 +1112,6 @@ dependencies = [
  "bevy_log",
  "bevy_math",
  "bevy_mesh",
- "bevy_picking",
  "bevy_platform",
  "bevy_reflect",
  "bevy_render",
@@ -1120,7 +1119,6 @@ dependencies = [
  "bevy_shape",
  "bevy_time",
  "bevy_transform",
- "bevy_ui_render",
  "bevy_utils",
  "bevy_window",
  "bevy_winit",
@@ -1137,7 +1135,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webbrowser",
  "wgpu-types",
  "winit",
 ]
@@ -1383,7 +1380,6 @@ dependencies = [
  "bevy_ptr",
  "bevy_reflect",
  "bevy_render",
- "bevy_scene",
  "bevy_shader",
  "bevy_shape",
  "bevy_sprite",
@@ -1393,9 +1389,6 @@ dependencies = [
  "bevy_text",
  "bevy_time",
  "bevy_transform",
- "bevy_ui",
- "bevy_ui_render",
- "bevy_ui_widgets",
  "bevy_utils",
  "bevy_window",
  "bevy_winit",
@@ -1625,14 +1618,12 @@ dependencies = [
  "bevy_ecs",
  "bevy_input",
  "bevy_math",
- "bevy_mesh",
  "bevy_platform",
  "bevy_reflect",
  "bevy_shape",
  "bevy_time",
  "bevy_transform",
  "bevy_window",
- "crossbeam-channel",
  "tracing",
  "uuid",
 ]
@@ -1934,7 +1925,6 @@ dependencies = [
  "bevy_log",
  "bevy_math",
  "bevy_mesh",
- "bevy_picking",
  "bevy_reflect",
  "bevy_text",
  "bevy_transform",
@@ -3256,6 +3246,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "design_tokens"
+version = "0.1.0"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "deterministic-hash"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3385,7 +3382,6 @@ dependencies = [
  "game",
  "serde",
  "serde_json",
- "ui",
  "ureq",
 ]
 
@@ -3483,6 +3479,7 @@ dependencies = [
  "bevy_replicon",
  "bevy_tilemap",
  "blake3",
+ "design_tokens",
  "dirs",
  "ebur128",
  "egui",
@@ -3503,7 +3500,6 @@ dependencies = [
  "strip-ansi-escapes",
  "strum",
  "tempfile",
- "ui",
  "ureq",
  "walkdir",
 ]
@@ -4075,13 +4071,15 @@ dependencies = [
 name = "game"
 version = "0.1.0"
 dependencies = [
+ "accesskit",
  "axum",
  "base64 0.23.1",
  "bevy",
  "bevy_app",
  "bevy_ecs",
+ "bevy_egui",
+ "bevy_input",
  "bevy_kira_audio",
- "bevy_picking",
  "bevy_platform",
  "bevy_replicon",
  "bevy_replicon_renet2",
@@ -4097,7 +4095,9 @@ dependencies = [
  "csv",
  "ctrlc",
  "derive_more",
+ "design_tokens",
  "driver",
+ "egui",
  "envy",
  "euclid",
  "fixedbitset",
@@ -4134,11 +4134,10 @@ dependencies = [
  "syn 3.0.9",
  "tar",
  "tempfile",
- "thread_local",
+ "testkit",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",
- "ui",
  "ureq",
  "walkdir",
  "wasm-bindgen",
@@ -8766,6 +8765,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "testkit"
+version = "0.1.0"
+dependencies = [
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_replicon",
+ "game",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9233,31 +9242,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
 
 [[package]]
-name = "ui"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_app",
- "bevy_asset",
- "bevy_camera",
- "bevy_color",
- "bevy_curve",
- "bevy_ecs",
- "bevy_input",
- "bevy_input_focus",
- "bevy_math",
- "bevy_picking",
- "bevy_scene",
- "bevy_text",
- "bevy_time",
- "bevy_ui",
- "bevy_ui_widgets",
- "bevy_window",
- "schemars 1.2.3",
- "serde",
-]
-
-[[package]]
 name = "unicase"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9693,22 +9677,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webbrowser"
-version = "1.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62c35be770821a214dbc362fc26908c853e776c0004294d0b10b8a6bad582f94"
-dependencies = [
- "jni 0.22.4",
- "log",
- "ndk-context",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "url",
- "web-sys",
 ]
 
 [[package]]

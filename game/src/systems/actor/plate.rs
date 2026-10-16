@@ -1,20 +1,22 @@
 use std::collections::HashMap;
 
-use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
-use bevy::ui::Val2;
-use ui::tokens::{palette, typography};
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::family;
+use egui::emath::{GuiRounding, TSTransform};
+use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 
 use crate::core::content::Content;
+use crate::core::gui::{self, Band, GuiImage};
 use crate::core::math::Pos;
-use crate::core::render::transition::ScreenTransitionPhase;
-use crate::core::render::{WorldOverlay, WorldToWindow, tile_to_window};
+use crate::core::render::tile_to_window;
+use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
+use crate::core::text::{self, TextShadow};
 use crate::core::tiling::Tiles;
 use crate::systems::actor::{Action, Actor, Hitbox, Name};
 use crate::systems::area::AreaObject;
 use crate::systems::attention;
 use crate::systems::combat::Attitude;
-use crate::systems::hud::reconcile_children;
 use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::npc::Npc;
 use crate::systems::player::Owner;
@@ -23,6 +25,14 @@ use crate::systems::screen::ClientScreen;
 
 const HEAD_ROOM: f32 = 6.0;
 const ICON: f32 = 22.0;
+const ICON_GAP: f32 = 2.0;
+const TEXT_SIZE: f32 = 12.0;
+const HOSTILE: Color32 = Color32::from_rgb(233, 117, 120);
+const PLAYER: Color32 = Color32::from_rgb(104, 168, 235);
+const SHADOW: TextShadow = TextShadow {
+    offset: egui::vec2(1.0, 1.0),
+    color: Color32::BLACK,
+};
 
 pub struct PlatePlugin;
 
@@ -30,9 +40,9 @@ impl Plugin for PlatePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Plates>()
             .add_systems(
-                Update,
-                (spawn_plates, place_plates, sync_plate_icons)
-                    .chain()
+                EguiPrimaryContextPass,
+                draw_plates
+                    .in_set(Band::World)
                     .run_if(in_state(ClientScreen::Area)),
             )
             .add_systems(OnExit(ClientScreen::Area), clear_plates);
@@ -40,18 +50,7 @@ impl Plugin for PlatePlugin {
 }
 
 pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
-    let plate = world
-        .resource::<Plates>()
-        .0
-        .get(&actor)
-        .copied()
-        .filter(|&plate| {
-            world
-                .get::<InheritedVisibility>(plate)
-                .is_some_and(|visibility| visibility.get())
-        })
-        .and_then(|plate| ui::node_rect(world, plate))
-        .filter(|rect| rect.height() > 0.0);
+    let plate = world.resource::<Plates>().0.get(&actor).copied();
     match plate {
         Some(rect) => Some(Vec2::new(rect.center().x, rect.min.y)),
         None => {
@@ -65,37 +64,180 @@ pub fn crown(world: &mut World, actor: Entity) -> Option<Vec2> {
 }
 
 #[derive(Resource, Default)]
-struct Plates(HashMap<Entity, Entity>);
-
-#[derive(Component, Default, Clone)]
-struct PlateIcons;
-
-type Labelled = (
-    Entity,
-    Option<&'static Name>,
-    Option<&'static Npc>,
-    Option<&'static Owner>,
-    Option<&'static Attitude>,
-    Has<AreaObject>,
-);
-
-type Plated = Or<(With<Actor>, With<AreaObject>)>;
+struct Plates(HashMap<Entity, egui::Rect>);
 
 struct Label {
     name: Option<String>,
-    role: Option<&'static str>,
-    color: Color,
+    role: Option<String>,
+    color: Color32,
+}
+
+struct Plate {
+    actor: Entity,
+    label: Label,
+    icons: Vec<Option<GuiImage>>,
+    rect: egui::Rect,
+}
+
+fn clear_plates(mut plates: ResMut<Plates>) {
+    plates.0.clear();
+}
+
+// One area holds every plate, so they all sit under the bubbles that float above them.
+pub fn draw_plates(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let mut plates = world.resource_mut::<Plates>();
+    plates.0.clear();
+    if world.resource::<ActiveTransition>().phase() != ScreenTransitionPhase::Idle {
+        return;
+    }
+    let content = world.resource::<Content>().clone();
+    let viewer = world.resource::<Viewpoint>().0;
+    let labelled: Vec<(Entity, Label, Pos<Tiles>, Hitbox)> = world
+        .query_filtered::<(
+            Entity,
+            Option<&Name>,
+            Option<&Npc>,
+            Option<&Owner>,
+            Option<&Attitude>,
+            Has<AreaObject>,
+            Option<&RenderPosition>,
+            &Position,
+            &Hitbox,
+            Option<&Actor>,
+        ), Or<(With<Actor>, With<AreaObject>)>>()
+        .iter(world)
+        .filter(|(actor, ..)| viewer != Some(*actor))
+        .filter(|(.., body)| body.is_none_or(|body| body.action != Action::Dead))
+        .filter_map(
+            |(actor, name, npc, owner, attitude, object, rendered, at, hitbox, _)| {
+                let label = label(&content, name, npc, owner, attitude, object)?;
+                let at = rendered.map_or(at.pos, |rendered| rendered.0);
+                Some((actor, label, at, hitbox.clone()))
+            },
+        )
+        .collect();
+    let plates: Vec<Plate> = labelled
+        .into_iter()
+        .filter_map(|(actor, label, at, hitbox)| {
+            let top = tile_to_window(world, head(at, &hitbox))?;
+            let icons: Vec<Option<GuiImage>> = attention::plate_marks(world, viewer, actor)
+                .into_iter()
+                .map(|mark| gui::image(world, &mark.get(&content).icon))
+                .collect();
+            if label.name.is_none() && label.role.is_none() && icons.is_empty() {
+                return None;
+            }
+            let size = plate_size(&gui, &label, &icons);
+            let rect = egui::Rect::from_min_size(
+                egui::pos2(top.x - size.x / 2.0, top.y - HEAD_ROOM - size.y)
+                    .round_to_pixels(gui.pixels_per_point()),
+                size,
+            );
+            Some(Plate {
+                actor,
+                label,
+                icons,
+                rect,
+            })
+        })
+        .collect();
+    gui::world_area(world, "plates")
+        .fixed_pos(egui::Pos2::ZERO)
+        .show(&gui, |ui| {
+            for plate in &plates {
+                draw_plate(ui, plate);
+            }
+        });
+    world.resource_mut::<Plates>().0 = plates
+        .iter()
+        .map(|plate| (plate.actor, plate.rect))
+        .collect();
+}
+
+fn draw_plate(ui: &mut egui::Ui, plate: &Plate) {
+    let mut column = ui.new_child(
+        UiBuilder::new()
+            .max_rect(plate.rect)
+            .layout(Layout::top_down(Align::Center)),
+    );
+    column.spacing_mut().item_spacing = egui::Vec2::ZERO;
+    if !plate.icons.is_empty() {
+        column.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = ICON_GAP;
+            for icon in &plate.icons {
+                match icon {
+                    Some(icon) => {
+                        ui.add(icon.widget(egui::Vec2::splat(ICON)));
+                    }
+                    None => {
+                        ui.allocate_exact_size(egui::Vec2::splat(ICON), Sense::hover());
+                    }
+                }
+            }
+        });
+    }
+    if let Some(name) = &plate.label.name {
+        text::show_shadowed(
+            &mut column,
+            name,
+            name_font(),
+            plate.label.color,
+            SHADOW,
+            TSTransform::IDENTITY,
+        );
+    }
+    if let Some(role) = plate.label.role.as_deref() {
+        text::show_shadowed(
+            &mut column,
+            &role_text(role),
+            role_font(),
+            Color32::WHITE.gamma_multiply(0.7),
+            SHADOW,
+            TSTransform::IDENTITY,
+        );
+    }
+}
+
+fn plate_size(gui: &egui::Context, label: &Label, icons: &[Option<GuiImage>]) -> egui::Vec2 {
+    let text = |text: String, font: FontId| {
+        gui.fonts_mut(|fonts| fonts.layout_no_wrap(text, font, Color32::WHITE))
+            .size()
+    };
+    let icons = match icons.len() {
+        0 => egui::Vec2::ZERO,
+        count => egui::vec2(count as f32 * ICON + (count - 1) as f32 * ICON_GAP, ICON),
+    };
+    [
+        Some(icons),
+        label.name.clone().map(|name| text(name, name_font())),
+        label
+            .role
+            .as_deref()
+            .map(|role| text(role_text(role), role_font())),
+    ]
+    .into_iter()
+    .flatten()
+    .fold(egui::Vec2::ZERO, |size, part| {
+        egui::vec2(size.x.max(part.x), size.y + part.y)
+    })
 }
 
 fn label(
     content: &Content,
-    (_, name, npc, owner, attitude, object): <Labelled as QueryData>::Item<'_, '_>,
+    name: Option<&Name>,
+    npc: Option<&Npc>,
+    owner: Option<&Owner>,
+    attitude: Option<&Attitude>,
+    object: bool,
 ) -> Option<Label> {
     if object {
         return Some(Label {
             name: None,
             role: None,
-            color: Color::WHITE,
+            color: Color32::WHITE,
         });
     }
     match (npc, owner) {
@@ -103,115 +245,19 @@ fn label(
             let def = npc.def.get(content);
             def.nameplate().map(|role| Label {
                 name: Some(def.name.to_owned()),
-                role: Some(role),
+                role: Some(role.to_owned()),
                 color: match attitude {
-                    Some(Attitude::Hostile) => palette::CRIMSON_80,
-                    _ => Color::WHITE,
+                    Some(Attitude::Hostile) => HOSTILE,
+                    _ => Color32::WHITE,
                 },
             })
         }
         (None, Some(_)) => Some(Label {
             name: Some(name?.name.clone()),
             role: None,
-            color: palette::AZURE_80,
+            color: PLAYER,
         }),
         (None, None) => None,
-    }
-}
-
-fn spawn_plates(
-    content: Res<Content>,
-    mut plates: ResMut<Plates>,
-    viewpoint: Res<Viewpoint>,
-    actors: Query<Labelled, Plated>,
-    mut commands: Commands,
-) {
-    plates.0.retain(|actor, plate| {
-        let keep = actors.contains(*actor) && viewpoint.0 != Some(*actor);
-        if !keep {
-            commands.entity(*plate).despawn();
-        }
-        keep
-    });
-    for labelled in &actors {
-        let actor = labelled.0;
-        if plates.0.contains_key(&actor) || viewpoint.0 == Some(actor) {
-            continue;
-        }
-        let Some(label) = label(&content, labelled) else {
-            continue;
-        };
-        let plate = commands.spawn_scene(plate(label)).id();
-        plates.0.insert(actor, plate);
-    }
-}
-
-fn place_plates(
-    plates: Res<Plates>,
-    actors: Query<(Option<&RenderPosition>, &Position, &Hitbox, Option<&Actor>)>,
-    projector: WorldToWindow,
-    phase: Res<ScreenTransitionPhase>,
-    mut nodes: Query<(&mut Node, &mut Visibility), With<WorldOverlay>>,
-) {
-    let world_on_screen = *phase == ScreenTransitionPhase::Idle;
-    for (&actor, &plate) in &plates.0 {
-        let Ok((mut node, mut visibility)) = nodes.get_mut(plate) else {
-            continue;
-        };
-        let head = actors
-            .get(actor)
-            .ok()
-            .and_then(|(rendered, at, hitbox, body)| {
-                let at = rendered.map_or(at.pos, |rendered| rendered.0);
-                (world_on_screen && body.is_none_or(|body| body.action != Action::Dead))
-                    .then(|| projector.project(head(at, hitbox)))
-                    .flatten()
-            });
-        let shown = match head {
-            Some(head) => {
-                let left = Val::Px(head.x.round());
-                let top = Val::Px((head.y - HEAD_ROOM).round());
-                if node.left != left || node.top != top {
-                    node.left = left;
-                    node.top = top;
-                }
-                Visibility::Inherited
-            }
-            None => Visibility::Hidden,
-        };
-        if *visibility != shown {
-            *visibility = shown;
-        }
-    }
-}
-
-fn sync_plate_icons(world: &mut World) {
-    let content = *world.resource::<Content>();
-    let viewer = world.resource::<Viewpoint>().0;
-    let plates: Vec<(Entity, Entity)> = world
-        .resource::<Plates>()
-        .0
-        .iter()
-        .map(|(&actor, &plate)| (actor, plate))
-        .collect();
-    for (actor, plate) in plates {
-        let Some(row) = world.get::<Children>(plate).and_then(|kids| {
-            kids.iter()
-                .find(|kid| world.get::<PlateIcons>(*kid).is_some())
-        }) else {
-            continue;
-        };
-        let marks = attention::plate_marks(world, viewer, actor);
-        let icons: Vec<Handle<Image>> = {
-            let assets = world.resource::<AssetServer>();
-            marks
-                .iter()
-                .map(|mark| assets.load(mark.get(&content).icon.path()))
-                .collect()
-        };
-        reconcile_children(world, row, &marks, |_, index| {
-            Box::new(plate_icon(icons[index].clone()))
-        });
     }
 }
 
@@ -219,53 +265,14 @@ fn head(at: Pos<Tiles>, hitbox: &Hitbox) -> Pos<Tiles> {
     Pos::new(at.x, at.y + 0.5 - hitbox.size.height)
 }
 
-fn plate_icon(image: Handle<Image>) -> impl Scene {
-    bsn! {
-        Node { width: Val::Px({ICON}), height: Val::Px({ICON}) }
-        ImageNode { image: {image} }
-        Pickable::IGNORE
-    }
+fn role_text(role: &str) -> String {
+    format!("<{role}>")
 }
 
-fn clear_plates(mut plates: ResMut<Plates>, mut commands: Commands) {
-    for (_, plate) in plates.0.drain() {
-        commands.entity(plate).despawn();
-    }
+fn name_font() -> FontId {
+    FontId::new(TEXT_SIZE, family::prose_bold())
 }
 
-fn plate(label: Label) -> impl Scene {
-    let shadow = TextShadow {
-        offset: Vec2::new(1.0, 1.0),
-        color: Color::BLACK,
-    };
-    let name = label.name.map(|name| {
-        bsn! {
-            @{ui::styled_text(name, label.color, typography::LABEL)}
-            shadow
-        }
-    });
-    let role = label.role.map(|role| {
-        bsn! {
-            @{ui::styled_text(format!("<{role}>"), Color::WHITE.with_alpha(0.7), typography::CAPTION)}
-            shadow
-        }
-    });
-    bsn! {
-        WorldOverlay
-        Node {
-            position_type: PositionType::Absolute,
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-        }
-        UiTransform { translation: {Val2::percent(-50.0, -100.0)} }
-        GlobalZIndex({ui::tokens::layer::BACKDROP})
-        Pickable::IGNORE
-        Children [
-            PlateIcons Node { column_gap: Val::Px(2.0) } Pickable::IGNORE
-            --
-            {name}
-            --
-            {role}
-        ]
-    }
+fn role_font() -> FontId {
+    FontId::new(TEXT_SIZE, family::prose())
 }

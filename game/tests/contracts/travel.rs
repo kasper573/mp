@@ -4,14 +4,50 @@ use game::core::tiling::{TilePos, Tiles};
 use game::systems::area::transition::Crossing;
 use game::systems::area::warp::warp;
 use game::systems::dialogue::Conversation;
-use game::systems::movement::{MoveRequest, moving, on_tile, position};
-use game::systems::player::commands_locked;
+use game::systems::movement::{MoveRequest, MoveSeq, Position, moving, on_tile, position};
+use game::systems::player::{
+    ARRIVAL_PATIENCE, AreaDrawn, ClientId, JoinRequest, Players, commands_locked,
+};
 use game::systems::script::Place;
 
-use crate::support::{
+use testkit::{
     Sim, conversation, count, errors, give, heard_the_news, labels, later, leave, locked,
     object_center, pick, place, remember, row, spawn_area, spoken, talk, told, townsperson,
 };
+
+fn joining_player(sim: &mut Sim) -> Entity {
+    sim.connect(1);
+    sim.send(1, JoinRequest);
+    sim.tick();
+    *sim.world()
+        .resource::<Players>()
+        .0
+        .get(&ClientId(1))
+        .expect("joined player")
+}
+
+#[test]
+fn an_arrival_is_released_by_the_client_reporting_its_area_drawn() {
+    let mut sim = Sim::area(spawn_area());
+    let player = joining_player(&mut sim);
+    assert!(commands_locked(sim.world(), player));
+
+    sim.send(1, AreaDrawn);
+    sim.tick();
+    assert!(!commands_locked(sim.world(), player));
+}
+
+#[test]
+fn an_arrival_is_released_by_the_server_once_the_patience_runs_out() {
+    let mut sim = Sim::area(spawn_area());
+    let player = joining_player(&mut sim);
+
+    sim.run_until(ARRIVAL_PATIENCE.0 - 1.0, |_| false);
+    assert!(commands_locked(sim.world(), player));
+
+    sim.run_until(2.0, |_| false);
+    assert!(!commands_locked(sim.world(), player));
+}
 
 #[test]
 fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
@@ -21,7 +57,13 @@ fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
     let away = sim.walkable_near(start, Tiles(4.0), Tiles(6.0));
     let there = sim.walkable_near(start, Tiles(2.0), Tiles(3.0));
 
-    sim.send(1, MoveRequest { pos: away });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: away,
+            seq: MoveSeq(1),
+        },
+    );
     assert!(
         sim.run_until(5.0, |world| !on_tile(world, player)),
         "you never set off"
@@ -34,6 +76,35 @@ fn a_warp_taken_mid_stride_leaves_you_standing_where_it_put_you() {
     later(&mut sim, 2.0);
     assert_eq!(position(sim.world(), player), Some(there));
     assert!(!moving(sim.world(), player));
+}
+
+#[test]
+fn a_warp_counts_as_a_jump_where_a_walk_does_not() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    let start = position(sim.world(), player).expect("placed");
+    let away = sim.walkable_near(start, Tiles(2.0), Tiles(3.0));
+    let jumps = |sim: &mut Sim| sim.world().get::<Position>(player).expect("placed").jumps;
+    let before = jumps(&mut sim);
+
+    sim.send(
+        1,
+        MoveRequest {
+            pos: away,
+            seq: MoveSeq(1),
+        },
+    );
+    assert!(
+        sim.run_until(5.0, |world| position(world, player) == Some(away)),
+        "you never got there"
+    );
+    assert_eq!(jumps(&mut sim), before, "the walk counted as a jump");
+    let back = Place {
+        area: spawn_area(),
+        at: start,
+    };
+    warp(sim.world(), player, back).expect("a warp within the area");
+    assert_ne!(jumps(&mut sim), before, "the warp went uncounted");
 }
 
 #[test]
@@ -73,7 +144,13 @@ fn ilsa_halts_you_each_time_you_step_back_onto_the_road() {
     leave(&mut sim, 1, player);
 
     let off = Pos::new(road.x - 2.0, road.y);
-    sim.send(1, MoveRequest { pos: off });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: off,
+            seq: MoveSeq(1),
+        },
+    );
     assert!(arrived(&mut sim, player, off));
     head_for_the_forest_road(&mut sim, 1);
     assert!(halted(&mut sim, player), "Ilsa let you try twice");
@@ -86,7 +163,13 @@ fn walking_past_the_forest_road_is_no_business_of_ilsas() {
     let road = object_center(&mut sim, "forest-road");
     let past = Pos::new(road.x - 2.0, road.y - 1.0);
 
-    sim.send(1, MoveRequest { pos: past });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: past,
+            seq: MoveSeq(1),
+        },
+    );
     assert!(arrived(&mut sim, player, past));
     assert!(conversation(&mut sim, player).is_none());
 }
@@ -125,7 +208,13 @@ fn crossing_the_forest_road_on_the_way_elsewhere_is_no_business_of_ilsas() {
     let beyond = Pos::new(road.x, road.y - 2.0);
     place(&mut sim, player, before);
 
-    sim.send(1, MoveRequest { pos: beyond });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: beyond,
+            seq: MoveSeq(1),
+        },
+    );
     assert!(arrived(&mut sim, player, beyond), "the road stopped you");
     assert!(sim.world().get::<Crossing>(player).is_none());
     assert!(conversation(&mut sim, player).is_none());
@@ -188,7 +277,13 @@ fn ilsa_has_a_word_only_for_friends_of_the_clan() {
 
 fn head_for_the_forest_road(sim: &mut Sim, client: u32) {
     let road = object_center(sim, "forest-road");
-    sim.send(client, MoveRequest { pos: road });
+    sim.send(
+        client,
+        MoveRequest {
+            pos: road,
+            seq: MoveSeq(1),
+        },
+    );
 }
 
 fn arrived(sim: &mut Sim, player: Entity, at: Pos<Tiles>) -> bool {

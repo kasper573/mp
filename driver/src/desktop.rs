@@ -26,11 +26,12 @@ pub struct Desktop {
     questions: TcpStream,
     answers: BufReader<TcpStream>,
     screen: Screen,
-    speakers: Speakers,
+    _speakers: Speakers,
     recording: Option<Recording>,
     observer: Option<Observer>,
     folder: PathBuf,
     seen: ProbeInputSeen,
+    cursor: Option<Pos<WindowPx>>,
     frame: u32,
     steps: File,
 }
@@ -65,12 +66,13 @@ impl Desktop {
         token: String,
         folder: &Path,
         recorded: bool,
+        size: (u32, u32),
     ) -> Desktop {
         std::fs::create_dir_all(folder).expect("a folder for the desktop");
-        let screen = Screen::open(folder);
+        let screen = Screen::open(folder, size);
         let speakers = Speakers::plug();
-        let recording = recorded
-            .then(|| Recording::start(&screen.display, SCREEN, &speakers.monitor(), folder));
+        let recording =
+            recorded.then(|| Recording::start(&screen.display, size, &speakers.monitor(), folder));
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a probe port");
         let config = ClientConfig {
             game_server_url: server.http_url(),
@@ -78,7 +80,6 @@ impl Desktop {
             access_token: token,
             profile_dir: folder.join("profile"),
             exit_on_stdin_eof: true,
-            vsync: false,
             probe: Some(listener.local_addr().expect("a bound probe port")),
         };
         let log = File::create(folder.join("client.log")).expect("a client log");
@@ -101,16 +102,18 @@ impl Desktop {
             questions,
             answers,
             screen,
-            speakers,
+            _speakers: speakers,
             recording,
             observer: None,
             folder: folder.to_path_buf(),
             seen: ProbeInputSeen::default(),
+            cursor: None,
             frame: 0,
             steps: File::create(folder.join("steps.log")).expect("a steps log"),
         };
-        // Nothing hands out keyboard focus on a screen without a window manager.
+        // Nothing fits windows to the screen or hands out keyboard focus without a window manager.
         let pid = desktop.client.id().to_string();
+        let (width, height) = (size.0.to_string(), size.1.to_string());
         desktop.xdotool(&[
             "search",
             "--sync",
@@ -118,6 +121,14 @@ impl Desktop {
             "--pid",
             &pid,
             ".",
+            "windowmove",
+            "--sync",
+            "0",
+            "0",
+            "windowsize",
+            "--sync",
+            &width,
+            &height,
             "windowfocus",
             "--sync",
         ]);
@@ -135,11 +146,16 @@ impl Desktop {
         }
         let snapshot: ProbeSnapshot = from_json(&line);
         self.seen = snapshot.input.seen;
+        self.cursor = snapshot.input.cursor;
         self.frame = snapshot.frame;
         if let Some(observer) = self.observer.as_mut() {
             observer(&snapshot);
         }
         snapshot
+    }
+
+    pub fn cursor(&self) -> Option<Pos<WindowPx>> {
+        self.cursor
     }
 
     pub fn frame(&self) -> u32 {
@@ -166,13 +182,45 @@ impl Desktop {
         seen
     }
 
+    // Through every point in turn as fast as a flick of the hand, many to a frame, coming to rest on
+    // the last.
+    pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
+        let to = through.last().expect("a point to sweep to").round();
+        let moves: Vec<String> = through
+            .iter()
+            .flat_map(|at| {
+                let at = at.round();
+                [
+                    "mousemove".to_owned(),
+                    at.x.to_string(),
+                    at.y.to_string(),
+                    "sleep".to_owned(),
+                    SWEEP_STEP.to_owned(),
+                ]
+            })
+            .collect();
+        self.xdotool(&moves.iter().map(String::as_str).collect::<Vec<_>>());
+        let seen = self.wait_for("the pointer to come to rest", BUDGET, |snapshot| {
+            let cursor = snapshot.input.cursor?;
+            (cursor.distance_to(to) <= 1.0).then(|| snapshot.clone())
+        });
+        self.note(&seen, &format!("pointer swept to {:?}", (to.x, to.y)));
+        seen
+    }
+
     // Both clicks of a double click go out together: the game counts it by the time between them. Frames
-    // far enough apart can still split them, and then, as a player would, it clicks again.
+    // far enough apart can still split them, and then, as a player would, it clicks again. Each try
+    // waits out the run of clicks before it, which the game would otherwise count it on from.
     pub fn click(&mut self, button: Button, times: u8) -> ProbeSnapshot {
         let deadline = Deadline::from(self, BUDGET);
         loop {
+            if times > 1 {
+                self.wait_for("the click run before to close", BUDGET, |snapshot| {
+                    (!snapshot.input.click_run_open).then_some(())
+                });
+            }
             let landed = self.click_once(button, times);
-            if times == 1 || landed.input.seen.click_run >= times {
+            if times == 1 || landed.input.seen.click_run == times {
                 return landed;
             }
             if deadline.passed(self) {
@@ -358,7 +406,6 @@ impl Drop for Desktop {
             }
             footage.discard();
         }
-        self.speakers.unplug();
     }
 }
 
@@ -386,17 +433,29 @@ impl Deadline {
 // Only a hung client goes this long without a frame: on a machine run into the ground, a frame can
 // take the better part of a minute.
 const STALL: Duration = Duration::from_secs(300);
+// Seconds between the moves of a sweep: a mouse reports a few hundred times a second.
+const SWEEP_STEP: &str = "0.004";
 
 // A virtual X screen of the desktop's own: a rootful Xwayland on a headless Wayland compositor. Unlike
 // on Xvfb, a GPU's driver hands it frames without copying each one through the CPU.
 struct Screen {
     display: String,
-    x: Child,
-    compositor: Child,
+    _x: ScreenServer,
+    _compositor: ScreenServer,
+}
+
+// Ended when dropped, so a screen set up halfway, when the next step fails, leaves nothing running.
+struct ScreenServer(Child);
+
+impl Drop for ScreenServer {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
 }
 
 impl Screen {
-    fn open(folder: &Path) -> Screen {
+    fn open(folder: &Path, size: (u32, u32)) -> Screen {
         let name = format!(
             "rift-playtest-{}-{}",
             std::process::id(),
@@ -404,52 +463,47 @@ impl Screen {
         );
         let ready = SocketAddr::from_abstract_name(&name).expect("a short enough socket name");
         let notices = UnixDatagram::bind_addr(&ready).expect("a socket to hear the compositor on");
-        let mut compositor = Command::new("weston")
-            .args([
-                "--backend=headless",
-                "--renderer=gl",
-                "--shell=kiosk",
-                "--no-config",
-                // Input goes to Xwayland, out of weston's sight: idle, it would blank the screen.
-                "--idle-time=0",
-                "--modules=systemd-notify.so",
-            ])
-            .arg(format!("--width={}", SCREEN.0))
-            .arg(format!("--height={}", SCREEN.1))
-            .arg(format!("--socket={name}"))
-            .arg(format!("--log={}", folder.join("compositor.log").display()))
-            .env("NOTIFY_SOCKET", format!("@{name}"))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("weston runs");
-        await_ready(&notices, &mut compositor, folder);
-        let mut x = Command::new("Xwayland")
-            .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
-            .arg(format!("{}x{}", SCREEN.0, SCREEN.1))
-            .env("WAYLAND_DISPLAY", &name)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("Xwayland runs");
+        let mut compositor = ScreenServer(
+            Command::new("weston")
+                .args([
+                    "--backend=headless",
+                    "--renderer=gl",
+                    "--shell=kiosk",
+                    "--no-config",
+                    // Input goes to Xwayland, out of weston's sight: idle, it would blank the screen.
+                    "--idle-time=0",
+                    "--modules=systemd-notify.so",
+                ])
+                .arg(format!("--width={}", size.0))
+                .arg(format!("--height={}", size.1))
+                .arg(format!("--socket={name}"))
+                .arg(format!("--log={}", folder.join("compositor.log").display()))
+                .env("NOTIFY_SOCKET", format!("@{name}"))
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("weston runs"),
+        );
+        await_ready(&notices, &mut compositor.0, folder);
+        let mut x = ScreenServer(
+            Command::new("Xwayland")
+                .args(["-displayfd", "1", "-nolisten", "tcp", "-geometry"])
+                .arg(format!("{}x{}", size.0, size.1))
+                .env("WAYLAND_DISPLAY", &name)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("Xwayland runs"),
+        );
         let mut number = String::new();
-        let named = BufReader::new(x.stdout.take().expect("a piped stdout"))
+        let named = BufReader::new(x.0.stdout.take().expect("a piped stdout"))
             .read_line(&mut number)
             .expect("Xwayland names its display");
         assert!(named > 0, "Xwayland exited before naming its display");
         Screen {
             display: format!(":{}", number.trim()),
-            x,
-            compositor,
-        }
-    }
-}
-
-impl Drop for Screen {
-    fn drop(&mut self) {
-        for server in [&mut self.x, &mut self.compositor] {
-            let _ = server.kill();
-            let _ = server.wait();
+            _x: x,
+            _compositor: compositor,
         }
     }
 }
@@ -487,8 +541,11 @@ impl Speakers {
     fn monitor(&self) -> String {
         format!("{}.monitor", self.sink)
     }
+}
 
-    fn unplug(&self) {
+// Unplugged when dropped, so a desktop that fails to start leaves no sink behind on the sound server.
+impl Drop for Speakers {
+    fn drop(&mut self) {
         let _ = Command::new("pactl")
             .args(["unload-module", &self.module])
             .status();

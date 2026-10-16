@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
-use game::core::content::{Content, ContentBuilder, ContentScope, with_content};
+use game::core::content::{Content, ContentBuilder, ContentScope, Table, with_content};
 use game::core::math::Pos;
 use game::core::script::compile::compile_owner;
-use game::core::script::{EffectDef, ScriptError};
+use game::core::script::{EffectDef, Expr, ScriptError};
 use game::systems::item::ItemId;
 use game::systems::memory::MemoryId;
 use game::systems::script::{
-    EventKind, OwnerKind, Place, Procedure, Reach, ScriptDef, ScriptModule,
+    EventKind, OwnerKind, Place, Procedure, Reach, RiftScripting, ScriptDef, ScriptModule,
 };
 use game::systems::shop::ShopId;
 use serde_json::{Value, json};
 
-use crate::json::{effect, inline, parse};
-use crate::support::{content, row};
+use crate::json::{effect, inline, inline_with, parse};
+use testkit::{content, row};
 
 const OWNERS: [OwnerKind; 6] = [
     OwnerKind::Object,
@@ -39,7 +39,7 @@ fn every_capability_compiles_for_exactly_the_owners_it_lists() {
                 "on": entry(owner, "do"),
                 "do": value,
             }));
-            let compiled = compile(owner, &[script]);
+            let compiled = compile(owner, &[&script]);
             assert_eq!(
                 compiled.is_ok(),
                 allowed,
@@ -82,7 +82,7 @@ fn may_do_lists_exactly_what_a_script_reaches() {
         "shop": { "type": "open_shop", "shop": "honesty_box" },
     }));
 
-    let procedures = compile(OwnerKind::Npc, &[script]).expect("compiles");
+    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
     let may_do = &procedures[0].may_do;
 
     assert_eq!(may_do.answers, vec![EventKind::Interacted]);
@@ -110,7 +110,7 @@ fn a_loop_without_a_wait_is_refused() {
         "b": { "type": "if", "test": true, "yes": "a" },
     }));
 
-    let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "loop without a wait");
     assert_eq!(error.expected, "a → b → a");
@@ -125,9 +125,33 @@ fn too_many_steps_between_pauses_are_refused() {
         "check": { "type": "if", "test": true },
     }));
 
-    let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+    let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
     assert_eq!(error.rule, "too many steps");
+}
+
+#[test]
+fn a_decision_reaches_as_deciding_a_path_not_completing_a_task() {
+    let script = inline(json!({
+        "on": entry(OwnerKind::Npc, "decide"),
+        "decide": {
+            "type": "decide",
+            "quest": "shamans_plea",
+            "path": "Keep them",
+        },
+    }));
+
+    let procedures = compile(OwnerKind::Npc, &[&script]).expect("compiles");
+    let reaches = &procedures[0].may_do.reaches;
+
+    assert!(
+        reaches.contains(&Reach::Decides(row("ShamansPlea"))),
+        "{reaches:?}"
+    );
+    assert!(
+        !reaches.contains(&Reach::Completes(row("ShamansPlea"))),
+        "{reaches:?}"
+    );
 }
 
 #[test]
@@ -145,7 +169,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
     }));
 
     for script in [effect, query] {
-        let error = compile(OwnerKind::Npc, &[script]).err().expect("refused");
+        let error = compile(OwnerKind::Npc, &[&script]).err().expect("refused");
 
         assert_eq!(error.rule, "unknown task");
         assert_eq!(error.node.as_deref(), Some("a"));
@@ -154,7 +178,7 @@ fn an_effect_or_query_refuses_by_its_own_rule() {
 
 #[test]
 fn a_script_that_runs_itself_is_refused() {
-    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[calling("loops")])
+    let error = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("loops")])
         .err()
         .expect("refused")
         .remove(0)
@@ -166,7 +190,7 @@ fn a_script_that_runs_itself_is_refused() {
 
 #[test]
 fn may_do_names_the_functions_a_script_calls() {
-    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[calling("helper")])
+    let procedures = compile_owner(&functions(), OwnerKind::Npc, "test", &[&calling("helper")])
         .expect("compiles");
 
     let may_do = &procedures[0].may_do;
@@ -185,9 +209,34 @@ fn an_if_always_taken_still_compiles_both_arrows() {
         "no": { "type": "notify", "notification": "forest_intro" },
     }));
 
-    let procedures = compile(OwnerKind::Area, &[script]).expect("compiles");
+    let procedures = compile(OwnerKind::Area, &[&script]).expect("compiles");
 
     assert_eq!(procedures[0].may_do.reaches.len(), 2);
+}
+
+#[test]
+fn every_expression_shape_serializes_back_to_the_json_it_was_read_from() {
+    let shapes = json!([
+        true,
+        3,
+        2.5,
+        "text",
+        { "var": "aggro" },
+        { "type": "local", "local": "target" },
+        { "type": "state", "state": "count" },
+        { "type": "event", "event": "started" },
+        { "type": "all", "of": [true, { "type": "not", "of": false }] },
+        { "type": "any", "of": [false] },
+        { "type": "join", "of": ["a", "b"] },
+        { "type": "round", "of": 2.5 },
+        { "type": "not_equal", "a": { "var": "aggro" }, "b": 4 },
+        { "type": "at_least", "a": { "var": "aggro" }, "b": 4 },
+        { "type": "divide", "a": 9, "b": 3 }
+    ]);
+    for shape in shapes.as_array().expect("a list") {
+        let expr: Expr<RiftScripting> = parse(shape.clone());
+        assert_eq!(serde_json::to_value(&expr).expect("json"), *shape);
+    }
 }
 
 #[test]
@@ -212,7 +261,7 @@ fn a_shared_script_row_reads_back_as_written() {
 
 fn compile(
     owner: OwnerKind,
-    modules: &[&'static ScriptModule],
+    modules: &[&ScriptModule],
 ) -> Result<Vec<Arc<Procedure>>, ScriptError> {
     compile_owner(content(), owner, "test", modules).map_err(|mut errors| errors.remove(0).1)
 }
@@ -295,14 +344,14 @@ fn functions() -> Content {
         }
     }));
     let mut tables = ContentBuilder::default();
-    tables.table::<ScriptDef>(vec![
+    tables.insert_table(Table::new(vec![
         ("helper".to_owned(), helper),
         ("loops".to_owned(), loops),
-    ]);
+    ]));
     tables.build()
 }
 
-fn calling(script: &str) -> &'static ScriptModule {
+fn calling(script: &str) -> ScriptModule {
     let mut scope = ContentScope::new();
     scope.table::<ScriptDef>(FUNCTIONS.map(str::to_owned).to_vec());
     let (parsed, _) = with_content(scope, || {
@@ -314,5 +363,37 @@ fn calling(script: &str) -> &'static ScriptModule {
             }
         }))
     });
-    Box::leak(Box::new(parsed.expect("a module")))
+    parsed.expect("a module")
+}
+
+#[test]
+fn a_trade_field_reads_where_every_entry_reaching_the_node_raises_it() {
+    let script = inline_with(
+        json!({ "price": "integer" }),
+        json!({
+            "on": { "type": "on", "event": "bought", "next": "read" },
+            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+        }),
+    );
+
+    compile(OwnerKind::Shop, &[&script]).expect("compiles");
+}
+
+#[test]
+fn an_event_field_is_refused_where_the_entry_reaching_it_raises_no_fields() {
+    let script = inline_with(
+        json!({ "price": "integer" }),
+        json!({
+            "on": { "type": "on", "event": "started", "next": "read" },
+            "read": { "type": "set", "values": [{ "local": "price", "to": { "type": "event", "event": "count" } }], "next": "check" },
+            "check": { "type": "if", "test": { "type": "more", "a": { "type": "local", "local": "price" }, "b": 0 } },
+        }),
+    );
+
+    let error = compile(OwnerKind::Object, &[&script])
+        .err()
+        .expect("refused");
+
+    assert_eq!(error.rule, "unknown field");
 }

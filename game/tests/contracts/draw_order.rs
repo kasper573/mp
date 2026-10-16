@@ -1,0 +1,82 @@
+use std::cmp::Ordering;
+
+use bevy::prelude::*;
+use game::core::render::{RowDepth, order_rows};
+
+const ROW: f32 = 3.5;
+
+// A component one sprite gains, as an actor does when its state changes, which moves it to another
+// table and so changes the order the renderer meets sprites in.
+#[derive(Component)]
+struct Reshuffled;
+
+#[test]
+fn sprites_sharing_a_row_keep_one_order_as_they_change() {
+    let mut app = rows();
+    let first = app.world_mut().spawn(on_row(ROW)).id();
+    let second = app.world_mut().spawn(on_row(ROW)).id();
+    app.update();
+    let before = drawn_order(&app, first, second);
+    assert_ne!(
+        before,
+        Ordering::Equal,
+        "two sprites on one row drew at one depth"
+    );
+
+    app.world_mut().entity_mut(first).insert(Reshuffled);
+    app.update();
+    assert_eq!(drawn_order(&app, first, second), before);
+}
+
+#[test]
+fn a_deeper_row_draws_in_front() {
+    let mut app = rows();
+    let behind = app.world_mut().spawn(on_row(ROW)).id();
+    let in_front = app.world_mut().spawn(on_row(ROW + 0.25)).id();
+    app.update();
+    assert_eq!(drawn_order(&app, in_front, behind), Ordering::Greater);
+}
+
+#[test]
+fn a_sprite_draws_in_front_of_scenery_on_its_row() {
+    let mut app = rows();
+    let sprite = app.world_mut().spawn(on_row(ROW)).id();
+    app.update();
+    assert!(depth(&app, sprite) > ROW);
+}
+
+#[test]
+fn ordering_again_changes_nothing() {
+    let mut app = rows();
+    let sprites: Vec<Entity> = (0..3)
+        .map(|_| app.world_mut().spawn(on_row(ROW)).id())
+        .collect();
+    app.update();
+    let once: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
+    app.update();
+    let twice: Vec<f32> = sprites.iter().map(|&sprite| depth(&app, sprite)).collect();
+    assert_eq!(once, twice);
+}
+
+fn rows() -> App {
+    let mut app = App::new();
+    app.add_systems(Update, order_rows);
+    app
+}
+
+fn on_row(row: f32) -> (RowDepth, Transform) {
+    (RowDepth(row), Transform::default())
+}
+
+fn depth(app: &App, sprite: Entity) -> f32 {
+    app.world()
+        .get::<Transform>(sprite)
+        .expect("a placed sprite")
+        .translation
+        .z
+}
+
+// Which of the two draws on top: greater is in front.
+fn drawn_order(app: &App, one: Entity, other: Entity) -> Ordering {
+    depth(app, one).total_cmp(&depth(app, other))
+}

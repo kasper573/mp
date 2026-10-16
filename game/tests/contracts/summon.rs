@@ -5,7 +5,7 @@ use game::systems::player::ClientId;
 use game::systems::stat::{self, StatKind};
 use game::systems::visibility::{self, Presence};
 
-use crate::support::{
+use testkit::{
     Sim, content, count, give, health, heard_the_news, later, pick, remember, remembered, row,
     settle, spawn_area, talk, townsperson,
 };

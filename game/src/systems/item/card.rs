@@ -1,21 +1,21 @@
 use bevy::prelude::*;
-use ui::TooltipText;
-use ui::tokens::{palette, spacing, typography};
-use ui::{
-    ChipOptions, Family, InspectableOptions, OnTap, RichPiece, RichSpan, RichText, TextVoice,
-};
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::{TextRole, color, widgets};
+use egui::{Color32, Pos2, Rect, Response, RichText, Ui, Vec2};
 
 use crate::core::content::Content;
-use crate::systems::hud;
-use crate::systems::input::map::{InputAction, input};
+use crate::core::gui::{self, Band, GuiContext};
+use crate::core::text::{self, StyledLine, StyledSpan, TextLook, TextPiece, TextVoice};
+use crate::systems::hud::{self, Sizing, WindowFrame};
+use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session::Viewpoint;
-use crate::systems::screen::{ClientScreen, despawn_all};
+use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
 use crate::systems::stat::Stat;
 
-const WINDOW_ID: &str = "Item";
+const WINDOW_KEY: &str = "Item";
 const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 360.0);
 const WINDOW_TOP: f32 = 96.0;
 const WINDOW_MARGIN: f32 = 72.0;
@@ -26,38 +26,61 @@ pub struct ItemCardPlugin;
 impl Plugin for ItemCardPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ItemCard>()
-            .add_systems(Update, show_card.run_if(in_state(ClientScreen::Area)))
+            .add_systems(Update, bring_to_front.run_if(in_state(ClientScreen::Area)))
             .add_systems(
-                OnExit(ClientScreen::Area),
-                (despawn_all::<ItemCardWindow>, forget),
-            );
+                EguiPrimaryContextPass,
+                draw_card
+                    .in_set(Band::Hud)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
-}
-
-#[derive(Component, Clone)]
-pub struct ItemCardWindow {
-    pub item: ItemId,
 }
 
 pub fn open(world: &mut World, item: ItemId) {
-    world.resource_mut::<ItemCard>().0 = Some(item);
+    let mut card = world.resource_mut::<ItemCard>();
+    let was_shown = card.wanted.replace(item);
+    card.to_front = true;
+    if was_shown.is_none() {
+        InterfaceSound::UiOpen.play(world);
+    }
 }
 
 pub fn close(world: &mut World) -> bool {
-    world.resource_mut::<ItemCard>().0.take().is_some()
+    let closed = world.resource_mut::<ItemCard>().wanted.take().is_some();
+    if closed {
+        InterfaceSound::UiClose.play(world);
+    }
+    closed
 }
 
-pub fn inspectable(content: &Content, item: ItemId) -> InspectableOptions {
-    let def = item.get(content);
-    InspectableOptions {
-        tooltip: TooltipText {
-            title: def.name.to_owned(),
-            lines: vec![vec![RichPiece::text(overview(def))]],
-            hint: Some(inspect_hint()),
-        },
-        input: InputAction::InspectItem.into(),
-        on_inspect: OnTap::new(move |world| open(world, item)),
+pub fn showing(world: &World) -> bool {
+    world.resource::<ItemCard>().wanted.is_some()
+}
+
+pub fn layer() -> egui::LayerId {
+    crate::systems::hud::window_layer(WINDOW_KEY)
+}
+
+pub fn shown(world: &World) -> Option<(ItemId, Rect)> {
+    world.resource::<ItemCard>().drawn
+}
+
+/// `response` must sense clicks.
+pub fn inspect(world: &mut World, response: Response, item: ItemId) -> Response {
+    if map::clicked(world, InputAction::InspectItem, &response) {
+        open(world, item);
     }
+    tooltip(world, &response, item);
+    response
+}
+
+pub fn tooltip(world: &World, response: &Response, item: ItemId) {
+    let content = world.resource::<Content>().clone();
+    let def = item.get(&content);
+    let lines = [overview(def)];
+    let hint = StyledLine::new(inspect_hint());
+    hud::tooltip(response, world, &def.name, &lines, Some(&hint));
 }
 
 pub fn overview(def: &ItemDef) -> String {
@@ -71,10 +94,10 @@ pub fn overview(def: &ItemDef) -> String {
     }
 }
 
-pub fn inspect_hint() -> Vec<RichPiece> {
+pub fn inspect_hint() -> Vec<TextPiece> {
     vec![
         input(InputAction::InspectItem),
-        RichPiece::text(" for more information"),
+        TextPiece::text(" for more information"),
     ]
 }
 
@@ -86,141 +109,124 @@ pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     }
 }
 
-pub fn sheet(world: &World, item: ItemId) -> Box<dyn Scene> {
-    let content = world.resource::<Content>();
-    let assets = world.resource::<AssetServer>();
-    let def = item.get(content);
-    let ink = ui::theme::theme().surface_floating.on;
-    let tags: Vec<Box<dyn Scene>> = tags(def)
-        .into_iter()
-        .map(|(label, color)| {
-            ui::chip(ChipOptions {
-                label: label.to_owned(),
-                icon: None,
-                family: Family::outline(color),
-                inspect: None,
-            })
-        })
-        .collect();
-    let facts: Vec<Box<dyn Scene>> = facts(world, def)
-        .into_iter()
-        .map(|(fact, color)| -> Box<dyn Scene> {
-            Box::new(ui::styled_text(fact, color, typography::BODY))
-        })
-        .collect();
-    let flavor = RichText {
-        pieces: vec![RichPiece::Span(RichSpan {
-            voice: TextVoice::Whisper,
-            ..RichSpan::plain(def.flavor().unwrap_or_default())
-        })],
-        size: typography::BODY.font_size,
-        color: ink,
-    };
-    Box::new(bsn! {
-        Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px({spacing::L}),
-            width: Val::Percent(100.0),
+pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
+    let content = world.resource::<Content>().clone();
+    let def = item.get(&content);
+    ui.spacing_mut().item_spacing.y = 8.0;
+    ui.horizontal(|ui| {
+        hud::icon(ui, world, &def.icon, ICON);
+        ui.vertical(|ui| {
+            ui.label(RichText::new(def.name.as_str()).font(TextRole::Heading.font_id()));
+            ui.label(
+                RichText::new(overview(def))
+                    .size(TextRole::Small.size())
+                    .color(color::MUTED),
+            );
+        });
+    });
+    let tags = tags(def);
+    if !tags.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            for (label, colour) in tags {
+                widgets::pill(ui, label, colour);
+            }
+        });
+    }
+    if let Some(flavor) = def.flavor() {
+        let line = StyledLine::new(vec![
+            StyledSpan::plain(flavor.to_owned())
+                .voice(TextVoice::Whisper)
+                .into(),
+        ]);
+        let look = TextLook {
+            size: TextRole::Prose.size(),
+            color: color::TEXT,
+        };
+        text::show(ui, world, &line, look, None);
+    }
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 3.0;
+        for (fact, colour) in facts(world, def) {
+            ui.label(RichText::new(fact).color(colour));
         }
-        Children [
-            Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center }
-            Children [
-                Node { width: Val::Px({ICON}), height: Val::Px({ICON}), flex_shrink: 0.0 }
-                ImageNode { image: {assets.load(def.icon.path())} }
-                --
-                Node { flex_direction: FlexDirection::Column }
-                Children [
-                    @{ui::styled_text(def.name.as_str(), ink, typography::NAME)}
-                    --
-                    @{ui::styled_text(overview(def), ink.with_alpha(0.6), typography::CAPTION)}
-                ]
-            ]
-            --
-            Node { column_gap: Val::Px({spacing::M}), flex_wrap: FlexWrap::Wrap } Children [ {tags} ]
-            --
-            @{ui::rich_text(flavor, false)}
-            --
-            Node { flex_direction: FlexDirection::Column, row_gap: Val::Px({spacing::S}) } Children [ {facts} ]
-        ]
-    })
+    });
 }
 
 #[derive(Resource, Default)]
-struct ItemCard(Option<ItemId>);
+struct ItemCard {
+    wanted: Option<ItemId>,
+    to_front: bool,
+    drawn: Option<(ItemId, Rect)>,
+}
 
 fn forget(mut card: ResMut<ItemCard>) {
-    card.0 = None;
+    *card = ItemCard::default();
 }
 
-fn show_card(world: &mut World) {
-    let content = *world.resource::<Content>();
-    let wanted = world.resource::<ItemCard>().0;
-    let shown = world
-        .query::<(Entity, &ItemCardWindow)>()
-        .iter(world)
-        .next()
-        .map(|(panel, card)| (panel, card.item));
-    if shown.map(|(_, item)| item) == wanted {
+// A press brings the area it lands on to the front as its pass ends, and areas brought to the front
+// in the same pass keep their order. So the card comes to the front a pass after it was asked for,
+// to end up above the window it was asked for from.
+fn bring_to_front(mut card: ResMut<ItemCard>, gui: Option<Res<GuiContext>>) {
+    if !card.to_front {
         return;
     }
-    if let Some((panel, _)) = shown {
-        world.entity_mut(panel).despawn();
+    card.to_front = false;
+    if let Some(gui) = gui
+        && card.wanted.is_some()
+    {
+        gui.0.move_to_top(layer());
     }
-    let Some(item) = wanted else {
-        InterfaceSound::UiClose.play(world);
+}
+
+fn draw_card(world: &mut World) {
+    let Some(item) = world.resource::<ItemCard>().wanted else {
+        world.resource_mut::<ItemCard>().drawn = None;
         return;
     };
-    let screen = world
-        .query::<&bevy::window::Window>()
-        .single(world)
-        .map_or(WINDOW_SIZE, |window| window.resolution.size());
-    let fallback = Vec2::new(
-        (screen.x - WINDOW_SIZE.x - WINDOW_MARGIN).max(8.0),
-        WINDOW_TOP,
-    );
-    let scene = hud::placed_window(
-        world,
-        WINDOW_ID,
-        (fallback, WINDOW_SIZE),
-        OnTap::new(|world| {
-            close(world);
-        }),
-        hud::single_tab(
-            item.get(&content).name.as_str(),
-            ui::scrolled(Box::new(padded(sheet(world, item)))),
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    let screen = gui.content_rect();
+    let start = Rect::from_min_size(
+        Pos2::new(
+            (screen.right() - WINDOW_SIZE.x - WINDOW_MARGIN).max(8.0),
+            screen.top() + WINDOW_TOP,
         ),
-        0,
+        WINDOW_SIZE,
     );
-    if let Some(panel) = hud::spawn_in_hud(world, scene) {
-        world.entity_mut(panel).insert(ItemCardWindow { item });
-    }
-    if shown.is_none() {
-        InterfaceSound::UiOpen.play(world);
+    let mut open = true;
+    let frame = WindowFrame {
+        key: WINDOW_KEY,
+        title: None,
+        start,
+        sizing: Sizing::FitsContent,
+    };
+    let shown = hud::window(world, &gui, frame, &mut open, |ui, world| {
+        egui::ScrollArea::vertical()
+            .max_height(WINDOW_SIZE.y)
+            .auto_shrink([false, true])
+            .show(ui, |ui| sheet(ui, world, item));
+    });
+    world.resource_mut::<ItemCard>().drawn = Some((item, shown.response.rect));
+    if !open {
+        close(world);
     }
 }
 
-fn padded(sheet: Box<dyn Scene>) -> impl Scene {
-    bsn! {
-        Node { padding: {UiRect::all(Val::Px(spacing::XL))}, width: Val::Percent(100.0) }
-        Children [ @{sheet} ]
-    }
-}
-
-fn tags(def: &ItemDef) -> Vec<(&'static str, Color)> {
+fn tags(def: &ItemDef) -> Vec<(&'static str, Color32)> {
     [
-        (ItemFlag::Quest, "Quest item", palette::AMBER_70),
-        (ItemFlag::Bound, "Bound", palette::CRIMSON_70),
+        (ItemFlag::Quest, "Quest item", color::WARN),
+        (ItemFlag::Bound, "Bound", color::DANGER),
     ]
     .into_iter()
     .filter(|(flag, ..)| def.has(*flag))
-    .map(|(_, label, color)| (label, color))
+    .map(|(_, label, colour)| (label, colour))
     .collect()
 }
 
-fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
+fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
     let content = world.resource::<Content>();
-    let ink = ui::theme::theme().surface_floating.on;
-    let plain = |fact: String| (fact, ink);
+    let plain = |fact: String| (fact, color::TEXT);
     let mut facts = Vec::new();
     match &def.kind {
         ItemKind::Consumable {
@@ -243,15 +249,15 @@ fn facts(world: &World, def: &'static ItemDef) -> Vec<(String, Color)> {
             facts.extend(def.stats().map(|stat| plain(modifier(stat))));
             let viewer = world.resource::<Viewpoint>().0;
             facts.extend(requires.iter().map(|requirement| {
-                let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
+                let colour = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
                 {
-                    Some(true) => palette::EMERALD_80,
-                    Some(false) => palette::CRIMSON_80,
-                    None => ink,
+                    Some(true) => color::OK,
+                    Some(false) => color::DANGER,
+                    None => color::TEXT,
                 };
                 (
                     format!("Requires {}", condition::describe(content, requirement)),
-                    color,
+                    colour,
                 )
             }));
         }

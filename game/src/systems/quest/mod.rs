@@ -19,12 +19,10 @@ use crate::core::content::{
     RowCheck,
 };
 use crate::core::math::{Percent, Rng};
-use crate::core::script::ChoiceReveal;
-use crate::core::script::Name;
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::{self, AreaDef, AreaId};
 use crate::systems::attention::{AttentionId, AttentionMark};
-use crate::systems::dialogue::{self, Revealable};
+use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
 use crate::systems::history::{HistoryTopic, RecordTally};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::item::{
@@ -149,7 +147,7 @@ impl QuestDef {
         })
     }
 
-    pub fn min_level(&'static self) -> u32 {
+    pub fn min_level(&self) -> u32 {
         self.requires()
             .into_iter()
             .flat_map(condition::parts)
@@ -318,7 +316,7 @@ impl QuestDef {
         }
     }
 
-    pub fn meta(&'static self, parties: &Parties, quest: QuestId) -> String {
+    pub fn meta(&self, parties: &Parties, quest: QuestId) -> String {
         format!(
             "{} · Level {} · from {}",
             self.category,
@@ -329,7 +327,7 @@ impl QuestDef {
         )
     }
 
-    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
         if self.time_limit().is_some() {
             return &InterfaceIcon::Timed.get(content).image;
         }
@@ -401,7 +399,7 @@ pub enum Objective {
 }
 
 impl Objective {
-    pub fn icon(&'static self, content: &Content) -> &'static AssetRef {
+    pub fn icon<'a>(&'a self, content: &'a Content) -> &'a AssetRef {
         match self {
             Objective::Hold(stack) => &stack.item.get(content).icon,
             Objective::Defeat { .. } => &InterfaceIcon::ObjectiveDefeat.get(content).image,
@@ -459,26 +457,19 @@ pub struct Party {
 impl Parties {
     pub fn of(content: &Content, scripts: &RiftScripts) -> Parties {
         let mut parties: HashMap<QuestId, QuestParties> = HashMap::new();
-        for (owner, _) in scripts.owners() {
-            let Some(party) = party_name(content, *owner) else {
+        for (owner, role) in quest_roles(scripts) {
+            let Some(party) = party_name(content, owner) else {
                 continue;
             };
-            for reach in scripts.may_do(*owner).reaches {
-                match reach {
-                    Reach::Offers(quest) | Reach::Accepts(quest) => {
-                        let parties = parties.entry(quest).or_default();
-                        if !parties.givers.contains(&party) {
-                            parties.givers.push(party.clone());
-                        }
-                    }
-                    Reach::TurnsIn(quest) => {
-                        let parties = parties.entry(quest).or_default();
-                        if !parties.turn_ins.contains(&party) {
-                            parties.turn_ins.push(party.clone());
-                        }
-                    }
-                    _ => {}
+            let parties = parties.entry(role.quest()).or_default();
+            match role {
+                QuestRole::Gives(_) if !parties.givers.contains(&party) => {
+                    parties.givers.push(party);
                 }
+                QuestRole::TurnsIn(_) if !parties.turn_ins.contains(&party) => {
+                    parties.turn_ins.push(party);
+                }
+                _ => {}
             }
         }
         Parties(Arc::new(parties))
@@ -495,6 +486,35 @@ impl Parties {
     pub fn turn_in(&self, quest: QuestId) -> Option<&Party> {
         self.get(quest).and_then(|parties| parties.turn_ins.first())
     }
+}
+
+enum QuestRole {
+    Gives(QuestId),
+    TurnsIn(QuestId),
+}
+
+impl QuestRole {
+    fn quest(&self) -> QuestId {
+        match *self {
+            QuestRole::Gives(quest) | QuestRole::TurnsIn(quest) => quest,
+        }
+    }
+}
+
+fn quest_roles(scripts: &RiftScripts) -> Vec<(OwnerRow, QuestRole)> {
+    let mut roles = Vec::new();
+    for (owner, _) in scripts.owners() {
+        for reach in scripts.may_do(*owner).reaches {
+            match reach {
+                Reach::Offers(quest) | Reach::Accepts(quest) => {
+                    roles.push((*owner, QuestRole::Gives(quest)));
+                }
+                Reach::TurnsIn(quest) => roles.push((*owner, QuestRole::TurnsIn(quest))),
+                _ => {}
+            }
+        }
+    }
+    roles
 }
 
 fn party_name(content: &Content, owner: OwnerRow) -> Option<Party> {
@@ -542,6 +562,7 @@ pub struct QuestLog {
     pub active: Vec<ActiveQuest>,
     pub finished: Vec<FinishedQuest>,
     pub tracked: Vec<QuestId>,
+    pub told_ready: Vec<QuestId>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -549,8 +570,6 @@ pub struct ActiveQuest {
     pub quest: QuestId,
     pub counts: Vec<u32>,
     pub deadline: Option<UnixMillis>,
-    pub left: Option<Seconds>,
-    pub ready: bool,
     pub dry_kills: u32,
     pub decided: Option<String>,
 }
@@ -560,7 +579,7 @@ pub struct FinishedQuest {
     pub quest: QuestId,
     pub result: QuestResult,
     pub day: GameDay,
-    pub resets_in: Option<Seconds>,
+    pub resets_at: Option<UnixMillis>,
     pub offered_again: bool,
 }
 
@@ -577,13 +596,27 @@ pub enum QuestRequest {
 }
 
 impl ActiveQuest {
+    pub fn left(&self, now: UnixMillis) -> Option<Seconds> {
+        self.deadline
+            .map(|deadline| Seconds(deadline.since(now).0.ceil()))
+    }
+
+    pub fn ready(
+        &self,
+        content: &Content,
+        parties: &Parties,
+        inventory: Option<&Inventory>,
+    ) -> bool {
+        self.quest
+            .get(content)
+            .complete(content, parties, self, inventory)
+    }
+
     pub fn fresh(content: &Content, quest: QuestId) -> ActiveQuest {
         ActiveQuest {
             quest,
             counts: vec![0; quest.get(content).objectives().count()],
             deadline: None,
-            left: None,
-            ready: false,
             dry_kills: 0,
             decided: None,
         }
@@ -618,10 +651,14 @@ impl QuestLog {
         })
     }
 
-    fn finish(&mut self, quest: QuestId, result: QuestResult, day: GameDay) {
+    fn finish(&mut self, quest: QuestId, result: QuestResult, clock: WallClock) {
         self.active.retain(|active| active.quest != quest);
+        self.told_ready.retain(|told| *told != quest);
         self.finished.retain(|finished| finished.quest != quest);
-        self.finished.push(FinishedQuest::new(quest, result, day));
+        let mut finished = FinishedQuest::new(quest, result, clock.day());
+        finished.resets_at =
+            (result == QuestResult::Completed).then(|| clock.now.after(clock.until_next_day()));
+        self.finished.push(finished);
     }
 }
 
@@ -631,9 +668,15 @@ impl FinishedQuest {
             quest,
             result,
             day,
-            resets_in: None,
+            resets_at: None,
             offered_again: false,
         }
+    }
+
+    pub fn resets_in(&self, now: UnixMillis) -> Option<Seconds> {
+        self.resets_at
+            .filter(|at| now < *at)
+            .map(|at| Seconds((at.since(now).0 / 60.0).ceil() * 60.0))
     }
 }
 
@@ -659,18 +702,14 @@ pub fn ready_to_hand_in(world: &World, player: Entity, quest: QuestId) -> bool {
     let parties = world.resource::<Parties>();
     log_of(world, player)
         .and_then(|log| log.active(quest))
-        .is_some_and(|active| {
-            quest
-                .get(content)
-                .complete(content, parties, active, world.get::<Inventory>(player))
-        })
+        .is_some_and(|active| active.ready(content, parties, world.get::<Inventory>(player)))
 }
 
 pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), String> {
     if let Some(refusal) = accept_refusal(world, player, quest) {
         return Err(refusal);
     }
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
     let mut inventory = world
@@ -686,7 +725,6 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         .retain(|finished| finished.quest != quest || finished.result == QuestResult::Completed);
     log.active.push(ActiveQuest {
         deadline: def.time_limit().map(|limit| clock.now.after(limit)),
-        left: def.time_limit(),
         ..ActiveQuest::fresh(&content, quest)
     });
     if !log.tracked.contains(&quest) {
@@ -700,8 +738,12 @@ pub fn accept(world: &mut World, player: Entity, quest: QuestId) -> Result<(), S
         Some(InterfaceSound::QuestAccepted.id(&content)),
     );
     raise(world, quest, EventKind::Accepted, player);
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
     Ok(())
+}
+
+pub fn not_ready(content: &Content, quest: QuestId) -> String {
+    format!("{} isn't ready to hand in", quest.get(content).title)
 }
 
 pub fn turn_in(
@@ -710,10 +752,10 @@ pub fn turn_in(
     quest: QuestId,
     pick: Option<ItemStack>,
 ) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
     if !ready_to_hand_in(world, player, quest) {
-        return Err(format!("{} isn't ready to hand in", def.title));
+        return Err(not_ready(&content, quest));
     }
     let gives: Vec<ItemStack> = def.rewards().iter().copied().chain(pick).collect();
     let mut inventory = world
@@ -727,7 +769,7 @@ pub fn turn_in(
 }
 
 pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let def = quest.get(&content);
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
@@ -736,7 +778,7 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
     if log.active(quest).is_none() {
         return;
     }
-    log.finish(quest, QuestResult::Completed, clock.day());
+    log.finish(quest, QuestResult::Completed, clock);
     if !def.daily() {
         log.tracked.retain(|&tracked| tracked != quest);
     }
@@ -754,11 +796,11 @@ pub fn complete(world: &mut World, player: Entity, quest: QuestId) {
         ),
     );
     raise(world, quest, EventKind::Completed, player);
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
 }
 
 pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
@@ -766,7 +808,7 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
     if log.active(quest).is_none() {
         return;
     }
-    log.finish(quest, QuestResult::Failed, clock.day());
+    log.finish(quest, QuestResult::Failed, clock);
     take_back(world, player, quest.get(&content).grants());
     let failed = Notification::new(
         NotificationKind::Feed {
@@ -783,7 +825,7 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
 }
 
 pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -804,7 +846,7 @@ pub fn abandon(world: &mut World, player: Entity, quest: QuestId) {
 }
 
 pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: usize) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let clock = *world.resource::<WallClock>();
     let done = world.get_mut::<QuestLog>(player).is_some_and(|mut log| {
         log.active
@@ -834,10 +876,10 @@ pub fn complete_task(world: &mut World, player: Entity, quest: QuestId, index: u
             Some(InterfaceSound::TallyTick.id(&content)),
         );
     }
-    refresh_log(world, player, clock);
+    announce(world, player, clock);
 }
 
-pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: Name) {
+pub fn decide(world: &mut World, player: Entity, quest: QuestId, path: &str) {
     if let Some(mut log) = world.get_mut::<QuestLog>(player)
         && let Some(active) = log.active.iter_mut().find(|active| active.quest == quest)
     {
@@ -895,13 +937,13 @@ pub fn refresh(world: &mut World, logs: &mut QueryState<Entity, With<QuestLog>>)
     let clock = *world.resource::<WallClock>();
     let players: Vec<Entity> = logs.iter(world).collect();
     for player in players {
-        refresh_log(world, player, clock);
+        announce(world, player, clock);
     }
 }
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, quest) in loading.rows::<QuestDef>() {
+    for (id, quest) in loading.rows::<QuestDef>(&content) {
         let key = id.key(&content);
         let mut check = RowCheck::default();
         let item_rows = |stacks: &[ItemStack]| -> Vec<ItemId> {
@@ -1006,20 +1048,13 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
     let content = loading.content();
     let mut offered = HashSet::new();
     let mut turned_in = HashSet::new();
-    for (owner, _) in scripts.owners() {
-        for reach in scripts.may_do(*owner).reaches {
-            match reach {
-                Reach::Offers(quest) | Reach::Accepts(quest) => {
-                    offered.insert(quest);
-                }
-                Reach::TurnsIn(quest) => {
-                    turned_in.insert(quest);
-                }
-                _ => {}
-            }
-        }
+    for (_, role) in quest_roles(scripts) {
+        match role {
+            QuestRole::Gives(quest) => offered.insert(quest),
+            QuestRole::TurnsIn(quest) => turned_in.insert(quest),
+        };
     }
-    for (id, _) in loading.rows::<QuestDef>() {
+    for (id, _) in loading.rows::<QuestDef>(&content) {
         let key = id.key(&content);
         let found = parties.get(id);
         let givers = found.is_some_and(|found| !found.givers.is_empty());
@@ -1070,7 +1105,7 @@ pub fn check_parties(loading: &mut Loading, scripts: &RiftScripts, parties: &Par
 }
 
 fn track(world: &mut World, player: Entity, quest: QuestId, tracked: bool) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(mut log) = world.get_mut::<QuestLog>(player) else {
         return;
     };
@@ -1128,8 +1163,11 @@ fn take_back(world: &mut World, player: Entity, grants: &[ItemStack]) {
     }
 }
 
-fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
-    let content = *world.resource::<Content>();
+/// Time-driven and news-bearing changes to a player's quests: expiries, and the moment a quest
+/// becomes ready or a daily quest is open again. What the log shows is read from the state
+/// itself, so this only runs where something may have changed.
+fn announce(world: &mut World, player: Entity, clock: WallClock) {
+    let content = world.resource::<Content>().clone();
     let parties = world.resource::<Parties>().clone();
     let Some(log) = log_of(world, player) else {
         return;
@@ -1155,37 +1193,34 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
         return;
     };
     let mut told: Vec<(String, &AssetRef, Option<SfxId>)> = Vec::new();
-    for active in &mut log.active {
-        let def = active.quest.get(&content);
-        active.left = active
-            .deadline
-            .map(|deadline| Seconds(deadline.since(clock.now).0.ceil()));
-        let ready = def.complete(&content, &parties, active, inventory.as_ref());
-        if ready && !active.ready {
+    let ready: Vec<QuestId> = log
+        .active
+        .iter()
+        .filter(|active| active.ready(&content, &parties, inventory.as_ref()))
+        .map(|active| active.quest)
+        .collect();
+    for &quest in &ready {
+        if !log.told_ready.contains(&quest) {
+            log.told_ready.push(quest);
+            let def = quest.get(&content);
             told.push((
-                format!("Quest ready · {}", def.hand_in_hint(&parties, active.quest)),
+                format!("Quest ready · {}", def.hand_in_hint(&parties, quest)),
                 &ready_mark(def).get(&content).icon,
                 Some(InterfaceSound::UiChime.id(&content)),
             ));
         }
-        active.ready = ready;
     }
-    let today = clock.day();
+    log.told_ready.retain(|quest| ready.contains(quest));
     for finished in &mut log.finished {
         let def = finished.quest.get(&content);
-        let resets =
-            def.daily() && finished.result == QuestResult::Completed && finished.day == today;
-        if finished.resets_in.is_some() && !resets {
+        if finished.resets_at.is_some_and(|at| clock.now >= at) {
+            finished.resets_at = None;
             told.push((
                 format!("{} is open again", def.title),
                 &AttentionMark::RepeatableOffered.get(&content).icon,
                 Some(InterfaceSound::UiPage.id(&content)),
             ));
         }
-        finished.resets_in = resets.then(|| {
-            let minutes = (clock.until_next_day().0 / 60.0).ceil();
-            Seconds(minutes * 60.0)
-        });
         finished.offered_again =
             finished.result == QuestResult::Failed && shown_to(world, player, finished.quest);
     }
@@ -1205,7 +1240,7 @@ fn refresh_log(world: &mut World, player: Entity, clock: WallClock) {
 }
 
 fn credit_kill(world: &mut World, kill: KillCredited) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let parties = world.resource::<Parties>().clone();
     let player = kill.credited;
     let Some(mut log) = log_of(world, player).cloned() else {
@@ -1261,6 +1296,8 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
         }
     });
     world.entity_mut(player).insert(log);
+    let clock = *world.resource::<WallClock>();
+    announce(world, player, clock);
     for notification in counted {
         notification::notify(world, player, notification);
     }
@@ -1347,7 +1384,9 @@ fn marks(
         for check in &checks {
             let def = check.quest.get(content);
             let kind = match log.active(check.quest) {
-                Some(active) if check.takes && active.ready => ready_mark(def),
+                Some(_) if check.takes && ready_to_hand_in(world, player, check.quest) => {
+                    ready_mark(def)
+                }
                 Some(_) if check.takes => AttentionMark::QuestInProgress,
                 Some(_) => continue,
                 None if check.gives

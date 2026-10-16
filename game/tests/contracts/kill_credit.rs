@@ -1,13 +1,13 @@
 use bevy_ecs::message::MessageCursor;
 use bevy_ecs::prelude::*;
 use game::core::time::Seconds;
-use game::systems::combat::Died;
+use game::systems::combat::{self, Died};
 use game::systems::item;
 use game::systems::movement::position;
 use game::systems::npc::{self, Pack};
 use game::systems::rewards::KillCredited;
 
-use crate::support::{Sim, row, spawn_area};
+use testkit::{Sim, row, spawn_area};
 
 #[test]
 fn a_reserved_kill_credits_the_reserving_player_once() {
@@ -34,7 +34,7 @@ fn an_unreserved_kill_credits_nobody() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
     let victim = orc(&mut sim, player);
-    kill(&mut sim, victim, player);
+    combat::inflict(sim.world(), victim, None, 1_000_000.0);
 
     assert!(credits(&mut sim, 3).is_empty());
 }
@@ -62,10 +62,7 @@ fn orc(sim: &mut Sim, near: Entity) -> Entity {
 }
 
 fn kill(sim: &mut Sim, victim: Entity, killer: Entity) {
-    sim.world().write_message(Died {
-        entity: victim,
-        killer: Some(killer),
-    });
+    combat::inflict(sim.world(), victim, Some(killer), 1_000_000.0);
 }
 
 fn credits(sim: &mut Sim, ticks: usize) -> Vec<KillCredited> {

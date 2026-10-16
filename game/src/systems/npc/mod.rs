@@ -20,7 +20,7 @@ use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
-use crate::systems::combat::{Attitude, Died};
+use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;
 use crate::systems::effect::{self, Effect, TimedEffects};
 use crate::systems::interact::Interactive;
@@ -28,12 +28,12 @@ use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
 use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
-use crate::systems::script::query::ActorRoster;
+use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
 };
-use crate::systems::stat::{self, StatKind, StatMap, Stats};
+use crate::systems::stat::{StatMap, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
@@ -81,11 +81,6 @@ pub struct Home(pub Pos<Tiles>);
 
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct Roams(pub Rect<Tiles>);
-
-#[derive(Component, Clone, Debug, PartialEq)]
-pub struct DeadAt {
-    pub at: Seconds,
-}
 
 #[derive(Component, Default)]
 pub struct Near(Vec<Entity>);
@@ -166,8 +161,11 @@ pub struct Loot {
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
 pub struct LootItem {
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub amount: u32,
+    #[schemars(extend("x-blank" = "always"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chance: Option<Percent>,
 }
@@ -222,7 +220,7 @@ pub fn next_pack(world: &mut World) -> Pack {
 }
 
 pub fn spawn_all(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let area_id = world.resource::<WorldArea>().0;
     for module in area::modules(&content, area_id) {
         match module {
@@ -278,7 +276,7 @@ fn spawn_wild(
 }
 
 pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let entity = world.spawn(character(&content, def, at, area)).id();
     world
         .entity_mut(entity)
@@ -287,7 +285,7 @@ pub fn spawn_actor(world: &mut World, def: &NpcDef, at: Pos<Tiles>, area: AreaId
 }
 
 pub fn spawn(world: &mut World, def: NpcId, at: Pos<Tiles>, area: AreaId, pack: Pack) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let entity = spawn_actor(world, def.get(&content), at, area);
     world.entity_mut(entity).insert((
         Npc { def },
@@ -366,7 +364,7 @@ struct Watcher {
 }
 
 pub fn approach(world: &mut World) {
-    let Some(roster) = world.get_resource::<ActorRoster>() else {
+    let Some(roster) = world.get_resource::<TickRoster>() else {
         return;
     };
     let instances = world.resource::<RiftInstances>();
@@ -454,13 +452,13 @@ pub fn approach(world: &mut World) {
 fn character(content: &Content, def: &NpcDef, at: Pos<Tiles>, area: AreaId) -> Character {
     Character {
         replicated: Replicated,
-        position: Position { pos: at },
+        position: Position::at(at),
         actor: Actor {
             color: def.tint(),
             dir: Direction::S,
             action: Action::Idle,
             model: def.model,
-            attack_rate: PlaybackRate(def.stats.get(StatKind::AttackSpeed)),
+            attack_rate: PlaybackRate::default(),
         },
         hitbox: Hitbox {
             size: ActorModel::get(content, def.model).hitbox(),
@@ -505,25 +503,17 @@ fn start_scripts(world: &mut World, entity: Entity, def: NpcId) {
 type NpcIds = QueryState<Entity, With<Npc>>;
 
 pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let time = Seconds(world.resource::<Time>().elapsed_secs());
     let ids: Vec<Entity> = npcs.iter(world).collect();
     world.resource_scope(|world, mut rng: Mut<Rng>| {
         for id in ids {
-            if !stat::is_dead(world, id) {
-                world.entity_mut(id).remove::<DeadAt>();
+            let Some(since) = world.get::<Dead>(id).map(|dead| dead.at) else {
                 continue;
-            }
-            let since = match world.get::<DeadAt>(id) {
-                Some(dead) => dead.at,
-                None => {
-                    world.entity_mut(id).insert(DeadAt { at: time });
-                    world
-                        .resource_mut::<RiftInstances>()
-                        .remove_owner(Owner::Entity(OwnerKind::Npc, id));
-                    time
-                }
             };
+            world
+                .resource_mut::<RiftInstances>()
+                .remove_owner(Owner::Entity(OwnerKind::Npc, id));
             let Some(npc) = world.get::<Npc>(id).map(|npc| npc.def) else {
                 continue;
             };
@@ -547,15 +537,12 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 (None, None) => grid.random_node(&mut rng),
             }
             .unwrap_or_else(|| region.fallback_spawn());
-            reach::forget(world, id);
-            crate::systems::movement::relocate(world, id, at);
+            crate::systems::combat::revive(world, id, at);
             world
                 .entity_mut(id)
                 .insert((Attitude::Friendly, body::Body::default(), Near::default()))
-                .remove::<DeadAt>()
                 .remove::<Reservation>()
                 .remove::<TimedEffects>();
-            stat::refill(world, id);
             start_scripts(world, id, npc);
         }
     });

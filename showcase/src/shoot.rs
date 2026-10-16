@@ -105,11 +105,8 @@ impl Star {
 
     // Lets the viewer finish reading the caption that's up, while what it describes stays on screen.
     pub fn hold(&mut self) {
-        let (until, watching) = {
-            let film = self.film.borrow();
-            (film.read_until(), film.mixing())
-        };
-        self.player.linger_until(until, watching);
+        let until = self.film.borrow().read_until();
+        self.player.linger_until(until);
     }
 
     // A recording can't show which channel a track plays on, or how loud, so this panel does.

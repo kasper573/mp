@@ -1,7 +1,7 @@
 use game::core::math::Rng;
 use game::core::time::{Backoff, Seconds};
 
-use crate::support::drawn_seed;
+use testkit::drawn_seed;
 
 const BACKOFF: Backoff = Backoff {
     first: Seconds(1.0),

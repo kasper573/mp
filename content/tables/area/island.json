@@ -535,7 +535,8 @@
         {
           "channel": 1,
           "file": "audio/music/harbour.flac",
-          "volume": 0.25
+          "volume": 0.25,
+          "category": "music"
         },
         {
           "channel": 2,
@@ -558,7 +559,8 @@
         {
           "channel": 1,
           "file": "audio/music/lagoon.flac",
-          "volume": 0.24
+          "volume": 0.24,
+          "category": "music"
         },
         {
           "channel": 2,

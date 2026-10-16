@@ -1,17 +1,16 @@
 use bevy::prelude::*;
+use design_tokens::{TextRole, color, family, ink, widgets};
+use egui::{Color32, Id, Rect, RichText, Ui, Vec2};
 use strum::{IntoStaticStr, VariantArray};
-use ui::tokens::{palette, spacing, typography};
-use ui::{RichSpan, RichText};
 
 use super::{
     HistoryEntry, HistoryMark, HistoryNews, HistoryRecord, HistoryTopic, KEPT, RecordTally, signed,
 };
-use crate::core::audio::playback::{PlaySfx, SfxPlace};
-use crate::core::content::{Content, Fixture};
 use crate::core::platform::ClientPlatform;
+use crate::core::text::{self, StyledLine, StyledSpan, TextLook};
 use crate::core::time::LocalClock;
 use crate::systems::actor::Name;
-use crate::systems::hud::{self, HudAudience, Window, reconcile_children};
+use crate::systems::hud::{self, HudAudience, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
@@ -23,6 +22,7 @@ const SIZE: Vec2 = Vec2::new(780.0, 460.0);
 const TIME_WIDTH: f32 = 72.0;
 const ICON: f32 = 16.0;
 const TALK_INDENT: f32 = 12.0;
+const PADDING: i8 = 8;
 
 pub struct HistoryPlugin;
 
@@ -30,8 +30,7 @@ impl Plugin for HistoryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HistoryBook>()
             .add_systems(Update, receive_news)
-            .add_systems(OnExit(ClientScreen::Area), forget)
-            .add_observer(remember_tab);
+            .add_systems(OnExit(ClientScreen::Area), forget);
     }
 }
 
@@ -62,17 +61,12 @@ impl HistoryTab {
         };
         entry.topic == topic || entry.mark == Some(HistoryMark::Arrived)
     }
-
-    fn index(self) -> usize {
-        self as usize
-    }
 }
 
 #[derive(Resource, Default)]
 pub struct HistoryBook {
     subject: Option<ClientId>,
     records: Vec<HistoryRecord>,
-    version: u64,
     tab: HistoryTab,
 }
 
@@ -94,17 +88,13 @@ impl HistoryBook {
     }
 }
 
-pub fn close(world: &mut World) -> bool {
-    hud::close_window(world, HistoryWindow.title())
-}
-
 pub fn shown_tab(world: &World) -> Option<HistoryTab> {
     hud::window_open(world, HistoryWindow.title()).then(|| world.resource::<HistoryBook>().tab)
 }
 
 pub struct HistoryWindow;
 
-impl Window for HistoryWindow {
+impl HudWindow for HistoryWindow {
     fn audience(&self) -> HudAudience {
         HudAudience::Everyone
     }
@@ -120,31 +110,63 @@ impl Window for HistoryWindow {
     fn size(&self) -> Vec2 {
         SIZE
     }
-    fn contents(&self, _: &World) -> Vec<ui::WindowContent> {
-        HistoryTab::VARIANTS
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let tabs: Vec<(HistoryTab, String)> = HistoryTab::VARIANTS
             .iter()
-            .map(|&tab| ui::WindowContent {
-                title: tab.title().into(),
-                scene: Box::new(body(tab)),
-            })
-            .collect()
-    }
-    fn tab(&self, world: &World) -> usize {
-        world.resource::<HistoryBook>().tab.index()
-    }
-    fn sync(&self, world: &mut World) {
-        sync_bodies(world);
+            .map(|&tab| (tab, tab.title().to_owned()))
+            .collect();
+        let before = world.resource::<HistoryBook>().tab;
+        let mut tab = before;
+        widgets::tab_strip(ui, &tabs, &mut tab);
+        if tab != before {
+            world.resource_mut::<HistoryBook>().tab = tab;
+            InterfaceSound::UiPage.play(world);
+        }
+        let rows = rows(world, tab, watched_name(world));
+        let clock = world.resource::<ClientPlatform>().0.local_clock();
+        egui::ScrollArea::vertical()
+            .id_salt(("history", tab.title()))
+            .stick_to_bottom(true)
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                egui::Frame::new()
+                    .inner_margin(egui::Margin::symmetric(0, PADDING))
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 3.0;
+                        for (index, row) in rows.iter().enumerate() {
+                            let id = ui.id().with(index);
+                            lazily(ui, id, row, |ui| show_row(ui, world, row, clock));
+                        }
+                    });
+            });
     }
 }
 
-#[derive(Component, Clone, Default)]
-struct HistoryBody {
-    tab: HistoryTab,
-    built: Option<u64>,
+pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: bool, ink: Color32) {
+    match tally {
+        Some(RecordTally::Change(change)) => {
+            let colour = match (change > 0, icon) {
+                (true, true) => color::OK,
+                (true, false) => color::WARN,
+                (false, _) => ink.gamma_multiply(0.6),
+            };
+            prefix(text, format!("{} ", signed(change)), colour);
+        }
+        Some(RecordTally::Progress { have, need }) => {
+            text.pieces
+                .push(StyledSpan::plain(format!(" {have}/{need}")).into());
+        }
+        None => {}
+    }
 }
 
-#[derive(Component, Default, Clone)]
-struct HistoryList;
+#[derive(Clone, PartialEq)]
+enum Row {
+    Watching { name: String, count: usize },
+    Trimmed,
+    Empty(HistoryTab),
+    Record(HistoryRecord),
+}
 
 fn receive_news(mut news: MessageReader<HistoryNews>, mut book: ResMut<HistoryBook>) {
     for news in news.read() {
@@ -160,7 +182,6 @@ fn receive_news(mut news: MessageReader<HistoryNews>, mut book: ResMut<HistoryBo
                 book.upsert(record);
             }
         }
-        book.version += 1;
     }
 }
 
@@ -172,101 +193,34 @@ fn forget(mut book: ResMut<HistoryBook>) {
     };
 }
 
-fn remember_tab(
-    changed: On<ui::WindowTabChanged>,
-    bodies: Query<Entity, With<HistoryBody>>,
-    parents: Query<&ChildOf>,
-    mut book: ResMut<HistoryBook>,
-    mut sounds: MessageWriter<PlaySfx>,
-    content: Res<Content>,
-) {
-    let ours = bodies
-        .iter()
-        .any(|body| parents.iter_ancestors(body).any(|up| up == changed.window));
-    let Some(&tab) = HistoryTab::VARIANTS.get(changed.tab) else {
-        return;
+// A history holds hundreds of rows, so only those in sight are laid out; the rest keep the height
+// they had when last drawn, for as long as they and the width they wrap to stay the same.
+#[derive(Clone)]
+struct Measured {
+    row: Row,
+    width: f32,
+    height: f32,
+}
+
+fn lazily(ui: &mut Ui, id: Id, row: &Row, add: impl FnOnce(&mut Ui)) {
+    let width = ui.available_width();
+    let known = ui
+        .data(|data| data.get_temp::<Measured>(id))
+        .filter(|measured| measured.row == *row && measured.width == width);
+    if let Some(measured) = known {
+        let rect = Rect::from_min_size(ui.cursor().min, Vec2::new(width, measured.height));
+        if !ui.is_rect_visible(rect) {
+            ui.allocate_space(rect.size());
+            return;
+        }
+    }
+    let height = ui.scope(add).response.rect.height();
+    let measured = Measured {
+        row: row.clone(),
+        width,
+        height,
     };
-    if ours && book.tab != tab {
-        book.tab = tab;
-        sounds.write(PlaySfx {
-            id: InterfaceSound::UiPage.id(&content),
-            place: SfxPlace::Interface,
-        });
-    }
-}
-
-fn body(tab: HistoryTab) -> impl Scene {
-    bsn! {
-        HistoryBody { tab: {tab}, built: None }
-        Node { width: Val::Percent(100.0), height: Val::Percent(100.0) }
-        Children [
-            @{ui::scroll_area()}
-            Children [
-              @{ui::scroll_viewport()}
-              ui::PinToBottom
-              Children [
-                HistoryList
-                Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px({spacing::S}),
-                    width: Val::Percent(100.0),
-                    padding: {UiRect::axes(Val::Px(spacing::XL), Val::Px(spacing::L))},
-                }
-              ]
-              --
-              @{ui::scroll_bar()} Children [ @{ui::scroll_thumb()} ]
-            ]
-        ]
-    }
-}
-
-enum Row {
-    Watching { name: String, count: usize },
-    Trimmed,
-    Empty(HistoryTab),
-    Record(HistoryRecord),
-}
-
-impl Row {
-    fn key(&self) -> String {
-        match self {
-            Row::Watching { name, count } => format!("watching {name} {count}"),
-            Row::Trimmed => "trimmed".to_owned(),
-            Row::Empty(tab) => format!("empty {}", tab.index()),
-            Row::Record(record) => format!(
-                "record {} {:?} {}",
-                record.nth, record.entry.tally, record.entry.repeats
-            ),
-        }
-    }
-}
-
-fn sync_bodies(world: &mut World) {
-    let bodies: Vec<(Entity, HistoryBody)> = world
-        .query::<(Entity, &HistoryBody)>()
-        .iter(world)
-        .map(|(entity, body)| (entity, body.clone()))
-        .collect();
-    let version = world.resource::<HistoryBook>().version;
-    let watched = watched_name(world);
-    let built_key = hud::fingerprint(&(version, &watched));
-    for (entity, body) in bodies {
-        if body.built == Some(built_key) {
-            continue;
-        }
-        let Some(list) = ui::descendant_with::<HistoryList>(world, entity) else {
-            continue;
-        };
-        if let Some(mut body) = world.get_mut::<HistoryBody>(entity) {
-            body.built = Some(built_key);
-        }
-        let rows = rows(world, body.tab, watched.clone());
-        let keys: Vec<String> = rows.iter().map(Row::key).collect();
-        let clock = world.resource::<ClientPlatform>().0.local_clock();
-        reconcile_children(world, list, &keys, |world, index| {
-            row(world.resource::<AssetServer>(), &rows[index], clock)
-        });
-    }
+    ui.data_mut(|data| data.insert_temp(id, measured));
 }
 
 fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {
@@ -306,25 +260,29 @@ fn watched_name(world: &World) -> Option<String> {
         .map(|name| name.name.clone())
 }
 
-fn row(assets: &AssetServer, row: &Row, clock: LocalClock) -> Box<dyn Scene> {
-    let ink = ui::theme::theme().surface_floating.on;
+fn show_row(ui: &mut Ui, world: &mut World, row: &Row, clock: LocalClock) {
     match row {
-        Row::Watching { name, count } => Box::new(note(
-            format!("Watching {name} · {count} records"),
-            ink,
-            true,
-        )),
-        Row::Trimmed => Box::new(note(
+        Row::Watching { name, count } => {
+            egui::Frame::new()
+                .fill(color::INPUT)
+                .corner_radius(design_tokens::WIDGET_RADIUS)
+                .inner_margin(egui::Margin::symmetric(8, 4))
+                .show(ui, |ui| {
+                    ui.set_min_width(ui.available_width());
+                    caption(
+                        ui,
+                        format!("Watching {name} · {count} records"),
+                        color::TEXT,
+                    );
+                });
+        }
+        Row::Trimmed => caption(
+            ui,
             format!("Older records are gone. The last {KEPT} are kept."),
-            ink.with_alpha(0.6),
-            false,
-        )),
-        Row::Empty(tab) => Box::new(note(
-            empty_text(*tab).to_owned(),
-            ink.with_alpha(0.6),
-            false,
-        )),
-        Row::Record(record) => record_row(assets, record, clock),
+            color::MUTED,
+        ),
+        Row::Empty(tab) => caption(ui, empty_text(*tab).to_owned(), color::MUTED),
+        Row::Record(record) => record_row(ui, world, record, clock),
     }
 }
 
@@ -339,24 +297,16 @@ fn empty_text(tab: HistoryTab) -> &'static str {
     }
 }
 
-fn note(text: String, ink: Color, bar: bool) -> impl Scene {
-    let surface = ui::theme::theme().surface_inset;
-    let frame = ui::Style::new()
-        .background(if bar { surface.base } else { Color::NONE })
-        .node(|node| {
-            node.width = Val::Percent(100.0);
-            node.padding = UiRect::axes(Val::Px(spacing::L), Val::Px(spacing::M));
-            node.border_radius = BorderRadius::all(Val::Px(ui::tokens::radius::S));
-        });
-    bsn! {
-        frame
-        Children [ @{ui::styled_text(text, ink, typography::CAPTION)} ]
-    }
+fn caption(ui: &mut Ui, text: String, colour: Color32) {
+    ui.label(
+        RichText::new(text)
+            .size(TextRole::Small.size())
+            .color(colour),
+    );
 }
 
-fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -> Box<dyn Scene> {
+fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: LocalClock) {
     let entry = &record.entry;
-    let ink = ui::theme::theme().surface_floating.on;
     let time = clock.label(record.at);
     match entry.mark {
         Some(HistoryMark::Began) => {
@@ -364,130 +314,101 @@ fn record_row(assets: &AssetServer, record: &HistoryRecord, clock: LocalClock) -
                 .by
                 .clone()
                 .unwrap_or_else(|| "Conversation".to_owned());
-            return Box::new(header(format!("{who} · {time}"), ink));
+            ui.add_space(6.0);
+            ui.label(
+                RichText::new(format!("{who} · {time}"))
+                    .family(family::medium())
+                    .color(color::TEXT.gamma_multiply(0.75)),
+            );
+            return;
         }
         Some(HistoryMark::Arrived) => {
-            return Box::new(divider(
-                format!("{} · {time}", entry.text.plain_words()),
-                ink,
-            ));
+            divider(ui, format!("{} · {time}", entry.text.plain_words()));
+            return;
         }
         _ => {}
     }
-    let mut text = entry.text.rich();
-    tallied(&mut text, entry.tally, entry.icon.is_some(), ink);
-    if entry.repeats > 1 {
-        text.pieces.push(
-            RichSpan::plain(format!(" \u{d7}{}", entry.repeats))
-                .color(ink.with_alpha(0.6))
-                .into(),
-        );
-    }
-    match (entry.topic, entry.mark) {
-        (HistoryTopic::Talk, Some(HistoryMark::You)) => {
-            prefix(&mut text, "You  ".to_owned(), palette::AZURE_80);
-        }
-        (HistoryTopic::Talk, _) => {
-            if let Some(by) = &entry.by {
-                prefix(&mut text, format!("{by}  "), palette::AMBER_80);
-            }
-        }
-        (HistoryTopic::Notification | HistoryTopic::Quest, _) => {
-            if let Some(by) = &entry.by {
-                prefix(&mut text, format!("{by}  "), palette::VIOLET_80);
-            }
-        }
-        _ => {}
-    }
-    let color = match (entry.topic, entry.mark) {
-        (_, Some(HistoryMark::Failed)) | (HistoryTopic::Error, _) => palette::CRIMSON_80,
-        _ => ink,
+    let line = record_line(entry);
+    let colour = match (entry.topic, entry.mark) {
+        (_, Some(HistoryMark::Failed)) | (HistoryTopic::Error, _) => color::DANGER,
+        _ => color::TEXT,
     };
     let indent = match entry.topic {
         HistoryTopic::Talk => TALK_INDENT,
         _ => 0.0,
     };
-    let icon: Vec<Box<dyn Scene>> = entry
-        .icon
-        .clone()
-        .map(|icon| -> Box<dyn Scene> { Box::new(icon_image(assets.load(icon))) })
-        .into_iter()
-        .collect();
-    let line = ui::rich_text(
-        RichText {
-            size: typography::BODY.font_size,
-            color,
-            ..text
-        },
-        false,
-    );
-    Box::new(bsn! {
-        Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::FlexStart, width: Val::Percent(100.0) }
-        Children [
-            Node { width: Val::Px(TIME_WIDTH), flex_shrink: 0.0 }
-            Children [ @{ui::styled_text(time, ink.with_alpha(0.5), typography::CAPTION)} ]
-            --
-            Node { column_gap: Val::Px({spacing::M}), align_items: AlignItems::Center, flex_grow: 1.0, min_width: Val::Px(0.0), margin: {UiRect::left(Val::Px(indent))} }
-            Children [ {icon} -- @{line} ]
-        ]
-    })
+    ui.horizontal_top(|ui| {
+        ui.allocate_ui(Vec2::new(TIME_WIDTH, 0.0), |ui| {
+            ui.set_min_width(TIME_WIDTH);
+            caption(ui, time, color::FAINT);
+        });
+        ui.add_space(indent);
+        if let Some(icon) = &entry.icon {
+            hud::file_icon(ui, world, icon, ICON);
+        }
+        let look = TextLook {
+            size: TextRole::Body.size(),
+            color: colour,
+        };
+        text::show(ui, world, &line, look, None);
+    });
 }
 
-pub(crate) fn tallied(text: &mut RichText, tally: Option<RecordTally>, icon: bool, ink: Color) {
-    match tally {
-        Some(RecordTally::Change(change)) => {
-            let color = match (change > 0, icon) {
-                (true, true) => palette::EMERALD_80,
-                (true, false) => palette::AMBER_80,
-                (false, _) => ink.with_alpha(0.6),
-            };
-            prefix(text, format!("{} ", signed(change)), color);
-        }
-        Some(RecordTally::Progress { have, need }) => {
-            text.pieces
-                .push(RichSpan::plain(format!(" {have}/{need}")).into());
-        }
-        None => {}
+fn record_line(entry: &HistoryEntry) -> StyledLine {
+    let mut line = entry.text.styled();
+    tallied(&mut line, entry.tally, entry.icon.is_some(), color::TEXT);
+    if entry.repeats > 1 {
+        line.pieces.push(
+            StyledSpan::plain(format!(" \u{d7}{}", entry.repeats))
+                .ink(color::MUTED)
+                .into(),
+        );
     }
+    match (entry.topic, entry.mark) {
+        (HistoryTopic::Talk, Some(HistoryMark::You)) => {
+            prefix(&mut line, "You  ".to_owned(), ink::PLACE);
+        }
+        (HistoryTopic::Talk, _) => {
+            if let Some(by) = &entry.by {
+                prefix(&mut line, format!("{by}  "), color::WARN);
+            }
+        }
+        (HistoryTopic::Notification | HistoryTopic::Quest, _) => {
+            if let Some(by) = &entry.by {
+                prefix(&mut line, format!("{by}  "), ink::MAGIC);
+            }
+        }
+        _ => {}
+    }
+    line
 }
 
-fn prefix(text: &mut RichText, label: String, color: Color) {
+fn prefix(text: &mut StyledLine, label: String, colour: Color32) {
     text.pieces
-        .insert(0, RichSpan::plain(label).color(color).into());
+        .insert(0, StyledSpan::plain(label).ink(colour).into());
 }
 
-fn header(text: String, ink: Color) -> impl Scene {
-    bsn! {
-        Node { margin: {UiRect::top(Val::Px(spacing::M))}, width: Val::Percent(100.0) }
-        Children [ @{ui::styled_text(text, ink.with_alpha(0.75), typography::LABEL)} ]
-    }
+fn divider(ui: &mut Ui, text: String) {
+    let font = egui::FontId::proportional(TextRole::Small.size());
+    let text_width = ui
+        .painter()
+        .layout_no_wrap(text.clone(), font, Color32::WHITE)
+        .size()
+        .x;
+    let gap = ui.spacing().item_spacing.x;
+    let lead = ((ui.available_width() - text_width) / 2.0 - gap).max(0.0);
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        rule(ui, lead);
+        caption(ui, text, color::TEXT.gamma_multiply(0.7));
+        let rest = ui.available_width();
+        rule(ui, rest);
+    });
+    ui.add_space(4.0);
 }
 
-fn divider(text: String, ink: Color) -> impl Scene {
-    let line = move || {
-        ui::Style::new()
-            .background(ink.with_alpha(0.25))
-            .node(|node| {
-                node.flex_grow = 1.0;
-                node.height = Val::Px(1.0);
-            })
-    };
-    bsn! {
-        Node { column_gap: Val::Px({spacing::L}), align_items: AlignItems::Center, width: Val::Percent(100.0), margin: {UiRect::vertical(Val::Px(spacing::M))} }
-        Children [
-            line()
-            --
-            @{ui::styled_text(text, ink.with_alpha(0.7), typography::CAPTION)}
-            --
-            line()
-        ]
-    }
-}
-
-fn icon_image(image: Handle<Image>) -> impl Scene {
-    bsn! {
-        Node { width: Val::Px(ICON), height: Val::Px(ICON), flex_shrink: 0.0 }
-        ImageNode { image: {image} }
-        Pickable::IGNORE
-    }
+fn rule(ui: &mut Ui, width: f32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 1.0), egui::Sense::hover());
+    ui.painter()
+        .rect_filled(rect, 0.0, color::TEXT.gamma_multiply(0.25));
 }

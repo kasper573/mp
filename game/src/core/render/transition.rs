@@ -57,10 +57,9 @@ impl ScreenTransition {
 #[derive(Resource, Default, Clone, Copy)]
 pub struct ScreenTransitionPreference(pub ScreenTransition);
 
-#[derive(Resource, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ScreenTransitionPhase {
-    #[default]
     Idle,
     Out,
     Hold,
@@ -73,8 +72,8 @@ pub enum ScreenTransitionPhase {
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldViewSystems;
 
-pub fn covering(phase: Res<ScreenTransitionPhase>) -> bool {
-    *phase == ScreenTransitionPhase::Out
+pub fn covering(transition: Res<ActiveTransition>) -> bool {
+    transition.phase() == ScreenTransitionPhase::Out
 }
 
 pub fn freeze(world: &mut World, viewed_at: Pos<Tiles>, heading: Direction) {
@@ -90,7 +89,6 @@ pub fn freeze(world: &mut World, viewed_at: Pos<Tiles>, heading: Direction) {
         heading: screen_heading(heading),
         arrival: None,
     });
-    world.insert_resource(ScreenTransitionPhase::Out);
 }
 
 pub fn reveal(world: &mut World, viewed_at: Pos<Tiles>) {
@@ -106,29 +104,34 @@ pub fn reveal(world: &mut World, viewed_at: Pos<Tiles>) {
 
 pub fn abort(world: &mut World) {
     world.resource_mut::<ActiveTransition>().0 = None;
-    world.insert_resource(ScreenTransitionPhase::Idle);
 }
 
 /// A long frame pauses the transition rather than skipping part of it.
 const LONGEST_STEP: Seconds = Seconds(1.0 / 30.0);
 
 #[derive(Resource, Default)]
-pub(super) struct ActiveTransition(Option<Cut>);
+pub struct ActiveTransition(Option<Cut>);
 
 impl ActiveTransition {
+    pub fn phase(&self) -> ScreenTransitionPhase {
+        self.0
+            .as_ref()
+            .map_or(ScreenTransitionPhase::Idle, |cut| cut.progress().phase)
+    }
+
     pub(super) fn advance(
         &mut self,
         frame: Seconds,
         camera: Option<(&Camera, &GlobalTransform)>,
-    ) -> (ScreenTransitionPhase, CutUniform) {
+    ) -> CutUniform {
         let Some(cut) = &mut self.0 else {
-            return (ScreenTransitionPhase::Idle, CutUniform::IDLE);
+            return CutUniform::IDLE;
         };
         cut.played += frame.min(LONGEST_STEP);
         let progress = cut.progress();
         if progress.phase == ScreenTransitionPhase::Idle {
             self.0 = None;
-            return (ScreenTransitionPhase::Idle, CutUniform::IDLE);
+            return CutUniform::IDLE;
         }
         let size = camera
             .and_then(|(camera, _)| camera.logical_viewport_size())
@@ -141,7 +144,7 @@ impl ActiveTransition {
                 target_marks(camera, transform, arrival.viewed_at)
             })
             .unwrap_or(cut.from);
-        let uniform = CutUniform {
+        CutUniform {
             style: cut.style as u32,
             out_progress: progress.cover,
             in_progress: progress.uncover,
@@ -157,8 +160,7 @@ impl ActiveTransition {
             sweep: -cut.heading,
             from_reach: reach(cut.from, size),
             to_reach: reach(to, size),
-        };
-        (progress.phase, uniform)
+        }
     }
 }
 

@@ -59,10 +59,6 @@ impl Film {
         self.read_until = now + reading(text);
     }
 
-    pub fn mixing(&self) -> bool {
-        self.mixing
-    }
-
     pub fn show_mixer(&mut self) {
         self.mixing = true;
     }

@@ -1,20 +1,17 @@
-use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use super::present::Viewport;
 use super::screen::{ToScreen, ToTile};
+use crate::core::gui;
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 
 #[derive(Component)]
 pub(crate) struct WorldCamera;
 
-#[derive(Component, Default, Clone)]
-pub struct WorldOverlay;
-
 pub fn cursor_tile(world: &mut World) -> Option<Pos<Tiles>> {
-    if world.resource::<ui::InterfaceCursor>().captured() {
+    if gui::pointer_claimed(world) {
         return None;
     }
     let cursor = world
@@ -42,19 +39,6 @@ pub fn tile_to_window(world: &mut World, tile: Pos<Tiles>) -> Option<Vec2> {
         .single(world)
         .ok()?;
     project(viewport, camera, transform, tile)
-}
-
-#[derive(SystemParam)]
-pub struct WorldToWindow<'w, 's> {
-    viewport: Res<'w, Viewport>,
-    camera: Query<'w, 's, (&'static Camera, &'static GlobalTransform), With<WorldCamera>>,
-}
-
-impl WorldToWindow<'_, '_> {
-    pub fn project(&self, tile: Pos<Tiles>) -> Option<Vec2> {
-        let (camera, transform) = self.camera.single().ok()?;
-        project(*self.viewport, camera, transform, tile)
-    }
 }
 
 fn project(

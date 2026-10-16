@@ -223,7 +223,8 @@
         {
           "channel": 1,
           "file": "audio/music/forest.flac",
-          "volume": 0.25
+          "volume": 0.25,
+          "category": "music"
         },
         {
           "channel": 2,

@@ -43,7 +43,7 @@ macro_rules! effects {
             fn needs_subject(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.needs_subject(),)* }
             }
-            fn outputs(&'static self) -> Vec<(Name, Link)> {
+            fn outputs(&self) -> Vec<(Name, Link<'_>)> {
                 match self { $(RiftEffect::$variant(e) => e.outputs(),)* }
             }
             fn pauses(&self) -> bool {
@@ -52,7 +52,7 @@ macro_rules! effects {
             fn keeps_box(&self) -> bool {
                 match self { $(RiftEffect::$variant(e) => e.keeps_box(),)* }
             }
-            fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+            fn compile<'c>(&'c self, cx: &mut Compiler<'c, RiftScripting>) -> Result<EffectCall, ScriptFault> {
                 match self { $(RiftEffect::$variant(e) => e.compile(cx),)* }
             }
             fn reach(&self, cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -106,7 +106,7 @@ effects! {
     PlaySound(PlaySound),
 }
 
-pub fn aim(cx: &mut Compiler<RiftScripting>, who: &'static Aim) -> Result<Eval, ScriptFault> {
+pub fn aim<'c>(cx: &mut Compiler<'c, RiftScripting>, who: &'c Aim) -> Result<Eval, ScriptFault> {
     cx.actor(who.as_ref())
 }
 
@@ -165,10 +165,13 @@ impl EffectDef<RiftScripting> for PlaySound {
     fn needs_subject(&self) -> bool {
         self.audience == Audience::Subject
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let sfx = cx.audio(&self.sfx)?;
         let audience = self.audience;
         Ok(Box::new(move |world, _, cx| {
@@ -191,9 +194,9 @@ pub enum Audience {
     Subject,
 }
 
-pub fn number(
-    cx: &mut Compiler<RiftScripting>,
-    expr: &'static Condition,
+pub fn number<'c>(
+    cx: &mut Compiler<'c, RiftScripting>,
+    expr: &'c Condition,
 ) -> Result<Eval, ScriptFault> {
     cx.expr(expr, ValueType::Number)
 }

@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
 use crate::core::content::store::ContentStore;
@@ -50,6 +51,8 @@ pub trait Platform: Send + Sync + 'static {
     fn load(&self, key: &str) -> Option<String>;
     fn save(&self, key: &str, value: &str);
     fn sync_window(&self, window: &mut Window);
+    /// The engine's default plugins as this platform runs them.
+    fn engine(&self, plugins: PluginGroupBuilder) -> PluginGroupBuilder;
     fn get(&self, url: String) -> LocalFuture<Result<Vec<u8>, FetchFailure>>;
     fn post(
         &self,

@@ -43,7 +43,7 @@ pub struct Traveler {
 }
 
 pub fn departing(world: &mut World) -> Vec<Traveler> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let ids: Vec<Entity> = world
         .query_filtered::<Entity, With<Crossing>>()
         .iter(world)
@@ -74,7 +74,7 @@ pub fn departing(world: &mut World) -> Vec<Traveler> {
 }
 
 pub fn arrive(world: &mut World, mut traveler: Traveler) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let first_visit = traveler.state.discovered.discover(traveler.dest_area);
     let entity = crate::systems::player::place(
         world,

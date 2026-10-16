@@ -4,10 +4,11 @@ use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
 use game::core::content::ContentRow;
 use game::systems::area::world_map::WorldMapDef;
 
-use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
+use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
-use crate::project::{GAME_FILE, Project, RowSelection, row_file, row_of};
+use crate::picker::{self, PictureFrame};
+use crate::project::{GAME_FILE, Project, RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::value::RowValue;
 use crate::{forms, rows, thumbs};
@@ -32,6 +33,12 @@ impl Default for BrowserState {
             },
         }
     }
+}
+
+#[derive(Clone)]
+enum FolderAction {
+    New,
+    OpenTable,
 }
 
 enum Hit {
@@ -143,9 +150,28 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 Some(node)
             },
             &mut |folder| {
-                folder.locked = shapes.has_fixtures(&folder.id);
-                folder.adds = !folder.locked;
-                folder.table = true;
+                let open = TreeAction {
+                    glyph: "▦",
+                    tip: "Open table".to_owned(),
+                    menu_label: "Open table".to_owned(),
+                    action: FolderAction::OpenTable,
+                };
+                if shapes.has_fixtures(&folder.id) {
+                    folder.note = Some(
+                        "Fixtures: the engine names these rows, so none can be added".to_owned(),
+                    );
+                    folder.actions = vec![open];
+                } else {
+                    folder.actions = vec![
+                        TreeAction {
+                            glyph: "+",
+                            tip: format!("New {}", folder.label),
+                            menu_label: format!("New {}…", folder.label),
+                            action: FolderAction::New,
+                        },
+                        open,
+                    ];
+                }
             },
         )
     };
@@ -178,8 +204,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 &nodes,
                 false,
                 tree::TreeHooks {
-                    menu: Some(&mut |ui, node| {
-                        if let Some((table, key)) = row_of(&node.id) {
+                    menu: Some(&mut |ui, id| {
+                        if let Some((table, key)) = row_of(id) {
                             row_menu(ui, &mut action, table, key);
                         }
                     }),
@@ -191,11 +217,11 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
             )
         })
         .inner;
-    if let Some(table) = out.add {
-        rows::new_row_dialog(editor, &table);
-    }
-    if let Some(table) = out.open_table {
-        editor.open_tab(EditorTab::Spreadsheet { table });
+    if let Some((folder, action)) = out.action {
+        match action {
+            FolderAction::New => rows::new_row_dialog(editor, &folder),
+            FolderAction::OpenTable => editor.open_tab(EditorTab::Spreadsheet { table: folder }),
+        }
     }
     if out
         .clicked
@@ -232,20 +258,12 @@ pub fn row_icon(
     key: &str,
     budget: &mut u32,
 ) -> Option<IconImage> {
-    match table {
-        "npc" | "player" | "model" => {
-            let model_key = if table == "model" {
-                key.to_owned()
-            } else {
-                project.files.json(&row_file(table, key))?["model"]
-                    .as_str()?
-                    .to_owned()
-            };
-            let model = project.files.json(&row_file("model", &model_key))?;
-            let image = model["sprites"]["image"].as_str()?;
+    let picture = picker::picture_of(&project.files, table, key)?;
+    match picture.frame {
+        PictureFrame::Sprite(model) => {
             let thumb = form
                 .thumbnails
-                .image_within(ctx, &project.files, image, budget)?;
+                .image_within(ctx, &project.files, &picture.path, budget)?;
             let frame = thumbs::model_frame(&model, &thumb);
             let scale = 18.0 / frame.size.y.max(1.0);
             Some(IconImage {
@@ -254,13 +272,13 @@ pub fn row_icon(
                 size: frame.size * scale,
             })
         }
-        "item" | "interface_icon" | "cursor" | "attention" => {
-            let row = project.files.json(&row_file(table, key))?;
-            let path = row["icon"].as_str().or_else(|| row["image"].as_str())?;
-            let thumb = form.thumbnails.icon(ctx, &project.files, path, budget)?;
+        PictureFrame::Whole => {
+            let thumb = form
+                .thumbnails
+                .icon(ctx, &project.files, &picture.path, budget)?;
             Some(super::assets::icon_image(&thumb))
         }
-        _ => None,
+        PictureFrame::Tile(_) => None,
     }
 }
 

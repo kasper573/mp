@@ -3,7 +3,7 @@ use game::systems::script::{RiftEffect, ScriptModule};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::support::content;
+use testkit::content;
 
 /// Reads a value as the loader would, with every row key resolved against the shipped content.
 pub fn parse<T: DeserializeOwned>(value: Value) -> T {
@@ -14,19 +14,19 @@ pub fn parse<T: DeserializeOwned>(value: Value) -> T {
     result.unwrap_or_else(|error| panic!("{error} in {value}"))
 }
 
-pub fn inline(nodes: Value) -> &'static ScriptModule {
-    Box::leak(Box::new(parse(serde_json::json!({
+pub fn inline(nodes: Value) -> ScriptModule {
+    parse(serde_json::json!({
         "type": "inline_script",
         "nodes": nodes,
-    }))))
+    }))
 }
 
-pub fn inline_with(locals: Value, nodes: Value) -> &'static ScriptModule {
-    Box::leak(Box::new(parse(serde_json::json!({
+pub fn inline_with(locals: Value, nodes: Value) -> ScriptModule {
+    parse(serde_json::json!({
         "type": "inline_script",
         "locals": locals,
         "nodes": nodes,
-    }))))
+    }))
 }
 
 pub fn effect(value: Value) -> RiftEffect {

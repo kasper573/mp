@@ -13,6 +13,7 @@ pub use object::{AreaObject, ObjectDef, ObjectShape};
 
 use std::collections::BTreeMap;
 use std::io;
+use std::sync::Arc;
 
 use bevy_app::App;
 use bevy_ecs::component::Component;
@@ -23,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::core::assets::AssetRef;
+use crate::core::audio::mix::AudioCategory;
 use crate::core::audio::playback::SfxId;
 use crate::core::audio::soundscape::{
     SoundscapeChannel, SoundscapeLayer, SoundscapeShape, SoundscapeZone,
@@ -319,6 +321,7 @@ pub struct SoundChannel {
     pub channel: u32,
     #[schemars(extend("x-asset" = "audio"))]
     pub file: AssetRef,
+    #[schemars(extend("default" = serial::one_f32()))]
     #[serde(
         default = "serial::one_f32",
         skip_serializing_if = "serial::is_one_f32"
@@ -326,6 +329,12 @@ pub struct SoundChannel {
     pub volume: f32,
     #[serde(default, skip_serializing_if = "serial::is_zero_f32")]
     pub pan: f32,
+    #[serde(default, skip_serializing_if = "is_ambience")]
+    pub category: AudioCategory,
+}
+
+fn is_ambience(category: &AudioCategory) -> bool {
+    *category == AudioCategory::Ambience
 }
 
 impl SoundscapeDef {
@@ -377,6 +386,7 @@ impl SoundscapeDef {
                             src: channel.file.clone(),
                             volume: channel.volume,
                             pan: channel.pan,
+                            category: channel.category,
                         },
                     )
                 })
@@ -442,10 +452,9 @@ impl Scenery {
     }
 
     pub fn bounds(&self) -> Rect<Tiles> {
-        self.flip.anchored(
-            self.at,
-            Size::new(self.width() as f32, self.height() as f32),
-        )
+        let size = Size::new(self.width() as f32, self.height() as f32);
+        self.flip
+            .place(Rect::new(Pos::new(0.0, 0.0), size), self.at)
     }
 
     pub fn sort_line(&self) -> Option<Tiles> {
@@ -500,6 +509,7 @@ impl From<SceneryTile> for SceneryTileRow {
 #[serde(deny_unknown_fields)]
 pub struct Population {
     pub npc: NpcId,
+    #[schemars(extend("x-count" = true))]
     pub count: u32,
     #[schemars(with = "Option<serial::RectRow>")]
     #[serde(
@@ -526,7 +536,7 @@ pub struct PlacedModules(pub Vec<Vec<Flattened>>);
 
 pub struct PlacedBlueprints(pub Vec<Vec<PlacedBlueprint>>);
 
-pub fn placed(content: &Content, area: AreaId) -> &'static [Flattened] {
+pub fn placed(content: &Content, area: AreaId) -> &[Flattened] {
     content
         .built::<PlacedModules>()
         .0
@@ -534,7 +544,7 @@ pub fn placed(content: &Content, area: AreaId) -> &'static [Flattened] {
         .map_or(&[], Vec::as_slice)
 }
 
-pub fn placements(content: &Content, area: AreaId) -> &'static [PlacedBlueprint] {
+pub fn placements(content: &Content, area: AreaId) -> &[PlacedBlueprint] {
     content
         .built::<PlacedBlueprints>()
         .0
@@ -542,7 +552,7 @@ pub fn placements(content: &Content, area: AreaId) -> &'static [PlacedBlueprint]
         .map_or(&[], Vec::as_slice)
 }
 
-pub fn modules(content: &Content, area: AreaId) -> impl Iterator<Item = &'static AreaModule> {
+pub fn modules(content: &Content, area: AreaId) -> impl Iterator<Item = &AreaModule> {
     placed(content, area).iter().map(|placed| &placed.module)
 }
 
@@ -571,7 +581,7 @@ pub fn residents(modules: &[Flattened]) -> impl Iterator<Item = NpcId> + '_ {
     })
 }
 
-pub fn warp_objects(content: &Content, area: AreaId) -> Vec<(u32, &'static ObjectDef)> {
+pub fn warp_objects(content: &Content, area: AreaId) -> Vec<(u32, &ObjectDef)> {
     if !content.has_built::<RiftScripts>() {
         return Vec::new();
     }
@@ -609,8 +619,8 @@ pub struct Area {
     pub safe_cells: Vec<bool>,
     pub footsteps: Vec<Option<SfxId>>,
     pub soundscape: Vec<SoundscapeZone>,
-    pub grids: &'static AreaGrids,
-    pub scenery: Vec<&'static Scenery>,
+    pub grids: Arc<AreaGrids>,
+    pub scenery: Vec<Scenery>,
 }
 
 impl Area {
@@ -657,9 +667,9 @@ impl Area {
 
 pub struct Areas(Vec<Option<Area>>);
 
-pub struct AreaGridSet(Vec<Option<AreaGrids>>);
+pub struct AreaGridSet(Vec<Option<Arc<AreaGrids>>>);
 
-pub fn load(content: &Content, area: AreaId) -> &'static Area {
+pub fn load(content: &Content, area: AreaId) -> &Area {
     content
         .built::<Areas>()
         .0
@@ -668,16 +678,20 @@ pub fn load(content: &Content, area: AreaId) -> &'static Area {
         .unwrap_or_else(|| panic!("area {} failed to load", area.key(content)))
 }
 
-pub fn of(world: &World, entity: Entity) -> Option<&'static Area> {
+pub fn of(world: &World, entity: Entity) -> Option<&Area> {
+    of_in(world.resource::<Content>(), world, entity)
+}
+
+pub fn of_in<'c>(content: &'c Content, world: &World, entity: Entity) -> Option<&'c Area> {
     let area = world.get::<AreaTag>(entity)?.area;
-    Some(load(world.resource::<Content>(), area))
+    Some(load(content, area))
 }
 
 fn read_grids(loading: &mut Loading) {
     let content = loading.content();
     let sizes = content.built::<ImageSizes>();
-    let mut grids: Vec<Option<AreaGrids>> = content.ids::<AreaDef>().map(|_| None).collect();
-    for (id, def) in loading.rows::<AreaDef>() {
+    let mut grids: Vec<Option<Arc<AreaGrids>>> = content.ids::<AreaDef>().map(|_| None).collect();
+    for (id, def) in loading.rows::<AreaDef>(&content) {
         let map = def.map();
         let folder = grid::folder(id.key(&content));
         let files = loading.row_folder(id);
@@ -886,13 +900,13 @@ fn read_grids(loading: &mut Loading) {
             loading.fail(id);
             continue;
         }
-        grids[id.index()] = Some(AreaGrids {
+        grids[id.index()] = Some(Arc::new(AreaGrids {
             size,
             palette,
             palette_keys,
             ground,
             walk,
-        });
+        }));
     }
     loading.built(AreaGridSet(grids));
 }
@@ -902,7 +916,7 @@ fn flatten_all(loading: &mut Loading) {
     let mut placed: Vec<Vec<Flattened>> = content.ids::<AreaDef>().map(|_| Vec::new()).collect();
     let mut placements: Vec<Vec<PlacedBlueprint>> =
         content.ids::<AreaDef>().map(|_| Vec::new()).collect();
-    for (id, def) in loading.rows::<AreaDef>() {
+    for (id, def) in loading.rows::<AreaDef>(&content) {
         let mut errors = Vec::new();
         let flattening = blueprint::flatten(&content, &def.modules, &mut errors);
         if !errors.is_empty() {
@@ -930,8 +944,8 @@ fn build_all(loading: &mut Loading) {
     let grids = content.built::<AreaGridSet>();
     let sizes = content.built::<ImageSizes>();
     let mut areas: Vec<Option<Area>> = content.ids::<AreaDef>().map(|_| None).collect();
-    for (id, def) in loading.rows::<AreaDef>() {
-        let Some(grids) = grids.0[id.index()].as_ref() else {
+    for (id, def) in loading.rows::<AreaDef>(&content) {
+        let Some(grids) = grids.0[id.index()].clone() else {
             continue;
         };
         let modules = placed(&content, id);
@@ -945,14 +959,14 @@ fn build_all(loading: &mut Loading) {
                 _ => None,
             })
             .collect();
-        let scenery: Vec<&Scenery> = modules
+        let scenery: Vec<Scenery> = modules
             .iter()
             .filter_map(|placed| match &placed.module {
-                AreaModule::Scenery(scenery) => Some(scenery),
+                AreaModule::Scenery(scenery) => Some(scenery.clone()),
                 _ => None,
             })
             .collect();
-        let walk = walk::grids(&content, grids, &scenery, &safe_zones);
+        let walk = walk::grids(&content, &grids, &scenery, &safe_zones);
         let size = map.size.grid();
         let area = Area {
             size: map.size.tiles(),

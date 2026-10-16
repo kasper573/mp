@@ -2,28 +2,33 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use ui::{RichPiece, RichText};
+use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::{TextRole, color};
 
-use super::{ClientScreen, despawn_all};
+use super::ClientScreen;
 use crate::core::audio::soundscape::Soundscape;
 use crate::core::content::Content;
 use crate::core::content::media::ImageSizes;
+use crate::core::gui::{self, Band};
+use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Direction, Pos};
 use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
-use crate::core::render::transition::{self, WorldViewSystems};
+use crate::core::render::transition::{
+    self, ActiveTransition, ScreenTransitionPhase, WorldViewSystems,
+};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::systems::actor::Actor;
 use crate::systems::area::tileset::TilesetId;
 use crate::systems::area::{self, AreaId, AreaTag, tileset};
-use crate::systems::hud::spawn_ui;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
-use crate::systems::player::AreaDrawn;
 use crate::systems::player::session::{self, Viewpoint};
+use crate::systems::player::{ARRIVAL_PATIENCE, AreaDrawn};
 
 pub struct AreaPlugin;
 
@@ -36,24 +41,24 @@ impl Plugin for AreaPlugin {
             .add_systems(
                 Update,
                 (
-                    carry_view_across.before(WorldViewSystems),
+                    carry_view_across
+                        .after(RenderValueSystems)
+                        .before(WorldViewSystems),
                     (spawn_area_tiles, play_area_soundscape).in_set(WorldViewSystems),
                     retain_loaded_images,
-                    sync_death_banner,
                 )
                     .run_if(in_state(ClientScreen::Area)),
             )
-            .add_systems(OnEnter(ClientScreen::Area), restart_patience)
             .add_systems(
-                OnExit(ClientScreen::Area),
-                (despawn_all::<DeathBanner>, silence_soundscape, leave_area),
-            );
+                EguiPrimaryContextPass,
+                death_notice
+                    .in_set(Band::Notices)
+                    .run_if(in_state(ClientScreen::Area)),
+            )
+            .add_systems(OnEnter(ClientScreen::Area), restart_patience)
+            .add_systems(OnExit(ClientScreen::Area), (silence_soundscape, leave_area));
     }
 }
-
-/// A view held on screen this long without its new area becoming drawable is revealed regardless:
-/// a missing image or a lost arrival must not hide the world for good.
-const ARRIVAL_PATIENCE: Seconds = Seconds(5.0);
 
 #[derive(Resource, Default)]
 struct SpawnedArea {
@@ -61,15 +66,15 @@ struct SpawnedArea {
     images: Vec<Handle<Image>>,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Copy)]
 struct Crossing {
     last_seen: Option<Pose>,
     held: Option<Held>,
-    drawn: Option<AreaId>,
 }
 
 #[derive(Clone, Copy)]
 struct Pose {
+    character: Entity,
     at: Pos<Tiles>,
     heading: Direction,
     area: AreaId,
@@ -84,13 +89,15 @@ struct Held {
     rendered: bool,
 }
 
-fn carry_view_across(world: &mut World) {
+/// The view is revealed when no crossing is held under the veil and no transition plays over it.
+pub fn settled(world: &World) -> bool {
+    world.resource::<Crossing>().held.is_none()
+        && world.resource::<ActiveTransition>().phase() == ScreenTransitionPhase::Idle
+}
+
+pub fn carry_view_across(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let Crossing {
-        last_seen,
-        held,
-        drawn,
-    } = *world.resource::<Crossing>();
+    let Crossing { last_seen, held } = *world.resource::<Crossing>();
     let (last_seen, held) = match world.resource::<Viewpoint>().0 {
         Some(character) => match (pose_of(world, character), held, last_seen) {
             (None, _, _) => (last_seen, held),
@@ -98,11 +105,14 @@ fn carry_view_across(world: &mut World) {
                 transition::freeze(world, seen.at, seen.heading);
                 (Some(pose), Some(Held::new(now, seen)))
             }
+            (Some(pose), None, Some(seen)) if seen.character == pose.character => {
+                (Some(pose), None)
+            }
+            (Some(pose), None, _) => (Some(pose), Some(Held::new(now, pose))),
             (Some(pose), Some(held), _) => {
                 let drawable = area_drawable(world, pose.area);
                 if now - held.since > ARRIVAL_PATIENCE || (drawable && held.rendered) {
-                    transition::reveal(world, pose.at);
-                    release_unshown_images(world);
+                    reveal(world, pose);
                     (Some(pose), None)
                 } else {
                     (
@@ -114,7 +124,6 @@ fn carry_view_across(world: &mut World) {
                     )
                 }
             }
-            (Some(pose), None, _) => (Some(pose), None),
         },
         None => match (held, last_seen) {
             (Some(_), _)
@@ -134,23 +143,13 @@ fn carry_view_across(world: &mut World) {
             _ => (None, held),
         },
     };
-    let drawn = match last_seen {
-        Some(pose) if held.is_none() && drawn != Some(pose.area) => {
-            if area_drawable(world, pose.area) {
-                world.write_message(AreaDrawn);
-                Some(pose.area)
-            } else {
-                None
-            }
-        }
-        Some(_) => drawn,
-        None => None,
-    };
-    *world.resource_mut::<Crossing>() = Crossing {
-        last_seen,
-        held,
-        drawn,
-    };
+    *world.resource_mut::<Crossing>() = Crossing { last_seen, held };
+}
+
+fn reveal(world: &mut World, pose: Pose) {
+    transition::reveal(world, pose.at);
+    release_unshown_images(world);
+    world.write_message(AreaDrawn);
 }
 
 fn restart_patience(world: &mut World) {
@@ -171,28 +170,35 @@ impl Held {
 }
 
 fn pose_of(world: &World, character: Entity) -> Option<Pose> {
-    let character = world.get_entity(character).ok()?;
+    let entity = world.get_entity(character).ok()?;
     Some(Pose {
-        at: character.get::<RenderPosition>()?.0,
-        heading: character.get::<Actor>()?.dir,
-        area: character.get::<AreaTag>()?.area,
+        character,
+        at: entity.get::<RenderPosition>()?.0,
+        heading: entity.get::<Actor>()?.dir,
+        area: entity.get::<AreaTag>()?.area,
     })
 }
 
 fn area_drawable(world: &mut World, area: AreaId) -> bool {
-    let spawned = world.resource::<SpawnedArea>();
-    if spawned.area != Some(area) {
+    if world.resource::<SpawnedArea>().area != Some(area) {
         return false;
     }
-    let mut pending = spawned.images.clone();
-    pending.extend(
-        world
-            .query::<&Sprite>()
-            .iter(world)
-            .map(|sprite| sprite.image.clone()),
-    );
+    let on_show = images_on_show(world);
     let images = world.resource::<Assets<Image>>();
-    pending.iter().all(|image| images.contains(image))
+    on_show.iter().all(|image| images.contains(image))
+}
+
+fn images_on_show(world: &mut World) -> Vec<Handle<Image>> {
+    let spawned = world.resource::<SpawnedArea>().images.clone();
+    spawned
+        .into_iter()
+        .chain(
+            world
+                .query::<&Sprite>()
+                .iter(world)
+                .map(|sprite| sprite.image.clone()),
+        )
+        .collect()
 }
 
 /// Leaving the area scene keeps the last view under the veil, so a lost connection or a content
@@ -200,9 +206,7 @@ fn area_drawable(world: &mut World, area: AreaId) -> bool {
 /// where the character lands.
 fn leave_area(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
-    let Crossing {
-        last_seen, held, ..
-    } = *world.resource::<Crossing>();
+    let Crossing { last_seen, held } = *world.resource::<Crossing>();
     let held = match (last_seen, held) {
         (Some(pose), None) => {
             transition::freeze(world, pose.at, pose.heading);
@@ -217,7 +221,6 @@ fn leave_area(world: &mut World) {
     *world.resource_mut::<Crossing>() = Crossing {
         last_seen: None,
         held,
-        drawn: None,
     };
     world.resource_mut::<SpawnedArea>().area = None;
     world.resource_mut::<RetainedImages>().0.clear();
@@ -245,18 +248,7 @@ fn retain_loaded_images(
 }
 
 fn release_unshown_images(world: &mut World) {
-    let mut shown: HashSet<AssetId<Image>> = world
-        .resource::<SpawnedArea>()
-        .images
-        .iter()
-        .map(Handle::id)
-        .collect();
-    shown.extend(
-        world
-            .query::<&Sprite>()
-            .iter(world)
-            .map(|sprite| sprite.image.id()),
-    );
+    let shown: HashSet<AssetId<Image>> = images_on_show(world).iter().map(Handle::id).collect();
     world
         .resource_mut::<RetainedImages>()
         .0
@@ -294,7 +286,7 @@ fn spawn_area_tiles(
     let mut loaded = Vec::new();
     let sheets = TileSheets::new(
         &content,
-        area.grids,
+        &area.grids,
         area.scenery.iter().map(|scenery| scenery.tileset),
         |def| {
             let image = assets.load(def.image.path());
@@ -302,7 +294,7 @@ fn spawn_area_tiles(
             image
         },
     );
-    let grids = area.grids;
+    let grids = &area.grids;
     let size = grids.size;
     for (index, layer) in grids.ground.iter().enumerate() {
         let cells: Vec<Option<bevy_tilemap::GridCell>> = layer
@@ -399,14 +391,14 @@ fn play_area_soundscape(
     else {
         return;
     };
-    let zones = area::load(&content, area_id).soundscape.as_slice();
-    if !std::ptr::eq(soundscape.0, zones) {
-        soundscape.0 = zones;
+    let zones = &area::load(&content, area_id).soundscape;
+    if soundscape.0 != *zones {
+        soundscape.0.clone_from(zones);
     }
 }
 
 fn silence_soundscape(mut soundscape: ResMut<Soundscape>) {
-    soundscape.0 = &[];
+    soundscape.0.clear();
 }
 
 pub struct TileSheets {
@@ -463,47 +455,31 @@ impl TileSheets {
     }
 }
 
-#[derive(Component, Default, Clone)]
-struct DeathBanner;
-
-fn sync_death_banner(world: &mut World) {
-    let dead = session::is_dead(world);
-    let banner = world
-        .query_filtered::<Entity, With<DeathBanner>>()
-        .iter(world)
-        .next();
-    match (dead, banner) {
-        (true, None) => {
-            spawn_ui(world, death_banner());
-        }
-        (false, Some(banner)) => world.entity_mut(banner).despawn(),
-        _ => {}
+/// The death notice reads over any ground, so its line sits in a popup frame. It takes no clicks:
+/// respawning is a key the line names.
+fn death_notice(world: &mut World) {
+    let Some(gui) = gui::context(world) else {
+        return;
+    };
+    if !session::is_dead(world) {
+        return;
     }
-}
-
-fn death_banner() -> impl Scene {
-    bsn! {
-        DeathBanner
-        Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-        }
-        GlobalZIndex({ui::tokens::layer::ALERTS})
-        Pickable { should_block_lower: false, is_hoverable: false }
-        Children [ @{ui::rich_text(death_text(), false)} ]
-    }
-}
-
-fn death_text() -> RichText {
-    RichText {
-        color: Color::WHITE,
-        ..RichText::new(vec![
-            RichPiece::text("You died! Press "),
-            map::input(InputAction::Respawn),
-            RichPiece::text(" to respawn"),
-        ])
-    }
+    let line = StyledLine::new(vec![
+        TextPiece::text("You died! Press "),
+        map::input(InputAction::Respawn),
+        TextPiece::text(" to respawn"),
+    ]);
+    let area = egui::Area::new(egui::Id::new("death"))
+        .order(Band::Notices.order())
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .interactable(false);
+    gui::show_anchored(&gui, area, |ui| {
+        egui::Frame::popup(ui.style()).show(ui, |ui| {
+            let look = TextLook {
+                size: TextRole::Body.size(),
+                color: color::TEXT,
+            };
+            text::show(ui, world, &line, look, None);
+        });
+    });
 }

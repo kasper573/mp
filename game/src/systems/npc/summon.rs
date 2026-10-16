@@ -3,6 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::Home;
+use crate::core::content::Content;
 use crate::core::math::{Offset, Pos};
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault};
 use crate::core::tiling::{TilePos, Tiles};
@@ -30,6 +31,7 @@ pub struct SetAttitude {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct SpawnNpcs {
     pub npc: NpcId,
+    #[schemars(extend("x-count" = true))]
     pub count: u32,
     pub near: SpawnNear,
     pub shown: ShownFor,
@@ -73,13 +75,10 @@ impl EffectDef<RiftScripting> for SetAttitude {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(
-        &'static self,
-        _cx: &mut Compiler<RiftScripting>,
-    ) -> Result<EffectCall, ScriptFault> {
+    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         let attitude = self.attitude;
         Ok(Box::new(move |world, _, cx| {
             if let Some(npc) = cx.owner
@@ -102,13 +101,10 @@ impl EffectDef<RiftScripting> for SpawnNpcs {
     fn needs_subject(&self) -> bool {
         self.near == SpawnNear::Subject || self.shown == ShownFor::Subject
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(
-        &'static self,
-        _cx: &mut Compiler<RiftScripting>,
-    ) -> Result<EffectCall, ScriptFault> {
+    fn compile(&self, _cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
         if !(1..=MAX_SPAWNED).contains(&self.count) {
             return Err(ScriptFault::new(
                 "out of range",
@@ -151,21 +147,29 @@ impl EffectDef<RiftScripting> for Despawn {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let refused = self.refused.as_deref();
+        let refused = self.refused.clone();
         Ok(Box::new(move |world, _, cx| {
             let Some(npc) = effects::aimed(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody there to send away");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody there to send away");
             };
             if world.get::<Summoned>(npc).is_none() {
-                return effects::refuse(world, cx, refused, "Only spawned npcs leave on command");
+                return effects::refuse(
+                    world,
+                    cx,
+                    refused.as_deref(),
+                    "Only spawned npcs leave on command",
+                );
             }
             super::despawn(world, npc);
             EffectStep::Done
@@ -184,10 +188,11 @@ pub fn summon(
     only_for: Option<ClientId>,
     with: Option<Entity>,
 ) -> Vec<Entity> {
+    let content = world.resource::<Content>().clone();
     let (Some(at), Some(tag), Some(region)) = (
         position(world, beside),
         world.get::<AreaTag>(beside).cloned(),
-        area::of(world, beside),
+        area::of_in(&content, world, beside),
     ) else {
         return Vec::new();
     };

@@ -15,9 +15,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         return;
     };
     let applied = project.history.applied();
-    let saved_at = project
-        .saved_at
-        .filter(|at| *at <= project.history.steps().len());
+    let saved_at = project.history.saved();
     let rows: Vec<(usize, String, String, bool)> = project
         .history
         .steps()

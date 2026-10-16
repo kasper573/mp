@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bevy::tasks::futures_lite::future::block_on;
 use game::core::content::FilesystemFolder;
-use game::core::content::store::{ContentStore, MemoryStore};
+use game::core::content::store::ContentStore;
 use game::core::content::sync::{
     ContentSource, ServedContent, SyncError, SyncPolicy, SyncStatus, SyncedContent, sync,
 };
@@ -12,6 +12,7 @@ use game::core::content::version;
 use game::core::platform::{FetchFailure, LocalFuture};
 use game::core::time::{Backoff, Seconds};
 
+use crate::store::MemoryStore;
 use crate::support::{TempFolder, load};
 
 const FILES: &str = "/content/files/";

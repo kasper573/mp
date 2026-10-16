@@ -33,7 +33,7 @@ impl Plugin for SoundscapePlugin {
 }
 
 #[derive(Resource, Default)]
-pub struct Soundscape(pub &'static [SoundscapeZone]);
+pub struct Soundscape(pub Vec<SoundscapeZone>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoundscapeZone {
@@ -57,34 +57,26 @@ pub struct SoundscapeLayer {
     pub src: AssetRef,
     pub volume: f32,
     pub pan: f32,
+    pub category: AudioCategory,
 }
 
 #[derive(Resource, Default)]
 pub struct SoundscapeMixer {
     clock_start: Duration,
-    sources: HashMap<&'static str, Handle<AudioSource>>,
+    sources: HashMap<AssetRef, Handle<AudioSource>>,
     voices: Vec<SoundscapeVoice>,
+    refused: Option<Vec<WantedLayer>>,
 }
 
 pub struct SoundscapeVoice {
     pub channel: SoundscapeChannel,
-    pub src: &'static str,
+    pub category: AudioCategory,
+    pub src: AssetRef,
     instance: Handle<AudioInstance>,
     share: f32,
     volume: f32,
     pan: f32,
     applied: Option<(f32, f32)>,
-}
-
-impl SoundscapeChannel {
-    pub const MUSIC: SoundscapeChannel = SoundscapeChannel(1);
-
-    pub fn category(self) -> AudioCategory {
-        match self {
-            SoundscapeChannel::MUSIC => AudioCategory::Music,
-            _ => AudioCategory::Ambience,
-        }
-    }
 }
 
 impl SoundscapeZone {
@@ -158,9 +150,11 @@ impl SoundscapeVoice {
     }
 }
 
+#[derive(Clone, PartialEq)]
 struct WantedLayer {
     channel: SoundscapeChannel,
-    src: &'static str,
+    category: AudioCategory,
+    src: AssetRef,
     share: f32,
     volume: f32,
     pan: f32,
@@ -186,7 +180,7 @@ fn load_sources(
         .0
         .iter()
         .flat_map(|zone| zone.channels.values())
-        .map(|layer| (layer.src.as_str(), assets.load(layer.src.path())))
+        .map(|layer| (layer.src.clone(), assets.load(layer.src.path())))
         .collect();
 }
 
@@ -206,11 +200,37 @@ fn mix(
         .0
         .map_or_else(Vec::new, |at| wanted_layers(&soundscape, at));
     let clock = time.elapsed().saturating_sub(mixer.clock_start);
+    let elapsed = Seconds(time.delta_secs());
+    if mixer
+        .refused
+        .as_ref()
+        .is_some_and(|refused| *refused != wanted)
+    {
+        mixer.refused = None;
+    }
+    mixer.voices.retain_mut(|voice| {
+        let playing = wanted.iter().find(|layer| voice.plays(layer));
+        voice.approach(playing, elapsed);
+        let Some(mut instance) = instances.get_mut(&voice.instance) else {
+            warn!("soundscape voice {} failed to start", voice.src.as_str());
+            mixer.refused = Some(wanted.clone());
+            return false;
+        };
+        if playing.is_none() && voice.share <= 0.0 {
+            instance.stop(AudioTween::default());
+            return false;
+        }
+        voice.apply(&mut instance, audio_mix.gain(voice.category), elapsed);
+        true
+    });
+    if mixer.refused.is_some() {
+        return;
+    }
     for layer in &wanted {
         if mixer.voices.iter().any(|voice| voice.plays(layer)) {
             continue;
         }
-        let Some(source) = mixer.sources.get(layer.src) else {
+        let Some(source) = mixer.sources.get(&layer.src) else {
             continue;
         };
         let Some(clip) = sources.get(source) else {
@@ -226,7 +246,8 @@ fn mix(
             .handle();
         mixer.voices.push(SoundscapeVoice {
             channel: layer.channel,
-            src: layer.src,
+            category: layer.category,
+            src: layer.src.clone(),
             instance,
             share: 0.0,
             volume: layer.volume,
@@ -234,29 +255,11 @@ fn mix(
             applied: None,
         });
     }
-    let elapsed = Seconds(time.delta_secs());
-    mixer.voices.retain_mut(|voice| {
-        let wanted = wanted.iter().find(|layer| voice.plays(layer));
-        voice.approach(wanted, elapsed);
-        let Some(mut instance) = instances.get_mut(&voice.instance) else {
-            return true;
-        };
-        if wanted.is_none() && voice.share <= 0.0 {
-            instance.stop(AudioTween::default());
-            return false;
-        }
-        voice.apply(
-            &mut instance,
-            audio_mix.gain(voice.channel.category()),
-            elapsed,
-        );
-        true
-    });
 }
 
 fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
     let mut wanted: Vec<WantedLayer> = Vec::new();
-    for zone in soundscape.0 {
+    for zone in &soundscape.0 {
         let Some(heard) = zone.heard_from(at) else {
             continue;
         };
@@ -265,12 +268,13 @@ fn wanted_layers(soundscape: &Soundscape, at: Pos<Tiles>) -> Vec<WantedLayer> {
             let pan = (layer.pan + heard.pan).clamp(-1.0, 1.0);
             match wanted
                 .iter_mut()
-                .find(|wanted| wanted.channel == channel && wanted.src == layer.src.as_str())
+                .find(|wanted| wanted.channel == channel && wanted.src == layer.src)
             {
                 Some(wanted) => wanted.blend(power, layer, pan),
                 None => wanted.push(WantedLayer {
                     channel,
-                    src: layer.src.as_str(),
+                    category: layer.category,
+                    src: layer.src.clone(),
                     share: power,
                     volume: layer.volume,
                     pan,
@@ -300,7 +304,9 @@ fn toward(from: f32, to: f32, step: f32) -> f32 {
 #[derive(JsonSchema, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum ShapeRow {
+    #[schemars(extend("x-rect" = true))]
     Rect { x: f32, y: f32, w: f32, h: f32 },
+    #[schemars(extend("x-rect" = true))]
     Ellipse { x: f32, y: f32, w: f32, h: f32 },
 }
 

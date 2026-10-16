@@ -65,10 +65,13 @@ impl EffectDef<RiftScripting> for Heal {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let by = match &self.by {
             HealBy::Amount(amount) => Some(effects::number(cx, amount)?),
@@ -96,10 +99,13 @@ impl EffectDef<RiftScripting> for Damage {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let by = effects::number(cx, &self.by)?;
         Ok(Box::new(move |world, _, cx| {
@@ -120,10 +126,13 @@ impl EffectDef<RiftScripting> for Buff {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let by = effects::number(cx, &self.by)?;
         let seconds = effects::number(cx, &self.seconds)?;
@@ -146,10 +155,13 @@ impl EffectDef<RiftScripting> for ClearBuffs {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         Ok(Box::new(move |world, _, cx| {
             if let Some(actor) = effects::aimed(world, cx, &who)

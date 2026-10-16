@@ -20,7 +20,7 @@ One-time setup:
   is [Playwright](https://playwright.dev) (in [`e2e/`](e2e)); `just e2e` installs its npm deps on
   first run and drives Chrome on a virtual display, so it's zero-config and never touches your
   desktop. CI fans out across Chrome, Firefox and Safari.
-- The ui gallery and editor recordings need `xvfb`, `xdotool` and ffmpeg.
+- The editor recordings need `xvfb`, `xdotool` and ffmpeg.
 
 Then:
 
@@ -38,7 +38,6 @@ To see the game in action without playing it, record its showcase chapters
 ```sh
 just showcase combat travel   # some chapters: target/showcase/03-combat.mp4, target/showcase/06-travel.mp4
 just showcase                 # all of them, stitched: target/showcase/showcase.mp4
-just gallery-showcase "toasts (sonner)" 8 "mousemove 800 523 click 1"   # a ui component on its own
 ```
 
 The website lives at <https://rift.localhost> and Grafana at <https://grafana.rift.localhost>.

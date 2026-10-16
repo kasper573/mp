@@ -1,65 +1,43 @@
 use bevy::prelude::*;
-use ui::{DragHandle, DragRoot, OnSettle, text_colored};
+use egui::{Pos2, Rect, Ui};
 
 use crate::systems::actor::Name;
-use crate::systems::hud::{BORDER, HudAudience, PANEL_BG, Widget, persist_widget};
+use crate::systems::hud::{self, HudAudience, HudWidget};
 use crate::systems::player::{Xp, session};
 use crate::systems::stat;
 
-#[derive(Component, Default, Clone)]
-struct CharacterText;
+const WIDTH: f32 = 140.0;
 
 pub struct CharacterWidget;
 
-impl Widget for CharacterWidget {
+impl HudWidget for CharacterWidget {
     fn audience(&self) -> HudAudience {
         HudAudience::Players
     }
-    fn fallback(&self, _: f32) -> Vec2 {
-        Vec2::new(8.0, 8.0)
+    fn fallback(&self, screen: Rect) -> Pos2 {
+        screen.min + egui::vec2(8.0, 8.0)
     }
-    fn build(&self, pos: Vec2, id: &'static str) -> Box<dyn Scene> {
-        build(pos, id)
+    fn show(&self, ui: &mut Ui, world: &mut World) {
+        let fresh = character_sheet(world);
+        let mut last = world.get_resource_or_init::<LastSheet>();
+        if let Some(fresh) = fresh {
+            last.0 = fresh;
+        }
+        let sheet = &last.0;
+        hud::panel().show(ui, |ui| {
+            ui.set_width(WIDTH);
+            for line in sheet {
+                ui.label(line);
+            }
+        });
     }
-    fn sync(&self, world: &mut World) {
-        sync_character(world)
-    }
-}
-
-fn build(pos: Vec2, id: &'static str) -> Box<dyn Scene> {
-    let node = Node {
-        position_type: PositionType::Absolute,
-        left: Val::Px(pos.x),
-        top: Val::Px(pos.y),
-        width: Val::Px(140.0),
-        height: Val::Px(64.0),
-        border: UiRect::all(Val::Px(1.0)),
-        padding: UiRect::all(Val::Px(6.0)),
-        ..default()
-    };
-    Box::new(bsn! {
-        node
-        BackgroundColor({PANEL_BG})
-        BorderColor::all(BORDER)
-        DragRoot
-        DragHandle
-        ~{OnSettle::new(move |world, geom| persist_widget(world, id, geom))}
-        Children [ @{text_colored(String::new(), Color::WHITE)} CharacterText ]
-    })
 }
 
 // Between areas there is no character for a moment; the panel keeps what it last showed.
-fn sync_character(world: &mut World) {
-    let Some(text) = character_text(world) else {
-        return;
-    };
-    let mut query = world.query_filtered::<&mut Text, With<CharacterText>>();
-    for mut node in query.iter_mut(world) {
-        node.0 = text.clone();
-    }
-}
+#[derive(Resource, Default)]
+struct LastSheet(Vec<String>);
 
-fn character_text(world: &World) -> Option<String> {
+fn character_sheet(world: &World) -> Option<Vec<String>> {
     let me = session::my_character(world)?;
     let entity = me.id();
     let name = me
@@ -68,5 +46,9 @@ fn character_text(world: &World) -> Option<String> {
     let xp = me.get::<Xp>().map_or(0, |x| x.amount);
     let health = stat::current_health(world, entity);
     let max = stat::max_health(world, entity);
-    Some(format!("{name}\n{health:.0} / {max:.0}\nxp {xp}"))
+    Some(vec![
+        name,
+        format!("{health:.0} / {max:.0}"),
+        format!("xp {xp}"),
+    ])
 }

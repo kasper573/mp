@@ -53,7 +53,8 @@ pub fn scenery_rect(module: &Value) -> Option<Rect<Tiles>> {
     let at = pos_of(&module["at"])?;
     let rows = module["tiles"].as_array()?;
     let width = rows.first().and_then(Value::as_array).map_or(0, Vec::len);
-    Some(flip_of(module).anchored(at, Size::new(width as f32, rows.len() as f32)))
+    let size = Size::new(width as f32, rows.len() as f32);
+    Some(flip_of(module).place(Rect::new(Pos::new(0.0, 0.0), size), at))
 }
 
 pub fn shift(module: &mut Value, dx: f32, dy: f32) {

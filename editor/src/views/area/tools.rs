@@ -1,22 +1,21 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use game::core::math::{Offset, Pos, Rect};
+use game::core::math::{Offset, Rect};
 use game::core::tiling::{Cell, TilePos, Tiles};
 use game::systems::area::AreaModuleKind;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
-use super::modules::{context_menu_at, open_add_menu, show_add_menu, write_modules};
+use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};
 use super::select::{
     copy_selection, delete_selection, duplicate_selection, move_selection, paste_anchor,
     paste_in_place, select_input, selected_indices, snapped_delta, start_paste,
 };
-use super::{
-    AreaCanvas, AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, shapes,
-};
+use super::{AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, shapes};
 use super::{placement, scenery, stamp};
 use crate::app::Editor;
 use crate::project::RowSelection;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
+use crate::views::navigation::{self, Viewport};
 
 pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     let view = editor.views.area.view_mut(view_key);
@@ -52,8 +51,7 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
             .on_hover_text(format!("{} ({})", tool.label(), tool.icon()))
             .clicked()
         {
-            view.tool = tool;
-            view.drag = None;
+            view.set_tool(tool);
             switched = Some(tool);
         }
         ui.add_space(2.0);
@@ -132,42 +130,17 @@ pub fn input(
 ) {
     let response = frame.response;
     let modifiers = ui.input(|i| i.modifiers);
-    let space = ui.input(|i| i.key_down(egui::Key::Space));
-    let scroll = ui.input(|i| i.smooth_scroll_delta);
-    let zoom_delta = ui.input(|i| i.zoom_delta());
-    {
-        let view = editor.views.area.view_mut(view_key);
-        if response.hovered() && (scroll.y != 0.0 || zoom_delta != 1.0) {
-            let factor = if zoom_delta != 1.0 {
-                zoom_delta
-            } else {
-                (scroll.y / 240.0).exp2()
-            };
-            let before = frame.pointer_tile;
-            view.zoom = (view.zoom * factor).clamp(MIN_ZOOM, MAX_ZOOM);
-            if let (Some(before), Some(p)) = (before, frame.pointer) {
-                let canvas = AreaCanvas {
-                    rect: frame.canvas.rect,
-                    center: view.center,
-                    zoom: view.zoom,
-                };
-                let after = canvas.to_tile(p);
-                view.center = Pos::new(
-                    view.center.x + before.x - after.x,
-                    view.center.y + before.y - after.y,
-                );
-            }
-        }
-        let panning = response.dragged_by(egui::PointerButton::Middle)
-            || (space && response.dragged_by(egui::PointerButton::Primary));
-        if panning {
-            let delta = response.drag_delta();
-            view.center = Pos::new(
-                view.center.x - delta.x / view.zoom / super::TILE_PX,
-                view.center.y - delta.y / view.zoom / super::TILE_PX,
-            );
-            return;
-        }
+    let view = editor.views.area.view_mut(view_key);
+    let mut viewport = Viewport {
+        screen: frame.canvas.screen,
+        center: view.center,
+        zoom: view.zoom,
+    };
+    let panning = navigation::zoom_and_pan(ui, response, &mut viewport, (MIN_ZOOM, MAX_ZOOM));
+    view.center = viewport.center;
+    view.zoom = viewport.zoom;
+    if panning {
+        return;
     }
     if let Some(pick) = editor.pick.clone() {
         pick_place(editor, painter, frame, &pick, modifiers.alt);
@@ -178,15 +151,7 @@ pub fn input(
     if response.secondary_clicked() {
         context_menu_at(editor, view_key, frame);
     }
-    let in_place = editor.views.area.view(view_key).in_place.last().cloned();
     match tool {
-        AreaTool::Select if in_place.is_some() => placement::select_input_in_place(
-            editor,
-            view_key,
-            frame,
-            in_place.as_ref().expect("in place"),
-            modifiers,
-        ),
         AreaTool::Select => select_input(editor, ui, view_key, frame, modifiers),
         AreaTool::Paint if walk_overlay => {
             grid_stroke(editor, view_key, frame, BrushStrokeKind::Walk)
@@ -226,7 +191,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
     let brush = editor.settings.brush.clone();
     let view = editor.views.area.view(view_key);
     let accent = Color32::from_rgb(255, 230, 120);
-    match &view.drag {
+    match view.drag() {
         Some(AreaDrag::Box { from }) => {
             if let Some(tile) = frame.pointer_tile {
                 painter.rect_stroke(
@@ -418,8 +383,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         if !modifiers.ctrl && !modifiers.alt {
             for tool in AreaTool::ALL {
                 if plain_key(tool.key()) {
-                    view.tool = tool;
-                    view.drag = None;
+                    view.set_tool(tool);
                     switched = tool.bottom_tab();
                 }
             }
@@ -456,28 +420,24 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             _ => {
                 let indices = selected_indices(editor, &frame.area_key);
                 if !indices.is_empty() {
-                    let mut modules = frame.modules.clone();
-                    for &index in &indices {
-                        shapes::flip_field(&mut modules[index], horizontal);
-                    }
-                    write_modules(
-                        editor,
-                        &frame.area_key,
-                        modules,
-                        &format!("Flip {} modules in {}", indices.len(), frame.area_key),
-                    );
+                    change_modules(editor, &frame.area_key, |modules| {
+                        for &index in &indices {
+                            shapes::flip_field(modules.get_mut(index)?, horizontal);
+                        }
+                        Some(format!(
+                            "Flip {} modules in {}",
+                            indices.len(),
+                            frame.area_key
+                        ))
+                    });
                 }
             }
         }
     }
     if input.key_pressed(egui::Key::Escape) {
         let view = editor.views.area.view_mut(view_key);
-        if view.drag.is_some() {
-            view.drag = None;
-            view.stroke = None;
-        } else if view.paste.is_some() {
-            view.paste = None;
-        } else if view.in_place.pop().is_some() || !editor.selection.parts.is_empty() {
+        if !view.cancel_gesture() && view.paste.take().is_none() {
+            view.in_place.pop();
             editor.selection.parts.clear();
         }
         return;
@@ -535,7 +495,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
     for (key, (dx, dy)) in nudge {
         if input.key_pressed(key) {
             if !editor.selection.parts.is_empty() && editor.selection.table == "area" {
-                move_selection(editor, view_key, frame, dx, dy);
+                move_selection(editor, frame, dx, dy);
             } else {
                 let view = editor.views.area.view_mut(view_key);
                 let cursor = view.cursor_cell.unwrap_or_else(|| view.center.cell());
@@ -552,7 +512,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             editor.selection = RowSelection {
                 table: "area".to_owned(),
                 keys: vec![frame.area_key.clone()],
-                parts: vec![format!("/modules/{hit}")],
+                parts: vec![super::module_part(hit)],
             };
         }
     }
@@ -561,7 +521,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let at = view
             .cursor_cell
             .map(|c| frame.canvas.to_screen(c.center()))
-            .unwrap_or(frame.canvas.rect.center());
+            .unwrap_or(frame.canvas.screen.center());
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
         super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }

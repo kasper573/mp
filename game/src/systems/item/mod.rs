@@ -28,7 +28,7 @@ use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
 use crate::systems::movement::{Position, position};
 use crate::systems::notification;
 use crate::systems::npc::Npc;
-use crate::systems::player::{ClientId, Owner, Players, commands_locked, sender_player};
+use crate::systems::player::{self, ClientId, Owner, Players, sender_player};
 use crate::systems::reach::{self, Pursuit, ReachAct};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
@@ -75,6 +75,8 @@ pub struct ItemStack {
 #[serde(deny_unknown_fields)]
 struct ItemStackRow {
     item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     count: u32,
 }
@@ -513,7 +515,7 @@ pub fn use_item(world: &mut World) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
         };
-        if stat::is_dead(world, entity) {
+        if !player::may_command(world, entity) {
             continue;
         }
         if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
@@ -536,7 +538,7 @@ pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), St
 }
 
 fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let item = world
         .get::<Inventory>(actor)
         .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
@@ -572,12 +574,12 @@ pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
 }
 
 pub fn drop_item(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     for request in drain_requests::<DropItemRequest>(world) {
         let Some(player) = sender_player(world, request.client_id) else {
             continue;
         };
-        if stat::is_dead(world, player) {
+        if !player::may_command(world, player) {
             continue;
         }
         let slot = request.message.slot as usize;
@@ -605,8 +607,7 @@ pub fn pickup_request(world: &mut World) {
             continue;
         };
         let target = request.message.target;
-        if stat::is_dead(world, player)
-            || commands_locked(world, player)
+        if !player::may_command(world, player)
             || world.get::<DroppedItem>(target).is_none()
             || !visibility::present(world, target, player)
         {
@@ -712,7 +713,8 @@ pub fn scatter_at(
     if drops.is_empty() {
         return;
     }
-    let area = area::load(world.resource::<Content>(), area_id);
+    let content = world.resource::<Content>().clone();
+    let area = area::load(&content, area_id);
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let count = drops.len();
     let mut items = Vec::with_capacity(count);
@@ -721,7 +723,7 @@ pub fn scatter_at(
         let entity = world
             .spawn((
                 Replicated,
-                Position { pos },
+                Position::at(pos),
                 AreaTag { area: area_id },
                 DroppedItem { item, count: stack },
                 Reservation {
@@ -794,7 +796,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     {
         return;
     }
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let collected = world
         .get_mut::<Inventory>(player)
         .is_some_and(|mut inventory| {
@@ -809,7 +811,7 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
 }
 
 fn instantiate_effects(world: &mut World, actor: Entity, item: ItemId, duration: Seconds) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let until = world.resource::<WallClock>().now.after(duration);
     let entries = item
         .get(&content)

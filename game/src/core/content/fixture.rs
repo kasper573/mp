@@ -23,7 +23,7 @@ pub trait Fixture: Copy + Into<&'static str> + VariantArray + 'static {
             })
     }
 
-    fn get(self, content: &Content) -> &'static Self::Row {
+    fn get(self, content: &Content) -> &Self::Row {
         self.id(content).get(content)
     }
 

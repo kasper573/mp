@@ -4,7 +4,7 @@ use game::systems::area::transition::{self, Crossing};
 use game::systems::memory::{self, Memory};
 use game::systems::movement::position;
 
-use crate::support::{Sim, content, row, spawn_area};
+use testkit::{Sim, content, row, spawn_area};
 
 const HOUR: u64 = 3_600_000;
 

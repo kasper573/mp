@@ -11,7 +11,7 @@ lint:
 
 # Every test lives in a tests/ folder; the libs' and bins' own test harnesses would build for nothing.
 test:
-    cargo test --release -p game -p ui -p editor --test '*'
+    cargo test --release -p game -p editor --test '*'
 
 # The website and game server binaries, and the roles the auth stack syncs from.
 build:
@@ -41,7 +41,7 @@ stack: build wasm (up "--profile dev")
 # The stack, rebuilding the wasm and the website on every change: reload the page to pick one up.
 dev: stack
     source docker/.env.test && echo "sign in and play at https://$RIFT_DOMAIN/play"
-    cargo watch -w game -w ui -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
+    cargo watch -w game -w design_tokens -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
 
 # Tears the stack down and wipes its data, so keycloak imports its realm again on the next start.
 reset:
@@ -95,15 +95,9 @@ showcase *chapters:
     RIFT_SHOWCASE_CONTENT_DIR=$PWD/content RIFT_SHOWCASE_OUT_DIR=$PWD/{{showcase_dir}} RIFT_SHOWCASE_CORES_PER_CHAPTER=5 \
       target/release/showcase {{chapters}}
 
-# Records the ui gallery on SCENE (a tab name): `just gallery-showcase "toasts (sonner)" 8 "mousemove 800 523 click 1"`.
-gallery-showcase scene seconds="6" input="":
-    cargo build --release -p ui --bin gallery
-    just record {{quote(showcase_dir / "gallery-" + kebabcase(scene) + ".webm")}} "rift ui gallery" {{seconds}} {{quote(input)}} "" \
-      target/release/gallery {{quote(scene)}}
-
 # The art exports sit beside the copy, so import scenes find them.
-[doc("Records the editor on a copy of the example content at SCENE; HOOK runs with WORK naming the copy's parent.")]
-editor-showcase scene seconds="8" input="" hook="":
+[doc("Records the editor on a copy of the example content at SCENE, a JSON array of steps, as editor-NAME.webm; HOOK runs with WORK naming the copy's parent.")]
+editor-showcase name scene seconds="8" input="" hook="":
     #!/usr/bin/env bash
     set -euo pipefail
     cargo build --release -p editor
@@ -111,7 +105,7 @@ editor-showcase scene seconds="8" input="" hook="":
     trap 'rm -rf "$WORK"' EXIT
     cp -r content "$WORK/game"
     cp -r art "$WORK/art"
-    just record {{quote(showcase_dir / "editor-" + kebabcase(scene) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
+    just record {{quote(showcase_dir / "editor-" + kebabcase(name) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
 # Frames sampled evenly across VIDEO, tiled into one image beside it: a recording at a glance.

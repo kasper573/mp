@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, Fixture};
 use crate::core::script::{
-    self, Answer, BoxEnding, ChoiceOffer, ChoiceReveal, ChoiceState, DialogueView, ScriptFault,
+    self, Answer, BoxEnding, ChoiceOffer, ChoiceState, DialogueView, RevealDef, ScriptFault,
 };
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
@@ -106,6 +108,18 @@ pub enum ChoiceChip {
     Gets { item: ItemId, count: u32 },
 }
 
+impl ChoiceChip {
+    pub fn needs(world: &World, player: Entity, requires: &Condition) -> Vec<ChoiceChip> {
+        condition::parts(requires)
+            .into_iter()
+            .map(|part| ChoiceChip::Needs {
+                what: condition::describe(world.resource::<Content>(), part),
+                met: condition::holds(world, player, part),
+            })
+            .collect()
+    }
+}
+
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ConversationRequest {
     Pick { step: ConversationStep, choice: u32 },
@@ -117,7 +131,7 @@ pub type CardPick = Arc<dyn Fn(&mut World, Entity) -> Result<Answer, String> + S
 pub struct CardOffer {
     pub label: LineText,
     pub tag: ChoiceTag,
-    pub icon: Option<&'static AssetRef>,
+    pub icon: Option<AssetRef>,
     pub chips: Vec<ChoiceChip>,
     pub locked: bool,
     pub warn: Option<String>,
@@ -151,6 +165,28 @@ pub struct Revealable {
     pub gains: bool,
 }
 
+#[derive(
+    JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash, IntoStaticStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ChoiceReveal {
+    Locked,
+    Needs,
+    Costs,
+    Gains,
+}
+
+impl RevealDef for ChoiceReveal {
+    fn shows_while_locked(self) -> bool {
+        self == ChoiceReveal::Locked
+    }
+
+    fn name(self) -> &'static str {
+        self.into()
+    }
+}
+
 pub fn check_reveal(reveal: &[ChoiceReveal], revealable: Revealable) -> Result<(), ScriptFault> {
     for kind in reveal {
         let (present, what) = match kind {
@@ -165,7 +201,7 @@ pub fn check_reveal(reveal: &[ChoiceReveal], revealable: Revealable) -> Result<(
             ));
         }
     }
-    ChoiceReveal::check_unique(reveal)
+    script::check_reveals_unique(reveal)
 }
 
 pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueView<RiftScripting>) {
@@ -198,7 +234,7 @@ pub fn show(world: &mut World, flow: FlowKey, subject: Entity, view: DialogueVie
             view: choice_view(world, subject, choice),
             pick: Pick::Choice {
                 index: choice.index,
-                requires: choice.requires,
+                requires: choice.requires.cloned(),
                 costs: revealed_costs(choice),
             },
         })
@@ -291,7 +327,7 @@ pub fn remark(world: &mut World, player: Entity, to: Entity, line: &Line) {
     let line = SpokenLine {
         by: line.by,
         face: line.face.clone(),
-        text: LineText::of(&line.text),
+        text: condition::spoken(world, player, &line.text),
     };
     record_line(world, player, &line);
     if let Some(mut session) = world.get_mut::<ConversationSession>(player) {
@@ -418,7 +454,7 @@ struct Offer {
 enum Pick {
     Choice {
         index: usize,
-        requires: Option<&'static Condition>,
+        requires: Option<Condition>,
         costs: Vec<ItemStack>,
     },
     Card(CardPick),
@@ -540,12 +576,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
     if choice.reveal.contains(&ChoiceReveal::Needs)
         && let Some(requires) = choice.requires
     {
-        for part in condition::parts(requires) {
-            chips.push(ChoiceChip::Needs {
-                what: condition::describe(world.resource::<Content>(), part),
-                met: condition::holds(world, player, part),
-            });
-        }
+        chips.extend(ChoiceChip::needs(world, player, requires));
     }
     let items = choice.leads.iter().find_map(|effect| match effect {
         RiftEffect::Items(items) => Some(items),
@@ -571,7 +602,7 @@ fn choice_view(world: &World, player: Entity, choice: &ChoiceOffer<RiftScripting
         }
     }
     ChoiceView {
-        label: LineText::of(choice.label),
+        label: LineText::spoken(choice.label, &choice.label_values),
         tag: ChoiceTag::Dialogue,
         icon: None,
         chips,
@@ -635,7 +666,7 @@ fn pick(world: &mut World, player: Entity, step: ConversationStep, choice: u32) 
             costs,
         } => match script::run::choice_state::<RiftScripting>(world, flow, index) {
             ChoiceState::Open => affordable(world, player, &costs).map(|()| Answer::Pick(index)),
-            ChoiceState::Locked => Err(unmet(world, player, requires)),
+            ChoiceState::Locked => Err(unmet(world, player, requires.as_ref())),
             ChoiceState::Gone => Err(NO_LONGER.to_owned()),
         },
         Pick::Card(card) => card(world, player),
@@ -678,7 +709,7 @@ fn affordable(world: &World, player: Entity, costs: &[ItemStack]) -> Result<(), 
         .map_err(|refusal| refusal.describe(content))
 }
 
-fn unmet(world: &World, player: Entity, requires: Option<&'static Condition>) -> String {
+fn unmet(world: &World, player: Entity, requires: Option<&Condition>) -> String {
     condition::first_unmet(world, player, requires)
         .map_or_else(|| LOCKED.to_owned(), |unmet| format!("Needs {unmet}"))
 }

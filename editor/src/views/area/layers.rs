@@ -17,11 +17,11 @@ pub fn popover(
     editor: &mut Editor,
     ui: &mut Ui,
     view_key: &str,
-    content: Content,
+    content: &Content,
     area_id: AreaId,
     canvas: ERect,
 ) {
-    let area_key = area_id.key(&content).to_owned();
+    let area_key = area_id.key(content).to_owned();
     let Some(row) = editor.row_value("area", &area_key) else {
         return;
     };
@@ -32,8 +32,8 @@ pub fn popover(
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect();
     let (blueprints, scenery) = {
-        let placed = area::placed(&content, area_id);
-        let blueprints = area::placements(&content, area_id)
+        let placed = area::placed(content, area_id);
+        let blueprints = area::placements(content, area_id)
             .iter()
             .filter(|p| p.chain.len() <= 1)
             .count();
@@ -157,8 +157,8 @@ pub fn popover(
             let mut layers = layers.clone();
             layers.push(name.clone());
             row["map"]["ground"] = serde_json::json!(layers);
-            let grids = area::load(&content, area_id).grids;
-            let mut draft = grid::GridDraft::of(&area_key, grids);
+            let grids = area::load(content, area_id).grids.clone();
+            let mut draft = grid::GridDraft::of(&area_key, &grids);
             draft.add_layer(&name);
             let mut edit = ContentEdit::new(format!("Add layer {name} to {area_key}"));
             edit.write_json(row_file("area", &area_key), &row);
@@ -305,6 +305,17 @@ pub fn rename_layer(
     edit.write(format!("{folder}/{}", area::grid::layer_file(to)), bytes);
     edit.remove(old);
     if editor.apply(edit) {
+        for view in editor
+            .views
+            .area
+            .views
+            .values_mut()
+            .filter(|view| view.area == area_key)
+        {
+            if view.hidden_ground.remove(from) {
+                view.hidden_ground.insert(to.to_owned());
+            }
+        }
         Ok(())
     } else {
         Err(REFUSED.to_owned())

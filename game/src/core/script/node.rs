@@ -37,6 +37,7 @@ pub enum Node<V: Vocabulary> {
         outputs: Vec<Arrow>,
     },
     Repeat {
+        #[schemars(extend("x-count" = true))]
         times: Expr<V>,
         at_most: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]

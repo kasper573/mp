@@ -91,12 +91,7 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
     let Some(target) = world.get::<ReachIntent>(actor).map(|intent| intent.target) else {
         return Pursuit::Lost;
     };
-    if stat::is_dead(world, actor)
-        || world.get_entity(target).is_err()
-        || stat::is_dead(world, target)
-        || !area::same_area(world, actor, target)
-        || !visibility::coexist(world, actor, target)
-    {
+    if stat::is_dead(world, actor) || !pursuable(world, actor, target) {
         return Pursuit::Lost;
     }
     let Some(target_at) = position(world, target) else {
@@ -109,7 +104,19 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
     }
 }
 
+pub fn pursuable(world: &World, actor: Entity, target: Entity) -> bool {
+    world.get_entity(target).is_ok()
+        && !stat::is_dead(world, target)
+        && area::same_area(world, actor, target)
+        && visibility::coexist(world, actor, target)
+}
+
 pub fn forget(world: &mut World, actor: Entity) {
-    world.entity_mut(actor).remove::<ReachIntent>();
+    drop_intent(world, actor);
     movement::halt(world, actor);
+}
+
+/// Gives up reaching for anything, leaving the actor's walk as it is.
+pub fn drop_intent(world: &mut World, actor: Entity) {
+    world.entity_mut(actor).remove::<ReachIntent>();
 }

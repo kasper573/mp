@@ -6,13 +6,16 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use bevy::prelude::*;
-use bevy_egui::{EguiContext, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
+use bevy_egui::{
+    EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
+};
 use egui_dock::DockState;
 use game::core::content::{Content, ContentRegistry, version};
 use game::core::math::Pos;
 use game::core::tiling::Tiles;
 use game::systems;
 use game::systems::script::Place;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::forms::FormState;
@@ -22,6 +25,7 @@ use crate::project::watch::FolderWatcher;
 use crate::project::{
     ContentEdit, EditRefusal, EditViewpoint, FileConflict, Project, RowSelection, row_file,
 };
+use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
 use crate::tabs::EditorTab;
 use crate::thumbs::Thumbnail;
@@ -32,12 +36,12 @@ use crate::views::script::inspect::{MakeInlineDialog, MakeSharedDialog};
 use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
-use crate::{import, play, rows, scenes, ui, views};
+use crate::{import, play, rows, ui, views};
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
     pub folder: Option<PathBuf>,
-    pub scene: Option<String>,
+    pub scene: Option<Vec<Step>>,
     pub user: Option<PathBuf>,
     pub frame_log: Option<PathBuf>,
 }
@@ -67,6 +71,10 @@ impl Plugin for EditorPlugin {
         app.add_plugins((EguiPlugin::default(), bevy_tilemap::TilemapPlugin))
             .insert_resource(editor)
             .add_systems(Startup, setup_camera)
+            .add_systems(
+                PreUpdate,
+                theme_context.after(EguiPreUpdateSet::InitContexts),
+            )
             .add_systems(EguiPrimaryContextPass, editor_ui)
             .add_systems(Update, background);
     }
@@ -74,6 +82,13 @@ impl Plugin for EditorPlugin {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, PrimaryEguiContext, EditorCamera));
+}
+
+// egui takes up new fonts as a pass begins, so they must be set before the first pass draws text.
+fn theme_context(mut contexts: Query<&mut EguiContext, Added<PrimaryEguiContext>>) {
+    for mut context in &mut contexts {
+        ui::theme::apply(context.get_mut());
+    }
 }
 
 pub const REFUSED: &str = "refused; see the output";
@@ -92,7 +107,6 @@ pub struct Editor {
     pub status: StatusBar,
     pub last_refusal: Option<EditRefusal>,
     pub history_focus: Option<usize>,
-    pub themed: bool,
     pub selection: RowSelection,
     pub form: FormState,
     pub output: OutputLog,
@@ -100,7 +114,7 @@ pub struct Editor {
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
-    pub scene: Option<String>,
+    pub scene: Option<Vec<Step>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
     pub play: play::PlayTest,
@@ -168,7 +182,8 @@ pub enum RightTab {
     Conflicts,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BottomTab {
     #[default]
     History,
@@ -390,7 +405,6 @@ impl Editor {
             status: StatusBar::default(),
             last_refusal: None,
             history_focus: None,
-            themed: false,
             selection: RowSelection::default(),
             form: FormState::default(),
             output: OutputLog::default(),
@@ -547,6 +561,7 @@ impl Editor {
     }
 
     pub fn close_project(&mut self) {
+        self.save_settings();
         if let Some(mut play) = self.play.running.take() {
             play.stop();
         }
@@ -588,15 +603,6 @@ impl Editor {
                 self.refused(&label, &refusal);
                 Err(refusal.sentence())
             }
-        }
-    }
-
-    pub fn release_retired(&mut self) {
-        if let Some(project) = &mut self.project
-            && project.has_retired()
-        {
-            self.views.content_changed();
-            project.release_retired();
         }
     }
 
@@ -711,7 +717,9 @@ impl Editor {
     }
 
     pub fn loaded(&self) -> Option<Content> {
-        self.project.as_ref().and_then(|project| project.content)
+        self.project
+            .as_ref()
+            .and_then(|project| project.content.clone())
     }
 
     fn poll_outside(&mut self) {
@@ -800,7 +808,6 @@ fn editor_ui(world: &mut World) {
     let frame_ms = world.resource::<Time>().delta_secs() * 1000.0;
     world.resource_scope(|world, mut editor: Mut<Editor>| {
         editor.frame += 1;
-        editor.release_retired();
         let started = Instant::now();
         ui::show(&mut editor, &ctx);
         let ui_ms = started.elapsed().as_secs_f32() * 1000.0;

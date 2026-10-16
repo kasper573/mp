@@ -25,11 +25,10 @@ pub fn resize_dialog(
     mut dialog: ResizeDialog,
 ) -> Option<ResizeDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let old = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .and_then(|c| {
             c.by_key::<area::AreaDef>(&dialog.area)
                 .map(|id| area::load(&c, id).size)
@@ -37,6 +36,7 @@ pub fn resize_dialog(
         .map(|size| (size.width as u32, size.height as u32))
         .unwrap_or((dialog.width, dialog.height));
     crate::ui::dialogs::card(ctx, "resize", 480.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(
             RichText::new(format!("Resize area/{}", dialog.area))
                 .strong()
@@ -120,10 +120,10 @@ pub fn resize_dialog(
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if widgets::primary(ui, "Resize").clicked() || enter {
+            if widgets::primary(ui, "Resize").clicked() || pressed.enter {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });
@@ -208,7 +208,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
     let content = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .ok_or("the folder does not load")?;
     let id = content
         .by_key::<area::AreaDef>(&dialog.area)
@@ -220,7 +220,7 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
         anchor_shift(dialog.anchor.0, old.width, new.width),
         anchor_shift(dialog.anchor.1, old.height, new.height),
     );
-    let draft = super::grid::GridDraft::of(&dialog.area, area.grids);
+    let draft = super::grid::GridDraft::of(&dialog.area, &area.grids);
     let (resized, clipped) = draft.resized(new, shift);
     let mut row = editor
         .row_value("area", &dialog.area)
@@ -265,26 +265,14 @@ pub fn resize_area(editor: &mut Editor, dialog: &ResizeDialog) -> Result<(), Str
     edit.write_json(row_file("area", &dialog.area), &row);
     resized.write_all_into(&mut edit);
     if dx != 0.0 || dy != 0.0 {
-        let area_file = row_file("area", &dialog.area);
+        let files = &editor.project.as_ref().ok_or("no folder")?.files;
         for arrival in pins::arrivals(editor, &dialog.area) {
-            let project = editor.project.as_ref().ok_or("no folder")?;
-            let mut json = if arrival.file == area_file {
-                row.clone()
-            } else {
-                project
-                    .files
-                    .json_owned(&arrival.file)
-                    .ok_or("a file is gone")?
-            };
-            let Some(place) = json.pointer_mut(&arrival.pointer) else {
-                continue;
-            };
-            place["x"] = serde_json::json!(arrival.at.x + dx);
-            place["y"] = serde_json::json!(arrival.at.y + dy);
-            if arrival.file == area_file {
-                row = json.clone();
-            }
-            edit.write_json(arrival.file.clone(), &json);
+            edit.update_json(files, &arrival.file, |json| {
+                let place = json.pointer_mut(&arrival.pointer)?;
+                place["x"] = serde_json::json!(arrival.at.x + dx);
+                place["y"] = serde_json::json!(arrival.at.y + dy);
+                Some(())
+            });
         }
     }
     if editor.apply(edit) {

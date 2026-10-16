@@ -4,20 +4,13 @@ use bevy::prelude::*;
 use bevy::window::{PresentMode, WindowResolution};
 use editor::app::{EditorLaunch, EditorPlugin};
 
-const USAGE: &str = "usage: editor [folder] [--scene STEPS] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
+const USAGE: &str = "usage: editor [folder] [--scene JSON] [--user-folder PATH] [--frame-log PATH] [--build-info] [--shapes]
 
-  --scene STEPS      opens the folder on a state, for recordings and tests; steps join with `;`:
-                     area:<key>  blueprint:<key>  row:<table>/<key>  rows:<table>/<key>,<key>
-                     script:<key> | script:<table>/<key>#<pointer>  node:<name>  model:<key>
-                     tileset:<key>  sheet:<table>  world  part:<table>/<key>/<indices>  resize:area/<key>
-                     fold:<table>/<key>/<indices>  unfold:…  delete:<table>/<key>  duplicate:<table>/<key>  save
-                     clipboard:<table>/<key>/<index>  make-shared | make-inline | connect  dialog:<keys|binaries>
-                     bottom:<may-do|used-by|run|output|timeline|sheet|sounds|surfaces>
-                     section:<stats|bag|equipment|start|areas|quests|memories|lines|shops|history>
-                     mp:<strip|timing|cues|hitbox|busts|bottom|setby|surface|drop>:<arg>
-                     tp:<mode|brush|select|tile|set|terrain|closeup|bottom|zoom|dialog>:<arg>
-                     imp:<files|apply|retime>:<arg>  sh:<columns|sort|filter|cell>:<arg>
-                     wm:<lens|colour|line|route|look|select|layer|arrange|arrange-apply|region|note>:<arg>  (look:<area>/<zoom>, route:<from>/<to>)
+  --scene JSON       opens the folder on a state, for recordings and tests: a JSON array of steps, each an
+                     object keyed by its step name (snake_case), e.g. [{\"area\":\"island\"},{\"bottom\":\"output\"},{\"model\":{\"open\":\"walk\"}}]
+                     top level: area blueprint resize row rows part fold unfold delete duplicate clipboard
+                     script node make_shared make_inline connect bottom model tileset sheet world import
+                     section save dialog; model, tileset, sheet, world and import take their own steps
   --user-folder PATH settings, journal and import records go here instead of the user's folder
   --frame-log PATH   writes a line per frame: frame ms, ui ms, the active tab, entities, images, meshes
   --build-info       prints the build and exits
@@ -37,7 +30,16 @@ fn main() {
                 println!("{}", serde_json::to_string_pretty(&shapes).expect("json"));
                 return;
             }
-            "--scene" => launch.scene = args.next(),
+            "--scene" => {
+                let json = args.next().unwrap_or_default();
+                match serde_json::from_str(&json) {
+                    Ok(steps) => launch.scene = Some(steps),
+                    Err(error) => {
+                        eprintln!("--scene: {error}\n{USAGE}");
+                        std::process::exit(2);
+                    }
+                }
+            }
             "--user-folder" => launch.user = args.next().map(PathBuf::from),
             "--frame-log" => launch.frame_log = args.next().map(PathBuf::from),
             "--help" | "-h" => {

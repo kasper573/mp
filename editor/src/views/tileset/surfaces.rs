@@ -5,10 +5,11 @@ use game::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;
+use crate::audio::Waveform;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{inspector, theme, widgets};
-use crate::views::model::sounds::{self, Waveform};
+use crate::views::model::sounds;
 use crate::{forms, picker, rows, value};
 
 const TABLE: &str = "surface";
@@ -135,16 +136,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
         (Some(loudness), Some(role)) => {
             let verdict = sounds::verdict(loudness, gain, &role.def);
             widgets::kv(ui, "loudness", |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(
-                        RichText::new(if verdict.ok { "✓" } else { "!" }).color(if verdict.ok {
-                            theme::OK
-                        } else {
-                            theme::WARN
-                        }),
-                    );
-                    ui.label(RichText::new(&verdict.loudness).size(12.5));
-                });
+                widgets::verdict(ui, verdict.ok, &verdict.loudness);
             });
         }
         (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
@@ -164,7 +156,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             name,
             ..def.clone()
         };
-        write_surface(editor, content, surface, &def, ContentEdit::new(label));
+        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
     }
     if let Some(footstep) = new_footstep
         && let Some(sfx) = content.by_key::<SfxDef>(&footstep)
@@ -174,7 +166,7 @@ pub fn card(editor: &mut Editor, ui: &mut Ui, surface: &str) {
             footstep: sfx,
             ..def.clone()
         };
-        write_surface(editor, content, surface, &def, ContentEdit::new(label));
+        write_surface(editor, &content, surface, &def, ContentEdit::new(label));
     }
 }
 
@@ -200,7 +192,7 @@ pub fn new_surface_dialog(
             widgets::default_focus(ui, &response);
         });
         widgets::kv(ui, "footstep", |ui| {
-            egui::ComboBox::from_id_salt("new-surface-footstep")
+            widgets::combo_box("new-surface-footstep")
                 .selected_text(theme::mono(&dialog.footstep))
                 .width(200.0)
                 .show_ui(ui, |ui| {
@@ -246,7 +238,7 @@ fn add_surface(
         name: dialog.name.trim().to_owned(),
         footstep,
     };
-    let json = value::untyped(content, &def).ok_or("the surface does not write")?;
+    let json = value::untyped(&content, &def).ok_or("the surface does not write")?;
     let mut edit = ContentEdit::new(format!("New surface {key}"));
     edit.write_json(row_file(TABLE, &key), &json);
     editor.try_apply(edit)?;
@@ -256,7 +248,7 @@ fn add_surface(
 
 fn write_surface(
     editor: &mut Editor,
-    content: Content,
+    content: &Content,
     key: &str,
     def: &SurfaceDef,
     mut edit: ContentEdit,

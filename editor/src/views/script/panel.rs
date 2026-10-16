@@ -39,7 +39,7 @@ pub fn bindings(editor: &Editor, doc: &ScriptDoc) -> Vec<ScriptBinding> {
     let Some(project) = &editor.project else {
         return Vec::new();
     };
-    let Some(content) = project.content else {
+    let Some(content) = project.content.clone() else {
         return Vec::new();
     };
     match &doc.owner {
@@ -159,7 +159,7 @@ fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
 }
 
 fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         ui.label(theme::muted("The folder does not load"));
         return;
     };
@@ -177,7 +177,7 @@ fn may_do(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if bound.len() > 1 {
         ui.horizontal(|ui| {
             ui.label(theme::muted("as").size(13.0));
-            egui::ComboBox::from_id_salt(pick_id)
+            widgets::combo_box(pick_id)
                 .selected_text(
                     theme::mono(
                         bound
@@ -446,6 +446,7 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
             Reach::TurnsIn(q) => ("turns in", q),
             Reach::Fails(q) => ("fails", q),
             Reach::Completes(q) => ("completes a task of", q),
+            Reach::Decides(q) => ("decides a path of", q),
             _ => continue,
         };
         let key = quest.key(content).to_owned();
@@ -610,6 +611,7 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
         Reach::TurnsIn(quest) => format!("turns in quest {}", quest.key(content)),
         Reach::Fails(quest) => format!("fails quest {}", quest.key(content)),
         Reach::Completes(quest) => format!("completes a task of {}", quest.key(content)),
+        Reach::Decides(quest) => format!("decides a path of {}", quest.key(content)),
         Reach::Remembers(memory) => format!("remembers {}", memory.key(content)),
         Reach::OpensShop(shop) => format!("opens shop {}", shop.key(content)),
         Reach::Spawns(npc) => format!("spawns {}", npc.key(content)),

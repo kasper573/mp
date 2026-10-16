@@ -25,6 +25,7 @@ use crate::app::{
     BottomTab, Clipboard, ConfirmAction, ConfirmDialog, Editor, ModalDialog, PlacePick, RightTab,
     TextComparison, registry,
 };
+use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormChange, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::rows::new_row_into;
@@ -604,7 +605,7 @@ fn modules_column(
                 if blocks == 1 { "block" } else { "blocks" }
             )
         } else {
-            summary_of(module)
+            summary_of(cx.root, module)
         };
         let folded_key = format!("{table}{path}");
         let folded = match (
@@ -729,7 +730,7 @@ pub(super) fn card_body(
                     .all(|name| name == "type" || hidden.contains(&name.as_str()))
             });
         if fieldless {
-            widgets::hint(ui, fieldless_note(table, &variant.tag));
+            widgets::hint(ui, &fieldless_note(variant.schema));
         } else {
             changed |= forms::object_without(ui, cx, variant.schema, module, path, hidden);
         }
@@ -780,10 +781,10 @@ pub(super) fn add_module_popup(
 ) -> Option<Value> {
     let registry = registry();
     let id = ui.id().with("add-module-filter");
-    let mut filter = cx.state.drafts.get(&id).cloned().unwrap_or_default();
+    let mut filter = draft_of(ui, id).unwrap_or_default();
     let response = widgets::search_box(ui, &mut filter, "filter", None);
     if response.changed() {
-        cx.state.drafts.insert(id, filter.clone());
+        set_draft(ui, id, &filter.clone());
     }
     widgets::default_focus(ui, &response);
     let needle = filter.to_lowercase();
@@ -876,7 +877,7 @@ pub(super) fn add_module_popup(
         }
     ));
     if picked.is_some() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-        cx.state.drafts.remove(&id);
+        clear_draft(ui, id);
         if picked.is_none() {
             ui.close();
         }
@@ -926,13 +927,19 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
         FormAction::MakeShared { pointer } => {
             script::open_inline(editor, table, key, &pointer);
             if let Some(owner) = ScriptOwner::inline(table, key, &pointer) {
-                editor.views.script.pending = Some((owner, PendingScriptAction::MakeShared));
+                editor
+                    .views
+                    .script
+                    .set_pending(&owner, PendingScriptAction::MakeShared);
             }
         }
         FormAction::MakeInline { script } => {
             let owner = ScriptOwner::Shared { key: script };
             editor.open_tab(EditorTab::Script(owner.clone()));
-            editor.views.script.pending = Some((owner, PendingScriptAction::MakeInline));
+            editor
+                .views
+                .script
+                .set_pending(&owner, PendingScriptAction::MakeInline);
         }
         FormAction::PickPlace { path } => {
             editor.pick = Some(PlacePick {
@@ -967,6 +974,8 @@ fn paste_modules(
     };
     let from = clip.from;
     let registry = registry();
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(table);
     for module in &clip.modules {
         let tag = module.kind_or("module").to_owned();
         let Some(rule) = registry.module_rule(table, module) else {
@@ -987,9 +996,9 @@ fn paste_modules(
                     label: format!("Replace {tag}"),
                     compare: Some(TextComparison {
                         left_title: format!("{key} now"),
-                        left: module_lines(&list[index]),
+                        left: module_lines(root, &list[index]),
                         right_title: format!("copied from {from}"),
-                        right: module_lines(module),
+                        right: module_lines(root, module),
                     }),
                     action: ConfirmAction::ReplaceModule {
                         table: table.to_owned(),

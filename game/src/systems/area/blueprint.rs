@@ -221,7 +221,7 @@ impl Expansion<'_> {
         flip: Flip,
         values: &BTreeMap<String, VarValue<RiftScripting>>,
     ) {
-        let content = *self.content;
+        let content = self.content.clone();
         let Some(def) = content.table::<BlueprintDef>().get(placement.blueprint) else {
             return;
         };
@@ -422,7 +422,7 @@ impl Expansion<'_> {
         def: &BlueprintDef,
         filled: &BTreeMap<String, Value>,
     ) -> Vec<ScriptModule> {
-        let content = *self.content;
+        let content = self.content.clone();
         let mut scripts = Vec::new();
         for (index, module) in def.modules.iter().enumerate() {
             let pointer = format!("/modules/{index}");
@@ -603,7 +603,7 @@ pub fn holes(json: &Value, into: &mut Vec<String>) {
 
 pub fn place(module: &mut AreaModule, at: Pos<Tiles>, flip: Flip) {
     let point = |p: Pos<Tiles>| at + flip.apply(p).to_vector();
-    let rect = |r: Rect<Tiles>| place_rect(r, at, flip);
+    let rect = |r: Rect<Tiles>| flip.place(r, at);
     match module {
         AreaModule::Object(object) => {
             object.shape = match object.shape {
@@ -628,18 +628,4 @@ pub fn place(module: &mut AreaModule, at: Pos<Tiles>, flip: Flip) {
         AreaModule::Resident(resident) => resident.at = point(resident.at),
         AreaModule::Blueprint(_) | AreaModule::Script(_) => {}
     }
-}
-
-pub fn place_rect(r: Rect<Tiles>, at: Pos<Tiles>, flip: Flip) -> Rect<Tiles> {
-    let x = if flip.horizontal() {
-        at.x - (r.origin.x + r.size.width)
-    } else {
-        at.x + r.origin.x
-    };
-    let y = if flip.vertical() {
-        at.y - (r.origin.y + r.size.height)
-    } else {
-        at.y + r.origin.y
-    };
-    Rect::new(Pos::new(x, y), r.size)
 }

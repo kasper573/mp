@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use egui::Ui;
 
 use super::tree::{self, IconImage, TreeIcon, TreeNode, TreeState};
@@ -52,7 +54,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
     let selected = (editor.selection.table == "asset")
         .then(|| editor.selection.keys.first().cloned())
         .flatten();
-    let nodes = tree::from_paths(
+    let nodes: Vec<TreeNode<Infallible>> = tree::from_paths(
         paths.iter().copied(),
         &mut |path| {
             let name = path.rsplit('/').next().unwrap_or(path);

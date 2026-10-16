@@ -19,16 +19,30 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 
 use egui::Context;
+use serde::Deserialize;
 
 use crate::app::{ChannelInbox, Editor, ModalDialog};
 use crate::project::ContentEdit;
+use crate::scenes::StripName;
 use crate::tabs::EditorTab;
 use crate::ui::{active_tab, dialogs, theme};
-use crate::views::model::{ModelPage, ModelStrip};
+use crate::views::model::ModelPage;
 use crate::views::model::{strip_of, write_strip};
 use formats::{AnimationExport, DroppedFiles};
 
 pub const IMPORT_PART: &str = "/import";
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportStep {
+    Files(Vec<PathBuf>),
+    Apply,
+    Retime {
+        strip: StripName,
+        frame: usize,
+        ms: u32,
+    },
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImportTarget {
@@ -48,47 +62,20 @@ pub struct ImportReading {
 }
 
 pub enum ImportDialog {
-    Reading(u64),
     Model(Box<model_ui::ModelDialog>),
     Tileset(Box<tileset_ui::TilesetDialog>),
     Animation(Box<tileset_ui::AnimationDialog>),
 }
 
-fn is_reading(dialog: &ModalDialog, id: u64) -> bool {
-    matches!(dialog, ModalDialog::Import(import) if matches!(**import, ImportDialog::Reading(seen) if seen == id))
-}
-
 #[derive(Default)]
 pub struct ImportJobs {
     pub reading: Vec<ImportReading>,
-    pub script: VecDeque<String>,
+    pub script: VecDeque<ImportStep>,
     next_id: u64,
 }
 
 pub fn dialog(editor: &mut Editor, ctx: &Context, dialog: ImportDialog) -> Option<ImportDialog> {
     match dialog {
-        ImportDialog::Reading(id) => {
-            let job = editor.jobs.reading.iter().find(|job| job.id == id)?;
-            let name = formats::names(&files_of(&job.dropped));
-            let mut cancel = false;
-            dialogs::card(ctx, "import-reading", 360.0, |ui| {
-                ui.label(theme::strong(format!("Reading {name}…")));
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(theme::muted("decoding the export off the interface thread"));
-                });
-                ui.add_space(10.0);
-                if ui.button("Cancel").clicked() {
-                    cancel = true;
-                }
-            });
-            if cancel {
-                editor.jobs.reading.retain(|job| job.id != id);
-                return None;
-            }
-            Some(ImportDialog::Reading(id))
-        }
         ImportDialog::Model(dialog) => {
             model_ui::dialog(editor, ctx, *dialog).map(|next| ImportDialog::Model(Box::new(next)))
         }
@@ -97,6 +84,33 @@ pub fn dialog(editor: &mut Editor, ctx: &Context, dialog: ImportDialog) -> Optio
         ImportDialog::Animation(dialog) => tileset_ui::animation_dialog(editor, ctx, *dialog)
             .map(|next| ImportDialog::Animation(Box::new(next))),
     }
+}
+
+pub fn show_readings(editor: &mut Editor, ctx: &Context) {
+    let mut cancelled = Vec::new();
+    for job in editor.jobs.reading.iter().filter(|job| job.again.is_none()) {
+        let name = names_of(job);
+        let mut cancel = false;
+        dialogs::card(ctx, &format!("import-reading-{}", job.id), 360.0, |ui| {
+            ui.label(theme::strong(format!("Reading {name}…")));
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label(theme::muted("decoding the export off the interface thread"));
+            });
+            ui.add_space(10.0);
+            if ui.button("Cancel").clicked() {
+                cancel = true;
+            }
+        });
+        if cancel {
+            cancelled.push(job.id);
+        }
+    }
+    editor
+        .jobs
+        .reading
+        .retain(|job| !cancelled.contains(&job.id));
 }
 
 pub fn poll(editor: &mut Editor) {
@@ -122,7 +136,6 @@ pub fn poll(editor: &mut Editor) {
                         editor.toast(format!("Could not read {}: {error}", names_of(&job)));
                     }
                 } else {
-                    editor.dialogs.retain(|dialog| !is_reading(dialog, job.id));
                     editor.toast(format!("Not imported: {error}"));
                 }
             }
@@ -167,28 +180,25 @@ fn scripted(editor: &mut Editor) {
     if !editor.jobs.reading.is_empty() {
         return;
     }
-    let (what, arg) = step.split_once(':').unwrap_or((step.as_str(), ""));
-    match what {
-        "files" => {
-            let files = arg
-                .split('|')
+    match step {
+        ImportStep::Files(paths) => {
+            editor.jobs.script.pop_front();
+            let files = paths
+                .into_iter()
                 .map(|path| {
-                    if path.starts_with("art/") {
-                        editor
-                            .project
-                            .as_ref()
-                            .and_then(|project| project.root.parent())
-                            .map(|parent| parent.join(path))
-                            .unwrap_or_else(|| PathBuf::from(path))
-                    } else {
-                        PathBuf::from(path)
+                    match editor
+                        .project
+                        .as_ref()
+                        .and_then(|project| project.root.parent())
+                    {
+                        Some(parent) if path.starts_with("art") => parent.join(path),
+                        _ => path,
                     }
                 })
                 .collect();
-            editor.jobs.script.pop_front();
             dropped(editor, files);
         }
-        "apply" => {
+        ImportStep::Apply => {
             let Some(index) = editor
                 .dialogs
                 .iter()
@@ -223,7 +233,6 @@ fn scripted(editor: &mut Editor) {
                     .map(|d| ImportDialog::Tileset(Box::new(d))),
                 ImportDialog::Animation(dialog) => tileset_ui::apply_animation_now(editor, *dialog)
                     .map(|d| ImportDialog::Animation(Box::new(d))),
-                other => Some(other),
             };
             if let Some(kept) = kept {
                 editor
@@ -231,27 +240,15 @@ fn scripted(editor: &mut Editor) {
                     .insert(index, ModalDialog::Import(Box::new(kept)));
             }
         }
-        "retime" => {
+        ImportStep::Retime { strip, frame, ms } => {
             editor.jobs.script.pop_front();
-            let Some((path, ms)) = arg.split_once('=') else {
-                return;
-            };
-            let bits: Vec<&str> = path.split('/').collect();
-            let (Some(action), Some(direction), Some(frame), Ok(ms)) = (
-                bits.first(),
-                bits.get(1),
-                bits.get(2).and_then(|f| f.parse::<usize>().ok()),
-                ms.parse::<u32>(),
-            ) else {
-                return;
-            };
             let Some(EditorTab::Model { key }) = active_tab(editor) else {
                 return;
             };
             let Some(row) = editor.row_value("model", &key) else {
                 return;
             };
-            let Some(strip) = ModelStrip::parse(action, direction) else {
+            let Some(strip) = strip.strip() else {
                 return;
             };
             let mut frames = strip_of(&row, strip);
@@ -260,9 +257,6 @@ fn scripted(editor: &mut Editor) {
             }
             let label = format!("Retime {} of {key}", strip.name());
             write_strip(editor, &key, strip, &frames, ContentEdit::new(label));
-        }
-        _ => {
-            editor.jobs.script.pop_front();
         }
     }
 }
@@ -356,20 +350,13 @@ fn begin(
         let _ = sender.send(formats::decode(&job_dropped));
     });
     editor.jobs.next_id += 1;
-    let id = editor.jobs.next_id;
-    let shown = again.is_none();
     editor.jobs.reading.push(ImportReading {
-        id,
+        id: editor.jobs.next_id,
         target,
         dropped,
         again,
         receiver: ChannelInbox::new(receiver),
     });
-    if shown {
-        editor
-            .dialogs
-            .push(ModalDialog::Import(Box::new(ImportDialog::Reading(id))));
-    }
 }
 
 fn start_again(editor: &mut Editor, due: records::DueReimport) {
@@ -412,17 +399,8 @@ fn land(editor: &mut Editor, job: ImportReading, export: AnimationExport) {
             tileset_ui::land_animation(editor, key, export, job.again.as_ref())
         }
     };
-    let reading = editor
-        .dialogs
-        .iter()
-        .position(|dialog| is_reading(dialog, job.id));
-    match (reading, next) {
-        (Some(index), Some(next)) => editor.dialogs[index] = ModalDialog::Import(Box::new(next)),
-        (Some(index), None) => {
-            editor.dialogs.remove(index);
-        }
-        (None, Some(next)) => editor.dialogs.push(ModalDialog::Import(Box::new(next))),
-        (None, None) => {}
+    if let Some(next) = next {
+        editor.dialogs.push(ModalDialog::Import(Box::new(next)));
     }
 }
 

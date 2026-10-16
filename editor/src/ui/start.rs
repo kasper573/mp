@@ -168,7 +168,6 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
         return;
     };
     let mut keep = Some((folder.clone(), data));
-    let (enter, escape) = dialogs::keys(ctx);
     dialogs::card(ctx, "recover", 520.0, |ui| {
         let (folder, data) = keep.as_ref().expect("kept");
         let when = widgets::clock(data.written, false);
@@ -234,11 +233,14 @@ fn recover_dialog(editor: &mut Editor, ctx: &Context) {
         }
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if same_version && (widgets::primary(ui, "Recover as unsaved").clicked() || enter) {
+            let pressed = dialogs::keys(ui);
+            if same_version
+                && (widgets::primary(ui, "Recover as unsaved").clicked() || pressed.enter)
+            {
                 let (folder, data) = keep.take().expect("kept");
                 editor.open_now(&folder, data.files);
             }
-            if keep.is_some() && (widgets::danger(ui, "Discard").clicked() || escape) {
+            if keep.is_some() && (widgets::danger(ui, "Discard").clicked() || pressed.escape) {
                 let (folder, _) = keep.take().expect("kept");
                 RecoveryJournal::set_aside(&editor.user, &folder);
                 editor.open_now(&folder, Vec::new());

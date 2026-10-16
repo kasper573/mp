@@ -69,7 +69,7 @@ impl TileBrush {
         }
     }
 
-    pub fn paint(&self, data: &mut TileData, content: Content) {
+    pub fn paint(&self, data: &mut TileData, content: &Content) {
         match self {
             TileBrush::Walk(brush) => data.walk = brush.walk(),
             TileBrush::Surface(surface) => {
@@ -337,10 +337,10 @@ fn paint(editor: &mut Editor, ui: &Ui, tileset: &OpenTileset, canvas: &SheetCanv
         && stroke.is_some_and(|stroke| !stroke.contains(&tile))
     {
         if brush.changes(tileset, tile) {
-            let content = tileset.content;
+            let content = tileset.content.clone();
             let edit = ContentEdit::new(format!("Paint {} on {key}", brush.label())).merging();
             change_tileset(editor, key, edit, |def| {
-                brush.paint(tile_mut(def, tile), content);
+                brush.paint(tile_mut(def, tile), &content);
             });
         }
         if let Some(stroke) = &mut editor.views.tileset.view_mut(key).stroke {
@@ -389,7 +389,7 @@ fn make_blueprint(
         flip: Flip::None,
         blocks: Vec::new(),
     });
-    let part = value::untyped(tileset.content, &part).ok_or("the scenery part does not write")?;
+    let part = value::untyped(&tileset.content, &part).ok_or("the scenery part does not write")?;
     let blueprint = BlueprintDef {
         variables: BTreeMap::new(),
         parts: vec![part],

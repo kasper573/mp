@@ -92,22 +92,19 @@ pub(super) fn grid_stroke(
     let down = response.dragged_by(egui::PointerButton::Primary);
     let released = response.drag_stopped_by(egui::PointerButton::Primary)
         || response.clicked_by(egui::PointerButton::Primary);
-    let Some(cell) = frame.pointer_cell().or_else(|| {
-        frame
-            .response
-            .interact_pointer_pos()
-            .map(|p| frame.canvas.to_tile(p).cell())
-    }) else {
+    let Some(cell) = frame.drag_tile().map(|tile| tile.cell()) else {
         if released {
             finish_stroke(editor, view_key, frame);
         }
         return;
     };
-    if pressed && editor.views.area.view(view_key).stroke.is_none() {
-        let grids = frame.area().grids;
-        let draft = grid::GridDraft::of(&frame.area_key, grids);
+    if pressed && editor.views.area.view(view_key).stroke().is_none() {
+        let grids = frame.area().grids.clone();
+        let draft = grid::GridDraft::of(&frame.area_key, &grids);
         let seed = stroke_seed(editor.frame, cell);
-        editor.views.area.view_mut(view_key).stroke = Some(BrushStroke {
+        let view = editor.views.area.view_mut(view_key);
+        view.skipped = None;
+        view.set_stroke(BrushStroke {
             draft,
             kind,
             cells: HashSet::new(),
@@ -131,13 +128,13 @@ pub(super) fn apply_brush(
     center: CellPos,
     brush: &user::BrushSettings,
 ) {
-    let content = frame.content;
+    let content = frame.content.clone();
     let view = editor.views.area.view_mut(view_key);
     let layer = view.layer;
     let walk_value = view.walk_value;
     let pick = view.pick.clone();
     let terrain = view.terrain.clone();
-    let Some(stroke) = &mut view.stroke else {
+    let Some(stroke) = view.stroke_mut() else {
         return;
     };
     match stroke.kind {
@@ -219,7 +216,7 @@ pub(super) fn apply_brush(
 
 pub(super) fn finish_stroke(editor: &mut Editor, view_key: &str, frame: &AreaFrame) {
     let view = editor.views.area.view_mut(view_key);
-    let Some(stroke) = view.stroke.take() else {
+    let Some(stroke) = view.take_stroke() else {
         return;
     };
     if stroke.cells.is_empty() || !stroke.draft.is_touched() {
@@ -269,8 +266,8 @@ pub(super) fn fill(editor: &mut Editor, view_key: &str, frame: &AreaFrame, cell:
     let walk_overlay = view.walk_overlay;
     let walk_value = view.walk_value;
     let brush = editor.settings.brush.clone();
-    let grids = frame.area().grids;
-    let mut draft = grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = grid::GridDraft::of(&frame.area_key, &grids);
     let cells = draft.flood(layer, cell);
     if cells.is_empty() {
         return;
@@ -324,7 +321,7 @@ pub(super) fn eyedrop(
     cell: CellPos,
     topmost: bool,
 ) {
-    let grids = frame.area().grids;
+    let grids = frame.area().grids.clone();
     let view = editor.views.area.view_mut(view_key);
     let layers: Vec<usize> = if topmost {
         (0..grids.ground.len()).rev().collect()
@@ -352,7 +349,7 @@ pub(super) fn eyedrop(
         view.layer = layer;
         editor.settings.brush.flip_x = entry.flip.horizontal();
         editor.settings.brush.flip_y = entry.flip.vertical();
-        view.tool = AreaTool::Paint;
+        view.set_tool(AreaTool::Paint);
         return;
     }
     editor.toast("Nothing on that layer here");
@@ -367,7 +364,7 @@ pub(super) fn pick_place(
 ) {
     let canvas = frame.canvas;
     let area = frame.area();
-    let warps = pins::warp_objects(frame.content, frame.area_id);
+    let warps = pins::warp_objects(&frame.content, frame.area_id);
     let visible = canvas.visible();
     for cell in area.size.grid().cells() {
         let bounds = cell.bounds();
@@ -391,7 +388,7 @@ pub(super) fn pick_place(
         pick.file, pick.pointer
     );
     painter.text(
-        canvas.rect.min + Vec2::new(8.0, 8.0),
+        canvas.screen.min + Vec2::new(8.0, 8.0),
         egui::Align2::LEFT_TOP,
         text,
         egui::FontId::proportional(13.0),
@@ -451,7 +448,7 @@ pub(super) fn paint_preview(
     let Some(&first) = cells.first() else {
         return;
     };
-    let anchor = view.stroke.as_ref().map_or(first, |s| s.anchor);
+    let anchor = view.stroke().map_or(first, |s| s.anchor);
     let brush = &editor.settings.brush;
     let choices = pick.choices();
     for cell in cells {

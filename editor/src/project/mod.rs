@@ -24,6 +24,7 @@ use game::systems;
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;
 use crate::value;
+use crate::views::script::nodes::NodeCatalogue;
 
 #[derive(Clone, Debug, Default)]
 pub struct ContentEdit {
@@ -62,6 +63,24 @@ impl ContentEdit {
         value: &serde_json::Value,
     ) -> &mut ContentEdit {
         self.write(file, json_bytes(value))
+    }
+
+    pub fn update_json(
+        &mut self,
+        files: &ProjectFiles,
+        file: &str,
+        update: impl FnOnce(&mut serde_json::Value) -> Option<()>,
+    ) -> Option<()> {
+        let mut json = match self.changes.iter().find(|change| change.file == file) {
+            Some(FileChange {
+                bytes: Some(bytes), ..
+            }) => serde_json::from_slice(bytes).ok()?,
+            Some(FileChange { bytes: None, .. }) => return None,
+            None => files.json_owned(file)?,
+        };
+        update(&mut json)?;
+        self.write_json(file, &json);
+        Some(())
     }
 
     pub fn write_row<T: serde::Serialize>(
@@ -143,12 +162,9 @@ pub struct Project {
     pub root: PathBuf,
     pub files: ProjectFiles,
     pub disk: BTreeMap<String, String>,
-    unsaved: Vec<String>,
     pub content: Option<Content>,
-    retired: Vec<Content>,
     pub report: Option<LoadReport>,
     pub history: EditHistory,
-    pub saved_at: Option<usize>,
     pub usages: ContentUsages,
     pub shapes: Arc<SchemaShapes>,
     pub read_only: Option<String>,
@@ -156,6 +172,7 @@ pub struct Project {
     pub last_usages: Option<Duration>,
     pub generation: u64,
     pub outside_rewrote: usize,
+    pub catalogue: NodeCatalogue,
 }
 
 impl Project {
@@ -166,16 +183,14 @@ impl Project {
         save::clean_leftovers(root);
         let files = ProjectFiles::read_dir(root).map_err(|error| error.to_string())?;
         let disk = files.hashes();
+        let catalogue = NodeCatalogue::build(shapes.shape_of("script"), None);
         let mut project = Project {
             root: root.to_path_buf(),
             files,
             disk,
-            unsaved: Vec::new(),
             content: None,
-            retired: Vec::new(),
             report: None,
             history: EditHistory::default(),
-            saved_at: Some(0),
             usages: ContentUsages::default(),
             shapes,
             read_only: None,
@@ -183,8 +198,8 @@ impl Project {
             last_usages: None,
             generation: 0,
             outside_rewrote: 0,
+            catalogue,
         };
-        project.refresh_unsaved();
         project.reload();
         Ok(project)
     }
@@ -323,10 +338,8 @@ impl Project {
 
     pub fn check(&self, edit: &ContentEdit) -> Result<(), Box<EditRefusal>> {
         let next = self.files.with(&edit.changes);
-        let (content, _) = load(&next, &self.root.display().to_string())
+        load(&next, &self.root.display().to_string())
             .map_err(|report| Box::new(EditRefusal::of(&report)))?;
-        // SAFETY: the content was loaded only to check the edit and nothing was taken out of it.
-        unsafe { content.release() };
         Ok(())
     }
 
@@ -334,45 +347,31 @@ impl Project {
         let (content, took) = load(&next, &self.root.display().to_string())
             .map_err(|report| Box::new(EditRefusal::of(&report)))?;
         self.files = next;
-        self.refresh_unsaved();
         self.last_load = Some(took);
         self.report = None;
         self.swap(content);
         Ok(())
     }
 
-    pub fn unsaved(&self) -> &[String] {
-        &self.unsaved
+    pub fn unsaved(&self) -> Vec<String> {
+        self.files
+            .paths()
+            .chain(self.disk.keys())
+            .filter(|path| self.is_unsaved(path))
+            .cloned()
+            .collect::<std::collections::BTreeSet<String>>()
+            .into_iter()
+            .collect()
     }
 
     pub fn is_unsaved(&self, path: &str) -> bool {
-        self.unsaved
-            .binary_search_by(|p| p.as_str().cmp(path))
-            .is_ok()
-    }
-
-    fn refresh_unsaved(&mut self) {
-        let mut paths: Vec<String> = self
-            .files
-            .paths()
-            .filter(|path| self.files.hash_of(path) != self.disk.get(*path).map(String::as_str))
-            .cloned()
-            .collect();
-        paths.extend(
-            self.disk
-                .keys()
-                .filter(|path| self.files.get(path).is_none())
-                .cloned(),
-        );
-        paths.sort();
-        self.unsaved = paths;
+        self.files.hash_of(path) != self.disk.get(path).map(String::as_str)
     }
 
     pub fn save(&mut self) -> Result<save::SaveOutcome, save::SaveError> {
         let outcome = save::save(&self.root, &self.files, &mut self.disk);
-        self.refresh_unsaved();
         if outcome.is_ok() {
-            self.saved_at = Some(self.history.applied());
+            self.history.mark_saved();
         }
         outcome
     }
@@ -418,9 +417,8 @@ impl Project {
                 taken.push(path);
             }
         }
-        self.refresh_unsaved();
         if !taken.is_empty() {
-            self.history.clear();
+            self.history.reset();
             self.reload();
             self.outside_rewrote = match self.report {
                 Some(_) => taken.len(),
@@ -435,35 +433,27 @@ impl Project {
             Some(bytes) => self.files.insert(conflict.file.clone(), bytes.clone()),
             None => self.files.remove(&conflict.file),
         }
-        self.refresh_unsaved();
-        self.history.clear();
-        self.saved_at = Some(0);
+        self.history.reset();
         self.reload();
     }
 
-    pub fn has_retired(&self) -> bool {
-        !self.retired.is_empty()
-    }
-
-    pub fn release_retired(&mut self) {
-        for content in self.retired.drain(..) {
-            // SAFETY: content retires mid-frame, while that frame may still read it, and is only
-            // released by `Editor::release_retired` at the start of a later frame, when no
-            // frame-local handle survives and after the views dropped the worlds built on it.
-            unsafe { content.release() };
-        }
-    }
-
     fn swap(&mut self, content: Content) {
-        if let Some(old) = self.content.take() {
-            self.retired.push(old);
-        }
         let started = Instant::now();
         self.usages = ContentUsages::build(&content, &self.files);
         self.last_usages = Some(started.elapsed());
+        self.catalogue = NodeCatalogue::build(self.shapes.shape_of("script"), Some(&content));
         self.content = Some(content);
         self.generation += 1;
     }
+}
+
+static NO_CATALOGUE: NodeCatalogue = NodeCatalogue {
+    entries: Vec::new(),
+    events: Vec::new(),
+};
+
+pub fn catalogue_of(project: Option<&Project>) -> &NodeCatalogue {
+    project.map_or(&NO_CATALOGUE, |project| &project.catalogue)
 }
 
 pub struct OutsideChanges {

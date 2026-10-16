@@ -12,7 +12,7 @@ use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
-use crate::project::{ContentEdit, RowSelection, row_file, row_of};
+use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, inspector, theme, widgets};
 use crate::value::RowValue;
@@ -20,7 +20,7 @@ use crate::views::area::holes::fill_holes;
 use crate::{condition, forms, picker, rows, schema, spans, thumbs};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
-    let Some(owner) = editor.views.script.focus.clone() else {
+    let Some(owner) = editor.views.script.focused() else {
         ui.label(theme::muted("No script in view"));
         return;
     };
@@ -28,7 +28,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
         ui.label(theme::muted(format!("{} is gone", owner.title())));
         return;
     };
-    super::ensure_catalogue(editor);
+    super::sync_with_content(editor);
     let names: Vec<String> = selection
         .parts
         .iter()
@@ -64,7 +64,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     widgets::card_title(ui, "script", &format!("{} nodes", many.len()));
                     for name in many {
                         if let Some(node) = doc.nodes().get(name) {
-                            let summary = nodes::summary(node, &editor.views.script.catalogue);
+                            let summary =
+                                nodes::summary(node, catalogue_of(editor.project.as_ref()));
                             ui.horizontal(|ui| {
                                 ui.label(theme::mono(name).size(12.5));
                                 ui.label(theme::muted(widgets::clip(&summary, 50)).size(12.5));
@@ -94,7 +95,7 @@ fn owner_short(editor: &Editor, doc: &ScriptDoc) -> String {
 }
 
 pub fn script_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
-    super::ensure_catalogue(editor);
+    super::sync_with_content(editor);
     if super::run::inspector(editor, ui, doc) {
         return;
     }
@@ -263,7 +264,7 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         }
         any = true;
         let event = nodes::event_of(node).unwrap_or("?").to_owned();
-        let pieces = nodes::pieces(node, &editor.views.script.catalogue);
+        let pieces = nodes::pieces(node, catalogue_of(editor.project.as_ref()));
         let detail = pieces
             .first()
             .map(|line| line.iter().map(|p| p.text.clone()).collect::<String>())
@@ -444,7 +445,7 @@ fn owner_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             }
         }
         None if doc.kind == OwnerKind::Npc => {
-            let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+            let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
                 return;
             };
             let placed: Vec<String> = content
@@ -742,7 +743,7 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
         .views
         .script
         .view(&doc.owner)
-        .is_some_and(|view| view.layout.outline);
+        .is_some_and(|view| view.outline);
     let mut fire = false;
     let mut toggle_outline = false;
     let mut make = false;
@@ -768,10 +769,14 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     });
     if fire {
         editor.panels.bottom = BottomTab::Run;
-        editor.views.script.fire = Some(doc.owner.clone());
+        editor.views.script.fire(&doc.owner);
     }
     if toggle_outline {
-        editor.views.script.view_mut(&doc.owner).toggle_outline();
+        editor
+            .views
+            .script
+            .view_mut(&doc.owner, &editor.user, editor.project.as_ref())
+            .toggle_outline();
     }
     if make {
         if doc.is_shared() {
@@ -792,7 +797,7 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
     let root = shapes.shape_of("script");
     let path = format!("{}/nodes/{name}", doc.owner.pointer());
     let (outs, ins, badge_kind, blurb) = {
-        let catalogue = &editor.views.script.catalogue;
+        let catalogue = catalogue_of(editor.project.as_ref());
         let ins: Vec<(String, String)> = nodes::arrows_into(doc.nodes(), name, catalogue)
             .into_iter()
             .map(|(from, field)| {
@@ -1091,7 +1096,7 @@ fn keeps_cards(ui: &mut Ui, doc: &ScriptDoc) {
 }
 
 fn bounds_card(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str, node: &Value) {
-    let catalogue = &editor.views.script.catalogue;
+    let catalogue = catalogue_of(editor.project.as_ref());
     let at_most = node["at_most"].as_f64().unwrap_or(1.0);
     let mut body: Vec<String> = Vec::new();
     let mut queue: Vec<String> = node["each"]
@@ -1157,7 +1162,7 @@ fn on_form(ui: &mut Ui, cx: &mut FormCx, root: &Value, node: &mut Value, path: &
     let current = nodes::event_of(node).unwrap_or("").to_owned();
     let mut picked = current.clone();
     widgets::kv(ui, "event", |ui| {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("event"))
+        widgets::combo_box(ui.id().with(path).with("event"))
             .selected_text(&current)
             .show_ui(ui, |ui| {
                 for variant in &events {
@@ -1259,9 +1264,8 @@ fn dialogue_form(
         .on_hover_text("Enter on the card")
         .clicked()
     {
-        let speaker = doc.default_speaker().json();
         if let Some(lines) = node["lines"].as_array_mut() {
-            lines.push(serde_json::json!({ "by": speaker, "text": [""] }));
+            lines.push(doc.default_speaker().blank_line());
         }
         changed = FormChange::at(path);
         *label = format!("Add a line in {}", doc.owner.title());
@@ -1364,7 +1368,6 @@ fn choice_card(ui: &mut Ui, cx: &mut FormCx, choice: &mut Value, at: &ChoiceAt) 
             let id = ui.id().with(choice_path).with("label");
             let edit = spans::line(
                 ui,
-                &mut cx.state.drafts,
                 &choice["label"],
                 id,
                 egui::FontId::new(13.5, theme::medium()),
@@ -1606,7 +1609,7 @@ fn speaker_rows(
     let current = LineSpeaker::of(by).unwrap_or(LineSpeaker::Narrator);
     let mut picked = current.kind();
     widgets::kv(ui, "by", |ui| {
-        egui::ComboBox::from_id_salt(ui.id().with(path).with("speaker"))
+        widgets::combo_box(ui.id().with(path).with("speaker"))
             .selected_text(theme::mono(current.kind()).size(13.0))
             .width(ui.available_width())
             .show_ui(ui, |ui| {
@@ -1651,7 +1654,7 @@ fn speaker_rows(
             face,
         };
         let ctx = ui.ctx().clone();
-        if let Some(file) = nodes::bust_file(cx.content, &speaker)
+        if let Some(file) = nodes::bust_file(cx.content.as_ref(), &speaker)
             && let Some(thumb) = cx.state.thumbnails.image(&ctx, cx.files, &file)
         {
             ui.add(
@@ -1788,7 +1791,6 @@ pub fn make_shared_body(
     mut dialog: MakeSharedDialog,
 ) -> Option<MakeSharedDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let owner = dialog
         .owner
         .title()
@@ -1806,6 +1808,7 @@ pub fn make_shared_body(
         .is_none_or(|problem| problem.contains("already exists"));
     let free = problem.is_none();
     dialogs::card(ctx, "make-shared", 620.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(RichText::new("Make shared").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(
@@ -1838,7 +1841,7 @@ pub fn make_shared_body(
             ui.label(theme::faint(standing).size(12.5).monospace());
         });
         widgets::kv(ui, "owner", |ui| {
-            egui::ComboBox::from_id_salt("make-shared-kind")
+            widgets::combo_box("make-shared-kind")
                 .width(ui.available_width() - 8.0)
                 .selected_text(theme::mono(&dialog.kind).size(13.0))
                 .show_ui(ui, |ui| {
@@ -1907,11 +1910,11 @@ pub fn make_shared_body(
                 })
                 .inner
                 .clicked()
-                || (enter && valid && free)
+                || (pressed.enter && valid && free)
             {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });
@@ -1984,17 +1987,19 @@ fn make_shared(editor: &mut Editor, dialog: &MakeSharedDialog) -> Result<(), Str
     edit.write_json(row_file("script", &dialog.key), &script);
     edit.write_json(doc.file.clone(), &row);
     if editor.apply(edit) {
-        if let Some(view) = editor.views.script.views.remove(&dialog.owner) {
-            let shared = ScriptOwner::Shared {
-                key: dialog.key.clone(),
-            };
-            editor.views.script.views.insert(shared, view);
-        }
+        let shared = ScriptOwner::Shared {
+            key: dialog.key.clone(),
+        };
+        editor.views.script.relocate(&dialog.owner, shared.clone());
+        let from = EditorTab::Script(dialog.owner.clone());
         for (_, tab) in editor.dock.iter_all_tabs_mut() {
-            if *tab == EditorTab::Script(dialog.owner.clone()) {
-                *tab = EditorTab::Script(ScriptOwner::Shared {
-                    key: dialog.key.clone(),
-                });
+            if *tab == from {
+                *tab = EditorTab::Script(shared.clone());
+            }
+        }
+        for tab in editor.open_tabs.iter_mut() {
+            if *tab == from {
+                *tab = EditorTab::Script(shared.clone());
             }
         }
         editor.select(RowSelection::row("script", &dialog.key));
@@ -2045,7 +2050,6 @@ pub fn make_inline_body(
     mut dialog: MakeInlineDialog,
 ) -> Option<MakeInlineDialog> {
     let mut outcome = None;
-    let (enter, escape) = dialogs::keys(ctx);
     let count = editor
         .row_value("script", &dialog.key)
         .map_or(0, |script| script["nodes"].as_object().map_or(0, Map::len));
@@ -2064,6 +2068,7 @@ pub fn make_inline_body(
         })
         .collect();
     dialogs::card(ctx, "make-inline", 620.0, |ui| {
+        let pressed = dialogs::keys(ui);
         ui.label(RichText::new("Make inline").strong().size(18.0));
         ui.add_space(6.0);
         ui.label(theme::muted(format!("The {count} nodes of script/{} are copied into one owner's row, its values written in. The script row stays.", dialog.key)).size(13.5));
@@ -2123,10 +2128,10 @@ pub fn make_inline_body(
         );
         ui.add_space(10.0);
         ui.horizontal(|ui| {
-            if widgets::primary(ui, "Make inline · one step").clicked() || enter {
+            if widgets::primary(ui, "Make inline · one step").clicked() || pressed.enter {
                 outcome = Some(true);
             }
-            if ui.button("Cancel").clicked() || escape {
+            if ui.button("Cancel").clicked() || pressed.escape {
                 outcome = Some(false);
             }
         });

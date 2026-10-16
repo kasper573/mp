@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
 use game::systems::text::{Ink, Motion, Voice};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
+use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
 use crate::forms::{FormChange, FormCx, committed};
 use crate::ui::{theme, widgets};
 use crate::{condition, forms, picker};
@@ -24,18 +23,10 @@ pub struct SpanLineEdit {
     pub entered: bool,
 }
 
-pub fn line(
-    ui: &mut Ui,
-    drafts: &mut HashMap<egui::Id, String>,
-    spans: &Value,
-    id: egui::Id,
-    font: FontId,
-    hint: &str,
-) -> SpanLineEdit {
+pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) -> SpanLineEdit {
     let stored = spans_of(spans);
-    let draft_spans: Value = drafts
-        .get(&id)
-        .and_then(|text| serde_json::from_str(text).ok())
+    let draft_spans: Value = draft_of(ui, id)
+        .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_else(|| stored.clone());
     let plain_before = plain(&draft_spans);
     let mut text = plain_before.clone();
@@ -118,18 +109,22 @@ pub fn line(
         state.store(ui.ctx(), response.id);
     }
     if changed {
-        drafts.insert(id, serde_json::to_string(&spans_now).unwrap_or_default());
+        set_draft(
+            ui,
+            id,
+            &serde_json::to_string(&spans_now).unwrap_or_default(),
+        );
     }
     let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
     if escape && focused {
-        drafts.remove(&id);
+        clear_draft(ui, id);
         return SpanLineEdit {
             spans: None,
             entered: false,
         };
     }
     if entered || committed(ui, &response) {
-        drafts.remove(&id);
+        clear_draft(ui, id);
         if spans_now != stored {
             return SpanLineEdit {
                 spans: Some(spans_now),
@@ -496,7 +491,7 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
                     .unwrap_or("")
                     .to_owned();
                 let mut picked = current.clone();
-                egui::ComboBox::from_id_salt(ui.id().with(path).with(field))
+                widgets::combo_box(ui.id().with(path).with(field))
                     .selected_text(if current.is_empty() {
                         field.to_owned()
                     } else {
@@ -532,10 +527,7 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
                 .get("pause_after")
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0);
-            let mut draft: f64 = cx
-                .state
-                .drafts
-                .get(&id)
+            let mut draft: f64 = draft_of(ui, id)
                 .and_then(|t| t.parse().ok())
                 .unwrap_or(current);
             ui.label("pause ms");
@@ -545,10 +537,10 @@ pub fn edit(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
                     .speed(10.0),
             );
             if response.changed() {
-                cx.state.drafts.insert(id, draft.to_string());
+                set_draft(ui, id, &draft.to_string());
             }
             if (response.drag_stopped() || committed(ui, &response))
-                && cx.state.drafts.remove(&id).is_some()
+                && take_draft(ui, id).is_some()
                 && draft != current
             {
                 if draft <= 0.0 {
@@ -580,14 +572,7 @@ pub fn line_field(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -
     let id = ui.id().with(path).with("line");
     let mut changed = FormChange::default();
     forms::boxed_input(ui, None, |ui| {
-        let edit = line(
-            ui,
-            &mut cx.state.drafts,
-            value,
-            id,
-            FontId::proportional(13.5),
-            "…",
-        );
+        let edit = line(ui, value, id, FontId::proportional(13.5), "…");
         if let Some(spans) = edit.spans {
             *value = spans;
             changed = FormChange::at(path);

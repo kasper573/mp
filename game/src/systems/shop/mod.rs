@@ -148,6 +148,8 @@ impl ShopDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct ShopOffer {
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
+    #[schemars(extend("default" = serial::one()))]
     #[serde(default = "serial::one", skip_serializing_if = "serial::is_one")]
     pub count: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -200,7 +202,7 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("closed", self.closed.as_deref())]
     }
     fn pauses(&self) -> bool {
@@ -209,7 +211,10 @@ impl EffectDef<RiftScripting> for OpenShop {
     fn keeps_box(&self) -> bool {
         true
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let shop = self.shop;
         Ok(Box::new(move |world, flow, cx| {
@@ -232,8 +237,20 @@ impl EffectDef<RiftScripting> for OpenShop {
 pub struct ShopView {
     pub shop: ShopId,
     pub offers: Vec<OfferView>,
-    pub buyback: Vec<Sale>,
-    pub declined: Vec<u32>,
+    pub buyback: Vec<BuybackView>,
+    pub quotes: Vec<SaleQuote>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub struct SaleQuote {
+    pub item: ItemId,
+    pub verdict: SaleVerdict,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub enum SaleVerdict {
+    Pays(Vec<ItemStack>),
+    Refused(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -241,6 +258,14 @@ pub struct OfferView {
     pub left: Option<u32>,
     pub restocks_in: Option<Seconds>,
     pub refusal: Option<WareRefusal>,
+    pub held: Vec<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
+pub struct BuybackView {
+    pub sale: Sale,
+    pub refusal: Option<WareRefusal>,
+    pub held: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Hash)]
@@ -377,7 +402,7 @@ pub fn refresh(world: &mut World, visits: &mut QueryState<Entity, With<ShopVisit
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    let shops = loading.rows::<ShopDef>();
+    let shops = loading.rows::<ShopDef>(&content);
     for &(id, shop) in &shops {
         for (index, module) in shop.modules.iter().enumerate() {
             let requires = match module {
@@ -509,7 +534,7 @@ fn traded(world: &mut World, player: Entity, shop: ShopId, kind: EventKind, stac
 }
 
 fn buy(world: &mut World, player: Entity, index: u32) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
@@ -558,7 +583,7 @@ fn buy(world: &mut World, player: Entity, index: u32) {
 }
 
 fn sell(world: &mut World, player: Entity, slot: u32, stack: ItemStack) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
@@ -634,13 +659,32 @@ fn trade(
     takes: &[ItemStack],
     gives: &[ItemStack],
 ) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let mut inventory = world
         .get_mut::<Inventory>(player)
         .ok_or_else(|| "You have no bag".to_owned())?;
     inventory
         .exchange(&content, takes, gives)
         .map_err(|refusal| refusal.describe(&content))
+}
+
+fn held(inventory: &Inventory, price: &[ItemStack]) -> Vec<u32> {
+    price
+        .iter()
+        .map(|stack| inventory.count(stack.item))
+        .collect()
+}
+
+fn price_refusal(
+    content: &Content,
+    inventory: &Inventory,
+    price: &[ItemStack],
+) -> Option<WareRefusal> {
+    let mut trial = inventory.clone();
+    trial
+        .exchange(content, price, &[])
+        .err()
+        .map(|refusal| WareRefusal::of(refusal, content))
 }
 
 fn offer_refusal(
@@ -694,35 +738,78 @@ fn stock(
 }
 
 fn refresh_view(world: &mut World, player: Entity) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some(shop) = visiting(world, player) else {
         return;
     };
     let now = world.resource::<WallClock>().now;
-    let offers = (0..shop.get(&content).sells().count() as u32)
-        .map(|index| {
+    let inventory = world
+        .get::<Inventory>(player)
+        .cloned()
+        .unwrap_or_else(Inventory::empty);
+    let offers = shop
+        .get(&content)
+        .sells()
+        .enumerate()
+        .map(|(index, offer)| {
+            let index = index as u32;
             let stock = stock(world, player, shop, index, now);
             OfferView {
                 left: stock.map(|(left, _)| left),
                 restocks_in: stock.and_then(|(_, restocks_in)| restocks_in),
                 refusal: offer_refusal(world, player, shop, index, now),
+                held: held(&inventory, &offer.price),
             }
         })
         .collect();
     let buyback = world
         .get::<ShopLedger>(player)
         .and_then(|ledger| ledger.sales.get(&shop))
-        .map(|sales| sales.iter().cloned().collect())
+        .map(|sales| {
+            sales
+                .iter()
+                .map(|sale| BuybackView {
+                    sale: sale.clone(),
+                    refusal: price_refusal(&content, &inventory, &sale.paid),
+                    held: held(&inventory, &sale.paid),
+                })
+                .collect()
+        })
         .unwrap_or_default();
+    let quotes = sale_quotes(&content, shop, &declined(world, player, shop), &inventory);
     let view = ShopView {
         shop,
         offers,
         buyback,
-        declined: declined(world, player, shop),
+        quotes,
     };
     if world.get::<ShopView>(player) != Some(&view) {
         world.entity_mut(player).insert(view);
     }
+}
+
+fn sale_quotes(
+    content: &Content,
+    shop: ShopId,
+    declined: &[u32],
+    inventory: &Inventory,
+) -> Vec<SaleQuote> {
+    let mut items: Vec<ItemId> = Vec::new();
+    for stack in &inventory.slots {
+        if !items.contains(&stack.item) {
+            items.push(stack.item);
+        }
+    }
+    items
+        .into_iter()
+        .map(|item| SaleQuote {
+            item,
+            verdict: match shop.get(content).pays_for(content, item, declined) {
+                Ok(pays) => SaleVerdict::Pays(pays.to_vec()),
+                Err(refusal) => SaleVerdict::Refused(refusal),
+            },
+        })
+        .collect()
 }
 
 fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {
@@ -739,7 +826,7 @@ fn declined(world: &World, player: Entity, shop: ShopId) -> Vec<u32> {
 }
 
 fn react(world: &mut World, player: Entity, pick: fn(&ShopReactions) -> &[Line]) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let Some((shop, nth)) = world.get_mut::<ShopVisit>(player).map(|mut visit| {
         visit.reactions += 1;
         (visit.shop, visit.reactions)

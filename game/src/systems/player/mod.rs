@@ -22,7 +22,7 @@ use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint}
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::belongings;
-use crate::systems::combat::HealthRegen;
+use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
 use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
@@ -30,16 +30,15 @@ use crate::systems::history::History;
 use crate::systems::item::Inventory;
 use crate::systems::job::{Job, JobId};
 use crate::systems::memory::Memory;
-use crate::systems::movement::{self, Position};
+use crate::systems::movement::{HeardMove, Position};
 use crate::systems::quest::QuestLog;
-use crate::systems::reach;
-use crate::systems::script::EventKind;
+use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::spectate::Spectators;
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
-use snapshot::JoinAs;
+use snapshot::{CharacterSnapshot, JoinAs};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -95,7 +94,10 @@ pub struct ArrivalHold {
     pub until: Seconds,
 }
 
-pub const ARRIVAL_HOLD: Seconds = Seconds(5.0);
+/// How long an arrival holds its character: the client reveals a view that is still not drawable
+/// after this long, and reports the arrival, while the server releases the hold on its own if no
+/// report comes in.
+pub const ARRIVAL_PATIENCE: Seconds = Seconds(5.0);
 
 #[derive(Message, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AreaDrawn;
@@ -167,7 +169,7 @@ impl PlayerDef {
     }
 }
 
-pub fn def(content: &Content) -> &'static PlayerDef {
+pub fn def(content: &Content) -> &PlayerDef {
     content.built::<GameSettings>().player.get(content)
 }
 
@@ -180,6 +182,10 @@ pub(crate) fn sender_player(world: &World, sender: Sender) -> Option<Entity> {
 
 pub fn commands_locked(world: &World, player: Entity) -> bool {
     world.get::<CommandLock>(player).is_some() || held(world, player)
+}
+
+pub fn may_command(world: &World, player: Entity) -> bool {
+    !stat::is_dead(world, player) && !commands_locked(world, player)
 }
 
 pub fn held(world: &World, entity: Entity) -> bool {
@@ -244,7 +250,7 @@ pub(crate) fn last_connection(
     (!elsewhere).then_some(id)
 }
 
-#[derive(Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SpawnPolicy {
     Map,
@@ -259,7 +265,7 @@ pub struct SpawnRules {
 
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let area = area::load(&content, zone);
     let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
     for request in drain_requests::<JoinRequest>(world) {
@@ -285,7 +291,10 @@ pub fn join(world: &mut World) {
                     .get::<Identity>(client_entity)
                     .map_or_else(|| format!("player {}", client.0), |id| id.name.clone());
                 let at = spawn_position(world, policy, zone, area);
-                (at, fresh_state(&content, zone, at, name, immortal))
+                let fresh = CharacterSnapshot::fresh(&name, def(&content).job);
+                let start = Place { area: zone, at };
+                let state = snapshot::materialize(&content, &fresh, start, clock, immortal);
+                (at, state)
             }
         };
         let entity = place(world, client, zone, at, state);
@@ -318,9 +327,10 @@ fn spawn_position(
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct SpawnPoint(pub Pos<Tiles>);
 
+#[derive(Bundle)]
 pub struct CharacterState {
-    pub name: String,
-    pub spawn: Pos<Tiles>,
+    pub name: Name,
+    pub spawn: SpawnPoint,
     pub discovered: Discovered,
     pub stats: Stats,
     pub inventory: Inventory,
@@ -338,8 +348,8 @@ pub struct CharacterState {
 impl CharacterState {
     pub fn of(world: &World, entity: Entity, spawn: Pos<Tiles>) -> Option<CharacterState> {
         Some(CharacterState {
-            name: world.get::<Name>(entity)?.name.clone(),
-            spawn,
+            name: world.get::<Name>(entity)?.clone(),
+            spawn: SpawnPoint(spawn),
             discovered: world.get::<Discovered>(entity)?.clone(),
             stats: stat::snapshot(world, entity),
             inventory: world.get::<Inventory>(entity)?.clone(),
@@ -356,32 +366,6 @@ impl CharacterState {
             quests: world.get::<QuestLog>(entity).cloned().unwrap_or_default(),
             history: world.get::<History>(entity).cloned().unwrap_or_default(),
         })
-    }
-}
-
-fn fresh_state(
-    content: &Content,
-    zone: AreaId,
-    at: Pos<Tiles>,
-    name: String,
-    immortal: bool,
-) -> CharacterState {
-    let def = def(content);
-    CharacterState {
-        name,
-        spawn: at,
-        discovered: Discovered::starting_in(zone),
-        stats: player_stats(&def.stats, immortal),
-        inventory: Inventory::empty(),
-        xp: Xp { amount: 0 },
-        equipment: Equipment::default(),
-        job: Job { def: def.job },
-        timed: TimedEffects::default(),
-        memory: Memory::default(),
-        heard: Heard::default(),
-        ledger: ShopLedger::default(),
-        quests: QuestLog::default(),
-        history: History::default(),
     }
 }
 
@@ -404,7 +388,7 @@ pub(crate) fn place(
     at: Pos<Tiles>,
     state: CharacterState,
 ) -> Entity {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let def = def(&content);
     let model = def.model;
     let now = Seconds(world.resource::<Time>().elapsed_secs());
@@ -412,40 +396,26 @@ pub(crate) fn place(
         .spawn((
             Character {
                 replicated: Replicated,
-                position: Position { pos: at },
+                position: Position::at(at),
                 actor: Actor {
                     color: def.tint(),
                     dir: Direction::S,
                     action: Action::Idle,
                     model,
-                    attack_rate: PlaybackRate(def.stats.get(StatKind::AttackSpeed)),
+                    attack_rate: PlaybackRate::default(),
                 },
                 hitbox: Hitbox {
                     size: ActorModel::get(&content, model).hitbox(),
                 },
                 area: AreaTag { area: zone },
             },
-            Name { name: state.name },
-            state.discovered,
             OwnedBy(client),
             Owner { client },
-            SpawnPoint(state.spawn),
+            HeardMove::default(),
             ArrivalHold {
-                until: now + ARRIVAL_HOLD,
+                until: now + ARRIVAL_PATIENCE,
             },
-            (
-                state.inventory,
-                state.xp,
-                state.equipment,
-                state.job,
-                state.timed,
-                state.memory,
-                state.heard,
-                state.ledger,
-                state.quests,
-                state.history,
-                state.stats,
-            ),
+            state,
         ))
         .id();
     let belongings = belongings::of(world, entity);
@@ -455,7 +425,7 @@ pub(crate) fn place(
 }
 
 pub fn respawn(world: &mut World) {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     for request in drain_requests::<RespawnRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
             continue;
@@ -466,11 +436,9 @@ pub fn respawn(world: &mut World) {
         let Some(spawn) = world.get::<SpawnPoint>(entity).map(|spawn| spawn.0) else {
             continue;
         };
-        stat::refill(world, entity);
         if let Some(mut memory) = world.get_mut::<Memory>(entity) {
             memory.leave_area(&content);
         }
-        reach::forget(world, entity);
-        movement::relocate(world, entity, spawn);
+        combat::revive(world, entity, spawn);
     }
 }

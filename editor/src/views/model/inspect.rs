@@ -639,14 +639,7 @@ fn verdict_row(ui: &mut Ui, label: &str, ok: bool, text: &str) {
         );
         ui.vertical(|ui| {
             ui.set_width(ui.available_width());
-            ui.horizontal_wrapped(|ui| {
-                ui.label(RichText::new(if ok { "✓" } else { "!" }).color(if ok {
-                    theme::OK
-                } else {
-                    theme::WARN
-                }));
-                ui.label(RichText::new(text).size(12.5));
-            });
+            widgets::verdict(ui, ok, text);
         });
     });
 }
@@ -870,7 +863,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
                 "{} lines ask for it. They take another face instead:",
                 removing.uses
             ));
-            egui::ComboBox::from_id_salt("face-replacement")
+            widgets::combo_box("face-replacement")
                 .selected_text(replacement.clone())
                 .show_ui(ui, |ui| {
                     for other in faces.iter().filter(|f| f.name != removing.face.name) {

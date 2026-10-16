@@ -18,6 +18,7 @@ use crate::views::{area, script, world};
 use crate::{import, play, rows, templates, ui};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
+    import::show_readings(editor, ctx);
     let mut dialogs = std::mem::take(&mut editor.dialogs);
     let mut keep = Vec::new();
     for dialog in dialogs.drain(..) {
@@ -42,12 +43,16 @@ fn window(ctx: &Context, title: &str, body: impl FnOnce(&mut egui::Ui)) {
         .show(ctx, body);
 }
 
-pub fn keys(ctx: &Context) -> (bool, bool) {
-    ctx.input(|i| {
-        (
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
-        )
+#[derive(Default)]
+pub struct DialogKeys {
+    pub enter: bool,
+    pub escape: bool,
+}
+
+pub fn keys(ui: &Ui) -> DialogKeys {
+    ui.ctx().input(|i| DialogKeys {
+        enter: i.key_pressed(egui::Key::Enter),
+        escape: i.key_pressed(egui::Key::Escape),
     })
 }
 
@@ -58,13 +63,13 @@ pub enum DialogAnswer {
 }
 
 pub fn answer_row(ui: &mut Ui, confirm: &str) -> Option<DialogAnswer> {
-    let (enter, escape) = keys(ui.ctx());
+    let pressed = keys(ui);
     let mut answer = None;
     ui.horizontal(|ui| {
-        if widgets::primary(ui, confirm).clicked() || enter {
+        if widgets::primary(ui, confirm).clicked() || pressed.enter {
             answer = Some(DialogAnswer::Confirm);
         }
-        if ui.button("Cancel").clicked() || escape {
+        if ui.button("Cancel").clicked() || pressed.escape {
             answer = Some(DialogAnswer::Cancel);
         }
     });
@@ -91,7 +96,7 @@ pub fn card(ctx: &Context, id: &str, width: f32, body: impl FnOnce(&mut egui::Ui
 fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Option<ModalDialog> {
     let mut outcome = None;
     let templates = templates::list();
-    let (enter, escape) = keys(ctx);
+    let mut pressed = DialogKeys::default();
     let copy_source = match &dialog.source {
         NewGameSource::Copy(folder) => Some(folder.clone()),
         NewGameSource::Template(_) => None,
@@ -105,6 +110,7 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
         "new-game",
         if copy_source.is_some() { 600.0 } else { 1080.0 },
         |ui| {
+            pressed = keys(ui);
             ui.label(RichText::new(&title).strong().size(18.0));
             ui.add_space(8.0);
             match &mut dialog.source {
@@ -245,10 +251,10 @@ fn new_game(editor: &mut Editor, ctx: &Context, mut dialog: NewGameDialog) -> Op
             });
         },
     );
-    if enter && !ctx.egui_wants_keyboard_input() {
+    if pressed.enter && !ctx.egui_wants_keyboard_input() {
         outcome = Some(true);
     }
-    if escape {
+    if pressed.escape {
         outcome = Some(false);
     }
     match outcome {
@@ -392,7 +398,7 @@ fn count_files_in(folder: &Path) -> usize {
 
 fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Option<ModalDialog> {
     let mut outcome = None;
-    let (enter, escape) = keys(ctx);
+    let mut pressed = DialogKeys::default();
     let groups: Vec<UsageSummary> = match (&dialog.target, &editor.project) {
         (RenameTarget::Row { table, key }, Some(project)) => {
             rows::usage_groups(project, table, key)
@@ -405,6 +411,7 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
         RenameTarget::Layer { area, layer } => format!("Rename layer {layer} of {area}"),
     };
     card(ctx, "rename", 600.0, |ui| {
+        pressed = keys(ui);
         ui.label(RichText::new(title).strong().size(18.0));
         ui.add_space(8.0);
         let response = ui.add(
@@ -481,10 +488,10 @@ fn rename(editor: &mut Editor, ctx: &Context, mut dialog: RenameDialog) -> Optio
             }
         });
     });
-    if enter {
+    if pressed.enter {
         outcome = Some(true);
     }
-    if escape {
+    if pressed.escape {
         outcome = Some(false);
     }
     match outcome {
@@ -524,7 +531,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         }
         ModalDialog::Confirm(confirm) => {
             let mut outcome = None;
-            let (enter, escape) = keys(ctx);
+            let mut pressed = DialogKeys::default();
             card(
                 ctx,
                 "confirm",
@@ -534,6 +541,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     440.0
                 },
                 |ui| {
+                    pressed = keys(ui);
                     ui.label(RichText::new(&confirm.title).strong().size(18.0));
                     ui.add_space(6.0);
                     ui.label(theme::muted(&confirm.body));
@@ -564,10 +572,10 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     });
                 },
             );
-            if enter {
+            if pressed.enter {
                 outcome = Some(true);
             }
-            if escape {
+            if pressed.escape {
                 outcome = Some(false);
             }
             match outcome {
@@ -752,8 +760,9 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         ModalDialog::Rename(dialog) => rename(editor, ctx, dialog),
         ModalDialog::Delete(mut dialog) => {
             let mut outcome = None;
-            let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+            let mut pressed = DialogKeys::default();
             card(ctx, "delete", 620.0, |ui| {
+                pressed = keys(ui);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("✕").color(theme::DANGER).size(16.0));
                     ui.label(
@@ -802,7 +811,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     }
                 });
             });
-            if escape {
+            if pressed.escape {
                 outcome = Some(false);
             }
             match outcome {
@@ -844,18 +853,18 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
         }
         ModalDialog::Binaries => {
             let mut open = true;
-            let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             card(ctx, "binaries", 560.0, |ui| {
-                if play::binaries_body(editor, ui) || escape {
+                if play::binaries_body(editor, ui) || keys(ui).escape {
                     open = false;
                 }
             });
             open.then_some(ModalDialog::Binaries)
         }
         ModalDialog::Keys => {
-            let escape = ctx.input(|i| i.key_pressed(egui::Key::Escape));
             let mut open = true;
+            let mut pressed = DialogKeys::default();
             card(ctx, "keys", 1500.0, |ui| {
+                pressed = keys(ui);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Keys").strong().size(18.0));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -885,7 +894,7 @@ fn one(editor: &mut Editor, ctx: &Context, dialog: ModalDialog) -> Option<ModalD
                     }
                 });
             });
-            (open && !escape).then_some(ModalDialog::Keys)
+            (open && !pressed.escape).then_some(ModalDialog::Keys)
         }
         ModalDialog::MakeBlueprint(dialog) => {
             area::make_blueprint_dialog(editor, ctx, dialog).map(ModalDialog::MakeBlueprint)

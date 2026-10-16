@@ -173,13 +173,16 @@ struct Cue {
 }
 
 fn load(assets: Res<AssetServer>, content: Res<Content>, mut catalog: ResMut<Catalog>) {
-    catalog.0 = content
-        .table::<SfxDef>()
-        .rows()
-        .map(|def| Sound {
-            handle: assets.load(def.file.path()),
-            volume: def.volume,
-            pitch: def.pitch,
+    let table = content.table::<SfxDef>();
+    catalog.0 = table
+        .ids()
+        .map(|id| {
+            let def = table.row(id);
+            Sound {
+                handle: assets.load(def.file.path()),
+                volume: def.volume,
+                pitch: def.pitch,
+            }
         })
         .collect();
 }

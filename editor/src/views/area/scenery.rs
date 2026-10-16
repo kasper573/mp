@@ -5,10 +5,10 @@ use game::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
 use super::inspect::Followups;
+use super::modules;
 use super::placement::warp_destinations;
 use super::stamp::object_names;
-use super::{AreaFrame, shapes};
-use super::{modules, placement};
+use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::widgets;
@@ -69,7 +69,7 @@ pub fn tile_count(module: &Value) -> usize {
 pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     let indices: Vec<usize> = super::selected_parts(editor, &frame.area_key)
         .iter()
-        .filter_map(|p| p.strip_prefix("/modules/")?.parse().ok())
+        .filter_map(|p| super::module_index(p))
         .collect();
     let sceneries: Vec<&Value> = indices
         .iter()
@@ -136,34 +136,36 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
     if !blocks.is_empty() {
         joined["blocks"] = Value::Array(blocks);
     }
-    let mut modules = frame.modules.clone();
     let mut sorted = indices.clone();
     sorted.sort_unstable();
-    for i in sorted.iter().rev() {
-        if frame.modules[*i].is_module(AreaModuleKind::Scenery) {
-            modules.remove(*i);
-        }
-    }
-    let at = sorted[0].min(modules.len());
-    modules.insert(at, joined);
-    if modules::write_modules(
-        editor,
-        &frame.area_key,
-        modules,
-        &format!("Join {} sceneries in {}", sceneries.len(), frame.area_key),
-    ) {
-        editor.selection.parts = vec![format!("/modules/{at}")];
+    let mut at = 0;
+    let applied = modules::change_modules(editor, &frame.area_key, |modules| {
+        let mut position = 0;
+        modules.retain(|module| {
+            position += 1;
+            !(sorted.contains(&(position - 1)) && module.is_module(AreaModuleKind::Scenery))
+        });
+        at = sorted[0].min(modules.len());
+        modules.insert(at, joined);
+        Some(format!(
+            "Join {} sceneries in {}",
+            sceneries.len(),
+            frame.area_key
+        ))
+    });
+    if applied {
+        editor.selection.parts = vec![super::module_part(at)];
     }
 }
 
-pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn split_scenery(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = shapes::scenery_rect(module) else {
         return;
     };
     let tileset = module.text("tileset").to_owned();
-    let grids = frame.area().grids;
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
     let layer = editor
         .views
         .area
@@ -194,29 +196,28 @@ pub fn split_scenery(editor: &mut Editor, frame: &AreaFrame, index: usize) {
         editor.toast("No free cell under the scenery on the active layer");
         return;
     }
-    let mut modules = frame.modules.clone();
     let all_gone = kept.iter().all(|row| row.iter().all(Value::is_null));
-    if all_gone {
-        modules.remove(index);
-    } else {
-        modules[index]["tiles"] = Value::Array(kept.into_iter().map(Value::Array).collect());
-    }
-    let Some(mut row) = editor.row_value("area", &frame.area_key) else {
+    let Some(mut edit) = modules::module_edit(editor, &frame.area_key, |modules| {
+        modules.get(index)?;
+        if all_gone {
+            modules.remove(index);
+        } else {
+            modules[index]["tiles"] = Value::Array(kept.into_iter().map(Value::Array).collect());
+        }
+        Some(format!(
+            "Split scenery into {placed} tiles in {}",
+            frame.area_key
+        ))
+    }) else {
         return;
     };
-    row["modules"] = Value::Array(modules);
-    let mut edit = ContentEdit::new(format!(
-        "Split scenery into {placed} tiles in {}",
-        frame.area_key
-    ));
-    edit.write_json(row_file("area", &frame.area_key), &row);
     draft.write_into(&mut edit);
     if editor.apply(edit) && all_gone {
         editor.selection.parts.clear();
     }
 }
 
-pub fn return_door(editor: &mut Editor, frame: &AreaFrame, index: usize) {
+pub fn return_door(editor: &mut Editor, frame: &AreaSnapshot, index: usize) {
     let area_key = &frame.area_key;
     let modules = &frame.modules;
     let Some(module) = modules.get(index) else {
@@ -226,7 +227,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaFrame, index: usize) {
         editor.toast("The object has no warp to return from");
         return;
     };
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(here_id) = content.by_key::<area::AreaDef>(area_key) else {
@@ -259,7 +260,7 @@ pub fn return_door(editor: &mut Editor, frame: &AreaFrame, index: usize) {
         editor.toast("The destination has no walkable cell");
         return;
     };
-    let mut names = object_names(content, there_id);
+    let mut names = object_names(&content, there_id);
     let name = rows::free_name(&format!("{}_back", module.text_or("name", "door")), &names);
     names.insert(name.clone());
     let cell = target_at.cell();
@@ -361,26 +362,25 @@ pub(super) fn scenery_extras(
             .button(format!("⧉ Make the {under} blocked cells its own"))
             .clicked()
         {
-            out.deferred
-                .push(super::DeferredAreaAction::AdoptBlocks(index));
+            out.actions.push(super::AreaAction::AdoptBlocks(index));
         }
     } else {
         widgets::hint(ui, "No cells under it are blocked");
     }
     ui.horizontal(|ui| {
         if ui.button("▣ Make blueprint…").clicked() {
-            out.extras.push(placement::PlacementAction::MakeBlueprint);
+            out.actions.push(super::AreaAction::MakeBlueprint);
         }
         if ui.button("Split into tiles").clicked() {
-            out.deferred.push(super::DeferredAreaAction::Split(index));
+            out.actions.push(super::AreaAction::Split(index));
         }
     });
 }
 
 pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Option<usize> {
-    let content = cx.content?;
+    let content = cx.content.clone()?;
     let area_id = content.by_key::<area::AreaDef>(area_key)?;
-    let grids = area::load(&content, area_id).grids;
+    let grids = area::load(&content, area_id).grids.clone();
     let rect = shapes::scenery_rect(module)?;
     let size = grids.size;
     Some(
@@ -393,7 +393,7 @@ pub(super) fn blocked_under(cx: &FormCx, area_key: &str, module: &Value) -> Opti
     )
 }
 
-pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize) {
+pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaSnapshot, index: usize) {
     let module = &frame.modules[index];
     let Some(rect) = super::shapes::scenery_rect(module) else {
         return;
@@ -401,8 +401,8 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize)
     let Some(at) = super::shapes::pos_of(&module["at"]) else {
         return;
     };
-    let grids = frame.area().grids;
-    let mut draft = super::grid::GridDraft::of(&frame.area_key, grids);
+    let grids = frame.area().grids.clone();
+    let mut draft = super::grid::GridDraft::of(&frame.area_key, &grids);
     let mut adopted: Vec<Value> = module["blocks"].as_array().cloned().unwrap_or_default();
     let mut count = 0;
     for cell in rect.tiles() {
@@ -419,17 +419,15 @@ pub fn adopt_blocks(editor: &mut Editor, frame: &super::AreaFrame, index: usize)
         editor.toast("Nothing under the scenery is blocked on the walk grid");
         return;
     }
-    let mut modules = frame.modules.clone();
-    modules[index]["blocks"] = Value::Array(adopted);
-    let Some(mut row) = editor.row_value("area", &frame.area_key) else {
+    let Some(mut edit) = modules::module_edit(editor, &frame.area_key, |modules| {
+        modules.get_mut(index)?["blocks"] = Value::Array(adopted);
+        Some(format!(
+            "Give {count} blocked cells to the scenery in {}",
+            frame.area_key
+        ))
+    }) else {
         return;
     };
-    row["modules"] = Value::Array(modules);
-    let mut edit = ContentEdit::new(format!(
-        "Give {count} blocked cells to the scenery in {}",
-        frame.area_key
-    ));
-    edit.write_json(row_file("area", &frame.area_key), &row);
     draft.write_into(&mut edit);
     editor.apply(edit);
 }
@@ -439,11 +437,6 @@ pub fn selected_scenery(editor: &Editor, frame: &super::AreaFrame) -> Option<usi
     if parts.len() != 1 {
         return None;
     }
-    let index: usize = parts
-        .iter()
-        .next()?
-        .strip_prefix("/modules/")?
-        .parse()
-        .ok()?;
+    let index = super::module_index(parts.iter().next()?)?;
     (frame.modules.get(index)?.is_module(AreaModuleKind::Scenery)).then_some(index)
 }

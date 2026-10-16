@@ -1,4 +1,4 @@
-use driver::{finished, in_feed, on_quest};
+use driver::{finished, noticed, on_quest};
 use game::systems::input::map::InputAction;
 use game::systems::quest::QuestResult;
 
@@ -39,7 +39,7 @@ fn play(shoot: &mut Shoot) {
         finished(snapshot, "bone_tithe") == Some(QuestResult::Completed)
     });
     me.wait_until("the tokens in the feed", |snapshot| {
-        in_feed(snapshot, "+6 Bone Token")
+        noticed(snapshot, "+6 Bone Token")
     });
     me.caption_top("Bones out, tokens in, and the day's tithe is done");
     me.read_to_choices();

@@ -70,6 +70,7 @@ pub struct DropItems {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Aim,
     pub item: ItemId,
+    #[schemars(extend("x-count" = true))]
     pub count: Condition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done: Arrow,
@@ -130,25 +131,24 @@ impl EffectDef<RiftScripting> for Items {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (take, give, refused) = (
-            self.take.as_slice(),
-            self.give.as_slice(),
-            self.refused.as_deref(),
-        );
+        let (take, give, refused) = (self.take.clone(), self.give.clone(), self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to trade with");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to trade with");
             };
-            let outcome = exchange(world, actor, take, give);
-            effects::settle(world, cx, refused, outcome)
+            let outcome = exchange(world, actor, &take, &give);
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -164,21 +164,24 @@ impl EffectDef<RiftScripting> for UseItem {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("used", self.used.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (item, refused) = (self.item, self.refused.as_deref());
+        let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to use it");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to use it");
             };
             let outcome = super::use_held(world, actor, item);
-            effects::settle(world, cx, refused, outcome)
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -190,21 +193,24 @@ impl EffectDef<RiftScripting> for Equip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (item, refused) = (self.item, self.refused.as_deref());
+        let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to equip");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to equip");
             };
             let outcome = equipment::equip_held(world, actor, item);
-            effects::settle(world, cx, refused, outcome)
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -216,21 +222,24 @@ impl EffectDef<RiftScripting> for Unequip {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
-        let (slot, refused) = (self.slot, self.refused.as_deref());
+        let (slot, refused) = (self.slot, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to unequip");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to unequip");
             };
             let outcome = equipment::unequip_slot(world, actor, slot);
-            effects::settle(world, cx, refused, outcome)
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -242,23 +251,26 @@ impl EffectDef<RiftScripting> for DropItems {
     fn needs_subject(&self) -> bool {
         self.who.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let who = effects::aim(cx, &self.who)?;
         let count = cx.expr(&self.count, ValueType::Integer)?;
-        let (item, refused) = (self.item, self.refused.as_deref());
+        let (item, refused) = (self.item, self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let Some(actor) = effects::aimed_character(world, cx, &who) else {
-                return effects::refuse(world, cx, refused, "Nobody to drop them");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to drop them");
             };
             let count = count(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
             let outcome = drop_held(world, actor, ItemStack::new(item, count));
-            effects::settle(world, cx, refused, outcome)
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -270,13 +282,16 @@ impl EffectDef<RiftScripting> for SpawnGroundItems {
     fn needs_subject(&self) -> bool {
         self.for_whom == GroundItemsFor::Subject || self.at.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let at = spot(cx, self.at.as_ref())?;
         let seconds = cx.opt_expr(self.seconds.as_ref(), ValueType::Number)?;
-        let (items, for_whom) = (self.items.as_slice(), self.for_whom);
+        let (items, for_whom) = (self.items.clone(), self.for_whom);
         Ok(Box::new(move |world, _, cx| {
             let Some((area, from)) = at(world, cx) else {
                 return EffectStep::Done;
@@ -310,10 +325,13 @@ impl EffectDef<RiftScripting> for ClearGroundItems {
     fn needs_subject(&self) -> bool {
         self.at.is_none()
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let at = spot(cx, self.at.as_ref())?;
         let within = effects::number(cx, &self.within)?;
         Ok(Box::new(move |world, _, cx| {
@@ -347,25 +365,28 @@ impl EffectDef<RiftScripting> for MoveItems {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![
             ("done", self.done.as_deref()),
             ("refused", self.refused.as_deref()),
         ]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let from = cx.expr(&self.from, ValueType::Actor)?;
         let to = cx.expr(&self.to, ValueType::Actor)?;
-        let (items, refused) = (self.items.as_slice(), self.refused.as_deref());
+        let (items, refused) = (self.items.clone(), self.refused.clone());
         Ok(Box::new(move |world, _, cx| {
             let (Some(from), Some(to)) = (
                 effects::aimed_character(world, cx, &from),
                 effects::aimed_character(world, cx, &to),
             ) else {
-                return effects::refuse(world, cx, refused, "Nobody to trade between");
+                return effects::refuse(world, cx, refused.as_deref(), "Nobody to trade between");
             };
-            let outcome = move_between(world, from, to, items);
-            effects::settle(world, cx, refused, outcome)
+            let outcome = move_between(world, from, to, &items);
+            effects::settle(world, cx, refused.as_deref(), outcome)
         }))
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
@@ -382,7 +403,7 @@ pub fn exchange(
     take: &[ItemStack],
     give: &[ItemStack],
 ) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     let mut inventory = world
         .get_mut::<Inventory>(actor)
         .ok_or_else(|| "Has no bag".to_owned())?;
@@ -391,11 +412,43 @@ pub fn exchange(
         .map_err(|refusal| refusal.describe(&content))
 }
 
+pub fn move_between(
+    world: &mut World,
+    from: Entity,
+    to: Entity,
+    items: &[ItemStack],
+) -> Result<(), String> {
+    let content = world.resource::<Content>().clone();
+    if from == to {
+        return Err("Nothing to move".to_owned());
+    }
+    if let Some(bound) = items.iter().find(|stack| stack.item.get(&content).bound()) {
+        return Err(format!("{} is bound", bound.item.get(&content).name));
+    }
+    let mut giving = world
+        .get::<Inventory>(from)
+        .cloned()
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    let mut taking = world
+        .get::<Inventory>(to)
+        .cloned()
+        .ok_or_else(|| "Has no bag".to_owned())?;
+    giving
+        .exchange(&content, items, &[])
+        .map_err(|refusal| refusal.describe(&content))?;
+    taking
+        .exchange(&content, &[], items)
+        .map_err(|refusal| refusal.describe(&content))?;
+    world.entity_mut(from).insert(giving);
+    world.entity_mut(to).insert(taking);
+    Ok(())
+}
+
 type SpotEval = Box<dyn Fn(&World, &FlowCx) -> Option<(AreaId, Pos<Tiles>)> + Send + Sync>;
 
-fn spot(
-    cx: &mut Compiler<RiftScripting>,
-    at: Option<&'static Spot>,
+fn spot<'c>(
+    cx: &mut Compiler<'c, RiftScripting>,
+    at: Option<&'c Spot>,
 ) -> Result<SpotEval, ScriptFault> {
     Ok(match at {
         Some(Spot::Place(place)) => {
@@ -418,7 +471,7 @@ fn standing(world: &World, who: Entity) -> Option<(AreaId, Pos<Tiles>)> {
 }
 
 fn drop_held(world: &mut World, actor: Entity, stack: ItemStack) -> Result<(), String> {
-    let content = *world.resource::<Content>();
+    let content = world.resource::<Content>().clone();
     if stack.item.get(&content).bound() {
         return Err(format!("{} is bound to you", stack.item.get(&content).name));
     }
@@ -429,34 +482,5 @@ fn drop_held(world: &mut World, actor: Entity, stack: ItemStack) -> Result<(), S
         .exchange(&content, &[stack], &[])
         .map_err(|refusal| refusal.describe(&content))?;
     super::scatter_drop(world, actor, &[(stack.item, stack.count)], None, None);
-    Ok(())
-}
-
-fn move_between(
-    world: &mut World,
-    from: Entity,
-    to: Entity,
-    items: &[ItemStack],
-) -> Result<(), String> {
-    let content = *world.resource::<Content>();
-    if let Some(bound) = items.iter().find(|stack| stack.item.get(&content).bound()) {
-        return Err(format!("{} is bound", bound.item.get(&content).name));
-    }
-    let mut giving = world
-        .get::<Inventory>(from)
-        .cloned()
-        .ok_or_else(|| "Has no bag".to_owned())?;
-    let mut taking = world
-        .get::<Inventory>(to)
-        .cloned()
-        .ok_or_else(|| "Has no bag".to_owned())?;
-    giving
-        .exchange(&content, items, &[])
-        .map_err(|refusal| refusal.describe(&content))?;
-    taking
-        .exchange(&content, &[], items)
-        .map_err(|refusal| refusal.describe(&content))?;
-    world.entity_mut(from).insert(giving);
-    world.entity_mut(to).insert(taking);
     Ok(())
 }

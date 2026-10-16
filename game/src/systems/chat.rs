@@ -53,16 +53,19 @@ impl EffectDef<RiftScripting> for Say {
     fn needs_subject(&self) -> bool {
         false
     }
-    fn outputs(&'static self) -> Vec<(Name, Link)> {
+    fn outputs(&self) -> Vec<(Name, Link<'_>)> {
         vec![("next", self.next.as_deref())]
     }
-    fn compile(&'static self, cx: &mut Compiler<RiftScripting>) -> Result<EffectCall, ScriptFault> {
+    fn compile<'c>(
+        &'c self,
+        cx: &mut Compiler<'c, RiftScripting>,
+    ) -> Result<EffectCall, ScriptFault> {
         let values = text::values(&self.text)
             .into_iter()
             .map(|value| cx.expr(value, ValueType::Text))
             .collect::<Result<Vec<_>, _>>()?;
         let within = cx.opt_expr(self.within.as_ref(), ValueType::Number)?;
-        let spans = self.text.as_slice();
+        let spans = self.text.clone();
         Ok(Box::new(move |world, _, cx| {
             let Some(speaker) = cx.owner else {
                 return EffectStep::Done;
@@ -71,7 +74,7 @@ impl EffectDef<RiftScripting> for Say {
             let within = within.as_ref().map_or(VIEW_DISTANCE, |within| {
                 Tiles(within(world, cx).as_num() as f32)
             });
-            say(world, speaker, LineText::spoken(spans, &spoken), within);
+            say(world, speaker, LineText::spoken(&spans, &spoken), within);
             EffectStep::Done
         }))
     }

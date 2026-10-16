@@ -8,7 +8,7 @@ use game::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::inspect::hidden_fields;
-use super::{holes, modules};
+use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{ContentEdit, RowSelection, row_file};
@@ -98,7 +98,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
         editor.selection = RowSelection {
             table: "blueprint".to_owned(),
             keys: vec![key.to_owned()],
-            parts: next.iter().map(|i| format!("/parts/{i}")).collect(),
+            parts: next.iter().copied().map(super::blueprint_part).collect(),
         };
     }
     if let Some(part) = add {
@@ -111,7 +111,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
             editor.selection = RowSelection {
                 table: "blueprint".to_owned(),
                 keys: vec![key.to_owned()],
-                parts: vec![format!("/parts/{index}")],
+                parts: vec![super::blueprint_part(index)],
             };
         }
         return;
@@ -216,7 +216,7 @@ pub(super) fn part_cards(
         let mut cx = FormCx::new(project, shape, shapes, form, &mut actions)
             .owned_by("blueprint", Some(key));
         for &index in selected {
-            let path = format!("/parts/{index}");
+            let path = super::blueprint_part(index);
             let Some(part) = row["parts"].get_mut(index) else {
                 continue;
             };
@@ -241,16 +241,22 @@ pub(super) fn part_cards(
                 });
                 ui.add_space(4.0);
                 let mut plain = part.clone();
-                holes::strip_holes(&mut plain);
                 let before = plain.clone();
                 cx.holes = Some(forms::FormHoles {
-                    filled: holes
+                    fields: holeable
                         .iter()
-                        .map(|hole| (format!("{path}{}", hole.pointer), hole.name.clone()))
-                        .collect(),
-                    open: holeable
-                        .iter()
-                        .map(|field| (format!("{path}{}", field.pointer), field.kind))
+                        .map(|field| {
+                            (
+                                format!("{path}{}", field.pointer),
+                                forms::FieldHole::Open(field.kind),
+                            )
+                        })
+                        .chain(holes.iter().map(|hole| {
+                            (
+                                format!("{path}{}", hole.pointer),
+                                forms::FieldHole::Filled(hole.name.clone()),
+                            )
+                        }))
                         .collect(),
                     variables: variables.clone(),
                     requests: Vec::new(),
@@ -272,7 +278,7 @@ pub(super) fn part_cards(
                     }
                 }
                 if plain != before {
-                    holes::merge_keeping_holes(part, &plain);
+                    *part = plain;
                 }
                 if module_kind == Some(AreaModuleKind::Object) {
                     changed |= crate::ui::inspector::scripts::script_cards(
@@ -337,17 +343,17 @@ pub(super) fn part_cards(
 }
 
 pub(super) fn placed_list(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return;
     };
     let Some(id) = content.by_key::<area::blueprint::BlueprintDef>(key) else {
         return;
     };
     let editing: Option<(String, usize)> = editor.views.area.views.values().find_map(|view| {
-        view.in_place
-            .last()
-            .filter(|p| p.blueprint == key)
-            .map(|p| (view.area.clone(), p.module))
+        let modules = super::modules::area_modules(editor, &view.area);
+        let chain = placement::resolve_in_place(&content, &modules, &view.in_place)?;
+        let innermost = chain.last()?;
+        (innermost.blueprint == key).then(|| (view.area.clone(), innermost.module))
     });
     let mut placed: Vec<PlacedAt> = Vec::new();
     let mut nested = 0;
@@ -436,7 +442,7 @@ pub(super) fn variables_section(editor: &Editor, ui: &mut Ui, key: &str, row: &V
     let area_keys: Vec<String> = editor
         .project
         .as_ref()
-        .and_then(|p| p.content)
+        .and_then(|p| p.content.clone())
         .map(|content| {
             content
                 .ids::<area::AreaDef>()
@@ -550,7 +556,7 @@ fn placements_keeping(
     key: &str,
     made: &[holes::MadeVariable],
 ) -> Vec<(String, Value)> {
-    let Some(content) = editor.project.as_ref().and_then(|p| p.content) else {
+    let Some(content) = editor.project.as_ref().and_then(|p| p.content.clone()) else {
         return Vec::new();
     };
     let mut out = Vec::new();

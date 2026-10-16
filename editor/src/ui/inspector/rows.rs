@@ -7,6 +7,7 @@ use serde_json::Value;
 use super::{LEFT_COLUMN, act, add_module_popup};
 use super::{theme, widgets};
 use crate::app::{Editor, registry};
+use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{self, FormAction, FormCx};
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::schema::{self, SchemaKind};
@@ -345,7 +346,7 @@ pub(super) fn shared_field(
             })
             .collect();
         let id = ui.id().with(path).with("set-all");
-        let mut draft = cx.state.drafts.get(&id).cloned().unwrap_or_default();
+        let mut draft = draft_of(ui, id).unwrap_or_default();
         let response = egui::Frame::new()
             .fill(theme::INPUT)
             .stroke(egui::Stroke::new(1.0, theme::BORDER))
@@ -362,10 +363,10 @@ pub(super) fn shared_field(
             });
         let response = response.inner.on_hover_text(listing.join("\n"));
         if response.changed() {
-            cx.state.drafts.insert(id, draft.clone());
+            set_draft(ui, id, &draft.clone());
         }
         if forms::committed(ui, &response) {
-            cx.state.drafts.remove(&id);
+            clear_draft(ui, id);
             if !draft.trim().is_empty() {
                 let parsed: Value = serde_json::from_str(draft.trim())
                     .unwrap_or(Value::String(draft.trim().to_owned()));
@@ -375,12 +376,10 @@ pub(super) fn shared_field(
     });
 }
 
-pub(super) fn fieldless_note(table: &str, tag: &str) -> &'static str {
-    match (table, tag) {
-        ("model", "airborne") => {
-            "No fields. Walks ignore blocked cells; wild ones keep out of safe zones."
-        }
-        _ => "No fields: having it is the setting.",
+pub(super) fn fieldless_note(variant: &Value) -> String {
+    match variant["description"].as_str() {
+        Some(description) => format!("No fields. {description}"),
+        None => "No fields: having it is the setting.".to_owned(),
     }
 }
 

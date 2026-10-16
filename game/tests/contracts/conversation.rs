@@ -4,12 +4,12 @@ use game::core::tiling::{TilePos, Tiles};
 use game::core::time::{UnixMillis, UtcHour, WallClock};
 use game::systems::attention::{Attention, AttentionId, AttentionMark};
 use game::systems::dialogue::{Conversation, ConversationRequest};
-use game::systems::movement::{MoveRequest, moving, position};
+use game::systems::movement::{MoveRequest, MoveSeq, moving, position};
 use game::systems::player::commands_locked;
 use game::systems::script::{self, EventKind, RiftInstances};
 use game::systems::stat::{self, StatKind};
 
-use crate::support::{
+use testkit::{
     Sim, choice, content, conversation, count, counted, errors, give, place, row, spawn_area, talk,
     townsperson,
 };
@@ -45,7 +45,13 @@ fn talking_walks_into_reach_opens_the_greeting_and_locks_commands() {
     assert!(commands_locked(sim.world(), player));
 
     let elsewhere = sim.walkable_near(at, Tiles(4.0), Tiles(6.0));
-    sim.send(1, MoveRequest { pos: elsewhere });
+    sim.send(
+        1,
+        MoveRequest {
+            pos: elsewhere,
+            seq: MoveSeq(1),
+        },
+    );
     sim.run_until(2.0, |_| false);
     let still = position(sim.world(), player).expect("position");
     assert!(still.distance(at) < Tiles(0.5));
@@ -209,8 +215,9 @@ fn an_npc_shows_news_only_to_those_who_have_not_heard_him_out() {
     let marks = |sim: &mut Sim, player: Entity| -> Vec<AttentionId> {
         sim.world()
             .get::<Attention>(player)
-            .map(|attention| attention.of(tobb).to_vec())
-            .unwrap_or_default()
+            .expect("attention")
+            .of(tobb)
+            .to_vec()
     };
     sim.run_until(0.5, |_| false);
 

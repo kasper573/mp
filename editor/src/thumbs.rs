@@ -1,12 +1,19 @@
 use std::collections::HashMap;
 
 use egui::{ColorImage, TextureHandle, TextureOptions};
+use image::RgbaImage;
+use image::imageops::FilterType;
 
 use crate::project::ProjectFiles;
 
 #[derive(Default)]
 pub struct Thumbnails {
-    textures: HashMap<String, Option<Thumbnail>>,
+    entries: HashMap<String, Entry>,
+}
+
+enum Entry {
+    Decoded(Thumbnail),
+    Undecodable { hash: String },
 }
 
 #[derive(Clone)]
@@ -15,6 +22,8 @@ pub struct Thumbnail {
     pub size: [usize; 2],
     pub hash: String,
 }
+
+pub const ICON: u32 = 32;
 
 impl Thumbnails {
     pub fn image(
@@ -35,28 +44,7 @@ impl Thumbnails {
         budget: &mut u32,
     ) -> Option<Thumbnail> {
         let file = format!("assets/{path}");
-        let bytes = files.get(&file)?;
-        let hash = files.hash_of(&file)?.to_owned();
-        if let Some(Some(thumb)) = self.textures.get(&file)
-            && thumb.hash == hash
-        {
-            return Some(thumb.clone());
-        }
-        if *budget == 0 {
-            ctx.request_repaint();
-            return None;
-        }
-        *budget -= 1;
-        let decoded = decode(bytes).map(|image| {
-            let size = image.size;
-            Thumbnail {
-                texture: ctx.load_texture(file.clone(), image, TextureOptions::NEAREST),
-                size,
-                hash,
-            }
-        });
-        self.textures.insert(file, decoded.clone());
-        decoded
+        self.load(ctx, files, file.clone(), file, budget, |image| image)
     }
 
     pub fn icon(
@@ -68,69 +56,51 @@ impl Thumbnails {
     ) -> Option<Thumbnail> {
         let file = format!("assets/{path}");
         let key = format!("icon:{file}");
+        self.load(ctx, files, key, file, budget, |image| shrink(image, ICON))
+    }
+
+    pub fn forget(&mut self, path: &str) {
+        self.entries.remove(&format!("assets/{path}"));
+        self.entries.remove(&format!("icon:assets/{path}"));
+    }
+
+    fn load(
+        &mut self,
+        ctx: &egui::Context,
+        files: &ProjectFiles,
+        key: String,
+        file: String,
+        budget: &mut u32,
+        prepare: impl FnOnce(RgbaImage) -> RgbaImage,
+    ) -> Option<Thumbnail> {
+        let bytes = files.get(&file)?;
         let hash = files.hash_of(&file)?.to_owned();
-        if let Some(Some(thumb)) = self.textures.get(&key)
-            && thumb.hash == hash
-        {
-            return Some(thumb.clone());
+        match self.entries.get(&key) {
+            Some(Entry::Decoded(thumb)) if thumb.hash == hash => return Some(thumb.clone()),
+            Some(Entry::Undecodable { hash: known }) if *known == hash => return None,
+            _ => {}
         }
         if *budget == 0 {
             ctx.request_repaint();
             return None;
         }
         *budget -= 1;
-        let decoded = decode(files.get(&file)?).map(|image| {
-            let image = shrink(image, ICON);
+        let thumb = decode(bytes).map(|image| {
+            let image = to_color_image(prepare(image));
             let size = image.size;
             Thumbnail {
                 texture: ctx.load_texture(key.clone(), image, TextureOptions::NEAREST),
                 size,
-                hash,
+                hash: hash.clone(),
             }
         });
-        self.textures.insert(key, decoded.clone());
-        decoded
+        let entry = match &thumb {
+            Some(thumb) => Entry::Decoded(thumb.clone()),
+            None => Entry::Undecodable { hash },
+        };
+        self.entries.insert(key, entry);
+        thumb
     }
-
-    pub fn forget(&mut self, path: &str) {
-        self.textures.remove(&format!("assets/{path}"));
-        self.textures.remove(&format!("icon:assets/{path}"));
-    }
-}
-
-pub const ICON: usize = 32;
-
-fn shrink(image: ColorImage, longest: usize) -> ColorImage {
-    let [w, h] = image.size;
-    if w <= longest && h <= longest {
-        return image;
-    }
-    let scale = longest as f32 / w.max(h) as f32;
-    let (sw, sh) = (
-        ((w as f32 * scale).round() as usize).max(1),
-        ((h as f32 * scale).round() as usize).max(1),
-    );
-    let pixels = (0..sh)
-        .flat_map(|y| {
-            let sy = ((y as f32 + 0.5) / scale) as usize;
-            (0..sw).map(move |x| {
-                let sx = ((x as f32 + 0.5) / scale) as usize;
-                (sx.min(w - 1), sy.min(h - 1))
-            })
-        })
-        .map(|(sx, sy)| image.pixels[sy * w + sx])
-        .collect();
-    ColorImage {
-        size: [sw, sh],
-        pixels,
-        source_size: egui::Vec2::new(sw as f32, sh as f32),
-    }
-}
-
-pub fn decode(bytes: &[u8]) -> Option<ColorImage> {
-    let image = image::load_from_memory(bytes).ok()?.into_rgba8();
-    let size = [image.width() as usize, image.height() as usize];
-    Some(ColorImage::from_rgba_unmultiplied(size, image.as_raw()))
 }
 
 pub struct ModelFrame {
@@ -181,4 +151,26 @@ pub fn flip_uv(uv: egui::Rect, horizontal: bool, vertical: bool) -> egui::Rect {
         std::mem::swap(&mut min.y, &mut max.y);
     }
     egui::Rect::from_min_max(min, max)
+}
+
+fn decode(bytes: &[u8]) -> Option<RgbaImage> {
+    image::load_from_memory(bytes)
+        .ok()
+        .map(|image| image.into_rgba8())
+}
+
+fn to_color_image(image: RgbaImage) -> ColorImage {
+    let size = [image.width() as usize, image.height() as usize];
+    ColorImage::from_rgba_unmultiplied(size, image.as_raw())
+}
+
+fn shrink(image: RgbaImage, longest: u32) -> RgbaImage {
+    let (w, h) = image.dimensions();
+    if w <= longest && h <= longest {
+        return image;
+    }
+    let scale = longest as f64 / w.max(h) as f64;
+    let sw = ((w as f64 * scale).round() as u32).max(1);
+    let sh = ((h as f64 * scale).round() as u32).max(1);
+    image::imageops::resize(&image, sw, sh, FilterType::Nearest)
 }

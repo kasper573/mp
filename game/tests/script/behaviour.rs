@@ -12,7 +12,7 @@ use game::systems::stat::{self, StatKind};
 use serde_json::json;
 
 use crate::json::inline_with;
-use crate::support::{Sim, content, health, place, row, spawn_area, townsperson};
+use testkit::{Sim, content, health, place, row, spawn_area, townsperson};
 
 #[test]
 fn an_aggressive_monster_picks_a_character_in_its_aggro_range_and_drops_one_beyond_it() {
@@ -171,7 +171,7 @@ fn brawler() -> Vec<Arc<Procedure>> {
             "tick": { "type": "wait", "seconds": 0, "at_most": 1.0, "next": "look" },
         }),
     );
-    compile_owner(content(), OwnerKind::Npc, "test/brawler", &[script]).expect("compiles")
+    compile_owner(content(), OwnerKind::Npc, "test/brawler", &[&script]).expect("compiles")
 }
 
 fn brawling_npc(sim: &mut Sim, near: Pos<Tiles>, pack: u32) -> Entity {
