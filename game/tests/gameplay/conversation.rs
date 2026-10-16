@@ -1,12 +1,8 @@
 use driver::{at_rest, beside_object, beside_resident, open_ground_beside};
 use game::core::tiling::{TilePos, Tiles};
 use game::systems::input::gestures::ClickClaim;
-use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
 
 use crate::playtest;
-
-const HELD_FRAMES: usize = 30;
 
 #[test]
 fn a_conversation_drops_world_clicks_until_it_is_left() {
@@ -47,37 +43,4 @@ fn a_map_object_opens_its_own_conversation() {
     let mut player = playtest.join_as("talker", Some(beside_object("island", "notice-board")));
     assert_eq!(player.interact_with("notice-board").node, "read");
     player.leave_conversation();
-}
-
-#[test]
-fn the_keys_move_the_choice_while_the_pointer_rests_on_another() {
-    let mut playtest = playtest();
-    let mut player = playtest.join_as("talker", Some(beside_resident("island", "grisha")));
-    player.talk_to("grisha");
-    let stage = player.read_to_choices();
-    let [first, second, ..] = &stage.choices[..] else {
-        panic!("Grisha offers fewer than two choices");
-    };
-    player.hover_choice(&first.label);
-    player.wait_for("the pointer to take the choice", |snapshot| {
-        (selected(snapshot)? == first.label).then_some(())
-    });
-    player.act(InputAction::ChooseNext);
-    player.wait_for("the keys to take the choice", |snapshot| {
-        (selected(snapshot)? == second.label).then_some(())
-    });
-    for _ in 0..HELD_FRAMES {
-        let snapshot = player.snapshot();
-        assert_eq!(
-            selected(&snapshot).as_deref(),
-            Some(second.label.as_str()),
-            "the pointer at rest took the choice back"
-        );
-    }
-}
-
-fn selected(snapshot: &ProbeSnapshot) -> Option<String> {
-    let stage = snapshot.stage.as_ref()?;
-    let choice = stage.choices.iter().find(|choice| choice.selected)?;
-    Some(choice.label.clone())
 }

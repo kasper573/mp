@@ -126,10 +126,6 @@ impl Player {
         seen.expect("at least one step")
     }
 
-    pub fn hitch(&mut self, length: Duration) {
-        self.desktop.hitch(length);
-    }
-
     pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
         self.desktop.sweep_pointer(through)
     }
@@ -147,21 +143,6 @@ impl Player {
         let (button, times, held) = pointer_binding(action);
         self.with_held(held, |player| {
             player.desktop.click(button_of(button), times)
-        })
-    }
-
-    // The action's pointer button kept down where the pointer is while `during` plays.
-    pub fn holding_down<T>(
-        &mut self,
-        action: InputAction,
-        during: impl FnOnce(&mut Player) -> T,
-    ) -> T {
-        let (button, _, held) = pointer_binding(action);
-        self.with_held(held, |player| {
-            player.desktop.button_down(button_of(button));
-            let done = during(player);
-            player.desktop.button_up(button_of(button));
-            done
         })
     }
 

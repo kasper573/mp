@@ -68,19 +68,9 @@ impl Playtest {
     // A player whose first sign-in plays the test character, starting at `start` or where the
     // character would.
     pub fn join_as(&mut self, character: &str, start: Option<Place>) -> Player {
-        self.join_as_on(character, start, SCREEN)
-    }
-
-    // As `join_as`, on a screen of the given size.
-    pub fn join_as_on(
-        &mut self,
-        character: &str,
-        start: Option<Place>,
-        screen: (u32, u32),
-    ) -> Player {
         let account = self.next_account();
         self.server.hand_over(&account, character, start);
-        self.enter_world(&account, screen)
+        self.enter_world(&account, SCREEN)
     }
 
     // A player new to the game, on a character of their own.

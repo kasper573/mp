@@ -18,7 +18,7 @@ use crate::core::math::{Offset, Pos, Rect, Size, WindowPx};
 use crate::core::platform::ClientPlatform;
 use crate::core::render::tile_to_window;
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
-use crate::core::tiling::{TilePos, Tiles, TilesPerSec};
+use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
@@ -31,7 +31,7 @@ use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
 use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
-use crate::systems::movement::{self, Position, RenderPosition};
+use crate::systems::movement::{Position, RenderPosition};
 use crate::systems::notification::{self, NotificationRows, bubble, error, feed, intro};
 use crate::systems::npc::{Npc, NpcId};
 use crate::systems::player::{Owner, commands_locked, session};
@@ -141,14 +141,10 @@ pub struct ProbeBody {
     /// Where it shows on screen, which runs behind `at` for others and ahead of it for the player's
     /// own walk.
     pub drawn: Pos<Tiles>,
-    /// Where its walk on screen ends: the player's own only, which the client walks ahead of the
-    /// server.
-    pub walking_to: Option<Pos<Tiles>>,
     /// Where a click takes it rather than whatever stands in front of it.
     pub aim: Pos<Tiles>,
     pub hitbox: Rect<Tiles>,
     pub action: Action,
-    pub speed: TilesPerSec,
     pub health: f32,
     pub max_health: f32,
     pub npc: Option<NpcId>,
@@ -691,11 +687,9 @@ fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
         player: entity.contains::<Owner>(),
         at,
         drawn: entity.get::<RenderPosition>().map_or(at, |drawn| drawn.0),
-        walking_to: movement::drawn_walk_end(world, entity.id()),
         aim: hitbox.center(),
         hitbox,
         action: actor.action,
-        speed: movement::speed_of(world, entity.id()),
         health: stat(StatKind::Health),
         max_health: stat(StatKind::MaxHealth),
         npc,

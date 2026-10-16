@@ -182,15 +182,6 @@ impl Desktop {
         seen
     }
 
-    // The client misses frames as when its system holds it up: frozen for `length`, it then
-    // catches up on the time that passed.
-    pub fn hitch(&self, length: Duration) {
-        let pid = self.client.id().to_string();
-        signal(&pid, "STOP");
-        std::thread::sleep(length);
-        signal(&pid, "CONT");
-    }
-
     // Through every point in turn as fast as a flick of the hand, many to a frame, coming to rest on
     // the last.
     pub fn sweep_pointer(&mut self, through: &[Pos<WindowPx>]) -> ProbeSnapshot {
@@ -608,12 +599,4 @@ fn accept(listener: &TcpListener, client: &mut Child) -> TcpStream {
         );
         std::thread::sleep(Duration::from_millis(10));
     }
-}
-
-fn signal(pid: &str, signal: &str) {
-    let sent = Command::new("kill")
-        .args(["-s", signal, pid])
-        .status()
-        .expect("kill to run");
-    assert!(sent.success(), "the client took no {signal} signal");
 }

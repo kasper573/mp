@@ -19,7 +19,6 @@ use crate::systems::{area, drain_requests};
 
 mod predict;
 
-pub(crate) use predict::drawn_walk_end;
 pub use predict::request_walk;
 
 pub fn register(app: &mut App) {
@@ -292,7 +291,7 @@ pub fn advance(world: &mut World, movers_query: &mut Movers, step_query: &mut St
     }
 }
 
-pub(crate) fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
+fn speed_of(world: &World, entity: Entity) -> TilesPerSec {
     TilesPerSec(Tiles(stat::effective(
         world,
         entity,
