@@ -19,6 +19,7 @@ mod quest;
 mod reach;
 mod safe_zone;
 mod shop;
+mod skills;
 mod snapshot;
 mod spectate;
 mod summon;

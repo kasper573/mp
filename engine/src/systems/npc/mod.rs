@@ -13,7 +13,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
-use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
+use crate::core::content::{
+    Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck, serial,
+};
 use crate::core::math::{Direction, Percent, Pos, Rect, Rng};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
@@ -32,7 +34,7 @@ use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
 };
-use crate::systems::skill::SkillId;
+use crate::systems::skill::{Rank, SkillId};
 use crate::systems::stat::{StatMap, Stats};
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
@@ -82,12 +84,50 @@ pub struct NpcDef {
     #[schemars(extend("x-usage" = "the skill a click on a target uses"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_attack: Option<SkillId>,
+    #[schemars(extend("x-usage" = "known at these ranks, for the scripts that will cast them"))]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<NpcSkill>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<NpcModule>,
 }
 
+#[derive(JsonSchema, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct NpcSkill {
+    pub skill: SkillId,
+    #[schemars(extend("default" = 1))]
+    #[serde(default = "first_rank", skip_serializing_if = "Rank::is_first")]
+    pub rank: Rank,
+}
+
+fn first_rank() -> Rank {
+    Rank::FIRST
+}
+
 impl ContentRow for NpcDef {
     const TABLE: &'static str = "npc";
+
+    fn check(&self, check: &mut RowCheck) {
+        let mut seen = std::collections::BTreeSet::new();
+        for (index, known) in self.skills.iter().enumerate() {
+            if !seen.insert(known.skill) {
+                check.error(
+                    format!("/skills/{index}/skill"),
+                    "skill twice",
+                    known.skill.raw(),
+                    "each skill listed once, at one rank",
+                );
+            }
+            if known.rank == Rank::NONE {
+                check.error(
+                    format!("/skills/{index}/rank"),
+                    "out of range",
+                    0,
+                    "1 or more",
+                );
+            }
+        }
+    }
 }
 
 impl ModuleSet for NpcDef {

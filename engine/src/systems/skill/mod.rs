@@ -35,7 +35,7 @@ use crate::systems::effect;
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
-use crate::systems::npc::Npc;
+use crate::systems::npc::{Npc, NpcDef};
 use crate::systems::script::event::{USED_POINT, USED_RANK, USED_TARGET};
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
@@ -433,10 +433,14 @@ pub fn known(world: &World, actor: Entity) -> BTreeMap<SkillId, Rank> {
     for skill in granted(world, actor) {
         known.entry(skill).or_insert(Rank::FIRST);
     }
-    if let Some(npc) = world.get::<Npc>(actor)
-        && let Some(skill) = npc.def.get(content).basic_attack
-    {
-        known.entry(skill).or_insert(Rank::FIRST);
+    if let Some(npc) = world.get::<Npc>(actor) {
+        let def = npc.def.get(content);
+        for listed in &def.skills {
+            known.insert(listed.skill, listed.rank);
+        }
+        if let Some(skill) = def.basic_attack {
+            known.entry(skill).or_insert(Rank::FIRST);
+        }
     }
     known
 }
@@ -572,6 +576,21 @@ fn used_rank(cx: &FlowCx) -> Rank {
 
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
+    for (id, def) in loading.rows::<NpcDef>(&content) {
+        let mut check = RowCheck::default();
+        for (index, listed) in def.skills.iter().enumerate() {
+            let has = listed.skill.get(&content).rank_count();
+            if listed.rank.0 > has {
+                check.error(
+                    format!("/skills/{index}/rank"),
+                    "rank out of range",
+                    listed.rank.0,
+                    format!("1 to {has}, the ranks of {}", listed.skill.key(&content)),
+                );
+            }
+        }
+        loading.row_errors(id, check);
+    }
     let scripts = content.built::<RiftScripts>();
     for (id, def) in loading.rows::<SkillDef>(&content) {
         if !def.answers_used(scripts, id) {
