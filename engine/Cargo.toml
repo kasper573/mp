@@ -2,7 +2,7 @@
 name = "engine"
 version.workspace = true
 edition.workspace = true
-description = "The game: the isomorphic simulation library and its server, browser client, bench, and lint binaries"
+description = "The engine: the isomorphic simulation library and its server, browser and desktop clients, bench, load test and lint binaries"
 
 [package.metadata.lint]
 game = true

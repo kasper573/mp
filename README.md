@@ -1,6 +1,24 @@
 # rift
 
-An online RPG built in rust.
+A game engine and editor for online RPGs, written in Rust on [Bevy](https://bevyengine.org/), and an
+example game built in the open on top of them.
+
+The engine plays whatever game folder it's given: the same server and clients run any game, without a
+rebuild. The example game in [`example_game/`](example_game) is a game folder like any other, edited in
+the editor and played on the engine's own binaries, and it's the game production runs. The engine and
+editor grow by building it: every feature is made for it and proven on it.
+
+## What's here
+
+| Folder | What it is |
+| --- | --- |
+| [`engine/`](engine) | The engine: the simulation the server and clients share, the game server, the browser (wasm) and desktop clients, and the bench, load test and lint tools. |
+| [`editor/`](editor) | The editor: opens a game folder, edits it through the engine's own loader and writer, and play-tests it on the engine's binaries. |
+| [`example_game/`](example_game) | The example game: a game folder like any other, and what production runs. |
+| [`design_tokens/`](design_tokens) | The look the editor and the game share: colours, shapes, text roles, fonts and themed egui helpers. |
+| [`bevy/`](bevy) | Bevy plugins that know nothing of rift: a tilemap renderer and server-authoritative terminal channels. |
+| [`driver/`](driver), [`testkit/`](testkit), [`showcase/`](showcase) | Playing the game to test and show it: real clients driven by real input, a simulated server for contract tests, and the showcase's recorded chapters. |
+| [`website/`](website), [`service/`](service), [`docker/`](docker), [`e2e/`](e2e) | The hosted game: the website, the stack it runs in, and the browser suite that tests it. |
 
 ## Development
 
@@ -58,11 +76,11 @@ gets them. Gameplay has a single smoke test there, a new player signing up and a
 at the spawn location (compared against the reference image beside it in [`e2e/tests/`](e2e/tests));
 the rest of gameplay is the gameplay tests' job.
 
-## Content
+## A game is a folder
 
-The game is a content folder: [`example_game/`](example_game) holds `game.json`, one JSON row per file under
-`tables/<table>/`, and `assets/`. The server loads it at start and serves it; clients sync it and keep
-it on the device; the same binaries run any folder that fits their build.
+A game is a folder: `game.json` for its settings, one JSON row per file under `tables/<table>/`, and
+`assets/`. [`example_game/`](example_game) is one. The server loads the folder at start and serves it;
+clients sync it and keep it on the device; the same binaries run any folder that fits their build.
 
 ```sh
 just editor               # build editor, game-server and desktop-client, open the editor on example_game/
@@ -78,7 +96,8 @@ the editor maps it onto the row, keeps the cues and tile data that still fit, an
 for changes.
 
 A content deploy needs no client build: the server restarts on the new folder, and players reconnect,
-sync the changed files and rejoin. Production mounts its own folder over the image's example.
+sync the changed files and rejoin. The game server's image carries the example game at `/content`;
+another game runs on the same image with its own folder mounted there instead.
 
 ## Release and deploy
 
