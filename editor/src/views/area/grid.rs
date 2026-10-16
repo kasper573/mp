@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
-use game::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteRow};
+use engine::core::math::{Pos, Rect, Size};
+use engine::core::tiling::{Cell, CellPos, GridDims, GridSize, NEIGHBORS_4, Tiles};
+use engine::systems::area::grid::{self, AreaGrids, Flip, GroundLayer, PaletteRow};
 
 use crate::project::{ContentEdit, ProjectFiles, text_bytes};
 

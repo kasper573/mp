@@ -1,13 +1,13 @@
 use egui::{Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::{Direction, Pos, Rng};
-use game::core::tiling::Tiles;
-use game::core::time::{PlaybackRate, Seconds};
-use game::systems::actor::model::ModelId;
-use game::systems::actor::{Action, ActorModel};
-use game::systems::area;
-use game::systems::npc::NpcDef;
-use game::systems::player::PlayerDef;
+use engine::core::content::Content;
+use engine::core::math::{Direction, Pos, Rng};
+use engine::core::tiling::Tiles;
+use engine::core::time::{PlaybackRate, Seconds};
+use engine::systems::actor::model::ModelId;
+use engine::systems::actor::{Action, ActorModel};
+use engine::systems::area;
+use engine::systems::npc::NpcDef;
+use engine::systems::player::PlayerDef;
 use serde_json::Value;
 
 use crate::app::Editor;

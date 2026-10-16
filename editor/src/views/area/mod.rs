@@ -33,10 +33,10 @@ use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::World;
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::{CellPos, TilePos, TileSize, Tiles};
-use game::systems::area::{self, AreaId, AreaModuleKind};
+use engine::core::content::Content;
+use engine::core::math::{Pos, Rect, Size};
+use engine::core::tiling::{CellPos, TilePos, TileSize, Tiles};
+use engine::systems::area::{self, AreaId, AreaModuleKind};
 use serde_json::Value;
 
 use self::overlays::{

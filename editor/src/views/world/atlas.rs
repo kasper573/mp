@@ -1,21 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
-use game::core::content::id::LeafKind;
-use game::core::content::{Content, ContentRow};
-use game::core::math::{Pos, Size};
-use game::core::script::Expr;
-use game::core::tiling::Tiles;
-use game::systems::GameSettings;
-use game::systems::area::blueprint::BlueprintDef;
-use game::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, ObjectShape};
-use game::systems::item::ItemDef;
-use game::systems::memory::MemoryDef;
-use game::systems::npc::{self, NpcDef, NpcId};
-use game::systems::quest::{Objective, QuestDef, QuestId};
-use game::systems::script::{
+use engine::core::content::id::LeafKind;
+use engine::core::content::{Content, ContentRow};
+use engine::core::math::{Pos, Size};
+use engine::core::script::Expr;
+use engine::core::tiling::Tiles;
+use engine::systems::GameSettings;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaModuleKind, ObjectShape};
+use engine::systems::item::ItemDef;
+use engine::systems::memory::MemoryDef;
+use engine::systems::npc::{self, NpcDef, NpcId};
+use engine::systems::quest::{Objective, QuestDef, QuestId};
+use engine::systems::script::{
     Condition, OwnerKind, OwnerRow, Reach, RiftQuery, RiftScripts, ScriptDef, condition,
 };
-use game::systems::shop::ShopDef;
+use engine::systems::shop::ShopDef;
 use strum::VariantArray;
 
 use crate::project::{ProjectFiles, row_file};

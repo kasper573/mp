@@ -2,5 +2,5 @@
 **/*.rs.bk
 Cargo.lock.bak
 .claude
-# Generated from the game crate.
+# Generated from the engine crate.
 /docker/keycloak/roles.conf

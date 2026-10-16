@@ -9,7 +9,7 @@ name = "editor"
 path = "src/main.rs"
 
 [dependencies]
-game = { path = "../game" }
+engine = { path = "../engine" }
 design_tokens = { path = "../design_tokens" }
 bevy_tilemap = { path = "../bevy/tilemap" }
 bevy_kira_audio = { version = "0.27", default-features = false }

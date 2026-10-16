@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use egui::{Color32, Key, Sense, Ui, Vec2};
-use game::core::content::ContentRow;
-use game::systems::npc::{self, NpcDef};
-use game::systems::script::RiftScripts;
+use engine::core::content::ContentRow;
+use engine::systems::npc::{self, NpcDef};
+use engine::systems::script::RiftScripts;
 use serde_json::Value;
 
 use crate::app::Editor;

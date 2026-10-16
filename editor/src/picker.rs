@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::systems::area::{self, AreaDef, AreaModule};
-use game::systems::npc::{self, NpcDef};
-use game::systems::script::{OwnerKind, RiftScripts};
+use engine::systems::area::{self, AreaDef, AreaModule};
+use engine::systems::npc::{self, NpcDef};
+use engine::systems::script::{OwnerKind, RiftScripts};
 use serde_json::Value;
 
 use crate::drafts::{clear_draft, draft_of, set_draft};

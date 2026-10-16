@@ -10,11 +10,11 @@ use bevy_egui::{
     EguiContext, EguiPlugin, EguiPreUpdateSet, EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui_dock::DockState;
-use game::core::content::{Content, ContentRegistry, version};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems;
-use game::systems::script::Place;
+use engine::core::content::{Content, ContentRegistry, version};
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems;
+use engine::systems::script::Place;
 use serde::Deserialize;
 use serde_json::Value;
 

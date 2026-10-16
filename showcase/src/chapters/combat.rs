@@ -7,11 +7,11 @@ use driver::{
     Player, UiTarget, WaitBudget, area_key, area_named, carried, clickable_point, holding, npc_is,
     resident_home,
 };
-use game::core::math::{Offset, Pos};
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::actor::Action;
-use game::systems::input::map::InputAction;
-use game::systems::probe::{ProbeBody, ProbeGroundItem, ProbeSnapshot};
+use engine::core::math::{Offset, Pos};
+use engine::core::tiling::{TilePos, Tiles};
+use engine::systems::actor::Action;
+use engine::systems::input::map::InputAction;
+use engine::systems::probe::{ProbeBody, ProbeGroundItem, ProbeSnapshot};
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

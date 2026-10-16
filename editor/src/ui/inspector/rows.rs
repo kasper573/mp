@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use egui::{RichText, Ui};
-use game::core::content::ModuleRule;
+use engine::core::content::ModuleRule;
 use serde_json::Value;
 
 use super::{LEFT_COLUMN, act, add_module_popup};

@@ -1,17 +1,17 @@
-use game::core::content::Fixture;
-use game::core::math::{Pos, Rect, WindowPx};
-use game::core::render::transition::ScreenTransitionPhase;
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::actor::Action;
-use game::systems::area::AreaDef;
-use game::systems::attention::AttentionMark;
-use game::systems::history::HistoryTopic;
-use game::systems::item::ItemDef;
-use game::systems::npc::NpcDef;
-use game::systems::probe::{
+use engine::core::content::Fixture;
+use engine::core::math::{Pos, Rect, WindowPx};
+use engine::core::render::transition::ScreenTransitionPhase;
+use engine::core::tiling::{TilePos, Tiles};
+use engine::systems::actor::Action;
+use engine::systems::area::AreaDef;
+use engine::systems::attention::AttentionMark;
+use engine::systems::history::HistoryTopic;
+use engine::systems::item::ItemDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::probe::{
     ProbeBody, ProbeExit, ProbeFixture, ProbeQuest, ProbeSnapshot, ProbeUiElement,
 };
-use game::systems::quest::{QuestDef, QuestResult};
+use engine::systems::quest::{QuestDef, QuestResult};
 
 use crate::content::{content, id};
 

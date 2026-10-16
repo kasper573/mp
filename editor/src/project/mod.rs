@@ -15,11 +15,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use game::core::content::ErrorPlace::{Json, WholeFile};
-use game::core::content::{Content, ContentProblem, LoadError, LoadReport};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems;
+use engine::core::content::ErrorPlace::{Json, WholeFile};
+use engine::core::content::{Content, ContentProblem, LoadError, LoadReport};
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems;
 
 use crate::schema::SchemaShapes;
 use crate::usages::ContentUsages;

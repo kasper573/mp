@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use game::systems::actor::model::GenericExpression;
+use engine::systems::actor::model::GenericExpression;
 use serde_json::Value;
 use strum::VariantArray;
 

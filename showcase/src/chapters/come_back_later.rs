@@ -1,6 +1,6 @@
 use driver::{finished, noticed, on_quest};
-use game::systems::input::map::InputAction;
-use game::systems::quest::QuestResult;
+use engine::systems::input::map::InputAction;
+use engine::systems::quest::QuestResult;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

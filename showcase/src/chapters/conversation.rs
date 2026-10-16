@@ -1,6 +1,6 @@
 use driver::{UiTarget, erred, noticed, open_ground_beside};
-use game::systems::input::gestures::ClickClaim;
-use game::systems::input::map::InputAction;
+use engine::systems::input::gestures::ClickClaim;
+use engine::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

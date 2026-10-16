@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 
 use egui::{Align, Layout, RichText, Ui, Vec2};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems::GameSettings;
-use game::systems::area::{self, AreaDef, AreaModule};
-use game::systems::job::{JobDef, JobLevel};
-use game::systems::npc::NpcId;
-use game::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
-use game::systems::script::RiftScripts;
-use game::systems::stat::StatKind;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems::GameSettings;
+use engine::systems::area::{self, AreaDef, AreaModule};
+use engine::systems::job::{JobDef, JobLevel};
+use engine::systems::npc::NpcId;
+use engine::systems::quest::{Objective, Parties, Party, QuestDef, QuestId, QuestLog, QuestResult};
+use engine::systems::script::RiftScripts;
+use engine::systems::stat::StatKind;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 

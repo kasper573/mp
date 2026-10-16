@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Align, Layout, Rect, RichText, Sense, Ui, Vec2};
-use game::core::content::{ContentRow, Fixture};
-use game::core::tiling::TilePos;
-use game::systems::area::world_map::{
+use engine::core::content::{ContentRow, Fixture};
+use engine::core::tiling::TilePos;
+use engine::systems::area::world_map::{
     MAX_NOTE, MAX_SIZE, MIN_SIZE, RegionColour, WorldMap, WorldMapDef,
 };
-use game::systems::area::{self, AreaId};
+use engine::systems::area::{self, AreaId};
 use strum::VariantArray;
 
 use super::atlas::{OpenTarget, RowSource, RowSourceKind, WorldAtlas};

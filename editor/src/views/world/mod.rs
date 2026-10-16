@@ -14,11 +14,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Rect, Ui, Vec2};
-use game::core::content::{Content, ContentRow, Fixture};
-use game::core::math::{Pos, Size};
-use game::core::tiling::Tiles;
-use game::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
-use game::systems::area::{self, AreaDef, AreaId};
+use engine::core::content::{Content, ContentRow, Fixture};
+use engine::core::math::{Pos, Size};
+use engine::core::tiling::Tiles;
+use engine::systems::area::world_map::{Card, Note, Region, RegionColour, WorldMap, WorldMapDef};
+use engine::systems::area::{self, AreaDef, AreaId};
 use serde::Deserialize;
 use std::str::FromStr;
 

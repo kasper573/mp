@@ -1,7 +1,7 @@
 use driver::{Player, holding, marked, nearest_npc, npc_is, told_by, townsperson};
-use game::core::math::Offset;
-use game::systems::attention::AttentionMark;
-use game::systems::input::map::InputAction;
+use engine::core::math::Offset;
+use engine::systems::attention::AttentionMark;
+use engine::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
 use crate::shoot::{Shoot, Star};

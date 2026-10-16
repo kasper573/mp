@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use egui::{Pos2, Ui};
-use game::core::math::{Offset, Pos, Rect};
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::area::AreaModuleKind;
+use engine::core::math::{Offset, Pos, Rect};
+use engine::core::tiling::{TilePos, Tiles};
+use engine::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::modules::{append_modules, change_modules};

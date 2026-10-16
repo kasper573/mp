@@ -1,9 +1,9 @@
 use std::f32::consts::TAU;
 
 use driver::{Player, UiTarget, content, holding};
-use game::core::math::{Offset, Pos, WindowPx};
-use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
+use engine::core::math::{Offset, Pos, WindowPx};
+use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
 use crate::shoot::{Shoot, Star};

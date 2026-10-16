@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::Pos;
-use game::systems::area::blueprint::BlueprintDef;
-use game::systems::area::grid::Flip;
-use game::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
-use game::systems::area::{AreaModule, Scenery, SceneryTile};
+use engine::core::content::Content;
+use engine::core::math::Pos;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::grid::Flip;
+use engine::systems::area::tileset::{SurfaceDef, TileData, TilesetDef, Walk};
+use engine::systems::area::{AreaModule, Scenery, SceneryTile};
 use strum::VariantArray;
 
 use super::{

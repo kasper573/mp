@@ -1,8 +1,8 @@
 use egui::{Color32, Pos2, Stroke as EStroke, Vec2};
-use game::core::content::Content;
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems::area::{self, AreaId, ObjectShape};
+use engine::core::content::Content;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems::area::{self, AreaId, ObjectShape};
 
 use super::AreaFrame;
 use crate::app::{Editor, PlacePick};

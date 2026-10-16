@@ -1,8 +1,8 @@
-use game::core::audio::soundscape::SoundscapeShape;
-use game::core::content::serial;
-use game::core::math::{Offset, Pos, Rect, Size};
-use game::core::tiling::Tiles;
-use game::systems::area::{AreaModuleKind, Flip, ObjectShape};
+use engine::core::audio::soundscape::SoundscapeShape;
+use engine::core::content::serial;
+use engine::core::math::{Offset, Pos, Rect, Size};
+use engine::core::tiling::Tiles;
+use engine::systems::area::{AreaModuleKind, Flip, ObjectShape};
 use serde::Deserialize;
 use serde_json::Value;
 

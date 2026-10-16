@@ -1,5 +1,5 @@
 use egui::Ui;
-use game::systems::stat::StatKind;
+use engine::systems::stat::StatKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 

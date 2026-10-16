@@ -1,6 +1,6 @@
 use egui::text::{CCursor, CCursorRange, LayoutJob, TextFormat};
 use egui::{Color32, FontId, RichText, Stroke, Ui};
-use game::systems::text::{Ink, Motion, Voice};
+use engine::systems::text::{Ink, Motion, Voice};
 use serde_json::{Map, Value};
 use strum::VariantArray;
 

@@ -1,9 +1,9 @@
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems::GameSettings;
-use game::systems::actor::Action;
-use game::systems::actor::render::ACTOR_ANCHOR;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems::GameSettings;
+use engine::systems::actor::Action;
+use engine::systems::actor::render::ACTOR_ANCHOR;
 use serde_json::Value;
 
 use super::{ModelSheet, StripFrame};

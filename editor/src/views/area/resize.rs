@@ -1,7 +1,7 @@
 use egui::{RichText, Vec2};
-use game::core::math::{Pos, Rect, Size};
-use game::core::tiling::{GridSize, TileSize};
-use game::systems::area::{self, AreaModuleKind};
+use engine::core::math::{Pos, Rect, Size};
+use engine::core::tiling::{GridSize, TileSize};
+use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::{pins, shapes};

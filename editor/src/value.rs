@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use game::core::content::{self, Content, ContentScope};
-use game::systems::area::AreaModuleKind;
+use engine::core::content::{self, Content, ContentScope};
+use engine::systems::area::AreaModuleKind;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;

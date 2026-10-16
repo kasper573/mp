@@ -2,8 +2,8 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use driver::{Footage, FootageOverlay, InsetCut, reading, seconds};
-use game::core::time::Seconds;
-use game::systems::probe::{ProbeSnapshot, ProbeVoice};
+use engine::core::time::Seconds;
+use engine::systems::probe::{ProbeSnapshot, ProbeVoice};
 
 // A chapter's cut of the screen it films: a title card, captions that pace the chapter, and
 // panels for what the picture can't show. The chapter plays as fast as the game lets it; only a

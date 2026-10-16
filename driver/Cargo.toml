@@ -5,7 +5,7 @@ edition.workspace = true
 description = "Plays the game as a player would: a native game server, and desktop clients on screens and speakers of their own, driven through real input and watched through the client's probe"
 
 [dependencies]
-game = { path = "../game" }
+engine = { path = "../engine" }
 bevy_ecs.workspace = true
 bevy_input.workspace = true
 serde.workspace = true

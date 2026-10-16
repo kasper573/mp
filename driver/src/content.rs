@@ -2,15 +2,15 @@ use std::ops::RangeInclusive;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use game::core::content::{
+use engine::core::content::{
     Content, ContentId, ContentRow, ContentScope, FilesystemFolder, key_of, with_content,
 };
-use game::core::math::{Pos, Rect};
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::area::{self, Area, AreaDef, AreaModule};
-use game::systems::load_content;
-use game::systems::probe::ProbeSnapshot;
-use game::systems::script::Place;
+use engine::core::math::{Pos, Rect};
+use engine::core::tiling::{TilePos, Tiles};
+use engine::systems::area::{self, Area, AreaDef, AreaModule};
+use engine::systems::load_content;
+use engine::systems::probe::ProbeSnapshot;
+use engine::systems::script::Place;
 
 use crate::seen::{area_key, clickable_point};
 use serde::Serialize;

@@ -5,35 +5,35 @@ showcase_dir := "target/showcase"
 
 lint:
     cargo fmt --check
-    cargo run --release --quiet -p game --bin lint
+    cargo run --release --quiet -p engine --bin lint
     cargo clippy --release --all-targets -- -D warnings
-    cargo clippy --release -p game --lib --bin client --target wasm32-unknown-unknown -- -D warnings
+    cargo clippy --release -p engine --lib --bin client --target wasm32-unknown-unknown -- -D warnings
 
 # Every test lives in a tests/ folder; the libs' and bins' own test harnesses would build for nothing.
 test:
-    cargo test --release -p game -p editor --test '*'
+    cargo test --release -p engine -p editor --test '*'
 
 # The website and game server binaries, and the roles the auth stack syncs from.
 build:
-    cargo build --release -p website -p game --bin website --bin game-server --bin kc-roles
+    cargo build --release -p website -p engine --bin website --bin game-server --bin kc-roles
     target/release/kc-roles > docker/keycloak/roles.conf
 
 # The browser client bundle the website serves; content syncs from the game server at boot.
 wasm:
-    cargo build --release -p game --bin client --target wasm32-unknown-unknown
+    cargo build --release -p engine --bin client --target wasm32-unknown-unknown
     wasm-bindgen --target web --no-typescript --out-name rift --out-dir target/wasm target/wasm32-unknown-unknown/release/client.wasm
 
 # Builds the editor and the two game binaries it starts, then opens the editor on FOLDER.
-editor folder="content":
-    cargo build --release -p editor -p game --bin editor --bin game-server --bin desktop-client
+editor folder="example_game":
+    cargo build --release -p editor -p engine --bin editor --bin game-server --bin desktop-client
     target/release/editor {{quote(folder)}}
 
 # The archive a release ships: the three binaries and the example content, for the running platform.
 archive out="target/archive":
-    cargo build --release -p editor -p game --bin editor --bin game-server --bin desktop-client
+    cargo build --release -p editor -p engine --bin editor --bin game-server --bin desktop-client
     rm -rf {{quote(out)}} && mkdir -p {{quote(out)}}
     cp target/release/{editor,game-server,desktop-client}{{ if os_family() == "windows" { ".exe" } else { "" } }} {{quote(out)}}
-    cp -r content {{quote(out / "content")}}
+    cp -r example_game {{quote(out / "content")}}
 
 # The local stack, with its observability services.
 stack: build wasm (up "--profile dev")
@@ -41,7 +41,7 @@ stack: build wasm (up "--profile dev")
 # The stack, rebuilding the wasm and the website on every change: reload the page to pick one up.
 dev: stack
     source docker/.env.test && echo "sign in and play at https://$RIFT_DOMAIN/play"
-    cargo watch -w game -w design_tokens -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
+    cargo watch -w engine -w design_tokens -w bevy -s 'just wasm && {{compose}} up -d --build --wait rift-website'
 
 # Tears the stack down and wipes its data, so keycloak imports its realm again on the next start.
 reset:
@@ -91,8 +91,8 @@ e2e-run filter="":
 # `just showcase combat travel`. Naming none records every chapter and stitches them into
 # target/showcase/showcase.mp4.
 showcase *chapters:
-    cargo build --release -p showcase -p game --bin showcase --bin game-server --bin desktop-client
-    RIFT_SHOWCASE_CONTENT_DIR=$PWD/content RIFT_SHOWCASE_OUT_DIR=$PWD/{{showcase_dir}} RIFT_SHOWCASE_CORES_PER_CHAPTER=5 \
+    cargo build --release -p showcase -p engine --bin showcase --bin game-server --bin desktop-client
+    RIFT_SHOWCASE_CONTENT_DIR=$PWD/example_game RIFT_SHOWCASE_OUT_DIR=$PWD/{{showcase_dir}} RIFT_SHOWCASE_CORES_PER_CHAPTER=5 \
       target/release/showcase {{chapters}}
 
 [doc("Records the editor on a copy of the example content at SCENE, a JSON array of steps, as editor-NAME.webm; HOOK runs with WORK naming the copy's parent.")]
@@ -102,7 +102,7 @@ editor-showcase name scene seconds="8" input="" hook="":
     cargo build --release -p editor
     export WORK=$(mktemp -d)
     trap 'rm -rf "$WORK"' EXIT
-    cp -r content "$WORK/game"
+    cp -r example_game "$WORK/game"
     just record {{quote(showcase_dir / "editor-" + kebabcase(name) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
@@ -115,25 +115,25 @@ contact-sheet video:
 # Empty NAMES or ANIMATIONS mean all.
 [doc("Films actors in all eight directions through the game's sprite renderer: `just render-actor adventurer,dire-wolf walk,attack 2`.")]
 render-actor names="" animations="" loops="4":
-    RIFT_RENDER_CONTENT_DIR=content cargo run --quiet -p game --bin render-actor -- {{quote(names)}} {{quote(animations)}} {{loops}} \
+    RIFT_RENDER_CONTENT_DIR=example_game cargo run --quiet -p engine --bin render-actor -- {{quote(names)}} {{quote(animations)}} {{loops}} \
       target/render/actor-{{ if names == "" { "all" } else { replace(names, ",", "+") } }}-{{ if animations == "" { "all" } else { replace(animations, ",", "+") } }}-x{{loops}}.mp4
 
 # Players are congested (all on the spawn tile, one shared view) by default; `dist` spreads them for distinct views.
 [doc("The server's highest area count sustained within the tick budget, then the client's frame rate through a playthrough.")]
 bench mode="":
-    RIFT_BENCH_CONTENT_DIR=content cargo run --release -p game --bin bench -- {{mode}}
-    cargo bench -p game --bench client
+    RIFT_BENCH_CONTENT_DIR=example_game cargo run --release -p engine --bin bench -- {{mode}}
+    cargo bench -p engine --bench client
 
 loadtest count="dyn":
     RIFT_LOADTEST_HTTP_URL=http://127.0.0.1:9998 RIFT_LOADTEST_WS_URL=ws://127.0.0.1:9999 \
-      cargo run --release -p game --bin loadtest -- {{count}}
+      cargo run --release -p engine --bin loadtest -- {{count}}
 
 loadtest-stack-up: (up "-f docker/docker-compose.loadtest.yaml")
 
 # The content copy is synced in place, never replaced, so a running game server keeps the folder it mounted.
 [private]
 up flags services="":
-    mkdir -p target/stack/content && rsync -a --delete content/ target/stack/content/
+    mkdir -p target/stack/content && rsync -a --delete example_game/ target/stack/content/
     docker network inspect rift >/dev/null 2>&1 || docker network create rift
     {{compose}} {{flags}} up -d --build --wait {{services}}
 

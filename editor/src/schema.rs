@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use game::core::script::VariableType;
+use engine::core::script::VariableType;
 use serde_json::{Map, Value, json};
 
 use crate::app::registry;

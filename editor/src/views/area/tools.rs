@@ -1,7 +1,7 @@
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use game::core::math::{Offset, Rect};
-use game::core::tiling::{Cell, TilePos, Tiles};
-use game::systems::area::AreaModuleKind;
+use engine::core::math::{Offset, Rect};
+use engine::core::tiling::{Cell, TilePos, Tiles};
+use engine::systems::area::AreaModuleKind;
 
 use super::brush::{BrushStrokeKind, eyedrop, fill, grid_stroke, paint_preview, pick_place};
 use super::modules::{change_modules, context_menu_at, open_add_menu, show_add_menu};

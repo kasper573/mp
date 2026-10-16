@@ -1,6 +1,6 @@
 use egui::{Color32, Rect as ERect, Vec2};
-use game::core::tiling::{Cell, TilePos};
-use game::systems::area;
+use engine::core::tiling::{Cell, TilePos};
+use engine::systems::area;
 
 use super::{AreaFrame, AreaTool, placement};
 use crate::app::Editor;

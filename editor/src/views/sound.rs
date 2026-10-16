@@ -1,8 +1,8 @@
 use egui::Ui;
-use game::core::content::Content;
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems::area::{self, AreaId};
+use engine::core::content::Content;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems::area::{self, AreaId};
 
 use crate::app::Editor;
 use crate::ui::theme;

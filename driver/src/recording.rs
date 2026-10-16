@@ -5,7 +5,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use game::core::time::Seconds;
+use engine::core::time::Seconds;
 
 // A screen and its speakers, recorded apart so neither waits on the other. Both keep the wall clock,
 // so the footage of several screens, and whatever was noted while they ran, line up afterwards.

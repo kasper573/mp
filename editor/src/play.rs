@@ -6,16 +6,16 @@ use std::sync::mpsc::{Sender, TryRecvError, channel};
 use std::time::{Duration, Instant};
 
 use egui::{RichText, Ui};
-use game::core::content::{Content, ContentScope, version, with_content};
-use game::core::time::UtcHour;
-use game::systems::GameSettings;
-use game::systems::job::JobDef;
-use game::systems::launch::{
+use engine::core::content::{Content, ContentScope, version, with_content};
+use engine::core::time::UtcHour;
+use engine::systems::GameSettings;
+use engine::systems::job::JobDef;
+use engine::systems::launch::{
     self, BUILD_INFO_FLAG, BuildInfo, CLIENT_ENV_PREFIX, ClientConfig, ReadyLine,
     SERVER_ENV_PREFIX, ServerConfig, TEST_CHARACTER_ROUTE, TestCharacterRequest, fake_token,
 };
-use game::systems::player::SpawnPolicy;
-use game::systems::script::Place;
+use engine::systems::player::SpawnPolicy;
+use engine::systems::script::Place;
 use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
 

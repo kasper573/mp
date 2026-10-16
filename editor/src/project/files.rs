@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use game::core::content::MemoryFolder;
+use engine::core::content::MemoryFolder;
 use walkdir::WalkDir;
 
 pub type FileBytes = Arc<[u8]>;

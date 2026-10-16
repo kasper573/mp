@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use game::systems::area::grid::{self, PaletteRow};
+use engine::systems::area::grid::{self, PaletteRow};
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 

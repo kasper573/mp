@@ -1,5 +1,5 @@
 use egui::{RichText, Ui};
-use game::systems::area::tileset::TileData;
+use engine::systems::area::tileset::TileData;
 use serde_json::Value;
 use strum::VariantArray;
 

@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use game::systems::area::tileset::TilesetDef;
+use engine::systems::area::tileset::TilesetDef;
 use strum::VariantArray;
 
 use super::{NewTerrainSetDialog, OpenTileset, TERRAINS_PART, sheet, tile_mut, try_change_tileset};

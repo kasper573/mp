@@ -1,8 +1,8 @@
 use driver::{Player, beside_resident, content, noticed, on_quest};
-use game::core::math::Offset;
-use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
-use game::systems::spectate::Spectating;
+use engine::core::math::Offset;
+use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
+use engine::systems::spectate::Spectating;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

@@ -1,7 +1,7 @@
 use driver::{Player, UiTarget, holding};
-use game::core::math::Offset;
-use game::systems::area::AreaId;
-use game::systems::input::map::InputAction;
+use engine::core::math::Offset;
+use engine::systems::area::AreaId;
+use engine::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

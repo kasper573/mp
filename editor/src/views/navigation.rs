@@ -1,5 +1,5 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
-use game::core::math::{Offset, Pos, Rect as TileRect};
+use engine::core::math::{Offset, Pos, Rect as TileRect};
 
 use super::area::TILE_PX;
 

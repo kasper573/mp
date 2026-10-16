@@ -32,7 +32,7 @@
 
 ## Architecture
 
-1. The game crate's `src/` is organized into `core/` and `systems/`; its content is not code, but a game folder read at runtime:
+1. The engine crate's `src/` is organized into `core/` and `systems/`; its content is not code, but a game folder read at runtime:
 
 `core/`:
 - code that may be reused by all systems
@@ -45,7 +45,7 @@
 - the majority of our game mechanics goes here
 - may depend on other high level systems
 
-The content layer is a game folder (`content/` is the example game): `game.json` for the game's settings, one row per file under `tables/<table>/<key>.json` (a row's grids beside it), and `assets/`. A row type implements `ContentRow` (its `TABLE`, and `check` for the rules a schema can't state) and is registered in `systems::registry()`. Loading resolves every key to a `ContentId`, newtyped per table (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Tables stay separate and reference each other only loosely by id, never by embedding another table's rows (a row may still nest its own data). Row types live in core/* or systems/*.
+The content layer is a game folder (`example_game/` is the example game): `game.json` for the game's settings, one row per file under `tables/<table>/<key>.json` (a row's grids beside it), and `assets/`. A row type implements `ContentRow` (its `TABLE`, and `check` for the rules a schema can't state) and is registered in `systems::registry()`. Loading resolves every key to a `ContentId`, newtyped per table (`ItemId`, `NpcId`, …) and valid only within the `Content` it was resolved against. Tables stay separate and reference each other only loosely by id, never by embedding another table's rows (a row may still nest its own data). Row types live in core/* or systems/*.
 
 Code must not depend on arbitrary game content, so the same server and client can run any game's data:
 - Code never names a row. A row that stands for a generic system or mechanic (an input action, an interface sound, a quest marker) is a `Fixture`: an enum whose variants are keys every game's data must provide, checked at load. Never make a piece of content (a character, an item, a quest) a fixture.
@@ -74,15 +74,15 @@ Code must not depend on arbitrary game content, so the same server and client ca
 
 Everything you build gets shown to the user on video, from a player's point of view, against the real game server.
 
-- The showcase is the `showcase` crate: one chapter per file in `showcase/src/chapters/`, played in the order of `CHAPTERS` (`showcase/src/chapters/mod.rs`) and narrated with `caption()` (`showcase/src/shoot.rs`). A chapter plays through the `driver` crate, as the gameplay tests do: real mouse and keyboard input through the game's own bindings, finding what to click through the client's probe of the world and UI (`walk_to`, `travel_to`, `talk_to`, `fight`, `click_ui`, …). Never hardcode screen positions — monsters wander and windows move. Never roam or search either: a chapter heads straight for where what it needs is (`resident_home`, `hunting_ground`, markers) and asserts it's there. When a chapter needs to see something the probe doesn't report, extend the probe (`game/src/systems/probe.rs`).
+- The showcase is the `showcase` crate: one chapter per file in `showcase/src/chapters/`, played in the order of `CHAPTERS` (`showcase/src/chapters/mod.rs`) and narrated with `caption()` (`showcase/src/shoot.rs`). A chapter plays through the `driver` crate, as the gameplay tests do: real mouse and keyboard input through the game's own bindings, finding what to click through the client's probe of the world and UI (`walk_to`, `travel_to`, `talk_to`, `fight`, `click_ui`, …). Never hardcode screen positions — monsters wander and windows move. Never roam or search either: a chapter heads straight for where what it needs is (`resident_home`, `hunting_ground`, markers) and asserts it's there. When a chapter needs to see something the probe doesn't report, extend the probe (`engine/src/systems/probe.rs`).
 - After every change, show it in the chapter it belongs to: extend that chapter, or add one where it fits the story. Record with `just showcase <chapter>…`, check the result with `just contact-sheet target/showcase/<NN-chapter>.mp4`, and share the video path(s) with the user when you report back. This is not optional. When a change has nothing new to show (a refactor, a fix with no visible effect), record the chapters covering what it touched to show they still work.
 - Chapters show the game's mechanics, never its content. New or changed content (maps, areas, actors, busts, items, dialogue) is reviewed in one-off recordings shared with the user, which are never committed as chapters. Content that brings no new mechanic adds nothing to the showcase.
 - The full showcase, `just showcase` with no chapter named → `target/showcase/showcase.mp4`, is only recorded when the user explicitly asks for it. It is every chapter stitched in order, so keeping the chapters current is what keeps it complete: never show a feature outside a chapter.
 
 ## Tests
 
-- Gameplay is tested in `game/tests/gameplay/`, played through the `driver` crate like the showcase: desktop clients against a native game server, with real input on virtual displays, recorded.
-- The Playwright suite (`e2e/`) tests the whole stack from a browser: the website, and whatever else a browser is served. Gameplay gets exactly one smoke test there, that a signed-up player appears in the game; every other gameplay test belongs in `game/tests/gameplay/`.
+- Gameplay is tested in `engine/tests/gameplay/`, played through the `driver` crate like the showcase: desktop clients against a native game server, with real input on virtual displays, recorded.
+- The Playwright suite (`e2e/`) tests the whole stack from a browser: the website, and whatever else a browser is served. Gameplay gets exactly one smoke test there, that a signed-up player appears in the game; every other gameplay test belongs in `engine/tests/gameplay/`.
 
 ## Verification
 

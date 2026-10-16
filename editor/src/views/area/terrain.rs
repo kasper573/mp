@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use game::core::content::Content;
-use game::core::math::Rng;
-use game::core::tiling::{Cell, CellPos};
-use game::systems::area::grid::Flip;
-use game::systems::area::tileset::TilesetDef;
+use engine::core::content::Content;
+use engine::core::math::Rng;
+use engine::core::tiling::{Cell, CellPos};
+use engine::systems::area::grid::Flip;
+use engine::systems::area::tileset::TilesetDef;
 
 use super::grid::GridDraft;
 use crate::views::tileset::terrain::MixCompleteness;

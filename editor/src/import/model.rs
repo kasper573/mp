@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use game::systems::actor::Action;
+use engine::systems::actor::Action;
 use image::{GenericImage, RgbaImage};
 use serde_json::{Value, json};
 

@@ -7,8 +7,8 @@ pub mod terrain;
 use std::collections::{BTreeSet, HashMap};
 
 use egui::{Color32, Pos2, Rect as ERect, Stroke, Ui, Vec2};
-use game::core::content::Content;
-use game::systems::area::tileset::{TileData, TilesetDef, TilesetGrid, Walk};
+use engine::core::content::Content;
+use engine::systems::area::tileset::{TileData, TilesetDef, TilesetGrid, Walk};
 use serde::Deserialize;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 

@@ -11,7 +11,7 @@ path = "src/main.rs"
 [dependencies]
 bevy_ecs.workspace = true
 driver = { path = "../driver" }
-game = { path = "../game" }
+engine = { path = "../engine" }
 envy.workspace = true
 serde.workspace = true
 serde_json.workspace = true

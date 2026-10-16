@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use game::core::math::Pos;
-use game::core::script::VariableType;
-use game::core::tiling::{CellPos, Tiles};
-use game::systems::area::{self, AreaModuleKind};
+use engine::core::math::Pos;
+use engine::core::script::VariableType;
+use engine::core::tiling::{CellPos, Tiles};
+use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::inspect::hidden_fields;

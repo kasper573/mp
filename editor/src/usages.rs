@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use game::core::content::id::LeafKind;
-use game::core::content::{Content, Reference};
+use engine::core::content::id::LeafKind;
+use engine::core::content::{Content, Reference};
 use rayon::prelude::*;
 
 use crate::app::registry;

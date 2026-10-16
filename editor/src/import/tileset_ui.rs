@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use egui::{Color32, Context, Rect, Sense, TextureHandle, Ui, Vec2};
-use game::systems::area::grid::{self, PALETTE_FILE, PaletteRow};
+use engine::systems::area::grid::{self, PALETTE_FILE, PaletteRow};
 use image::RgbaImage;
 use serde_json::{Value, json};
 

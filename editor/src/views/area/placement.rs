@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use egui::{RichText, Stroke as EStroke, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::{Pos, Rect};
-use game::core::script::VariableType;
-use game::core::tiling::Tiles;
-use game::systems::area::{self, AreaId, AreaModuleKind, Flip};
-use game::systems::script::Variable;
+use engine::core::content::Content;
+use engine::core::math::{Pos, Rect};
+use engine::core::script::VariableType;
+use engine::core::tiling::Tiles;
+use engine::systems::area::{self, AreaId, AreaModuleKind, Flip};
+use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::value_kind;
@@ -166,7 +166,7 @@ pub fn placement_card(
 }
 
 pub fn variable_template(variable: &Variable) -> Value {
-    use game::core::script::VariableType as T;
+    use engine::core::script::VariableType as T;
     match variable.ty {
         T::Integer => Value::from(0),
         T::Number => Value::from(0.0),

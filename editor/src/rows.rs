@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{RichText, Ui};
-use game::core::content::ModuleRule;
-use game::core::content::id::LeafKind;
+use engine::core::content::ModuleRule;
+use engine::core::content::id::LeafKind;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog, registry};

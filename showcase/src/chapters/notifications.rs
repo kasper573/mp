@@ -4,10 +4,10 @@ use driver::{
     Player, UiTarget, arrived_in, content, erred, holding, marker_at, nearest_npc, noticed, npc_is,
     portal, told_by,
 };
-use game::core::math::Offset;
-use game::systems::history::HistoryTopic;
-use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
+use engine::core::math::Offset;
+use engine::systems::history::HistoryTopic;
+use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

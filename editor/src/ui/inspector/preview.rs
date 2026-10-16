@@ -1,13 +1,13 @@
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::Direction;
-use game::core::time::{PlaybackRate, Seconds};
-use game::systems::GameSettings;
-use game::systems::actor::model::ModelDef;
-use game::systems::actor::{Action, ActorModel};
-use game::systems::dialogue::ChoiceReveal;
-use game::systems::quest::{ActiveQuest, Parties, QuestDef};
-use game::systems::script::{Reach, RiftScripts};
+use engine::core::content::Content;
+use engine::core::math::Direction;
+use engine::core::time::{PlaybackRate, Seconds};
+use engine::systems::GameSettings;
+use engine::systems::actor::model::ModelDef;
+use engine::systems::actor::{Action, ActorModel};
+use engine::systems::dialogue::ChoiceReveal;
+use engine::systems::quest::{ActiveQuest, Parties, QuestDef};
+use engine::systems::script::{Reach, RiftScripts};
 use serde_json::Value;
 use strum::VariantArray;
 

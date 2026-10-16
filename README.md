@@ -45,7 +45,7 @@ The website lives at <https://rift.localhost> and Grafana at <https://grafana.ri
 ## Tests
 
 `just test` runs every crate's tests. The gameplay tests among them
-([`game/tests/gameplay/`](game/tests/gameplay)) play the game for real, through the same
+([`engine/tests/gameplay/`](engine/tests/gameplay)) play the game for real, through the same
 [`driver`](driver) the showcase plays through: each runs a game server and desktop clients natively,
 every client on a virtual display with a sound server sink of its own, played with mouse and keyboard
 through the game's own input bindings and recorded, picture and sound. Clients draw as fast as the
@@ -60,12 +60,12 @@ the rest of gameplay is the gameplay tests' job.
 
 ## Content
 
-The game is a content folder: [`content/`](content) holds `game.json`, one JSON row per file under
+The game is a content folder: [`example_game/`](example_game) holds `game.json`, one JSON row per file under
 `tables/<table>/`, and `assets/`. The server loads it at start and serves it; clients sync it and keep
 it on the device; the same binaries run any folder that fits their build.
 
 ```sh
-just editor               # build editor, game-server and desktop-client, open the editor on content/
+just editor               # build editor, game-server and desktop-client, open the editor on example_game/
 just editor ~/my-game     # …or on another folder
 just archive              # the release: the three binaries and the example content, in target/archive
 ```

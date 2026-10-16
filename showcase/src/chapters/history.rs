@@ -1,7 +1,7 @@
 use driver::{UiTarget, on_quest, told_by};
-use game::core::tiling::Tiles;
-use game::systems::history::HistoryMark;
-use game::systems::input::map::InputAction;
+use engine::core::tiling::Tiles;
+use engine::systems::history::HistoryMark;
+use engine::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

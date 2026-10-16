@@ -21,8 +21,8 @@ fn main() {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            game::systems::launch::BUILD_INFO_FLAG => {
-                println!("{}", game::systems::launch::build_info_line());
+            engine::systems::launch::BUILD_INFO_FLAG => {
+                println!("{}", engine::systems::launch::build_info_line());
                 return;
             }
             "--shapes" => {

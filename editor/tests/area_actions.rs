@@ -9,8 +9,8 @@ use editor::user::{EditorSettings, UserFolder};
 use editor::views::area::brush::{BrushStroke, BrushStrokeKind};
 use editor::views::area::grid::GridDraft;
 use editor::views::area::{AreaAction, AreaSnapshot, AreaTool, area_view_key, run_action};
-use game::core::math::Rng;
-use game::core::tiling::CellPos;
+use engine::core::math::Rng;
+use engine::core::tiling::CellPos;
 use serde_json::{Value, json};
 
 const AREA: &str = "start";

@@ -1,5 +1,5 @@
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
 use serde_json::Value;
 
 use super::placement::replace_with;

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use egui::{Color32, Stroke as EStroke, Vec2};
-use game::core::math::{Pos, Rect, Rng, Size};
-use game::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
-use game::systems::area::tileset::TilesetDef;
-use game::systems::area::{self, Flip};
-use game::systems::script::Place;
+use engine::core::math::{Pos, Rect, Rng, Size};
+use engine::core::tiling::{Cell, CellPos, GridDims, TilePos, TileSize};
+use engine::systems::area::tileset::TilesetDef;
+use engine::systems::area::{self, Flip};
+use engine::systems::script::Place;
 
 use super::{AreaFrame, AreaTool, grid, pins, select, terrain};
 use crate::app::{Editor, PlacePick};

@@ -5,7 +5,7 @@ members = [
     "bevy/tilemap",
     "bevy/terminal",
     "bevy/terminal/macros",
-    "game",
+    "engine",
     "driver",
     "testkit",
     "showcase",

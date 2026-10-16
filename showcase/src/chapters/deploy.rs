@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use driver::{UiTarget, WaitBudget, arrived_in, in_world, resident_home};
-use game::core::math::Offset;
+use engine::core::math::Offset;
 use serde_json::{Value, json};
 
 use crate::chapters::Chapter;

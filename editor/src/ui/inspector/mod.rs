@@ -9,8 +9,8 @@ pub mod usages;
 use std::collections::BTreeMap;
 
 use egui::{Align, Color32, Layout, RichText, Sense, Ui, Vec2};
-use game::core::content::{ContentRow, ModuleRule};
-use game::systems::area::world_map::WorldMapDef;
+use engine::core::content::{ContentRow, ModuleRule};
+use engine::systems::area::world_map::WorldMapDef;
 use serde_json::Value;
 
 use self::bindings::bindings_section;

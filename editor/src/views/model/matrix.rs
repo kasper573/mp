@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use game::core::math::Direction;
-use game::systems::actor::Action;
+use engine::core::math::Direction;
+use engine::systems::actor::Action;
 use serde_json::Value;
 use strum::VariantArray;
 

@@ -1,5 +1,5 @@
-use game::core::content::{ContentRow, Fixture};
-use game::systems::area::world_map::{WorldMap, WorldMapDef};
+use engine::core::content::{ContentRow, Fixture};
+use engine::systems::area::world_map::{WorldMap, WorldMapDef};
 
 use crate::views::character;
 use crate::views::script::ScriptOwner;

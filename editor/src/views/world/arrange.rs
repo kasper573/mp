@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 use egui::{Color32, Pos2, Rect, RichText, Stroke, Ui, Vec2};
-use game::systems::area::AreaId;
-use game::systems::area::world_map::WorldMapDef;
+use engine::systems::area::AreaId;
+use engine::systems::area::world_map::WorldMapDef;
 
 use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
 use crate::app::{Editor, ModalDialog};

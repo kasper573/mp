@@ -7,11 +7,11 @@ use editor::import::formats::{self, ExportFormat};
 use editor::import::model::{self, CuePlacement};
 use editor::import::records::ImportRecord;
 use editor::import::tileset;
-use game::systems::area::grid::{self, PaletteRow};
+use engine::systems::area::grid::{self, PaletteRow};
 use image::RgbaImage;
 use serde_json::Value;
 
-const CONTENT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../content");
+const CONTENT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../example_game");
 
 #[test]
 fn an_aseprite_sheet_imports_to_the_expected_row_and_image() {
@@ -393,8 +393,8 @@ fn a_tileset_grid_is_cut_whole_and_a_wider_one_keeps_tile_data_and_palettes() {
     for (area, text) in &rewritten {
         std::fs::write(game.join(format!("tables/area/{area}/palette.csv")), text).unwrap();
     }
-    let loaded = game::systems::load_content(
-        std::sync::Arc::new(game::core::content::FilesystemFolder(game)),
+    let loaded = engine::systems::load_content(
+        std::sync::Arc::new(engine::core::content::FilesystemFolder(game)),
         "cargo test failed",
     );
     if let Err(report) = &loaded {

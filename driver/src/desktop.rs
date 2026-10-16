@@ -8,9 +8,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-use game::core::math::{Pos, WindowPx};
-use game::systems::launch::{self, CLIENT_ENV_PREFIX, ClientConfig};
-use game::systems::probe::{ProbeInputSeen, ProbeSnapshot};
+use engine::core::math::{Pos, WindowPx};
+use engine::systems::launch::{self, CLIENT_ENV_PREFIX, ClientConfig};
+use engine::systems::probe::{ProbeInputSeen, ProbeSnapshot};
 
 use crate::content::{from_json, to_json};
 use crate::recording::{Footage, Recording};

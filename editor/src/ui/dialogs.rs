@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Context, RichText, Ui};
-use game::core::content::version;
+use engine::core::content::version;
 
 use super::{theme, widgets};
 use crate::app::{

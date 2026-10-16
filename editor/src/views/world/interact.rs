@@ -1,8 +1,8 @@
 use egui::{Key, Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
-use game::core::tiling::TilePos;
-use game::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
-use game::systems::area::{self, AreaId};
-use game::systems::script::Place;
+use engine::core::tiling::TilePos;
+use engine::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
+use engine::systems::area::{self, AreaId};
+use engine::systems::script::Place;
 
 use super::canvas::{MapCanvas, corners};
 use super::{

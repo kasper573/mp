@@ -1,7 +1,7 @@
 use egui::{RichText, Sense, Ui, Vec2};
-use game::core::audio::playback::SfxDef;
-use game::core::content::Content;
-use game::systems::area::tileset::SurfaceDef;
+use engine::core::audio::playback::SfxDef;
+use engine::core::content::Content;
+use engine::systems::area::tileset::SurfaceDef;
 
 use super::{NewSurfaceDialog, TileSheetDialog};
 use crate::app::Editor;

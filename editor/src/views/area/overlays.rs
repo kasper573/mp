@@ -2,10 +2,10 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use egui::{Color32, Pos2, Rect as ERect, Sense, Stroke as EStroke, Ui, Vec2};
-use game::core::audio::soundscape::EDGE_FALLOFF;
-use game::core::math::{Pos, Rect};
-use game::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
-use game::systems::area::{self, AreaModuleKind};
+use engine::core::audio::soundscape::EDGE_FALLOFF;
+use engine::core::math::{Pos, Rect};
+use engine::core::tiling::{Cell, CellPos, GridDims, TileRect, TileSize, Tiles};
+use engine::systems::area::{self, AreaModuleKind};
 use serde_json::Value;
 
 use super::population::NpcSprite;

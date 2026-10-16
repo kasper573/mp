@@ -12,8 +12,8 @@ use std::time::Instant;
 use egui::emath::TSTransform;
 use egui::{Key, Modifiers, Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
-use game::core::script::OwnerKindDef;
-use game::systems::script::OwnerKind;
+use engine::core::script::OwnerKindDef;
+use engine::systems::script::OwnerKind;
 use serde_json::{Map, Value};
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};

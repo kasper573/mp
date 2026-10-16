@@ -1,7 +1,7 @@
 use egui::{Sense, Ui, Vec2};
-use game::core::math::Pos;
-use game::systems::area;
-use game::systems::script::Place;
+use engine::core::math::Pos;
+use engine::systems::area;
+use engine::systems::script::Place;
 use serde_json::Value;
 
 use super::{pins, select};

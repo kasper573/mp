@@ -25,8 +25,8 @@ fn new_game_writes_the_built_in_template_under_the_given_name() {
         !folder.parent().unwrap().join(".fresh.new-game").exists(),
         "the hidden staging folder is renamed into place"
     );
-    let loaded = game::systems::load_content(
-        std::sync::Arc::new(game::core::content::FilesystemFolder(folder.clone())),
+    let loaded = engine::systems::load_content(
+        std::sync::Arc::new(engine::core::content::FilesystemFolder(folder.clone())),
         "cargo test failed",
     );
     assert!(loaded.is_ok(), "the written game loads with this build");
@@ -35,7 +35,7 @@ fn new_game_writes_the_built_in_template_under_the_given_name() {
 #[test]
 fn every_built_in_template_carries_the_content_version_of_this_build() {
     let scratch = scratch();
-    let version = game::systems::registry().version().0;
+    let version = engine::systems::registry().version().0;
     for template in templates::list() {
         let folder = scratch.path().join(&template.key);
         templates::new_game(&template.key, "Saltmarsh", &folder).expect("writes");

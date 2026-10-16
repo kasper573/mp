@@ -4,9 +4,9 @@ use driver::{
     Player, UiTarget, WaitBudget, content, erred, finished, holding, marked, noticed, on_quest,
     told_by,
 };
-use game::systems::attention::AttentionMark;
-use game::systems::input::map::InputAction;
-use game::systems::quest::QuestResult;
+use engine::systems::attention::AttentionMark;
+use engine::systems::input::map::InputAction;
+use engine::systems::quest::QuestResult;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

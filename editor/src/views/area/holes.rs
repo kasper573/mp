@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 
-use game::core::content::locate;
-use game::core::script::VariableType;
-use game::systems::area::blueprint::{self, hole_name};
-use game::systems::script::Variable;
+use engine::core::content::locate;
+use engine::core::script::VariableType;
+use engine::systems::area::blueprint::{self, hole_name};
+use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::placement;

@@ -1,15 +1,15 @@
 use std::collections::BTreeSet;
 
 use egui::{RichText, Ui};
-use game::core::content::Content;
-use game::core::script::MayDo;
-use game::systems::area::blueprint::BlueprintDef;
-use game::systems::area::{self, AreaDef, AreaModule};
-use game::systems::item::ItemDef;
-use game::systems::npc::NpcDef;
-use game::systems::quest::QuestDef;
-use game::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
-use game::systems::shop::ShopDef;
+use engine::core::content::Content;
+use engine::core::script::MayDo;
+use engine::systems::area::blueprint::BlueprintDef;
+use engine::systems::area::{self, AreaDef, AreaModule};
+use engine::systems::item::ItemDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::quest::QuestDef;
+use engine::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
+use engine::systems::shop::ShopDef;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};

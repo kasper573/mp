@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use egui::{Align, Layout, RichText, Ui};
-use game::core::script::VariableType;
-use game::systems::script::RiftScripts;
+use engine::core::script::VariableType;
+use engine::systems::script::RiftScripts;
 use serde_json::Value;
 
 use super::card_body;

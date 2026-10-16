@@ -1,7 +1,7 @@
 use egui::Ui;
-use game::core::math::Pos;
-use game::core::tiling::{Cell, TilePos, TileRect, Tiles};
-use game::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
+use engine::core::math::Pos;
+use engine::core::tiling::{Cell, TilePos, TileRect, Tiles};
+use engine::systems::area::{self, AreaModuleKind, Flip, SceneryTile};
 use serde_json::Value;
 
 use super::inspect::Followups;

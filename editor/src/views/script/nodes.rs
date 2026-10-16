@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
-use game::core::content::{Content, ContentScope, with_content};
-use game::core::script::{EffectDef, EventDef, OwnerKindDef};
-use game::systems::actor::model::Face;
-use game::systems::area::blueprint::hole_name;
-use game::systems::npc::NpcDef;
-use game::systems::script::{Node, OwnerKind};
+use engine::core::content::{Content, ContentScope, with_content};
+use engine::core::script::{EffectDef, EventDef, OwnerKindDef};
+use engine::systems::actor::model::Face;
+use engine::systems::area::blueprint::hole_name;
+use engine::systems::npc::NpcDef;
+use engine::systems::script::{Node, OwnerKind};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::{EnumString, IntoStaticStr, VariantArray};

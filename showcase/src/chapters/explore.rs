@@ -1,4 +1,4 @@
-use game::core::math::Offset;
+use engine::core::math::Offset;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

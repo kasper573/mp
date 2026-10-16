@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use egui::{Align, Context, Layout, RichText, Ui};
-use game::core::content::version;
+use engine::core::content::version;
 
 use super::report::{self, ReportAction};
 use super::{theme, widgets};

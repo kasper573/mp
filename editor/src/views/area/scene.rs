@@ -9,12 +9,12 @@ use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiTextureHandle, EguiUserTextures};
-use game::core::content::Content;
-use game::core::math::{Pos, Rect};
-use game::core::render::{self, TILE, ToScreen};
-use game::core::tiling::{TileSize, Tiles};
-use game::systems::area::{self, AreaId, AreaModule, Flip, Scenery};
-use game::systems::screen::area::TileSheets;
+use engine::core::content::Content;
+use engine::core::math::{Pos, Rect};
+use engine::core::render::{self, TILE, ToScreen};
+use engine::core::tiling::{TileSize, Tiles};
+use engine::systems::area::{self, AreaId, AreaModule, Flip, Scenery};
+use engine::systems::screen::area::TileSheets;
 
 use super::stamp;
 use crate::project::{ProjectFiles, hash};

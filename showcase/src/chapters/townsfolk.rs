@@ -1,9 +1,9 @@
 use driver::{Player, UiTarget, content, fixture, holding, resident_home, townsperson};
-use game::core::math::{Offset, Pos};
-use game::core::tiling::Tiles;
-use game::systems::input::gestures::ClickClaim;
-use game::systems::input::map::InputAction;
-use game::systems::probe::ProbeSnapshot;
+use engine::core::math::{Offset, Pos};
+use engine::core::tiling::Tiles;
+use engine::systems::input::gestures::ClickClaim;
+use engine::systems::input::map::InputAction;
+use engine::systems::probe::ProbeSnapshot;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

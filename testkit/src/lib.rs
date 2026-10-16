@@ -7,28 +7,28 @@ use bevy_ecs::message::{Message, MessageCursor, Messages};
 use bevy_ecs::prelude::*;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use bevy_replicon::server::ServerSystems;
-use game::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
-use game::core::math::{Pos, Rng};
-use game::core::script::Value;
-use game::core::tiling::{TilePos, Tiles};
-use game::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
-use game::systems::TICK_HZ;
-use game::systems::area::{self, Area, AreaId, AreaObject};
-use game::systems::dialogue::{Conversation, ConversationRequest};
-use game::systems::input::map::InputMap;
-use game::systems::interact::InteractRequest;
-use game::systems::item::{self, Inventory, ItemId, ItemStack};
-use game::systems::memory::{self, MemoryId};
-use game::systems::movement::{Position, position};
-use game::systems::notification::{
+use engine::core::content::{Content, ContentId, ContentRow, FilesystemFolder, key_of};
+use engine::core::math::{Pos, Rng};
+use engine::core::script::Value;
+use engine::core::tiling::{TilePos, Tiles};
+use engine::core::time::{Seconds, UnixMillis, UtcHour, WallClock};
+use engine::systems::TICK_HZ;
+use engine::systems::area::{self, Area, AreaId, AreaObject};
+use engine::systems::dialogue::{Conversation, ConversationRequest};
+use engine::systems::input::map::InputMap;
+use engine::systems::interact::InteractRequest;
+use engine::systems::item::{self, Inventory, ItemId, ItemStack};
+use engine::systems::memory::{self, MemoryId};
+use engine::systems::movement::{Position, position};
+use engine::systems::notification::{
     Notification, NotificationId, NotificationKind, NotificationSent,
 };
-use game::systems::npc::{self, Npc, NpcId, Pack};
-use game::systems::player::snapshot::JoinAs;
-use game::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
-use game::systems::script::condition;
-use game::systems::stat::{self, StatKind};
-use game::systems::{GameSettings, WorldArea, from_client, load_content, start_server};
+use engine::systems::npc::{self, Npc, NpcId, Pack};
+use engine::systems::player::snapshot::JoinAs;
+use engine::systems::player::{AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules};
+use engine::systems::script::condition;
+use engine::systems::stat::{self, StatKind};
+use engine::systems::{GameSettings, WorldArea, from_client, load_content, start_server};
 
 pub const CLOCK: WallClock = WallClock {
     now: UnixMillis(0),
@@ -39,7 +39,7 @@ pub fn content() -> &'static Content {
     static CONTENT: LazyLock<Content> = LazyLock::new(|| {
         load_content(
             Arc::new(FilesystemFolder(
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("../content"),
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../example_game"),
             )),
             "cargo test failed",
         )
@@ -76,7 +76,7 @@ pub struct Sim {
 
 impl Sim {
     pub fn area(area: AreaId) -> Sim {
-        let mut app = game::systems::server_app(area, 0, drawn_seed(), CLOCK, content());
+        let mut app = engine::systems::server_app(area, 0, drawn_seed(), CLOCK, content());
         app.insert_resource(SpawnRules {
             policy: SpawnPolicy::Map,
             immortal: true,
@@ -373,7 +373,7 @@ pub fn slay(sim: &mut Sim, player: Entity, what: NpcId) {
     let area = world.resource::<WorldArea>().0;
     let victim = npc::spawn(world, what, at, area, Pack(u32::MAX));
     item::reserve(world, victim, player, Seconds(0.0));
-    game::systems::combat::inflict(world, victim, Some(player), 1_000_000.0);
+    engine::systems::combat::inflict(world, victim, Some(player), 1_000_000.0);
     sim.run_until(0.2, |_| false);
 }
 

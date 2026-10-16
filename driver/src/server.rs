@@ -6,13 +6,13 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-use game::core::time::UtcHour;
-use game::systems::launch::{
+use engine::core::time::UtcHour;
+use engine::systems::launch::{
     self, AuthMode, ReadyLine, SERVER_ENV_PREFIX, ServerConfig, ServerReady, Switch,
     TEST_CHARACTER_ROUTE, TestCharacterRequest,
 };
-use game::systems::player::SpawnPolicy;
-use game::systems::script::Place;
+use engine::systems::player::SpawnPolicy;
+use engine::systems::script::Place;
 
 use crate::content::to_json;
 

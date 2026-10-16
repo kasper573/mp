@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
-use game::core::content::ContentRow;
-use game::systems::area::world_map::WorldMapDef;
+use engine::core::content::ContentRow;
+use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};

@@ -1,5 +1,5 @@
 use egui::{Color32, Rect as ERect, RichText, Sense, Ui, Vec2};
-use game::core::math::Direction;
+use engine::core::math::Direction;
 use serde_json::Value;
 use strum::VariantArray;
 

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use egui::{Align2, Key, Pos2, Ui};
-use game::core::script::OwnerKindDef;
+use engine::core::script::OwnerKindDef;
 
 use super::graph::NodePaletteOpen;
 use super::nodes::{NodeCatalogue, NodeEntry};

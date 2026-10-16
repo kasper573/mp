@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 
 use egui::{Color32, Pos2, Rect as ERect, Stroke as EStroke, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::{Pos, Rect, Size};
-use game::core::script::VariableType;
-use game::core::tiling::{TilePos, Tiles};
-use game::systems::area::{self, AreaId, Flip};
-use game::systems::script::Variable;
+use engine::core::content::Content;
+use engine::core::math::{Pos, Rect, Size};
+use engine::core::script::VariableType;
+use engine::core::tiling::{TilePos, Tiles};
+use engine::systems::area::{self, AreaId, Flip};
+use engine::systems::script::Variable;
 use serde_json::Value;
 
 use super::holes::fill_holes;

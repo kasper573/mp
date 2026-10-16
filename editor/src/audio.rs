@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use game::core::audio;
-use game::core::audio::loader::{self, DecodedAudio};
+use engine::core::audio;
+use engine::core::audio::loader::{self, DecodedAudio};
 
 use crate::project::ProjectFiles;
 

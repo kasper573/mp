@@ -1,9 +1,9 @@
 use egui::{Align, Layout, RichText, Ui, Vec2};
-use game::core::content::ContentRow;
-use game::systems::item::ItemDef;
-use game::systems::npc::NpcDef;
-use game::systems::quest::QuestDef;
-use game::systems::shop::ShopDef;
+use engine::core::content::ContentRow;
+use engine::systems::item::ItemDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::quest::QuestDef;
+use engine::systems::shop::ShopDef;
 
 use super::filters::{ColourBy, ColourField, MapLens};
 use super::{MapPart, OpenWorldMap, select};

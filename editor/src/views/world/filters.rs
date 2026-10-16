@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use game::core::content::ContentRow;
-use game::systems::area::{AreaDef, AreaId, AreaModuleKind};
-use game::systems::item::ItemDef;
-use game::systems::npc::NpcDef;
-use game::systems::quest::QuestDef;
-use game::systems::shop::ShopDef;
+use engine::core::content::ContentRow;
+use engine::systems::area::{AreaDef, AreaId, AreaModuleKind};
+use engine::systems::item::ItemDef;
+use engine::systems::npc::NpcDef;
+use engine::systems::quest::QuestDef;
+use engine::systems::shop::ShopDef;
 use serde::Deserialize;
 use serde_json::Value;
 use strum::VariantArray;

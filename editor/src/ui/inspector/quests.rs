@@ -1,5 +1,5 @@
 use egui::{Sense, Ui};
-use game::systems::area::AreaModuleKind;
+use engine::systems::area::AreaModuleKind;
 use serde_json::Value;
 
 use super::{theme, widgets};

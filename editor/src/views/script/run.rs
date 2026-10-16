@@ -8,30 +8,32 @@ use bevy::prelude::{Entity, World};
 use bevy::time::TimeUpdateStrategy;
 use bevy_replicon::prelude::{ClientId as Sender, SendTargets, ToClients};
 use egui::{RichText, Ui};
-use game::core::content::Content;
-use game::core::math::Pos;
-use game::core::script::{FlowSteering, OwnerKindDef, Pause, Value as ScriptValue, ValueType};
-use game::core::tiling::Tiles;
-use game::core::time::{UnixMillis, UtcHour, WallClock};
-use game::systems::actor::Name;
-use game::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
-use game::systems::dialogue::{self, Conversation, ConversationRequest};
-use game::systems::input::map::InputMap;
-use game::systems::item::{Inventory, ItemDef, ItemStack};
-use game::systems::job::{self, Job, JobDef, JobId};
-use game::systems::memory::{Memory, MemoryDef};
-use game::systems::notification::NotificationSent;
-use game::systems::npc::{Npc, NpcId};
-use game::systems::player::snapshot::{CharacterSnapshot, JoinAs};
-use game::systems::player::{
+use engine::core::content::Content;
+use engine::core::math::Pos;
+use engine::core::script::{FlowSteering, OwnerKindDef, Pause, Value as ScriptValue, ValueType};
+use engine::core::tiling::Tiles;
+use engine::core::time::{UnixMillis, UtcHour, WallClock};
+use engine::systems::actor::Name;
+use engine::systems::area::{self, AreaDef, AreaId, AreaModule, AreaObject};
+use engine::systems::dialogue::{self, Conversation, ConversationRequest};
+use engine::systems::input::map::InputMap;
+use engine::systems::item::{Inventory, ItemDef, ItemStack};
+use engine::systems::job::{self, Job, JobDef, JobId};
+use engine::systems::memory::{Memory, MemoryDef};
+use engine::systems::notification::NotificationSent;
+use engine::systems::npc::{Npc, NpcId};
+use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs};
+use engine::systems::player::{
     AreaDrawn, ClientId, JoinRequest, Players, SpawnPolicy, SpawnRules, Xp,
 };
-use game::systems::quest::{ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult};
-use game::systems::script::{
+use engine::systems::quest::{
+    ActiveQuest, FinishedQuest, QuestDef, QuestId, QuestLog, QuestResult,
+};
+use engine::systems::script::{
     EventKind, FlowKey, FlowTrace, Owner, OwnerKind, Place, Reach, RiftInstances, RiftScripts,
     TraceStep,
 };
-use game::systems::{self, GameSettings, TICK_HZ, memory, npc};
+use engine::systems::{self, GameSettings, TICK_HZ, memory, npc};
 
 use super::nodes::{self, NodeReads};
 use super::panel::{ScriptBinding, bindings};

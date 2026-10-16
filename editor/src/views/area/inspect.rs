@@ -2,11 +2,11 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 use egui::{Align, Layout, RichText, Sense, Ui, Vec2};
-use game::core::content::Content;
-use game::core::math::Rng;
-use game::core::script::VariableType;
-use game::core::tiling::{Cell, CellPos, TileSize};
-use game::systems::area::{self, AreaId, AreaModuleKind};
+use engine::core::content::Content;
+use engine::core::math::Rng;
+use engine::core::script::VariableType;
+use engine::core::tiling::{Cell, CellPos, TileSize};
+use engine::systems::area::{self, AreaId, AreaModuleKind};
 use serde_json::Value;
 
 use super::pins::INITIAL_SPAWN;

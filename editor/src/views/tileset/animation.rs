@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use egui::{Color32, Pos2, Rect as ERect, RichText, Sense, Stroke, Ui, Vec2};
-use game::systems::actor::Action;
-use game::systems::area::tileset::TileFrame;
+use engine::systems::actor::Action;
+use engine::systems::area::tileset::TileFrame;
 
 use super::{OpenTileset, SheetRect, change_tileset, sheet, tile_mut};
 use crate::app::Editor;

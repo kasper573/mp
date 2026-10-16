@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use egui::{Color32, Rect as ERect, Ui, Vec2};
-use game::core::math::Direction;
-use game::systems::actor::Action;
+use engine::core::math::Direction;
+use engine::systems::actor::Action;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};

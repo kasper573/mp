@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use egui::Ui;
-use game::core::content::Content;
-use game::core::script::VariableType;
+use engine::core::content::Content;
+use engine::core::script::VariableType;
 use serde_json::{Map, Value};
 
 use crate::drafts;

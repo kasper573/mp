@@ -5,7 +5,7 @@ edition.workspace = true
 description = "A simulated game server for the contract and script tests: one world, clients joining and acting through the game's own messages"
 
 [dependencies]
-game = { path = "../game" }
+engine = { path = "../engine" }
 bevy_app.workspace = true
 bevy_ecs.workspace = true
 bevy_replicon = { workspace = true, features = ["client", "server"] }

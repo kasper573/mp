@@ -1,6 +1,6 @@
 use driver::{Player, UiTarget};
-use game::core::math::Offset;
-use game::systems::input::map::InputAction;
+use engine::core::math::Offset;
+use engine::systems::input::map::InputAction;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

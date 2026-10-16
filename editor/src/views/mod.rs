@@ -11,9 +11,9 @@ pub mod world;
 
 use bevy::prelude::*;
 use egui::Ui;
-use game::core::tiling::TilePos;
-use game::systems::area::AreaDef;
-use game::systems::script::Place;
+use engine::core::tiling::TilePos;
+use engine::systems::area::AreaDef;
+use engine::systems::script::Place;
 
 use crate::app::{BottomTab, Editor};
 use crate::project::{AreaCameraState, RowSelection};

@@ -1,7 +1,7 @@
 use driver::Player;
-use game::core::math::{Pos, Rect};
-use game::core::tiling::Tiles;
-use game::systems::probe::{ProbeSoundZone, ProbeVoice};
+use engine::core::math::{Pos, Rect};
+use engine::core::tiling::Tiles;
+use engine::systems::probe::{ProbeSoundZone, ProbeVoice};
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;

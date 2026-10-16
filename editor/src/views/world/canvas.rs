@@ -5,10 +5,10 @@ use egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
     Vec2,
 };
-use game::core::math::Pos;
-use game::core::tiling::Tiles;
-use game::systems::area::AreaId;
-use game::systems::area::world_map::WorldMapDef;
+use engine::core::math::Pos;
+use engine::core::tiling::Tiles;
+use engine::systems::area::AreaId;
+use engine::systems::area::world_map::WorldMapDef;
 
 use super::atlas::{AtlasWarp, RowSource, WorldAtlas};
 use super::filters::{self, ColourRanges};

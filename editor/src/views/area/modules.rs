@@ -1,8 +1,8 @@
 use egui::{Pos2, RichText, Ui, Vec2};
-use game::core::math::Pos;
-use game::core::tiling::{CellPos, TilePos, Tiles};
-use game::systems::area::AreaModuleKind;
-use game::systems::script::Place;
+use engine::core::math::Pos;
+use engine::core::tiling::{CellPos, TilePos, Tiles};
+use engine::systems::area::AreaModuleKind;
+use engine::systems::script::Place;
 use serde_json::Value;
 
 use super::select::start_paste;

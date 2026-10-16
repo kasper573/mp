@@ -1,12 +1,12 @@
 use bevy::prelude::World;
 use bevy_kira_audio::prelude::{Audio, AudioControl, AudioSource};
 use egui::{Color32, Rect as ERect, Sense, Ui, Vec2};
-use game::core::audio;
-use game::core::audio::loader::{self, DecodedAudio};
-use game::core::audio::mix::{AudioCategory, AudioMix};
-use game::core::audio::playback::{SfxRoleDef, SfxScalar};
-use game::core::content::ContentRow;
-use game::core::math::Rng;
+use engine::core::audio;
+use engine::core::audio::loader::{self, DecodedAudio};
+use engine::core::audio::mix::{AudioCategory, AudioMix};
+use engine::core::audio::playback::{SfxRoleDef, SfxScalar};
+use engine::core::content::ContentRow;
+use engine::core::math::Rng;
 
 use crate::app::Editor;
 use crate::audio::{LOUDEST_WINDOW_MS, Loudness, Waveform, gain_db};

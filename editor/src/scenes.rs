@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use game::systems::area::world_map::{Note, Region};
-use game::systems::area::{self, AreaDef};
+use engine::systems::area::world_map::{Note, Region};
+use engine::systems::area::{self, AreaDef};
 use serde::Deserialize;
 
 use crate::app::{BottomTab, Clipboard, Editor, ModalDialog};

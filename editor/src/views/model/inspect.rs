@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use egui::{RichText, Sense, Ui, Vec2};
+use engine::systems::actor::Action;
 use forms::FormCx;
-use game::systems::actor::Action;
 use serde_json::Value;
 
 use super::{
