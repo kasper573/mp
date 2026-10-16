@@ -95,7 +95,6 @@ showcase *chapters:
     RIFT_SHOWCASE_CONTENT_DIR=$PWD/content RIFT_SHOWCASE_OUT_DIR=$PWD/{{showcase_dir}} RIFT_SHOWCASE_CORES_PER_CHAPTER=5 \
       target/release/showcase {{chapters}}
 
-# The art exports sit beside the copy, so import scenes find them.
 [doc("Records the editor on a copy of the example content at SCENE, a JSON array of steps, as editor-NAME.webm; HOOK runs with WORK naming the copy's parent.")]
 editor-showcase name scene seconds="8" input="" hook="":
     #!/usr/bin/env bash
@@ -104,7 +103,6 @@ editor-showcase name scene seconds="8" input="" hook="":
     export WORK=$(mktemp -d)
     trap 'rm -rf "$WORK"' EXIT
     cp -r content "$WORK/game"
-    cp -r art "$WORK/art"
     just record {{quote(showcase_dir / "editor-" + kebabcase(name) + ".webm")}} "Rift editor" {{seconds}} {{quote(input)}} {{quote(hook)}} \
       target/release/editor "$WORK/game" --scene {{quote(scene)}} --user-folder "$WORK/user"
 
