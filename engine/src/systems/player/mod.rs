@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
-use crate::core::time::{PlaybackRate, Seconds, WallClock};
+use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
 use crate::systems::GameSettings;
 use crate::systems::account::Identity;
 use crate::systems::actor::model::ModelId;
@@ -112,6 +112,7 @@ pub struct RespawnRequest;
 #[derive(Message, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Welcome {
     pub id: ClientId,
+    pub now: UnixMillis,
 }
 
 /// High enough that nothing in the world can grind it down.
@@ -226,7 +227,10 @@ pub fn greet(add: On<Add<ClientId>>, clients: Query<&ClientId>, mut commands: Co
         return;
     };
     let conn = add.entity;
-    commands.queue(move |world: &mut World| visibility::send_to(world, conn, Welcome { id }));
+    commands.queue(move |world: &mut World| {
+        let now = world.resource::<WallClock>().now;
+        visibility::send_to(world, conn, Welcome { id, now });
+    });
 }
 
 pub fn client_left(

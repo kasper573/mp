@@ -21,6 +21,7 @@ use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players}
 use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
+use crate::systems::skill::ResetPrompt;
 use crate::systems::spectate::Spectators;
 
 pub const VIEW_DISTANCE: Tiles = Tiles(24.0);
@@ -226,6 +227,7 @@ impl VisibilityFilter for OwnedBy {
         QuestLog,
         MoveTarget,
         HeardMove,
+        ResetPrompt,
     );
 
     fn is_visible(&self, _: Entity, sight: Option<&PrivateSight>) -> bool {

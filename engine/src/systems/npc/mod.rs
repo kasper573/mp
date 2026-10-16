@@ -22,11 +22,10 @@ use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint}
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;
-use crate::systems::effect::{self, Effect, TimedEffects};
+use crate::systems::effect::TimedEffects;
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
-use crate::systems::reach::{self, ReachAct};
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::query::TickRoster;
 use crate::systems::script::{
@@ -45,7 +44,6 @@ const CORPSE_LINGER: Seconds = Seconds(5.0);
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate_once::<Npc>();
-    effect::source(app, chase);
 }
 
 pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
@@ -57,16 +55,6 @@ pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
         })
         .reaches
         .contains(&Reach::Hostile)
-}
-
-pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
-    if world.get::<Npc>(entity).is_some()
-        && reach::intent(world, entity, ReachAct::Attack).is_some()
-    {
-        vec![Effect::Chasing]
-    } else {
-        Vec::new()
-    }
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

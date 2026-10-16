@@ -4,6 +4,7 @@ use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::movement::{self, approach, position};
+use crate::systems::skill::SkillId;
 use crate::systems::stat;
 use crate::systems::visibility;
 
@@ -11,13 +12,24 @@ const DIAGONAL_MARGIN: Tiles = Tiles(std::f32::consts::SQRT_2 - 1.0);
 
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct ReachIntent {
-    pub target: Entity,
+    pub target: ReachTarget,
     pub act: ReachAct,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ReachTarget {
+    Actor(Entity),
+    Point(Pos<Tiles>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReachAct {
-    Attack,
+    /// `repeat` keeps the intent after a cast, so a basic attack lands again and again until the
+    /// target falls or the actor turns away.
+    Cast {
+        skill: SkillId,
+        repeat: bool,
+    },
     Pickup,
     Interact,
 }
@@ -35,6 +47,38 @@ pub struct Tether {
     pub area: AreaId,
     pub range: Tiles,
     pub with: Option<Entity>,
+}
+
+impl ReachTarget {
+    pub fn actor(self) -> Option<Entity> {
+        match self {
+            ReachTarget::Actor(actor) => Some(actor),
+            ReachTarget::Point(_) => None,
+        }
+    }
+
+    pub fn point(self) -> Option<Pos<Tiles>> {
+        match self {
+            ReachTarget::Point(point) => Some(point),
+            ReachTarget::Actor(_) => None,
+        }
+    }
+
+    pub fn position(self, world: &World) -> Option<Pos<Tiles>> {
+        match self {
+            ReachTarget::Actor(actor) => position(world, actor),
+            ReachTarget::Point(point) => Some(point),
+        }
+    }
+}
+
+impl ReachIntent {
+    pub fn cast(&self) -> Option<SkillId> {
+        match self.act {
+            ReachAct::Cast { skill, .. } => Some(skill),
+            ReachAct::Pickup | ReachAct::Interact => None,
+        }
+    }
 }
 
 impl Tether {
@@ -65,36 +109,60 @@ impl Tether {
     }
 }
 
-pub fn intend(world: &mut World, actor: Entity, target: Entity, act: ReachAct) {
+pub fn intend(world: &mut World, actor: Entity, target: ReachTarget, act: ReachAct) {
     movement::halt(world, actor);
     world.entity_mut(actor).insert(ReachIntent { target, act });
 }
 
 pub type Intents = QueryState<(Entity, &'static ReachIntent)>;
 
+/// Every actor reaching for another actor with exactly this act.
 pub fn intending(world: &World, intents: &mut Intents, act: ReachAct) -> Vec<(Entity, Entity)> {
     intents
         .iter(world)
         .filter(|(_, intent)| intent.act == act)
-        .map(|(actor, intent)| (actor, intent.target))
+        .filter_map(|(actor, intent)| Some((actor, intent.target.actor()?)))
         .collect()
 }
 
+pub fn casting(world: &World, intents: &mut Intents) -> Vec<(Entity, ReachIntent)> {
+    intents
+        .iter(world)
+        .filter(|(_, intent)| intent.cast().is_some())
+        .map(|(actor, intent)| (actor, *intent))
+        .collect()
+}
+
+pub fn current(world: &World, actor: Entity) -> Option<ReachIntent> {
+    world.get::<ReachIntent>(actor).copied()
+}
+
+/// The actor a cast is aimed at, while the actor is casting at one.
+pub fn attacking(world: &World, actor: Entity) -> Option<Entity> {
+    current(world, actor)
+        .filter(|intent| intent.cast().is_some())
+        .and_then(|intent| intent.target.actor())
+}
+
 pub fn intent(world: &World, actor: Entity, act: ReachAct) -> Option<Entity> {
-    world
-        .get::<ReachIntent>(actor)
+    current(world, actor)
         .filter(|intent| intent.act == act)
-        .map(|intent| intent.target)
+        .and_then(|intent| intent.target.actor())
 }
 
 pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
-    let Some(target) = world.get::<ReachIntent>(actor).map(|intent| intent.target) else {
+    let Some(target) = current(world, actor).map(|intent| intent.target) else {
         return Pursuit::Lost;
     };
-    if stat::is_dead(world, actor) || !pursuable(world, actor, target) {
+    if stat::is_dead(world, actor) {
         return Pursuit::Lost;
     }
-    let Some(target_at) = position(world, target) else {
+    if let ReachTarget::Actor(target) = target
+        && !pursuable(world, actor, target)
+    {
+        return Pursuit::Lost;
+    }
+    let Some(target_at) = target.position(world) else {
         return Pursuit::Lost;
     };
     if approach(world, actor, target_at, range + DIAGONAL_MARGIN) {

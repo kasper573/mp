@@ -123,7 +123,7 @@ impl Value {
 
     pub fn as_actors(&self) -> Vec<Entity> {
         match self {
-            Value::Actor(actor) => actor.into_iter().copied().collect(),
+            Value::Actor(actor) => actor.iter().copied().collect(),
             Value::Actors(all) => all.clone(),
             _ => Vec::new(),
         }

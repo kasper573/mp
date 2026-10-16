@@ -29,7 +29,7 @@ use crate::systems::movement::{Position, position};
 use crate::systems::notification;
 use crate::systems::npc::Npc;
 use crate::systems::player::{self, ClientId, Owner, Players, sender_player};
-use crate::systems::reach::{self, Pursuit, ReachAct};
+use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
@@ -371,7 +371,6 @@ pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
     Stat(Stat),
-    Chasing,
     QuestItem,
     Bound,
     Currency,
@@ -448,7 +447,6 @@ impl ItemDef {
     pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
         self.modules.iter().filter_map(|module| match module {
             ItemModule::Stat(stat) => Some(Effect::StatModifier(*stat)),
-            ItemModule::Chasing => Some(Effect::Chasing),
             _ => None,
         })
     }
@@ -617,7 +615,7 @@ pub fn pickup_request(world: &mut World) {
         {
             continue;
         }
-        reach::intend(world, player, target, ReachAct::Pickup);
+        reach::intend(world, player, ReachTarget::Actor(target), ReachAct::Pickup);
     }
 }
 

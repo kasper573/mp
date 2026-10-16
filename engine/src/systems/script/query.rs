@@ -407,7 +407,7 @@ impl QueryDef<RiftScripting> for RiftQuery {
                 let of = cx.actor(of.as_deref())?;
                 Box::new(move |world, cx| {
                     Value::Num(
-                        character(world, cx, &of)
+                        actor(world, cx, &of)
                             .map_or(0.0, |who| f64::from(stat::effective(world, who, stat))),
                     )
                 })

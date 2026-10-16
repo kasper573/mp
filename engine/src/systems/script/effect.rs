@@ -9,6 +9,7 @@ use crate::core::audio::playback::SfxId;
 use crate::core::script::{
     Compiler, EffectDef, EffectStep, Eval, FlowCx, Name, ScriptFault, ValueType,
 };
+use crate::systems::actor::Animate;
 use crate::systems::area::warp::Warp;
 use crate::systems::chat::Say;
 use crate::systems::class::GrantXp;
@@ -24,6 +25,7 @@ use crate::systems::quest::effects::{
 };
 use crate::systems::script::{EffectCall, OwnerKind};
 use crate::systems::shop::OpenShop;
+use crate::systems::skill::{ResetSkills, UseSkill};
 use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
 
 pub type Aim = Option<Condition>;
@@ -99,6 +101,9 @@ effects! {
     Attack(Attack),
     Stop(Stop),
     Face(FaceToward),
+    Animate(Animate),
+    UseSkill(UseSkill),
+    ResetSkills(ResetSkills),
     SetAttitude(SetAttitude),
     SpawnNpcs(SpawnNpcs),
     Despawn(Despawn),

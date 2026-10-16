@@ -8,15 +8,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
-use crate::core::math::{Direction, Pos};
+use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
-use crate::core::time::{Millis, PlaybackRate, Seconds};
-use crate::systems::actor::{self, Action, Actor, ActorModel, Timing, set_facing};
-use crate::systems::area;
-use crate::systems::movement::{halt, moving, on_tile, position};
+use crate::core::time::Seconds;
+use crate::systems::actor::{self, Actor};
+use crate::systems::notification;
+use crate::systems::npc::Pack;
 use crate::systems::player::{self, Owner, sender_player, session};
-use crate::systems::reach::{self, Pursuit, ReachAct};
-use crate::systems::stat::{self, StatKind, Stats};
+use crate::systems::reach;
+use crate::systems::skill::{self, BasicAttack};
+use crate::systems::stat::{self, Stats};
 use crate::systems::{drain_requests, visibility};
 
 pub fn register(app: &mut App) {
@@ -32,28 +33,51 @@ pub enum Attitude {
     Hostile,
 }
 
-/// How two actors stand to each other. Characters and friendly npcs share a side; every other npc
-/// stands against them. There are no parties yet, so every character is every character's ally.
+/// How two actors stand to each other. Every character is every character's ally, as there are no
+/// parties yet; a friendly npc is neutral to them and every other npc their enemy. Npcs side with
+/// their pack and with each other when both are friendly, and stand against everyone else.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Relation {
     Own,
     Ally,
+    Neutral,
     Enemy,
 }
 
 pub fn relation(world: &World, from: Entity, to: Entity) -> Relation {
     if from == to {
-        Relation::Own
-    } else if with_characters(world, from) == with_characters(world, to) {
-        Relation::Ally
-    } else {
-        Relation::Enemy
+        return Relation::Own;
+    }
+    match (side(world, from), side(world, to)) {
+        (Side::Character, Side::Character) => Relation::Ally,
+        (Side::Character, Side::Friendly) | (Side::Friendly, Side::Character) => Relation::Neutral,
+        (Side::Character, Side::Wild) | (Side::Wild, Side::Character) => Relation::Enemy,
+        (Side::Friendly, Side::Friendly) => Relation::Ally,
+        _ => {
+            let pack = |entity| world.get::<Pack>(entity).copied();
+            match (pack(from), pack(to)) {
+                (Some(a), Some(b)) if a == b => Relation::Ally,
+                _ => Relation::Enemy,
+            }
+        }
     }
 }
 
-fn with_characters(world: &World, entity: Entity) -> bool {
-    world.get::<Owner>(entity).is_some()
-        || world.get::<Attitude>(entity) == Some(&Attitude::Friendly)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Side {
+    Character,
+    Friendly,
+    Wild,
+}
+
+fn side(world: &World, entity: Entity) -> Side {
+    if world.get::<Owner>(entity).is_some() {
+        Side::Character
+    } else if world.get::<Attitude>(entity) == Some(&Attitude::Friendly) {
+        Side::Friendly
+    } else {
+        Side::Wild
+    }
 }
 
 pub fn attackable(world: &World, attacker: Entity, target: Entity) -> bool {
@@ -76,11 +100,6 @@ pub fn enemy_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
 }
 
 #[derive(Component, Clone, Debug, PartialEq)]
-pub struct LastAttack {
-    pub at: Seconds,
-}
-
-#[derive(Component, Clone, Debug, PartialEq)]
 pub struct Attackers {
     pub ids: Vec<Entity>,
 }
@@ -93,14 +112,6 @@ pub struct Died {
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct Dead {
     pub at: Seconds,
-}
-
-#[derive(Component, Clone, Debug, PartialEq)]
-pub struct Swing {
-    pub target: Entity,
-    pub hit_at: Seconds,
-    pub ends_at: Seconds,
-    pub struck: bool,
 }
 
 #[derive(JsonSchema, Clone, Copy, Serialize, Deserialize)]
@@ -133,6 +144,8 @@ pub fn regen(world: &mut World) {
     }
 }
 
+/// A click on an enemy casts whatever sits in the basic attack slot at it, again and again until
+/// it falls.
 pub fn request(world: &mut World) {
     for request in drain_requests::<AttackRequest>(world) {
         let Some(entity) = sender_player(world, request.client_id) else {
@@ -146,18 +159,14 @@ pub fn request(world: &mut World) {
         {
             continue;
         }
-        reach::intend(world, entity, target, ReachAct::Attack);
+        let Some(skill) = world.get::<BasicAttack>(entity).and_then(|slot| slot.0) else {
+            notification::error(world, entity, "Nothing to attack with");
+            continue;
+        };
+        if let Err(reason) = skill::cast(world, entity, skill, skill::Aim::Actor(target), true) {
+            notification::error(world, entity, reason);
+        }
     }
-}
-
-pub fn combat(
-    world: &mut World,
-    intents: &mut reach::Intents,
-    swings: &mut QueryState<Entity, With<Swing>>,
-) {
-    let time = Seconds(world.resource::<Time>().elapsed_secs());
-    engage(world, time, intents);
-    progress_swings(world, time, swings);
 }
 
 pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) {
@@ -201,97 +210,6 @@ pub fn revive(world: &mut World, entity: Entity, at: Pos<Tiles>) {
     crate::systems::movement::relocate(world, entity, at);
     stat::revive(world, entity);
     world.entity_mut(entity).remove::<Dead>();
-}
-
-fn engage(world: &mut World, time: Seconds, intents: &mut reach::Intents) {
-    for (id, target) in reach::intending(world, intents, ReachAct::Attack) {
-        if world.get::<Swing>(id).is_some() {
-            continue;
-        }
-        let stats = stat::effective_all(world, id);
-        let range = Tiles(stats.get(StatKind::Range));
-        let attack_delay = Millis(stats.get(StatKind::AttackDelay));
-        let attack_speed = PlaybackRate(stats.get(StatKind::AttackSpeed));
-        match reach::pursue(world, id, range) {
-            Pursuit::Lost => {
-                reach::forget(world, id);
-                continue;
-            }
-            Pursuit::Approaching => continue,
-            Pursuit::Arrived => {}
-        }
-        let (Some(at), Some(target_at)) = (position(world, id), position(world, target)) else {
-            continue;
-        };
-
-        halt(world, id);
-        if !on_tile(world, id) {
-            continue;
-        }
-        if world
-            .get::<LastAttack>(id)
-            .is_some_and(|l| time - l.at < attack_delay.seconds())
-        {
-            continue;
-        }
-        let dir = Direction::from(target_at - at);
-        let speed = attack_speed.at_least(0.01);
-        if let Some(mut actor) = world.get_mut::<Actor>(id) {
-            set_facing(&mut actor, dir, Action::Attack);
-            actor.attack_rate = speed;
-        }
-        let timing = attack_timing(world, id, dir);
-        world.entity_mut(id).insert(Swing {
-            target,
-            hit_at: time + timing.apex / speed,
-            ends_at: time + timing.duration / speed,
-            struck: false,
-        });
-    }
-}
-
-fn progress_swings(world: &mut World, time: Seconds, swings: &mut QueryState<Entity, With<Swing>>) {
-    let ids: Vec<Entity> = swings.iter(world).collect();
-    for id in ids {
-        if stat::is_dead(world, id) || moving(world, id) {
-            world
-                .entity_mut(id)
-                .remove::<Swing>()
-                .insert(LastAttack { at: time });
-            continue;
-        }
-        let Some(swing) = world.get::<Swing>(id).cloned() else {
-            continue;
-        };
-        if !swing.struck && time >= swing.hit_at {
-            strike(world, id, swing.target);
-            if let Some(mut swing) = world.get_mut::<Swing>(id) {
-                swing.struck = true;
-            }
-        }
-        if time >= swing.ends_at {
-            world
-                .entity_mut(id)
-                .remove::<Swing>()
-                .insert(LastAttack { at: swing.ends_at });
-        }
-    }
-}
-
-fn strike(world: &mut World, attacker: Entity, target: Entity) {
-    if !area::same_area(world, attacker, target) {
-        return;
-    }
-    let damage = stat::effective(world, attacker, StatKind::Damage);
-    inflict(world, target, Some(attacker), damage);
-}
-
-fn attack_timing(world: &World, entity: Entity, dir: Direction) -> Timing {
-    let content = world.resource::<Content>();
-    world
-        .get::<Actor>(entity)
-        .map(|a| ActorModel::get(content, a.model).timing(Action::Attack, dir))
-        .unwrap_or_default()
 }
 
 fn add_attacker(world: &mut World, target: Entity, by: Entity) {

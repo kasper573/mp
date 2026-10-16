@@ -7,8 +7,10 @@ use bevy_state::prelude::{OnEnter, OnExit};
 
 use super::{ClientId, Owner, Welcome};
 use crate::core::render::transition::WorldViewSystems;
+use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::spectate::Spectating;
 use crate::systems::stat;
+use bevy_time::Time;
 
 pub struct ClientSessionPlugin;
 
@@ -21,6 +23,7 @@ impl Plugin for ClientSessionPlugin {
         );
         crate::systems::protocol(app);
         app.init_resource::<MyClient>()
+            .init_resource::<ServerClock>()
             .init_resource::<MyCharacter>()
             .init_resource::<SpectateStatus>()
             .init_resource::<Viewpoint>();
@@ -41,6 +44,23 @@ impl Plugin for ClientSessionPlugin {
 
 #[derive(Resource, Default)]
 pub struct MyClient(pub Option<ClientId>);
+
+/// The server's wall clock as the welcome carried it, against the client's own uptime, so the
+/// client can tell how far along a server deadline is without a wall clock of its own.
+#[derive(Resource, Default)]
+pub struct ServerClock(Option<(UnixMillis, Seconds)>);
+
+impl ServerClock {
+    pub fn now(&self, uptime: Seconds) -> Option<UnixMillis> {
+        let (then, at) = self.0?;
+        Some(then.after(uptime - at))
+    }
+}
+
+pub fn server_now(world: &World) -> Option<UnixMillis> {
+    let uptime = Seconds(world.resource::<Time>().elapsed_secs());
+    world.resource::<ServerClock>().now(uptime)
+}
 
 #[derive(Resource, Default)]
 struct MyCharacter(Option<Entity>);
@@ -106,9 +126,15 @@ pub fn followed(world: &World) -> Option<ClientId> {
     )
 }
 
-fn record_welcome(mut welcomes: MessageReader<Welcome>, mut me: ResMut<MyClient>) {
+fn record_welcome(
+    mut welcomes: MessageReader<Welcome>,
+    time: Res<Time>,
+    mut me: ResMut<MyClient>,
+    mut clock: ResMut<ServerClock>,
+) {
     for welcome in welcomes.read() {
         me.0 = Some(welcome.id);
+        clock.0 = Some((welcome.now, Seconds(time.elapsed_secs())));
     }
 }
 

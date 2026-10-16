@@ -160,6 +160,7 @@ pub fn server_app(
         .init_resource::<spectate::Spectators>()
         .init_resource::<area::transition::Departures>()
         .init_resource::<combat::RegenAt>()
+        .init_resource::<skill::reset::PendingResets>()
         // Seed the phase by the world's ordinal so worlds replicate on different ticks, spreading the
         // serialization load across ticks instead of spiking every Nth tick in lockstep.
         .insert_resource(ReplicationClock(ordinal))
@@ -194,6 +195,7 @@ pub fn server_app(
                     combat::regen,
                     movement::move_request,
                     combat::request,
+                    skill::requests,
                     item::use_item,
                     item::drop_item,
                     item::pickup_request,
@@ -202,7 +204,9 @@ pub fn server_app(
                     shop::requests,
                     quest::requests,
                     equipment::unequip,
-                    combat::combat,
+                    skill::reset::expire,
+                    actor::playing::progress,
+                    skill::using::casts,
                 )
                     .chain(),
                 (
@@ -236,6 +240,7 @@ pub fn server_app(
                 (
                     stat::settle_health,
                     combat::defeats,
+                    skill::hotbar::settle_basic_attack,
                     actor::settle,
                     bevy_terminal::ingest::<TerminalKind>,
                     bevy_terminal::dispatch::<TerminalKind>,

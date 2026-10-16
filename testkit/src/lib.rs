@@ -102,7 +102,13 @@ impl Sim {
         area::load(self.app.world().resource::<Content>(), self.area)
     }
 
+    /// One server tick: the wall clock moves with it, as the real server's does.
     pub fn tick(&mut self) {
+        let clock = *self.world().resource::<WallClock>();
+        self.world().insert_resource(WallClock {
+            now: clock.now.after(Seconds(1.0 / TICK_HZ.0)),
+            ..clock
+        });
         self.app.update();
     }
 

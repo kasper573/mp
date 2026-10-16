@@ -85,7 +85,8 @@ fn a_character_joined_from_a_row_is_that_character() {
     let timed = world.get::<TimedEffects>(player).expect("effects");
     assert_eq!(timed.0.len(), 1);
     assert_eq!(timed.0[0].effect, Effect::Chasing);
-    assert_eq!(timed.0[0].until, LATER.now.after(Seconds(30.0)));
+    let joined_at = world.resource::<WallClock>().now;
+    assert_eq!(timed.0[0].until, joined_at.after(Seconds(30.0)));
     let log = world.get::<QuestLog>(player).expect("quest log");
     let tusks = log
         .active(row("tusks_for_the_chief"))
@@ -121,7 +122,7 @@ fn a_character_joined_from_a_row_is_that_character() {
     let records: Vec<_> = history.records().collect();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].entry.text, LineText::plain("Hello"));
-    assert_eq!(records[0].at, LATER.now.before(Seconds(5.0)));
+    assert_eq!(records[0].at, joined_at.before(Seconds(5.0)));
 }
 
 #[test]

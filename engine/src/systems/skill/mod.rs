@@ -1,3 +1,14 @@
+pub mod hotbar;
+pub mod learn;
+pub mod reset;
+#[path = "use.rs"]
+pub mod using;
+
+pub use hotbar::{AssignBasicAttackRequest, AssignHotbarRequest};
+pub use learn::LearnSkillsRequest;
+pub use reset::{ResetAnswerRequest, ResetPrompt, ResetSkills};
+pub use using::{Aim, UseSkill, UseSkillRequest, cast};
+
 use std::collections::BTreeMap;
 
 use bevy_app::App;
@@ -20,6 +31,7 @@ use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::area::AreaTag;
 use crate::systems::class::{self, SkillPoints, SkillTree};
 use crate::systems::combat::{self, Relation};
+use crate::systems::effect;
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
@@ -41,7 +53,22 @@ pub fn register(app: &mut App) {
     app.replicate::<Learned>()
         .replicate::<Cooldowns>()
         .replicate::<Hotbar>()
-        .replicate::<BasicAttack>();
+        .replicate::<BasicAttack>()
+        .replicate::<ResetPrompt>()
+        .add_mapped_client_message::<UseSkillRequest>(Channel::Ordered)
+        .add_client_message::<LearnSkillsRequest>(Channel::Ordered)
+        .add_client_message::<AssignHotbarRequest>(Channel::Ordered)
+        .add_client_message::<AssignBasicAttackRequest>(Channel::Ordered)
+        .add_client_message::<ResetAnswerRequest>(Channel::Ordered);
+    effect::source(app, using::chase);
+}
+
+/// Every request a client may send about its skills, answered in one place.
+pub fn requests(world: &mut World) {
+    using::request(world);
+    learn::requests(world);
+    hotbar::requests(world);
+    reset::answers(world);
 }
 
 pub type SkillId = ContentId<SkillDef>;
@@ -462,9 +489,10 @@ pub fn targets(world: &World, cx: &FlowCx, skill: SkillId) -> Vec<Entity> {
     let def = skill.get(world.resource::<Content>());
     let fits = |who: Entity| {
         let relation = combat::relation(world, caster, who);
-        let side = match def.target.hostile() {
-            true => relation == Relation::Enemy,
-            false => relation != Relation::Enemy,
+        let side = if def.target.hostile() {
+            relation == Relation::Enemy
+        } else {
+            relation != Relation::Enemy
         };
         side && !stat::is_dead(world, who) && visibility::coexist(world, caster, who)
     };

@@ -81,13 +81,19 @@ impl CharacterSnapshot {
                 _ => None,
             })
             .collect();
+        let basic_attack = def
+            .wearing
+            .iter()
+            .flat_map(|&item| skill::grants_of(content, item))
+            .copied()
+            .find(|skill| skill.get(content).basic_attack);
         CharacterSnapshot {
             name: name.to_owned(),
             class: def.class,
             xp: 0,
             skills: Vec::new(),
             hotbar: Vec::new(),
-            basic_attack: None,
+            basic_attack,
             stats: StatMap::default(),
             effects: Vec::new(),
             bag: Vec::new(),

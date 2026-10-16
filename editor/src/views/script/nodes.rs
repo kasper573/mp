@@ -236,7 +236,7 @@ impl NodeEntry {
             "flow" | "dialogue" => "script",
             "memory" => "quest",
             "area" => "object",
-            "npc body" | "notification" | "chat" => "npc",
+            "npc body" | "notification" | "chat" | "actor" => "npc",
             "audio" => "sfx",
             "stat" | "class" => "respawn",
             other => other,
@@ -954,7 +954,7 @@ impl NodeReads {
     }
 }
 
-const EFFECT_BLURBS: [(&str, &str, &str); 34] = [
+const EFFECT_BLURBS: [(&str, &str, &str); 37] = [
     (
         "warp",
         "area",
@@ -1012,7 +1012,22 @@ const EFFECT_BLURBS: [(&str, &str, &str); 34] = [
     ),
     ("attack", "npc body", "Chases and swings at a target"),
     ("stop", "npc body", "Interrupts the body"),
-    ("face", "npc body", "Turns the body toward something"),
+    ("face", "actor", "Turns an actor toward something"),
+    (
+        "animate",
+        "actor",
+        "Plays a model action, waiting for its apex or end when asked",
+    ),
+    (
+        "use_skill",
+        "skill",
+        "Casts a skill as a player would, aimed at an actor or a point",
+    ),
+    (
+        "reset_skills",
+        "skill",
+        "Asks, then forgets every learned rank and returns the points",
+    ),
     (
         "set_attitude",
         "npc",
