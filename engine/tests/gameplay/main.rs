@@ -1,4 +1,7 @@
+mod casting;
 mod conversation;
+mod effects;
+mod hotbar;
 mod skills;
 mod travel;
 

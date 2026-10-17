@@ -71,6 +71,13 @@ fn worn_slot(ui: &mut Ui, world: &mut World, kind: EquipmentSlot, item: ItemId) 
         faded: false,
     };
     let response = slot(ui, world, look, Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(
+            egui::WidgetType::Button,
+            true,
+            format!("Worn as {}: {}", kind.label(), def.name),
+        )
+    });
     if map::clicked(world, InputAction::UseItem, &response) {
         world.write_message(UnequipRequest { slot: kind });
     } else if map::clicked(world, InputAction::InspectItem, &response) {

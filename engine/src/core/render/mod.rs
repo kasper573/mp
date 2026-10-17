@@ -38,6 +38,20 @@ pub fn dynamic_z(area_height: f32, base: f32, y: Tiles) -> f32 {
 #[derive(Resource, Clone, Copy, Default, PartialEq, Debug)]
 pub struct GroundDepth(pub f32);
 
+/// How the shown area's rows map to depths, for what is drawn over tiles yet must sort among the
+/// sprites standing on them, such as a bolt threading actors.
+#[derive(Resource, Clone, Copy, Default, PartialEq, Debug)]
+pub struct RowDepths {
+    pub height: f32,
+    pub base: f32,
+}
+
+impl RowDepths {
+    pub fn at(&self, y: Tiles) -> f32 {
+        dynamic_z(self.height, self.base, y)
+    }
+}
+
 /// The depth a sprite sorts by from its row, which `order_rows` turns into the depth it is drawn at.
 #[derive(Component, Clone, Copy, Default, PartialEq, Debug)]
 pub struct RowDepth(pub f32);
@@ -81,6 +95,7 @@ impl Plugin for RenderPlugin {
             .init_resource::<present::ScreenTint>()
             .init_resource::<present::Viewport>()
             .init_resource::<GroundDepth>()
+            .init_resource::<RowDepths>()
             .init_resource::<transition::ActiveTransition>()
             .init_resource::<transition::ScreenTransitionPreference>()
             .configure_sets(

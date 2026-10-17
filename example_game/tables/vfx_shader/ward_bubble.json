@@ -1,0 +1,21 @@
+{
+  "name": "Ward bubble",
+  "source": "shaders/ward_bubble.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        120,
+        190,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "strength",
+      "kind": "number",
+      "default": 1.0
+    }
+  ]
+}

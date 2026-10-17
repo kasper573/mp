@@ -38,21 +38,21 @@
               "skill": "sunder",
               "stat": "power"
             }
-          },
-          "next": "show"
+          }
         },
         "show": {
           "type": "vfx",
-          "vfx": "slash_hit",
+          "vfx": "sunder_slash",
           "on": {
             "type": "skill_targets"
-          }
+          },
+          "next": "hit"
         },
         "swing": {
           "type": "animate",
           "action": "attack",
           "wait": "apex",
-          "next": "hit"
+          "next": "show"
         },
         "used": {
           "type": "on",

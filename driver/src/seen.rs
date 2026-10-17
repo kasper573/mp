@@ -1,7 +1,9 @@
+use bevy_ecs::entity::Entity;
 use engine::core::content::Fixture;
-use engine::core::math::{Pos, Rect, WindowPx};
+use engine::core::math::{Offset, Pos, Rect, WindowPx};
 use engine::core::render::transition::ScreenTransitionPhase;
 use engine::core::tiling::{TilePos, Tiles};
+use engine::core::vfx::{VfxDef, VfxSite};
 use engine::systems::actor::Action;
 use engine::systems::area::AreaDef;
 use engine::systems::attention::AttentionMark;
@@ -9,9 +11,11 @@ use engine::systems::history::HistoryTopic;
 use engine::systems::item::ItemDef;
 use engine::systems::npc::NpcDef;
 use engine::systems::probe::{
-    ProbeBody, ProbeExit, ProbeFixture, ProbeQuest, ProbeSnapshot, ProbeUiElement,
+    ProbeBody, ProbeExit, ProbeFixture, ProbeQuest, ProbeSnapshot, ProbeTreeView, ProbeUiElement,
+    ProbeVfx,
 };
 use engine::systems::quest::{QuestDef, QuestResult};
+use engine::systems::skill::{HotbarEntry, bar::HotbarPress};
 
 use crate::content::{content, id};
 
@@ -319,4 +323,122 @@ impl From<&str> for UiTarget {
     fn from(text: &str) -> UiTarget {
         UiTarget::text(text)
     }
+}
+
+// The skills window and the hotbar, as the probe reports them.
+
+pub fn tree_view(snapshot: &ProbeSnapshot) -> Option<&ProbeTreeView> {
+    snapshot.skills.as_ref()?.view.as_ref()
+}
+
+pub fn learned(snapshot: &ProbeSnapshot, node: &str) -> u8 {
+    snapshot
+        .skills
+        .as_ref()
+        .and_then(|skills| {
+            skills
+                .learned
+                .iter()
+                .find(|(key, _)| key == node)
+                .map(|(_, rank)| rank.0)
+        })
+        .unwrap_or(0)
+}
+
+pub fn planned(snapshot: &ProbeSnapshot) -> usize {
+    snapshot
+        .skills
+        .as_ref()
+        .map_or(0, |skills| skills.planned.len())
+}
+
+pub fn to_spend(snapshot: &ProbeSnapshot) -> u32 {
+    snapshot.skills.as_ref().map_or(0, |skills| skills.to_spend)
+}
+
+pub fn aiming(snapshot: &ProbeSnapshot) -> bool {
+    snapshot
+        .skills
+        .as_ref()
+        .is_some_and(|skills| skills.aiming.is_some())
+}
+
+pub fn reset_prompted(snapshot: &ProbeSnapshot) -> bool {
+    snapshot
+        .skills
+        .as_ref()
+        .is_some_and(|skills| skills.reset_prompt)
+}
+
+pub fn pressed(snapshot: &ProbeSnapshot, slot: usize) -> Option<HotbarPress> {
+    snapshot.hotbar.get(slot).and_then(|slot| slot.pressed)
+}
+
+pub fn cooling(snapshot: &ProbeSnapshot, slot: usize) -> bool {
+    snapshot.hotbar.get(slot).is_some_and(|slot| slot.cooling)
+}
+
+pub fn blocked(snapshot: &ProbeSnapshot, slot: usize) -> bool {
+    snapshot.hotbar.get(slot).is_some_and(|slot| slot.blocked)
+}
+
+pub fn slot_skill(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
+    match snapshot.hotbar.get(slot)?.entry {
+        HotbarEntry::Skill(skill) => Some(skill.key(content())),
+        _ => None,
+    }
+}
+
+pub fn slot_item(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
+    match snapshot.hotbar.get(slot)?.entry {
+        HotbarEntry::Item(item) => Some(item.key(content())),
+        _ => None,
+    }
+}
+
+// Statuses, vfx and company, as the probe reports them.
+
+pub fn status_on_me(snapshot: &ProbeSnapshot, effect: &str) -> bool {
+    snapshot
+        .statuses
+        .iter()
+        .any(|status| status.effect == effect)
+}
+
+// Every instance of the vfx row in view.
+pub fn playing<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> {
+    let wanted = id::<VfxDef>(vfx);
+    snapshot
+        .vfx
+        .iter()
+        .filter(|instance| instance.vfx == wanted)
+        .collect()
+}
+
+pub fn playing_on(snapshot: &ProbeSnapshot, vfx: &str, body: Entity) -> bool {
+    playing(snapshot, vfx)
+        .iter()
+        .any(|instance| instance.site == VfxSite::Actor(body))
+}
+
+/// The tile two east of the other player: where a friend walks to stand with them, in full view.
+pub fn beside_other_player(snapshot: &ProbeSnapshot) -> Option<Pos<Tiles>> {
+    other_player(snapshot).map(|star| star.at + Offset::new(2.0, 0.0))
+}
+
+/// The other player once they stand within `reach` tiles of me.
+pub fn other_player_within(snapshot: &ProbeSnapshot, reach: f32) -> Option<ProbeBody> {
+    let me = snapshot.me.as_ref()?.at;
+    other_player(snapshot)
+        .filter(|star| star.at.distance_to(me) <= reach)
+        .cloned()
+}
+
+// Another player in view: the first one that is not me.
+pub fn other_player(snapshot: &ProbeSnapshot) -> Option<&ProbeBody> {
+    let me = snapshot.me.as_ref()?.id;
+    snapshot
+        .actors
+        .iter()
+        .find(|actor| actor.player && actor.id != me)
 }

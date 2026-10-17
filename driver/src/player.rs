@@ -445,8 +445,11 @@ impl Player {
     }
 
     // The first frame with the player standing in an area, done crossing into it.
+    // In the world and free to act: a newcomer's commands are held for a moment after arriving.
     pub fn in_world(&mut self) -> ProbeSnapshot {
-        self.wait_until("the player in the world", in_world)
+        self.wait_until("the player in the world", |snapshot| {
+            in_world(snapshot) && snapshot.me.as_ref().is_some_and(|me| !me.locked)
+        })
     }
 
     pub fn come_to_rest(&mut self) -> Pos<Tiles> {

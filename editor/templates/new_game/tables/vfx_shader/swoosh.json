@@ -1,0 +1,51 @@
+{
+  "name": "Swoosh",
+  "source": "shaders/swoosh.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "thickness",
+      "kind": "number",
+      "default": 0.18
+    },
+    {
+      "name": "sweeps",
+      "kind": "number",
+      "default": 1.0
+    },
+    {
+      "name": "along",
+      "kind": "number",
+      "default": 0.0
+    },
+    {
+      "name": "angle",
+      "kind": "number",
+      "default": 0.0
+    },
+    {
+      "name": "curve",
+      "kind": "number",
+      "default": 0.35
+    },
+    {
+      "name": "trail",
+      "kind": "number",
+      "default": 0.6
+    },
+    {
+      "name": "clip",
+      "kind": "number",
+      "default": 0.0
+    }
+  ]
+}

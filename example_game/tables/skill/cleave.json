@@ -62,7 +62,7 @@
         },
         "sweep": {
           "type": "vfx",
-          "vfx": "sweep",
+          "vfx": "cleave_swoosh",
           "on": {
             "type": "skill_area"
           },

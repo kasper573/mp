@@ -1,0 +1,36 @@
+{
+  "name": "Lightning",
+  "source": "shaders/lightning.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        140,
+        190,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "core",
+      "kind": "colour",
+      "default": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "jitter",
+      "kind": "number",
+      "default": 0.35
+    },
+    {
+      "name": "bolts",
+      "kind": "number",
+      "default": 2.0
+    }
+  ]
+}

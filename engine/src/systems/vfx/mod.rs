@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
+use crate::core::math::Pos;
 use crate::core::script::{Compiler, EffectDef, EffectStep, Eval, Name, ScriptFault, ValueType};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, WallClock};
@@ -79,8 +80,9 @@ pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstanc
     }
 }
 
-/// Plays a vfx on whatever `on` names: each actor of a set, a point or an area; or, for a screen
-/// or widget site, on the screen of each character named.
+/// Plays a vfx on whatever `on` names: each actor of a set, a point or an area; on a path from the
+/// subject through the actors named, each nearest to the last; or, for a screen or widget site, on
+/// the screen of each character named.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Vfx {
@@ -100,6 +102,7 @@ pub struct Vfx {
 pub enum VfxTarget {
     #[default]
     Place,
+    Path,
     Screen,
     Widget {
         name: String,
@@ -129,8 +132,13 @@ impl EffectDef<RiftScripting> for Vfx {
             Some(expr) => {
                 let (eval, ty) = cx.typed(expr)?;
                 match ty {
-                    ValueType::Actor | ValueType::Actors | ValueType::Point | ValueType::Area => {
-                        eval
+                    ValueType::Actor | ValueType::Actors => eval,
+                    ValueType::Point | ValueType::Area if self.site != VfxTarget::Path => eval,
+                    ValueType::Point | ValueType::Area => {
+                        return Err(ScriptFault::new(
+                            "wrong type",
+                            format!("on is {ty:?}; a path runs through actors"),
+                        ));
                     }
                     other => {
                         return Err(ScriptFault::new(
@@ -201,6 +209,12 @@ impl EffectDef<RiftScripting> for Vfx {
                         spawn(world, vfx, VfxSite::Area(footprint), filled.clone());
                     }
                 }
+                VfxTarget::Path => {
+                    let points = chained(world, cx.subject, &value.as_actors());
+                    if points.len() >= 2 {
+                        spawn(world, vfx, VfxSite::Path(points), filled.clone());
+                    }
+                }
                 VfxTarget::Screen => {
                     for actor in value.as_actors() {
                         spawn_for(world, actor, vfx, VfxSite::Screen, filled.clone());
@@ -221,12 +235,47 @@ impl EffectDef<RiftScripting> for Vfx {
     }
 }
 
+/// Where a path through actors runs: from the subject, when there is one, to the actor nearest it,
+/// then the one nearest that, until every actor is passed.
+fn chained(world: &World, from: Option<Entity>, actors: &[Entity]) -> Vec<Pos<Tiles>> {
+    let mut left: Vec<Pos<Tiles>> = actors
+        .iter()
+        .filter_map(|actor| position(world, *actor))
+        .collect();
+    let mut points: Vec<Pos<Tiles>> = from
+        .and_then(|from| position(world, from))
+        .into_iter()
+        .collect();
+    let mut at = points
+        .first()
+        .copied()
+        .or_else(|| (!left.is_empty()).then(|| left.remove(0)));
+    if points.is_empty()
+        && let Some(start) = at
+    {
+        points.push(start);
+    }
+    while let Some(here) = at
+        && !left.is_empty()
+    {
+        let (index, _) = left
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.distance_to(here).total_cmp(&b.distance_to(here)))
+            .expect("left is not empty");
+        let next = left.remove(index);
+        points.push(next);
+        at = Some(next);
+    }
+    points
+}
+
 fn spawn_at(
     world: &mut World,
     vfx: VfxId,
     site: VfxSite,
     params: VfxParams,
-    at: crate::core::math::Pos<Tiles>,
+    at: Pos<Tiles>,
     presence: Option<Presence>,
 ) -> Entity {
     let content = world.resource::<Content>().clone();

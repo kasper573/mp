@@ -1,0 +1,21 @@
+{
+  "name": "Holy motes",
+  "layers": [
+    {
+      "type": "shader",
+      "shader": "motes",
+      "params": {
+        "colour": [
+          255,
+          226,
+          150,
+          255
+        ],
+        "count": 20.0,
+        "size": 0.08,
+        "speed": 0.7
+      },
+      "duration": 1.6
+    }
+  ]
+}

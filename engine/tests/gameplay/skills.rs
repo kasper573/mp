@@ -1,17 +1,17 @@
-use driver::{UiTarget, bare_spot, content, holding, resident_home};
+use driver::{
+    UiTarget, bare_spot, holding, id, learned, planned, reset_prompted, resident_home, slot_skill,
+    to_spend, tree_view,
+};
 use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
-use engine::systems::probe::{ProbeSnapshot, ProbeTreeView};
-use engine::systems::skill::HotbarEntry;
-use engine::systems::skill::bar::HotbarPress;
+use engine::systems::skill::{HotbarEntry, SkillDef};
 
 use crate::playtest;
 
-const POTION: &str = "icons/potion/red_potion.png";
 const DRAUGHT: &str = "icons/potion/green_potion_3.png";
 
 #[test]
-fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
+fn skills_are_learned_in_the_tree_pinned_on_the_bar_and_given_back_by_a_reset() {
     let mut playtest = playtest();
     let mut player = playtest.join_as(
         "unspent",
@@ -29,6 +29,11 @@ fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
             && learned(snapshot, "guard") == 1
             && to_spend(snapshot) == 1
     });
+    player.click_ui(UiTarget::starting("Toughness node"));
+    player.click_ui(UiTarget::starting("Confirm"));
+    player.wait_until("Toughness learned", |snapshot| {
+        learned(snapshot, "toughness") == 1 && to_spend(snapshot) == 0
+    });
 
     player.carry_onto(
         UiTarget::starting("Cleave node"),
@@ -41,7 +46,29 @@ fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
     player.wait_until("Guard in slot 2", |snapshot| {
         slot_skill(snapshot, 1) == Some("guard")
     });
-    let opened = player.snapshot();
+    player.carry_onto(
+        UiTarget::starting("Toughness node"),
+        UiTarget::starting("Hotbar slot 3"),
+    );
+    player.act_on_ui(
+        InputAction::PinToHotbar,
+        UiTarget::starting("Toughness node"),
+    );
+    let opened = player.settled();
+    assert_eq!(
+        opened.hotbar.get(2).map(|slot| slot.entry),
+        Some(HotbarEntry::Empty),
+        "a passive never lands on the bar"
+    );
+    assert!(
+        opened
+            .hotbar
+            .iter()
+            .all(|slot| slot.entry != HotbarEntry::Skill(id::<SkillDef>("toughness"))),
+        "a passive never lands on the bar: {:?}",
+        opened.hotbar
+    );
+
     let view = tree_view(&opened).expect("the skills window");
     assert!(
         view.canvas.width > view.viewport.size.width
@@ -102,136 +129,21 @@ fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
     );
     player.act(InputAction::ToggleSkills);
 
-    player.act(InputAction::Hotbar2);
-    player.wait_until("Guard cooling", |snapshot| {
-        cooling(snapshot, 1) && pressed(snapshot, 1) == Some(HotbarPress::Used)
-    });
-    player.act(InputAction::Hotbar2);
-    player.wait_until("the press refused", |snapshot| {
-        pressed(snapshot, 1) == Some(HotbarPress::Denied)
-    });
-    player.act(InputAction::Hotbar1);
-    player.wait_until("Cleave armed", aiming);
-    let at = player.snapshot().me.expect("the player").at + Offset::new(2.0, 0.0);
-    player.point_at_tile(at);
-    player.click();
-    player.wait_until("Cleave cast", |snapshot| {
-        cooling(snapshot, 0) && !aiming(snapshot)
-    });
-    player.act(InputAction::ToggleSettings);
-    player.click_ui(UiTarget::text("Quick cast skills"));
-    player.act(InputAction::ToggleSettings);
-    player.wait_until("Cleave ready", |snapshot| !cooling(snapshot, 0));
-    player.point_at_tile(at);
-    player.act(InputAction::Hotbar1);
-    player.wait_until("Cleave cast at once", |snapshot| {
-        cooling(snapshot, 0) && !aiming(snapshot)
-    });
-
-    player.act(InputAction::ToggleInventory);
-    player.act_on_ui(InputAction::PinToHotbar, UiTarget::image(POTION));
-    player.wait_until("the potion on the bar", |snapshot| {
-        slot_item(snapshot, 2) == Some("health_potion")
-    });
-    player.act(InputAction::ToggleInventory);
-    player.act(InputAction::Hotbar3);
-    player.wait_until("a potion drunk", |snapshot| {
-        holding(snapshot, "health_potion") == 1
-    });
-
-    player.act_on_ui(
-        InputAction::InspectItem,
-        UiTarget::starting("Hotbar slot 2"),
-    );
-    player.click_ui(UiTarget::button("Rebind key"));
-    player.wait_until("the slot waiting for a key", |snapshot| {
-        snapshot.hotbar.get(1).is_some_and(|slot| slot.rebinding)
-    });
-    player.type_text("q", |snapshot| {
-        snapshot
-            .hotbar
-            .get(1)
-            .is_some_and(|slot| slot.key.as_deref() == Some("Q"))
-    });
-
-    player.drag_ui("Resize", Offset::new(-200.0, -44.0));
-    player.wait_until("another shape", |snapshot| snapshot.hotbar.len() == 8);
-    player.drag_ui("Resize", Offset::new(200.0, 44.0));
-    player.wait_until("one row of nine", |snapshot| snapshot.hotbar.len() == 9);
-
     player.act(InputAction::ToggleInventory);
     player.act_on_ui(InputAction::UseItem, UiTarget::image(DRAUGHT));
-    player.wait_until("the question", prompted);
+    player.wait_until("the question", reset_prompted);
+    player.click_ui(UiTarget::button("Keep"));
+    player.wait_until("the question gone", |snapshot| !reset_prompted(snapshot));
+    assert_eq!(learned(&player.snapshot(), "cleave"), 1);
+    assert_eq!(holding(&player.snapshot(), "shamans_draught"), 1);
+    player.act_on_ui(InputAction::UseItem, UiTarget::image(DRAUGHT));
+    player.wait_until("the question", reset_prompted);
     player.click_ui(UiTarget::button("Reset"));
     player.wait_until("the points back", |snapshot| {
         learned(snapshot, "cleave") == 0 && to_spend(snapshot) == 3
     });
     let snapshot = player.snapshot();
+    assert_eq!(holding(&snapshot, "shamans_draught"), 0);
     assert_eq!(slot_skill(&snapshot, 0), Some("cleave"));
     assert!(snapshot.hotbar[0].dimmed);
-}
-
-fn tree_view(snapshot: &ProbeSnapshot) -> Option<&ProbeTreeView> {
-    snapshot.skills.as_ref()?.view.as_ref()
-}
-
-fn learned(snapshot: &ProbeSnapshot, node: &str) -> u8 {
-    snapshot
-        .skills
-        .as_ref()
-        .and_then(|skills| {
-            skills
-                .learned
-                .iter()
-                .find(|(key, _)| key == node)
-                .map(|(_, rank)| rank.0)
-        })
-        .unwrap_or(0)
-}
-
-fn planned(snapshot: &ProbeSnapshot) -> usize {
-    snapshot
-        .skills
-        .as_ref()
-        .map_or(0, |skills| skills.planned.len())
-}
-
-fn to_spend(snapshot: &ProbeSnapshot) -> u32 {
-    snapshot.skills.as_ref().map_or(0, |skills| skills.to_spend)
-}
-
-fn aiming(snapshot: &ProbeSnapshot) -> bool {
-    snapshot
-        .skills
-        .as_ref()
-        .is_some_and(|skills| skills.aiming.is_some())
-}
-
-fn prompted(snapshot: &ProbeSnapshot) -> bool {
-    snapshot
-        .skills
-        .as_ref()
-        .is_some_and(|skills| skills.reset_prompt)
-}
-
-fn pressed(snapshot: &ProbeSnapshot, slot: usize) -> Option<HotbarPress> {
-    snapshot.hotbar.get(slot).and_then(|slot| slot.pressed)
-}
-
-fn cooling(snapshot: &ProbeSnapshot, slot: usize) -> bool {
-    snapshot.hotbar.get(slot).is_some_and(|slot| slot.cooling)
-}
-
-fn slot_skill(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
-    match snapshot.hotbar.get(slot)?.entry {
-        HotbarEntry::Skill(skill) => Some(skill.key(content())),
-        _ => None,
-    }
-}
-
-fn slot_item(snapshot: &ProbeSnapshot, slot: usize) -> Option<&'static str> {
-    match snapshot.hotbar.get(slot)?.entry {
-        HotbarEntry::Item(item) => Some(item.key(content())),
-        _ => None,
-    }
 }

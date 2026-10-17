@@ -20,6 +20,7 @@ use crate::core::render::tile_to_window;
 use crate::core::render::transition::{ActiveTransition, ScreenTransitionPhase};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
+use crate::core::vfx::{VfxId, VfxInstance, VfxSite};
 use crate::systems::actor::model::ModelId;
 use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox};
 use crate::systems::area::{self, AreaId, AreaObject, AreaTag};
@@ -91,6 +92,7 @@ pub struct ProbeSnapshot {
     pub quests: ProbeQuests,
     pub hotbar: Vec<ProbeSlot>,
     pub statuses: Vec<ProbeStatus>,
+    pub vfx: Vec<ProbeVfx>,
     pub basic_attack: Option<SkillId>,
     pub skills: Option<ProbeSkills>,
     pub soundscape: ProbeSoundscape,
@@ -306,6 +308,13 @@ pub struct ProbeStatus {
     pub effect: String,
     pub category: StatusCategory,
     pub left: Option<Seconds>,
+}
+
+/// A vfx playing in view, with the site it plays on.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProbeVfx {
+    pub vfx: VfxId,
+    pub site: VfxSite,
 }
 
 /// The character's class, tree and bar as the client shows them.
@@ -609,6 +618,14 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .collect()
             })
             .unwrap_or_default(),
+        vfx: world
+            .query::<&VfxInstance>()
+            .iter(world)
+            .map(|instance| ProbeVfx {
+                vfx: instance.vfx,
+                site: instance.site.clone(),
+            })
+            .collect(),
         hotbar: skill::bar::report(world)
             .into_iter()
             .map(|slot| ProbeSlot {

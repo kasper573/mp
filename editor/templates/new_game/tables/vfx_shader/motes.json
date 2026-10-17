@@ -1,0 +1,36 @@
+{
+  "name": "Motes",
+  "source": "shaders/motes.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        255,
+        220,
+        120,
+        255
+      ]
+    },
+    {
+      "name": "count",
+      "kind": "number",
+      "default": 24.0
+    },
+    {
+      "name": "speed",
+      "kind": "number",
+      "default": 1.0
+    },
+    {
+      "name": "size",
+      "kind": "number",
+      "default": 0.07
+    },
+    {
+      "name": "spread",
+      "kind": "number",
+      "default": 1.0
+    }
+  ]
+}

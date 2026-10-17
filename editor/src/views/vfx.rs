@@ -859,7 +859,7 @@ impl Stage {
         let blank = world.resource_mut::<Assets<Image>>().add(Image::new_fill(
             bevy::render::render_resource::Extent3d::default(),
             bevy::render::render_resource::TextureDimension::D2,
-            &[255, 255, 255, 255],
+            &[0, 0, 0, 0],
             bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
             bevy::asset::RenderAssetUsages::default(),
         ));
@@ -1114,6 +1114,7 @@ fn show_shader_piece(
         origin: frame.area.origin,
         extent: frame.area.extent,
         tiles: frame.area.tiles,
+        ..SiteUniform::default()
     };
     let params = vfx_render::fill_params(&def, fills, given);
     if let Some(mut shown) = world

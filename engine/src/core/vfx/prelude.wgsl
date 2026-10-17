@@ -16,9 +16,11 @@ struct Site {
     time: f32,
     overscan: f32,
     shape: u32,
+    point_count: u32,
     origin: vec2<f32>,
     extent: vec2<f32>,
     tiles: vec2<f32>,
+    points: array<vec4<f32>, 8>,
 }
 
 const SITE_ACTOR: u32 = 0u;
@@ -91,6 +93,50 @@ fn area_distance(uv: vec2<f32>) -> f32 {
 fn box_distance(p: vec2<f32>, half: vec2<f32>) -> f32 {
     let d = abs(p) - half;
     return length(max(d, vec2<f32>(0.0))) + min(max(d.x, d.y), 0.0);
+}
+
+// A point of a path site, in site uv: the first is where the path starts.
+fn path_point(index: u32) -> vec2<f32> {
+    let word = site.points[min(index, 15u) / 2u];
+    if (index % 2u) == 0u {
+        return word.xy;
+    }
+    return word.zw;
+}
+
+// The distance in tiles from a site uv to the nearest stretch of a path site, and how far along the
+// whole path, 0 at its start and 1 at its end, the nearest point of it lies: x and y of the result.
+fn path_nearest(uv: vec2<f32>) -> vec2<f32> {
+    if site.point_count < 2u {
+        return vec2<f32>(length((uv - path_point(0u)) * site.tiles), 0.0);
+    }
+    var total = 0.0;
+    for (var i = 1u; i < site.point_count; i++) {
+        total += length((path_point(i) - path_point(i - 1u)) * site.tiles);
+    }
+    var nearest = 1e9;
+    var along = 0.0;
+    var walked = 0.0;
+    for (var i = 1u; i < site.point_count; i++) {
+        let a = path_point(i - 1u) * site.tiles;
+        let b = path_point(i) * site.tiles;
+        let p = uv * site.tiles;
+        let ab = b - a;
+        let stretch = max(length(ab), 1e-4);
+        let t = clamp(dot(p - a, ab) / (stretch * stretch), 0.0, 1.0);
+        let d = length(p - (a + ab * t));
+        if d < nearest {
+            nearest = d;
+            along = (walked + t * stretch) / max(total, 1e-4);
+        }
+        walked += stretch;
+    }
+    return vec2<f32>(nearest, along);
+}
+
+// The distance in tiles from a site uv to the nearest stretch of a path site.
+fn path_distance(uv: vec2<f32>) -> f32 {
+    return path_nearest(uv).x;
 }
 
 @fragment

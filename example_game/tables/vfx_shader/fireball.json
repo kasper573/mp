@@ -1,0 +1,21 @@
+{
+  "name": "Fireball",
+  "source": "shaders/fireball.wgsl",
+  "params": [
+    {
+      "name": "heat",
+      "kind": "number",
+      "default": 1.0
+    },
+    {
+      "name": "smoke",
+      "kind": "colour",
+      "default": [
+        40,
+        30,
+        30,
+        255
+      ]
+    }
+  ]
+}

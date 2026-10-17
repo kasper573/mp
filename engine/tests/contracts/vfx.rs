@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bevy_ecs::prelude::*;
 use engine::core::geometry::{Degrees, Footprint, Radians, Shape};
 use engine::core::math::{Offset, Pos, Rgba};
@@ -8,7 +10,7 @@ use engine::systems::class;
 use engine::systems::combat;
 use engine::systems::movement::position;
 use engine::systems::player::Owner;
-use engine::systems::skill::{Aim, LearnSkillsRequest, Rank, UseSkillRequest};
+use engine::systems::skill::{self, Aim, LearnSkillsRequest, Rank, UseSkillRequest};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
 
@@ -131,7 +133,7 @@ fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
     struck.sort_by_key(|site| format!("{site:?}"));
     assert!(!struck.is_empty());
     assert_eq!(hit, struck);
-    let sweeps = instances(&mut sim, row("Sweep"));
+    let sweeps = instances(&mut sim, row("CleaveSwoosh"));
     assert_eq!(sweeps.len(), 1);
     assert!(
         matches!(sweeps[0].site, VfxSite::Area(_)),
@@ -192,4 +194,43 @@ fn orc_toward(sim: &mut Sim, player: Entity, east: f32) -> Entity {
     let start = position(sim.world(), player).expect("position");
     let spot = sim.walkable_toward(start, Offset::new(east, 0.0));
     target_dummy(sim, row("Orc"), spot)
+}
+
+#[test]
+fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    sim.world().entity_mut(player).insert((
+        class::Class { def: row("Mage") },
+        skill::Learned(BTreeMap::from([("chain_lightning".to_owned(), Rank(1))])),
+    ));
+    let from = position(sim.world(), player).expect("position");
+    let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
+    let far = orc_toward(&mut sim, player, 5.0);
+    let near = orc_toward(&mut sim, player, 2.0);
+    let middle = orc_toward(&mut sim, player, 4.0);
+    settle(&mut sim);
+
+    sim.send(
+        1,
+        UseSkillRequest {
+            skill: row("ChainLightning"),
+            aim: Aim::Point(aimed),
+        },
+    );
+    assert!(sim.run_until(10.0, |world| {
+        world
+            .query::<&VfxInstance>()
+            .iter(world)
+            .any(|instance| instance.vfx == row::<VfxId>("ChainLightning"))
+    }));
+
+    let shown = instances(&mut sim, row("ChainLightning"));
+    assert_eq!(shown.len(), 1);
+    let stops: Vec<_> = [player, near, middle, far]
+        .iter()
+        .map(|who| position(sim.world(), *who).expect("position"))
+        .collect();
+    assert_eq!(shown[0].site, VfxSite::Path(stops));
 }

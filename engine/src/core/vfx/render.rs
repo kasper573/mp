@@ -24,12 +24,15 @@ use super::{
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
-use crate::core::math::Rgba;
+use crate::core::math::{Pos, Rgba};
 use crate::core::render::present::{self, PRESENT_LAYER, Viewport};
 use crate::core::render::screen::ToTile;
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::render::{self as render, GroundDepth, RowDepth, TILE, ToScreen, tile_to_window};
+use crate::core::render::{
+    self as render, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, tile_to_window,
+};
 use crate::core::text::{self, TextShadow};
+use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, ServerClock, UnixMillis};
 use crate::core::vfx::CompiledVfxShaders;
 
@@ -111,7 +114,8 @@ impl Material2d for VfxMaterial {
 }
 
 /// The site a shader layer draws over, as the shader reads it: the texel rect of the site's image
-/// within its texture, its size in world pixels and where the layer is in its run.
+/// within its texture, its size in world pixels, where the layer is in its run, and the geometry
+/// of an area or path site.
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
 pub struct SiteUniform {
     pub rect: Vec4,
@@ -123,10 +127,15 @@ pub struct SiteUniform {
     pub time: f32,
     pub overscan: f32,
     pub shape: u32,
+    pub point_count: u32,
     pub origin: Vec2,
     pub extent: Vec2,
     pub tiles: Vec2,
+    pub points: [Vec4; MAX_PATH_POINTS / 2],
 }
+
+/// How many points of a path site a shader can read; a longer path keeps its first ones.
+pub const MAX_PATH_POINTS: usize = 16;
 
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
 pub struct ParamsUniform {
@@ -153,7 +162,7 @@ impl FromWorld for VfxAssets {
         let blank = world.resource_mut::<Assets<Image>>().add(Image::new_fill(
             bevy::render::render_resource::Extent3d::default(),
             bevy::render::render_resource::TextureDimension::D2,
-            &[255, 255, 255, 255],
+            &[0, 0, 0, 0],
             bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
             bevy::asset::RenderAssetUsages::default(),
         ));
@@ -191,6 +200,7 @@ struct SiteFrame {
     texture: Option<(Handle<Image>, Rect, Vec2)>,
     sprite: Option<Entity>,
     area: AreaShape,
+    path: SitePath,
 }
 
 /// Where a shader layer is in its run: how far through its duration, and the seconds since its
@@ -247,6 +257,58 @@ impl Default for AreaShape {
             tiles: Vec2::ONE,
         }
     }
+}
+
+/// The points of a path site in site uv, two to a word, as a shader reads them through the
+/// prelude's `path_point`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SitePath {
+    pub count: u32,
+    pub points: [Vec4; MAX_PATH_POINTS / 2],
+}
+
+impl Default for SitePath {
+    fn default() -> SitePath {
+        SitePath {
+            count: 0,
+            points: [Vec4::ZERO; MAX_PATH_POINTS / 2],
+        }
+    }
+}
+
+/// The quad a path site is drawn on, half a tile clear of its points on every side: its centre and
+/// size in world pixels, where its points lie on it and the quad's size in tiles.
+pub fn path_quad(points: &[Pos<Tiles>]) -> (Vec2, Vec2, SitePath, AreaShape) {
+    let (center, size) = bounds(points);
+    let size = size + Vec2::splat(TILE.0);
+    let corner = Vec2::new(center.x - size.x / 2.0, center.y + size.y / 2.0);
+    let uv = |at: Pos<Tiles>| {
+        let screen = at.to_screen();
+        Vec2::new(
+            (screen.x - corner.x) / size.x,
+            (corner.y - screen.y) / size.y,
+        )
+    };
+    let mut path = SitePath::default();
+    for (index, point) in points.iter().take(MAX_PATH_POINTS).enumerate() {
+        let at = uv(*point);
+        let word = &mut path.points[index / 2];
+        if index % 2 == 0 {
+            word.x = at.x;
+            word.y = at.y;
+        } else {
+            word.z = at.x;
+            word.w = at.y;
+        }
+        path.count = index as u32 + 1;
+    }
+    let area = AreaShape {
+        shape: SHAPE_NONE,
+        origin: points.first().map_or(Vec2::splat(0.5), |first| uv(*first)),
+        extent: Vec2::ZERO,
+        tiles: size / TILE.0,
+    };
+    (center, size, path, area)
 }
 
 /// The quad an area site is drawn on: its centre and size in world pixels, and the footprint on it.
@@ -615,9 +677,11 @@ fn show_shader(
         time: run.time.0,
         overscan,
         shape: frame.area.shape,
+        point_count: frame.path.count,
         origin: frame.area.origin,
         extent: frame.area.extent,
         tiles: frame.area.tiles,
+        points: frame.path.points,
     };
     let params = fill_params(shader, fills, given);
     if let Some(mut material) = world.resource_mut::<Assets<VfxMaterial>>().get_mut(&handle) {
@@ -741,10 +805,11 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 texture: None,
                 sprite: None,
                 area,
+                path: SitePath::default(),
             })
         }
         VfxSite::Path(points) => {
-            let (center, size) = bounds(points);
+            let (center, size, path, area) = path_quad(points);
             let facing = match (points.first(), points.last()) {
                 (Some(first), Some(last)) if first != last => {
                     let heading = last.to_screen() - first.to_screen();
@@ -752,15 +817,17 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 }
                 _ => 0.0,
             };
+            let south = points.iter().map(|point| point.y).fold(f32::MIN, f32::max);
             Some(SiteFrame {
                 kind: SITE_PATH,
                 center,
-                size: size + Vec2::splat(TILE.0),
+                size,
                 facing,
-                depth: Some(world.resource::<GroundDepth>().0),
+                depth: Some(world.resource::<RowDepths>().at(Tiles(south))),
                 texture: None,
                 sprite: None,
-                area: AreaShape::default(),
+                area,
+                path,
             })
         }
         VfxSite::Screen => {
@@ -783,6 +850,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 )),
                 sprite: None,
                 area: AreaShape::default(),
+                path: SitePath::default(),
             })
         }
         VfxSite::Widget(_) => None,
@@ -815,10 +883,11 @@ fn sprite_frame(world: &World, entity: Entity, kind: u32) -> Option<SiteFrame> {
         )),
         sprite: Some(entity),
         area: AreaShape::default(),
+        path: SitePath::default(),
     })
 }
 
-fn bounds(points: &[crate::core::math::Pos<crate::core::tiling::Tiles>]) -> (Vec2, Vec2) {
+fn bounds(points: &[Pos<Tiles>]) -> (Vec2, Vec2) {
     let screen: Vec<Vec2> = points.iter().map(|point| point.to_screen()).collect();
     let min = screen.iter().fold(Vec2::MAX, |min, at| min.min(*at));
     let max = screen.iter().fold(Vec2::MIN, |max, at| max.max(*at));
@@ -1031,9 +1100,11 @@ impl Default for SiteUniform {
             time: 0.0,
             overscan: 1.0,
             shape: SHAPE_NONE,
+            point_count: 0,
             origin: Vec2::splat(0.5),
             extent: Vec2::ZERO,
             tiles: Vec2::ONE,
+            points: [Vec4::ZERO; MAX_PATH_POINTS / 2],
         }
     }
 }
