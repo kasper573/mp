@@ -157,10 +157,17 @@ pub fn pin_bag_slot(world: &mut World, slot: u32) {
     pin(world, HotbarEntry::Item(item));
 }
 
-/// Fires the slot a key was pressed for, or takes the key a rebind waits on.
-pub fn keys(world: &mut World) {
+/// Takes the key a rebind waits on. It runs whether or not the interface claims the keyboard:
+/// the menu button that started the rebind keeps egui's focus for the frame after its click.
+pub fn capture_key(world: &mut World) {
     if let Some(slot) = world.resource::<BarState>().rebinding {
         capture(world, slot);
+    }
+}
+
+/// Fires the slot a key was pressed for.
+pub fn keys(world: &mut World) {
+    if world.resource::<BarState>().rebinding.is_some() {
         return;
     }
     if session::is_locked(world) || !session::is_alive(world) || hud::confirming(world) {

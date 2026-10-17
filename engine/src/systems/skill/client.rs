@@ -23,6 +23,7 @@ impl Plugin for SkillClientPlugin {
             .add_systems(
                 Update,
                 (
+                    bar::capture_key,
                     bar::keys.run_if(not(egui_wants_any_keyboard_input)),
                     window::settle_plan,
                     aim::settle,
