@@ -120,6 +120,9 @@ fn play(shoot: &mut Shoot) {
         UiTarget::starting("Hotbar slot 2"),
     );
     me.click_ui(UiTarget::button("Rebind key"));
+    me.wait_until("the slot waiting for a key", |snapshot| {
+        snapshot.hotbar.get(1).is_some_and(|slot| slot.rebinding)
+    });
     me.hold();
     me.type_text("q", |snapshot| {
         snapshot

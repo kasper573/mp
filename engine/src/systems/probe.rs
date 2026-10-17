@@ -295,6 +295,7 @@ pub struct ProbeSlot {
     pub cooling: bool,
     pub blocked: bool,
     pub dimmed: bool,
+    pub rebinding: bool,
 }
 
 /// The character's class, tree and bar as the client shows them.
@@ -591,6 +592,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 cooling: slot.cooling,
                 blocked: slot.blocked,
                 dimmed: slot.dimmed,
+                rebinding: slot.rebinding,
             })
             .collect(),
         basic_attack: me

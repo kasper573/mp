@@ -272,6 +272,8 @@ pub struct SlotReport {
     pub cooling: bool,
     pub blocked: bool,
     pub dimmed: bool,
+    /// Waiting for the next key pressed to become its key.
+    pub rebinding: bool,
 }
 
 pub fn report(world: &World) -> Vec<SlotReport> {
@@ -290,6 +292,7 @@ pub fn report(world: &World) -> Vec<SlotReport> {
                 cooling: matches!(view.fill, Fill::Cooling { .. }),
                 blocked: matches!(view.fill, Fill::Blocked(_)),
                 dimmed: view.dimmed,
+                rebinding: world.resource::<BarState>().rebinding == Some(index),
             }
         })
         .collect()

@@ -128,6 +128,9 @@ fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
         UiTarget::starting("Hotbar slot 2"),
     );
     player.click_ui(UiTarget::button("Rebind key"));
+    player.wait_until("the slot waiting for a key", |snapshot| {
+        snapshot.hotbar.get(1).is_some_and(|slot| slot.rebinding)
+    });
     player.type_text("q", |snapshot| {
         snapshot
             .hotbar
