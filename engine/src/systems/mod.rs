@@ -88,6 +88,7 @@ pub fn protocol(app: &mut App) {
     shop::register(app);
     quest::register(app);
     player::register(app);
+    reach::register(app);
     terminal::register(app);
     vfx::register(app);
 }
@@ -206,6 +207,7 @@ pub fn server_app(
                     skill::reset::expire,
                     actor::playing::progress,
                     skill::using::casts,
+                    reach::mirror_engaged,
                 )
                     .chain(),
                 (
@@ -361,6 +363,7 @@ pub fn client_app(
             shop::counter::ShopCounterPlugin,
             item::card::ItemCardPlugin,
             item::widget::CarryPlugin,
+            skill::client::SkillClientPlugin,
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,
             quest::tracker::QuestTrackerPlugin,

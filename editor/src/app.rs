@@ -37,6 +37,7 @@ use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, ui, views};
+use engine::core::vfx::render::VfxMaterial;
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
@@ -68,15 +69,19 @@ impl Plugin for EditorPlugin {
         if let Some(folder) = &self.launch.folder {
             editor.open_folder(folder);
         }
-        app.add_plugins((EguiPlugin::default(), bevy_tilemap::TilemapPlugin))
-            .insert_resource(editor)
-            .add_systems(Startup, setup_camera)
-            .add_systems(
-                PreUpdate,
-                theme_context.after(EguiPreUpdateSet::InitContexts),
-            )
-            .add_systems(EguiPrimaryContextPass, editor_ui)
-            .add_systems(Update, background);
+        app.add_plugins((
+            EguiPlugin::default(),
+            bevy_tilemap::TilemapPlugin,
+            bevy::sprite_render::Material2dPlugin::<VfxMaterial>::default(),
+        ))
+        .insert_resource(editor)
+        .add_systems(Startup, setup_camera)
+        .add_systems(
+            PreUpdate,
+            theme_context.after(EguiPreUpdateSet::InitContexts),
+        )
+        .add_systems(EguiPrimaryContextPass, editor_ui)
+        .add_systems(Update, background);
     }
 }
 

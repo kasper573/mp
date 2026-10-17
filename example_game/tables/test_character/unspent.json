@@ -7,6 +7,13 @@
     {
       "item": "gold",
       "count": 60
+    },
+    {
+      "item": "health_potion",
+      "count": 2
+    },
+    {
+      "item": "shamans_draught"
     }
   ],
   "equipment": {

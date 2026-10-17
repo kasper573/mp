@@ -17,9 +17,9 @@ use crate::systems::input::map::{ActionInput, InputAction, InputMap};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::screen::ClientScreen;
 use crate::systems::settings;
-use crate::systems::{equipment, history, item, player, quest, stat, terminal};
+use crate::systems::{equipment, history, item, player, quest, skill, stat, terminal};
 
-pub(crate) use panel::{Sizing, WindowFrame, widget, window};
+pub(crate) use panel::{GripCorner, Sizing, WindowFrame, corner_grip, widget, window};
 
 pub(crate) const WIDGET: WindowPx = WindowPx(48.0);
 const WINDOW_SIZE: Vec2 = Vec2::new(400.0, 200.0);
@@ -174,6 +174,8 @@ pub(crate) fn file_icon(ui: &mut Ui, world: &mut World, file: &str, size: f32) -
 static WIDGETS: &[(&str, &dyn HudWidget)] = &[
     ("character", &player::widget::CharacterWidget),
     ("quests", &quest::tracker::QuestTrackerWidget),
+    (skill::bar::HOTBAR, &skill::bar::HotbarWidget),
+    (skill::bar::BASIC_ATTACK, &skill::bar::BasicAttackWidget),
 ];
 
 // Their launchers line up in this order.
@@ -181,6 +183,7 @@ static WINDOWS: &[&dyn HudWindow] = &[
     &item::widget::InventoryWindow,
     &equipment::widget::EquipmentWindow,
     &stat::widget::StatsWindow,
+    &skill::window::SkillsWindow,
     &quest::log::QuestLogWindow,
     &history::widget::HistoryWindow,
     &settings::SettingsWindow,

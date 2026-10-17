@@ -35,7 +35,7 @@ use crate::ui::browser::{self, BrowserAction};
 use crate::value::RowValue;
 use crate::views::area::{inspect, parts};
 use crate::views::script::{PendingScriptAction, ScriptOwner};
-use crate::views::{class, model, script, tileset, world};
+use crate::views::{class, model, script, skill, tileset, vfx, world};
 use crate::{forms, views};
 
 const WIDE: f32 = 760.0;
@@ -462,11 +462,19 @@ fn first_class_card(
         let hidden: &[&str] = match table {
             "input" => &["modules", "bindings"],
             class::TABLE => &["modules", "levels", "tree"],
+            skill::TABLE => &["modules", "levels"],
+            vfx::SHADER_TABLE => &["modules", "params"],
             _ => &["modules"],
         };
         changed = forms::object_without(ui, cx, schema, value, "", hidden);
         if table == class::TABLE {
             changed |= class::levels(ui, cx, value);
+        }
+        if table == skill::TABLE {
+            changed |= skill::ranks(ui, cx, value);
+        }
+        if table == vfx::SHADER_TABLE {
+            changed |= vfx::shader_params(ui, cx, value);
         }
     });
     changed

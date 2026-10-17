@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
-use engine::core::math::Offset;
-use engine::core::math::Rgba;
+use engine::core::geometry::{Degrees, Footprint, Radians, Shape};
+use engine::core::math::{Offset, Pos, Rgba};
+use engine::core::tiling::Tiles;
 use engine::core::time::UnixMillis;
 use engine::core::vfx::{ParamValue, VfxId, VfxInstance, VfxParams, VfxSite};
 use engine::systems::class;
@@ -148,6 +149,27 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
             ("amount".to_owned(), ParamValue::Number(4.5)),
             ("tint".to_owned(), ParamValue::Colour(Rgba(0xff00_80ff))),
         ]),
+        started: UnixMillis(1_000),
+        until: UnixMillis(2_500),
+    };
+    let bytes = postcard::to_allocvec(&sent).expect("serializes");
+    let received: VfxInstance = postcard::from_bytes(&bytes).expect("deserializes");
+    assert_eq!(received, sent);
+}
+
+#[test]
+fn an_instance_on_an_area_survives_the_wire() {
+    let sent = VfxInstance {
+        vfx: row("Sweep"),
+        site: VfxSite::Area(Footprint {
+            at: Pos::new(3.0, 4.0),
+            facing: Radians(0.5),
+            shape: Shape::Cone {
+                angle: Degrees(90.0),
+                length: Tiles(2.5),
+            },
+        }),
+        params: VfxParams::default(),
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),
     };

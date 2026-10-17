@@ -587,13 +587,13 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             );
         }
         match slot.entry {
-            HotbarEntry::Skill { skill } if !known.contains(&skill) => check.error(
+            HotbarEntry::Skill(skill) if !known.contains(&skill) => check.error(
                 format!("/hotbar/{index}/entry"),
                 "skill not known",
                 skill.key(content),
                 "a skill learned in the tree or granted by worn gear",
             ),
-            HotbarEntry::Item { item } if !held(item) => check.error(
+            HotbarEntry::Item(item) if !held(item) => check.error(
                 format!("/hotbar/{index}/entry"),
                 "item not held",
                 item.key(content),

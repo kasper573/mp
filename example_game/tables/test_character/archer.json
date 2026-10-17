@@ -16,14 +16,12 @@
     {
       "slot": 0,
       "entry": {
-        "type": "skill",
         "skill": "aimed_shot"
       }
     },
     {
       "slot": 1,
       "entry": {
-        "type": "skill",
         "skill": "quickstep"
       }
     }

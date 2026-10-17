@@ -13,6 +13,7 @@ use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
+use crate::systems::skill::{self, window::CarriedSkill};
 use crate::systems::stat::Stat;
 
 const WINDOW_KEY: &str = "Item";
@@ -150,6 +151,67 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
             ui.label(RichText::new(fact).color(colour));
         }
     });
+    grants(ui, world, item);
+}
+
+const GRANT_ICON: f32 = 24.0;
+
+fn grants(ui: &mut Ui, world: &mut World, item: ItemId) {
+    let content = world.resource::<Content>().clone();
+    let granted = skill::grants_of(&content, item);
+    if granted.is_empty() {
+        return;
+    }
+    ui.add_space(4.0);
+    ui.label(
+        RichText::new("Grants while worn")
+            .size(TextRole::Small.size())
+            .family(design_tokens::family::medium())
+            .color(color::MUTED),
+    );
+    for &granted in granted {
+        let def = granted.get(&content);
+        let response = ui
+            .horizontal(|ui| {
+                hud::icon(ui, world, &def.icon, GRANT_ICON);
+                ui.label(&def.name);
+                ui.label(
+                    RichText::new(def.target.describe())
+                        .size(TextRole::Small.size())
+                        .color(color::MUTED),
+                );
+                if def.basic_attack {
+                    widgets::pill(ui, skill::card::BASIC_ATTACK_MARK, color::WARN);
+                }
+            })
+            .response
+            .interact(egui::Sense::click_and_drag());
+        if map::drag_started(world, InputAction::CarryItem, &response) {
+            egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(granted));
+        } else if map::clicked(world, InputAction::PinToHotbar, &response) {
+            skill::bar::pin(world, skill::HotbarEntry::Skill(granted));
+        }
+        let hint = StyledLine::new(vec![
+            TextPiece::text("Drag it to a slot · "),
+            input(InputAction::PinToHotbar),
+            TextPiece::text(" puts it on the hotbar"),
+        ]);
+        skill::card::tooltip(
+            &response,
+            world,
+            &skill::card::of(world, granted),
+            Some(&hint),
+        );
+    }
+    if granted.iter().any(|skill| skill.get(&content).basic_attack) {
+        ui.label(
+            RichText::new(
+                "Dropping the item on the basic attack slot picks its first basic attack",
+            )
+            .size(TextRole::Small.size())
+            .color(color::FAINT),
+        );
+    }
 }
 
 #[derive(Resource, Default)]

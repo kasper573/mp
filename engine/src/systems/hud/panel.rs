@@ -98,7 +98,8 @@ pub(crate) fn window<R>(
             let ((bar, inner), outer) = (framed.inner, framed.response.rect);
             let title_rect = Rect::from_min_max(outer.min, Pos2::new(outer.max.x, bar.max.y));
             let handle = ui.interact(title_rect, id.with("title"), Sense::drag());
-            let grip = (sizing == Sizing::Resizable).then(|| corner_grip(ui, id, outer));
+            let grip = (sizing == Sizing::Resizable)
+                .then(|| corner_grip(ui, id, outer, GripCorner::BottomRight));
             (handle, grip, inner)
         });
     let (handle, grip, inner) = shown.inner;
@@ -319,21 +320,47 @@ fn fitted<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.scope_builder(UiBuilder::new().max_rect(room), add).inner
 }
 
-fn corner_grip(ui: &mut Ui, id: Id, window: Rect) -> egui::Response {
+/// Which corner a resize grip sits in: the bottom right unless there is no room to pull there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GripCorner {
+    BottomRight,
+    TopRight,
+}
+
+pub(crate) fn corner_grip(ui: &mut Ui, id: Id, window: Rect, at: GripCorner) -> egui::Response {
     let size = ui.visuals().resize_corner_size;
-    let corner = Rect::from_min_max(window.max - Vec2::splat(size), window.max);
+    let (corner, cursor) = match at {
+        GripCorner::BottomRight => (
+            Rect::from_min_max(window.max - Vec2::splat(size), window.max),
+            egui::CursorIcon::ResizeNwSe,
+        ),
+        GripCorner::TopRight => (
+            Rect::from_min_max(
+                Pos2::new(window.max.x - size, window.min.y),
+                Pos2::new(window.max.x, window.min.y + size),
+            ),
+            egui::CursorIcon::ResizeNeSw,
+        ),
+    };
     let response = ui
         .interact(corner, id.with("grip"), Sense::drag())
-        .on_hover_cursor(egui::CursorIcon::ResizeNwSe);
+        .on_hover_cursor(cursor);
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::ResizeHandle, ui.is_enabled(), "Resize")
     });
     let stroke = Stroke::new(1.0, ui.style().interact(&response).fg_stroke.color);
-    let tip = corner.max - Vec2::splat(f32::from(ui.visuals().window_corner_radius.se) / 2.0);
+    let inset = f32::from(ui.visuals().window_corner_radius.se) / 2.0;
+    let (tip, down) = match at {
+        GripCorner::BottomRight => (corner.max - Vec2::splat(inset), -1.0),
+        GripCorner::TopRight => (corner.right_top() + Vec2::new(-inset, inset), 1.0),
+    };
     let mut reach = 2.0;
     while reach <= size {
         ui.painter().line_segment(
-            [tip - Vec2::new(reach, 0.0), tip - Vec2::new(0.0, reach)],
+            [
+                tip - Vec2::new(reach, 0.0),
+                tip + Vec2::new(0.0, down * reach),
+            ],
             stroke,
         );
         reach += 4.0;

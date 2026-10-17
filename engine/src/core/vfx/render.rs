@@ -33,7 +33,7 @@ use crate::core::time::{Seconds, ServerClock, UnixMillis};
 use crate::core::vfx::CompiledVfxShaders;
 
 /// How far past an actor's or object's sprite a shader layer may draw, in sizes.
-const OVERSCAN: f32 = 1.5;
+pub const OVERSCAN: f32 = 1.5;
 const SHADOW: TextShadow = TextShadow {
     offset: egui::vec2(1.0, 1.0),
     color: Color32::BLACK,
@@ -70,12 +70,12 @@ pub struct Overdrawn {
 pub struct VfxMaterial {
     #[texture(0)]
     #[sampler(1)]
-    image: Handle<Image>,
+    pub image: Handle<Image>,
     #[uniform(2)]
-    site: SiteUniform,
+    pub site: SiteUniform,
     #[uniform(3)]
-    params: ParamsUniform,
-    shader: Handle<Shader>,
+    pub params: ParamsUniform,
+    pub shader: Handle<Shader>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -109,20 +109,22 @@ impl Material2d for VfxMaterial {
     }
 }
 
+/// The site a shader layer draws over, as the shader reads it: the texel rect of the site's image
+/// within its texture, its size in world pixels and where the layer is in its run.
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
-struct SiteUniform {
-    rect: Vec4,
-    size: Vec2,
-    pixel: Vec2,
-    kind: u32,
-    facing: f32,
-    progress: f32,
-    time: f32,
-    overscan: f32,
+pub struct SiteUniform {
+    pub rect: Vec4,
+    pub size: Vec2,
+    pub pixel: Vec2,
+    pub kind: u32,
+    pub facing: f32,
+    pub progress: f32,
+    pub time: f32,
+    pub overscan: f32,
 }
 
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
-struct ParamsUniform {
+pub struct ParamsUniform {
     words: [Vec4; PARAMS_BYTES / 16],
 }
 
@@ -199,11 +201,11 @@ impl SiteFrame {
     }
 }
 
-const SITE_ACTOR: u32 = 0;
-const SITE_OBJECT: u32 = 1;
-const SITE_AREA: u32 = 2;
-const SITE_PATH: u32 = 3;
-const SITE_SCREEN: u32 = 4;
+pub const SITE_ACTOR: u32 = 0;
+pub const SITE_OBJECT: u32 = 1;
+pub const SITE_AREA: u32 = 2;
+pub const SITE_PATH: u32 = 3;
+pub const SITE_SCREEN: u32 = 4;
 
 fn load_shaders(
     content: Res<Content>,
@@ -522,7 +524,9 @@ fn place_in_depth(entity: &mut EntityWorldMut, frame: &SiteFrame, screen_z: f32)
     }
 }
 
-fn fill_params(
+/// The parameter uniform of one shader layer: each declared parameter from the layer's fill, the
+/// caller's parameters or the shader's default, laid out as the shader's `Params` struct.
+pub fn fill_params(
     shader: &VfxShaderDef,
     fills: &std::collections::BTreeMap<String, ParamFill>,
     given: &VfxParams,

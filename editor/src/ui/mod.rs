@@ -22,7 +22,7 @@ use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog
 use crate::project::{RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::views::script::ScriptKeys;
-use crate::views::{area, character, model, script, spreadsheet, tileset, world};
+use crate::views::{area, character, class, model, script, spreadsheet, tileset, vfx, world};
 use crate::{import, play, views};
 
 pub fn show(editor: &mut Editor, ctx: &Context) {
@@ -538,6 +538,15 @@ impl TabViewer for Viewer<'_> {
             EditorTab::World => world::show(self.editor, ui),
             EditorTab::Row { table, key } if table == character::TABLE => {
                 character::show(self.editor, ui, key)
+            }
+            EditorTab::Row { table, key } if table == class::TABLE => {
+                class::show(self.editor, ui, key)
+            }
+            EditorTab::Row { table, key } if table == vfx::TABLE => {
+                vfx::show_vfx(self.editor, ui, key)
+            }
+            EditorTab::Row { table, key } if table == vfx::SHADER_TABLE => {
+                vfx::show_shader(self.editor, ui, key)
             }
             EditorTab::Row { table, key } => inspector::show_row_tab(self.editor, ui, table, key),
             EditorTab::Rows { table, keys } => {

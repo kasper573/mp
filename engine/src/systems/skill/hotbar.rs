@@ -55,12 +55,12 @@ pub fn assign(
     }
     match entry {
         HotbarEntry::Empty => {}
-        HotbarEntry::Skill { skill } => {
+        HotbarEntry::Skill(skill) => {
             if !super::known(world, player).contains_key(&skill) {
                 return Err(format!("You don't know {}", skill.get(&content).name));
             }
         }
-        HotbarEntry::Item { item } => {
+        HotbarEntry::Item(item) => {
             let held = world
                 .get::<Inventory>(player)
                 .is_some_and(|inventory| inventory.count(item) > 0)

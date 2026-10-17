@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use egui::{Pos2, Rect, Ui};
 
 use crate::systems::actor::Name;
+use crate::systems::class;
 use crate::systems::hud::{self, HudWidget};
 use crate::systems::player::{Xp, session};
 use crate::systems::stat;
@@ -43,9 +44,24 @@ fn character_sheet(world: &World) -> Option<Vec<String>> {
     let xp = me.get::<Xp>().map_or(0, |x| x.amount);
     let health = stat::current_health(world, entity);
     let max = stat::max_health(world, entity);
-    Some(vec![
-        name,
-        format!("{health:.0} / {max:.0}"),
-        format!("xp {xp}"),
-    ])
+    let content = world.resource::<crate::core::content::Content>();
+    let mut lines = vec![name];
+    if let Some(class) = class::of(world, entity) {
+        lines.push(format!(
+            "{} · level {}",
+            class.get(content).name,
+            class::level(world, entity)
+        ));
+    }
+    lines.push(format!("{health:.0} / {max:.0}"));
+    lines.push(format!("xp {xp}"));
+    let points = class::points_to_spend(world, entity);
+    if points.0 > 0 {
+        lines.push(format!(
+            "{} skill point{} to spend",
+            points.0,
+            if points.0 == 1 { "" } else { "s" }
+        ));
+    }
+    Some(lines)
 }

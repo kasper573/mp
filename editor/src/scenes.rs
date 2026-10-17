@@ -21,7 +21,7 @@ use crate::views::tileset::{
 use crate::views::world::{
     ColourBy, ColourField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
-use crate::views::{model, tileset, world};
+use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -80,6 +80,10 @@ pub enum Step {
     World(WorldStep),
     Import(ImportStep),
     Section(CharacterSection),
+    Tree {
+        key: String,
+        node: Option<String>,
+    },
     Save,
     Dialog(DialogName),
 }
@@ -364,6 +368,15 @@ fn open_one(editor: &mut Editor, step: &Step) {
         }
         Step::Import(step) => editor.jobs.script.push_back(step.clone()),
         Step::Section(section) => editor.views.character.section = *section,
+        Step::Tree { key, node } => {
+            editor.open_tab(EditorTab::for_row(class::TABLE, key));
+            editor
+                .views
+                .class
+                .pages
+                .insert(key.clone(), class::ClassPage::Tree);
+            class::select_node(editor, key, node.as_deref());
+        }
         Step::Save => {
             editor.save();
         }

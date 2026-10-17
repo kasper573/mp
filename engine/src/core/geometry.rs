@@ -89,7 +89,10 @@ impl Shape {
     }
 }
 
+/// A shape placed in the world. It travels the wire inside replicated components, and postcard
+/// cannot read the internally tagged `Shape`, so it serializes through an externally tagged twin.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(from = "WireFootprint", into = "WireFootprint")]
 pub struct Footprint {
     pub at: Pos<Tiles>,
     pub facing: Radians,
@@ -178,5 +181,52 @@ pub fn facing_from(from: Pos<Tiles>, toward: Pos<Tiles>) -> Radians {
         Radians(std::f32::consts::FRAC_PI_2)
     } else {
         Radians::of(toward - from)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+struct WireFootprint {
+    at: Pos<Tiles>,
+    facing: Radians,
+    shape: WireShape,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+enum WireShape {
+    Circle { radius: Tiles },
+    Rect { width: Tiles, height: Tiles },
+    Cone { angle: Degrees, length: Tiles },
+    Line { length: Tiles, width: Tiles },
+}
+
+impl From<Footprint> for WireFootprint {
+    fn from(footprint: Footprint) -> WireFootprint {
+        let shape = match footprint.shape {
+            Shape::Circle { radius } => WireShape::Circle { radius },
+            Shape::Rect { width, height } => WireShape::Rect { width, height },
+            Shape::Cone { angle, length } => WireShape::Cone { angle, length },
+            Shape::Line { length, width } => WireShape::Line { length, width },
+        };
+        WireFootprint {
+            at: footprint.at,
+            facing: footprint.facing,
+            shape,
+        }
+    }
+}
+
+impl From<WireFootprint> for Footprint {
+    fn from(wire: WireFootprint) -> Footprint {
+        let shape = match wire.shape {
+            WireShape::Circle { radius } => Shape::Circle { radius },
+            WireShape::Rect { width, height } => Shape::Rect { width, height },
+            WireShape::Cone { angle, length } => Shape::Cone { angle, length },
+            WireShape::Line { length, width } => Shape::Line { length, width },
+        };
+        Footprint {
+            at: wire.at,
+            facing: wire.facing,
+            shape,
+        }
     }
 }

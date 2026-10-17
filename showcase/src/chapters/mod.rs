@@ -11,6 +11,7 @@ mod quest_choices;
 mod quests;
 mod shops;
 mod sign_in;
+mod skills;
 mod soundscape;
 mod townsfolk;
 mod travel;
@@ -32,6 +33,7 @@ pub const CHAPTERS: &[Chapter] = &[
     explore::CHAPTER,
     soundscape::CHAPTER,
     combat::CHAPTER,
+    skills::CHAPTER,
     windows::CHAPTER,
     chat::CHAPTER,
     travel::CHAPTER,

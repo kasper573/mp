@@ -1,8 +1,14 @@
+pub mod aim;
+pub mod bar;
+pub mod card;
+pub mod client;
 pub mod hotbar;
 pub mod learn;
+pub mod prompt;
 pub mod reset;
 #[path = "use.rs"]
 pub mod using;
+pub mod window;
 
 pub use hotbar::{AssignBasicAttackRequest, AssignHotbarRequest};
 pub use learn::LearnSkillsRequest;
@@ -329,16 +335,12 @@ impl Cooldowns {
 pub struct Hotbar(pub Vec<HotbarEntry>);
 
 #[derive(JsonSchema, Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
 pub enum HotbarEntry {
     #[default]
     Empty,
-    Skill {
-        skill: SkillId,
-    },
-    Item {
-        item: ItemId,
-    },
+    Skill(SkillId),
+    Item(ItemId),
 }
 
 impl Hotbar {

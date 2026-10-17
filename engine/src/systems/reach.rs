@@ -1,4 +1,8 @@
+use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
+use bevy_replicon::bytes::Bytes;
+use bevy_replicon::shared::replication::registry::ctx::{SerializeCtx, WriteCtx};
+use serde::{Deserialize, Serialize};
 
 use crate::core::math::Pos;
 use crate::core::tiling::{TilePos, Tiles};
@@ -14,6 +18,43 @@ const DIAGONAL_MARGIN: Tiles = Tiles(std::f32::consts::SQRT_2 - 1.0);
 pub struct ReachIntent {
     pub target: ReachTarget,
     pub act: ReachAct,
+}
+
+/// The actor a character is casting at, replicated so its client knows whom a single-target skill
+/// goes on without another click.
+#[derive(Component, Serialize, Deserialize, MapEntities, Clone, Copy, Debug, PartialEq)]
+pub struct Engaged(#[entities] pub Entity);
+
+pub fn register(app: &mut bevy_app::App) {
+    use bevy_replicon::prelude::*;
+    app.replicate_with(RuleFns::new(serialize_engaged, deserialize_engaged));
+}
+
+/// Keeps every character's `Engaged` in step with the actor its cast intent aims at.
+pub fn mirror_engaged(
+    world: &mut World,
+    intents: &mut Intents,
+    engaged: &mut QueryState<(Entity, &Engaged)>,
+) {
+    let mut wanted: std::collections::HashMap<Entity, Entity> = intents
+        .iter(world)
+        .filter(|(_, intent)| intent.cast().is_some())
+        .filter_map(|(actor, intent)| Some((actor, intent.target.actor()?)))
+        .collect();
+    let stale: Vec<Entity> = engaged
+        .iter(world)
+        .filter(|(actor, engaged)| wanted.remove(actor) != Some(engaged.0))
+        .map(|(actor, _)| actor)
+        .collect();
+    for actor in stale {
+        world.entity_mut(actor).remove::<Engaged>();
+    }
+    let missing: Vec<(Entity, Entity)> = wanted.into_iter().collect();
+    for (actor, target) in missing {
+        if world.get::<Engaged>(actor) != Some(&Engaged(target)) {
+            world.entity_mut(actor).insert(Engaged(target));
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -187,4 +228,22 @@ pub fn forget(world: &mut World, actor: Entity) {
 /// Gives up reaching for anything, leaving the actor's walk as it is.
 pub fn drop_intent(world: &mut World, actor: Entity) {
     world.entity_mut(actor).remove::<ReachIntent>();
+}
+
+fn serialize_engaged(
+    _ctx: &mut SerializeCtx,
+    engaged: &Engaged,
+    message: &mut Vec<u8>,
+) -> bevy_ecs::error::Result<()> {
+    bevy_replicon::postcard_utils::to_extend_mut(engaged, message)?;
+    Ok(())
+}
+
+fn deserialize_engaged(
+    ctx: &mut WriteCtx,
+    message: &mut Bytes,
+) -> bevy_ecs::error::Result<Engaged> {
+    let mut engaged: Engaged = bevy_replicon::postcard_utils::from_buf(message)?;
+    engaged.map_entities(ctx);
+    Ok(engaged)
 }

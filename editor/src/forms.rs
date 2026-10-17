@@ -1192,7 +1192,7 @@ fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) ->
     FormChange::default()
 }
 
-fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
+pub fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
     let mut rgba = value::rgba(value);
     let mut changed = FormChange::default();
     ui.horizontal(|ui| {

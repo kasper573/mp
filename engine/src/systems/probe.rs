@@ -38,6 +38,7 @@ use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
+use crate::systems::skill::{self, HotbarEntry, Rank, SkillId};
 use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
@@ -86,6 +87,9 @@ pub struct ProbeSnapshot {
     pub item_card: Option<ProbeItemCard>,
     pub bag: Vec<ProbeStack>,
     pub quests: ProbeQuests,
+    pub hotbar: Vec<ProbeSlot>,
+    pub basic_attack: Option<SkillId>,
+    pub skills: Option<ProbeSkills>,
     pub soundscape: ProbeSoundscape,
     pub transition: ScreenTransitionPhase,
 }
@@ -281,6 +285,27 @@ pub struct ProbeStack {
 pub struct ProbeItemCard {
     pub item: ItemId,
     pub rect: Rect<WindowPx>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProbeSlot {
+    pub entry: HotbarEntry,
+    pub key: Option<String>,
+    pub cooling: bool,
+    pub blocked: bool,
+    pub dimmed: bool,
+}
+
+/// The character's class, tree and bar as the client shows them.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProbeSkills {
+    pub class: String,
+    pub level: u32,
+    pub to_spend: u32,
+    pub learned: Vec<(String, Rank)>,
+    pub planned: Vec<(String, Rank)>,
+    pub aiming: Option<SkillId>,
+    pub reset_prompt: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -544,6 +569,20 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             })
             .unwrap_or_default(),
         quests: me.and_then(|seen| quests(world, seen)).unwrap_or_default(),
+        hotbar: skill::bar::report(world)
+            .into_iter()
+            .map(|slot| ProbeSlot {
+                entry: slot.entry,
+                key: slot.key,
+                cooling: slot.cooling,
+                blocked: slot.blocked,
+                dimmed: slot.dimmed,
+            })
+            .collect(),
+        basic_attack: me
+            .and_then(|me| world.get::<skill::BasicAttack>(me))
+            .and_then(|slot| slot.0),
+        skills: me.and_then(|me| skills(world, me)),
         me: me.and_then(|me| body(world, me)),
         actors: actors(world, me, area),
         props: props(world, area),
@@ -607,6 +646,29 @@ fn soundscape(world: &World) -> ProbeSoundscape {
             })
             .collect(),
     }
+}
+
+fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
+    let content = world.resource::<Content>();
+    let class = crate::systems::class::of(world, me)?;
+    let learned = world
+        .get::<skill::Learned>(me)
+        .map(|learned| learned.0.iter().map(|(k, r)| (k.clone(), *r)).collect())
+        .unwrap_or_default();
+    Some(ProbeSkills {
+        class: class.key(content).to_owned(),
+        level: crate::systems::class::level(world, me),
+        to_spend: crate::systems::class::points_to_spend(world, me).0,
+        learned,
+        planned: world
+            .resource::<skill::window::Plan>()
+            .0
+            .iter()
+            .map(|(k, r)| (k.clone(), *r))
+            .collect(),
+        aiming: skill::aim::aiming(world).map(|aimed| aimed.skill),
+        reset_prompt: skill::prompt::showing(world),
+    })
 }
 
 fn quests(world: &World, seen: Entity) -> Option<ProbeQuests> {

@@ -93,7 +93,7 @@ fn a_slot_takes_only_what_you_have_and_keeps_it_when_it_goes() {
         1,
         AssignHotbarRequest {
             slot: 1,
-            entry: HotbarEntry::Item { item: potion },
+            entry: HotbarEntry::Item(potion),
         },
     );
     settle(&mut sim);
@@ -112,13 +112,13 @@ fn a_slot_takes_only_what_you_have_and_keeps_it_when_it_goes() {
         1,
         AssignHotbarRequest {
             slot: 1,
-            entry: HotbarEntry::Item { item: potion },
+            entry: HotbarEntry::Item(potion),
         },
     );
     settle(&mut sim);
     let bar = sim.world().get::<Hotbar>(player).expect("hotbar");
     assert_eq!(bar.entry(0), skill_entry("Slash"));
-    assert_eq!(bar.entry(1), HotbarEntry::Item { item: potion });
+    assert_eq!(bar.entry(1), HotbarEntry::Item(potion));
 
     sim.send(
         1,
@@ -368,6 +368,24 @@ fn learned(sim: &mut Sim, player: Entity, node: &str) -> Rank {
         .map_or(Rank(0), |learned| learned.rank(node))
 }
 
+#[test]
+fn a_filled_hotbar_and_its_requests_survive_the_wire() {
+    let bar = Hotbar(vec![
+        skill_entry("Cleave"),
+        HotbarEntry::Empty,
+        HotbarEntry::Item(row("HealthPotion")),
+    ]);
+    let bytes = postcard::to_allocvec(&bar).expect("serializes");
+    assert_eq!(postcard::from_bytes::<Hotbar>(&bytes).expect("reads"), bar);
+    let request = AssignHotbarRequest {
+        slot: 2,
+        entry: HotbarEntry::Item(row("HealthPotion")),
+    };
+    let bytes = postcard::to_allocvec(&request).expect("serializes");
+    let received: AssignHotbarRequest = postcard::from_bytes(&bytes).expect("reads");
+    assert_eq!(received, request);
+}
+
 fn basic_attack(sim: &mut Sim, player: Entity) -> Option<SkillId> {
     sim.world()
         .get::<BasicAttack>(player)
@@ -375,7 +393,7 @@ fn basic_attack(sim: &mut Sim, player: Entity) -> Option<SkillId> {
 }
 
 fn skill_entry(name: &str) -> HotbarEntry {
-    HotbarEntry::Skill { skill: row(name) }
+    HotbarEntry::Skill(row(name))
 }
 
 fn orc_near(sim: &mut Sim, player: Entity, min: f32, max: f32) -> Entity {

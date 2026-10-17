@@ -1,4 +1,5 @@
 mod conversation;
+mod skills;
 mod travel;
 
 use std::path::Path;

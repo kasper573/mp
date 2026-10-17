@@ -1,6 +1,6 @@
 pub mod tree;
 
-pub use tree::{AccessRequirement, CanvasPoint, SkillNode, SkillTree};
+pub use tree::{AccessRequirement, CanvasPoint, NODE_EXTENT, SkillNode, SkillTree};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;

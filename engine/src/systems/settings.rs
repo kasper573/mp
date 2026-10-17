@@ -13,7 +13,7 @@ use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
 use crate::core::text::{MotionPreference, TypewriterSpeed};
 use crate::systems::hud::HudWindow;
-use crate::systems::input::map::InputAction;
+use crate::systems::input::map::{InputAction, KeyGesture};
 use crate::systems::interface::InterfaceIcon;
 
 const WINDOW_SIZE: egui::Vec2 = egui::Vec2::new(400.0, 410.0);
@@ -47,6 +47,23 @@ pub(crate) struct Placement {
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub(crate) struct LettersPerSecond(pub f32);
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HotbarShape {
+    pub columns: u32,
+    pub rows: u32,
+}
+
+impl HotbarShape {
+    pub(crate) const DEFAULT: HotbarShape = HotbarShape {
+        columns: 9,
+        rows: 1,
+    };
+
+    pub(crate) fn slots(self) -> u32 {
+        self.columns * self.rows
+    }
+}
 
 pub struct SettingsWindow;
 
@@ -247,6 +264,23 @@ impl UserSettings {
         self.ui.windows.insert(id.to_owned(), placement);
     }
 
+    pub(crate) fn hotbar_shape(&self) -> HotbarShape {
+        self.ui.hotbar.shape.unwrap_or(HotbarShape::DEFAULT)
+    }
+
+    pub(crate) fn set_hotbar_shape(&mut self, shape: HotbarShape) {
+        self.ui.hotbar.shape = Some(shape);
+    }
+
+    /// `None` when the slot keeps the game's default key, `Some(None)` when its key was taken away.
+    pub(crate) fn hotbar_key(&self, slot: u32) -> Option<Option<KeyGesture>> {
+        self.ui.hotbar.keys.get(&slot).copied()
+    }
+
+    pub(crate) fn set_hotbar_key(&mut self, slot: u32, key: Option<KeyGesture>) {
+        self.ui.hotbar.keys.insert(slot, key);
+    }
+
     fn load(platform: &dyn Platform) -> UserSettings {
         let mut settings: UserSettings = platform
             .load(KEY)
@@ -290,6 +324,8 @@ struct UiSettings {
     widgets: BTreeMap<String, Pos<WindowPx>>,
     #[serde(default)]
     windows: BTreeMap<String, Placement>,
+    #[serde(default)]
+    hotbar: HotbarSettings,
 }
 
 impl Default for UiSettings {
@@ -298,8 +334,17 @@ impl Default for UiSettings {
             snap: default_snap(),
             widgets: BTreeMap::new(),
             windows: BTreeMap::new(),
+            hotbar: HotbarSettings::default(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct HotbarSettings {
+    #[serde(default)]
+    shape: Option<HotbarShape>,
+    #[serde(default)]
+    keys: BTreeMap<u32, Option<KeyGesture>>,
 }
 
 fn default_snap() -> Option<WindowPx> {

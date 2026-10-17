@@ -1,15 +1,105 @@
+pub mod inspect;
+pub mod tree;
+
+use std::collections::HashMap;
+
 use egui::Ui;
 use engine::systems::stat::StatKind;
 use serde_json::{Map, Value};
 use strum::VariantArray;
 
+use crate::app::Editor;
 use crate::forms::{self, FormChange, FormCx};
-use crate::ui::{theme, widgets};
+use crate::project::{ContentEdit, RowSelection, row_file};
+use crate::ui::{inspector, theme, widgets};
 
 pub const TABLE: &str = "class";
+pub const TREE_PART: &str = "/tree/";
 
 const LABEL: f32 = 110.0;
 const INPUT: f32 = 150.0;
+
+#[derive(Default)]
+pub struct ClassViews {
+    pub pages: HashMap<String, ClassPage>,
+    pub snap: Option<bool>,
+    pub drag: Option<tree::NodeDrag>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum ClassPage {
+    #[default]
+    Levels,
+    Tree,
+}
+
+impl ClassViews {
+    pub fn page(&self, key: &str) -> ClassPage {
+        self.pages.get(key).copied().unwrap_or_default()
+    }
+
+    pub fn snaps(&self) -> bool {
+        self.snap.unwrap_or(true)
+    }
+}
+
+pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
+    if editor.row_value(TABLE, key).is_none() {
+        ui.label(theme::muted(format!("{} is gone", row_file(TABLE, key))));
+        return;
+    }
+    let page = editor.views.class.page(key);
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(12, 8))
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            ui.horizontal(|ui| {
+                ui.label(theme::mono(format!("{TABLE}/{key}")).color(theme::CODE));
+                ui.add_space(8.0);
+                for (target, label) in [(ClassPage::Levels, "levels"), (ClassPage::Tree, "tree")] {
+                    if widgets::mode_chip(ui, label, page == target).clicked() {
+                        editor.views.class.pages.insert(key.to_owned(), target);
+                        if target == ClassPage::Levels {
+                            editor.select(RowSelection::row(TABLE, key));
+                        }
+                    }
+                }
+            });
+            ui.add_space(4.0);
+            match page {
+                ClassPage::Levels => inspector::show_row_tab(editor, ui, TABLE, key),
+                ClassPage::Tree => tree::show(editor, ui, key),
+            }
+        });
+}
+
+pub fn node_of(selection: &RowSelection) -> Option<&str> {
+    if selection.table != TABLE || selection.keys.len() != 1 {
+        return None;
+    }
+    selection
+        .parts
+        .first()?
+        .strip_prefix(TREE_PART)
+        .filter(|node| !node.is_empty())
+}
+
+pub fn select_node(editor: &mut Editor, key: &str, node: Option<&str>) {
+    match node {
+        Some(node) => editor.select(RowSelection::parts(
+            TABLE,
+            key,
+            vec![format!("{TREE_PART}{node}")],
+        )),
+        None => editor.select(RowSelection::row(TABLE, key)),
+    }
+}
+
+pub fn write(editor: &mut Editor, key: &str, label: &str, value: &Value) {
+    let mut edit = ContentEdit::new(format!("{label} · {TABLE}/{key}"));
+    edit.write_json(row_file(TABLE, key), value);
+    editor.apply(edit);
+}
 
 pub fn levels(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();

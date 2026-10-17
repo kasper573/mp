@@ -23,6 +23,20 @@ const PICTURE_TABLES: [&str; 6] = [
 ];
 
 pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &str) -> bool {
+    let mut held = table.to_owned();
+    row_among(ui, cx, &[table], &mut held, key, path)
+}
+
+/// A picker over several tables at once: the search filters by table name as well as by key, and
+/// the pick names which table the key came from.
+pub fn row_among(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    tables: &[&str],
+    table: &mut String,
+    key: &mut String,
+    path: &str,
+) -> bool {
     let id = ui.id().with(path).with("picker");
     let mut changed = false;
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -37,16 +51,16 @@ pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &s
                 .clicked()
         {
             cx.actions.push(FormAction::OpenRow {
-                table: table.to_owned(),
+                table: table.clone(),
                 key: key.clone(),
             });
         }
-        let response = chip(ui, cx, table, key);
+        let response = chip(ui, cx, tables, table, key);
         let popup = egui::Popup::from_toggle_button_response(&response)
             .id(id)
             .width(440.0);
         popup.show(|ui| {
-            if picker_body(ui, cx, table, key, path, id) {
+            if picker_body(ui, cx, tables, table, key, path, id) {
                 changed = true;
             }
         });
@@ -54,7 +68,7 @@ pub fn row(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &mut String, path: &s
     changed
 }
 
-fn chip(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str) -> egui::Response {
+fn chip(ui: &mut Ui, cx: &mut FormCx, tables: &[&str], table: &str, key: &str) -> egui::Response {
     let empty = key.is_empty();
     egui::Frame::new()
         .fill(if empty {
@@ -72,7 +86,7 @@ fn chip(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str) -> egui::Response 
             ui.set_width(ui.available_width());
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 if empty {
-                    ui.label(theme::muted(format!("pick {}…", table.replace('_', " "))));
+                    ui.label(theme::muted(format!("pick {}…", spoken(tables))));
                     return;
                 }
                 thumbnail(ui, cx, table, key, 18.0);
@@ -87,13 +101,14 @@ fn chip(ui: &mut Ui, cx: &mut FormCx, table: &str, key: &str) -> egui::Response 
 fn picker_body(
     ui: &mut Ui,
     cx: &mut FormCx,
-    table: &str,
+    tables: &[&str],
+    table: &mut String,
     key: &mut String,
     path: &str,
     id: egui::Id,
 ) -> bool {
     let mut changed = false;
-    let field = path.rsplit('/').next().unwrap_or(table);
+    let field = path.rsplit('/').next().unwrap_or(tables[0]);
     cx.state.status = vec![
         field.to_owned(),
         if key.is_empty() {
@@ -104,35 +119,49 @@ fn picker_body(
     ];
     let search_id = id.with("search");
     let mut search = draft_of(ui, search_id).unwrap_or_default();
-    let total = cx.files.paths_under(&format!("tables/{table}/")).count();
     let needle = search.to_lowercase();
-    let blocked = pick_block(cx, table, path);
-    let mut keys: Vec<(String, String, Option<String>)> = cx
-        .files
-        .paths_under(&format!("tables/{table}/"))
-        .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
-        .map(|row_key| {
-            let name = display_name(cx, table, &row_key);
-            let reason = blocked
-                .as_ref()
-                .and_then(|block| (block.reason)(cx, &row_key));
-            (row_key, name, reason)
-        })
-        .filter(|(row_key, name, _)| {
-            needle.is_empty()
-                || row_key.to_lowercase().contains(&needle)
-                || name.to_lowercase().contains(&needle)
-        })
-        .collect();
+    let several = tables.len() > 1;
+    let mut total = 0;
+    let mut blocked = None;
+    let mut keys: Vec<Candidate> = Vec::new();
+    for listed in tables {
+        let block = pick_block(cx, listed, path);
+        total += cx.files.paths_under(&format!("tables/{listed}/")).count();
+        keys.extend(
+            cx.files
+                .paths_under(&format!("tables/{listed}/"))
+                .filter_map(|file| row_of(file).map(|(_, key)| key.to_owned()))
+                .map(|row_key| Candidate {
+                    name: display_name(cx, listed, &row_key),
+                    reason: block
+                        .as_ref()
+                        .and_then(|block| (block.reason)(cx, &row_key)),
+                    table: (*listed).to_owned(),
+                    key: row_key,
+                })
+                .filter(|candidate| {
+                    needle.is_empty()
+                        || candidate.key.to_lowercase().contains(&needle)
+                        || candidate.name.to_lowercase().contains(&needle)
+                        || (several && candidate.table.contains(&needle))
+                }),
+        );
+        if block.is_some() {
+            blocked = block;
+        }
+    }
+    let current = |candidate: &Candidate| candidate.table == *table && candidate.key == *key;
     keys.sort_by(|a, b| {
-        a.2.is_some()
-            .cmp(&b.2.is_some())
-            .then((a.0 != *key).cmp(&(b.0 != *key)))
-            .then(a.0.cmp(&b.0))
+        a.reason
+            .is_some()
+            .cmp(&b.reason.is_some())
+            .then((!current(a)).cmp(&!current(b)))
+            .then(a.table.cmp(&b.table))
+            .then(a.key.cmp(&b.key))
     });
     let pickable = keys
         .iter()
-        .filter(|(_, _, reason)| reason.is_none())
+        .filter(|candidate| candidate.reason.is_none())
         .count();
     let highlight_id = id.with("highlight");
     let mut highlight: usize = ui.ctx().data(|d| d.get_temp(highlight_id)).unwrap_or(0);
@@ -147,7 +176,7 @@ fn picker_body(
                 let response = ui.add(
                     egui::TextEdit::singleline(&mut search)
                         .frame(egui::Frame::NONE)
-                        .hint_text(filter_hint(cx, table))
+                        .hint_text(filter_hint(cx, tables))
                         .desired_width(ui.available_width() - 120.0),
                 );
                 widgets::default_focus(ui, &response);
@@ -157,8 +186,10 @@ fn picker_body(
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let counted = match &blocked {
-                        Some(block) => format!("{table} · {pickable} {}", block.rule),
-                        None => format!("{table} · {} of {total}", keys.len()),
+                        Some(block) if !several => {
+                            format!("{} · {pickable} {}", tables[0], block.rule)
+                        }
+                        _ => format!("{} · {} of {total}", spoken(tables), keys.len()),
                     };
                     ui.label(theme::muted(counted).monospace().size(11.5));
                 });
@@ -172,7 +203,7 @@ fn picker_body(
             i.key_pressed(egui::Key::Escape),
         )
     });
-    let pictures = PICTURE_TABLES.contains(&table);
+    let pictures = !several && PICTURE_TABLES.contains(&tables[0]);
     let columns = if pictures { 5 } else { 1 };
     if down {
         highlight = (highlight + columns).min(keys.len().saturating_sub(1));
@@ -194,7 +225,7 @@ fn picker_body(
             highlight = highlight.saturating_sub(1);
         }
     }
-    let mut picked: Option<String> = None;
+    let mut picked: Option<(String, String)> = None;
     egui::ScrollArea::vertical()
         .max_height(300.0)
         .id_salt(id.with("list"))
@@ -204,13 +235,18 @@ fn picker_body(
                     .num_columns(columns)
                     .spacing([4.0, 4.0])
                     .show(ui, |ui| {
-                        for (index, (row_key, _, reason)) in keys.iter().enumerate() {
+                        for (index, candidate) in keys.iter().enumerate() {
+                            let Candidate {
+                                table: row_table,
+                                key: row_key,
+                                reason,
+                                ..
+                            } = candidate;
                             let lit = index == highlight;
-                            let current = row_key == key;
                             let response = egui::Frame::new()
                                 .fill(if lit {
                                     theme::ACCENT_SOFT
-                                } else if current {
+                                } else if current(candidate) {
                                     theme::RAISED
                                 } else {
                                     Color32::TRANSPARENT
@@ -221,7 +257,7 @@ fn picker_body(
                                     ui.set_width(72.0);
                                     ui.vertical_centered(|ui| {
                                         ui.add_enabled_ui(reason.is_none(), |ui| {
-                                            thumbnail(ui, cx, table, row_key, 48.0);
+                                            thumbnail(ui, cx, row_table, row_key, 48.0);
                                             ui.label(
                                                 RichText::new(row_key)
                                                     .monospace()
@@ -242,7 +278,7 @@ fn picker_body(
                                 None => response,
                             };
                             if response.clicked() && reason.is_none() {
-                                picked = Some(row_key.clone());
+                                picked = Some((row_table.clone(), row_key.clone()));
                             }
                             if (index + 1) % columns == 0 {
                                 ui.end_row();
@@ -250,9 +286,15 @@ fn picker_body(
                         }
                     });
             } else {
-                for (index, (row_key, name, reason)) in keys.iter().enumerate() {
+                for (index, candidate) in keys.iter().enumerate() {
+                    let Candidate {
+                        table: row_table,
+                        key: row_key,
+                        name,
+                        reason,
+                    } = candidate;
                     let lit = index == highlight;
-                    let hint = pick_hint(cx, table, row_key);
+                    let hint = pick_hint(cx, row_table, row_key);
                     let full = ui.available_rect_before_wrap();
                     let (rect, response) =
                         ui.allocate_exact_size(Vec2::new(full.width(), 36.0), Sense::click());
@@ -270,7 +312,7 @@ fn picker_body(
                             .max_rect(rect.shrink2(Vec2::new(6.0, 2.0)))
                             .layout(Layout::left_to_right(Align::Center)),
                     );
-                    thumbnail(&mut child, cx, table, row_key, 24.0);
+                    thumbnail(&mut child, cx, row_table, row_key, 24.0);
                     child.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
                         let ink = if reason.is_some() {
@@ -279,6 +321,11 @@ fn picker_body(
                             theme::TEXT
                         };
                         ui.horizontal(|ui| {
+                            if several {
+                                ui.label(
+                                    theme::muted(format!("{row_table}/")).monospace().size(13.0),
+                                );
+                            }
                             ui.label(RichText::new(row_key).monospace().size(13.0).color(ink));
                             if !name.is_empty() && name != row_key {
                                 ui.label(theme::muted(name).size(12.0));
@@ -288,7 +335,7 @@ fn picker_body(
                             Some(reason) => reason.clone(),
                             None => {
                                 let mut line = hint;
-                                if row_key == key {
+                                if current(candidate) {
                                     line.push_str(if line.is_empty() {
                                         "this one"
                                     } else {
@@ -301,7 +348,7 @@ fn picker_body(
                         ui.label(theme::muted(line).size(11.5));
                     });
                     if response.clicked() && reason.is_none() {
-                        picked = Some(row_key.clone());
+                        picked = Some((row_table.clone(), row_key.clone()));
                     }
                 }
             }
@@ -309,8 +356,11 @@ fn picker_body(
                 ui.label(theme::muted("nothing matches"));
             }
         });
-    if enter && let Some((row_key, _, None)) = keys.get(highlight) {
-        picked = Some(row_key.clone());
+    if enter
+        && let Some(candidate) = keys.get(highlight)
+        && candidate.reason.is_none()
+    {
+        picked = Some((candidate.table.clone(), candidate.key.clone()));
     }
     ui.separator();
     if !key.is_empty() {
@@ -322,7 +372,7 @@ fn picker_body(
         footer.push_str(&format!(" · used by {uses}"));
         ui.label(theme::muted(footer).monospace().size(11.5));
     }
-    if !cx.shapes.has_fixtures(table) {
+    if !several && !cx.shapes.has_fixtures(table) {
         let response = ui
             .horizontal(|ui| {
                 ui.label(theme::code("+"));
@@ -344,8 +394,9 @@ fn picker_body(
     }
     ui.ctx()
         .data_mut(|d| d.insert_temp(highlight_id, highlight));
-    if let Some(row_key) = picked {
-        if row_key != *key {
+    if let Some((row_table, row_key)) = picked {
+        if row_table != *table || row_key != *key {
+            *table = row_table;
             *key = row_key;
             changed = true;
         }
@@ -364,11 +415,27 @@ fn close_picker(ui: &mut Ui, id: egui::Id, search_id: egui::Id) {
     ui.close();
 }
 
-fn filter_hint(cx: &FormCx, table: &str) -> String {
-    match (table, &cx.owner_table) {
-        ("script", Some(owner)) => format!("filter · owner {owner}"),
-        _ => "filter".to_owned(),
+fn filter_hint(cx: &FormCx, tables: &[&str]) -> String {
+    match (tables, &cx.owner_table) {
+        (["script"], Some(owner)) => format!("filter · owner {owner}"),
+        ([_], _) => "filter".to_owned(),
+        _ => format!("filter · {}", spoken(tables)),
     }
+}
+
+fn spoken(tables: &[&str]) -> String {
+    tables
+        .iter()
+        .map(|table| table.replace('_', " "))
+        .collect::<Vec<_>>()
+        .join(" or ")
+}
+
+struct Candidate {
+    table: String,
+    key: String,
+    name: String,
+    reason: Option<String>,
 }
 
 type BlockReason = Box<dyn Fn(&FormCx, &str) -> Option<String>>;
@@ -390,6 +457,35 @@ fn pick_block(cx: &FormCx, table: &str, path: &str) -> Option<Block> {
                     .then(|| format!("owner {script_owner}"))
             }),
             rule: "fit the owner",
+        });
+    }
+    if table == "skill" && path.ends_with("/basic_attack") {
+        return Some(Block {
+            reason: Box::new(|cx, key| {
+                let row = cx.files.json(&row_file("skill", key))?;
+                (row["basic_attack"] != true).then(|| "not flagged as a basic attack".to_owned())
+            }),
+            rule: "flagged as a basic attack",
+        });
+    }
+    if table == "skill"
+        && cx.owner_table.as_deref() == Some("class")
+        && let Some(node) = path
+            .strip_prefix("/tree/")
+            .and_then(|rest| rest.strip_suffix("/skill"))
+    {
+        let class = cx.owner_key.clone()?;
+        let node = node.to_owned();
+        return Some(Block {
+            reason: Box::new(move |cx, key| {
+                let row = cx.files.json(&row_file("class", &class))?;
+                let holder = row["tree"]
+                    .as_object()?
+                    .iter()
+                    .find(|(other, held)| **other != node && held["skill"] == key)?;
+                Some(format!("already the node {}", holder.0))
+            }),
+            rule: "not in the tree yet",
         });
     }
     if table == "npc" && cx.owner_table.as_deref() == Some("quest") && path.ends_with("/npc") {
@@ -489,7 +585,7 @@ pub fn picture_of(files: &ProjectFiles, table: &str, key: &str) -> Option<Pictur
             let model = files.json(&row_file("model", row["model"].as_str()?))?;
             (sprite_image(&model)?, PictureFrame::Sprite(model))
         }
-        "item" | "attention" | "interface_icon" | "cursor" => {
+        "item" | "skill" | "attention" | "interface_icon" | "cursor" => {
             let path = row["icon"].as_str().or(row["image"].as_str())?;
             (path.to_owned(), PictureFrame::Whole)
         }

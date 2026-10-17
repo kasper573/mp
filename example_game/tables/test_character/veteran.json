@@ -20,28 +20,24 @@
     {
       "slot": 0,
       "entry": {
-        "type": "skill",
         "skill": "cleave"
       }
     },
     {
       "slot": 1,
       "entry": {
-        "type": "skill",
         "skill": "guard"
       }
     },
     {
       "slot": 2,
       "entry": {
-        "type": "skill",
         "skill": "second_wind"
       }
     },
     {
       "slot": 3,
       "entry": {
-        "type": "item",
         "item": "health_potion"
       }
     }
