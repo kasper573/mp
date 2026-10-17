@@ -317,6 +317,40 @@ fn a_resource_skill_needs_its_cost_and_eats_it_on_use() {
 }
 
 #[test]
+fn a_single_target_cast_engages_its_target_while_walking_and_lets_go_after() {
+    let mut sim = Sim::area(spawn_area());
+    let player = sim.join(1);
+    settle(&mut sim);
+    sim.send(1, learn(&[("throw_knife", 1)]));
+    settle(&mut sim);
+    give(&mut sim, player, row("ThrowingKnife"), 1);
+    let start = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_toward(start, Offset::new(8.0, 0.0));
+    let orc = target_dummy(&mut sim, row("Orc"), spot);
+    let full = stat::effective(sim.world(), orc, StatKind::Health);
+
+    sim.send(
+        1,
+        UseSkillRequest {
+            skill: row("ThrowKnife"),
+            aim: Aim::Actor(orc),
+        },
+    );
+    sim.tick();
+    sim.tick();
+    assert_eq!(
+        sim.world().get::<reach::Engaged>(player),
+        Some(&reach::Engaged(orc))
+    );
+    assert!(
+        sim.run_until(10.0, |world| stat::effective(world, orc, StatKind::Health)
+            < full)
+    );
+    settle(&mut sim);
+    assert_eq!(sim.world().get::<reach::Engaged>(player), None);
+}
+
+#[test]
 fn a_reset_asks_first_and_gives_every_point_back() {
     let mut sim = Sim::area(spawn_area());
     let player = sim.join(1);
