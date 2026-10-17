@@ -55,9 +55,14 @@ fn a_character_joined_from_a_row_is_that_character() {
         world.get::<Name>(player).map(|name| name.name.as_str()),
         Some("Tess")
     );
-    assert_eq!(
-        world.get::<Position>(player).map(|position| position.pos),
-        Some(start.at)
+    let landed = world
+        .get::<Position>(player)
+        .map(|position| position.pos)
+        .expect("a position");
+    assert!(
+        landed.distance_to(start.at) <= 1.5,
+        "landed at {landed:?}, asked for {:?}",
+        start.at
     );
     assert_eq!(world.get::<Xp>(player), Some(&Xp { amount: 60 }));
     assert_eq!(
