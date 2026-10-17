@@ -1217,6 +1217,10 @@ impl<'c, V: Vocabulary> Compiler<'c, V> {
         self.owner
     }
 
+    pub fn content(&self) -> &'c Content {
+        self.content
+    }
+
     /// The row whose script this is, when it is a row's own.
     pub fn owner_row(&self) -> Option<OwnerRow<V>> {
         self.row

@@ -26,4 +26,5 @@ mod summon;
 mod templates;
 mod travel;
 mod typewriter;
+mod vfx;
 mod walking;

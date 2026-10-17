@@ -54,12 +54,34 @@
               "skill": "volley",
               "stat": "power"
             }
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "arrow_hit",
+          "on": {
+            "type": "skill_targets"
           }
+        },
+        "sweep": {
+          "type": "vfx",
+          "vfx": "volley_fall",
+          "on": {
+            "type": "skill_area"
+          },
+          "next": "hit"
+        },
+        "swing": {
+          "type": "animate",
+          "action": "attack",
+          "wait": "apex",
+          "next": "sweep"
         },
         "used": {
           "type": "on",
           "event": "used",
-          "next": "hit"
+          "next": "swing"
         }
       }
     }

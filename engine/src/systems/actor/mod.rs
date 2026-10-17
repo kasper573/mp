@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString, VariantArray};
 
 use crate::core::content::{ContentRegistry, LoadStep};
-use crate::core::math::{Direction, Pos, Size};
+use crate::core::math::{Direction, Pos, Rgba, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
 use crate::systems::actor::model::ModelId;
@@ -66,37 +66,10 @@ pub enum Action {
     Dead,
 }
 
-#[derive(
-    JsonSchema,
-    Serialize,
-    Deserialize,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Debug,
-    Default,
-)]
-#[serde(from = "[u8; 4]", into = "[u8; 4]")]
-#[schemars(extend("x-color" = true))]
-pub struct Rgba(pub u32);
-
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tint {
     pub rgba: Rgba,
-}
-
-impl Rgba {
-    pub const WHITE: Rgba = Rgba(0xffff_ffff);
-
-    pub fn color(self) -> bevy::color::Color {
-        let [r, g, b, a] = self.0.to_be_bytes();
-        bevy::color::Color::srgba_u8(r, g, b, a)
-    }
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -187,17 +160,5 @@ pub fn settle(mut actors: Query<Situation>) {
 fn set_action(actor: &mut Mut<Actor>, action: Action) {
     if actor.action != action {
         actor.action = action;
-    }
-}
-
-impl From<[u8; 4]> for Rgba {
-    fn from(bytes: [u8; 4]) -> Rgba {
-        Rgba(u32::from_be_bytes(bytes))
-    }
-}
-
-impl From<Rgba> for [u8; 4] {
-    fn from(rgba: Rgba) -> [u8; 4] {
-        rgba.0.to_be_bytes()
     }
 }

@@ -1,4 +1,5 @@
 use bevy_ecs::prelude::*;
+use engine::core::math::Offset;
 use engine::core::tiling::Tiles;
 use engine::core::time::WallClock;
 use engine::systems::class::{self, SkillPoints};
@@ -15,7 +16,7 @@ use engine::systems::skill::{
 };
 use engine::systems::stat::{self, StatKind};
 
-use testkit::{Sim, count, errors, give, row, settle, slot_of, spawn_area};
+use testkit::{Sim, count, errors, give, row, settle, slot_of, spawn_area, target_dummy};
 
 #[test]
 fn a_fresh_fighter_wears_the_sword_and_slash_fills_the_basic_attack_slot() {
@@ -186,13 +187,14 @@ fn an_empty_basic_attack_slot_says_so_on_a_click() {
     let full = stat::effective(sim.world(), orc, StatKind::Health);
 
     sim.send(1, AssignBasicAttackRequest { skill: None });
+    settle(&mut sim);
     sim.send(1, AttackRequest { target: orc });
     settle(&mut sim);
 
     assert!(
         errors(&sim, 1)
             .iter()
-            .any(|text| text == "Nothing to attack with")
+            .any(|text| text == "Nothing to attack with"),
     );
     assert_eq!(stat::effective(sim.world(), orc, StatKind::Health), full);
 }
@@ -231,7 +233,9 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
     settle(&mut sim);
     sim.send(1, learn(&[("cleave", 1)]));
     settle(&mut sim);
-    let orc = orc_near(&mut sim, player, 3.0, 4.0);
+    let start = position(sim.world(), player).expect("position");
+    let spot = sim.walkable_toward(start, Offset::new(4.0, 0.0));
+    let orc = target_dummy(&mut sim, row("Orc"), spot);
     let full = stat::effective(sim.world(), orc, StatKind::Health);
     let at = position(sim.world(), orc).expect("position");
 

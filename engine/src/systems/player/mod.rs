@@ -12,13 +12,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet};
+use crate::core::math::Rgba;
 use crate::core::math::{Direction, Pos, Rng};
 use crate::core::tiling::Tiles;
 use crate::core::time::{PlaybackRate, Seconds, UnixMillis, WallClock};
 use crate::systems::GameSettings;
 use crate::systems::account::Identity;
 use crate::systems::actor::model::ModelId;
-use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Rgba, Tint};
+use crate::systems::actor::{Action, Actor, ActorModel, Hitbox, Name, Tint};
 use crate::systems::area::transition::{self, Discovered};
 use crate::systems::area::{self, AreaId, AreaTag};
 use crate::systems::belongings;

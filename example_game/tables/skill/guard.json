@@ -39,6 +39,14 @@
             "type": "skill_stat",
             "skill": "guard",
             "stat": "duration"
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "guard_up",
+          "on": {
+            "type": "skill_targets"
           }
         },
         "used": {

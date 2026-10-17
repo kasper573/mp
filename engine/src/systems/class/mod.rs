@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, serial};
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::vfx::VfxSite;
 use crate::systems::effect::{self, Effect};
 use crate::systems::player::Xp;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
@@ -18,6 +19,7 @@ use crate::systems::script::{
 };
 use crate::systems::skill::{Learned, SkillDef};
 use crate::systems::stat::StatMap;
+use crate::systems::vfx::{self, VfxFixture};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -170,7 +172,11 @@ pub fn grant_xp(world: &mut World, entity: Entity, amount: u32) {
     if let Some(mut xp) = world.get_mut::<Xp>(entity) {
         xp.gain(amount);
     }
-    if level(world, entity) > before {
+    let reached = level(world, entity);
+    if reached > before {
+        let level = &[("level", reached as f32)];
+        vfx::fixture::play(world, VfxFixture::LevelUp, VfxSite::Actor(entity), level);
+        vfx::fixture::play_for(world, entity, VfxFixture::LevelUp, VfxSite::Screen, level);
         let owner = area_owner(world);
         world.resource_mut::<RiftInstances>().raise(
             owner,

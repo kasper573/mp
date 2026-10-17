@@ -27,6 +27,7 @@ use crate::systems::script::{EffectCall, OwnerKind};
 use crate::systems::shop::OpenShop;
 use crate::systems::skill::{ResetSkills, UseSkill};
 use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
+use crate::systems::vfx::Vfx;
 
 pub type Aim = Option<Condition>;
 
@@ -104,6 +105,7 @@ effects! {
     Animate(Animate),
     UseSkill(UseSkill),
     ResetSkills(ResetSkills),
+    Vfx(Vfx),
     SetAttitude(SetAttitude),
     SpawnNpcs(SpawnNpcs),
     Despawn(Despawn),

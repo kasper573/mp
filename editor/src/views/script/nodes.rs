@@ -238,6 +238,7 @@ impl NodeEntry {
             "area" => "object",
             "npc body" | "notification" | "chat" | "actor" => "npc",
             "audio" => "sfx",
+            "vfx" => "skill",
             "stat" | "class" => "respawn",
             other => other,
         }
@@ -954,7 +955,7 @@ impl NodeReads {
     }
 }
 
-const EFFECT_BLURBS: [(&str, &str, &str); 37] = [
+const EFFECT_BLURBS: [(&str, &str, &str); 38] = [
     (
         "warp",
         "area",
@@ -1027,6 +1028,11 @@ const EFFECT_BLURBS: [(&str, &str, &str); 37] = [
         "reset_skills",
         "skill",
         "Asks, then forgets every learned rank and returns the points",
+    ),
+    (
+        "vfx",
+        "vfx",
+        "Plays a vfx row on each actor, a point or an area named, or on a player's screen or widget",
     ),
     (
         "set_attitude",

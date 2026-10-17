@@ -16,11 +16,11 @@ use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{
     Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck, serial,
 };
-use crate::core::math::{Direction, Percent, Pos, Rect, Rng};
+use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{PlaybackRate, Seconds};
 use crate::systems::actor::model::ModelId;
-use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Rgba, Tint};
+use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;

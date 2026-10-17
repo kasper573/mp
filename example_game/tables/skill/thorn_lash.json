@@ -37,12 +37,34 @@
               "skill": "thorn_lash",
               "stat": "power"
             }
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "thorns",
+          "on": {
+            "type": "skill_targets"
           }
+        },
+        "sweep": {
+          "type": "vfx",
+          "vfx": "sweep",
+          "on": {
+            "type": "skill_area"
+          },
+          "next": "hit"
+        },
+        "swing": {
+          "type": "animate",
+          "action": "attack",
+          "wait": "apex",
+          "next": "sweep"
         },
         "used": {
           "type": "on",
           "event": "used",
-          "next": "hit"
+          "next": "swing"
         }
       }
     }

@@ -1,0 +1,21 @@
+{
+  "name": "Fade",
+  "source": "shaders/fade.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        0,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "name": "strength",
+      "kind": "number",
+      "default": 1.0
+    }
+  ]
+}

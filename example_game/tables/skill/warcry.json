@@ -37,12 +37,28 @@
             "type": "skill_stat",
             "skill": "warcry",
             "stat": "duration"
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "cheered",
+          "on": {
+            "type": "skill_targets"
           }
+        },
+        "sweep": {
+          "type": "vfx",
+          "vfx": "rally",
+          "on": {
+            "type": "skill_area"
+          },
+          "next": "roar"
         },
         "used": {
           "type": "on",
           "event": "used",
-          "next": "roar"
+          "next": "sweep"
         }
       }
     }

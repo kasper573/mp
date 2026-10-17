@@ -12,12 +12,12 @@ use crate::core::content::media::ImageSizes;
 use crate::core::gui::{self, Band};
 use crate::core::interpolate::RenderValueSystems;
 use crate::core::math::{Direction, Pos};
-use crate::core::render::TILE;
 use crate::core::render::dynamic_z;
 use crate::core::render::screen::ToScreen;
 use crate::core::render::transition::{
     self, ActiveTransition, ScreenTransitionPhase, WorldViewSystems,
 };
+use crate::core::render::{GroundDepth, TILE};
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::tiling::TileSize;
 use crate::core::tiling::Tiles;
@@ -282,6 +282,7 @@ fn spawn_area_tiles(
         commands.entity(tile).despawn();
     }
     let area = area::load(&content, area_id);
+    commands.insert_resource(GroundDepth(area.sort_base()));
     let origin = area.size.bounds().min().to_screen();
     let mut loaded = Vec::new();
     let sheets = TileSheets::new(

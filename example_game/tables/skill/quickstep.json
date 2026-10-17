@@ -39,6 +39,14 @@
             "type": "skill_stat",
             "skill": "quickstep",
             "stat": "duration"
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "dash",
+          "on": {
+            "type": "skill_targets"
           }
         },
         "used": {

@@ -1,0 +1,16 @@
+{
+  "name": "Warp",
+  "source": "shaders/warp.wgsl",
+  "params": [
+    {
+      "name": "amplitude",
+      "kind": "number",
+      "default": 0.05
+    },
+    {
+      "name": "frequency",
+      "kind": "number",
+      "default": 18.0
+    }
+  ]
+}

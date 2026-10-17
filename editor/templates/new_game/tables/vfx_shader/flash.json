@@ -1,0 +1,21 @@
+{
+  "name": "Flash",
+  "source": "shaders/flash.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        255,
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "strength",
+      "kind": "number",
+      "default": 1.0
+    }
+  ]
+}

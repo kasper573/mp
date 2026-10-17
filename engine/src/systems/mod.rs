@@ -35,6 +35,7 @@ pub mod spectate;
 pub mod stat;
 pub mod terminal;
 pub mod text;
+pub mod vfx;
 pub mod view;
 pub mod visibility;
 
@@ -90,6 +91,7 @@ pub fn protocol(app: &mut App) {
     player::register(app);
     spectate::register(app);
     terminal::register(app);
+    vfx::register(app);
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -191,6 +193,7 @@ pub fn server_app(
             (
                 (
                     effect::expire,
+                    vfx::expire,
                     player::arrival_holds,
                     combat::regen,
                     movement::move_request,
@@ -338,6 +341,7 @@ pub fn client_app(
                 period: REPLICATION_PERIOD,
             },
             crate::core::render::RenderPlugin,
+            crate::core::vfx::render::VfxRenderPlugin,
             crate::core::audio::playback::SfxPlugin,
             crate::core::audio::soundscape::SoundscapePlugin,
             crate::core::babble::BabblePlugin,
@@ -471,11 +475,13 @@ pub fn registry() -> ContentRegistry {
         .fixture::<interface::CursorShape>()
         .fixture::<interface::InterfaceIcon>()
         .fixture::<interface::FontFace>()
+        .fixture::<vfx::VfxFixture>()
         .settings::<GameSettings>()
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);
     actor::content(&mut registry);
     area::content(&mut registry);
+    crate::core::vfx::content(&mut registry);
     registry
         .hook(LoadStep::Expand, script::build_all)
         .hook(LoadStep::Across, shop::check_all)

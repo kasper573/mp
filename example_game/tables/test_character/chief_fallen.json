@@ -2,6 +2,7 @@
   "name": "Chief Fallen",
   "class": "fighter",
   "xp": 60,
+  "basic_attack": "slash",
   "bag": [
     {
       "item": "orc_tusk",
@@ -72,11 +73,11 @@
     },
     {
       "item": "rusty_sword"
-    },
-    {
-      "item": "rusty_sword"
     }
   ],
+  "equipment": {
+    "weapon": "rusty_sword"
+  },
   "quests": [
     {
       "quest": "tusks_for_the_chief",

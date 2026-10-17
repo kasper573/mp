@@ -29,7 +29,7 @@ const FUNCTIONS: [&str; 2] = ["helper", "loops"];
 #[test]
 fn every_capability_compiles_for_exactly_the_owners_it_lists() {
     let capabilities = every_capability();
-    assert_eq!(capabilities.len(), 37);
+    assert_eq!(capabilities.len(), 38);
     for owner in OWNERS {
         for value in &capabilities {
             let parsed = effect(value.clone());
@@ -319,6 +319,7 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "animate", "action": "attack", "wait": "apex" }),
         json!({ "type": "use_skill", "skill": "slash", "at": { "type": "subject" } }),
         json!({ "type": "reset_skills" }),
+        json!({ "type": "vfx", "vfx": "damage_taken", "params": { "amount": 3.0 } }),
         json!({ "type": "set_attitude", "attitude": "hostile" }),
         json!({ "type": "spawn_npcs", "npc": "orc", "count": 1, "near": "subject", "shown": "everyone" }),
         json!({ "type": "despawn" }),

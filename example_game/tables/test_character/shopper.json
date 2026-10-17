@@ -1,6 +1,7 @@
 {
   "name": "Shopper",
   "class": "fighter",
+  "basic_attack": "slash",
   "bag": [
     {
       "item": "gold",
@@ -13,10 +14,10 @@
     {
       "item": "bone",
       "count": 4
-    },
-    {
-      "item": "rusty_sword"
     }
   ],
+  "equipment": {
+    "weapon": "rusty_sword"
+  },
   "start": "initial_spawn"
 }

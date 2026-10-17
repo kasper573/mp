@@ -11,6 +11,7 @@ use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
+use crate::core::vfx::VfxSite;
 use crate::systems::actor::{self, Actor};
 use crate::systems::notification;
 use crate::systems::npc::Pack;
@@ -18,6 +19,7 @@ use crate::systems::player::{self, Owner, sender_player, session};
 use crate::systems::reach;
 use crate::systems::skill::{self, BasicAttack};
 use crate::systems::stat::{self, Stats};
+use crate::systems::vfx::{self, VfxFixture};
 use crate::systems::{drain_requests, visibility};
 
 pub fn register(app: &mut App) {
@@ -140,7 +142,7 @@ pub fn regen(world: &mut World) {
         .iter(world)
         .collect();
     for player in players {
-        stat::heal(world, player, regen.health);
+        stat::regenerate(world, player, regen.health);
     }
 }
 
@@ -201,6 +203,7 @@ pub fn defeats(world: &mut World) {
             .entity_mut(entity)
             .remove::<Attackers>()
             .insert(Dead { at: time });
+        vfx::fixture::play(world, VfxFixture::Defeated, VfxSite::Actor(entity), &[]);
         world.write_message(Died { entity });
     }
 }

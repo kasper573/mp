@@ -1,0 +1,11 @@
+{
+  "name": "Shake",
+  "source": "shaders/shake.wgsl",
+  "params": [
+    {
+      "name": "amplitude",
+      "kind": "number",
+      "default": 0.04
+    }
+  ]
+}

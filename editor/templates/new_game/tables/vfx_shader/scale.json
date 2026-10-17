@@ -1,0 +1,16 @@
+{
+  "name": "Scale",
+  "source": "shaders/scale.wgsl",
+  "params": [
+    {
+      "name": "start",
+      "kind": "number",
+      "default": 1.0
+    },
+    {
+      "name": "end",
+      "kind": "number",
+      "default": 1.3
+    }
+  ]
+}

@@ -3700,6 +3700,7 @@ dependencies = [
  "jsonwebtoken",
  "kira",
  "metrics",
+ "naga",
  "oauth2",
  "oorandom",
  "opener",

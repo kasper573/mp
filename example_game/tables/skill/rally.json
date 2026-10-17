@@ -44,12 +44,28 @@
             "type": "skill_stat",
             "skill": "rally",
             "stat": "duration"
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "cheered",
+          "on": {
+            "type": "skill_targets"
           }
+        },
+        "sweep": {
+          "type": "vfx",
+          "vfx": "rally",
+          "on": {
+            "type": "skill_area"
+          },
+          "next": "cheer"
         },
         "used": {
           "type": "on",
           "event": "used",
-          "next": "cheer"
+          "next": "sweep"
         }
       }
     }

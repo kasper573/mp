@@ -32,12 +32,26 @@
               "skill": "slash",
               "stat": "power"
             }
+          },
+          "next": "show"
+        },
+        "show": {
+          "type": "vfx",
+          "vfx": "slash_hit",
+          "on": {
+            "type": "skill_targets"
           }
+        },
+        "swing": {
+          "type": "animate",
+          "action": "attack",
+          "wait": "apex",
+          "next": "hit"
         },
         "used": {
           "type": "on",
           "event": "used",
-          "next": "hit"
+          "next": "swing"
         }
       }
     }

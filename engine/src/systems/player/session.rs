@@ -7,7 +7,7 @@ use bevy_state::prelude::{OnEnter, OnExit};
 
 use super::{ClientId, Owner, Welcome};
 use crate::core::render::transition::WorldViewSystems;
-use crate::core::time::{Seconds, UnixMillis};
+use crate::core::time::{Seconds, ServerClock, UnixMillis};
 use crate::systems::spectate::Spectating;
 use crate::systems::stat;
 use bevy_time::Time;
@@ -44,18 +44,6 @@ impl Plugin for ClientSessionPlugin {
 
 #[derive(Resource, Default)]
 pub struct MyClient(pub Option<ClientId>);
-
-/// The server's wall clock as the welcome carried it, against the client's own uptime, so the
-/// client can tell how far along a server deadline is without a wall clock of its own.
-#[derive(Resource, Default)]
-pub struct ServerClock(Option<(UnixMillis, Seconds)>);
-
-impl ServerClock {
-    pub fn now(&self, uptime: Seconds) -> Option<UnixMillis> {
-        let (then, at) = self.0?;
-        Some(then.after(uptime - at))
-    }
-}
 
 pub fn server_now(world: &World) -> Option<UnixMillis> {
     let uptime = Seconds(world.resource::<Time>().elapsed_secs());
@@ -134,7 +122,7 @@ fn record_welcome(
 ) {
     for welcome in welcomes.read() {
         me.0 = Some(welcome.id);
-        clock.0 = Some((welcome.now, Seconds(time.elapsed_secs())));
+        clock.record(welcome.now, Seconds(time.elapsed_secs()));
     }
 }
 

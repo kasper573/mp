@@ -46,6 +46,10 @@ pub(crate) fn widget<R>(
         Held::new(key, Kept::Spot, Grip::Move, rect),
     );
     world.resource_mut::<HudDrawn>().0.push(rect);
+    world
+        .resource_mut::<gui::WidgetRects>()
+        .0
+        .insert(key.to_owned(), rect);
     shown.inner
 }
 
