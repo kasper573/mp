@@ -461,7 +461,7 @@ fn first_class_card(
         }
         let hidden: &[&str] = match table {
             "input" => &["modules", "bindings"],
-            class::TABLE => &["modules", "levels", "tree"],
+            class::TABLE => &["modules", "levels", "tree", "backdrop"],
             skill::TABLE => &["modules", "levels"],
             vfx::SHADER_TABLE => &["modules", "params"],
             _ => &["modules"],

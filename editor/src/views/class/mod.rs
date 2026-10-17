@@ -24,6 +24,7 @@ pub struct ClassViews {
     pub pages: HashMap<String, ClassPage>,
     pub snap: Option<bool>,
     pub drag: Option<tree::NodeDrag>,
+    pub frame_drag: Option<tree::FrameDrag>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]

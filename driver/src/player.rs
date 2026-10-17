@@ -191,6 +191,11 @@ impl Player {
         self.drag(Button::Left, KeyModifiers::NONE, from + by)
     }
 
+    pub fn drag_from(&mut self, from: Pos<WindowPx>, by: Offset<WindowPx>) -> ProbeSnapshot {
+        self.point_at(from);
+        self.drag(Button::Left, KeyModifiers::NONE, from + by)
+    }
+
     pub fn carry_onto(
         &mut self,
         item: impl Into<UiTarget>,

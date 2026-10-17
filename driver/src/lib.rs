@@ -19,7 +19,7 @@ pub use player::{LONG, Pace, Player, reading};
 pub use playtest::{ContentEdit, Playtest, PlaytestSetup};
 pub use recording::{Footage, FootageOverlay, InsetCut, seconds};
 pub use seen::{
-    UiTarget, area_key, arrived_in, at_rest, carried, clickable_point, erred, finished, fixture,
-    holding, in_warp, in_world, marked, me_at_rest, nearest_npc, noticed, npc_is, on_quest, open,
-    portal, taken, told_by, townsperson,
+    UiTarget, area_key, arrived_in, at_rest, bare_spot, carried, clickable_point, erred, finished,
+    fixture, holding, in_warp, in_world, marked, me_at_rest, nearest_npc, noticed, npc_is,
+    on_quest, open, portal, taken, told_by, townsperson,
 };

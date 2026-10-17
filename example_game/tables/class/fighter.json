@@ -131,5 +131,15 @@
         "y": 340.0
       }
     }
+  },
+  "backdrop": {
+    "image": "backdrops/fighter.png",
+    "frame": {
+      "x": -100.0,
+      "y": -120.0,
+      "width": 1000.0,
+      "height": 600.0
+    },
+    "fit": "cover"
   }
 }

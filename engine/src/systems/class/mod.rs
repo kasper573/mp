@@ -1,6 +1,9 @@
 pub mod tree;
 
-pub use tree::{AccessRequirement, CanvasPoint, NODE_EXTENT, SkillNode, SkillTree};
+pub use tree::{
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NODE_EXTENT, SkillNode, SkillTree,
+    TreeBackdrop,
+};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -38,6 +41,21 @@ pub struct ClassDef {
     pub levels: Vec<ClassLevel>,
     #[serde(default, skip_serializing_if = "SkillTree::is_empty")]
     pub tree: SkillTree,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backdrop: Option<TreeBackdrop>,
+}
+
+impl ClassDef {
+    /// The canvas the tree is shown on: its backdrop's frame and every node's footprint. A
+    /// window never shows past it.
+    pub fn canvas(&self) -> Option<egui::Rect> {
+        let nodes = self.tree.bounds();
+        let frame = self.backdrop.as_ref().map(|backdrop| backdrop.frame.rect());
+        match (nodes, frame) {
+            (Some(nodes), Some(frame)) => Some(nodes.union(frame)),
+            (nodes, frame) => nodes.or(frame),
+        }
+    }
 }
 
 impl ContentRow for ClassDef {
@@ -65,6 +83,9 @@ impl ContentRow for ClassDef {
             }
         }
         self.tree.check(check);
+        if let Some(backdrop) = &self.backdrop {
+            backdrop.check(check);
+        }
     }
 }
 

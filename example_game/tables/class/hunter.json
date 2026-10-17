@@ -104,5 +104,15 @@
         "y": 200.0
       }
     }
+  },
+  "backdrop": {
+    "image": "backdrops/hunter.png",
+    "frame": {
+      "x": -80.0,
+      "y": -60.0,
+      "width": 800.0,
+      "height": 640.0
+    },
+    "fit": "contain"
   }
 }

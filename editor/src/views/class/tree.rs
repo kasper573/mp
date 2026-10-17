@@ -1,14 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use egui::{Color32, Key, Modifiers, Pos2, Rect, Sense, Stroke, Ui, Vec2};
-use engine::systems::class::NODE_EXTENT;
+use egui::{Color32, CursorIcon, Key, Modifiers, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use engine::systems::class::{BackdropFit, NODE_EXTENT};
 use serde::Deserialize;
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::{TABLE, node_of, select_node, write};
 use crate::app::Editor;
 use crate::forms::FormCx;
 use crate::project::{ProjectFiles, row_file};
+use crate::ui::assets::AssetKind;
 use crate::ui::{inspector, theme, widgets};
 use crate::{picker, thumbs};
 
@@ -21,6 +22,14 @@ const GHOST_OFFSET: Vec2 = Vec2::new(-150.0, -40.0);
 const FIRST_SPOT: Point = Point { x: 80.0, y: 60.0 };
 const SPOT_STEP: Vec2 = Vec2::new(80.0, 140.0);
 const SPOTS_PER_ROW: u32 = 8;
+const HANDLE: f32 = 10.0;
+const FRAME_AROUND_NODES: f32 = 40.0;
+const DEFAULT_FRAME: Rect = Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(800.0, 600.0));
+const FITS: [(BackdropFit, &str); 3] = [
+    (BackdropFit::Contain, "contain"),
+    (BackdropFit::Cover, "cover"),
+    (BackdropFit::Stretch, "stretch"),
+];
 
 /// A node of a class tree as the canvas reads it from the row.
 #[derive(Clone, Deserialize)]
@@ -55,6 +64,54 @@ pub enum Requirement {
 }
 
 pub type Nodes = BTreeMap<String, Node>;
+
+/// The art behind the tree as the canvas reads it from the row.
+#[derive(Clone, Deserialize)]
+pub struct Backdrop {
+    pub image: String,
+    pub frame: Frame,
+    #[serde(default)]
+    pub fit: BackdropFit,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Debug)]
+pub struct Frame {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Frame {
+    fn rect(self) -> Rect {
+        Rect::from_min_size(
+            Pos2::new(self.x, self.y),
+            Vec2::new(self.width, self.height),
+        )
+    }
+
+    fn json(rect: Rect) -> Value {
+        json!({ "x": rect.min.x, "y": rect.min.y, "width": rect.width(), "height": rect.height() })
+    }
+}
+
+/// The backdrop's frame taken hold of, by a corner or its middle, until it is let go of.
+pub struct FrameDrag {
+    grip: FrameGrip,
+    start: Rect,
+    grab: Pos2,
+    now: Rect,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FrameGrip {
+    Move,
+    Corner(usize),
+}
+
+pub fn backdrop_of(row: &Value) -> Option<Backdrop> {
+    serde_json::from_value(row["backdrop"].clone()).ok()
+}
 
 /// A node picked up off the canvas, drawn under the pointer until it is let go of.
 pub struct NodeDrag {
@@ -222,6 +279,7 @@ fn toolbar(
         });
     }
     editor.views.class.snap = Some(snap);
+    backdrop_bar(editor, ui, key, row, nodes, changed);
     if !picked.is_empty() {
         let node = fresh_key(nodes, &picked);
         let at = free_spot(nodes);
@@ -237,6 +295,112 @@ fn toolbar(
     }
 }
 
+fn backdrop_bar(
+    editor: &mut Editor,
+    ui: &mut Ui,
+    key: &str,
+    row: &mut Value,
+    nodes: &Nodes,
+    changed: &mut Option<&'static str>,
+) {
+    let shapes = editor.shapes.clone();
+    let root = shapes.shape_of(TABLE);
+    let mut actions = Vec::new();
+    let backdrop = backdrop_of(row);
+    let mut image = backdrop
+        .as_ref()
+        .map(|backdrop| backdrop.image.clone())
+        .unwrap_or_default();
+    let mut fit = backdrop
+        .as_ref()
+        .map_or(BackdropFit::Contain, |backdrop| backdrop.fit);
+    let mut framed = false;
+    let mut removed = false;
+    {
+        let Editor {
+            project,
+            form,
+            shapes,
+            ..
+        } = editor;
+        let project = project.as_ref().expect("a project");
+        let mut cx =
+            FormCx::new(project, root, shapes, form, &mut actions).owned_by(TABLE, Some(key));
+        ui.horizontal(|ui| {
+            ui.label(theme::muted("backdrop").size(12.5));
+            ui.scope(|ui| {
+                ui.set_width(260.0);
+                picker::asset_of(ui, &mut cx, &[AssetKind::Image], &mut image, "/backdrop/image");
+            });
+            if backdrop.is_some() {
+                design_tokens::widgets::combo_box(ui.id().with("backdrop-fit"))
+                    .selected_text(fit_label(fit))
+                    .show_ui(ui, |ui| {
+                        for (option, label) in FITS {
+                            ui.selectable_value(&mut fit, option, label);
+                        }
+                    })
+                    .response
+                    .on_hover_text("How the image meets its frame: shown whole, cropped to fill it, or stretched");
+                framed = ui
+                    .button("frame the nodes")
+                    .on_hover_text("Sizes the frame to the nodes, with room around them")
+                    .clicked();
+                removed = ui.button("remove").clicked();
+            }
+        });
+    }
+    for action in actions {
+        inspector::act(editor, action, TABLE, key);
+    }
+    match &backdrop {
+        None if !image.is_empty() => {
+            row["backdrop"] = json!({
+                "image": image,
+                "frame": Frame::json(nodes_frame(nodes)),
+                "fit": "contain",
+            });
+            *changed = Some("Add backdrop");
+        }
+        Some(_) if removed => {
+            row.as_object_mut().expect("object").remove("backdrop");
+            *changed = Some("Remove backdrop");
+        }
+        Some(backdrop) if image != backdrop.image => {
+            row["backdrop"]["image"] = Value::String(image);
+            *changed = Some("Change backdrop image");
+        }
+        Some(backdrop) if fit != backdrop.fit => {
+            row["backdrop"]["fit"] = Value::String(fit_label(fit).to_owned());
+            *changed = Some("Change backdrop fit");
+        }
+        Some(_) if framed => {
+            row["backdrop"]["frame"] = Frame::json(nodes_frame(nodes));
+            *changed = Some("Frame the nodes");
+        }
+        _ => {}
+    }
+}
+
+fn fit_label(fit: BackdropFit) -> &'static str {
+    FITS.iter()
+        .find(|(option, _)| *option == fit)
+        .map_or("contain", |(_, label)| label)
+}
+
+fn nodes_frame(nodes: &Nodes) -> Rect {
+    nodes
+        .values()
+        .map(|node| {
+            Rect::from_center_size(
+                Pos2::new(node.at.x, node.at.y),
+                Vec2::splat(NODE_EXTENT * 2.0),
+            )
+        })
+        .reduce(|all, next| all.union(next))
+        .map_or(DEFAULT_FRAME, |rect| rect.expand(FRAME_AROUND_NODES))
+}
+
 fn canvas(
     editor: &mut Editor,
     ui: &mut Ui,
@@ -249,14 +413,35 @@ fn canvas(
         .filter(|_| editor.selection.keys.first().is_some_and(|k| k == key))
         .map(str::to_owned);
     let snap = editor.views.class.snaps();
-    let extent = nodes.values().fold(Vec2::ZERO, |most, node| {
-        most.max(Vec2::new(node.at.x, node.at.y))
-    });
-    let wanted = extent + Vec2::splat(MARGIN * 2.0);
+    let backdrop = backdrop_of(row);
+    let saved_frame = backdrop.as_ref().map(|backdrop| backdrop.frame.rect());
+    // The canvas keeps the extent of the saved frame while one is dragged, so what is under
+    // the pointer stays put until it is let go of.
+    let frame = editor
+        .views
+        .class
+        .frame_drag
+        .as_ref()
+        .map(|drag| drag.now)
+        .or(saved_frame);
+    let (low, high) = nodes
+        .values()
+        .map(|node| Vec2::new(node.at.x, node.at.y))
+        .chain(
+            saved_frame
+                .into_iter()
+                .flat_map(|frame| [frame.min.to_vec2(), frame.max.to_vec2()]),
+        )
+        .fold((Vec2::ZERO, Vec2::ZERO), |(low, high), at| {
+            (low.min(at), high.max(at))
+        });
+    let wanted = high - low + Vec2::splat(MARGIN * 2.0);
     let mut released: Option<(String, Point)> = None;
     let mut clicked: Option<Option<String>> = None;
     let mut removed: Option<String> = None;
     let mut started: Option<NodeDrag> = None;
+    let mut frame_started: Option<FrameDrag> = None;
+    let mut frame_released: Option<Rect> = None;
     let mut hovering_canvas = false;
     egui::ScrollArea::both()
         .id_salt(("class-tree", key))
@@ -265,10 +450,54 @@ fn canvas(
             let size = wanted.max(ui.available_size());
             let (rect, background) = ui.allocate_exact_size(size, Sense::click());
             hovering_canvas = ui.rect_contains_pointer(rect);
-            let origin = rect.min + Vec2::splat(MARGIN);
+            let origin = rect.min + Vec2::splat(MARGIN) - low;
             let to_screen = |at: Point| origin + Vec2::new(at.x, at.y);
             let painter = ui.painter_at(rect);
             painter.rect_filled(rect, 0.0, theme::CANVAS);
+            if let (Some(backdrop), Some(frame)) = (&backdrop, frame) {
+                let on_screen = frame.translate(origin.to_vec2());
+                let files = editor.project.as_ref().map(|project| &project.files);
+                let image = files.and_then(|files| {
+                    editor
+                        .form
+                        .thumbnails
+                        .image(ui.ctx(), files, &backdrop.image)
+                });
+                if let Some(image) = image {
+                    let drawn = backdrop.fit.place(
+                        on_screen,
+                        Vec2::new(image.size[0] as f32, image.size[1] as f32),
+                    );
+                    painter.with_clip_rect(on_screen.intersect(rect)).image(
+                        image.texture.id(),
+                        drawn,
+                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+                let holding = editor.views.class.frame_drag.as_ref();
+                frame_handles(
+                    ui,
+                    &painter,
+                    frame,
+                    origin,
+                    holding.map(|drag| drag.grip),
+                    &mut frame_started,
+                    &mut clicked,
+                );
+                if let Some(drag) = holding
+                    && let Some(pointer) = ui.input(|input| input.pointer.latest_pos())
+                {
+                    let mut now = dragged_frame(drag, pointer);
+                    if snap {
+                        now = snapped_rect(now);
+                    }
+                    frame_released = ui
+                        .input(|input| input.pointer.any_released())
+                        .then_some(now);
+                    editor.views.class.frame_drag = Some(FrameDrag { now, ..*drag });
+                }
+            }
             dots(&painter, rect, origin);
             if background.clicked() {
                 clicked = Some(None);
@@ -430,8 +659,20 @@ fn canvas(
     if let Some(drag) = started {
         editor.views.class.drag = Some(drag);
     }
+    if let Some(drag) = frame_started {
+        editor.views.class.frame_drag = Some(drag);
+    }
     if ui.input(|input| input.pointer.any_released()) {
         editor.views.class.drag = None;
+        editor.views.class.frame_drag = None;
+    }
+    if let Some(now) = frame_released
+        && backdrop
+            .as_ref()
+            .is_some_and(|backdrop| backdrop.frame.rect() != now)
+    {
+        row["backdrop"]["frame"] = Frame::json(now);
+        *changed = Some("Reframe backdrop");
     }
     if let Some((node, at)) = released {
         let blocked = nodes
@@ -462,6 +703,78 @@ fn canvas(
     editor.status.left.push(
         "click a node to inspect it · drag to move · right-click or Delete removes it".to_owned(),
     );
+    if backdrop.is_some() {
+        editor
+            .status
+            .left
+            .push("drag the backdrop's corners to size it, its middle to move it".to_owned());
+    }
+}
+
+/// The frame's outline and grips on the canvas: `frame` is in canvas coordinates, drawn at
+/// `origin`. Registered before the nodes, so a node over the frame still takes the pointer.
+fn frame_handles(
+    ui: &mut Ui,
+    painter: &egui::Painter,
+    frame: Rect,
+    origin: Pos2,
+    held: Option<FrameGrip>,
+    started: &mut Option<FrameDrag>,
+    clicked: &mut Option<Option<String>>,
+) {
+    let on_screen = frame.translate(origin.to_vec2());
+    let colour = if held.is_some() {
+        theme::ACCENT
+    } else {
+        theme::MUTED
+    };
+    painter.rect_stroke(on_screen, 0.0, Stroke::new(1.0, colour), StrokeKind::Inside);
+    let middle = ui.interact(
+        on_screen.shrink(HANDLE),
+        ui.id().with("backdrop-frame"),
+        Sense::click_and_drag(),
+    );
+    if middle.clicked() {
+        *clicked = Some(None);
+    }
+    let mut take = |response: &egui::Response, grip: FrameGrip| {
+        if response.drag_started()
+            && let Some(pointer) = response.interact_pointer_pos()
+        {
+            *started = Some(FrameDrag {
+                grip,
+                start: frame,
+                grab: pointer,
+                now: frame,
+            });
+        }
+    };
+    take(&middle, FrameGrip::Move);
+    let corners = [
+        on_screen.left_top(),
+        on_screen.right_top(),
+        on_screen.right_bottom(),
+        on_screen.left_bottom(),
+    ];
+    for (index, corner) in corners.into_iter().enumerate() {
+        let handle = Rect::from_center_size(corner, Vec2::splat(HANDLE));
+        let cursor = if index % 2 == 0 {
+            CursorIcon::ResizeNwSe
+        } else {
+            CursorIcon::ResizeNeSw
+        };
+        let response = ui
+            .interact(
+                handle,
+                ui.id().with(("backdrop-corner", index)),
+                Sense::drag(),
+            )
+            .on_hover_cursor(cursor);
+        take(&response, FrameGrip::Corner(index));
+        let lit = response.hovered() || held == Some(FrameGrip::Corner(index));
+        painter.rect_filled(handle, 1.0, if lit { theme::ACCENT } else { theme::RAISED });
+        painter.rect_stroke(handle, 1.0, Stroke::new(1.0, colour), StrokeKind::Inside);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -556,6 +869,34 @@ fn cycles(nodes: &Nodes) -> BTreeSet<&str> {
         }
     }
     on_cycle
+}
+
+fn dragged_frame(drag: &FrameDrag, pointer: Pos2) -> Rect {
+    let moved = pointer - drag.grab;
+    let start = drag.start;
+    let (left, top) = match drag.grip {
+        FrameGrip::Move => return start.translate(moved),
+        FrameGrip::Corner(corner) => (corner == 0 || corner == 3, corner == 0 || corner == 1),
+    };
+    let mut rect = start;
+    if left {
+        rect.min.x = (start.min.x + moved.x).min(start.max.x - GRID);
+    } else {
+        rect.max.x = (start.max.x + moved.x).max(start.min.x + GRID);
+    }
+    if top {
+        rect.min.y = (start.min.y + moved.y).min(start.max.y - GRID);
+    } else {
+        rect.max.y = (start.max.y + moved.y).max(start.min.y + GRID);
+    }
+    rect
+}
+
+fn snapped_rect(rect: Rect) -> Rect {
+    let snap = |value: f32| (value / GRID).round() * GRID;
+    let min = Pos2::new(snap(rect.min.x), snap(rect.min.y));
+    let max = Pos2::new(snap(rect.max.x), snap(rect.max.y));
+    Rect::from_min_max(min, max.max(min + Vec2::splat(GRID)))
 }
 
 fn overlaps(a: Point, b: Point) -> bool {

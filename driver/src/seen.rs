@@ -81,6 +81,32 @@ pub fn portal<'a>(snapshot: &'a ProbeSnapshot, name: &str) -> &'a ProbeExit {
         .unwrap_or_else(|| panic!("no warp named {name} here"))
 }
 
+/// A spot within `rect` with no interface element under or near it, for a drag meant for the
+/// surface itself rather than a control on it: the first found on a coarse grid in from the
+/// edges. Near counts, since the interface takes a pointer a few pixels off a control as on it.
+pub fn bare_spot(snapshot: &ProbeSnapshot, rect: Rect<WindowPx>) -> Option<Pos<WindowPx>> {
+    const INSET: f32 = 20.0;
+    const STEP: f32 = 40.0;
+    const CLEARANCE: f32 = 10.0;
+    let mut y = rect.min().y + INSET;
+    while y < rect.max().y - INSET {
+        let mut x = rect.min().x + INSET;
+        while x < rect.max().x - INSET {
+            let spot = Pos::new(x, y);
+            if !snapshot
+                .ui
+                .iter()
+                .any(|element| element.rect.inflate(CLEARANCE, CLEARANCE).contains(spot))
+            {
+                return Some(spot);
+            }
+            x += STEP;
+        }
+        y += STEP;
+    }
+    None
+}
+
 pub fn holding(snapshot: &ProbeSnapshot, item: &str) -> u32 {
     let item = id::<ItemDef>(item);
     snapshot

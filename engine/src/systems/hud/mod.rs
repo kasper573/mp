@@ -69,6 +69,11 @@ pub trait HudWindow: Send + Sync {
     fn size(&self) -> Vec2 {
         WINDOW_SIZE
     }
+    /// The most body the window may be given, when its content has an edge it must never
+    /// show past.
+    fn body_limit(&self, _world: &World) -> Option<Vec2> {
+        None
+    }
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
@@ -216,6 +221,21 @@ fn forget_drawn(mut drawn: ResMut<WindowsDrawn>, mut hud: ResMut<HudDrawn>) {
     hud.0.clear();
 }
 
+/// Where a window stands this frame, while it is open.
+pub(crate) fn window_rect(world: &World, window: &dyn HudWindow) -> Option<Rect> {
+    let title = window.title();
+    if !window_open(world, title) {
+        return None;
+    }
+    panel::shown_rect(&gui::context(world)?, title)
+}
+
+/// The most a window may be given, when its content bounds it.
+pub(crate) fn window_limit(world: &World, window: &dyn HudWindow) -> Option<Vec2> {
+    let body = window.body_limit(world)?;
+    Some(body + panel::chrome(&gui::context(world)?))
+}
+
 fn draw_hud(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
@@ -242,6 +262,7 @@ fn draw_hud(world: &mut World) {
             title: Some(title),
             start: centered,
             sizing: Sizing::Resizable,
+            body_limit: shown.body_limit(world),
         };
         let mut open = true;
         window(world, &gui, frame, &mut open, |ui, world| {

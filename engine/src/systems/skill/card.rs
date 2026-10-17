@@ -312,6 +312,7 @@ fn draw_card(world: &mut World) {
         title: None,
         start,
         sizing: Sizing::FitsContent,
+        body_limit: None,
     };
     let fresh = of(world, card.skill);
     hud::window(world, &gui, frame, &mut open, |ui, world| {

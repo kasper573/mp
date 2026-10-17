@@ -28,6 +28,7 @@ use crate::systems::combat::Attitude;
 use crate::systems::dialogue::stage;
 use crate::systems::history::widget::{self as history, HistoryBook};
 use crate::systems::history::{HistoryMark, HistoryRecord, HistoryTopic};
+use crate::systems::hud;
 use crate::systems::input::gestures::{self, ClickClaim};
 use crate::systems::input::map::InputMap;
 use crate::systems::item::{self, DroppedItem, Inventory, ItemId};
@@ -306,6 +307,19 @@ pub struct ProbeSkills {
     pub planned: Vec<(String, Rank)>,
     pub aiming: Option<SkillId>,
     pub reset_prompt: bool,
+    /// The skills window, while open.
+    pub view: Option<ProbeTreeView>,
+}
+
+/// How the skills window shows the tree: the canvas (backdrop and nodes) pans within the
+/// viewport, which the canvas always fills, and the window stops growing at `max`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProbeTreeView {
+    pub window: Rect<WindowPx>,
+    pub max: Option<Size<WindowPx>>,
+    pub viewport: Rect<WindowPx>,
+    pub canvas: Size<WindowPx>,
+    pub panned: Offset<WindowPx>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -668,6 +682,20 @@ fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
             .collect(),
         aiming: skill::aim::aiming(world).map(|aimed| aimed.skill),
         reset_prompt: skill::prompt::showing(world),
+        view: tree_view(world),
+    })
+}
+
+fn tree_view(world: &World) -> Option<ProbeTreeView> {
+    let window = hud::window_rect(world, &skill::window::SkillsWindow)?;
+    let view = world.resource::<skill::window::TreeView>();
+    Some(ProbeTreeView {
+        window: window_rect(window),
+        max: hud::window_limit(world, &skill::window::SkillsWindow)
+            .map(|max| Size::new(max.x, max.y)),
+        viewport: window_rect(view.viewport),
+        canvas: Size::new(view.content.x, view.content.y),
+        panned: Offset::new(view.offset.x, view.offset.y),
     })
 }
 

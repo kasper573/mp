@@ -1,5 +1,5 @@
-use driver::{UiTarget, content, holding, resident_home};
-use engine::core::math::Offset;
+use driver::{UiTarget, bare_spot, content, holding, resident_home};
+use engine::core::math::{Offset, Pos, WindowPx};
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::skill::HotbarEntry;
@@ -23,12 +23,12 @@ fn play(shoot: &mut Shoot) {
         Some(resident_home("glimmercap", "gnome_alchemist")),
     );
     let mut me = shoot.roll(player);
-    me.caption_top("Your class grants skill points as you level: K opens your skills");
+    me.caption_top("Your class grants skill points as you level: P opens your skills");
     me.act(InputAction::ToggleSkills);
     me.find_ui("Skills");
     me.find_ui(UiTarget::containing("to spend"));
     me.caption_top(
-        "The tree is laid out as the designer drew it; arrows lead from a node to what it unlocks",
+        "The tree is laid out as the designer drew it, over the class's own art; arrows lead from a node to what it unlocks",
     );
     me.hold();
     me.caption_top(
@@ -65,6 +65,31 @@ fn play(shoot: &mut Shoot) {
     me.wait_until("Guard in slot 2", |snapshot| {
         slot_skill(snapshot, 1) == Some("guard")
     });
+    me.caption_top("A tree larger than its window pans by dragging, and never past the art's edge");
+    let opened = me.snapshot();
+    let view = tree_view(&opened).expect("the skills window").clone();
+    let grab = bare_spot(&opened, view.viewport).expect("a bare spot of the tree");
+    me.drag_from(grab, Offset::new(-140.0, -90.0));
+    me.wait_until("the tree panned", |snapshot| {
+        panned(snapshot).x > view.panned.x
+    });
+    me.hold();
+    me.caption_top("Pull the window's corner as far as you like: it stops where the tree ends");
+    me.drag_ui("Skills", Pos::new(20.0, 20.0) - view.window.origin);
+    let moved = me.wait_until("the window moved", |snapshot| {
+        tree_view(snapshot).is_some_and(|view| view.window.origin.x < 40.0)
+    });
+    let before = tree_view(&moved).expect("the skills window").window;
+    let corner = before.max() - Offset::new(4.0, 4.0);
+    let screen = moved.screen.expect("the screen");
+    me.drag_from(
+        corner,
+        Pos::new(screen.width - 2.0, screen.height - 2.0) - corner,
+    );
+    me.wait_until("the window at its largest", |snapshot| {
+        tree_view(snapshot).is_some_and(|view| view.window.size.width > before.size.width + 100.0)
+    });
+    me.hold();
     me.act(InputAction::ToggleSkills);
     me.caption_top("Press a slot's key: a skill on yourself fires at once, and its cooldown drains off the slot");
     me.act(InputAction::Hotbar2);
@@ -129,6 +154,14 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("Every point is back. The slots that held the skills stay, dimmed, until they are learned again");
     me.hover_ui(UiTarget::starting("Hotbar slot 1"));
     me.hold();
+}
+
+fn tree_view(snapshot: &ProbeSnapshot) -> Option<&engine::systems::probe::ProbeTreeView> {
+    snapshot.skills.as_ref()?.view.as_ref()
+}
+
+fn panned(snapshot: &ProbeSnapshot) -> Offset<WindowPx> {
+    tree_view(snapshot).map_or(Offset::new(0.0, 0.0), |view| view.panned)
 }
 
 fn learned(snapshot: &ProbeSnapshot, node: &str) -> u8 {

@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 use design_tokens::{HAIRLINE, TextRole, color, widgets};
-use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
+use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
+use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
 
 use super::card::{self, NodeAccess, SkillCard};
 use super::{LearnSkillsRequest, Learned, Rank, SkillId};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
-use crate::systems::class::tree::{NODE_EXTENT, SkillTree};
 use crate::systems::class::{self, ClassDef, SkillPoints};
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{self, InputAction, input};
@@ -39,6 +39,12 @@ impl HudWindow for SkillsWindow {
     fn size(&self) -> Vec2 {
         WINDOW_SIZE
     }
+    fn body_limit(&self, world: &World) -> Option<Vec2> {
+        let sheet = Sheet::of(world)?;
+        let canvas = sheet.class.get(world.resource::<Content>()).canvas()?;
+        let view = world.resource::<TreeView>();
+        Some(canvas.size() + view.body - view.viewport.size())
+    }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let Some(sheet) = Sheet::of(world) else {
             ui.label(RichText::new("No class yet").color(color::MUTED));
@@ -46,10 +52,44 @@ impl HudWindow for SkillsWindow {
         };
         header(ui, world, &sheet);
         let room = ui.available_rect_before_wrap();
-        let canvas = Rect::from_min_max(room.min, Pos2::new(room.max.x, room.max.y - DOCK_HEIGHT));
-        tree(ui, world, &sheet, canvas);
+        let viewport =
+            Rect::from_min_max(room.min, Pos2::new(room.max.x, room.max.y - DOCK_HEIGHT));
+        let panned = tree(ui, world, &sheet, viewport);
+        *world.resource_mut::<TreeView>() = TreeView {
+            body: ui.max_rect().size(),
+            viewport,
+            content: panned.content,
+            offset: panned.offset,
+        };
         dock(ui, world, &sheet, room);
     }
+}
+
+/// How the tree sat in its window when last drawn: the window's body, the viewport the tree
+/// pans within, the canvas shown there and how far it is panned. The window may grow until
+/// the viewport takes the whole canvas, and no further.
+#[derive(Resource, Clone, Copy, Debug, PartialEq)]
+pub struct TreeView {
+    pub body: Vec2,
+    pub viewport: Rect,
+    pub content: Vec2,
+    pub offset: Vec2,
+}
+
+impl Default for TreeView {
+    fn default() -> TreeView {
+        TreeView {
+            body: Vec2::ZERO,
+            viewport: Rect::ZERO,
+            content: Vec2::ZERO,
+            offset: Vec2::ZERO,
+        }
+    }
+}
+
+struct Panned {
+    content: Vec2,
+    offset: Vec2,
 }
 
 /// The ranks picked in the window and not yet confirmed, one rank per node.
@@ -216,13 +256,70 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
     card::tooltip(&response, world, &card::of(world, skill), Some(&hint));
 }
 
-fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, canvas: Rect) {
+/// The designer's canvas at its own scale, panned by dragging its background, and never past
+/// its edges: the viewport is always full of canvas.
+fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, viewport: Rect) -> Panned {
     let content = world.resource::<Content>().clone();
     let def = sheet.class.get(&content);
+    let canvas = def
+        .canvas()
+        .unwrap_or(Rect::from_min_size(Pos2::ZERO, viewport.size()));
+    let last = *world.resource::<TreeView>();
+    let shown = ui.scope_builder(UiBuilder::new().id_salt("tree").max_rect(viewport), |ui| {
+        ui.set_clip_rect(viewport.intersect(ui.clip_rect()));
+        let mut area = egui::ScrollArea::both()
+            .id_salt("tree")
+            .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
+            .scroll_source(ScrollSource {
+                scroll_bar: false,
+                drag: DragScroll::Always,
+                mouse_wheel: true,
+            })
+            .auto_shrink([false, false]);
+        let furthest = (canvas.size() - viewport.size()).max(Vec2::ZERO);
+        if last.viewport == Rect::ZERO {
+            if let Some(nodes) = def.tree.bounds() {
+                let centred = nodes.center() - canvas.min - viewport.size() / 2.0;
+                area = area.scroll_offset(centred.clamp(Vec2::ZERO, furthest));
+            }
+        } else if last.offset != last.offset.clamp(Vec2::ZERO, furthest) {
+            // The area clamps its offset only after drawing, which would bare a strip of the
+            // viewport for the frame a growing window lets more canvas in.
+            area = area.scroll_offset(last.offset.clamp(Vec2::ZERO, furthest));
+        }
+        area.show(ui, |ui| {
+            let size = canvas.size().max(viewport.size());
+            let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Other, true, "Skill tree")
+            });
+            let origin = rect.min + (size - canvas.size()) / 2.0 - canvas.min.to_vec2();
+            draw_canvas(ui, world, sheet, def, Placement { origin });
+        })
+    });
+    Panned {
+        content: shown.inner.content_size,
+        offset: shown.inner.state.offset,
+    }
+}
+
+fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, place: Placement) {
+    let content = world.resource::<Content>().clone();
     let tree = &def.tree;
     let plan = world.resource::<Plan>().clone();
     let planned = sheet.planned_ranks(&plan);
-    let place = Placement::fit(tree, canvas);
+    if let Some(backdrop) = &def.backdrop
+        && let Some(image) = gui::image(world, &backdrop.image)
+    {
+        let frame = place.rect(backdrop.frame.rect());
+        let drawn = backdrop.fit.place(frame, image.size);
+        ui.painter().with_clip_rect(frame).image(
+            image.texture,
+            drawn,
+            Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+            Color32::WHITE,
+        );
+    }
     let states: BTreeMap<&str, NodeState> = tree
         .0
         .iter()
@@ -245,7 +342,7 @@ fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, canvas: Rect) {
             (key.as_str(), state)
         })
         .collect();
-    let painter = ui.painter_at(canvas);
+    let painter = ui.painter().clone();
     for arrow in tree.arrows() {
         let (Some(from), Some(to)) = (tree.node(arrow.from), tree.node(arrow.to)) else {
             continue;
@@ -579,42 +676,17 @@ fn points(count: u32) -> String {
     }
 }
 
-/// The designer's canvas scaled to fit the window, never enlarged past its own size.
+/// Where the designer's canvas origin lands on screen.
 struct Placement {
     origin: Pos2,
-    offset: Vec2,
-    scale: f32,
 }
 
 impl Placement {
-    fn fit(tree: &SkillTree, canvas: Rect) -> Placement {
-        let (mut min, mut max) = (Vec2::splat(f32::INFINITY), Vec2::splat(f32::NEG_INFINITY));
-        for node in tree.0.values() {
-            min = min.min(Vec2::new(node.at.x, node.at.y));
-            max = max.max(Vec2::new(node.at.x, node.at.y));
-        }
-        if !min.x.is_finite() {
-            return Placement {
-                origin: canvas.center(),
-                offset: Vec2::ZERO,
-                scale: 1.0,
-            };
-        }
-        let margin = NODE_EXTENT;
-        let span = (max - min) + Vec2::splat(margin * 2.0);
-        let scale = (canvas.width() / span.x)
-            .min(canvas.height() / span.y)
-            .min(1.0);
-        let drawn = span * scale;
-        let origin = canvas.min + (canvas.size() - drawn) / 2.0;
-        Placement {
-            origin,
-            offset: Vec2::splat(margin) - min,
-            scale,
-        }
+    fn at(&self, point: class::CanvasPoint) -> Pos2 {
+        self.origin + Vec2::new(point.x, point.y)
     }
 
-    fn at(&self, point: class::CanvasPoint) -> Pos2 {
-        self.origin + (Vec2::new(point.x, point.y) + self.offset) * self.scale
+    fn rect(&self, rect: Rect) -> Rect {
+        rect.translate(self.origin.to_vec2())
     }
 }
