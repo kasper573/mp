@@ -3,7 +3,7 @@ use design_tokens::color;
 use egui::{RichText, Ui, Vec2};
 
 use crate::systems::class;
-use crate::systems::hud::{HudAudience, HudWindow};
+use crate::systems::hud::HudWindow;
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::player::session;
@@ -16,9 +16,6 @@ const ROW_SPACING: Vec2 = Vec2::new(16.0, 6.0);
 pub struct StatsWindow;
 
 impl HudWindow for StatsWindow {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Players
-    }
     fn title(&self) -> &'static str {
         "Stats"
     }

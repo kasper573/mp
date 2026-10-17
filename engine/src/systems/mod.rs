@@ -31,7 +31,6 @@ pub mod script;
 pub mod settings;
 pub mod shop;
 pub mod skill;
-pub mod spectate;
 pub mod stat;
 pub mod terminal;
 pub mod text;
@@ -89,7 +88,6 @@ pub fn protocol(app: &mut App) {
     shop::register(app);
     quest::register(app);
     player::register(app);
-    spectate::register(app);
     terminal::register(app);
     vfx::register(app);
 }
@@ -159,7 +157,6 @@ pub fn server_app(
     protocol(&mut app);
     visibility::register(&mut app);
     app.init_resource::<player::Players>()
-        .init_resource::<spectate::Spectators>()
         .init_resource::<area::transition::Departures>()
         .init_resource::<combat::RegenAt>()
         .init_resource::<skill::reset::PendingResets>()
@@ -170,7 +167,6 @@ pub fn server_app(
         .add_message::<rewards::KillCredited>()
         .add_observer(player::greet)
         .add_observer(player::client_left)
-        .add_observer(spectate::client_left)
         .add_systems(
             Startup,
             (
@@ -236,7 +232,6 @@ pub fn server_app(
                     item::expire_drops,
                     player::join,
                     player::respawn,
-                    spectate::requests,
                     (npc::run_respawn, npc::dismiss).chain(),
                 )
                     .chain(),
@@ -369,7 +364,6 @@ pub fn client_app(
             quest::card::QuestCardPlugin,
             quest::log::QuestLogPlugin,
             quest::tracker::QuestTrackerPlugin,
-            spectate::widget::SpectatorPlugin,
             terminal::TerminalPlugin,
             frame_rate::FrameRatePlugin,
         ));

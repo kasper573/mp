@@ -885,7 +885,7 @@ fn spawn_client(
         game_server_url: format!("http://{LOCALHOST}:{}", ports.http),
         game_server_ws_url: format!("ws://{LOCALHOST}:{}", ports.ws),
         auth: launch::AuthMode::Fake,
-        access_token: Some(fake_token(character, &[])),
+        access_token: Some(fake_token(character)),
         profile_dir: profile,
         exit_on_stdin_eof: true,
         probe: None,
@@ -965,7 +965,7 @@ fn hand_over(
     }
     .map_err(|error| error.to_string())?;
     let response = ureq::post(format!("http://{LOCALHOST}:{http}{TEST_CHARACTER_ROUTE}"))
-        .header("Authorization", fake_token(character, &[]))
+        .header("Authorization", fake_token(character))
         .send(body.as_bytes());
     match response {
         Ok(_) => Ok(()),

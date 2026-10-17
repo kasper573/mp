@@ -70,7 +70,7 @@ impl Server {
             start,
         };
         ureq::post(format!("{}{TEST_CHARACTER_ROUTE}", self.http_url()))
-            .header("Authorization", launch::fake_token(account, &[]))
+            .header("Authorization", launch::fake_token(account))
             .send(to_json(&request))
             .unwrap_or_else(|error| panic!("the game server refused {character}: {error}"));
     }

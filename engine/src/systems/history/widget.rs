@@ -9,12 +9,10 @@ use super::{
 use crate::core::platform::ClientPlatform;
 use crate::core::text::{self, StyledLine, StyledSpan, TextLook};
 use crate::core::time::LocalClock;
-use crate::systems::actor::Name;
-use crate::systems::hud::{self, HudAudience, HudWindow};
+use crate::systems::hud::{self, HudWindow};
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::player::ClientId;
-use crate::systems::player::session::{self, ClientMode, Viewpoint};
 use crate::systems::screen::ClientScreen;
 
 const SIZE: Vec2 = Vec2::new(780.0, 460.0);
@@ -94,9 +92,6 @@ pub fn shown_tab(world: &World) -> Option<HistoryTab> {
 pub struct HistoryWindow;
 
 impl HudWindow for HistoryWindow {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Everyone
-    }
     fn title(&self) -> &'static str {
         "History"
     }
@@ -121,7 +116,7 @@ impl HudWindow for HistoryWindow {
             world.resource_mut::<HistoryBook>().tab = tab;
             InterfaceSound::UiPage.play(world);
         }
-        let rows = rows(world, tab, watched_name(world));
+        let rows = rows(world, tab);
         let clock = world.resource::<ClientPlatform>().0.local_clock();
         egui::ScrollArea::vertical()
             .id_salt(("history", tab.title()))
@@ -161,7 +156,6 @@ pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: b
 
 #[derive(Clone, PartialEq)]
 enum Row {
-    Watching { name: String, count: usize },
     Trimmed,
     Empty(HistoryTab),
     Record(HistoryRecord),
@@ -222,15 +216,9 @@ fn lazily(ui: &mut Ui, id: Id, row: &Row, add: impl FnOnce(&mut Ui)) {
     ui.data_mut(|data| data.insert_temp(id, measured));
 }
 
-fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {
+fn rows(world: &World, tab: HistoryTab) -> Vec<Row> {
     let book = world.resource::<HistoryBook>();
     let mut rows = Vec::new();
-    if let Some(name) = watched {
-        rows.push(Row::Watching {
-            name,
-            count: book.records.len(),
-        });
-    }
     if book.records.first().is_some_and(|first| first.nth > 1) {
         rows.push(Row::Trimmed);
     }
@@ -248,33 +236,8 @@ fn rows(world: &World, tab: HistoryTab, watched: Option<String>) -> Vec<Row> {
     rows
 }
 
-fn watched_name(world: &World) -> Option<String> {
-    if session::mode(world) != ClientMode::Spectate {
-        return None;
-    }
-    world
-        .resource::<Viewpoint>()
-        .0
-        .and_then(|seen| world.get::<Name>(seen))
-        .map(|name| name.name.clone())
-}
-
 fn show_row(ui: &mut Ui, world: &mut World, row: &Row, clock: LocalClock) {
     match row {
-        Row::Watching { name, count } => {
-            egui::Frame::new()
-                .fill(color::INPUT)
-                .corner_radius(design_tokens::WIDGET_RADIUS)
-                .inner_margin(egui::Margin::symmetric(8, 4))
-                .show(ui, |ui| {
-                    ui.set_min_width(ui.available_width());
-                    caption(
-                        ui,
-                        format!("Watching {name} · {count} records"),
-                        color::TEXT,
-                    );
-                });
-        }
         Row::Trimmed => caption(
             ui,
             format!("Older records are gone. The last {KEPT} are kept."),

@@ -13,12 +13,12 @@ use super::{
 use crate::core::content::{Content, Fixture};
 use crate::core::time::UnixMillis;
 use crate::systems::dialogue::ChoiceReveal;
-use crate::systems::hud::{self, Confirm, HudAudience, HudWindow};
+use crate::systems::hud::{self, Confirm, HudWindow};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::widget::slot_note_source;
 use crate::systems::item::{Inventory, ItemFlag, ItemStack};
-use crate::systems::player::session::{self, ClientMode, Viewpoint};
+use crate::systems::player::session;
 use crate::systems::quest::QuestDef;
 use crate::systems::screen::ClientScreen;
 
@@ -40,9 +40,6 @@ impl Plugin for QuestLogPlugin {
 pub struct QuestLogWindow;
 
 impl HudWindow for QuestLogWindow {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Players
-    }
     fn title(&self) -> &'static str {
         "Quests"
     }
@@ -109,7 +106,6 @@ struct Page {
     inventory: Inventory,
     now: UnixMillis,
     selected: Option<QuestId>,
-    playing: bool,
 }
 
 fn forget(mut browse: ResMut<Browse>) {
@@ -118,7 +114,7 @@ fn forget(mut browse: ResMut<Browse>) {
 
 impl Page {
     fn of(world: &World, tab: LogTab) -> Page {
-        let seen = world.resource::<Viewpoint>().0;
+        let seen = session::me(world);
         Page {
             parties: world.resource::<Parties>().clone(),
             tab,
@@ -132,7 +128,6 @@ impl Page {
                 .unwrap_or_else(Inventory::empty),
             now: super::card::clock_now(world),
             selected: world.resource::<Browse>().of(tab),
-            playing: session::mode(world) == ClientMode::Play,
         }
     }
 
@@ -422,7 +417,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
                 .color(colour),
         );
     }
-    if page.playing && page.log.trackable(&content, quest) {
+    if page.log.trackable(&content, quest) {
         footer(ui, world, page, quest);
     }
 }
@@ -512,9 +507,7 @@ fn quest_note(world: &World, stack: ItemStack) -> Option<String> {
     if !stack.item.get(content).has(ItemFlag::Quest) {
         return None;
     }
-    let granted_by = world
-        .resource::<Viewpoint>()
-        .0
+    let granted_by = session::me(world)
         .and_then(|seen| world.get::<QuestLog>(seen))
         .and_then(|log| {
             log.active.iter().find(|active| {

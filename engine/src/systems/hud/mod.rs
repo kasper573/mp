@@ -15,10 +15,9 @@ use crate::core::math::WindowPx;
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::input::map::{ActionInput, InputAction, InputMap};
 use crate::systems::interface::InterfaceIcon;
-use crate::systems::player::session::{ClientMode, SpectateStatus};
 use crate::systems::screen::ClientScreen;
 use crate::systems::settings;
-use crate::systems::{equipment, history, item, player, quest, spectate, stat, terminal};
+use crate::systems::{equipment, history, item, player, quest, stat, terminal};
 
 pub(crate) use panel::{Sizing, WindowFrame, widget, window};
 
@@ -58,31 +57,12 @@ impl Plugin for HudPlugin {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum HudAudience {
-    Players,
-    Spectators,
-    Everyone,
-}
-
-impl HudAudience {
-    fn includes(self, mode: ClientMode) -> bool {
-        match self {
-            HudAudience::Players => mode == ClientMode::Play,
-            HudAudience::Spectators => mode == ClientMode::Spectate,
-            HudAudience::Everyone => true,
-        }
-    }
-}
-
 pub trait HudWidget: Send + Sync {
-    fn audience(&self) -> HudAudience;
     fn fallback(&self, screen: Rect) -> Pos2;
     fn show(&self, ui: &mut Ui, world: &mut World);
 }
 
 pub trait HudWindow: Send + Sync {
-    fn audience(&self) -> HudAudience;
     fn title(&self) -> &'static str;
     fn toggle(&self) -> InputAction;
     fn icon(&self) -> InterfaceIcon;
@@ -194,7 +174,6 @@ pub(crate) fn file_icon(ui: &mut Ui, world: &mut World, file: &str, size: f32) -
 static WIDGETS: &[(&str, &dyn HudWidget)] = &[
     ("character", &player::widget::CharacterWidget),
     ("quests", &quest::tracker::QuestTrackerWidget),
-    ("spectator", &spectate::widget::SpectatorWidget),
 ];
 
 // Their launchers line up in this order.
@@ -207,20 +186,6 @@ static WINDOWS: &[&dyn HudWindow] = &[
     &settings::SettingsWindow,
     &terminal::widget::TerminalWindow,
 ];
-
-fn widgets(mode: ClientMode) -> impl Iterator<Item = (&'static str, &'static dyn HudWidget)> {
-    WIDGETS
-        .iter()
-        .copied()
-        .filter(move |(_, widget)| widget.audience().includes(mode))
-}
-
-fn windows(mode: ClientMode) -> impl Iterator<Item = &'static dyn HudWindow> {
-    WINDOWS
-        .iter()
-        .copied()
-        .filter(move |window| window.audience().includes(mode))
-}
 
 #[derive(Resource, Default)]
 struct Open(HashSet<&'static str>);
@@ -252,14 +217,13 @@ fn draw_hud(world: &mut World) {
     let Some(gui) = gui::context(world) else {
         return;
     };
-    let mode = world.resource::<SpectateStatus>().mode();
     let screen = gui.content_rect();
-    for (name, shown) in widgets(mode) {
+    for &(name, shown) in WIDGETS {
         widget(world, &gui, name, shown.fallback(screen), |ui, world| {
             shown.show(ui, world);
         });
     }
-    for (slot, shown) in windows(mode).enumerate() {
+    for (slot, &shown) in WINDOWS.iter().enumerate() {
         let title = shown.title();
         if !window_open(world, title) {
             launcher(world, &gui, shown, launcher_pos(slot, screen));
@@ -377,8 +341,8 @@ fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {
     )
 }
 
-fn toggle_keys(input: ActionInput, status: Res<SpectateStatus>, mut open: ResMut<Open>) {
-    for window in windows(status.mode()) {
+fn toggle_keys(input: ActionInput, mut open: ResMut<Open>) {
+    for window in WINDOWS {
         let title = window.title();
         if input.just_pressed(window.toggle()) && !open.0.remove(title) {
             open.0.insert(title);

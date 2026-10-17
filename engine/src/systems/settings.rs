@@ -12,7 +12,7 @@ use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
 use crate::core::text::{MotionPreference, TypewriterSpeed};
-use crate::systems::hud::{HudAudience, HudWindow};
+use crate::systems::hud::HudWindow;
 use crate::systems::input::map::InputAction;
 use crate::systems::interface::InterfaceIcon;
 
@@ -51,9 +51,6 @@ pub(crate) struct LettersPerSecond(pub f32);
 pub struct SettingsWindow;
 
 impl HudWindow for SettingsWindow {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Everyone
-    }
     fn title(&self) -> &'static str {
         "Settings"
     }

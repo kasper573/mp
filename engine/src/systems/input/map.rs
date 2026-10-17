@@ -56,8 +56,6 @@ pub enum InputAction {
     Choice8,
     Choice9,
     ToggleHistory,
-    SpectatePrevious,
-    SpectateNext,
 }
 
 impl Fixture for InputAction {

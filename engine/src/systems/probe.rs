@@ -38,7 +38,6 @@ use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
-use crate::systems::spectate::Spectating;
 use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
@@ -61,8 +60,7 @@ pub fn install(app: &mut App, channel: impl ProbeChannel + 'static) {
 
 /// One frame of the client. Content ids (de)serialize by key, so a driver reads a snapshot within a
 /// content scope. World positions are tiles, which `view` places in the window; window positions
-/// are the window's logical pixels. `viewpoint` is the character the camera follows: `me`, or the
-/// player a spectator watches.
+/// are the window's logical pixels.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProbeSnapshot {
     pub frame: u32,
@@ -72,8 +70,6 @@ pub struct ProbeSnapshot {
     pub view: Option<ProbeView>,
     pub area: Option<AreaId>,
     pub me: Option<ProbeBody>,
-    pub viewpoint: Option<ProbeBody>,
-    pub spectating: Option<Spectating>,
     pub actors: Vec<ProbeBody>,
     pub props: Vec<ProbeFixture>,
     pub items: Vec<ProbeGroundItem>,
@@ -439,10 +435,8 @@ fn publish(world: &mut World) {
 
 fn snapshot(world: &mut World) -> ProbeSnapshot {
     let content = world.resource::<Content>().clone();
-    let me = session::my_character(world).map(|me| me.id());
-    let viewpoint = world.resource::<session::Viewpoint>().0;
-    let spectating = world.resource::<session::SpectateStatus>().0;
-    let area = viewpoint
+    let me = session::me(world);
+    let area = me
         .and_then(|seen| world.get::<AreaTag>(seen))
         .map(|tag| tag.area);
     let view = view(world);
@@ -536,7 +530,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 })
                 .collect(),
         }),
-        bag: viewpoint
+        bag: me
             .and_then(|seen| world.get::<Inventory>(seen))
             .map(|inventory| {
                 inventory
@@ -549,12 +543,8 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .collect()
             })
             .unwrap_or_default(),
-        quests: viewpoint
-            .and_then(|seen| quests(world, seen))
-            .unwrap_or_default(),
+        quests: me.and_then(|seen| quests(world, seen)).unwrap_or_default(),
         me: me.and_then(|me| body(world, me)),
-        viewpoint: viewpoint.and_then(|seen| body(world, seen)),
-        spectating,
         actors: actors(world, me, area),
         props: props(world, area),
         items: items(world, area),
@@ -663,7 +653,7 @@ fn view(world: &mut World) -> Option<ProbeView> {
 }
 
 fn body(world: &World, entity: Entity) -> Option<ProbeBody> {
-    let viewer = world.resource::<session::Viewpoint>().0;
+    let viewer = session::me(world);
     let marks = viewer
         .and_then(|viewer| world.get::<Attention>(viewer))
         .map(|attention| attention.of(entity).to_vec())
@@ -727,7 +717,7 @@ fn actors(world: &mut World, me: Option<Entity>, area: Option<AreaId>) -> Vec<Pr
 }
 
 fn props(world: &mut World, area: Option<AreaId>) -> Vec<ProbeFixture> {
-    let viewer = world.resource::<session::Viewpoint>().0;
+    let viewer = session::me(world);
     let attention = viewer
         .and_then(|viewer| world.get::<Attention>(viewer))
         .cloned();

@@ -36,7 +36,6 @@ use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
 use crate::systems::skill::{BasicAttack, Cooldowns, Hotbar, Learned};
-use crate::systems::spectate::Spectators;
 use crate::systems::stat::{self, StatKind, StatMap, Stats};
 use crate::systems::visibility::{self, OwnedBy};
 use crate::systems::{Character, WorldArea, drain_requests};
@@ -284,9 +283,7 @@ pub fn join(world: &mut World) {
         let Some(&client) = world.get::<ClientId>(client_entity) else {
             continue;
         };
-        let playing = world.resource::<Players>().0.contains_key(&client);
-        let spectating = world.resource::<Spectators>().0.contains_key(&client);
-        if playing || spectating {
+        if world.resource::<Players>().0.contains_key(&client) {
             continue;
         }
         let clock = *world.resource::<WallClock>();

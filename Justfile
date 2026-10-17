@@ -15,8 +15,7 @@ test:
 
 # The website and game server binaries, and the roles the auth stack syncs from.
 build:
-    cargo build --release -p website -p engine --bin website --bin game-server --bin kc-roles
-    target/release/kc-roles > docker/keycloak/roles.conf
+    cargo build --release -p website -p engine --bin website --bin game-server
 
 # The browser client bundle the website serves; content syncs from the game server at boot.
 wasm:
@@ -92,9 +91,6 @@ reset:
 
 logs:
     {{compose}} logs --no-color
-
-kc-provision: build
-    {{compose}} up -d --build keycloak
 
 # No service names: compose's build sections are the single source of truth for what we publish.
 [doc("Builds and pushes the production images.")]

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use egui::{Pos2, Rect, Ui};
 
 use crate::systems::actor::Name;
-use crate::systems::hud::{self, HudAudience, HudWidget};
+use crate::systems::hud::{self, HudWidget};
 use crate::systems::player::{Xp, session};
 use crate::systems::stat;
 
@@ -11,9 +11,6 @@ const WIDTH: f32 = 140.0;
 pub struct CharacterWidget;
 
 impl HudWidget for CharacterWidget {
-    fn audience(&self) -> HudAudience {
-        HudAudience::Players
-    }
     fn fallback(&self, screen: Rect) -> Pos2 {
         screen.min + egui::vec2(8.0, 8.0)
     }

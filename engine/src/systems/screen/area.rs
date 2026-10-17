@@ -27,7 +27,7 @@ use crate::systems::area::tileset::TilesetId;
 use crate::systems::area::{self, AreaId, AreaTag, tileset};
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::movement::RenderPosition;
-use crate::systems::player::session::{self, Viewpoint};
+use crate::systems::player::session::{self, MyCharacter};
 use crate::systems::player::{ARRIVAL_PATIENCE, AreaDrawn};
 
 pub struct AreaPlugin;
@@ -98,7 +98,7 @@ pub fn settled(world: &World) -> bool {
 pub fn carry_view_across(world: &mut World) {
     let now = Seconds(world.resource::<Time>().elapsed_secs());
     let Crossing { last_seen, held } = *world.resource::<Crossing>();
-    let (last_seen, held) = match world.resource::<Viewpoint>().0 {
+    let (last_seen, held) = match session::me(world) {
         Some(character) => match (pose_of(world, character), held, last_seen) {
             (None, _, _) => (last_seen, held),
             (Some(pose), None, Some(seen)) if seen.area != pose.area => {
@@ -126,17 +126,11 @@ pub fn carry_view_across(world: &mut World) {
             }
         },
         None => match (held, last_seen) {
-            (Some(_), _)
-                if session::my_id(world).is_some() && session::followed(world).is_none() =>
-            {
-                transition::abort(world);
-                (None, None)
-            }
             (Some(held), _) if now - held.since > ARRIVAL_PATIENCE => {
                 transition::reveal(world, held.pose.at);
                 (None, None)
             }
-            (None, Some(pose)) if session::followed(world).is_some() => {
+            (None, Some(pose)) if session::my_id(world).is_some() => {
                 transition::freeze(world, pose.at, pose.heading);
                 (None, Some(Held::new(now, pose)))
             }
@@ -257,7 +251,7 @@ fn release_unshown_images(world: &mut World) {
 
 #[allow(clippy::too_many_arguments)]
 fn spawn_area_tiles(
-    viewpoint: Res<Viewpoint>,
+    viewpoint: Res<MyCharacter>,
     areas: Query<&AreaTag>,
     assets: Res<AssetServer>,
     content: Res<Content>,
@@ -380,7 +374,7 @@ fn spawn_area_tiles(
 }
 
 fn play_area_soundscape(
-    viewpoint: Res<Viewpoint>,
+    viewpoint: Res<MyCharacter>,
     areas: Query<&AreaTag>,
     content: Res<Content>,
     mut soundscape: ResMut<Soundscape>,

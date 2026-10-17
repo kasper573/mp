@@ -15,7 +15,7 @@ use crate::systems::dialogue::{Conversation, ConversationPanel};
 use crate::systems::hud;
 use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::item::{self, Inventory, ItemStack};
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session;
 
 const WIDTH: f32 = 480.0;
 const ICON: f32 = 20.0;
@@ -54,7 +54,7 @@ impl Moment {
 }
 
 fn moment(world: &World) -> Option<(QuestId, Moment)> {
-    let seen = world.resource::<Viewpoint>().0?;
+    let seen = session::me(world)?;
     let panel = world.get::<Conversation>(seen)?.panel.as_ref()?;
     Some(match *panel {
         ConversationPanel::QuestOffer(quest) => (quest, Moment::Offer),
@@ -76,9 +76,7 @@ fn show_card(ui: &mut Ui, world: &mut World) {
     let Some((quest, moment)) = moment(world) else {
         return;
     };
-    let inventory = world
-        .resource::<Viewpoint>()
-        .0
+    let inventory = session::me(world)
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);

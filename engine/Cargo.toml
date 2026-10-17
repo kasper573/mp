@@ -11,10 +11,6 @@ game = true
 name = "game-server"
 path = "src/bin/server/main.rs"
 
-[[bin]]
-name = "kc-roles"
-path = "src/bin/kc_roles.rs"
-
 # Load generator: connects N headless replicon clients to an already-running real game server over
 # real websocket sockets. Server-only (no in-process server); see `just loadtest`.
 [[bin]]

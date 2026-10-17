@@ -10,7 +10,7 @@ use crate::systems::hud::{self, Sizing, WindowFrame};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{ItemDef, ItemFlag, ItemId, ItemKind};
-use crate::systems::player::session::Viewpoint;
+use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
 use crate::systems::stat::Stat;
@@ -247,7 +247,7 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
                 slot.label().to_lowercase()
             )));
             facts.extend(def.stats().map(|stat| plain(modifier(stat))));
-            let viewer = world.resource::<Viewpoint>().0;
+            let viewer = session::me(world);
             facts.extend(requires.iter().map(|requirement| {
                 let colour = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
                 {
