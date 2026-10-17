@@ -355,9 +355,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     let (play, arrow) = ui
         .scope(|ui| {
             ui.spacing_mut().item_spacing.x = 1.0;
-            let arrow = ui
-                .add(egui::Button::new(RichText::new("▾").size(12.0)).fill(theme::ACCENT))
-                .on_hover_text("Pick the test character");
+            let arrow = widgets::primary(ui, "▾").on_hover_text("Pick the test character");
             let play = widgets::primary(ui, "▸ Play").on_hover_text(
                 "Save, then play as the picked test character from its own start (F5)",
             );

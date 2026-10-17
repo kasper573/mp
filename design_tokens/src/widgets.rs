@@ -175,7 +175,7 @@ pub fn primary(ui: &mut Ui, text: &str) -> Response {
                 .family(family::medium()),
         )
         .fill(color::ACCENT)
-        .stroke(Stroke::NONE),
+        .stroke(Stroke::new(HAIRLINE.width, color::ACCENT)),
     );
     if response.has_focus() {
         focus_ring(

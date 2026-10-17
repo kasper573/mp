@@ -182,7 +182,7 @@ pub fn field(
                 .add(
                     egui::Button::new(RichText::new("→").color(Color32::WHITE))
                         .fill(theme::ACCENT)
-                        .min_size(Vec2::new(26.0, 22.0)),
+                        .min_size(Vec2::new(26.0, ui.spacing().interact_size.y)),
                 )
                 .on_hover_text(format!("Open {}", source.shown(pick).1))
                 .clicked()
