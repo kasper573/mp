@@ -110,6 +110,13 @@
         "y": 60.0
       }
     },
+    "toughness": {
+      "skill": "toughness",
+      "at": {
+        "x": 480.0,
+        "y": 200.0
+      }
+    },
     "warcry": {
       "skill": "warcry",
       "requires": [

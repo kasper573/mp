@@ -142,7 +142,12 @@ fn describe_query(content: &Content, query: &RiftQuery) -> String {
         }
         RiftQuery::SpentSkillPoints { .. } => "skill points spent".to_owned(),
         RiftQuery::Stat { stat, .. } => stat_label(*stat).to_owned(),
-        RiftQuery::Buffed { stat, .. } => format!("{} buffed", stat_label(*stat)),
+        RiftQuery::HasStatus { effect, .. } => effect.get(content).name.to_owned(),
+        RiftQuery::StatusCount { category, .. } => match category {
+            Some(category) => format!("{}s", category.label().to_lowercase()),
+            None => "statuses".to_owned(),
+        },
+        RiftQuery::StatusPower => "status power".to_owned(),
         RiftQuery::Holding { item, .. } => item.get(content).name.to_owned(),
         RiftQuery::FreeSlots { .. } => "free slots".to_owned(),
         RiftQuery::Wearing { item, .. } => format!("{} worn", item.get(content).name),

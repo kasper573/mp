@@ -25,12 +25,12 @@
       "type": "inline_script",
       "nodes": {
         "dash": {
-          "type": "buff",
+          "type": "apply_status",
           "who": {
             "type": "skill_targets"
           },
-          "stat": "movement_speed",
-          "by": {
+          "effect": "quickened",
+          "power": {
             "type": "skill_stat",
             "skill": "quickstep",
             "stat": "power"
@@ -39,14 +39,6 @@
             "type": "skill_stat",
             "skill": "quickstep",
             "stat": "duration"
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "dash",
-          "on": {
-            "type": "skill_targets"
           }
         },
         "used": {

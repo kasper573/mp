@@ -10,7 +10,7 @@ use super::card;
 use super::window::CarriedSkill;
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, Cooldowns, Hotbar, HotbarEntry,
-    Rank, SkillId, Targeting, UseSkillRequest, using,
+    Rank, SkillId, SkillKind, Targeting, UseSkillRequest, using,
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::gui::{self, Band};
@@ -734,7 +734,7 @@ fn slot_tooltip(world: &mut World, response: &egui::Response, index: u32, entry:
 
 fn item_use_line(def: &crate::systems::item::ItemDef) -> String {
     match def.kind {
-        ItemKind::Consumable { .. } | ItemKind::Usable => "The key uses one".to_owned(),
+        ItemKind::Usable => "The key uses one".to_owned(),
         ItemKind::Equipment { .. } => "The key wears it".to_owned(),
         ItemKind::Resource => "Counts what you carry".to_owned(),
     }
@@ -885,6 +885,13 @@ fn use_skill(world: &mut World, skill: SkillId) -> bool {
     let rank = super::rank_of(world, me, skill);
     if rank == Rank::NONE {
         notification::local_error(world, format!("You don't know {}", def.name));
+        return false;
+    }
+    if def.kind == SkillKind::Passive {
+        notification::local_error(
+            world,
+            format!("{} is passive: it holds on its own", def.name),
+        );
         return false;
     }
     match def.target {

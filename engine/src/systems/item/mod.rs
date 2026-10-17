@@ -22,9 +22,8 @@ use crate::core::audio::playback::SfxId;
 use crate::core::content::{Content, ContentId, ContentRow, ModuleRule, ModuleSet, serial};
 use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
-use crate::core::time::{Seconds, WallClock};
+use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaId, AreaTag};
-use crate::systems::effect::{self, Effect, TimedEffect, TimedEffects};
 use crate::systems::movement::{Position, position};
 use crate::systems::notification;
 use crate::systems::npc::Npc;
@@ -34,7 +33,6 @@ use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
-use crate::systems::stat::{self, Stat};
 use crate::systems::visibility::{self, Presence, seen_by};
 use crate::systems::{drain_requests, equipment};
 
@@ -55,7 +53,6 @@ pub fn register(app: &mut App) {
         .add_mapped_client_message::<PickupRequest>(Channel::Ordered)
         .add_mapped_server_message::<ItemConsumed>(Channel::Ordered)
         .add_mapped_server_message::<ItemsDropped>(Channel::Ordered);
-    effect::source(app, carried);
 }
 
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -346,11 +343,8 @@ impl ModuleSet for ItemDef {
         &self.modules
     }
 
-    fn rule(module: &ItemModule) -> ModuleRule {
-        match module {
-            ItemModule::Stat(_) => ModuleRule::AnyNumber,
-            _ => ModuleRule::AtMostOne,
-        }
+    fn rule(_: &ItemModule) -> ModuleRule {
+        ModuleRule::AtMostOne
     }
 }
 
@@ -370,7 +364,6 @@ impl ScriptedRow for ItemDef {
 pub enum ItemModule {
     Flavor(Flavor),
     Stack(Stack),
-    Stat(Stat),
     QuestItem,
     Bound,
     Currency,
@@ -437,20 +430,6 @@ impl ItemDef {
             .unwrap_or(1)
     }
 
-    pub fn stats(&self) -> impl Iterator<Item = Stat> + '_ {
-        self.modules.iter().filter_map(|module| match module {
-            ItemModule::Stat(stat) => Some(*stat),
-            _ => None,
-        })
-    }
-
-    pub fn effects(&self) -> impl Iterator<Item = Effect> + '_ {
-        self.modules.iter().filter_map(|module| match module {
-            ItemModule::Stat(stat) => Some(Effect::StatModifier(*stat)),
-            _ => None,
-        })
-    }
-
     pub fn has(&self, flag: ItemFlag) -> bool {
         self.modules.iter().any(|module| {
             matches!(
@@ -471,9 +450,9 @@ impl ItemDef {
             return ItemCategory::Currency;
         }
         match self.kind {
-            ItemKind::Consumable { .. } => ItemCategory::Consumable,
+            ItemKind::Usable => ItemCategory::Consumable,
             ItemKind::Equipment { .. } => ItemCategory::Equipment,
-            ItemKind::Resource | ItemKind::Usable => ItemCategory::Material,
+            ItemKind::Resource => ItemCategory::Material,
         }
     }
 }
@@ -481,10 +460,6 @@ impl ItemDef {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ItemKind {
-    Consumable {
-        health_bonus: f32,
-        lasts: Seconds,
-    },
     Equipment {
         slot: equipment::EquipmentSlot,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -495,12 +470,6 @@ pub enum ItemKind {
     },
     Usable,
     Resource,
-}
-
-impl ItemKind {
-    fn carried(&self) -> bool {
-        matches!(self, ItemKind::Resource)
-    }
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -546,18 +515,9 @@ fn use_slot(world: &mut World, actor: Entity, slot: usize) -> Result<(), String>
         .and_then(|inventory| inventory.slots.get(slot).map(|slot| slot.item))
         .ok_or_else(|| "Nothing there".to_owned())?;
     match item.get(&content).kind {
-        ItemKind::Consumable {
-            health_bonus,
-            lasts,
-        } => {
-            stat::heal(world, actor, health_bonus);
-            consume_slot(world, actor, slot);
-            announce_consumed(world, actor, item);
-            instantiate_effects(world, actor, item, lasts);
-            Ok(())
-        }
         ItemKind::Equipment { .. } => equipment::equip(world, actor, slot),
         ItemKind::Usable => {
+            announce_consumed(world, actor, item);
             raise(world, item, EventKind::Used, actor);
             Ok(())
         }
@@ -754,36 +714,9 @@ pub fn scatter_at(
     }
 }
 
-fn carried(world: &World, entity: Entity) -> Vec<Effect> {
-    let content = world.resource::<Content>();
-    world
-        .get::<Inventory>(entity)
-        .map(|inventory| {
-            inventory
-                .slots
-                .iter()
-                .map(|slot| slot.item.get(content))
-                .filter(|def| def.kind.carried())
-                .flat_map(|def| def.effects())
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 fn announce_consumed(world: &mut World, actor: Entity, item: ItemId) {
     for client in seen_by(world, actor) {
         visibility::send_to(world, client, ItemConsumed { item, actor });
-    }
-}
-
-fn consume_slot(world: &mut World, entity: Entity, slot: usize) {
-    if let Some(mut inventory) = world.get_mut::<Inventory>(entity)
-        && let Some(stack) = inventory.slots.get_mut(slot)
-    {
-        stack.count -= 1;
-        if stack.count == 0 {
-            inventory.slots.remove(slot);
-        }
     }
 }
 
@@ -809,25 +742,6 @@ fn collect(world: &mut World, player: Entity, item: Entity) {
     if collected {
         world.entity_mut(item).despawn();
         raise(world, drop.item, EventKind::PickedUp, player);
-    }
-}
-
-fn instantiate_effects(world: &mut World, actor: Entity, item: ItemId, duration: Seconds) {
-    let content = world.resource::<Content>().clone();
-    let until = world.resource::<WallClock>().now.after(duration);
-    let entries = item
-        .get(&content)
-        .effects()
-        .map(|effect| TimedEffect { effect, until })
-        .collect::<Vec<_>>();
-    if entries.is_empty() {
-        return;
-    }
-    match world.get_mut::<TimedEffects>(actor) {
-        Some(mut timed) => timed.0.extend(entries),
-        None => {
-            world.entity_mut(actor).insert(TimedEffects(entries));
-        }
     }
 }
 

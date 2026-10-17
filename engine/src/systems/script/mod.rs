@@ -34,7 +34,9 @@ use crate::systems::notification::{NotificationDef, NotificationId};
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::quest::{Parties, QuestDef, QuestId};
 use crate::systems::shop::{ShopDef, ShopId};
-use crate::systems::skill::{SkillDef, SkillId};
+use crate::systems::skill::{SkillDef, SkillId, SkillKind};
+use crate::systems::stat::StatKind;
+use crate::systems::status::{StatusEffectDef, StatusEffectId};
 use crate::systems::text::{self, Span};
 use crate::systems::{WorldArea, dialogue};
 
@@ -65,6 +67,7 @@ pub enum OwnerKind {
     Quest,
     Shop,
     Skill,
+    StatusEffect,
     Blueprint,
     Any,
 }
@@ -75,7 +78,11 @@ impl OwnerKindDef for OwnerKind {
     fn keeps_state(self) -> bool {
         !matches!(
             self,
-            OwnerKind::Item | OwnerKind::Quest | OwnerKind::Shop | OwnerKind::Skill
+            OwnerKind::Item
+                | OwnerKind::Quest
+                | OwnerKind::Shop
+                | OwnerKind::Skill
+                | OwnerKind::StatusEffect
         )
     }
 
@@ -151,6 +158,7 @@ pub enum RowRef {
     Notification(NotificationId),
     Class(ClassId),
     Skill(SkillId),
+    StatusEffect(StatusEffectId),
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -256,7 +264,9 @@ pub enum Reach {
     Walks,
     Damages,
     Heals,
-    Buffs,
+    Applies(StatusEffectId),
+    Cleanses,
+    Boosts(StatKind, Option<f32>),
     GrantsXp,
     Casts(SkillId),
     ResetsSkills,
@@ -292,6 +302,7 @@ impl Vocabulary for RiftScripting {
             "notification" => RowRef::Notification(content.by_key::<NotificationDef>(key)?),
             "class" => RowRef::Class(content.by_key::<ClassDef>(key)?),
             "skill" => RowRef::Skill(content.by_key::<SkillDef>(key)?),
+            "status_effect" => RowRef::StatusEffect(content.by_key::<StatusEffectDef>(key)?),
             _ => return None,
         })
     }
@@ -334,6 +345,7 @@ pub fn row_key(content: &Content, row: RowRef) -> String {
         RowRef::Notification(id) => id.key(content).to_owned(),
         RowRef::Class(id) => id.key(content).to_owned(),
         RowRef::Skill(id) => id.key(content).to_owned(),
+        RowRef::StatusEffect(id) => id.key(content).to_owned(),
     }
 }
 
@@ -385,6 +397,7 @@ pub fn build_all(loading: &mut Loading) {
     bind_table::<QuestDef>(loading, &mut bind);
     bind_table::<ShopDef>(loading, &mut bind);
     bind_table::<SkillDef>(loading, &mut bind);
+    bind_table::<StatusEffectDef>(loading, &mut bind);
     for (id, _) in loading.rows::<AreaDef>(&content) {
         let key = id.key(&content);
         let placed = area::placed(&content, id);
@@ -516,6 +529,10 @@ fn owner_site(content: &Content, row: OwnerRow) -> ScriptSite {
         OwnerKind::Quest => (QuestDef::TABLE, row.id::<QuestDef>().key(content)),
         OwnerKind::Shop => (ShopDef::TABLE, row.id::<ShopDef>().key(content)),
         OwnerKind::Skill => (SkillDef::TABLE, row.id::<SkillDef>().key(content)),
+        OwnerKind::StatusEffect => (
+            StatusEffectDef::TABLE,
+            row.id::<StatusEffectDef>().key(content),
+        ),
         OwnerKind::Blueprint => {
             let area: AreaId = row.id();
             let placement = row
@@ -553,9 +570,11 @@ pub fn spawn_stateless(world: &mut World) {
             OwnerKind::Blueprint if row.row == area.raw() => {
                 Owner::Row(OwnerKind::Blueprint, row.object.unwrap_or_default())
             }
-            OwnerKind::Item | OwnerKind::Quest | OwnerKind::Shop | OwnerKind::Skill => {
-                Owner::Row(row.kind, row.row)
-            }
+            OwnerKind::Item
+            | OwnerKind::Quest
+            | OwnerKind::Shop
+            | OwnerKind::Skill
+            | OwnerKind::StatusEffect => Owner::Row(row.kind, row.row),
             _ => continue,
         };
         instances.spawn_owner(owner, procedures.clone());
@@ -675,6 +694,42 @@ pub fn check_all(loading: &mut Loading) {
                 );
             }
         }
+    }
+    for (id, def) in loading.rows::<SkillDef>(&content) {
+        let may_do = scripts.may_do(OwnerRow {
+            kind: OwnerKind::Skill,
+            row: id.raw(),
+            object: None,
+        });
+        let (rule, kind, expected) = match def.kind {
+            SkillKind::Passive if may_do.answers(EventKind::Used) => (
+                "passive answers used",
+                EventKind::Used,
+                "activated, deactivated or interval: a passive skill is never used",
+            ),
+            SkillKind::Active
+                if [
+                    EventKind::Activated,
+                    EventKind::Deactivated,
+                    EventKind::Interval,
+                ]
+                .into_iter()
+                .any(|kind| may_do.answers(kind)) =>
+            {
+                (
+                    "active answers an aspect event",
+                    EventKind::Used,
+                    "used: an active skill's script runs when it is used",
+                )
+            }
+            _ => continue,
+        };
+        let _ = kind;
+        loading.row_error(
+            id,
+            "/modules",
+            ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
+        );
     }
     for (id, def) in loading.rows::<ItemDef>(&content) {
         let usable = matches!(def.kind, ItemKind::Usable);

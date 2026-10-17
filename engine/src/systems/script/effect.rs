@@ -26,7 +26,8 @@ use crate::systems::quest::effects::{
 use crate::systems::script::{EffectCall, OwnerKind};
 use crate::systems::shop::OpenShop;
 use crate::systems::skill::{ResetSkills, UseSkill};
-use crate::systems::stat::effects::{Buff, ClearBuffs, Damage, Heal};
+use crate::systems::stat::effects::{Damage, Heal};
+use crate::systems::status::{ApplyStatus, Boost, RemoveStatus};
 use crate::systems::vfx::Vfx;
 
 pub type Aim = Option<Condition>;
@@ -75,8 +76,9 @@ effects! {
     Warp(Warp),
     Heal(Heal),
     Damage(Damage),
-    Buff(Buff),
-    ClearBuffs(ClearBuffs),
+    ApplyStatus(ApplyStatus),
+    RemoveStatus(RemoveStatus),
+    Boost(Boost),
     Items(Items),
     UseItem(UseItem),
     Equip(Equip),

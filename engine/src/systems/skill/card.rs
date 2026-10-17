@@ -3,7 +3,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use design_tokens::{TextRole, color};
 use egui::{Pos2, Rect, Response, RichText, Ui, Vec2};
 
-use super::{Rank, SkillDef, SkillId, SkillStat};
+use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook};
@@ -160,6 +160,9 @@ pub fn sheet(ui: &mut Ui, world: &mut World, card: &SkillCard) {
 }
 
 fn use_line(def: &SkillDef, rank: Rank) -> String {
+    if def.kind == SkillKind::Passive {
+        return "Passive · holds while known".to_owned();
+    }
     let rank = rank.max(Rank::FIRST);
     let mut parts = vec![def.target.describe().to_owned()];
     if let Some(shape) = def.area_at(rank) {

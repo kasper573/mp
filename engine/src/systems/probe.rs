@@ -41,6 +41,7 @@ use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
 use crate::systems::skill::{self, HotbarEntry, Rank, SkillId, bar::HotbarPress};
 use crate::systems::stat::{StatKind, Stats};
+use crate::systems::status::{self, StatusCategory};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
 pub trait ProbeChannel {
@@ -89,6 +90,7 @@ pub struct ProbeSnapshot {
     pub bag: Vec<ProbeStack>,
     pub quests: ProbeQuests,
     pub hotbar: Vec<ProbeSlot>,
+    pub statuses: Vec<ProbeStatus>,
     pub basic_attack: Option<SkillId>,
     pub skills: Option<ProbeSkills>,
     pub soundscape: ProbeSoundscape,
@@ -297,6 +299,13 @@ pub struct ProbeSlot {
     pub dimmed: bool,
     pub rebinding: bool,
     pub pressed: Option<HotbarPress>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ProbeStatus {
+    pub effect: String,
+    pub category: StatusCategory,
+    pub left: Option<Seconds>,
 }
 
 /// The character's class, tree and bar as the client shows them.
@@ -585,6 +594,21 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
             })
             .unwrap_or_default(),
         quests: me.and_then(|seen| quests(world, seen)).unwrap_or_default(),
+        statuses: me
+            .and_then(|seen| world.get::<status::Statuses>(seen).cloned())
+            .map(|statuses| {
+                let now = session::server_now(world);
+                statuses
+                    .0
+                    .iter()
+                    .map(|held| ProbeStatus {
+                        effect: held.effect.key(&content).to_owned(),
+                        category: held.effect.get(&content).category,
+                        left: held.until.zip(now).map(|(until, now)| until.since(now)),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
         hotbar: skill::bar::report(world)
             .into_iter()
             .map(|slot| ProbeSlot {

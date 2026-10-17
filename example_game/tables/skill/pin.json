@@ -44,28 +44,28 @@
               "stat": "power"
             }
           },
-          "next": "stick"
+          "next": "show"
         },
         "show": {
           "type": "vfx",
           "vfx": "arrow_hit",
           "on": {
             "type": "skill_targets"
-          }
+          },
+          "next": "stick"
         },
         "stick": {
-          "type": "buff",
+          "type": "apply_status",
           "who": {
             "type": "skill_targets"
           },
-          "stat": "movement_speed",
-          "by": -1.0,
+          "effect": "pinned",
+          "power": 1.0,
           "seconds": {
             "type": "skill_stat",
             "skill": "pin",
             "stat": "duration"
-          },
-          "next": "show"
+          }
         },
         "swing": {
           "type": "animate",

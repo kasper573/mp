@@ -26,7 +26,6 @@ use crate::systems::belongings;
 use crate::systems::class::{Class, ClassId};
 use crate::systems::combat::{self, HealthRegen};
 use crate::systems::dialogue::Heard;
-use crate::systems::effect::TimedEffects;
 use crate::systems::equipment::Equipment;
 use crate::systems::history::History;
 use crate::systems::item::{Inventory, ItemId};
@@ -367,7 +366,6 @@ pub struct CharacterState {
     pub cooldowns: Cooldowns,
     pub hotbar: Hotbar,
     pub basic_attack: BasicAttack,
-    pub timed: TimedEffects,
     pub memory: Memory,
     pub heard: Heard,
     pub ledger: ShopLedger,
@@ -392,10 +390,6 @@ impl CharacterState {
             basic_attack: world
                 .get::<BasicAttack>(entity)
                 .copied()
-                .unwrap_or_default(),
-            timed: world
-                .get::<TimedEffects>(entity)
-                .cloned()
                 .unwrap_or_default(),
             memory: world.get::<Memory>(entity).cloned().unwrap_or_default(),
             heard: world.get::<Heard>(entity).cloned().unwrap_or_default(),

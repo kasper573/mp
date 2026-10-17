@@ -277,6 +277,7 @@ fn entry(owner: OwnerKind, next: &str) -> Value {
         OwnerKind::Area => json!({ "type": "on", "event": "discovered", "next": next }),
         OwnerKind::Quest => json!({ "type": "on", "event": "accepted", "next": next }),
         OwnerKind::Shop => json!({ "type": "on", "event": "bought", "next": next }),
+        OwnerKind::StatusEffect => json!({ "type": "on", "event": "activated", "next": next }),
         OwnerKind::Blueprint | OwnerKind::Any => unreachable!("no entry for {owner:?}"),
     }
 }
@@ -286,8 +287,8 @@ fn every_capability() -> Vec<Value> {
         json!({ "type": "warp", "to": { "area": "forest", "x": 3.0, "y": 18.0 } }),
         json!({ "type": "heal", "by": "full" }),
         json!({ "type": "damage", "by": 10.0 }),
-        json!({ "type": "buff", "stat": "health", "by": 10.0, "seconds": 10.0 }),
-        json!({ "type": "clear_buffs" }),
+        json!({ "type": "apply_status", "effect": "guarded", "power": 10.0, "seconds": 10.0 }),
+        json!({ "type": "remove_status", "category": "debuff" }),
         json!({ "type": "items", "take": [{ "item": "gold" }] }),
         json!({ "type": "use_item", "item": "tattered_map" }),
         json!({ "type": "equip", "item": "road_pass" }),

@@ -6,7 +6,7 @@ use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
 use egui::{Color32, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
 
 use super::card::{self, NodeAccess, SkillCard};
-use super::{LearnSkillsRequest, Learned, Rank, SkillId};
+use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
@@ -14,6 +14,7 @@ use crate::systems::class::{self, ClassDef, SkillPoints};
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
+use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::skill::bar;
 
@@ -241,9 +242,12 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
             format!("{} granted by gear", def.name),
         )
     });
+    let passive = skill.get(world.resource::<Content>()).kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, &response) {
-        egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(skill));
-    } else if map::clicked(world, InputAction::PinToHotbar, &response) {
+        if !passive {
+            egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(skill));
+        }
+    } else if map::clicked(world, InputAction::PinToHotbar, &response) && !passive {
         bar::pin(world, super::HotbarEntry::Skill(skill));
     } else if response.secondary_clicked() {
         card::open(world, card::of(world, skill));
@@ -388,12 +392,21 @@ fn node_input(
     response: &egui::Response,
 ) {
     let held = sheet.learned.rank(key);
+    let passive = skill.get(world.resource::<Content>()).kind == SkillKind::Passive;
     if map::drag_started(world, InputAction::CarryItem, response) {
-        if held > Rank::NONE {
+        if held > Rank::NONE && !passive {
             egui::DragAndDrop::set_payload(ui.ctx(), CarriedSkill(skill));
         }
     } else if map::clicked(world, InputAction::PinToHotbar, response) {
-        if held > Rank::NONE {
+        if passive {
+            notification::local_error(
+                world,
+                format!(
+                    "{} is passive: it holds without a slot",
+                    skill.get(world.resource::<Content>()).name
+                ),
+            );
+        } else if held > Rank::NONE {
             bar::pin(world, super::HotbarEntry::Skill(skill));
         } else {
             InterfaceSound::UiRefuse.play(world);

@@ -14,7 +14,8 @@ use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
 use crate::systems::skill::{self, window::CarriedSkill};
-use crate::systems::stat::Stat;
+use crate::systems::stat::StatKind;
+use crate::systems::status;
 
 const WINDOW_KEY: &str = "Item";
 const WINDOW_SIZE: Vec2 = Vec2::new(300.0, 360.0);
@@ -87,9 +88,6 @@ pub fn tooltip(world: &World, response: &Response, item: ItemId) {
 pub fn overview(def: &ItemDef) -> String {
     let category = def.category().label();
     match &def.kind {
-        ItemKind::Consumable { health_bonus, .. } if *health_bonus > 0.0 => {
-            format!("{category} · restores {health_bonus} health")
-        }
         ItemKind::Equipment { slot, .. } => format!("{category} · {}", slot.label()),
         _ => category.to_owned(),
     }
@@ -104,7 +102,7 @@ pub fn inspect_hint() -> Vec<TextPiece> {
 
 pub fn use_verb(def: &ItemDef) -> Option<&'static str> {
     match def.kind {
-        ItemKind::Consumable { .. } | ItemKind::Usable => Some("use"),
+        ItemKind::Usable => Some("use"),
         ItemKind::Equipment { .. } => Some("wear"),
         ItemKind::Resource => None,
     }
@@ -147,7 +145,7 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
     }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 3.0;
-        for (fact, colour) in facts(world, def) {
+        for (fact, colour) in facts(world, item, def) {
             ui.label(RichText::new(fact).color(colour));
         }
     });
@@ -287,29 +285,18 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Color32)> {
     .collect()
 }
 
-fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
+fn facts(world: &World, item: ItemId, def: &ItemDef) -> Vec<(String, Color32)> {
     let content = world.resource::<Content>();
     let plain = |fact: String| (fact, color::TEXT);
     let mut facts = Vec::new();
+    let boosts = status::boosts_of(content, item);
     match &def.kind {
-        ItemKind::Consumable {
-            health_bonus,
-            lasts,
-        } => {
-            if *health_bonus > 0.0 {
-                facts.push(plain(format!("Restores {health_bonus} health")));
-            }
-            facts.extend(
-                def.stats()
-                    .map(|stat| plain(format!("{} for {}s", modifier(stat), lasts.0))),
-            );
-        }
         ItemKind::Equipment { slot, requires, .. } => {
             facts.push(plain(format!(
                 "Worn as your {}",
                 slot.label().to_lowercase()
             )));
-            facts.extend(def.stats().map(|stat| plain(modifier(stat))));
+            facts.extend(boosts.iter().map(|boost| plain(modifier(*boost))));
             let viewer = session::me(world);
             facts.extend(requires.iter().map(|requirement| {
                 let colour = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
@@ -326,8 +313,9 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
         }
         ItemKind::Usable => facts.push(plain("Can be used".to_owned())),
         ItemKind::Resource => facts.extend(
-            def.stats()
-                .map(|stat| plain(format!("{} while carried", modifier(stat)))),
+            boosts
+                .iter()
+                .map(|boost| plain(format!("{} while carried", modifier(*boost)))),
         ),
     }
     match def.stack_max() {
@@ -341,6 +329,10 @@ fn facts(world: &World, def: &ItemDef) -> Vec<(String, Color32)> {
     facts
 }
 
-fn modifier(stat: Stat) -> String {
-    format!("{:+} {}", stat.value, stat.label())
+fn modifier((stat, by): (StatKind, Option<f32>)) -> String {
+    let name: &'static str = stat.into();
+    match by {
+        Some(by) => format!("{by:+} {name}"),
+        None => format!("Boosts {name}"),
+    }
 }

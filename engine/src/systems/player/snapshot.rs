@@ -12,7 +12,6 @@ use crate::systems::actor::Name;
 use crate::systems::area::{self, AreaId, transition::Discovered};
 use crate::systems::class::{AccessRequirement, Class, ClassId, SkillPoints};
 use crate::systems::dialogue::Heard;
-use crate::systems::effect::{Effect, TimedEffect, TimedEffects};
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{History, HistoryEntry};
 use crate::systems::item::{INVENTORY_MAX, Inventory, ItemId, ItemKind, ItemStack};
@@ -44,8 +43,6 @@ pub struct CharacterSnapshot {
     pub basic_attack: Option<SkillId>,
     #[serde(default, skip_serializing_if = "StatMap::is_empty")]
     pub stats: StatMap,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub effects: Vec<SnapshotEffect>,
     #[schemars(extend("x-usage" = "from the bag"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bag: Vec<ItemStack>,
@@ -95,7 +92,6 @@ impl CharacterSnapshot {
             hotbar: Vec::new(),
             basic_attack,
             stats: StatMap::default(),
-            effects: Vec::new(),
             bag: Vec::new(),
             equipment,
             known_areas: Vec::new(),
@@ -134,13 +130,6 @@ pub struct SnapshotSkill {
 pub struct SnapshotSlot {
     pub slot: u32,
     pub entry: HotbarEntry,
-}
-
-#[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SnapshotEffect {
-    pub effect: Effect,
-    pub left: Seconds,
 }
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -299,16 +288,6 @@ pub fn materialize(
         cooldowns: Cooldowns::default(),
         hotbar: hotbar(snapshot),
         basic_attack: BasicAttack(snapshot.basic_attack),
-        timed: TimedEffects(
-            snapshot
-                .effects
-                .iter()
-                .map(|timed| TimedEffect {
-                    effect: timed.effect,
-                    until: clock.now.after(timed.left),
-                })
-                .collect(),
-        ),
         memory,
         heard,
         ledger,

@@ -6,6 +6,7 @@ use crate::systems::class;
 use crate::systems::hud::{self, HudWidget};
 use crate::systems::player::{Xp, session};
 use crate::systems::stat;
+use crate::systems::status;
 
 const WIDTH: f32 = 140.0;
 
@@ -21,12 +22,13 @@ impl HudWidget for CharacterWidget {
         if let Some(fresh) = fresh {
             last.0 = fresh;
         }
-        let sheet = &last.0;
+        let sheet = last.0.clone();
         hud::panel().show(ui, |ui| {
             ui.set_width(WIDTH);
-            for line in sheet {
+            for line in &sheet {
                 ui.label(line);
             }
+            status::widget::grid(ui, world);
         });
     }
 }

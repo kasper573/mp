@@ -14,20 +14,19 @@ use crate::core::assets::AssetRef;
 use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, serial};
 use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
-use crate::systems::effect::{self, Effect};
 use crate::systems::player::Xp;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
 };
 use crate::systems::skill::{Learned, SkillDef};
-use crate::systems::stat::StatMap;
+use crate::systems::stat::{self, Stat, StatMap};
 use crate::systems::vfx::{self, VfxFixture};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate::<Class>();
-    effect::source(app, level_effects);
+    stat::source(app, level_stats);
 }
 
 pub type ClassId = ContentId<ClassDef>;
@@ -142,11 +141,11 @@ impl ClassDef {
         SkillPoints(self.levels.iter().map(|tier| tier.skill_points).sum())
     }
 
-    pub fn effects_at(&self, xp: u32) -> impl Iterator<Item = Effect> + '_ {
+    pub fn stats_at(&self, xp: u32) -> impl Iterator<Item = Stat> + '_ {
         self.levels
             .iter()
             .filter(move |tier| tier.xp <= xp)
-            .flat_map(|tier| tier.stats.listed().map(Effect::StatModifier))
+            .flat_map(|tier| tier.stats.listed())
     }
 }
 
@@ -282,15 +281,12 @@ fn xp_of(world: &World, entity: Entity) -> u32 {
     world.get::<Xp>(entity).map_or(0, |xp| xp.amount)
 }
 
-fn level_effects(world: &World, entity: Entity) -> Vec<Effect> {
+fn level_stats(world: &World, entity: Entity) -> Vec<Stat> {
     let content = world.resource::<Content>();
     let Some(class) = of(world, entity) else {
         return Vec::new();
     };
-    class
-        .get(content)
-        .effects_at(xp_of(world, entity))
-        .collect()
+    class.get(content).stats_at(xp_of(world, entity)).collect()
 }
 
 impl SkillDef {

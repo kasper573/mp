@@ -30,12 +30,12 @@
       "type": "inline_script",
       "nodes": {
         "cheer": {
-          "type": "buff",
+          "type": "apply_status",
           "who": {
             "type": "skill_targets"
           },
-          "stat": "damage",
-          "by": {
+          "effect": "rallied",
+          "power": {
             "type": "skill_stat",
             "skill": "rally",
             "stat": "power"
@@ -44,14 +44,6 @@
             "type": "skill_stat",
             "skill": "rally",
             "stat": "duration"
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "cheered",
-          "on": {
-            "type": "skill_targets"
           }
         },
         "sweep": {

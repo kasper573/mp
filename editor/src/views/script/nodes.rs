@@ -955,7 +955,7 @@ impl NodeReads {
     }
 }
 
-const EFFECT_BLURBS: [(&str, &str, &str); 38] = [
+const EFFECT_BLURBS: [(&str, &str, &str); 39] = [
     (
         "warp",
         "area",
@@ -963,8 +963,21 @@ const EFFECT_BLURBS: [(&str, &str, &str); 38] = [
     ),
     ("heal", "stat", "Restores health up to the maximum"),
     ("damage", "stat", "Takes health, credited to an npc owner"),
-    ("buff", "stat", "Adds a timed effect to a stat"),
-    ("clear_buffs", "stat", "Ends every timed effect"),
+    (
+        "apply_status",
+        "status",
+        "Puts a status on actors, at a power, for a time or until removed",
+    ),
+    (
+        "remove_status",
+        "status",
+        "Takes a status off actors: one effect, a category or all",
+    ),
+    (
+        "boost",
+        "status",
+        "Holds a stat modifier while this status, item or passive skill is active",
+    ),
     (
         "items",
         "item",

@@ -24,7 +24,6 @@ use crate::systems::actor::{self, Action, Actor, ActorModel, Hitbox, Tint};
 use crate::systems::area::{self, AreaId, AreaModule, AreaTag, Wild};
 use crate::systems::combat::{Attitude, Dead, Died};
 use crate::systems::dialogue;
-use crate::systems::effect::TimedEffects;
 use crate::systems::interact::Interactive;
 use crate::systems::item::{ItemId, Reservation};
 use crate::systems::movement::{Position, position};
@@ -36,6 +35,7 @@ use crate::systems::script::{
 };
 use crate::systems::skill::{Rank, SkillId};
 use crate::systems::stat::{StatMap, Stats};
+use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
 use crate::systems::{Character, WorldArea};
 
@@ -574,7 +574,7 @@ pub fn run_respawn(world: &mut World, npcs: &mut NpcIds) {
                 .entity_mut(id)
                 .insert((Attitude::Friendly, body::Body::default(), Near::default()))
                 .remove::<Reservation>()
-                .remove::<TimedEffects>();
+                .insert(Statuses::default());
             start_scripts(world, id, npc);
         }
     });

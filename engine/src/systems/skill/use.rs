@@ -3,7 +3,7 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Cooldowns, Rank, SkillDef, SkillId, Targeting};
+use super::{Cooldowns, Rank, SkillDef, SkillId, SkillKind, Targeting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
@@ -14,7 +14,6 @@ use crate::core::time::WallClock;
 use crate::systems::actor::{self, playing};
 use crate::systems::area;
 use crate::systems::combat::{self, Relation};
-use crate::systems::effect::Effect;
 use crate::systems::item::Inventory;
 use crate::systems::movement::{halt, on_tile};
 use crate::systems::notification;
@@ -87,6 +86,9 @@ pub fn cast(
     let rank = super::rank_of(world, caster, skill);
     if rank == Rank::NONE {
         return Err(format!("You don't know {}", def.name));
+    }
+    if def.kind == SkillKind::Passive {
+        return Err(format!("{} is passive: it holds on its own", def.name));
     }
     ready(world, caster, skill, rank)?;
     let target = match (def.target, aim) {
@@ -213,14 +215,17 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
     }
 }
 
-/// Everyone reaching for a cast gives chase.
-pub fn chase(world: &World, entity: Entity) -> Vec<Effect> {
+/// Everyone reaching for a cast gives chase, at twice their pace.
+pub fn chase(world: &World, entity: Entity) -> Vec<stat::Stat> {
     if reach::current(world, entity).is_some_and(|intent| intent.cast().is_some()) {
-        vec![Effect::Chasing]
+        let base = stat::base(world, entity, stat::StatKind::MovementSpeed);
+        vec![stat::StatKind::MovementSpeed.of(base * (CHASE_SPEED_MULTIPLIER - 1.0))]
     } else {
         Vec::new()
     }
 }
+
+const CHASE_SPEED_MULTIPLIER: f32 = 2.0;
 
 fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target: ReachTarget) {
     let content = world.resource::<Content>().clone();

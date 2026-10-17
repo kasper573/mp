@@ -37,7 +37,6 @@ use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::area::AreaTag;
 use crate::systems::class::{self, SkillPoints, SkillTree};
 use crate::systems::combat::{self, Relation};
-use crate::systems::effect;
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
@@ -66,7 +65,7 @@ pub fn register(app: &mut App) {
         .add_client_message::<AssignHotbarRequest>(Channel::Ordered)
         .add_client_message::<AssignBasicAttackRequest>(Channel::Ordered)
         .add_client_message::<ResetAnswerRequest>(Channel::Ordered);
-    effect::source(app, using::chase);
+    stat::source(app, using::chase);
 }
 
 /// Every request a client may send about its skills, answered in one place.
@@ -83,6 +82,8 @@ pub type SkillId = ContentId<SkillDef>;
 pub struct SkillDef {
     pub name: String,
     pub icon: AssetRef,
+    #[serde(default, skip_serializing_if = "SkillKind::is_active")]
+    pub kind: SkillKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sfx: Option<SfxId>,
     pub target: Targeting,
@@ -109,6 +110,42 @@ impl ContentRow for SkillDef {
     fn check(&self, check: &mut RowCheck) {
         check.text("/name", &self.name, 1, 40);
         check.count("/levels", self.levels.len(), 1, 20, "ranks");
+        if self.kind == SkillKind::Passive {
+            let passive = "nothing: a passive skill is never used, it holds while known";
+            if self.target != Targeting::Caster {
+                check.error(
+                    "/target",
+                    "passive with a target",
+                    self.target.label(),
+                    "self",
+                );
+            }
+            if self.area.is_some() {
+                check.error("/area", "passive with an area", "an area", passive);
+            }
+            if self.range.is_some() {
+                check.error("/range", "passive with a range", "a range", passive);
+            }
+            if self.cooldown.0 > 0.0 {
+                check.error(
+                    "/cooldown",
+                    "passive with a cooldown",
+                    self.cooldown.0,
+                    passive,
+                );
+            }
+            if !self.cost.is_empty() {
+                check.error("/cost", "passive with a cost", "a cost", passive);
+            }
+            if self.basic_attack {
+                check.error(
+                    "/basic_attack",
+                    "passive basic attack",
+                    "true",
+                    "false: a basic attack is used on a click",
+                );
+            }
+        }
         match (self.target.aimed_at_point(), self.area.is_some()) {
             (true, false) => check.error(
                 "/area",
@@ -172,6 +209,40 @@ impl ScriptedRow for SkillDef {
 pub enum SkillModule {
     #[serde(untagged)]
     Script(ScriptModule),
+}
+
+/// An active skill is used, aimed and performed; a passive one holds while it is known, its
+/// script running as an aspect of the character.
+#[derive(
+    JsonSchema,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    VariantArray,
+    IntoStaticStr,
+)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "title_case")]
+pub enum SkillKind {
+    #[default]
+    Active,
+    Passive,
+}
+
+impl SkillKind {
+    pub fn is_active(&self) -> bool {
+        *self == SkillKind::Active
+    }
+
+    pub fn label(self) -> &'static str {
+        self.into()
+    }
 }
 
 #[derive(
@@ -618,7 +689,7 @@ pub fn check_all(loading: &mut Loading) {
     }
     let scripts = content.built::<RiftScripts>();
     for (id, def) in loading.rows::<SkillDef>(&content) {
-        if !def.answers_used(scripts, id) {
+        if def.kind.is_active() && !def.answers_used(scripts, id) {
             loading.row_error(
                 id,
                 "/modules",

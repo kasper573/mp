@@ -23,12 +23,12 @@
       "type": "inline_script",
       "nodes": {
         "roar": {
-          "type": "buff",
+          "type": "apply_status",
           "who": {
             "type": "skill_targets"
           },
-          "stat": "attack_speed",
-          "by": {
+          "effect": "emboldened",
+          "power": {
             "type": "skill_stat",
             "skill": "warcry",
             "stat": "power"
@@ -37,14 +37,6 @@
             "type": "skill_stat",
             "skill": "warcry",
             "stat": "duration"
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "cheered",
-          "on": {
-            "type": "skill_targets"
           }
         },
         "sweep": {

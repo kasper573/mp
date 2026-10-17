@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::{BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, Learned, SkillId};
+use super::{BasicAttack, HOTBAR_SLOTS, Hotbar, HotbarEntry, Learned, SkillId, SkillKind};
 use crate::core::content::Content;
 use crate::systems::drain_requests;
 use crate::systems::equipment::Equipment;
@@ -58,6 +58,12 @@ pub fn assign(
         HotbarEntry::Skill(skill) => {
             if !super::known(world, player).contains_key(&skill) {
                 return Err(format!("You don't know {}", skill.get(&content).name));
+            }
+            if skill.get(&content).kind == SkillKind::Passive {
+                return Err(format!(
+                    "{} is passive: it holds without a slot",
+                    skill.get(&content).name
+                ));
             }
         }
         HotbarEntry::Item(item) => {

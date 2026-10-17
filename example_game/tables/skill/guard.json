@@ -25,12 +25,12 @@
       "type": "inline_script",
       "nodes": {
         "brace": {
-          "type": "buff",
+          "type": "apply_status",
           "who": {
             "type": "skill_targets"
           },
-          "stat": "max_health",
-          "by": {
+          "effect": "guarded",
+          "power": {
             "type": "skill_stat",
             "skill": "guard",
             "stat": "power"
@@ -39,14 +39,6 @@
             "type": "skill_stat",
             "skill": "guard",
             "stat": "duration"
-          },
-          "next": "show"
-        },
-        "show": {
-          "type": "vfx",
-          "vfx": "guard_up",
-          "on": {
-            "type": "skill_targets"
           }
         },
         "used": {

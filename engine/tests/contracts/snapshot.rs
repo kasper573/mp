@@ -9,7 +9,6 @@ use engine::systems::area::AreaId;
 use engine::systems::area::transition::Discovered;
 use engine::systems::class::Class;
 use engine::systems::dialogue;
-use engine::systems::effect::{Effect, TimedEffects};
 use engine::systems::equipment::{Equipment, EquipmentSlot};
 use engine::systems::history::{History, HistoryEntry, HistoryTopic};
 use engine::systems::item::{Inventory, ItemStack};
@@ -17,7 +16,7 @@ use engine::systems::memory;
 use engine::systems::movement::Position;
 use engine::systems::player::snapshot::{
     AtInitialSpawn, CharacterSnapshot, CharacterStart, HeardLine, JoinAs, MemoryValue, QuestState,
-    SnapshotEffect, SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
+    SnapshotMemory, SnapshotQuest, SnapshotRecord, SnapshotShop,
 };
 use engine::systems::player::{SpawnPolicy, SpawnRules, Xp};
 use engine::systems::quest::{QuestLog, QuestResult};
@@ -82,11 +81,7 @@ fn a_character_joined_from_a_row_is_that_character() {
     );
     let known = world.get::<Discovered>(player).expect("known areas");
     assert!(known.knows(forest) && known.knows(row("island")));
-    let timed = world.get::<TimedEffects>(player).expect("effects");
-    assert_eq!(timed.0.len(), 1);
-    assert_eq!(timed.0[0].effect, Effect::Chasing);
     let joined_at = world.resource::<WallClock>().now;
-    assert_eq!(timed.0[0].until, joined_at.after(Seconds(30.0)));
     let log = world.get::<QuestLog>(player).expect("quest log");
     let tusks = log
         .active(row("tusks_for_the_chief"))
@@ -182,10 +177,6 @@ fn tess(start: Place) -> CharacterSnapshot {
         hotbar: Vec::new(),
         basic_attack: None,
         stats: StatMap(BTreeMap::from([(StatKind::Damage, 9.0)])),
-        effects: vec![SnapshotEffect {
-            effect: Effect::Chasing,
-            left: Seconds(30.0),
-        }],
         bag: vec![
             ItemStack::new(row("orc_tusk"), 5),
             ItemStack::new(row("gold"), 20),

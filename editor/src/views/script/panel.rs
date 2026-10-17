@@ -11,6 +11,7 @@ use engine::systems::quest::QuestDef;
 use engine::systems::script::{OwnerKind, OwnerRow, Place, Reach, RiftScripting, RiftScripts};
 use engine::systems::shop::ShopDef;
 use engine::systems::skill::SkillDef;
+use engine::systems::status::StatusEffectDef;
 use serde_json::Value;
 
 use super::nodes::{self, NodeReads};
@@ -154,6 +155,7 @@ fn raw_of(content: &Content, kind: OwnerKind, key: &str) -> Option<u32> {
         OwnerKind::Quest => content.by_key::<QuestDef>(key)?.raw(),
         OwnerKind::Shop => content.by_key::<ShopDef>(key)?.raw(),
         OwnerKind::Skill => content.by_key::<SkillDef>(key)?.raw(),
+        OwnerKind::StatusEffect => content.by_key::<StatusEffectDef>(key)?.raw(),
         OwnerKind::Area | OwnerKind::Object => content.by_key::<AreaDef>(key)?.raw(),
         OwnerKind::Blueprint => content.by_key::<BlueprintDef>(key)?.raw(),
         OwnerKind::Any => return None,
@@ -490,7 +492,9 @@ fn may_do_rows(content: &Content, doc: &ScriptDoc, may: &MayDo<RiftScripting>) -
     }
     let stats = unique(may.reaches.iter().filter_map(|reach| match reach {
         Reach::Heals => Some("heals".to_owned()),
-        Reach::Buffs => Some("buffs".to_owned()),
+        Reach::Applies(effect) => Some(format!("applies {}", effect.key(content))),
+        Reach::Cleanses => Some("removes statuses".to_owned()),
+        Reach::Boosts(stat, _) => Some(format!("boosts {}", stat_name(*stat))),
         Reach::GrantsXp => Some("grants xp".to_owned()),
         Reach::Casts(skill) => Some(format!("casts {}", skill.key(content))),
         Reach::ResetsSkills => Some("resets skills".to_owned()),
@@ -627,7 +631,9 @@ pub fn describe_reach(content: &Content, reach: &Reach) -> String {
         Reach::Walks => "walks".to_owned(),
         Reach::Damages => "damages".to_owned(),
         Reach::Heals => "heals".to_owned(),
-        Reach::Buffs => "buffs".to_owned(),
+        Reach::Applies(effect) => format!("applies {}", effect.key(content)),
+        Reach::Cleanses => "removes statuses".to_owned(),
+        Reach::Boosts(stat, _) => format!("boosts {}", stat_name(*stat)),
         Reach::GrantsXp => "grants xp".to_owned(),
         Reach::Casts(skill) => format!("casts {}", skill.key(content)),
         Reach::ResetsSkills => "resets skills".to_owned(),
@@ -827,4 +833,9 @@ fn summarise_values(values: &Value) -> String {
                 .join(" · ")
         })
         .unwrap_or_default()
+}
+
+fn stat_name(stat: engine::systems::stat::StatKind) -> String {
+    let name: &'static str = stat.into();
+    name.to_lowercase()
 }

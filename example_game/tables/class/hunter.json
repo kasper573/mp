@@ -66,6 +66,13 @@
         "y": 200.0
       }
     },
+    "keen_eye": {
+      "skill": "keen_eye",
+      "at": {
+        "x": 560.0,
+        "y": 200.0
+      }
+    },
     "pin": {
       "skill": "pin",
       "requires": [

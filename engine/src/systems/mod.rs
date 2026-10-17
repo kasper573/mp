@@ -7,7 +7,6 @@ pub mod chat;
 pub mod class;
 pub mod combat;
 pub mod dialogue;
-pub mod effect;
 pub mod equipment;
 pub mod frame_rate;
 pub mod history;
@@ -32,6 +31,7 @@ pub mod settings;
 pub mod shop;
 pub mod skill;
 pub mod stat;
+pub mod status;
 pub mod terminal;
 pub mod text;
 pub mod vfx;
@@ -76,7 +76,7 @@ pub fn protocol(app: &mut App) {
     combat::register(app);
     dialogue::register(app);
     stat::register(app);
-    effect::register(app);
+    status::register(app);
     equipment::register(app);
     history::register(app);
     item::register(app);
@@ -189,7 +189,7 @@ pub fn server_app(
             Update,
             (
                 (
-                    effect::expire,
+                    (status::expire, status::aspect::settle, status::aspect::tick).chain(),
                     vfx::expire,
                     player::arrival_holds,
                     combat::regen,
@@ -465,6 +465,8 @@ pub fn registry() -> ContentRegistry {
         .modules::<shop::ShopDef>()
         .row::<skill::SkillDef>()
         .modules::<skill::SkillDef>()
+        .row::<status::StatusEffectDef>()
+        .modules::<status::StatusEffectDef>()
         .list_kind("modules", "unknown module type", "a module type")
         .fixture::<input::map::InputAction>()
         .fixture::<attention::AttentionMark>()
