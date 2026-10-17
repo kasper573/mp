@@ -27,6 +27,7 @@ impl Plugin for SkillClientPlugin {
                     bar::keys.run_if(not(egui_wants_any_keyboard_input)),
                     window::settle_plan,
                     aim::settle,
+                    aim::surface,
                 )
                     .run_if(in_state(ClientScreen::Area)),
             )

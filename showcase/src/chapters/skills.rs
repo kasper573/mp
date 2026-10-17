@@ -3,6 +3,7 @@ use engine::core::math::{Offset, Pos, WindowPx};
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::ProbeSnapshot;
 use engine::systems::skill::HotbarEntry;
+use engine::systems::skill::bar::HotbarPress;
 
 use crate::chapters::Chapter;
 use crate::shoot::Shoot;
@@ -93,7 +94,15 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::ToggleSkills);
     me.caption_top("Press a slot's key: a skill on yourself fires at once, and its cooldown drains off the slot");
     me.act(InputAction::Hotbar2);
-    me.wait_until("Guard cooling", |snapshot| cooling(snapshot, 1));
+    me.wait_until("Guard cooling", |snapshot| {
+        cooling(snapshot, 1) && pressed(snapshot, 1) == Some(HotbarPress::Used)
+    });
+    me.hold();
+    me.caption_top("Every press ripples its slot: blue when it fired, red when it could not");
+    me.act(InputAction::Hotbar2);
+    me.wait_until("the press refused", |snapshot| {
+        pressed(snapshot, 1) == Some(HotbarPress::Denied)
+    });
     me.hold();
     me.caption_top("An area skill is aimed: its shape follows the pointer, and a click casts it");
     me.act(InputAction::Hotbar1);
@@ -103,6 +112,19 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.click();
     me.wait_until("Cleave cast", |snapshot| cooling(snapshot, 0));
+    me.hold();
+    me.caption_top(
+        "Quick cast, in Settings, skips the aiming: the press casts at once, at where the pointer rests",
+    );
+    me.act(InputAction::ToggleSettings);
+    me.click_ui(UiTarget::text("Quick cast skills"));
+    me.act(InputAction::ToggleSettings);
+    me.wait_until("Cleave ready", |snapshot| !cooling(snapshot, 0));
+    me.point_at_tile(at);
+    me.act(InputAction::Hotbar1);
+    me.wait_until("Cleave cast at once", |snapshot| {
+        cooling(snapshot, 0) && !aiming(snapshot)
+    });
     me.caption_top("Items go on the bar too: shift-click one in the bag. Its count stays live");
     me.act(InputAction::ToggleInventory);
     me.act_on_ui(InputAction::PinToHotbar, UiTarget::image(POTION));
@@ -204,6 +226,10 @@ fn prompted(snapshot: &ProbeSnapshot) -> bool {
         .skills
         .as_ref()
         .is_some_and(|skills| skills.reset_prompt)
+}
+
+fn pressed(snapshot: &ProbeSnapshot, slot: usize) -> Option<HotbarPress> {
+    snapshot.hotbar.get(slot).and_then(|slot| slot.pressed)
 }
 
 fn cooling(snapshot: &ProbeSnapshot, slot: usize) -> bool {

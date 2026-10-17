@@ -37,6 +37,8 @@ pub(crate) struct UserSettings {
     sound: AudioMix,
     #[serde(default)]
     screen: ScreenSettings,
+    #[serde(default)]
+    skills: SkillSettings,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -103,6 +105,14 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     let mut frame_rate = settings.frame_rate_shown();
     if ui.checkbox(&mut frame_rate, "Show FPS").changed() {
         settings.toggle_frame_rate();
+    }
+    let mut quick_cast = settings.quick_cast();
+    if ui
+        .checkbox(&mut quick_cast, "Quick cast skills")
+        .on_hover_text("A skill is cast the moment it is used, at what the pointer rests on")
+        .changed()
+    {
+        settings.toggle_quick_cast();
     }
     ui.add_space(4.0);
     form(ui, "interface", |ui| {
@@ -248,6 +258,14 @@ impl UserSettings {
         self.screen.frame_rate = !self.screen.frame_rate;
     }
 
+    pub(crate) fn quick_cast(&self) -> bool {
+        self.skills.quick_cast
+    }
+
+    pub(crate) fn toggle_quick_cast(&mut self) {
+        self.skills.quick_cast = !self.skills.quick_cast;
+    }
+
     pub(crate) fn widget_pos(&self, id: &str) -> Option<Pos<WindowPx>> {
         self.ui.widgets.get(id).copied()
     }
@@ -357,6 +375,12 @@ struct TextSettings {
     letters_per_second: LettersPerSecond,
     #[serde(default)]
     reduced_motion: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct SkillSettings {
+    #[serde(default)]
+    quick_cast: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]

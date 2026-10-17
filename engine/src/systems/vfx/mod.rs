@@ -1,6 +1,6 @@
 pub mod fixture;
 
-pub use fixture::VfxFixture;
+pub use fixture::{VfxFixture, VfxShaderFixture};
 
 use std::collections::BTreeMap;
 

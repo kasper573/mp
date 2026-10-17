@@ -1,0 +1,56 @@
+{
+  "name": "Skill area",
+  "source": "shaders/skill_area.wgsl",
+  "params": [
+    {
+      "name": "colour",
+      "kind": "colour",
+      "default": [
+        120,
+        200,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "rim",
+      "kind": "colour",
+      "default": [
+        225,
+        245,
+        255,
+        255
+      ]
+    },
+    {
+      "name": "hostile_colour",
+      "kind": "colour",
+      "default": [
+        255,
+        96,
+        64,
+        255
+      ]
+    },
+    {
+      "name": "hostile_rim",
+      "kind": "colour",
+      "default": [
+        255,
+        220,
+        150,
+        255
+      ]
+    },
+    {
+      "name": "hostile",
+      "kind": "number",
+      "default": 0.0
+    },
+    {
+      "name": "strength",
+      "kind": "number",
+      "default": 1.0
+    }
+  ]
+}

@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::{Content, Fixture};
-use crate::core::vfx::{ParamValue, VfxDef, VfxParams, VfxSite};
+use crate::core::vfx::{ParamValue, VfxDef, VfxParams, VfxShaderDef, VfxSite};
 
 /// The vfx every game provides, played by the engine itself where damage, healing, defeat and a
 /// level reached land, so skills, items and scripts never repeat them.
@@ -17,6 +17,18 @@ pub enum VfxFixture {
 
 impl Fixture for VfxFixture {
     type Row = VfxDef;
+}
+
+/// The shaders every game provides, drawn by the engine itself: the ground an area skill is aimed
+/// at, which reads `hostile` as 1 when the skill harms.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray, IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
+pub enum VfxShaderFixture {
+    SkillArea,
+}
+
+impl Fixture for VfxShaderFixture {
+    type Row = VfxShaderDef;
 }
 
 pub fn play(world: &mut World, fixture: VfxFixture, site: VfxSite, params: &[(&str, f32)]) {

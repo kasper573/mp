@@ -3,6 +3,7 @@ use engine::core::math::{Offset, Pos};
 use engine::systems::input::map::InputAction;
 use engine::systems::probe::{ProbeSnapshot, ProbeTreeView};
 use engine::systems::skill::HotbarEntry;
+use engine::systems::skill::bar::HotbarPress;
 
 use crate::playtest;
 
@@ -102,13 +103,28 @@ fn skills_are_learned_in_the_tree_put_on_the_bar_cast_and_reset() {
     player.act(InputAction::ToggleSkills);
 
     player.act(InputAction::Hotbar2);
-    player.wait_until("Guard cooling", |snapshot| cooling(snapshot, 1));
+    player.wait_until("Guard cooling", |snapshot| {
+        cooling(snapshot, 1) && pressed(snapshot, 1) == Some(HotbarPress::Used)
+    });
+    player.act(InputAction::Hotbar2);
+    player.wait_until("the press refused", |snapshot| {
+        pressed(snapshot, 1) == Some(HotbarPress::Denied)
+    });
     player.act(InputAction::Hotbar1);
     player.wait_until("Cleave armed", aiming);
     let at = player.snapshot().me.expect("the player").at + Offset::new(2.0, 0.0);
     player.point_at_tile(at);
     player.click();
     player.wait_until("Cleave cast", |snapshot| {
+        cooling(snapshot, 0) && !aiming(snapshot)
+    });
+    player.act(InputAction::ToggleSettings);
+    player.click_ui(UiTarget::text("Quick cast skills"));
+    player.act(InputAction::ToggleSettings);
+    player.wait_until("Cleave ready", |snapshot| !cooling(snapshot, 0));
+    player.point_at_tile(at);
+    player.act(InputAction::Hotbar1);
+    player.wait_until("Cleave cast at once", |snapshot| {
         cooling(snapshot, 0) && !aiming(snapshot)
     });
 
@@ -196,6 +212,10 @@ fn prompted(snapshot: &ProbeSnapshot) -> bool {
         .skills
         .as_ref()
         .is_some_and(|skills| skills.reset_prompt)
+}
+
+fn pressed(snapshot: &ProbeSnapshot, slot: usize) -> Option<HotbarPress> {
+    snapshot.hotbar.get(slot).and_then(|slot| slot.pressed)
 }
 
 fn cooling(snapshot: &ProbeSnapshot, slot: usize) -> bool {

@@ -39,7 +39,7 @@ use crate::systems::player::{Owner, commands_locked, session};
 use crate::systems::quest::{Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::{OwnerKind, OwnerRow, Reach, RiftScripts};
 use crate::systems::shop::{self, ShopId};
-use crate::systems::skill::{self, HotbarEntry, Rank, SkillId};
+use crate::systems::skill::{self, HotbarEntry, Rank, SkillId, bar::HotbarPress};
 use crate::systems::stat::{StatKind, Stats};
 
 /// How a driver asks the client what it shows: the frame after a driver asks answers it.
@@ -296,6 +296,7 @@ pub struct ProbeSlot {
     pub blocked: bool,
     pub dimmed: bool,
     pub rebinding: bool,
+    pub pressed: Option<HotbarPress>,
 }
 
 /// The character's class, tree and bar as the client shows them.
@@ -593,6 +594,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                 blocked: slot.blocked,
                 dimmed: slot.dimmed,
                 rebinding: slot.rebinding,
+                pressed: slot.pressed,
             })
             .collect(),
         basic_attack: me

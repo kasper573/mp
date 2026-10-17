@@ -22,6 +22,7 @@ use super::{
     VfxShaderDef, VfxShaderId, VfxSite,
 };
 use crate::core::content::Content;
+use crate::core::geometry::{Footprint, Shape};
 use crate::core::gui::{self, Band, WidgetRects};
 use crate::core::math::Rgba;
 use crate::core::render::present::{self, PRESENT_LAYER, Viewport};
@@ -121,6 +122,10 @@ pub struct SiteUniform {
     pub progress: f32,
     pub time: f32,
     pub overscan: f32,
+    pub shape: u32,
+    pub origin: Vec2,
+    pub extent: Vec2,
+    pub tiles: Vec2,
 }
 
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
@@ -185,6 +190,15 @@ struct SiteFrame {
     depth: Option<f32>,
     texture: Option<(Handle<Image>, Rect, Vec2)>,
     sprite: Option<Entity>,
+    area: AreaShape,
+}
+
+/// Where a shader layer is in its run: how far through its duration, and the seconds since its
+/// instance started.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Run {
+    progress: f32,
+    time: Seconds,
 }
 
 impl SiteFrame {
@@ -206,6 +220,68 @@ pub const SITE_OBJECT: u32 = 1;
 pub const SITE_AREA: u32 = 2;
 pub const SITE_PATH: u32 = 3;
 pub const SITE_SCREEN: u32 = 4;
+
+pub const SHAPE_NONE: u32 = 0;
+pub const SHAPE_CIRCLE: u32 = 1;
+pub const SHAPE_RECT: u32 = 2;
+pub const SHAPE_CONE: u32 = 3;
+pub const SHAPE_LINE: u32 = 4;
+
+/// How an area site's footprint lies on the quad drawn over its bounds, as a shader reads it
+/// through the prelude's `area_distance`: the shape, where its point sits in site uv, its measures
+/// in tiles and the quad's size in tiles.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AreaShape {
+    pub shape: u32,
+    pub origin: Vec2,
+    pub extent: Vec2,
+    pub tiles: Vec2,
+}
+
+impl Default for AreaShape {
+    fn default() -> AreaShape {
+        AreaShape {
+            shape: SHAPE_NONE,
+            origin: Vec2::splat(0.5),
+            extent: Vec2::ZERO,
+            tiles: Vec2::ONE,
+        }
+    }
+}
+
+/// The quad an area site is drawn on: its centre and size in world pixels, and the footprint on it.
+pub fn area_quad(footprint: &Footprint) -> (Vec2, Vec2, AreaShape) {
+    let (center, size) = bounds(&footprint.outline(32));
+    let size = size.max(Vec2::ONE);
+    let at = footprint.at.to_screen();
+    let origin = Vec2::new(
+        (at.x - (center.x - size.x / 2.0)) / size.x,
+        ((center.y + size.y / 2.0) - at.y) / size.y,
+    );
+    let (shape, extent) = match footprint.shape {
+        Shape::Circle { radius } => (SHAPE_CIRCLE, Vec2::new(radius.0, 0.0)),
+        Shape::Rect { width, height } => (SHAPE_RECT, Vec2::new(width.0, height.0)),
+        Shape::Cone { angle, length } => (SHAPE_CONE, Vec2::new(angle.radians().0, length.0)),
+        Shape::Line { length, width } => (SHAPE_LINE, Vec2::new(length.0, width.0)),
+    };
+    let area = AreaShape {
+        shape,
+        origin,
+        extent,
+        tiles: size / TILE.0,
+    };
+    (center, size, area)
+}
+
+/// A shader the client draws on a site of its own accord, for as long as the component stays: an
+/// aim preview, a highlight. Its time runs from `since`, an uptime.
+#[derive(Component, Clone, Debug, PartialEq)]
+pub struct ShaderOverlay {
+    pub shader: VfxShaderId,
+    pub site: VfxSite,
+    pub params: VfxParams,
+    pub since: Seconds,
+}
 
 fn load_shaders(
     content: Res<Content>,
@@ -285,6 +361,10 @@ fn sync(world: &mut World) {
                     duration,
                     ..
                 } => {
+                    let run = Run {
+                        progress: (local.0 / duration.0.max(0.001)).clamp(0.0, 1.0),
+                        time: elapsed,
+                    };
                     let shown = show_shader(
                         world,
                         piece,
@@ -293,9 +373,7 @@ fn sync(world: &mut World) {
                         *shader,
                         params,
                         &instance.params,
-                        local,
-                        *duration,
-                        elapsed,
+                        run,
                     );
                     if shown && let Some(sprite) = frame.sprite {
                         overdrawn.insert(sprite);
@@ -305,13 +383,62 @@ fn sync(world: &mut World) {
             }
         }
     }
+    let uptime = Seconds(world.resource::<Time>().elapsed_secs());
+    let overlays: Vec<(Entity, ShaderOverlay)> = world
+        .query::<(Entity, &ShaderOverlay)>()
+        .iter(world)
+        .map(|(entity, overlay)| (entity, overlay.clone()))
+        .collect();
+    for (entity, overlay) in overlays {
+        if world.get::<VfxView>(entity).is_none() {
+            let piece = shader_piece(world, entity);
+            world.entity_mut(entity).insert((
+                VfxView {
+                    pieces: vec![Some(piece)],
+                },
+                Transform::default(),
+                Visibility::default(),
+            ));
+        }
+        let Some(piece) = world
+            .get::<VfxView>(entity)
+            .and_then(|view| view.pieces.first().copied().flatten())
+        else {
+            continue;
+        };
+        let Some(frame) = site_frame(world, &overlay.site) else {
+            hide(world, piece);
+            continue;
+        };
+        let fills = overlay
+            .params
+            .0
+            .iter()
+            .map(|(name, value)| (name.clone(), ParamFill::Value(*value)))
+            .collect();
+        let run = Run {
+            progress: 0.0,
+            time: uptime - overlay.since,
+        };
+        let shown = show_shader(
+            world,
+            piece,
+            &frame,
+            overlay.shader.get(&content),
+            overlay.shader,
+            &fills,
+            &VfxParams::default(),
+            run,
+        );
+        if shown && let Some(sprite) = frame.sprite {
+            overdrawn.insert(sprite);
+        }
+    }
     settle_overdrawn(world, &overdrawn);
 }
 
 fn attach(world: &mut World, entity: Entity, def: &VfxDef) {
     let assets = world.resource::<AssetServer>().clone();
-    let quad = world.resource::<VfxAssets>().quad.clone();
-    let blank = world.resource::<VfxAssets>().blank.clone();
     let pieces: Vec<Option<Entity>> = def
         .layers
         .iter()
@@ -330,28 +457,7 @@ fn attach(world: &mut World, entity: Entity, def: &VfxDef) {
                     ))
                     .id(),
             ),
-            VfxLayer::Shader { .. } => {
-                let material = world
-                    .resource_mut::<Assets<VfxMaterial>>()
-                    .add(VfxMaterial {
-                        image: blank.clone(),
-                        site: SiteUniform::default(),
-                        params: ParamsUniform::default(),
-                        shader: Handle::default(),
-                    });
-                Some(
-                    world
-                        .spawn((
-                            Mesh2d(quad.clone()),
-                            MeshMaterial2d(material),
-                            Transform::default(),
-                            Visibility::Hidden,
-                            VfxPiece,
-                            ChildOf(entity),
-                        ))
-                        .id(),
-                )
-            }
+            VfxLayer::Shader { .. } => Some(shader_piece(world, entity)),
             VfxLayer::Text { .. } => None,
         })
         .collect();
@@ -360,6 +466,29 @@ fn attach(world: &mut World, entity: Entity, def: &VfxDef) {
         Transform::default(),
         Visibility::default(),
     ));
+}
+
+fn shader_piece(world: &mut World, parent: Entity) -> Entity {
+    let quad = world.resource::<VfxAssets>().quad.clone();
+    let blank = world.resource::<VfxAssets>().blank.clone();
+    let material = world
+        .resource_mut::<Assets<VfxMaterial>>()
+        .add(VfxMaterial {
+            image: blank,
+            site: SiteUniform::default(),
+            params: ParamsUniform::default(),
+            shader: Handle::default(),
+        });
+    world
+        .spawn((
+            Mesh2d(quad),
+            MeshMaterial2d(material),
+            Transform::default(),
+            Visibility::Hidden,
+            VfxPiece,
+            ChildOf(parent),
+        ))
+        .id()
 }
 
 fn hide(world: &mut World, piece: Entity) {
@@ -448,9 +577,7 @@ fn show_shader(
     shader_id: VfxShaderId,
     fills: &std::collections::BTreeMap<String, ParamFill>,
     given: &VfxParams,
-    local: Seconds,
-    duration: Seconds,
-    elapsed: Seconds,
+    run: Run,
 ) -> bool {
     let Some(compiled) = world
         .resource::<VfxShaders>()
@@ -484,9 +611,13 @@ fn show_shader(
         pixel,
         kind: frame.kind,
         facing: frame.facing,
-        progress: (local.0 / duration.0.max(0.001)).clamp(0.0, 1.0),
-        time: elapsed.0,
+        progress: run.progress,
+        time: run.time.0,
         overscan,
+        shape: frame.area.shape,
+        origin: frame.area.origin,
+        extent: frame.area.extent,
+        tiles: frame.area.tiles,
     };
     let params = fill_params(shader, fills, given);
     if let Some(mut material) = world.resource_mut::<Assets<VfxMaterial>>().get_mut(&handle) {
@@ -600,7 +731,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
         VfxSite::Actor(entity) => sprite_frame(world, *entity, SITE_ACTOR),
         VfxSite::Object(entity) => sprite_frame(world, *entity, SITE_OBJECT),
         VfxSite::Area(footprint) => {
-            let (center, size) = bounds(&footprint.outline(32));
+            let (center, size, area) = area_quad(footprint);
             Some(SiteFrame {
                 kind: SITE_AREA,
                 center,
@@ -609,6 +740,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 depth: Some(world.resource::<GroundDepth>().0),
                 texture: None,
                 sprite: None,
+                area,
             })
         }
         VfxSite::Path(points) => {
@@ -628,6 +760,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 depth: Some(world.resource::<GroundDepth>().0),
                 texture: None,
                 sprite: None,
+                area: AreaShape::default(),
             })
         }
         VfxSite::Screen => {
@@ -649,6 +782,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                     Vec2::ONE / size,
                 )),
                 sprite: None,
+                area: AreaShape::default(),
             })
         }
         VfxSite::Widget(_) => None,
@@ -680,6 +814,7 @@ fn sprite_frame(world: &World, entity: Entity, kind: u32) -> Option<SiteFrame> {
             Vec2::ONE / sheet,
         )),
         sprite: Some(entity),
+        area: AreaShape::default(),
     })
 }
 
@@ -895,6 +1030,10 @@ impl Default for SiteUniform {
             progress: 0.0,
             time: 0.0,
             overscan: 1.0,
+            shape: SHAPE_NONE,
+            origin: Vec2::splat(0.5),
+            extent: Vec2::ZERO,
+            tiles: Vec2::ONE,
         }
     }
 }

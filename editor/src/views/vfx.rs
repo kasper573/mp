@@ -830,6 +830,7 @@ struct SiteFrame {
     size: Vec2,
     facing: f32,
     texture: Option<(Handle<Image>, Rect, Vec2)>,
+    area: vfx_render::AreaShape,
 }
 
 impl Stage {
@@ -1002,6 +1003,7 @@ fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<S
                     Rect::from_corners(rect.min / sheet, rect.max / sheet),
                     Vec2::ONE / sheet,
                 )),
+                area: vfx_render::AreaShape::default(),
             })
         }
         Target::Area { shape, facing } => {
@@ -1010,19 +1012,14 @@ fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<S
                 facing: facing.radians(),
                 shape: *shape,
             };
-            let points: Vec<Vec2> = footprint
-                .outline(32)
-                .into_iter()
-                .map(ToScreen::to_screen)
-                .collect();
-            let min = points.iter().fold(Vec2::MAX, |min, at| min.min(*at));
-            let max = points.iter().fold(Vec2::MIN, |max, at| max.max(*at));
+            let (center, size, area) = vfx_render::area_quad(&footprint);
             Some(SiteFrame {
                 kind: SITE_AREA,
-                center: (min + max) / 2.0,
-                size: max - min,
+                center,
+                size,
                 facing: -facing.radians().0,
                 texture: None,
+                area,
             })
         }
         Target::Screen => Some(SiteFrame {
@@ -1031,6 +1028,7 @@ fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<S
             size: Vec2::new(PREVIEW[0] as f32, PREVIEW[1] as f32) / ZOOM,
             facing: 0.0,
             texture: None,
+            area: vfx_render::AreaShape::default(),
         }),
     }
 }
@@ -1112,6 +1110,10 @@ fn show_shader_piece(
         progress: (local.0 / duration.0.max(0.001)).clamp(0.0, 1.0),
         time: elapsed,
         overscan,
+        shape: frame.area.shape,
+        origin: frame.area.origin,
+        extent: frame.area.extent,
+        tiles: frame.area.tiles,
     };
     let params = vfx_render::fill_params(&def, fills, given);
     if let Some(mut shown) = world

@@ -473,6 +473,7 @@ pub fn registry() -> ContentRegistry {
         .fixture::<interface::InterfaceIcon>()
         .fixture::<interface::FontFace>()
         .fixture::<vfx::VfxFixture>()
+        .fixture::<vfx::VfxShaderFixture>()
         .settings::<GameSettings>()
         .hook(LoadStep::Files, crate::core::content::media::check_media);
     crate::core::babble::content(&mut registry);

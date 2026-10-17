@@ -1,6 +1,9 @@
+use std::collections::BTreeMap;
+
 use bevy::prelude::*;
 use design_tokens::{HAIRLINE, TextRole, color};
 use egui::{Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
+use serde::{Deserialize, Serialize};
 use strum::VariantArray;
 
 use super::card;
@@ -47,6 +50,10 @@ const GAP: f32 = 4.0;
 const PITCH: f32 = SLOT + GAP;
 const FRAME: f32 = 4.0;
 const CARRIED: f32 = 40.0;
+const RIPPLE_SECONDS: f32 = 0.6;
+const RIPPLE_REACH: f32 = 18.0;
+const RIPPLE_USED: Color32 = Color32::from_rgb(150, 210, 255);
+const RIPPLE_DENIED: Color32 = Color32::from_rgb(190, 24, 40);
 
 pub struct HotbarWidget;
 
@@ -119,6 +126,21 @@ pub struct BarState {
     rebinding: Option<u32>,
     resizing: Option<Resizing>,
     dropped: bool,
+    presses: BTreeMap<u32, Press>,
+}
+
+/// How a press on a slot went: what it held was used, or the press was refused, by the slot's own
+/// state or by what the use ran into.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HotbarPress {
+    Used,
+    Denied,
+}
+
+#[derive(Clone, Copy)]
+struct Press {
+    outcome: HotbarPress,
+    since: Seconds,
 }
 
 #[derive(Clone, Copy)]
@@ -184,7 +206,7 @@ pub fn keys(world: &mut World) {
     let entry = world
         .get::<Hotbar>(me)
         .map_or(HotbarEntry::Empty, |hotbar| hotbar.entry(slot));
-    fire(world, entry);
+    press(world, slot, entry);
 }
 
 pub fn rebinding(world: &World) -> bool {
@@ -195,12 +217,19 @@ pub fn cancel_rebind(world: &mut World) -> bool {
     world.resource_mut::<BarState>().rebinding.take().is_some()
 }
 
-/// Uses what a slot holds: a skill is cast or aimed, an item is used from the bag.
-pub fn fire(world: &mut World, entry: HotbarEntry) {
-    match entry {
-        HotbarEntry::Empty => {}
+/// Uses what a slot holds: a skill is cast or aimed, an item is used from the bag. A slot drawn as
+/// cooling or blocked counts its press as denied whatever the use comes to.
+pub fn fire(world: &mut World, entry: HotbarEntry) -> HotbarPress {
+    let ready = matches!(SlotView::of(world, entry).fill, Fill::Ready);
+    let used = match entry {
+        HotbarEntry::Empty => false,
         HotbarEntry::Skill(skill) => use_skill(world, skill),
         HotbarEntry::Item(item) => use_item(world, item),
+    };
+    if used && ready {
+        HotbarPress::Used
+    } else {
+        HotbarPress::Denied
     }
 }
 
@@ -269,6 +298,7 @@ pub fn draw_carried(world: &mut World) {
 pub fn forget(mut state: ResMut<BarState>) {
     state.rebinding = None;
     state.resizing = None;
+    state.presses.clear();
 }
 
 /// What each shown slot holds and how it is drawn, for whoever probes the client.
@@ -281,6 +311,8 @@ pub struct SlotReport {
     pub dimmed: bool,
     /// Waiting for the next key pressed to become its key.
     pub rebinding: bool,
+    /// How the last press on the slot went, if it was ever pressed.
+    pub pressed: Option<HotbarPress>,
 }
 
 pub fn report(world: &World) -> Vec<SlotReport> {
@@ -300,6 +332,11 @@ pub fn report(world: &World) -> Vec<SlotReport> {
                 blocked: matches!(view.fill, Fill::Blocked(_)),
                 dimmed: view.dimmed,
                 rebinding: world.resource::<BarState>().rebinding == Some(index),
+                pressed: world
+                    .resource::<BarState>()
+                    .presses
+                    .get(&index)
+                    .map(|press| press.outcome),
             }
         })
         .collect()
@@ -454,6 +491,7 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: u32) {
         )
     });
     overlay(ui, response.rect, view.fill);
+    ripple(ui, world, index, response.rect);
     if rebinding {
         ui.painter()
             .rect_filled(response.rect, 4.0, Color32::from_black_alpha(170));
@@ -474,7 +512,7 @@ fn hotbar_slot(ui: &mut Ui, world: &mut World, index: u32) {
             });
         }
     } else if response.clicked() {
-        fire(world, entry);
+        press(world, index, entry);
     } else if map::drag_started(world, InputAction::CarryItem, &response)
         && entry != HotbarEntry::Empty
     {
@@ -745,6 +783,54 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
     }
 }
 
+/// A ring spreading out of a slot just pressed, in the colour of how the press went.
+fn ripple(ui: &Ui, world: &World, slot: u32, rect: Rect) {
+    let Some(press) = world.resource::<BarState>().presses.get(&slot) else {
+        return;
+    };
+    let age = (uptime(world) - press.since).0;
+    if age >= RIPPLE_SECONDS {
+        return;
+    }
+    let progress = (age / RIPPLE_SECONDS).clamp(0.0, 1.0);
+    let spread = 1.0 - (1.0 - progress) * (1.0 - progress);
+    let colour = match press.outcome {
+        HotbarPress::Used => RIPPLE_USED,
+        HotbarPress::Denied => RIPPLE_DENIED,
+    };
+    let painter = ui.ctx().layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("hotbar ripple"),
+    ));
+    painter.rect_filled(
+        rect,
+        4.0,
+        colour.gamma_multiply((1.0 - progress).powi(3) * 0.5),
+    );
+    painter.rect_stroke(
+        rect.expand(spread * RIPPLE_REACH),
+        4.0 + spread * 8.0,
+        Stroke::new(
+            3.0 * (1.0 - 0.5 * progress),
+            colour.gamma_multiply(1.0 - progress),
+        ),
+        StrokeKind::Outside,
+    );
+}
+
+fn uptime(world: &World) -> Seconds {
+    Seconds(world.resource::<Time>().elapsed_secs())
+}
+
+fn press(world: &mut World, slot: u32, entry: HotbarEntry) {
+    let outcome = fire(world, entry);
+    let since = uptime(world);
+    world
+        .resource_mut::<BarState>()
+        .presses
+        .insert(slot, Press { outcome, since });
+}
+
 fn hatch(painter: &egui::Painter, rect: Rect) {
     let stroke = Stroke::new(1.0, Color32::from_white_alpha(28));
     let span = rect.width() + rect.height();
@@ -789,16 +875,17 @@ fn dragging_something(gui: &egui::Context) -> bool {
         || egui::DragAndDrop::has_payload_of_type::<CarriedEntry>(gui)
 }
 
-fn use_skill(world: &mut World, skill: SkillId) {
+/// Whether the skill was asked for, armed or cast; not whether the server then performs it.
+fn use_skill(world: &mut World, skill: SkillId) -> bool {
     let Some(me) = session::me(world) else {
-        return;
+        return false;
     };
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
     let rank = super::rank_of(world, me, skill);
     if rank == Rank::NONE {
         notification::local_error(world, format!("You don't know {}", def.name));
-        return;
+        return false;
     }
     match def.target {
         Targeting::Caster => {
@@ -806,6 +893,7 @@ fn use_skill(world: &mut World, skill: SkillId) {
                 skill,
                 aim: Aim::None,
             });
+            true
         }
         Targeting::SingleAlly | Targeting::SingleEnemy => {
             let engaged = world
@@ -818,22 +906,33 @@ fn use_skill(world: &mut World, skill: SkillId) {
                         skill,
                         aim: Aim::Actor(target),
                     });
+                    true
                 }
-                None => aim::arm(world, skill, rank),
+                None => aim_or_cast(world, skill, rank),
             }
         }
-        Targeting::AreaAlly | Targeting::AreaEnemy => aim::arm(world, skill, rank),
+        Targeting::AreaAlly | Targeting::AreaEnemy => aim_or_cast(world, skill, rank),
     }
 }
 
-fn use_item(world: &mut World, item: ItemId) {
+fn aim_or_cast(world: &mut World, skill: SkillId, rank: Rank) -> bool {
+    if world.resource::<UserSettings>().quick_cast() {
+        aim::cast_at_pointer(world, skill)
+    } else {
+        aim::arm(world, skill, rank);
+        true
+    }
+}
+
+/// Whether a use of the item was asked for.
+fn use_item(world: &mut World, item: ItemId) -> bool {
     let Some(me) = session::my_character(world) else {
-        return;
+        return false;
     };
     let content = world.resource::<Content>().clone();
     let def = item.get(&content);
     if matches!(def.kind, ItemKind::Resource) {
-        return;
+        return false;
     }
     let bag_slot = me
         .get::<Inventory>()
@@ -844,9 +943,16 @@ fn use_item(world: &mut World, item: ItemId) {
     match bag_slot {
         Some(slot) => {
             world.write_message(UseItemRequest { slot: slot as u32 });
+            true
         }
-        None if worn => notification::local_error(world, format!("{} is worn already", def.name)),
-        None => notification::local_error(world, format!("No {} left", def.name)),
+        None if worn => {
+            notification::local_error(world, format!("{} is worn already", def.name));
+            false
+        }
+        None => {
+            notification::local_error(world, format!("No {} left", def.name));
+            false
+        }
     }
 }
 
