@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
 
 use egui::{RichText, Ui};
 use engine::core::content::ModuleRule;
 use engine::core::content::id::LeafKind;
+use engine::core::vfx::shader_file;
 use serde_json::Value;
 
 use crate::app::{DeleteDialog, Editor, ModalDialog, NewRowDialog, registry};
@@ -12,7 +14,7 @@ use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
 use crate::usages::ContentUsage;
 use crate::views::area::placement;
-use crate::views::world;
+use crate::views::{vfx, world};
 use crate::{schema, usages};
 
 pub const KEY_MAX: usize = 64;
@@ -142,6 +144,9 @@ pub fn create(editor: &mut Editor, dialog: &NewRowDialog) -> Result<(), String> 
     }
     let mut edit = ContentEdit::new(format!("New {} {key}", dialog.table));
     edit.write_json(row_file(&dialog.table, &key), &dialog.value);
+    if let Some(file) = companion_file(&dialog.table, &key) {
+        edit.write(file, Arc::from(NEW_SHADER.as_bytes()));
+    }
     if let Some((file, pointer)) = &dialog.into
         && let Some(mut target) = project.files.json_owned(file)
     {
@@ -166,6 +171,11 @@ pub fn duplicate(editor: &mut Editor, table: &str, key: &str) {
     let copy = free_key(&project.files, table, &format!("{key}_2"));
     let mut edit = ContentEdit::new(format!("Duplicate {table}/{key} as {copy}"));
     edit.write_json(row_file(table, &copy), &value);
+    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, &copy))
+        && let Some(bytes) = project.files.get(&from)
+    {
+        edit.write(to, bytes.clone());
+    }
     for file in folder_files(project, table, key) {
         if let Some(bytes) = project.files.get(&file) {
             edit.write(
@@ -229,6 +239,12 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         edit.write_json(row_file(table, new_key), &value);
     }
     edit.remove(own);
+    if let Some((from, to)) = companion_file(table, key).zip(companion_file(table, new_key))
+        && let Some(bytes) = project.files.get(&from)
+    {
+        edit.write(to, bytes.clone());
+        edit.remove(from);
+    }
     for file in folder_files(project, table, key) {
         if let Some(bytes) = project.files.get(&file) {
             edit.write(
@@ -301,6 +317,15 @@ fn retarget_tabs(editor: &mut Editor, table: &str, key: &str, new_key: &str) {
         }
     }
 }
+
+/// The file a row owns by convention besides its own, which follows the row through a copy, a
+/// rename and a deletion: a shader's WGSL.
+pub fn companion_file(table: &str, key: &str) -> Option<String> {
+    (table == vfx::SHADER_TABLE).then(|| shader_file(key))
+}
+
+const NEW_SHADER: &str =
+    "fn vfx(uv: vec2<f32>) -> vec4<f32> {\n    return sample(site_uv(uv));\n}\n";
 
 pub fn folder_files(project: &Project, table: &str, key: &str) -> Vec<String> {
     project
@@ -852,6 +877,11 @@ pub fn delete(editor: &mut Editor, dialog: &DeleteDialog) -> Result<(), String> 
     }
     for key in &dialog.keys {
         edit.remove(row_file(&dialog.table, key));
+        if let Some(file) = companion_file(&dialog.table, key)
+            && project.files.contains(&file)
+        {
+            edit.remove(file);
+        }
         for file in folder_files(project, &dialog.table, key) {
             edit.remove(file);
         }

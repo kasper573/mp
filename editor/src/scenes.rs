@@ -19,7 +19,7 @@ use crate::views::tileset::{
     TilesetMode, WalkBrush,
 };
 use crate::views::world::{
-    ColourBy, ColourField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
+    ColorBy, ColorField, MapLens, MapLook, MapPart, MapRoute, OpenWorldMap, arrange,
 };
 use crate::views::{class, model, tileset, world};
 use crate::{rows, ui};
@@ -224,7 +224,7 @@ pub enum SortOrder {
 pub enum WorldStep {
     Open,
     Lens(WorldLens),
-    Colour(Option<ColourField>),
+    Color(Option<ColorField>),
     Line(String),
     Route(Option<MapRoute>),
     Look {
@@ -632,7 +632,7 @@ fn world_step(editor: &mut Editor, step: &WorldStep) {
             },
             WorldLens::Text(text) => MapLens::Text(text.clone()),
         }),
-        WorldStep::Colour(field) => editor.views.world.colour = field.clone().map(ColourBy::new),
+        WorldStep::Color(field) => editor.views.world.color = field.clone().map(ColorBy::new),
         WorldStep::Line(line) => editor.views.world.quest_line = Some(line.clone()),
         WorldStep::Route(route) => editor.views.world.route = route.clone(),
         WorldStep::Look { area, zoom } => {
@@ -660,7 +660,7 @@ fn world_step(editor: &mut Editor, step: &WorldStep) {
                 layout.regions.push(Region {
                     name: name.clone(),
                     cards: cards.iter().filter_map(|key| map.atlas.id(key)).collect(),
-                    colour: None,
+                    color: None,
                 });
             });
         }

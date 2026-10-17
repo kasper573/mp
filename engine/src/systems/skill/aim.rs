@@ -195,9 +195,9 @@ impl Gesture for AimGesture {
     }
 }
 
-/// The armed skill's range around the character, a ring on each actor its area would take and,
-/// for a skill aimed at one target, a line saying what a click does. The area itself lies on the
-/// ground, kept by `surface`.
+/// The armed skill's range around the character and, for a skill aimed at one target, a line
+/// saying what a click does. The area itself lies on the ground, kept by `surface`, and says on
+/// its own what it takes.
 pub fn draw_aim(world: &mut World) {
     let Some(aimed) = aiming(world) else {
         return;
@@ -224,16 +224,6 @@ pub fn draw_aim(world: &mut World) {
     if let Some(ring) = project(world, &reach.outline(OUTLINE_STEPS)) {
         lines.push((ring, color::WARN.gamma_multiply(0.35), 1.0));
     }
-    if let Some((footprint, _)) = aimed_area(world, aimed) {
-        for actor in inside(world, me, &footprint, def.target) {
-            if let Some(at) = movement::position(world, actor)
-                && let Some(center) = render::tile_to_window(world, at)
-            {
-                let ring = circle(Pos2::new(center.x, center.y), 14.0);
-                lines.push((ring, color::OK, 1.5));
-            }
-        }
-    }
     let label = def
         .target
         .aimed_at_actor()
@@ -241,8 +231,8 @@ pub fn draw_aim(world: &mut World) {
     let screen = gui.content_rect();
     area.fixed_pos(screen.min).show(&gui, |ui| {
         let painter = ui.painter();
-        for (points, colour, width) in lines {
-            painter.add(egui::Shape::closed_line(points, Stroke::new(width, colour)));
+        for (points, color, width) in lines {
+            painter.add(egui::Shape::closed_line(points, Stroke::new(width, color)));
         }
         let Some(label) = label else {
             return;
@@ -294,35 +284,9 @@ fn actor_at(world: &mut World, point: Pos<Tiles>, targeting: Targeting) -> Optio
     })
 }
 
-fn inside(world: &World, me: Entity, footprint: &Footprint, targeting: Targeting) -> Vec<Entity> {
-    let mut query = world.try_query::<(Entity, &crate::systems::movement::Position)>();
-    let Some(query) = query.as_mut() else {
-        return Vec::new();
-    };
-    query
-        .iter(world)
-        .filter(|(entity, at)| {
-            *entity != me
-                && footprint.contains(at.pos)
-                && world.get::<Actor>(*entity).is_some()
-                && using::fits(world, me, *entity, targeting)
-        })
-        .map(|(entity, _)| entity)
-        .collect()
-}
-
 fn project(world: &mut World, points: &[Pos<Tiles>]) -> Option<Vec<Pos2>> {
     points
         .iter()
         .map(|point| render::tile_to_window(world, *point).map(|at| Pos2::new(at.x, at.y)))
-        .collect()
-}
-
-fn circle(center: Pos2, radius: f32) -> Vec<Pos2> {
-    (0..24)
-        .map(|step| {
-            let angle = std::f32::consts::TAU * step as f32 / 24.0;
-            center + Vec2::new(angle.cos(), angle.sin()) * radius
-        })
         .collect()
 }

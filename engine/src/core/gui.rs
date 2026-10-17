@@ -325,7 +325,7 @@ fn forget_world_layers(mut layers: ResMut<WorldLayers>, mut widgets: ResMut<Widg
 }
 
 /// bevy_egui blends every texture as premultiplied but samples a Bevy image as stored, which would
-/// show the colour of each transparent pixel; egui premultiplies the pixels it is handed itself.
+/// show the color of each transparent pixel; egui premultiplies the pixels it is handed itself.
 fn upload(world: &World, file: &str, handle: &Handle<Image>) -> Option<egui::TextureHandle> {
     let image = world.resource::<Assets<Image>>().get(handle)?;
     let rgba = image.clone().try_into_dynamic().ok()?.to_rgba8();

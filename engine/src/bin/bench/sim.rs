@@ -9,6 +9,8 @@ use engine::systems::player::{ClientId, JoinRequest, SpawnPolicy, SpawnRules};
 use engine::systems::{GameSettings, TICK_HZ, from_client, server_app, start_server, step_areas};
 use strum::AsRefStr;
 
+use crate::play;
+
 pub const PLAYERS_PER_AREA: usize = 25;
 
 const CLOCK: WallClock = WallClock {
@@ -94,9 +96,13 @@ pub fn connect(worlds: &mut [App], rosters: &[Roster]) {
 }
 
 /// Advances every world one tick across all cores — the same parallel area fan-out the real server
-/// uses, so the benchmark's capacity reflects the threaded server.
-pub fn step(worlds: &mut [App]) {
+/// uses, so the benchmark's capacity reflects the threaded server — after its players have made
+/// their moves.
+pub fn step(worlds: &mut [App], rosters: &[Roster], content: &Content) {
     let ticks = TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    for (app, roster) in worlds.iter_mut().zip(rosters) {
+        play::act(app.world_mut(), content, roster, ticks);
+    }
     step_areas(worlds, clock_after(ticks));
     consume_sent(worlds);
 }
@@ -139,10 +145,12 @@ fn build_world(layout: Layout, content: &Content, ordinal: u64) -> (App, Roster)
     });
     start_server(&mut app);
 
+    let zone = content.built::<GameSettings>().initial_spawn.area;
     let world = app.world_mut();
     let mut roster = Vec::with_capacity(PLAYERS_PER_AREA);
     for index in 0..PLAYERS_PER_AREA {
         let conn = world.spawn(ClientId(index as u32 + 1)).id();
+        play::join_as(world, content, zone, conn, index);
         from_client(world, conn, JoinRequest);
         roster.push(conn);
     }

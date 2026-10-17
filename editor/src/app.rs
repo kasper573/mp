@@ -662,6 +662,17 @@ impl Editor {
             self.toast("Read-only: nothing saved");
             return false;
         }
+        let was_loading = project.loading();
+        let late = project.settle();
+        for late in &late {
+            self.refused(&late.label, &late.refusal);
+        }
+        if was_loading {
+            self.views.content_changed();
+        }
+        let Some(project) = &mut self.project else {
+            return false;
+        };
         match project.save() {
             Ok(outcome) => {
                 let count = outcome.written.len() + outcome.removed.len();
@@ -725,6 +736,21 @@ impl Editor {
         self.project
             .as_ref()
             .and_then(|project| project.content.clone())
+    }
+
+    fn poll_project(&mut self) {
+        let Some(project) = &mut self.project else {
+            return;
+        };
+        let was_loading = project.loading();
+        let late = project.poll();
+        let landed = was_loading && !project.loading();
+        if let Some(late) = late {
+            self.refused(&late.label, &late.refusal);
+        }
+        if landed {
+            self.views.content_changed();
+        }
     }
 
     fn poll_outside(&mut self) {
@@ -836,6 +862,7 @@ fn editor_ui(world: &mut World) {
 
 fn background(world: &mut World) {
     world.resource_scope(|world, mut editor: Mut<Editor>| {
+        editor.poll_project();
         editor.poll_outside();
         editor.tick_journal();
         play::poll(&mut editor);
@@ -875,5 +902,9 @@ impl<T> ChannelInbox<T> {
             Ok(receiver) => receiver.try_recv(),
             Err(_) => Err(TryRecvError::Disconnected),
         }
+    }
+
+    pub fn recv(&self) -> Option<T> {
+        self.0.lock().ok().and_then(|receiver| receiver.recv().ok())
     }
 }

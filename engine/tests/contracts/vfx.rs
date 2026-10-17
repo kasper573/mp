@@ -149,7 +149,7 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
         site: VfxSite::Screen,
         params: VfxParams(vec![
             ("amount".to_owned(), ParamValue::Number(4.5)),
-            ("tint".to_owned(), ParamValue::Colour(Rgba(0xff00_80ff))),
+            ("tint".to_owned(), ParamValue::Color(Rgba(0xff00_80ff))),
         ]),
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),

@@ -6,7 +6,7 @@
       "shader": "flash",
       "duration": 0.12,
       "params": {
-        "colour": [
+        "color": [
           255,
           255,
           255,

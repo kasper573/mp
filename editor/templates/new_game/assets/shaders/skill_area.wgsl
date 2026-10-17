@@ -1,21 +1,23 @@
-// The ground a skill is aimed at: a translucent sheet of magic in the shape of the area, ripples
-// drifting across it, rings rolling out from its point and a rim that glows at its edge. hostile
-// is 1 for a skill that harms, which trades the calm colours for the hostile ones.
+// The ground a skill is aimed at, as a clean ring of light in the shape of the area: a crisp
+// one-pixel rim, a glow that steps away from it on both sides, a breath of light pulsing along
+// it and a floor so faint the ground stays readable. Kept strictly to the area, since this is the
+// shape the player reads. hostile is 1 for a skill that harms, which trades the calm colors for
+// the hostile ones.
 fn vfx(uv: vec2<f32>) -> vec4<f32> {
-    let distance = area_distance(uv);
-    let inside = 1.0 - smoothstep(-0.05, 0.03, distance);
-    let local = area_local(uv);
-    let t = site.time;
-    let colour = mix(params.colour, params.hostile_colour, params.hostile);
-    let rim_colour = mix(params.rim, params.hostile_rim, params.hostile);
-    let drift = sin(local.x * 6.0 + t * 1.7) * sin(local.y * 5.0 - t * 1.3 + sin(t * 0.6) * 1.5);
-    let sheen = 0.5 + 0.5 * drift;
-    let radius = length(local);
-    let rings = pow(0.5 + 0.5 * sin(radius * 5.5 - t * 3.0), 8.0);
-    let rim = smoothstep(-0.45, 0.0, distance);
-    let pulse = 0.85 + 0.15 * sin(t * 3.5);
-    let body = colour.a * (0.10 + 0.08 * sheen + 0.18 * rings * (1.0 - rim * 0.5));
-    let edge = rim_colour.a * rim * rim * pulse * 0.85;
-    let rgb = mix(colour.rgb, rim_colour.rgb, rim * rim + 0.5 * rings);
-    return vec4<f32>(rgb, (body + edge) * inside * params.strength);
+    let suv = site_uv(pixel_uv(uv));
+    let distance = site_distance(suv);
+    let pixel = site.tiles.x / max(site.size.x, 1.0);
+    let inside = step(distance, 0.0);
+    let tick = floor(site.time * 12.0) / 12.0;
+    let color = mix(params.color, params.hostile_color, clamp(params.hostile, 0.0, 1.0));
+    let rim_color = mix(params.rim, params.hostile_rim, clamp(params.hostile, 0.0, 1.0));
+    let breath = 0.8 + 0.2 * step(0.5, fract(tick * 0.8));
+    let rim = step(abs(distance), pixel);
+    let inner = floor((1.0 - clamp(-distance / 0.3, 0.0, 0.999)) * 3.0) / 3.0 * inside * 0.45;
+    let outer = floor((1.0 - clamp(distance / 0.2, 0.0, 0.999)) * 2.0) / 2.0 * (1.0 - inside) * 0.35;
+    let floor_glow = inside * 0.07;
+    let glow = max(max(inner, outer), floor_glow) * color.a * breath;
+    let edge = rim * rim_color.a;
+    let rgb = mix(color.rgb, rim_color.rgb, rim);
+    return vec4<f32>(rgb, clamp(max(glow, edge) * params.strength, 0.0, 1.0));
 }

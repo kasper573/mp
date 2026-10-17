@@ -10,7 +10,7 @@
     {
       "type": "text",
       "template": "+{amount}",
-      "colour": [
+      "color": [
         120,
         232,
         128,
@@ -24,7 +24,7 @@
       "shader": "tint",
       "duration": 0.35,
       "params": {
-        "colour": [
+        "color": [
           120,
           232,
           128,

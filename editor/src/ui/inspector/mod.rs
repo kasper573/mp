@@ -150,13 +150,19 @@ pub fn right_tabs(editor: &Editor) -> Vec<(RightTab, String)> {
         if !shown_in_centre {
             tabs.push((RightTab::Inspector, "Inspector".to_owned()));
         }
-    } else {
+    } else if !(shown_in_centre && views_with_own_form(&selection.table)) {
         tabs.push((RightTab::Inspector, "Inspector".to_owned()));
     }
     if !selection.is_game() {
         tabs.push((RightTab::UsedBy, "Used by".to_owned()));
     }
     tabs
+}
+
+/// The tables whose centre view lays the row's form out beside what it previews, so the panel
+/// would only repeat it.
+fn views_with_own_form(table: &str) -> bool {
+    table == vfx::TABLE || table == vfx::SHADER_TABLE
 }
 
 pub fn has_preview(editor: &Editor) -> bool {

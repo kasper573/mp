@@ -181,6 +181,22 @@ fn a_shader_that_does_not_compile_is_refused_at_its_line() {
 }
 
 #[test]
+fn a_shader_row_without_its_file_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.remove("assets/shaders/tint.wgsl");
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "tables/vfx_shader/tint.json")
+        .expect("the row is refused");
+    assert_eq!(error.problem.rule, "shader file missing");
+    assert_eq!(error.problem.expected, "assets/shaders/tint.wgsl");
+}
+
+#[test]
 fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
     let folder = TempFolder::of_template();
     folder.edit("tables/vfx/healed.json", |row| {

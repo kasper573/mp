@@ -783,7 +783,7 @@ fn overlay(ui: &Ui, rect: Rect, fill: Fill) {
     }
 }
 
-/// A ring spreading out of a slot just pressed, in the colour of how the press went.
+/// A ring spreading out of a slot just pressed, in the color of how the press went.
 fn ripple(ui: &Ui, world: &World, slot: u32, rect: Rect) {
     let Some(press) = world.resource::<BarState>().presses.get(&slot) else {
         return;
@@ -794,7 +794,7 @@ fn ripple(ui: &Ui, world: &World, slot: u32, rect: Rect) {
     }
     let progress = (age / RIPPLE_SECONDS).clamp(0.0, 1.0);
     let spread = 1.0 - (1.0 - progress) * (1.0 - progress);
-    let colour = match press.outcome {
+    let color = match press.outcome {
         HotbarPress::Used => RIPPLE_USED,
         HotbarPress::Denied => RIPPLE_DENIED,
     };
@@ -805,14 +805,14 @@ fn ripple(ui: &Ui, world: &World, slot: u32, rect: Rect) {
     painter.rect_filled(
         rect,
         4.0,
-        colour.gamma_multiply((1.0 - progress).powi(3) * 0.5),
+        color.gamma_multiply((1.0 - progress).powi(3) * 0.5),
     );
     painter.rect_stroke(
         rect.expand(spread * RIPPLE_REACH),
         4.0 + spread * 8.0,
         Stroke::new(
             3.0 * (1.0 - 0.5 * progress),
-            colour.gamma_multiply(1.0 - progress),
+            color.gamma_multiply(1.0 - progress),
         ),
         StrokeKind::Outside,
     );

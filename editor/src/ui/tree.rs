@@ -268,7 +268,7 @@ fn line_button(ui: &mut Ui, glyph: &str, tip: &str) -> egui::Response {
 }
 
 fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeThumbs<'_>>) {
-    let colour = if node.selected {
+    let color = if node.selected {
         theme::TEXT
     } else {
         theme::CODE
@@ -290,7 +290,7 @@ fn leaf_line<A>(ui: &mut Ui, node: &TreeNode<A>, thumbs: &mut Option<&mut TreeTh
     } else if matches!(node.icon, TreeIcon::Thumb(_)) {
         ui.add_space(18.0);
     }
-    ui.label(theme::mono(&node.label).size(13.0).color(colour));
+    ui.label(theme::mono(&node.label).size(13.0).color(color));
 }
 
 #[derive(Default)]

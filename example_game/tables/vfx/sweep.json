@@ -5,7 +5,7 @@
       "type": "shader",
       "shader": "ring",
       "params": {
-        "colour": [
+        "color": [
           120,
           170,
           255,

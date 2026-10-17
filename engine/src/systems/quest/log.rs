@@ -256,11 +256,11 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
                     if page.log.tracked.contains(&quest) {
                         hud::icon(ui, world, &InterfaceIcon::Tracked.get(&content).image, 14.0);
                     }
-                    let (status, colour) = status(&content, page, quest);
+                    let (status, color) = status(&content, page, quest);
                     ui.label(
                         RichText::new(status)
                             .size(TextRole::Small.size())
-                            .color(colour),
+                            .color(color),
                     );
                     ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                         hud::icon(ui, world, def.icon(&content), ROW_ICON);
@@ -363,7 +363,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     );
     let finished = page.finished(quest);
     for (index, (objective, mut progress)) in def.objectives().zip(progress).enumerate() {
-        let colour = match finished.map(|finished| finished.result) {
+        let color = match finished.map(|finished| finished.result) {
             Some(QuestResult::Completed) => color::OK,
             Some(QuestResult::Failed) => color::MUTED,
             None if progress.done() => color::OK,
@@ -371,7 +371,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
         };
         progress.counted &= finished.is_none();
         ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, &progress, colour);
+            objective_row(ui, world, objective, &progress, color);
         });
     }
     if let Some(paths) = def.decision() {
@@ -397,7 +397,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
         ));
     }
     if let Some(finished) = finished {
-        let (outcome, colour) = match finished.result {
+        let (outcome, color) = match finished.result {
             QuestResult::Completed if finished.resets_in(page.now).is_some() => (
                 Countdown::ResetsDetail
                     .label(&page.log, quest, page.now)
@@ -411,11 +411,7 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
             ),
             QuestResult::Failed => ("Failed".to_owned(), color::DANGER),
         };
-        ui.label(
-            RichText::new(outcome)
-                .family(family::medium())
-                .color(colour),
-        );
+        ui.label(RichText::new(outcome).family(family::medium()).color(color));
     }
     if page.log.trackable(&content, quest) {
         footer(ui, world, page, quest);

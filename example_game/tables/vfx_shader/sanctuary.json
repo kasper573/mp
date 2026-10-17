@@ -1,10 +1,9 @@
 {
   "name": "Sanctuary",
-  "source": "shaders/sanctuary.wgsl",
   "params": [
     {
-      "name": "colour",
-      "kind": "colour",
+      "name": "color",
+      "kind": "color",
       "default": [
         255,
         226,
@@ -15,7 +14,9 @@
     {
       "name": "rays",
       "kind": "number",
-      "default": 5.0
+      "default": 5.0,
+      "min": 0.0,
+      "max": 12.0
     }
   ]
 }

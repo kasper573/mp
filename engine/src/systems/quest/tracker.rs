@@ -82,7 +82,7 @@ enum Count {
 }
 
 impl Tone {
-    fn colour(self) -> Color32 {
+    fn color(self) -> Color32 {
         match self {
             Tone::Plain => color::TEXT.gamma_multiply(0.75),
             Tone::Done => color::OK.gamma_multiply(0.7),
@@ -141,7 +141,7 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
         });
     });
     for (label, count, tone) in &entry.rows {
-        let colour = tone.colour();
+        let color = tone.color();
         let count = match count {
             Count::Hidden => String::new(),
             Count::Fixed(count) => count.clone(),
@@ -153,11 +153,11 @@ fn entry_rows(ui: &mut Ui, world: &mut World, log: &QuestLog, entry: &Entry) {
             ui.add_space(8.0);
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if !count.is_empty() {
-                    ui.label(RichText::new(count).size(small).color(colour));
+                    ui.label(RichText::new(count).size(small).color(color));
                 }
                 ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
                     ui.add(
-                        Label::new(RichText::new(label.as_str()).size(small).color(colour)).wrap(),
+                        Label::new(RichText::new(label.as_str()).size(small).color(color)).wrap(),
                     );
                 });
             });

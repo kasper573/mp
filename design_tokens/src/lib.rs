@@ -29,7 +29,7 @@ pub mod color {
     pub const DANGER: Color32 = Color32::from_rgb(226, 90, 90);
 }
 
-/// The colours prose marks words with: places, names, items, magic and danger.
+/// The colors prose marks words with: places, names, items, magic and danger.
 pub mod ink {
     use egui::Color32;
 

@@ -851,7 +851,7 @@ fn table_body(
                         }
                         continue;
                     }
-                    let (text, colour) = match column.text(row) {
+                    let (text, color) = match column.text(row) {
                         Some(text) => (
                             text,
                             if column.source == ColumnSource::Key {
@@ -874,7 +874,7 @@ fn table_body(
                         align,
                         &text,
                         egui::FontId::monospace(12.5),
-                        colour,
+                        color,
                         *width - 10.0,
                     );
                 }
@@ -1522,12 +1522,12 @@ fn histogram(ui: &mut Ui, values: &[f64], highlight: Option<f64>) {
             egui::pos2(x + 2.0, rect.min.y + bar_h - h.max(2.0)),
             egui::pos2(x + bar_w - 2.0, rect.min.y + bar_h),
         );
-        let colour = if highlight_bin == Some(index) {
+        let color = if highlight_bin == Some(index) {
             theme::SELECTION
         } else {
             theme::RAISED.gamma_multiply(1.6)
         };
-        painter.rect_filled(bar, 2.0, colour);
+        painter.rect_filled(bar, 2.0, color);
         let label = if integral && bins as f64 == high - low + 1.0 {
             (low + index as f64).to_string()
         } else {

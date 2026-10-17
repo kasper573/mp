@@ -5,7 +5,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::ParamValue;
-use crate::core::assets::AssetRef;
 use crate::core::content::{
     ContentId, ContentProblem, ContentRow, ErrorPlace, Loading, RowCheck, asset_file,
 };
@@ -21,15 +20,21 @@ pub const PARAMS_BYTES: usize = 128;
 
 const RESERVED: [&str; 4] = ["site", "params", "sample", "site_uv"];
 
-/// A shader a game ships: a WGSL file defining `fn vfx(uv: vec2<f32>) -> vec4<f32>`, and the
-/// parameters it reads from `params`, each with the default it gets when a layer leaves it unfilled.
+/// A shader a game ships: the WGSL file at `shader_file(key)` defining
+/// `fn vfx(uv: vec2<f32>) -> vec4<f32>`, and the parameters it reads from `params`, each with the
+/// default it gets when a layer leaves it unfilled and, for a number, the range the designer means
+/// it to be set within.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VfxShaderDef {
     pub name: String,
-    pub source: AssetRef,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub params: Vec<ShaderParam>,
+}
+
+/// Where a shader row's WGSL lives: beside the other assets, named after the row.
+pub fn shader_file(key: &str) -> String {
+    asset_file(&format!("shaders/{key}.wgsl"))
 }
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -38,13 +43,24 @@ pub struct ShaderParam {
     pub name: String,
     pub kind: ParamKind,
     pub default: ParamValue,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f32>,
+}
+
+impl ShaderParam {
+    /// The range a number parameter is set within; a color has none.
+    pub fn range(&self) -> Option<(f32, f32)> {
+        Some((self.min?, self.max?))
+    }
 }
 
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ParamKind {
     Number,
-    Colour,
+    Color,
 }
 
 /// Where each parameter sits in the uniform, by the layout rules WGSL gives the generated struct.
@@ -69,21 +85,21 @@ impl ParamKind {
     pub fn label(self) -> &'static str {
         match self {
             ParamKind::Number => "number",
-            ParamKind::Colour => "colour",
+            ParamKind::Color => "color",
         }
     }
 
     fn wgsl(self) -> &'static str {
         match self {
             ParamKind::Number => "f32",
-            ParamKind::Colour => "vec4<f32>",
+            ParamKind::Color => "vec4<f32>",
         }
     }
 
     fn size(self) -> usize {
         match self {
             ParamKind::Number => 4,
-            ParamKind::Colour => 16,
+            ParamKind::Color => 16,
         }
     }
 }
@@ -168,6 +184,53 @@ impl ContentRow for VfxShaderDef {
                     format!("a {}", param.kind.label()),
                 );
             }
+            match (param.kind, param.min, param.max, param.default) {
+                (ParamKind::Number, Some(min), Some(max), ParamValue::Number(default)) => {
+                    if min >= max {
+                        check.error(
+                            format!("/params/{index}/max"),
+                            "empty range",
+                            format!("{min}..{max}"),
+                            "a max above the min",
+                        );
+                    } else if default < min || default > max {
+                        check.error(
+                            format!("/params/{index}/default"),
+                            "default out of range",
+                            default,
+                            format!("{min}..{max}"),
+                        );
+                    }
+                }
+                (ParamKind::Number, min, max, _) => {
+                    if min.is_none() {
+                        check.error(
+                            format!("/params/{index}/min"),
+                            "range missing",
+                            "nothing",
+                            "the least a number may be set to",
+                        );
+                    }
+                    if max.is_none() {
+                        check.error(
+                            format!("/params/{index}/max"),
+                            "range missing",
+                            "nothing",
+                            "the most a number may be set to",
+                        );
+                    }
+                }
+                (ParamKind::Color, min, max, _) => {
+                    if min.is_some() || max.is_some() {
+                        check.error(
+                            format!("/params/{index}/min"),
+                            "range on a color",
+                            "a min or max",
+                            "no range",
+                        );
+                    }
+                }
+            }
         }
         let size = layout(&self.params)
             .last()
@@ -235,9 +298,17 @@ pub fn compile_all(loading: &mut Loading) {
     let content = loading.content();
     let mut compiled = HashMap::new();
     for (id, def) in loading.rows::<VfxShaderDef>(&content) {
-        let file = asset_file(def.source.as_str());
-        let Ok(source) = loading.read_text(&file) else {
-            continue;
+        let file = shader_file(id.key(&content));
+        let source = match loading.read_text(&file) {
+            Ok(source) => source,
+            Err(_) => {
+                loading.row_error(
+                    id,
+                    "",
+                    ContentProblem::new("shader file missing", "nothing", &file),
+                );
+                continue;
+            }
         };
         match def.check_source(&source) {
             Ok(composed) => {

@@ -296,6 +296,9 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         let unsaved = project.unsaved().len();
                         if let Some(reason) = &project.read_only {
                             widgets::pill(ui, "read-only", theme::WARN).on_hover_text(reason);
+                        } else if project.loading() {
+                            widgets::pill(ui, "applying…", theme::MUTED);
+                            ui.ctx().request_repaint_after(Duration::from_millis(50));
                         } else if unsaved > 0 {
                             widgets::pill(ui, &format!("{unsaved} unsaved"), theme::TEXT);
                         } else if project.report.is_some() {

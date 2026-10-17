@@ -13,8 +13,8 @@ const ICON: f32 = 24.0;
 const GAP: f32 = 4.0;
 const COLUMNS: usize = 5;
 
-/// The statuses on the character as a grid of icons, a buff ringed green and a debuff red, each
-/// with a card of what it is and how long it has left.
+/// The statuses on the character as a grid of icons hanging below the character panel, a buff
+/// ringed green and a debuff red, each with a card of what it is and how long it has left.
 pub fn grid(ui: &mut Ui, world: &mut World) {
     let Some(me) = session::my_character(world) else {
         return;

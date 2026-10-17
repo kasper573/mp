@@ -126,8 +126,8 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
     let tags = tags(def);
     if !tags.is_empty() {
         ui.horizontal_wrapped(|ui| {
-            for (label, colour) in tags {
-                widgets::pill(ui, label, colour);
+            for (label, color) in tags {
+                widgets::pill(ui, label, color);
             }
         });
     }
@@ -145,8 +145,8 @@ pub fn sheet(ui: &mut Ui, world: &mut World, item: ItemId) {
     }
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 3.0;
-        for (fact, colour) in facts(world, item, def) {
-            ui.label(RichText::new(fact).color(colour));
+        for (fact, color) in facts(world, item, def) {
+            ui.label(RichText::new(fact).color(color));
         }
     });
     grants(ui, world, item);
@@ -281,7 +281,7 @@ fn tags(def: &ItemDef) -> Vec<(&'static str, Color32)> {
     ]
     .into_iter()
     .filter(|(flag, ..)| def.has(*flag))
-    .map(|(_, label, colour)| (label, colour))
+    .map(|(_, label, color)| (label, color))
     .collect()
 }
 
@@ -299,7 +299,7 @@ fn facts(world: &World, item: ItemId, def: &ItemDef) -> Vec<(String, Color32)> {
             facts.extend(boosts.iter().map(|boost| plain(modifier(*boost))));
             let viewer = session::me(world);
             facts.extend(requires.iter().map(|requirement| {
-                let colour = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
+                let color = match viewer.map(|viewer| condition::holds(world, viewer, requirement))
                 {
                     Some(true) => color::OK,
                     Some(false) => color::DANGER,
@@ -307,7 +307,7 @@ fn facts(world: &World, item: ItemId, def: &ItemDef) -> Vec<(String, Color32)> {
                 };
                 (
                     format!("Requires {}", condition::describe(content, requirement)),
-                    colour,
+                    color,
                 )
             }));
         }

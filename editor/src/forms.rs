@@ -1195,29 +1195,11 @@ fn enum_combo(ui: &mut Ui, options: &[String], value: &mut Value, path: &str) ->
 
 pub fn color(ui: &mut Ui, value: &mut Value, path: &str) -> FormChange {
     let mut rgba = value::rgba(value);
-    let mut changed = FormChange::default();
-    ui.horizontal(|ui| {
-        let response = ui.color_edit_button_srgba_unmultiplied(&mut rgba);
-        if response.changed() {
-            *value = Value::Array(rgba.iter().map(|byte| Value::from(*byte)).collect());
-            changed = FormChange::at(path);
-        }
-        egui::Frame::new()
-            .fill(theme::INPUT)
-            .stroke(egui::Stroke::new(1.0, theme::BORDER))
-            .corner_radius(4.0)
-            .inner_margin(egui::Margin::symmetric(8, 3))
-            .show(ui, |ui| {
-                ui.label(
-                    theme::mono(format!(
-                        "{}, {}, {}, {}",
-                        rgba[0], rgba[1], rgba[2], rgba[3]
-                    ))
-                    .size(13.0),
-                );
-            });
-    });
-    changed
+    if ui.color_edit_button_srgba_unmultiplied(&mut rgba).changed() {
+        *value = Value::Array(rgba.iter().map(|byte| Value::from(*byte)).collect());
+        return FormChange::at(path);
+    }
+    FormChange::default()
 }
 
 pub fn raw_json(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {

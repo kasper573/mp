@@ -49,7 +49,7 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::Dismiss);
     me.act(InputAction::ToggleEquipment);
     me.caption_top(
-        "Skills apply them as well: Ward is a buff, ringed blue, and wears a shell of light for as long as it holds",
+        "Skills apply them as well: Ward is a buff, ringed blue, and wraps your sprite in a shimmering outline for as long as it holds",
     );
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));

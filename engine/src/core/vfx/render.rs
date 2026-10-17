@@ -36,8 +36,17 @@ use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, ServerClock, UnixMillis};
 use crate::core::vfx::CompiledVfxShaders;
 
-/// How far past an actor's or object's sprite a shader layer may draw, in sizes.
-pub const OVERSCAN: f32 = 1.5;
+/// The margin around every world site that a shader layer may draw on, so spent matter (smoke,
+/// sparks, mist) can drift clear of the body and dissolve; the prelude fades the margin's outer
+/// edge, and the screen is drawn as is.
+pub const MARGIN: Tiles = Tiles(2.0);
+
+/// How many times its own size a site of `size` world pixels is drawn, per axis, with `MARGIN`
+/// on every side.
+pub fn quad_overscan(size: Vec2) -> Vec2 {
+    let size = size.max(Vec2::ONE);
+    (size + Vec2::splat(2.0 * MARGIN.0 * TILE.0)) / size
+}
 const SHADOW: TextShadow = TextShadow {
     offset: egui::vec2(1.0, 1.0),
     color: Color32::BLACK,
@@ -125,7 +134,7 @@ pub struct SiteUniform {
     pub facing: f32,
     pub progress: f32,
     pub time: f32,
-    pub overscan: f32,
+    pub overscan: Vec2,
     pub shape: u32,
     pub point_count: u32,
     pub origin: Vec2,
@@ -237,15 +246,25 @@ pub const SHAPE_RECT: u32 = 2;
 pub const SHAPE_CONE: u32 = 3;
 pub const SHAPE_LINE: u32 = 4;
 
-/// How an area site's footprint lies on the quad drawn over its bounds, as a shader reads it
-/// through the prelude's `area_distance`: the shape, where its point sits in site uv, its measures
-/// in tiles and the quad's size in tiles.
+/// How a site's body lies on the quad drawn over it, as a shader reads it through the prelude's
+/// `site_*` functions: an area's shape and its measures in tiles, where the site's point sits in
+/// site uv, and the quad's size in tiles.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AreaShape {
     pub shape: u32,
     pub origin: Vec2,
     pub extent: Vec2,
     pub tiles: Vec2,
+}
+
+impl AreaShape {
+    /// A site that is no area, drawn over its image: its body is the image's box, `tiles` across.
+    pub fn image(tiles: Vec2) -> AreaShape {
+        AreaShape {
+            tiles,
+            ..AreaShape::default()
+        }
+    }
 }
 
 impl Default for AreaShape {
@@ -657,10 +676,10 @@ fn show_shader(
     else {
         return false;
     };
-    let overscan = if frame.sprite.is_some() {
-        OVERSCAN
+    let overscan = if frame.on_screen() {
+        Vec2::ONE
     } else {
-        1.0
+        quad_overscan(frame.size)
     };
     let (image, rect, pixel) = frame.texture.clone().unwrap_or((
         blank,
@@ -694,7 +713,7 @@ fn show_shader(
     if let Some(mut transform) = entity.get_mut::<Transform>() {
         transform.translation.x = frame.center.x;
         transform.translation.y = frame.center.y;
-        transform.scale = Vec3::new(frame.size.x * overscan, frame.size.y * overscan, 1.0);
+        transform.scale = (frame.size * overscan).extend(1.0);
     }
     place_in_depth(&mut entity, frame, 1.0);
     if let Some(mut visibility) = entity.get_mut::<Visibility>() {
@@ -740,8 +759,8 @@ pub fn fill_params(
         let at = slot.offset / 4;
         match (slot.kind, value) {
             (ParamKind::Number, ParamValue::Number(number)) => floats[at] = number,
-            (ParamKind::Colour, ParamValue::Colour(colour)) => {
-                let linear = colour.color().to_linear();
+            (ParamKind::Color, ParamValue::Color(color)) => {
+                let linear = color.color().to_linear();
                 floats[at..at + 4].copy_from_slice(&[
                     linear.red,
                     linear.green,
@@ -837,6 +856,10 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                 .and_then(|entity| entity.get::<Window>())?;
             let size = Vec2::new(window.resolution.width(), window.resolution.height());
             let live = present::world_texture(world)?;
+            let px = present::SCALE
+                * world
+                    .get_resource::<Viewport>()
+                    .map_or(1.0, |viewport| viewport.scale.max(0.01));
             Some(SiteFrame {
                 kind: SITE_SCREEN,
                 center: Vec2::ZERO,
@@ -849,7 +872,7 @@ fn site_frame(world: &World, site: &VfxSite) -> Option<SiteFrame> {
                     Vec2::ONE / size,
                 )),
                 sprite: None,
-                area: AreaShape::default(),
+                area: AreaShape::image(size / px),
                 path: SitePath::default(),
             })
         }
@@ -882,7 +905,7 @@ fn sprite_frame(world: &World, entity: Entity, kind: u32) -> Option<SiteFrame> {
             Vec2::ONE / sheet,
         )),
         sprite: Some(entity),
-        area: AreaShape::default(),
+        area: AreaShape::image(size / TILE.0),
         path: SitePath::default(),
     })
 }
@@ -934,7 +957,7 @@ fn draw_overlays(world: &mut World) {
             match layer {
                 VfxLayer::Text {
                     template,
-                    colour,
+                    color,
                     size,
                     rise,
                     ..
@@ -955,7 +978,7 @@ fn draw_overlays(world: &mut World) {
                                 ui,
                                 &text,
                                 font,
-                                colour32(*colour).gamma_multiply(alpha),
+                                color32(*color).gamma_multiply(alpha),
                                 SHADOW,
                                 TSTransform::IDENTITY,
                             );
@@ -1003,12 +1026,12 @@ fn draw_overlays(world: &mut World) {
                         continue;
                     };
                     let shader = shader.get(&content);
-                    let colour = params
+                    let color = params
                         .values()
                         .filter_map(|fill| match fill {
-                            ParamFill::Value(ParamValue::Colour(colour)) => Some(*colour),
+                            ParamFill::Value(ParamValue::Color(color)) => Some(*color),
                             ParamFill::Param { param } => match instance.params.get(param) {
-                                Some(ParamValue::Colour(colour)) => Some(colour),
+                                Some(ParamValue::Color(color)) => Some(color),
                                 _ => None,
                             },
                             ParamFill::Value(ParamValue::Number(_)) => None,
@@ -1016,7 +1039,7 @@ fn draw_overlays(world: &mut World) {
                         .next()
                         .or_else(|| {
                             shader.params.iter().find_map(|param| match param.default {
-                                ParamValue::Colour(colour) => Some(colour),
+                                ParamValue::Color(color) => Some(color),
                                 ParamValue::Number(_) => None,
                             })
                         })
@@ -1025,7 +1048,7 @@ fn draw_overlays(world: &mut World) {
                         ui.painter().rect_filled(
                             rect,
                             4.0,
-                            colour32(colour).gamma_multiply(WIDGET_PULSE * (1.0 - progress)),
+                            color32(color).gamma_multiply(WIDGET_PULSE * (1.0 - progress)),
                         );
                     });
                 }
@@ -1083,8 +1106,8 @@ fn ease(progress: f32) -> f32 {
     1.0 - (1.0 - progress) * (1.0 - progress)
 }
 
-fn colour32(colour: Rgba) -> Color32 {
-    let [r, g, b, a] = colour.0.to_be_bytes();
+fn color32(color: Rgba) -> Color32 {
+    let [r, g, b, a] = color.0.to_be_bytes();
     Color32::from_rgba_unmultiplied(r, g, b, a)
 }
 
@@ -1098,7 +1121,7 @@ impl Default for SiteUniform {
             facing: 0.0,
             progress: 0.0,
             time: 0.0,
-            overscan: 1.0,
+            overscan: Vec2::ONE,
             shape: SHAPE_NONE,
             point_count: 0,
             origin: Vec2::splat(0.5),

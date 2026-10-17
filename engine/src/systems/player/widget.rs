@@ -28,8 +28,8 @@ impl HudWidget for CharacterWidget {
             for line in &sheet {
                 ui.label(line);
             }
-            status::widget::grid(ui, world);
         });
+        status::widget::grid(ui, world);
     }
 }
 

@@ -58,7 +58,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.hold();
     me.caption_top(
-        "A line: Frost Lance travels the length you aimed, frosts the ground it crossed and shatters at the end",
+        "A line: Frost Lance thrusts the length you aimed, bursts into ice at the end and crumbles behind",
     );
     cast_at(&mut me, InputAction::Hotbar2, ring, |snapshot| {
         !played(snapshot, "frost_lance").is_empty()
@@ -67,7 +67,7 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
     me.caption_top(
-        "A site can be an actor: Ward's shell is a shader drawn around the character's own sprite",
+        "A site can be an actor: Ward is a shader working on the character's own sprite, an outline and a sheen",
     );
     me.hold();
     me.caption_top(
@@ -101,7 +101,7 @@ fn play(shoot: &mut Shoot) {
     });
     me.hold();
     me.caption_top(
-        "A status ending is an effect too: the moment the ward's time runs out, its shell shatters",
+        "A status ending is an effect too: the moment the ward's time runs out, it shatters",
     );
     me.wait_within("the ward broken", LONG, |snapshot| {
         (!status_on_me(snapshot, "warded")).then_some(())

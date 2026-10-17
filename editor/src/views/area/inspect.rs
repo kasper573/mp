@@ -355,17 +355,17 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
     tool_card(ui, "Paint walkability", |ui| {
         let view = editor.views.area.view_mut(view_key);
         widgets::kv(ui, "paint", |ui| {
-            for (value, label, colour) in [
+            for (value, label, color) in [
                 (Some(false), "blocked", theme::DANGER),
                 (Some(true), "walkable", theme::OK),
                 (None, "clear", theme::MUTED),
             ] {
                 let on = view.walk_value == value;
-                if widgets::chip_coloured(
+                if widgets::chip_colored(
                     ui,
                     label,
-                    if on { colour } else { theme::INPUT },
-                    if on { egui::Color32::WHITE } else { colour },
+                    if on { color } else { theme::INPUT },
+                    if on { egui::Color32::WHITE } else { color },
                 )
                 .clicked()
                 {
@@ -388,18 +388,18 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
 
 fn overlays_legend(ui: &mut Ui) {
     widgets::section(ui, "Overlays");
-    let swatch = |ui: &mut Ui, colour: egui::Color32, hatch: bool| {
+    let swatch = |ui: &mut Ui, color: egui::Color32, hatch: bool| {
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(14.0), Sense::hover());
         ui.painter().rect_stroke(
             rect,
             2.0,
-            egui::Stroke::new(1.0, colour),
+            egui::Stroke::new(1.0, color),
             egui::StrokeKind::Inside,
         );
         if hatch {
-            patterns::hatch(ui.painter(), rect, colour, 4.0);
+            patterns::hatch(ui.painter(), rect, color, 4.0);
         } else {
-            ui.painter().rect_filled(rect.shrink(3.0), 1.0, colour);
+            ui.painter().rect_filled(rect.shrink(3.0), 1.0, color);
         }
     };
     ui.horizontal(|ui| {

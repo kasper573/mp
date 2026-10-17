@@ -10,7 +10,7 @@
     {
       "type": "text",
       "template": "-{amount}",
-      "colour": [
+      "color": [
         255,
         92,
         92,
@@ -24,7 +24,7 @@
       "shader": "flash",
       "duration": 0.15,
       "params": {
-        "colour": [
+        "color": [
           255,
           255,
           255,

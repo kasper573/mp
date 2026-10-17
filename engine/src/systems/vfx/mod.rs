@@ -157,10 +157,10 @@ impl EffectDef<RiftScripting> for Vfx {
                 Some(ParamKind::Number) => {
                     params.push((name.clone(), cx.expr(expr, ValueType::Number)?))
                 }
-                Some(ParamKind::Colour) => {
+                Some(ParamKind::Color) => {
                     return Err(ScriptFault::new(
                         "wrong type",
-                        format!("{name} is a colour, which a script cannot fill"),
+                        format!("{name} is a color, which a script cannot fill"),
                     ));
                 }
                 None => {

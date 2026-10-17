@@ -1,7 +1,9 @@
 pub mod render;
 pub mod shader;
 
-pub use shader::{CompiledVfxShaders, ParamKind, ShaderParam, VfxShaderDef, VfxShaderId};
+pub use shader::{
+    CompiledVfxShaders, ParamKind, ShaderError, ShaderParam, VfxShaderDef, VfxShaderId, shader_file,
+};
 
 use std::collections::BTreeMap;
 
@@ -68,7 +70,7 @@ pub enum VfxLayer {
     },
     Text {
         template: String,
-        colour: Rgba,
+        color: Rgba,
         #[serde(
             default = "default_text_size",
             skip_serializing_if = "is_default_text_size"
@@ -122,7 +124,7 @@ pub enum ParamFill {
 #[serde(untagged)]
 pub enum ParamValue {
     Number(f32),
-    Colour(Rgba),
+    Color(Rgba),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -159,7 +161,7 @@ impl ParamValue {
     pub fn kind(self) -> ParamKind {
         match self {
             ParamValue::Number(_) => ParamKind::Number,
-            ParamValue::Colour(_) => ParamKind::Colour,
+            ParamValue::Color(_) => ParamKind::Color,
         }
     }
 
@@ -173,7 +175,7 @@ impl ParamValue {
                     format!("{rounded:.2}").trim_end_matches('0').to_owned()
                 }
             }
-            ParamValue::Colour(colour) => format!("{:08x}", colour.0),
+            ParamValue::Color(color) => format!("{:08x}", color.0),
         }
     }
 }
@@ -194,7 +196,7 @@ struct WireParams(Vec<(String, WireValue)>);
 #[derive(Serialize, Deserialize)]
 enum WireValue {
     Number(f32),
-    Colour(Rgba),
+    Color(Rgba),
 }
 
 impl From<VfxParams> for WireParams {
@@ -206,7 +208,7 @@ impl From<VfxParams> for WireParams {
                 .map(|(name, value)| {
                     let wire = match value {
                         ParamValue::Number(number) => WireValue::Number(number),
-                        ParamValue::Colour(colour) => WireValue::Colour(colour),
+                        ParamValue::Color(color) => WireValue::Color(color),
                     };
                     (name, wire)
                 })
@@ -223,7 +225,7 @@ impl From<WireParams> for VfxParams {
                 .map(|(name, value)| {
                     let value = match value {
                         WireValue::Number(number) => ParamValue::Number(number),
-                        WireValue::Colour(colour) => ParamValue::Colour(colour),
+                        WireValue::Color(color) => ParamValue::Color(color),
                     };
                     (name, value)
                 })
@@ -462,6 +464,17 @@ fn check_all(loading: &mut Loading) {
                                 "wrong parameter kind",
                                 given.label(),
                                 format!("a {}", declared.kind.label()),
+                            );
+                        }
+                        if let (ParamFill::Value(ParamValue::Number(number)), Some((min, max))) =
+                            (fill, declared.range())
+                            && (*number < min || *number > max)
+                        {
+                            check.error(
+                                at(&format!("params/{name}")),
+                                "parameter out of range",
+                                number,
+                                format!("{min}..{max}"),
                             );
                         }
                     }

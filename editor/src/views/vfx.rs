@@ -14,10 +14,11 @@ use engine::core::render::{TILE, ToScreen};
 use engine::core::tiling::Tiles;
 use engine::core::time::Seconds;
 use engine::core::vfx::render::{
-    self as vfx_render, OVERSCAN, SITE_ACTOR, SITE_AREA, SITE_SCREEN, SiteUniform, VfxMaterial,
+    self as vfx_render, SITE_ACTOR, SITE_AREA, SITE_SCREEN, SiteUniform, VfxMaterial, quad_overscan,
 };
 use engine::core::vfx::{
-    ParamFill, ParamKind, ParamValue, Play, SpriteAnchor, VfxDef, VfxParams, VfxShaderDef,
+    ParamFill, ParamKind, ParamValue, Play, ShaderError, SpriteAnchor, VfxDef, VfxParams,
+    VfxShaderDef, shader_file,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -28,6 +29,7 @@ use crate::forms::{self, FormChange, FormCx};
 use crate::project::{ContentEdit, ProjectFiles, row_file};
 use crate::ui::{inspector, theme, widgets};
 use crate::views::area::scene;
+use crate::views::{model, shader_code};
 
 pub const TABLE: &str = "vfx";
 pub const SHADER_TABLE: &str = "vfx_shader";
@@ -37,20 +39,43 @@ const PREVIEW: [u32; 2] = [384, 288];
 const ZOOM: f32 = 2.0;
 const PREVIEW_LAYER: usize = 31;
 const REST_BETWEEN_PLAYS: f32 = 0.5;
-const CODE_ROWS: usize = 22;
+const CODE_FOOTER: f32 = 40.0;
+const COLUMN_GAP: f32 = 16.0;
+const MIN_CODE_WIDTH: f32 = 260.0;
+const MIN_PREVIEW_WIDTH: f32 = 220.0;
+const SLIDER_SURROUND: f32 = 130.0;
+const HEADING_HEIGHT: f32 = 24.0;
+const MIN_TITLE_WIDTH: f32 = 60.0;
+const KEPT_SHADERS: usize = 64;
+const PARAM_INDENT: f32 = 22.0;
+const BOUND_WIDTH: f32 = 64.0;
+const BACKDROP_SCENE: &str = "vfx-preview";
 
 /// The vfx previews: what the open row asked to see this frame, and the stage that renders it.
-#[derive(Default)]
 pub struct VfxViews {
     pub target: Target,
-    pub playing: bool,
-    pub started: f64,
-    pub scrub: f32,
+    pub background: bool,
+    started: Option<(String, f64)>,
     pub fills: HashMap<String, BTreeMap<String, ParamValue>>,
     request: Option<PreviewRequest>,
     overlays: Vec<Overlay>,
     problems: Vec<String>,
     stage: Option<Stage>,
+}
+
+impl Default for VfxViews {
+    fn default() -> VfxViews {
+        VfxViews {
+            target: Target::default(),
+            background: true,
+            started: None,
+            fills: HashMap::new(),
+            request: None,
+            overlays: Vec::new(),
+            problems: Vec::new(),
+            stage: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -74,16 +99,21 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let layers = layers_of(&row);
-    let declared: Vec<(String, ParamKind)> = row["params"]
+    let tunables: Vec<Tunable> = row["params"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(|param| {
-            let kind = match param["kind"].as_str()? {
-                "colour" => ParamKind::Colour,
-                _ => ParamKind::Number,
+            let (kind, default) = match param["kind"].as_str()? {
+                "color" => (ParamKind::Color, ParamValue::Color(Rgba::WHITE)),
+                _ => (ParamKind::Number, ParamValue::Number(1.0)),
             };
-            Some((param["name"].as_str()?.to_owned(), kind))
+            Some(Tunable {
+                name: param["name"].as_str()?.to_owned(),
+                kind,
+                default,
+                range: None,
+            })
         })
         .collect();
     ui.horizontal_top(|ui| {
@@ -102,7 +132,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 ui,
                 &format!("{TABLE}/{key}"),
                 layers,
-                &declared,
+                &tunables,
                 &[],
             );
         });
@@ -118,6 +148,18 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     };
     let def: Option<VfxShaderDef> = serde_json::from_value(row.clone()).ok();
+    let file = shader_file(key);
+    let current = editor
+        .project
+        .as_ref()
+        .and_then(|project| project.files.text(&file))
+        .unwrap_or_default();
+    let code_id = egui::Id::new(("shader-code", key));
+    let draft = draft_or(ui, code_id, current.clone());
+    let room = ui.available_width() - 2.0 * COLUMN_GAP;
+    let preview_width =
+        (room - FORM_WIDTH - MIN_CODE_WIDTH).clamp(MIN_PREVIEW_WIDTH, PREVIEW[0] as f32);
+    let code_width = (room - FORM_WIDTH - preview_width).max(MIN_CODE_WIDTH);
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(FORM_WIDTH);
@@ -126,47 +168,75 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
                 .auto_shrink([false, false])
                 .show(ui, |ui| inspector::show_row(editor, ui, SHADER_TABLE, key));
         });
-        ui.add_space(16.0);
+        ui.add_space(COLUMN_GAP);
         ui.vertical(|ui| {
-            let source = row["source"].as_str().unwrap_or_default().to_owned();
-            let Some(def) = def else {
-                ui.label(theme::warn("the row does not parse as a shader yet"));
+            ui.set_width(code_width);
+            match def.as_ref() {
+                Some(def) => {
+                    code_pane(
+                        editor,
+                        ui,
+                        code_id,
+                        def,
+                        key,
+                        &file,
+                        &current,
+                        draft.clone(),
+                    );
+                }
+                None => {
+                    widgets::section(ui, &format!("code · {file}"));
+                    ui.label(theme::warn("the row does not parse as a shader yet"));
+                }
+            }
+        });
+        ui.add_space(COLUMN_GAP);
+        ui.vertical(|ui| {
+            ui.set_width(preview_width);
+            widgets::section(ui, "preview");
+            let Some(def) = def.as_ref() else {
                 return;
             };
-            widgets::section(ui, &format!("code · assets/{source}"));
-            let text = code_pane(editor, ui, key, &def, &source);
-            widgets::section(ui, "preview");
             let layer = Layer::Shader {
                 shader: key.to_owned(),
                 params: BTreeMap::new(),
                 duration: Seconds(1.0),
                 delay: Seconds(0.0),
             };
-            let defaults: Vec<(String, ParamKind, ParamValue)> = def
+            let tunables: Vec<Tunable> = def
                 .params
                 .iter()
-                .map(|param| (param.name.clone(), param.kind, param.default))
+                .map(|param| Tunable {
+                    name: param.name.clone(),
+                    kind: param.kind,
+                    default: param.default,
+                    range: param.range(),
+                })
                 .collect();
-            let declared: Vec<(String, ParamKind)> = defaults
-                .iter()
-                .map(|(name, kind, _)| (name.clone(), *kind))
-                .collect();
-            let drafts = [(key.to_owned(), text)];
+            let drafts = [(key.to_owned(), draft)];
             preview(
                 editor,
                 ui,
                 &format!("{SHADER_TABLE}/{key}"),
                 vec![layer],
-                &declared,
+                &tunables,
                 &drafts,
             );
-            seed_defaults(editor, &format!("{SHADER_TABLE}/{key}"), &defaults);
         });
     });
 }
 
-/// The parameters a shader declares: a name, a kind and the default a layer that leaves it
-/// unfilled gets.
+/// A parameter the preview lets the designer play with: the value it starts at, and for a number
+/// with a range, the slider's bounds.
+struct Tunable {
+    name: String,
+    kind: ParamKind,
+    default: ParamValue,
+    range: Option<(f32, f32)>,
+}
+
+/// The parameters a shader declares: a name, a kind, the default a layer that leaves it unfilled
+/// gets and, for a number, the range it is meant to be set within.
 pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
     if !value["params"].is_array() {
@@ -178,6 +248,7 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
     for index in 0..count {
         let path = format!("/params/{index}");
         let param = &mut value["params"][index];
+        let kind = param["kind"].as_str().unwrap_or("number").to_owned();
         ui.horizontal(|ui| {
             if ui
                 .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
@@ -190,38 +261,38 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
                 ui.set_width(120.0);
                 changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
             });
-            let kind = param["kind"].as_str().unwrap_or("number").to_owned();
             let mut picked = kind.clone();
             widgets::combo_box(("param-kind", index))
                 .width(90.0)
                 .selected_text(theme::mono(&kind).size(13.0))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut picked, "number".to_owned(), "number");
-                    ui.selectable_value(&mut picked, "colour".to_owned(), "colour");
+                    ui.selectable_value(&mut picked, "color".to_owned(), "color");
                 });
             if picked != kind {
                 param["kind"] = Value::String(picked.clone());
-                param["default"] = if picked == "colour" {
-                    serde_json::json!([255, 255, 255, 255])
+                let fields = param.as_object_mut().expect("object");
+                if picked == "color" {
+                    fields.insert(
+                        "default".to_owned(),
+                        serde_json::json!([255, 255, 255, 255]),
+                    );
+                    fields.remove("min");
+                    fields.remove("max");
                 } else {
-                    Value::from(0.0)
-                };
+                    fields.insert("default".to_owned(), Value::from(0.0));
+                    fields.insert("min".to_owned(), Value::from(0.0));
+                    fields.insert("max".to_owned(), Value::from(1.0));
+                }
                 changed = FormChange::at(&path);
             }
-            if picked == "colour" {
+            if picked == "color" {
                 changed |= forms::color(ui, &mut param["default"], &format!("{path}/default"));
-            } else {
-                let schema = serde_json::json!({ "type": "number" });
-                changed |= forms::number(
-                    ui,
-                    cx,
-                    &schema,
-                    &mut param["default"],
-                    &format!("{path}/default"),
-                    false,
-                );
             }
         });
+        if kind != "color" {
+            changed |= number_param_fields(ui, cx, param, &path);
+        }
     }
     if let Some(index) = remove {
         value["params"].as_array_mut().expect("array").remove(index);
@@ -231,13 +302,63 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
         value["params"]
             .as_array_mut()
             .expect("array")
-            .push(serde_json::json!({ "name": "amount", "kind": "number", "default": 1.0 }));
+            .push(serde_json::json!({
+                "name": "amount", "kind": "number", "default": 1.0, "min": 0.0, "max": 2.0
+            }));
         changed = FormChange::at("/params");
     }
     if value["params"].as_array().is_some_and(Vec::is_empty) {
         value.as_object_mut().expect("object").remove("params");
     }
     changed
+}
+
+fn number_param_fields(ui: &mut Ui, cx: &mut FormCx, param: &mut Value, path: &str) -> FormChange {
+    let mut changed = FormChange::default();
+    let schema = serde_json::json!({ "type": "number" });
+    ui.horizontal(|ui| {
+        ui.add_space(PARAM_INDENT);
+        for bound in ["min", "max"] {
+            ui.label(theme::faint(bound).size(12.0));
+            ui.scope(|ui| {
+                ui.set_width(BOUND_WIDTH);
+                changed |= forms::number(
+                    ui,
+                    cx,
+                    &schema,
+                    &mut param[bound],
+                    &format!("{path}/{bound}"),
+                    false,
+                );
+            });
+        }
+        ui.label(theme::faint("default").size(12.0));
+        let range = param["min"]
+            .as_f64()
+            .zip(param["max"].as_f64())
+            .filter(|(min, max)| min < max);
+        let mut amount = param["default"].as_f64().unwrap_or_default();
+        let moved = match range {
+            Some((min, max)) => design_tokens::widgets::slider(
+                ui,
+                egui::Slider::new(&mut amount, min..=max).show_value(true),
+            )
+            .changed(),
+            None => ui
+                .add(egui::DragValue::new(&mut amount).speed(0.01))
+                .changed(),
+        };
+        if moved {
+            param["default"] = Value::from(tidy(amount));
+            changed |= FormChange::at(&format!("{path}/default"));
+        }
+    });
+    changed
+}
+
+/// A slider's position as a number worth writing into a row: four decimals, no float noise.
+fn tidy(number: f64) -> f64 {
+    (number * 10_000.0).round() / 10_000.0
 }
 
 /// Renders the requested preview into its image, so the next frame's panel shows it.
@@ -265,7 +386,14 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
             .collect();
         stage.target = spawn_target(world, &request.target, &mut views.area.scenes, &files);
     }
-    let Some(frame) = site_frame(world, &request.target, stage.target) else {
+    let behind = views
+        .area
+        .scenes
+        .by_key
+        .get(BACKDROP_SCENE)
+        .filter(|_| views.vfx.background)
+        .map(|scene| (scene.image.clone(), scene.uv(), scene.alloc));
+    let Some(frame) = site_frame(world, &request.target, stage.target, behind) else {
         return;
     };
     views.vfx.overlays.clear();
@@ -276,7 +404,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
         let active = local.0 >= 0.0 && local.0 <= layer.duration().0;
         if let Layer::Text {
             template,
-            colour,
+            color,
             size,
             rise,
             duration,
@@ -288,7 +416,7 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
                 let risen = frame.center.y + frame.size.y / 2.0 + rise.0 * TILE.0 * ease(progress);
                 views.vfx.overlays.push(Overlay {
                     text: VfxDef::fill(template, &given),
-                    colour: *colour,
+                    color: *color,
                     size: *size,
                     at: Vec2::new(frame.center.x, risen),
                     alpha: 1.0 - ((progress - 0.6) / 0.4).clamp(0.0, 1.0),
@@ -408,7 +536,7 @@ fn preview(
     ui: &mut Ui,
     key: &str,
     layers: Vec<Layer>,
-    declared: &[(String, ParamKind)],
+    tunables: &[Tunable],
     drafts: &[(String, String)],
 ) {
     let models: Vec<String> = editor
@@ -447,98 +575,112 @@ fn preview(
                 };
             }
         }
-        match &mut views.target {
-            Target::Actor { model } => {
-                widgets::combo_box("preview-model")
-                    .width(160.0)
-                    .selected_text(theme::mono(model.as_str()).size(13.0))
-                    .show_ui(ui, |ui| {
-                        for candidate in &models {
-                            ui.selectable_value(model, candidate.clone(), candidate);
-                        }
-                    });
-            }
-            Target::Area { shape, facing } => {
-                shape_fields(ui, shape);
-                ui.add(
-                    egui::DragValue::new(&mut facing.0)
-                        .range(0.0..=360.0)
-                        .suffix("°"),
-                );
-            }
-            Target::Screen => {}
-        }
     });
+    ui.horizontal(|ui| match &mut views.target {
+        Target::Actor { model } => {
+            widgets::combo_box("preview-model")
+                .width(160.0)
+                .selected_text(theme::mono(model.as_str()).size(13.0))
+                .show_ui(ui, |ui| {
+                    for candidate in &models {
+                        ui.selectable_value(model, candidate.clone(), candidate);
+                    }
+                });
+        }
+        Target::Area { shape, facing } => {
+            shape_fields(ui, shape);
+            ui.add(
+                egui::DragValue::new(&mut facing.0)
+                    .range(0.0..=360.0)
+                    .suffix("°"),
+            );
+        }
+        Target::Screen => {}
+    });
+    let started = match &views.started {
+        Some((playing, started)) if playing == key => *started,
+        _ => {
+            views.started = Some((key.to_owned(), now));
+            now
+        }
+    };
+    let elapsed = ((now - started) as f32)
+        .rem_euclid(total + REST_BETWEEN_PLAYS)
+        .min(total);
+    ui.ctx().request_repaint();
     ui.horizontal(|ui| {
-        let label = if views.playing { "⏸" } else { "▶" };
-        if ui.button(label).clicked() {
-            views.playing = !views.playing;
-            views.started = now;
-        }
-        let period = total + REST_BETWEEN_PLAYS;
-        let elapsed = if views.playing {
-            ((now - views.started) as f32).rem_euclid(period)
-        } else {
-            views.scrub * total
-        };
-        if views.playing {
-            views.scrub = (elapsed / total).min(1.0);
-            ui.ctx().request_repaint();
-        }
-        let mut scrub = views.scrub;
-        let label = format!("{:.2} s of {total:.2}", scrub * total);
-        if design_tokens::widgets::slider(
-            ui,
-            egui::Slider::new(&mut scrub, 0.0..=1.0)
-                .show_value(false)
-                .text(label),
-        )
-        .changed()
-        {
-            views.playing = false;
-            views.scrub = scrub;
-        }
+        ui.checkbox(&mut views.background, "background");
+        ui.label(theme::faint(format!("{elapsed:.2} s of {total:.2}")).size(12.0));
     });
     let fills = views.fills.entry(key.to_owned()).or_default();
-    for (name, kind) in declared {
-        fills.entry(name.clone()).or_insert(match kind {
-            ParamKind::Number => ParamValue::Number(1.0),
-            ParamKind::Colour => ParamValue::Colour(Rgba::WHITE),
+    for tunable in tunables {
+        fills.entry(tunable.name.clone()).or_insert(tunable.default);
+    }
+    if !tunables.is_empty() {
+        ui.horizontal(|ui| {
+            ui.label(theme::faint("values to try").size(12.0));
+            let at_defaults = tunables
+                .iter()
+                .all(|tunable| fills.get(&tunable.name) == Some(&tunable.default));
+            if !at_defaults && ui.small_button("defaults").clicked() {
+                for tunable in tunables {
+                    fills.insert(tunable.name.clone(), tunable.default);
+                }
+            }
         });
+    }
+    ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
+    for tunable in tunables {
+        let name = &tunable.name;
         ui.horizontal(|ui| {
             ui.label(theme::muted(name).monospace().size(12.5));
-            match kind {
+            match tunable.kind {
                 ParamKind::Number => {
                     let mut amount = match fills.get(name) {
                         Some(ParamValue::Number(number)) => *number,
                         _ => 1.0,
                     };
-                    let top = (amount.abs() * 4.0).max(10.0);
-                    if design_tokens::widgets::slider(ui, egui::Slider::new(&mut amount, 0.0..=top))
-                        .changed()
-                    {
+                    let moved = match tunable.range {
+                        Some((min, max)) => design_tokens::widgets::slider(
+                            ui,
+                            egui::Slider::new(&mut amount, min..=max),
+                        )
+                        .changed(),
+                        None => ui
+                            .add(egui::DragValue::new(&mut amount).speed(0.01))
+                            .changed(),
+                    };
+                    if moved {
                         fills.insert(name.clone(), ParamValue::Number(amount));
                     }
                 }
-                ParamKind::Colour => {
+                ParamKind::Color => {
                     let held = match fills.get(name) {
-                        Some(ParamValue::Colour(colour)) => *colour,
+                        Some(ParamValue::Color(color)) => *color,
                         _ => Rgba::WHITE,
                     };
                     let [r, g, b, a] = held.0.to_be_bytes();
-                    let mut colour = Color32::from_rgba_unmultiplied(r, g, b, a);
-                    if ui.color_edit_button_srgba(&mut colour).changed() {
-                        let [r, g, b, a] = colour.to_srgba_unmultiplied();
-                        fills.insert(name.clone(), ParamValue::Colour(Rgba::from([r, g, b, a])));
+                    let mut color = Color32::from_rgba_unmultiplied(r, g, b, a);
+                    if ui.color_edit_button_srgba(&mut color).changed() {
+                        let [r, g, b, a] = color.to_srgba_unmultiplied();
+                        fills.insert(name.clone(), ParamValue::Color(Rgba::from([r, g, b, a])));
                     }
                 }
             }
         });
     }
     let fills = fills.clone();
-    let elapsed = views.scrub * total;
-    let size = EVec2::new(PREVIEW[0] as f32, PREVIEW[1] as f32);
+    let background = views.background;
+    let fit = (ui.available_width() / PREVIEW[0] as f32).min(1.0);
+    let size = EVec2::new(PREVIEW[0] as f32, PREVIEW[1] as f32) * fit;
+    let zoom = ZOOM * fit;
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    if background {
+        model::preview::backdrop(editor, ui.painter(), rect, BACKDROP_SCENE.to_owned(), zoom);
+    } else {
+        ui.painter().rect_filled(rect, 4.0, theme::CANVAS);
+    }
+    let views = &mut editor.views.vfx;
     if let Some(stage) = &views.stage {
         ui.painter().image(
             stage.texture,
@@ -546,11 +688,9 @@ fn preview(
             egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
             Color32::WHITE,
         );
-    } else {
-        ui.painter().rect_filled(rect, 4.0, theme::CANVAS);
     }
     let to_image =
-        |at: Vec2| rect.min + EVec2::new(at.x * ZOOM + size.x / 2.0, -at.y * ZOOM + size.y / 2.0);
+        |at: Vec2| rect.min + EVec2::new(at.x * zoom + size.x / 2.0, -at.y * zoom + size.y / 2.0);
     if let Target::Area { shape, facing } = &views.target {
         let outline: Vec<Pos2> = Footprint {
             at: Pos::new(0.0, 0.0),
@@ -574,13 +714,13 @@ fn preview(
     }
     for overlay in &views.overlays {
         let at = to_image(overlay.at);
-        let [r, g, b, _] = overlay.colour.0.to_be_bytes();
+        let [r, g, b, _] = overlay.color.0.to_be_bytes();
         let ink = Color32::from_rgba_unmultiplied(r, g, b, (overlay.alpha * 255.0) as u8);
         ui.painter().text(
             at,
             egui::Align2::CENTER_BOTTOM,
             &overlay.text,
-            FontId::proportional(overlay.size * ZOOM),
+            FontId::proportional(overlay.size * zoom),
             ink,
         );
     }
@@ -600,13 +740,6 @@ fn preview(
         drafts: drafts.iter().cloned().collect(),
         signature,
     });
-}
-
-fn seed_defaults(editor: &mut Editor, key: &str, defaults: &[(String, ParamKind, ParamValue)]) {
-    let fills = editor.views.vfx.fills.entry(key.to_owned()).or_default();
-    for (name, _, default) in defaults {
-        fills.entry(name.clone()).or_insert(*default);
-    }
 }
 
 fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
@@ -674,65 +807,85 @@ fn shape_fields(ui: &mut Ui, shape: &mut Shape) {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one shader's code as it stands, read once"
+)]
 fn code_pane(
     editor: &mut Editor,
     ui: &mut Ui,
-    key: &str,
+    id: egui::Id,
     def: &VfxShaderDef,
-    source: &str,
-) -> String {
-    let file = format!("assets/{source}");
-    let current = editor
-        .project
-        .as_ref()
-        .and_then(|project| project.files.text(&file))
-        .unwrap_or_default();
-    let id = ui.id().with(("shader-code", key));
-    let mut draft = draft_or(ui, id, current.clone());
-    let response = ui.add(
-        egui::TextEdit::multiline(&mut draft)
-            .code_editor()
-            .font(FontId::monospace(12.5))
-            .desired_width(f32::INFINITY)
-            .desired_rows(CODE_ROWS),
-    );
+    key: &str,
+    file: &str,
+    current: &str,
+    mut draft: String,
+) {
+    let heading_slot = ui.available_rect_before_wrap();
+    ui.add_space(HEADING_HEIGHT);
+    let height = ui.available_height() - CODE_FOOTER;
+    let (response, verdict) = shader_code::show(ui, id, &mut draft, def, height);
     if response.changed() {
         set_draft(ui, id, &draft);
     }
+    let status = match &verdict {
+        Ok(()) => theme::ok("✓ compiles"),
+        Err(error) => {
+            let place = error
+                .line
+                .map(|(line, column)| format!("line {line}:{column} · "))
+                .unwrap_or_default();
+            theme::warn(format!("✗ {place}{}", error.message))
+        }
+    };
+    let heading = egui::Rect::from_min_size(
+        heading_slot.min,
+        EVec2::new(heading_slot.width(), HEADING_HEIGHT),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(heading)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        |ui| {
+            let status = status.size(11.0);
+            let status_width = ui.fonts_mut(|fonts| {
+                fonts
+                    .layout_no_wrap(
+                        status.text().to_owned(),
+                        FontId::proportional(11.0),
+                        Color32::WHITE,
+                    )
+                    .size()
+                    .x
+            });
+            let title_room = ui.available_width() - status_width - ui.spacing().item_spacing.x;
+            ui.scope(|ui| {
+                ui.set_max_width(title_room.max(MIN_TITLE_WIDTH));
+                ui.add(
+                    egui::Label::new(widgets::section_heading(&format!("code · {file} · ")))
+                        .truncate(),
+                );
+            });
+            ui.add(egui::Label::new(status).truncate());
+        },
+    );
     let dirty = draft != current;
-    let verdict = def.check_source(&draft);
-    ui.horizontal(|ui| {
-        match &verdict {
-            Ok(_) => {
-                ui.label(theme::ok("✓ compiles"));
-            }
-            Err(error) => {
-                let place = error
-                    .line
-                    .map(|(line, column)| format!("line {line}:{column} · "))
-                    .unwrap_or_default();
-                ui.label(theme::warn(format!("✗ {place}{}", error.message)));
+    if !dirty {
+        return;
+    }
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        let apply = widgets::primary(ui, "Apply").clicked();
+        if ui.button("Revert").clicked() {
+            clear_draft(ui, id);
+        }
+        if apply || (response.lost_focus() && verdict.is_ok()) {
+            let mut edit = ContentEdit::new(format!("Edit shader {key}")).merging();
+            edit.write(file.to_owned(), Arc::from(draft.as_bytes()));
+            if editor.apply(edit) {
+                clear_draft(ui, id);
             }
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if dirty {
-                let apply = widgets::primary(ui, "Apply").clicked();
-                if ui.button("Revert").clicked() {
-                    clear_draft(ui, id);
-                }
-                if apply || (response.lost_focus() && verdict.is_ok()) {
-                    let mut edit = ContentEdit::new(format!("Edit shader {source}")).merging();
-                    edit.write(file.clone(), Arc::from(draft.as_bytes()));
-                    if editor.apply(edit) {
-                        clear_draft(ui, id);
-                    }
-                }
-            } else {
-                ui.label(theme::faint("saved as typed once it compiles").size(12.0));
-            }
-        });
     });
-    draft
 }
 
 #[derive(Clone, Deserialize, serde::Serialize)]
@@ -754,7 +907,7 @@ enum Layer {
     },
     Text {
         template: String,
-        colour: Rgba,
+        color: Rgba,
         #[serde(default = "text_size")]
         size: f32,
         #[serde(default = "text_rise")]
@@ -806,7 +959,7 @@ struct PreviewRequest {
 
 struct Overlay {
     text: String,
-    colour: Rgba,
+    color: Rgba,
     size: f32,
     at: Vec2,
     alpha: f32,
@@ -820,7 +973,7 @@ struct Stage {
     blank: Handle<Image>,
     target: Option<Entity>,
     pieces: Vec<Option<Entity>>,
-    shaders: HashMap<String, Handle<Shader>>,
+    shaders: HashMap<String, Result<Handle<Shader>, ShaderError>>,
     signature: String,
 }
 
@@ -842,7 +995,7 @@ impl Stage {
                 RenderTarget::Image(image.clone().into()),
                 Camera {
                     order: -50,
-                    clear_color: ClearColorConfig::Custom(Color::srgb(0.08, 0.08, 0.1)),
+                    clear_color: ClearColorConfig::Custom(Color::NONE),
                     ..default()
                 },
                 Projection::Orthographic(OrthographicProjection {
@@ -984,7 +1137,14 @@ fn spawn_target(
     )
 }
 
-fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<SiteFrame> {
+// The screen site's image is the area drawn behind the preview, so a screen-wide shader has
+// something to work on, as it has the frame in the game.
+fn site_frame(
+    world: &World,
+    target: &Target,
+    actor: Option<Entity>,
+    behind: Option<(Handle<Image>, egui::Rect, [u32; 2])>,
+) -> Option<SiteFrame> {
     match target {
         Target::Actor { .. } => {
             let sprite = world.get::<Sprite>(actor?)?;
@@ -1003,7 +1163,7 @@ fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<S
                     Rect::from_corners(rect.min / sheet, rect.max / sheet),
                     Vec2::ONE / sheet,
                 )),
-                area: vfx_render::AreaShape::default(),
+                area: vfx_render::AreaShape::image(rect.size() / TILE.0),
             })
         }
         Target::Area { shape, facing } => {
@@ -1022,14 +1182,27 @@ fn site_frame(world: &World, target: &Target, actor: Option<Entity>) -> Option<S
                 area,
             })
         }
-        Target::Screen => Some(SiteFrame {
-            kind: SITE_SCREEN,
-            center: Vec2::ZERO,
-            size: Vec2::new(PREVIEW[0] as f32, PREVIEW[1] as f32) / ZOOM,
-            facing: 0.0,
-            texture: None,
-            area: vfx_render::AreaShape::default(),
-        }),
+        Target::Screen => {
+            let size = Vec2::new(PREVIEW[0] as f32, PREVIEW[1] as f32) / ZOOM;
+            let texture = behind.map(|(image, uv, alloc)| {
+                (
+                    image,
+                    Rect::from_corners(
+                        Vec2::new(uv.min.x, uv.min.y),
+                        Vec2::new(uv.max.x, uv.max.y),
+                    ),
+                    Vec2::ONE / Vec2::new(alloc[0] as f32, alloc[1] as f32),
+                )
+            });
+            Some(SiteFrame {
+                kind: SITE_SCREEN,
+                center: Vec2::ZERO,
+                size,
+                facing: 0.0,
+                texture,
+                area: vfx_render::AreaShape::image(size / TILE.0),
+            })
+        }
     }
 }
 
@@ -1063,38 +1236,41 @@ fn show_shader_piece(
     let source = drafts
         .get(shader)
         .cloned()
-        .or_else(|| files.text(&format!("assets/{}", def.source.as_str())))
+        .or_else(|| files.text(&shader_file(shader)))
         .unwrap_or_default();
-    let composed = match def.check_source(&source) {
-        Ok(composed) => composed,
+    if stage.shaders.len() > KEPT_SHADERS {
+        stage.shaders.clear();
+    }
+    let verdict = stage
+        .shaders
+        .entry(def.compose(&source))
+        .or_insert_with_key(|composed| {
+            def.check_source(&source)?;
+            let path = format!(
+                "vfx_preview/{shader}-{}.wgsl",
+                crate::project::hash(composed.as_bytes())
+            );
+            Ok(world
+                .resource_mut::<Assets<Shader>>()
+                .add(Shader::from_wgsl(composed.clone(), path)))
+        });
+    let handle = match verdict {
+        Ok(handle) => handle.clone(),
         Err(error) => {
             problems.push(format!("{shader}: {}", error.message));
             return false;
         }
     };
-    let handle = stage
-        .shaders
-        .entry(composed.clone())
-        .or_insert_with(|| {
-            let path = format!(
-                "vfx_preview/{shader}-{}.wgsl",
-                crate::project::hash(composed.as_bytes())
-            );
-            world
-                .resource_mut::<Assets<Shader>>()
-                .add(Shader::from_wgsl(composed.clone(), path))
-        })
-        .clone();
     let Some(material) = world
         .get::<MeshMaterial2d<VfxMaterial>>(piece)
         .map(|material| material.0.clone())
     else {
         return false;
     };
-    let overscan = if frame.texture.is_some() {
-        OVERSCAN
+    let overscan = if frame.kind == SITE_SCREEN {
+        Vec2::ONE
     } else {
-        1.0
+        quad_overscan(frame.size)
     };
     let (image, rect, pixel) = frame.texture.clone().unwrap_or((
         stage.blank.clone(),
@@ -1128,7 +1304,7 @@ fn show_shader_piece(
     }
     if let Some(mut transform) = world.get_mut::<Transform>(piece) {
         transform.translation = Vec3::new(frame.center.x, frame.center.y, 3.0);
-        transform.scale = Vec3::new(frame.size.x * overscan, frame.size.y * overscan, 1.0);
+        transform.scale = (frame.size * overscan).extend(1.0);
     }
     true
 }

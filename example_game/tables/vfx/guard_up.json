@@ -6,7 +6,7 @@
       "shader": "tint",
       "params": {
         "amount": 0.55,
-        "colour": [
+        "color": [
           120,
           170,
           255,

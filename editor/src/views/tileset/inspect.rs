@@ -241,7 +241,7 @@ fn terrains_cards(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
                 widgets::kv(ui, "terrains", |ui| {
                     ui.horizontal_wrapped(|ui| {
                         for (index, terrain) in terrains.iter().enumerate() {
-                            ui.label(theme::mono(terrain).color(palette::terrain_colour(index)));
+                            ui.label(theme::mono(terrain).color(palette::terrain_color(index)));
                             if index == 0 {
                                 ui.label(theme::faint("base").size(11.0));
                             }

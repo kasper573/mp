@@ -199,12 +199,12 @@ fn header(ui: &mut Ui, world: &mut World, sheet: &Sheet) {
         if picked.0 > 0 {
             pill.push_str(&format!(" · {} picked", points(picked.0)));
         }
-        let colour = if left.0 > 0 || picked.0 > 0 {
+        let color = if left.0 > 0 || picked.0 > 0 {
             color::WARN
         } else {
             color::MUTED
         };
-        widgets::pill(ui, &pill, colour);
+        widgets::pill(ui, &pill, color);
         let granted = super::granted(world, sheet.me);
         if !granted.is_empty() {
             ui.separator();
@@ -354,8 +354,8 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
         let opened = planned
             .get(arrow.from)
             .is_some_and(|held| *held >= arrow.rank);
-        let colour = if opened { color::WARN } else { color::BORDER };
-        draw_arrow(&painter, place.at(from.at), place.at(to.at), colour);
+        let color = if opened { color::WARN } else { color::BORDER };
+        draw_arrow(&painter, place.at(from.at), place.at(to.at), color);
     }
     for (key, node) in &tree.0 {
         let state = states[key.as_str()];
@@ -622,7 +622,7 @@ fn draw_node(
     );
 }
 
-fn draw_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32) {
+fn draw_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32) {
     let delta = to - from;
     let length = delta.length();
     if length <= NODE_RADIUS * 2.0 {
@@ -631,7 +631,7 @@ fn draw_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32) {
     let dir = delta / length;
     let start = from + dir * (NODE_RADIUS + 4.0);
     let end = to - dir * (NODE_RADIUS + 6.0);
-    let stroke = Stroke::new(2.0, colour);
+    let stroke = Stroke::new(2.0, color);
     painter.line_segment([start, end], stroke);
     let side = Vec2::new(-dir.y, dir.x);
     let tip = end + dir * ARROW_HEAD;
@@ -641,7 +641,7 @@ fn draw_arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32) {
             end - dir * 2.0 + side * ARROW_HEAD * 0.6,
             end - dir * 2.0 - side * ARROW_HEAD * 0.6,
         ],
-        colour,
+        color,
         Stroke::NONE,
     ));
 }

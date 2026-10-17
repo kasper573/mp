@@ -1,10 +1,9 @@
 {
   "name": "Frost lance",
-  "source": "shaders/frost_lance.wgsl",
   "params": [
     {
-      "name": "colour",
-      "kind": "colour",
+      "name": "color",
+      "kind": "color",
       "default": [
         170,
         225,
@@ -15,7 +14,9 @@
     {
       "name": "shards",
       "kind": "number",
-      "default": 7.0
+      "default": 7.0,
+      "min": 1.0,
+      "max": 16.0
     }
   ]
 }

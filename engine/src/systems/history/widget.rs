@@ -139,12 +139,12 @@ impl HudWindow for HistoryWindow {
 pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: bool, ink: Color32) {
     match tally {
         Some(RecordTally::Change(change)) => {
-            let colour = match (change > 0, icon) {
+            let color = match (change > 0, icon) {
                 (true, true) => color::OK,
                 (true, false) => color::WARN,
                 (false, _) => ink.gamma_multiply(0.6),
             };
-            prefix(text, format!("{} ", signed(change)), colour);
+            prefix(text, format!("{} ", signed(change)), color);
         }
         Some(RecordTally::Progress { have, need }) => {
             text.pieces
@@ -259,11 +259,11 @@ fn empty_text(tab: HistoryTab) -> &'static str {
     }
 }
 
-fn caption(ui: &mut Ui, text: String, colour: Color32) {
+fn caption(ui: &mut Ui, text: String, color: Color32) {
     ui.label(
         RichText::new(text)
             .size(TextRole::Small.size())
-            .color(colour),
+            .color(color),
     );
 }
 
@@ -291,7 +291,7 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
         _ => {}
     }
     let line = record_line(entry);
-    let colour = match (entry.topic, entry.mark) {
+    let color = match (entry.topic, entry.mark) {
         (_, Some(HistoryMark::Failed)) | (HistoryTopic::Error, _) => color::DANGER,
         _ => color::TEXT,
     };
@@ -310,7 +310,7 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
         }
         let look = TextLook {
             size: TextRole::Body.size(),
-            color: colour,
+            color,
         };
         text::show(ui, world, &line, look, None);
     });
@@ -345,9 +345,9 @@ fn record_line(entry: &HistoryEntry) -> StyledLine {
     line
 }
 
-fn prefix(text: &mut StyledLine, label: String, colour: Color32) {
+fn prefix(text: &mut StyledLine, label: String, color: Color32) {
     text.pieces
-        .insert(0, StyledSpan::plain(label).ink(colour).into());
+        .insert(0, StyledSpan::plain(label).ink(color).into());
 }
 
 fn divider(ui: &mut Ui, text: String) {

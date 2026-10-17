@@ -5,7 +5,7 @@
       "type": "shader",
       "shader": "flash",
       "params": {
-        "colour": [
+        "color": [
           190,
           220,
           255,

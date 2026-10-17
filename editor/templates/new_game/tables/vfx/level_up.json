@@ -10,7 +10,7 @@
     {
       "type": "text",
       "template": "Level {level}!",
-      "colour": [
+      "color": [
         255,
         214,
         92,
@@ -25,7 +25,7 @@
       "shader": "flash",
       "duration": 0.5,
       "params": {
-        "colour": [
+        "color": [
           255,
           214,
           92,

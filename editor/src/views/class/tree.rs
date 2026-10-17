@@ -520,12 +520,12 @@ fn canvas(
                         Some(at) => {
                             let on_cycle =
                                 cycles.contains(to.as_str()) && cycles.contains(from.as_str());
-                            let colour = if on_cycle {
+                            let color = if on_cycle {
                                 theme::DANGER
                             } else {
                                 theme::MUTED
                             };
-                            arrow(&painter, to_screen(at), head, colour, false);
+                            arrow(&painter, to_screen(at), head, color, false);
                         }
                         None => {
                             let ghost = head + GHOST_OFFSET + Vec2::new(0.0, index as f32 * 30.0);
@@ -723,12 +723,12 @@ fn frame_handles(
     clicked: &mut Option<Option<String>>,
 ) {
     let on_screen = frame.translate(origin.to_vec2());
-    let colour = if held.is_some() {
+    let color = if held.is_some() {
         theme::ACCENT
     } else {
         theme::MUTED
     };
-    painter.rect_stroke(on_screen, 0.0, Stroke::new(1.0, colour), StrokeKind::Inside);
+    painter.rect_stroke(on_screen, 0.0, Stroke::new(1.0, color), StrokeKind::Inside);
     let middle = ui.interact(
         on_screen.shrink(HANDLE),
         ui.id().with("backdrop-frame"),
@@ -773,7 +773,7 @@ fn frame_handles(
         take(&response, FrameGrip::Corner(index));
         let lit = response.hovered() || held == Some(FrameGrip::Corner(index));
         painter.rect_filled(handle, 1.0, if lit { theme::ACCENT } else { theme::RAISED });
-        painter.rect_stroke(handle, 1.0, Stroke::new(1.0, colour), StrokeKind::Inside);
+        painter.rect_stroke(handle, 1.0, Stroke::new(1.0, color), StrokeKind::Inside);
     }
 }
 
@@ -931,19 +931,19 @@ fn fresh_key(nodes: &Nodes, skill: &str) -> String {
 }
 
 fn dots(painter: &egui::Painter, rect: Rect, origin: Pos2) {
-    let colour = Color32::from_rgba_unmultiplied(255, 255, 255, 14);
+    let color = Color32::from_rgba_unmultiplied(255, 255, 255, 14);
     let mut x = origin.x - ((origin.x - rect.min.x) / GRID).floor() * GRID;
     while x <= rect.max.x {
         let mut y = origin.y - ((origin.y - rect.min.y) / GRID).floor() * GRID;
         while y <= rect.max.y {
-            painter.circle_filled(Pos2::new(x, y), 1.0, colour);
+            painter.circle_filled(Pos2::new(x, y), 1.0, color);
             y += GRID;
         }
         x += GRID;
     }
 }
 
-fn arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32, dashed: bool) {
+fn arrow(painter: &egui::Painter, from: Pos2, to: Pos2, color: Color32, dashed: bool) {
     let delta = to - from;
     let length = delta.length();
     if length <= NODE_RADIUS * 2.0 {
@@ -952,7 +952,7 @@ fn arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32, dashed:
     let dir = delta / length;
     let start = from + dir * (NODE_RADIUS + 4.0);
     let end = to - dir * (NODE_RADIUS + 6.0);
-    let stroke = Stroke::new(2.0, colour);
+    let stroke = Stroke::new(2.0, color);
     if dashed {
         painter.add(egui::Shape::dashed_line(&[start, end], stroke, 6.0, 4.0));
     } else {
@@ -966,7 +966,7 @@ fn arrow(painter: &egui::Painter, from: Pos2, to: Pos2, colour: Color32, dashed:
             end - dir * 2.0 + side * ARROW_HEAD * 0.6,
             end - dir * 2.0 - side * ARROW_HEAD * 0.6,
         ],
-        colour,
+        color,
         Stroke::NONE,
     ));
 }

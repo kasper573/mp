@@ -1,10 +1,9 @@
 {
   "name": "Ring",
-  "source": "shaders/ring.wgsl",
   "params": [
     {
-      "name": "colour",
-      "kind": "colour",
+      "name": "color",
+      "kind": "color",
       "default": [
         255,
         214,
@@ -15,7 +14,9 @@
     {
       "name": "width",
       "kind": "number",
-      "default": 0.2
+      "default": 0.2,
+      "min": 0.02,
+      "max": 1.0
     }
   ]
 }
