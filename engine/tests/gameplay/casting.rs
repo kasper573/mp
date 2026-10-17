@@ -1,6 +1,6 @@
 use driver::{
     Player, aiming, beside_other_player, id, npc_is, other_player, other_player_within,
-    pack_ground, playing, playing_on, status_on_me,
+    pack_ground, played, played_on, status_on_me,
 };
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
@@ -38,26 +38,26 @@ fn every_targeting_kind_and_shape_lands_where_it_is_aimed() {
     me.point_at_tile(ally.at);
     me.click();
     me.wait_until("the friend mended", |snapshot| {
-        playing_on(snapshot, "mend_glow", ally.id)
+        played_on(snapshot, "mend_glow", ally.id)
     });
 
     me.fight(
         |_, actor| npc_is(actor, PREY),
-        |snapshot| !playing(snapshot, "spark_hit").is_empty(),
+        |snapshot| !played(snapshot, "spark_hit").is_empty(),
     );
 
     cast_at(&mut me, InputAction::Hotbar1, ring, |snapshot| {
-        playing(snapshot, "fireball_blast")
+        played(snapshot, "fireball_blast")
             .iter()
             .any(|blast| matches!(blast.site, VfxSite::Area(_)))
     });
     cast_at(&mut me, InputAction::Hotbar3, ring, |snapshot| {
-        playing(snapshot, "chain_lightning")
+        played(snapshot, "chain_lightning")
             .iter()
             .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
     });
     cast_at(&mut me, InputAction::Hotbar2, ring, |snapshot| {
-        playing(snapshot, "frost_lance")
+        played(snapshot, "frost_lance")
             .iter()
             .any(|lance| matches!(lance.site, VfxSite::Area(_)))
     });
@@ -66,7 +66,7 @@ fn every_targeting_kind_and_shape_lands_where_it_is_aimed() {
         other_player_within(snapshot, 4.5)
     });
     cast_at(&mut me, InputAction::Hotbar5, ally.at, |snapshot| {
-        playing_on(snapshot, "holy_motes", ally.id)
+        played_on(snapshot, "holy_motes", ally.id)
     });
 
     friend.act(InputAction::Hotbar1);
@@ -74,7 +74,7 @@ fn every_targeting_kind_and_shape_lands_where_it_is_aimed() {
     friend.point_at_tile(ring);
     friend.click();
     me.wait_until("the friend's cleave in view", |snapshot| {
-        playing(snapshot, "cleave_swoosh")
+        played(snapshot, "cleave_swoosh")
             .iter()
             .any(|sweep| matches!(sweep.site, VfxSite::Area(_)))
     });

@@ -1,4 +1,4 @@
-use driver::{LONG, UiTarget, aiming, holding, playing, resident_home, status_on_me};
+use driver::{LONG, UiTarget, aiming, holding, played, resident_home, status_on_me};
 use engine::systems::input::map::InputAction;
 use engine::systems::status::StatusCategory;
 
@@ -42,7 +42,7 @@ fn statuses_come_from_items_skills_and_gear_and_go_by_category_or_time() {
             .any(|status| status.effect == "warded" && status.category == StatusCategory::Buff)
     );
     player.find_ui(UiTarget::starting("Status Warded"));
-    assert!(playing(&warded, "ward_bubble").len() + playing(&warded, "ward_up").len() >= 1);
+    assert!(played(&warded, "ward_bubble").len() + played(&warded, "ward_up").len() >= 1);
 
     player.act(InputAction::ToggleInventory);
     player.act_on_ui(InputAction::UseItem, UiTarget::image(ANTIDOTE));

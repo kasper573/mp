@@ -406,7 +406,9 @@ pub fn status_on_me(snapshot: &ProbeSnapshot, effect: &str) -> bool {
 }
 
 // Every instance of the vfx row in view.
-pub fn playing<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> {
+/// Every instance of a vfx the client saw start lately, over or not: what a wait for a cast to land
+/// looks for, since a short vfx may come and go between two frames of a slow client.
+pub fn played<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> {
     let wanted = id::<VfxDef>(vfx);
     snapshot
         .vfx
@@ -415,10 +417,18 @@ pub fn playing<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> 
         .collect()
 }
 
-pub fn playing_on(snapshot: &ProbeSnapshot, vfx: &str, body: Entity) -> bool {
-    playing(snapshot, vfx)
+pub fn played_on(snapshot: &ProbeSnapshot, vfx: &str, body: Entity) -> bool {
+    played(snapshot, vfx)
         .iter()
         .any(|instance| instance.site == VfxSite::Actor(body))
+}
+
+/// The instances of a vfx still playing.
+pub fn playing<'a>(snapshot: &'a ProbeSnapshot, vfx: &str) -> Vec<&'a ProbeVfx> {
+    played(snapshot, vfx)
+        .into_iter()
+        .filter(|instance| !instance.over)
+        .collect()
 }
 
 /// The tile two east of the other player: where a friend walks to stand with them, in full view.

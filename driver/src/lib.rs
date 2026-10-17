@@ -22,6 +22,6 @@ pub use seen::{
     UiTarget, aiming, area_key, arrived_in, at_rest, bare_spot, beside_other_player, blocked,
     carried, clickable_point, cooling, erred, finished, fixture, holding, in_warp, in_world,
     learned, marked, me_at_rest, nearest_npc, noticed, npc_is, on_quest, open, other_player,
-    other_player_within, planned, playing, playing_on, portal, pressed, reset_prompted, slot_item,
-    slot_skill, status_on_me, taken, to_spend, told_by, townsperson, tree_view,
+    other_player_within, planned, played, played_on, playing, portal, pressed, reset_prompted,
+    slot_item, slot_skill, status_on_me, taken, to_spend, told_by, townsperson, tree_view,
 };

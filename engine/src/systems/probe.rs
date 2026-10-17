@@ -54,6 +54,8 @@ pub fn install(app: &mut App, channel: impl ProbeChannel + 'static) {
     app.insert_non_send(Probe(Box::new(channel)))
         .init_resource::<ProbeInputSeen>()
         .init_resource::<DrawnUi>()
+        .init_resource::<VfxSeen>()
+        .add_observer(remember_vfx)
         .add_systems(PreUpdate, (count_input, read_accessibly))
         .add_systems(
             PostUpdate,
@@ -310,11 +312,13 @@ pub struct ProbeStatus {
     pub left: Option<Seconds>,
 }
 
-/// A vfx playing in view, with the site it plays on.
+/// A vfx seen starting lately, with the site it plays on; `over` once its time has run out. One
+/// shorter than the gap between two snapshots is still reported in the next.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ProbeVfx {
     pub vfx: VfxId,
     pub site: VfxSite,
+    pub over: bool,
 }
 
 /// The character's class, tree and bar as the client shows them.
@@ -618,14 +622,7 @@ fn snapshot(world: &mut World) -> ProbeSnapshot {
                     .collect()
             })
             .unwrap_or_default(),
-        vfx: world
-            .query::<&VfxInstance>()
-            .iter(world)
-            .map(|instance| ProbeVfx {
-                vfx: instance.vfx,
-                site: instance.site.clone(),
-            })
-            .collect(),
+        vfx: vfx_seen(world),
         hotbar: skill::bar::report(world)
             .into_iter()
             .map(|slot| ProbeSlot {
@@ -1103,5 +1100,37 @@ fn covered(world: &mut World) -> Vec<Rect<WindowPx>> {
         .map(|area| area.rect())
         .filter(|rect| rect.width() > 0.0 && rect.height() > 0.0)
         .map(window_rect)
+        .collect()
+}
+
+const VFX_MEMORY: Seconds = Seconds(3.0);
+
+#[derive(Resource, Default)]
+struct VfxSeen(Vec<VfxInstance>);
+
+fn remember_vfx(
+    add: On<Add<VfxInstance>>,
+    instances: Query<&VfxInstance>,
+    mut seen: ResMut<VfxSeen>,
+) {
+    if let Ok(instance) = instances.get(add.entity) {
+        seen.0.push(instance.clone());
+    }
+}
+
+fn vfx_seen(world: &mut World) -> Vec<ProbeVfx> {
+    let now = session::server_now(world);
+    let mut seen = world.resource_mut::<VfxSeen>();
+    if let Some(now) = now {
+        seen.0
+            .retain(|instance| now < instance.until.after(VFX_MEMORY));
+    }
+    seen.0
+        .iter()
+        .map(|instance| ProbeVfx {
+            vfx: instance.vfx,
+            site: instance.site.clone(),
+            over: now.is_some_and(|now| instance.until <= now),
+        })
         .collect()
 }

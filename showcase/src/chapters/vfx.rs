@@ -1,6 +1,6 @@
 use driver::{
     BUDGET, LONG, Player, aiming, beside_other_player, id, npc_is, other_player_within,
-    pack_ground, playing, playing_on, status_on_me,
+    pack_ground, played, played_on, playing, status_on_me,
 };
 use engine::core::math::{Offset, Pos};
 use engine::core::tiling::Tiles;
@@ -37,7 +37,7 @@ fn play(shoot: &mut Shoot) {
         "A path site threads the targets: Chain Lightning arcs from you through each one it hit, nearest first",
     );
     cast_at(&mut me, InputAction::Hotbar3, ring, |snapshot| {
-        playing(snapshot, "chain_lightning")
+        played(snapshot, "chain_lightning")
             .iter()
             .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
     });
@@ -47,21 +47,21 @@ fn play(shoot: &mut Shoot) {
     );
     let here = me.snapshot().me.expect("the player").at;
     cast_at(&mut me, InputAction::Hotbar1, here, |snapshot| {
-        !playing(snapshot, "fireball_blast").is_empty()
+        !played(snapshot, "fireball_blast").is_empty()
     });
     me.hold();
     me.caption_top(
         "The Burning it leaves is a status with effects of its own: embers rise from whoever it holds",
     );
     me.wait_until("embers on the pack", |snapshot| {
-        !playing(snapshot, "embers").is_empty()
+        !played(snapshot, "embers").is_empty()
     });
     me.hold();
     me.caption_top(
         "A line: Frost Lance travels the length you aimed, frosts the ground it crossed and shatters at the end",
     );
     cast_at(&mut me, InputAction::Hotbar2, ring, |snapshot| {
-        !playing(snapshot, "frost_lance").is_empty()
+        !played(snapshot, "frost_lance").is_empty()
     });
     me.hold();
     me.act(InputAction::Hotbar6);
@@ -78,7 +78,7 @@ fn play(shoot: &mut Shoot) {
         other_player_within(snapshot, 4.5)
     });
     cast_at(&mut me, InputAction::Hotbar5, ally.at, |snapshot| {
-        playing_on(snapshot, "holy_motes", ally.id)
+        played_on(snapshot, "holy_motes", ally.id)
     });
     me.hold();
     me.caption_top(
@@ -89,7 +89,7 @@ fn play(shoot: &mut Shoot) {
     friend.point_at_tile(ring);
     friend.click();
     me.wait_until("the cleave", |snapshot| {
-        !playing(snapshot, "cleave_swoosh").is_empty()
+        !played(snapshot, "cleave_swoosh").is_empty()
     });
     me.hold();
     me.caption_top(
@@ -97,7 +97,7 @@ fn play(shoot: &mut Shoot) {
     );
     sunder_nearest(&mut friend);
     me.wait_until("the slash", |snapshot| {
-        !playing(snapshot, "sunder_slash").is_empty()
+        !played(snapshot, "sunder_slash").is_empty()
     });
     me.hold();
     me.caption_top(
@@ -108,7 +108,7 @@ fn play(shoot: &mut Shoot) {
     });
     if me
         .try_wait_for(BUDGET, |snapshot| {
-            (!playing(snapshot, "ward_break").is_empty()).then_some(())
+            (!played(snapshot, "ward_break").is_empty()).then_some(())
         })
         .is_some()
     {
