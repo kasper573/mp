@@ -1,6 +1,6 @@
 {
   "name": "Slash",
-  "icon": "icons/weapon_and_tool/iron_sword.png",
+  "icon": "icons/weapon_and_tool/wooden_sword.png",
   "sfx": "slash01",
   "target": "single_enemy",
   "basic_attack": true,

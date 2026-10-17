@@ -1,6 +1,6 @@
 {
   "name": "Strike",
-  "icon": "icons/weapon_and_tool/wooden_sword.png",
+  "icon": "icons/cursors/sword001.png",
   "sfx": "bite01",
   "target": "single_enemy",
   "basic_attack": true,

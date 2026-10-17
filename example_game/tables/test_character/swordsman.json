@@ -4,6 +4,9 @@
   "basic_attack": "slash",
   "bag": [
     {
+      "item": "rusty_sword"
+    },
+    {
       "item": "greater_health_potion"
     }
   ],
