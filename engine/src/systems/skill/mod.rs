@@ -467,7 +467,7 @@ pub fn rank_of(world: &World, actor: Entity, skill: SkillId) -> Rank {
                 rank.0 > 0 && tree.node(node).is_some_and(|node| node.skill == skill)
             })
             .map(|(_, rank)| *rank)
-            .last();
+            .next_back();
         if let Some(rank) = held {
             return rank;
         }
