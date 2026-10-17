@@ -8,6 +8,7 @@ use serde_json::{Map, Value};
 use crate::drafts;
 use crate::project::{Project, ProjectFiles, row_file};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
+use crate::ui::assets::AssetKind;
 use crate::ui::{browser, theme, widgets};
 use crate::usages::ContentUsages;
 use crate::views::model::busts;
@@ -340,7 +341,7 @@ fn plain(
             "x-table" => {
                 return reference(ui, cx, schema, value, path);
             }
-            "x-asset" => return asset(ui, cx, value, path),
+            "x-asset" => return asset(ui, cx, schema, value, path),
             "x-place" => return place(ui, cx, schema, value, path),
             "x-color" => return color(ui, value, path),
             "x-face" => return face(ui, cx, value, path),
@@ -1266,9 +1267,19 @@ pub fn reference(
     FormChange::default()
 }
 
-fn asset(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> FormChange {
+fn asset(
+    ui: &mut Ui,
+    cx: &mut FormCx,
+    schema: &Value,
+    value: &mut Value,
+    path: &str,
+) -> FormChange {
+    let kinds: Vec<AssetKind> = schema["x-asset"]
+        .as_str()
+        .and_then(AssetKind::named)
+        .map_or_else(|| AssetKind::ALL.to_vec(), |kind| vec![kind]);
     let mut file = value.as_str().unwrap_or_default().to_owned();
-    if picker::asset(ui, cx, &mut file, path) {
+    if picker::asset_of(ui, cx, &kinds, &mut file, path) {
         *value = Value::String(file);
         return FormChange::at(path);
     }

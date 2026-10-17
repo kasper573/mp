@@ -7,6 +7,7 @@ use engine::systems::area::world_map::WorldMapDef;
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget, RightTab};
+use crate::picker::Dragged;
 use crate::picker::{self, PictureFrame};
 use crate::project::{GAME_FILE, Project, RowSelection, row_of};
 use crate::tabs::EditorTab;
@@ -147,6 +148,10 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 node.selected = selection.table == table && selection.keys.iter().any(|k| k == key);
                 node.icon = TreeIcon::Thumb(file.clone());
                 node.unsaved = project.is_unsaved(&file);
+                node.drag = Some(Dragged::Row {
+                    table: table.to_owned(),
+                    key: key.to_owned(),
+                });
                 Some(node)
             },
             &mut |folder| {
@@ -607,12 +612,21 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             .horizontal(|ui| {
                                 ui.add_space(6.0);
                                 ui.label(theme::muted(icon));
-                                ui.add(
+                                let sense = if *folder {
+                                    Sense::click()
+                                } else {
+                                    Sense::click_and_drag()
+                                };
+                                let response = ui.add(
                                     egui::Label::new(
                                         theme::mono(path).color(theme::CODE).size(13.0),
                                     )
-                                    .sense(Sense::click()),
-                                )
+                                    .sense(sense),
+                                );
+                                if !*folder {
+                                    picker::carry(ui, &response, &Dragged::Asset(path.clone()));
+                                }
+                                response
                             })
                             .inner;
                         if response.clicked() {
@@ -670,7 +684,22 @@ fn result_line(
     selected: bool,
 ) -> egui::Response {
     let full = ui.available_rect_before_wrap();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), 22.0), Sense::click());
+    let sense = if row.is_some() {
+        Sense::click_and_drag()
+    } else {
+        Sense::click()
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(full.width(), 22.0), sense);
+    if let Some((table, key)) = row {
+        picker::carry(
+            ui,
+            &response,
+            &Dragged::Row {
+                table: table.to_owned(),
+                key: key.to_owned(),
+            },
+        );
+    }
     if selected {
         ui.painter().rect_filled(rect, 3.0, theme::ACCENT_SOFT);
     } else if response.hovered() {

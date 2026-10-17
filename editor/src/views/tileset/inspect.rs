@@ -14,6 +14,7 @@ use crate::forms::{FormChange, FormCx};
 use crate::picker;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
+use crate::ui::assets::AssetKind;
 use crate::ui::{inspector, theme, widgets};
 use crate::views::area::palette;
 use crate::views::model::sounds;
@@ -60,7 +61,7 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Form
     let mut changed = FormChange::default();
     widgets::kv(ui, "image", |ui| {
         let mut file = value["image"].as_str().unwrap_or_default().to_owned();
-        if picker::asset(ui, cx, &mut file, "/image") {
+        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/image") {
             value["image"] = Value::String(file);
             changed = FormChange::at("/image");
         }

@@ -12,6 +12,7 @@ use crate::app::Editor;
 use crate::forms::FormChange;
 use crate::project::{ContentEdit, RowSelection, row_of};
 use crate::tabs::EditorTab;
+use crate::ui::assets::AssetKind;
 use crate::ui::{dialogs, inspector, theme, widgets};
 use crate::{forms, picker};
 
@@ -664,7 +665,7 @@ fn asset_picker(
     path: &str,
 ) -> bool {
     inspector::with_row_form(editor, super::TABLE, key, |cx| {
-        picker::asset(ui, cx, file, path)
+        picker::asset_of(ui, cx, &[AssetKind::Image], file, path)
     })
 }
 
@@ -944,7 +945,7 @@ pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> Form
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        if picker::asset(ui, cx, &mut file, "/sprites/image") {
+        if picker::asset_of(ui, cx, &[AssetKind::Image], &mut file, "/sprites/image") {
             value["sprites"]["image"] = Value::String(file);
             changed = FormChange::at("/sprites/image");
         }
