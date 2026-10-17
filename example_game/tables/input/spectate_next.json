@@ -1,9 +1,1 @@
-{
-  "label": "Watch the next player",
-  "bindings": [
-    {
-      "type": "key",
-      "key": "ArrowRight"
-    }
-  ]
-}
+../../../editor/templates/new_game/tables/input/spectate_next.json

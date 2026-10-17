@@ -15,9 +15,16 @@ COPY target/release/website /usr/local/bin/website
 COPY target/wasm /wasm
 ENTRYPOINT ["website"]
 
+# The example game shares files with the new game template through symlinks in the repo; the image
+# gets the files themselves.
+FROM runtime AS content
+COPY example_game /source/example_game
+COPY editor/templates/new_game /source/editor/templates/new_game
+RUN cp -rL /source/example_game /content
+
 FROM runtime AS game-server
 # A static busybox supplies wget for the compose healthcheck without an apt layer.
 COPY --from=busybox:1.36-musl /bin/busybox /usr/bin/wget
 COPY target/release/game-server /usr/local/bin/game-server
-COPY example_game /content
+COPY --from=content /content /content
 ENTRYPOINT ["game-server"]
