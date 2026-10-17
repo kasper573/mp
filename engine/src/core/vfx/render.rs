@@ -759,6 +759,7 @@ pub fn fill_params(
         let at = slot.offset / 4;
         match (slot.kind, value) {
             (ParamKind::Number, ParamValue::Number(number)) => floats[at] = number,
+            (ParamKind::Bool, ParamValue::Bool(flag)) => floats[at] = f32::from(u8::from(flag)),
             (ParamKind::Color, ParamValue::Color(color)) => {
                 let linear = color.color().to_linear();
                 floats[at..at + 4].copy_from_slice(&[
@@ -1034,13 +1035,13 @@ fn draw_overlays(world: &mut World) {
                                 Some(ParamValue::Color(color)) => Some(color),
                                 _ => None,
                             },
-                            ParamFill::Value(ParamValue::Number(_)) => None,
+                            ParamFill::Value(ParamValue::Number(_) | ParamValue::Bool(_)) => None,
                         })
                         .next()
                         .or_else(|| {
                             shader.params.iter().find_map(|param| match param.default {
                                 ParamValue::Color(color) => Some(color),
-                                ParamValue::Number(_) => None,
+                                ParamValue::Number(_) | ParamValue::Bool(_) => None,
                             })
                         })
                         .unwrap_or(Rgba::WHITE);

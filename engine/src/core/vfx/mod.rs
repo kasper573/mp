@@ -123,6 +123,7 @@ pub enum ParamFill {
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ParamValue {
+    Bool(bool),
     Number(f32),
     Color(Rgba),
 }
@@ -160,6 +161,7 @@ pub struct WidgetName(pub String);
 impl ParamValue {
     pub fn kind(self) -> ParamKind {
         match self {
+            ParamValue::Bool(_) => ParamKind::Bool,
             ParamValue::Number(_) => ParamKind::Number,
             ParamValue::Color(_) => ParamKind::Color,
         }
@@ -167,6 +169,7 @@ impl ParamValue {
 
     pub fn text(self) -> String {
         match self {
+            ParamValue::Bool(flag) => flag.to_string(),
             ParamValue::Number(number) => {
                 let rounded = (number * 100.0).round() / 100.0;
                 if rounded.fract() == 0.0 {
@@ -195,6 +198,7 @@ struct WireParams(Vec<(String, WireValue)>);
 
 #[derive(Serialize, Deserialize)]
 enum WireValue {
+    Bool(bool),
     Number(f32),
     Color(Rgba),
 }
@@ -207,6 +211,7 @@ impl From<VfxParams> for WireParams {
                 .into_iter()
                 .map(|(name, value)| {
                     let wire = match value {
+                        ParamValue::Bool(flag) => WireValue::Bool(flag),
                         ParamValue::Number(number) => WireValue::Number(number),
                         ParamValue::Color(color) => WireValue::Color(color),
                     };
@@ -224,6 +229,7 @@ impl From<WireParams> for VfxParams {
                 .into_iter()
                 .map(|(name, value)| {
                     let value = match value {
+                        WireValue::Bool(flag) => ParamValue::Bool(flag),
                         WireValue::Number(number) => ParamValue::Number(number),
                         WireValue::Color(color) => ParamValue::Color(color),
                     };

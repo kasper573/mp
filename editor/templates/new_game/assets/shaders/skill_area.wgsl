@@ -1,7 +1,7 @@
 // The ground a skill is aimed at, as a clean ring of light in the shape of the area: a crisp
 // one-pixel rim, a glow that steps away from it on both sides, a breath of light pulsing along
 // it and a floor so faint the ground stays readable. Kept strictly to the area, since this is the
-// shape the player reads. hostile is 1 for a skill that harms, which trades the calm colors for
+// shape the player reads. hostile is set for a skill that harms, which trades the calm colors for
 // the hostile ones.
 fn vfx(uv: vec2<f32>) -> vec4<f32> {
     let suv = site_uv(pixel_uv(uv));

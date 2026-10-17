@@ -115,10 +115,7 @@ pub fn surface(world: &mut World) {
     let overlay = ShaderOverlay {
         shader: VfxShaderFixture::SkillArea.id(&content),
         site: VfxSite::Area(footprint),
-        params: VfxParams(vec![(
-            HOSTILE_PARAM.to_owned(),
-            ParamValue::Number(if hostile { 1.0 } else { 0.0 }),
-        )]),
+        params: VfxParams(vec![(HOSTILE_PARAM.to_owned(), ParamValue::Bool(hostile))]),
         since,
     };
     match shown {

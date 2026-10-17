@@ -27,10 +27,8 @@
     },
     {
       "name": "along",
-      "kind": "number",
-      "default": 0.0,
-      "min": 0.0,
-      "max": 1.0
+      "kind": "bool",
+      "default": false
     },
     {
       "name": "angle",

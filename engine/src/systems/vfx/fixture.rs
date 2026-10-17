@@ -20,7 +20,7 @@ impl Fixture for VfxFixture {
 }
 
 /// The shaders every game provides, drawn by the engine itself: the ground an area skill is aimed
-/// at, which reads `hostile` as 1 when the skill harms.
+/// at, whose `hostile` flag is set when the skill harms.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, VariantArray, IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum VfxShaderFixture {

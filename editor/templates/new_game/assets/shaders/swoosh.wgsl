@@ -5,7 +5,7 @@
 //   color      the band's color; its alpha scales the whole sweep
 //   thickness  the band's width, as a fraction of the sweep's span
 //   sweeps     how many times it crosses during the layer
-//   along      0 runs across the facing, 1 runs along it
+//   along      whether the sweep runs along the facing rather than across it
 //   angle      degrees the sweep turns on a sprite or the screen
 //   curve      how far the band bows into a crescent, as a fraction of the span
 //   trail      how long the wake lingers behind the band, as a fraction of the span

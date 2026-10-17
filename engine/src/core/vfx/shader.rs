@@ -23,7 +23,7 @@ const RESERVED: [&str; 4] = ["site", "params", "sample", "site_uv"];
 /// A shader a game ships: the WGSL file at `shader_file(key)` defining
 /// `fn vfx(uv: vec2<f32>) -> vec4<f32>`, and the parameters it reads from `params`, each with the
 /// default it gets when a layer leaves it unfilled and, for a number, the range the designer means
-/// it to be set within.
+/// it to be set within. A flag is `true` or `false` in the data and 0.0 or 1.0 in the shader.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VfxShaderDef {
@@ -59,6 +59,7 @@ impl ShaderParam {
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ParamKind {
+    Bool,
     Number,
     Color,
 }
@@ -84,21 +85,23 @@ pub struct ShaderError {
 impl ParamKind {
     pub fn label(self) -> &'static str {
         match self {
+            ParamKind::Bool => "bool",
             ParamKind::Number => "number",
             ParamKind::Color => "color",
         }
     }
 
+    // A flag reaches the shader as 0.0 or 1.0, which mixes and selects without a cast.
     fn wgsl(self) -> &'static str {
         match self {
-            ParamKind::Number => "f32",
+            ParamKind::Bool | ParamKind::Number => "f32",
             ParamKind::Color => "vec4<f32>",
         }
     }
 
     fn size(self) -> usize {
         match self {
-            ParamKind::Number => 4,
+            ParamKind::Bool | ParamKind::Number => 4,
             ParamKind::Color => 16,
         }
     }
@@ -220,11 +223,11 @@ impl ContentRow for VfxShaderDef {
                         );
                     }
                 }
-                (ParamKind::Color, min, max, _) => {
+                (ParamKind::Color | ParamKind::Bool, min, max, _) => {
                     if min.is_some() || max.is_some() {
                         check.error(
                             format!("/params/{index}/min"),
-                            "range on a color",
+                            "range on a flag or color",
                             "a min or max",
                             "no range",
                         );

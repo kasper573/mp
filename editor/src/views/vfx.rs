@@ -106,6 +106,7 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         .filter_map(|param| {
             let (kind, default) = match param["kind"].as_str()? {
                 "color" => (ParamKind::Color, ParamValue::Color(Rgba::WHITE)),
+                "bool" => (ParamKind::Bool, ParamValue::Bool(false)),
                 _ => (ParamKind::Number, ParamValue::Number(1.0)),
             };
             Some(Tunable {
@@ -199,7 +200,16 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
             };
             let layer = Layer::Shader {
                 shader: key.to_owned(),
-                params: BTreeMap::new(),
+                params: def
+                    .params
+                    .iter()
+                    .map(|param| {
+                        let fill = ParamFill::Param {
+                            param: param.name.clone(),
+                        };
+                        (param.name.clone(), fill)
+                    })
+                    .collect(),
                 duration: Seconds(1.0),
                 delay: Seconds(0.0),
             };
@@ -266,31 +276,48 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
                 .width(90.0)
                 .selected_text(theme::mono(&kind).size(13.0))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut picked, "number".to_owned(), "number");
-                    ui.selectable_value(&mut picked, "color".to_owned(), "color");
+                    for kind in ["number", "bool", "color"] {
+                        ui.selectable_value(&mut picked, kind.to_owned(), kind);
+                    }
                 });
             if picked != kind {
                 param["kind"] = Value::String(picked.clone());
                 let fields = param.as_object_mut().expect("object");
-                if picked == "color" {
-                    fields.insert(
-                        "default".to_owned(),
-                        serde_json::json!([255, 255, 255, 255]),
-                    );
-                    fields.remove("min");
-                    fields.remove("max");
-                } else {
-                    fields.insert("default".to_owned(), Value::from(0.0));
-                    fields.insert("min".to_owned(), Value::from(0.0));
-                    fields.insert("max".to_owned(), Value::from(1.0));
+                fields.remove("min");
+                fields.remove("max");
+                match picked.as_str() {
+                    "color" => {
+                        fields.insert(
+                            "default".to_owned(),
+                            serde_json::json!([255, 255, 255, 255]),
+                        );
+                    }
+                    "bool" => {
+                        fields.insert("default".to_owned(), Value::Bool(false));
+                    }
+                    _ => {
+                        fields.insert("default".to_owned(), Value::from(0.0));
+                        fields.insert("min".to_owned(), Value::from(0.0));
+                        fields.insert("max".to_owned(), Value::from(1.0));
+                    }
                 }
                 changed = FormChange::at(&path);
             }
-            if picked == "color" {
-                changed |= forms::color(ui, &mut param["default"], &format!("{path}/default"));
+            match picked.as_str() {
+                "color" => {
+                    changed |= forms::color(ui, &mut param["default"], &format!("{path}/default"));
+                }
+                "bool" => {
+                    let mut flag = param["default"].as_bool().unwrap_or(false);
+                    if ui.checkbox(&mut flag, "").changed() {
+                        param["default"] = Value::Bool(flag);
+                        changed |= FormChange::at(&format!("{path}/default"));
+                    }
+                }
+                _ => {}
             }
         });
-        if kind != "color" {
+        if kind == "number" {
             changed |= number_param_fields(ui, cx, param, &path);
         }
     }
@@ -616,18 +643,10 @@ fn preview(
     for tunable in tunables {
         fills.entry(tunable.name.clone()).or_insert(tunable.default);
     }
-    if !tunables.is_empty() {
-        ui.horizontal(|ui| {
-            ui.label(theme::faint("values to try").size(12.0));
-            let at_defaults = tunables
-                .iter()
-                .all(|tunable| fills.get(&tunable.name) == Some(&tunable.default));
-            if !at_defaults && ui.small_button("defaults").clicked() {
-                for tunable in tunables {
-                    fills.insert(tunable.name.clone(), tunable.default);
-                }
-            }
-        });
+    if !tunables.is_empty() && ui.button("reset to defaults").clicked() {
+        for tunable in tunables {
+            fills.insert(tunable.name.clone(), tunable.default);
+        }
     }
     ui.spacing_mut().slider_width = (ui.available_width() - SLIDER_SURROUND).max(60.0);
     for tunable in tunables {
@@ -635,6 +654,12 @@ fn preview(
         ui.horizontal(|ui| {
             ui.label(theme::muted(name).monospace().size(12.5));
             match tunable.kind {
+                ParamKind::Bool => {
+                    let mut flag = matches!(fills.get(name), Some(ParamValue::Bool(true)));
+                    if ui.checkbox(&mut flag, "").changed() {
+                        fills.insert(name.clone(), ParamValue::Bool(flag));
+                    }
+                }
                 ParamKind::Number => {
                     let mut amount = match fills.get(name) {
                         Some(ParamValue::Number(number)) => *number,

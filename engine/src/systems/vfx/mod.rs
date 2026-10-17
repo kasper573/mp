@@ -151,11 +151,14 @@ impl EffectDef<RiftScripting> for Vfx {
             None => cx.actor(None)?,
         };
         let def = self.vfx.get(cx.content());
-        let mut params: Vec<(String, Eval)> = Vec::new();
+        let mut params: Vec<(String, ParamKind, Eval)> = Vec::new();
         for (name, expr) in &self.params {
             match def.declares(name) {
-                Some(ParamKind::Number) => {
-                    params.push((name.clone(), cx.expr(expr, ValueType::Number)?))
+                Some(kind @ ParamKind::Number) => {
+                    params.push((name.clone(), kind, cx.expr(expr, ValueType::Number)?))
+                }
+                Some(kind @ ParamKind::Bool) => {
+                    params.push((name.clone(), kind, cx.expr(expr, ValueType::Boolean)?))
                 }
                 Some(ParamKind::Color) => {
                     return Err(ScriptFault::new(
@@ -176,11 +179,13 @@ impl EffectDef<RiftScripting> for Vfx {
             let filled = VfxParams(
                 params
                     .iter()
-                    .map(|(name, eval)| {
-                        (
-                            name.clone(),
-                            ParamValue::Number(eval(world, cx).as_num() as f32),
-                        )
+                    .map(|(name, kind, eval)| {
+                        let value = eval(world, cx);
+                        let filled = match kind {
+                            ParamKind::Bool => ParamValue::Bool(value.truthy()),
+                            _ => ParamValue::Number(value.as_num() as f32),
+                        };
+                        (name.clone(), filled)
                     })
                     .collect(),
             );

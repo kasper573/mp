@@ -11,10 +11,10 @@ use crate::systems::player::session;
 
 const ICON: f32 = 24.0;
 const GAP: f32 = 4.0;
-const COLUMNS: usize = 5;
 
-/// The statuses on the character as a grid of icons hanging below the character panel, a buff
-/// ringed green and a debuff red, each with a card of what it is and how long it has left.
+/// The statuses on the character as rows of icons hanging below the character panel, as wide as
+/// the panel, a buff ringed green and a debuff red, each with a card of what it is and how long it
+/// has left.
 pub fn grid(ui: &mut Ui, world: &mut World) {
     let Some(me) = session::my_character(world) else {
         return;
@@ -26,34 +26,28 @@ pub fn grid(ui: &mut Ui, world: &mut World) {
     let content = world.resource::<Content>().clone();
     let now = session::server_now(world);
     ui.add_space(GAP);
-    egui::Grid::new("statuses")
-        .spacing(Vec2::splat(GAP))
-        .show(ui, |ui| {
-            for (index, status) in statuses.0.iter().enumerate() {
-                let def = status.effect.get(&content);
-                let response = match gui::image(world, &def.icon) {
-                    Some(image) => ui.add(
-                        egui::Image::new(SizedTexture::new(image.texture, Vec2::splat(ICON)))
-                            .sense(Sense::hover()),
-                    ),
-                    None => ui.allocate_response(Vec2::splat(ICON), Sense::hover()),
-                };
-                let label = format!("Status {}: {}", def.name, def.category.label());
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::WidgetType::Label, true, label.clone())
-                });
-                ui.painter().rect_stroke(
-                    response.rect,
-                    3.0,
-                    Stroke::new(1.0, ring(def.category)),
-                    StrokeKind::Outside,
-                );
-                response.on_hover_ui(|ui| card(ui, def, status, now));
-                if (index + 1) % COLUMNS == 0 {
-                    ui.end_row();
-                }
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = Vec2::splat(GAP);
+        for status in &statuses.0 {
+            let def = status.effect.get(&content);
+            let (rect, response) = ui.allocate_exact_size(Vec2::splat(ICON), Sense::hover());
+            if let Some(image) = gui::image(world, &def.icon) {
+                egui::Image::new(SizedTexture::new(image.texture, Vec2::splat(ICON)))
+                    .paint_at(ui, rect);
             }
-        });
+            ui.painter().rect_stroke(
+                rect,
+                3.0,
+                Stroke::new(1.0, ring(def.category)),
+                StrokeKind::Outside,
+            );
+            let label = format!("Status {}: {}", def.name, def.category.label());
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Label, true, label.clone())
+            });
+            response.on_hover_ui(|ui| card(ui, def, status, now));
+        }
+    });
 }
 
 pub fn ring(category: StatusCategory) -> Color32 {
