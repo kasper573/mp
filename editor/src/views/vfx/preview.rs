@@ -24,6 +24,7 @@ use engine::core::vfx::{
     shader_file,
 };
 use engine::systems::actor::Action;
+use engine::systems::actor::render::ACTOR_ANCHOR;
 use serde::Deserialize;
 use serde_json::Value;
 use strum::VariantArray;
@@ -44,7 +45,9 @@ const SLIDER_SURROUND: f32 = 130.0;
 const KEPT_SHADERS: usize = 64;
 const BACKDROP_SCENE: &str = "vfx-preview";
 const MOST_ACTORS: u32 = 100;
+const FIRST_CROWD: u32 = 3;
 const SPREAD_CANDIDATES: usize = 4096;
+const SPREAD_ROUNDS: usize = 12;
 const GROUND_DEPTH: f32 = 0.5;
 const OVER_ACTORS_DEPTH: f32 = 3.0;
 
@@ -149,7 +152,7 @@ pub fn preview(
                     "area + actors" => Target::Crowd {
                         shape: Shape::Circle { radius: Tiles(2.5) },
                         facing: Degrees(0.0),
-                        count: 5,
+                        count: FIRST_CROWD,
                         action: Action::Idle,
                     },
                     _ => Target::Screen,
@@ -831,12 +834,13 @@ impl StagedActor {
             sprite.custom_size = Some(drawn);
         }
         if let Some(mut transform) = entity.get_mut::<Transform>() {
-            transform.translation = Vec3::new(
-                self.feet.x,
-                self.feet.y + drawn.y / 2.0,
-                1.0 - self.feet.y * 0.001,
-            );
+            transform.translation = Vec3::new(self.feet.x, self.feet.y, 1.0 - self.feet.y * 0.001);
         }
+    }
+
+    /// Where the sprite's middle lands once its anchor stands on the feet.
+    fn center(&self) -> Vec2 {
+        self.feet - ACTOR_ANCHOR.0 * self.cell * self.scale
     }
 }
 
@@ -917,6 +921,7 @@ fn spawn_actor(
     let entity = world
         .spawn((
             Sprite { image, ..default() },
+            ACTOR_ANCHOR,
             Transform::default(),
             RenderLayers::layer(PREVIEW_LAYER),
         ))
@@ -932,7 +937,9 @@ fn spawn_actor(
 }
 
 /// `count` points spread evenly over the footprint, the same every time: a sunflower spiral over
-/// the footprint's reach, kept where it falls inside, and sampled at even strides.
+/// the footprint's reach, kept where it falls inside, gives the candidates; picks start at even
+/// strides through them and relax to the middle of the candidates nearest each, so they end up
+/// evenly apart and well inside whatever the shape is.
 fn spread(footprint: &Footprint, count: u32) -> Vec<Pos<Tiles>> {
     let reach = footprint.reach().0.max(0.1);
     let golden = PI * (3.0 - 5f32.sqrt());
@@ -950,12 +957,47 @@ fn spread(footprint: &Footprint, count: u32) -> Vec<Pos<Tiles>> {
     if inside.is_empty() {
         return vec![footprint.at; count as usize];
     }
-    (0..count)
+    let mut picks: Vec<usize> = (0..count)
         .map(|k| {
             let stride = (k as f32 + 0.5) * inside.len() as f32 / count as f32;
-            inside[(stride as usize).min(inside.len() - 1)]
+            (stride as usize).min(inside.len() - 1)
         })
-        .collect()
+        .collect();
+    let nearest = |to: Pos<Tiles>, among: &[usize]| {
+        among
+            .iter()
+            .copied()
+            .min_by(|a, b| {
+                (inside[*a] - to)
+                    .length()
+                    .total_cmp(&(inside[*b] - to).length())
+            })
+            .unwrap_or(0)
+    };
+    let all: Vec<usize> = (0..inside.len()).collect();
+    for _ in 0..SPREAD_ROUNDS {
+        let mut sums = vec![(Vec2::ZERO, 0usize); picks.len()];
+        for point in &inside {
+            let owner = picks
+                .iter()
+                .enumerate()
+                .min_by(|a, b| {
+                    (inside[*a.1] - *point)
+                        .length()
+                        .total_cmp(&(inside[*b.1] - *point).length())
+                })
+                .map_or(0, |(owner, _)| owner);
+            sums[owner].0 += Vec2::new(point.x, point.y);
+            sums[owner].1 += 1;
+        }
+        for (pick, (sum, members)) in picks.iter_mut().zip(sums) {
+            if members > 0 {
+                let mean = sum / members as f32;
+                *pick = nearest(Pos::new(mean.x, mean.y), &all);
+            }
+        }
+    }
+    picks.into_iter().map(|pick| inside[pick]).collect()
 }
 
 // The screen site's image is the area drawn behind the preview, so a screen-wide shader has
@@ -976,8 +1018,8 @@ fn site_frame(
                 .unwrap_or_else(|| Rect::from_corners(Vec2::ZERO, sheet));
             Some(SiteFrame {
                 kind: SITE_ACTOR,
-                center: Vec2::ZERO,
-                size: rect.size(),
+                center: actor?.center(),
+                size: rect.size() * actor?.scale,
                 facing: 0.0,
                 texture: Some((
                     sprite.image.clone(),
