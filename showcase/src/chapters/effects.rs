@@ -61,9 +61,10 @@ fn play(shoot: &mut Shoot) {
     me.act(InputAction::ToggleInventory);
     me.act_on_ui(InputAction::UseItem, UiTarget::image(ANTIDOTE));
     me.wait_until("cleansed", |snapshot| {
-        !status_on_me(snapshot, "poisoned") && status_on_me(snapshot, "warded")
+        !status_on_me(snapshot, "poisoned")
+            && status_on_me(snapshot, "warded")
+            && holding(snapshot, "antidote") == 0
     });
-    assert_eq!(holding(&me.snapshot(), "antidote"), 0);
     me.act(InputAction::ToggleInventory);
     me.hold();
     me.caption_top(

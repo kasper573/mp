@@ -46,10 +46,11 @@ fn statuses_come_from_items_skills_and_gear_and_go_by_category_or_time() {
 
     player.act(InputAction::ToggleInventory);
     player.act_on_ui(InputAction::UseItem, UiTarget::image(ANTIDOTE));
-    let cleansed = player.wait_until("cleansed", |snapshot| {
-        !status_on_me(snapshot, "poisoned") && status_on_me(snapshot, "warded")
+    player.wait_until("cleansed", |snapshot| {
+        !status_on_me(snapshot, "poisoned")
+            && status_on_me(snapshot, "warded")
+            && holding(snapshot, "antidote") == 0
     });
-    assert_eq!(holding(&cleansed, "antidote"), 0);
     player.act(InputAction::ToggleInventory);
 
     player.act(InputAction::ToggleEquipment);

@@ -124,9 +124,10 @@ fn play(shoot: &mut Shoot) {
     me.hold();
     me.click_ui(UiTarget::button("Reset"));
     me.wait_until("the points back", |snapshot| {
-        learned(snapshot, "cleave") == 0 && to_spend(snapshot) == 3
+        learned(snapshot, "cleave") == 0
+            && to_spend(snapshot) == 3
+            && holding(snapshot, "shamans_draught") == 0
     });
-    assert_eq!(holding(&me.snapshot(), "shamans_draught"), 0);
     me.act(InputAction::ToggleInventory);
     me.caption_top(
         "Every point is back. The slots that held the skills stay, dimmed, until they are learned again",

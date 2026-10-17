@@ -41,6 +41,11 @@ pub const LONG: WaitBudget = WaitBudget {
     frames: 3600,
 };
 
+const NUDGE: WaitBudget = WaitBudget {
+    time: Duration::from_secs(2),
+    frames: 120,
+};
+
 impl Player {
     pub fn new(desktop: Desktop, pace: Pace) -> Player {
         Player { desktop, pace }
@@ -614,20 +619,26 @@ impl Player {
 
     // A walk click can land on a townsperson who strolled under it, and leaving one conversation can
     // open another that someone held until the player was free.
+    // Presses Dismiss again whenever a press went unanswered, since one can land in a frame the
+    // stage is still settling and be lost.
     pub fn leave_conversation(&mut self) {
-        for _ in 0..5 {
+        let deadline = Deadline::from(&self.desktop, BUDGET);
+        loop {
             let Some(before) = self.snapshot().stage else {
                 return;
             };
             self.act(InputAction::Dismiss);
-            self.wait_until("the conversation to end", |snapshot| {
+            let moved_on = self.try_wait_for(NUDGE, |snapshot| {
                 snapshot
                     .stage
                     .as_ref()
                     .is_none_or(|stage| stage.with != before.with || stage.node != before.node)
+                    .then_some(())
             });
+            if moved_on.is_none() && deadline.passed(&self.desktop) {
+                self.desktop.give_up("the conversation to end");
+            }
         }
-        self.desktop.fail("conversations kept opening");
     }
 
     pub fn conversation_over(&mut self) {

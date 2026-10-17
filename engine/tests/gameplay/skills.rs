@@ -139,11 +139,11 @@ fn skills_are_learned_in_the_tree_pinned_on_the_bar_and_given_back_by_a_reset() 
     player.act_on_ui(InputAction::UseItem, UiTarget::image(DRAUGHT));
     player.wait_until("the question", reset_prompted);
     player.click_ui(UiTarget::button("Reset"));
-    player.wait_until("the points back", |snapshot| {
-        learned(snapshot, "cleave") == 0 && to_spend(snapshot) == 3
+    let snapshot = player.wait_until("the points back", |snapshot| {
+        learned(snapshot, "cleave") == 0
+            && to_spend(snapshot) == 3
+            && holding(snapshot, "shamans_draught") == 0
     });
-    let snapshot = player.snapshot();
-    assert_eq!(holding(&snapshot, "shamans_draught"), 0);
     assert_eq!(slot_skill(&snapshot, 0), Some("cleave"));
     assert!(snapshot.hotbar[0].dimmed);
 }
