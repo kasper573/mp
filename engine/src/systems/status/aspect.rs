@@ -134,18 +134,12 @@ pub fn tick(world: &mut World, active: &mut QueryState<(Entity, &ActiveAspects)>
             EventKind::Interval,
             Some(actor),
             Vec::new(),
-            move |event| matches!(event, RiftEvent::Interval { seconds: every } if *every == seconds.0),
+            move |event| matches!(event, RiftEvent::Interval { seconds: every } if *every == seconds),
         );
     }
     for (actor, source) in replays {
         play_during(world, actor, source, now);
     }
-}
-
-pub fn active(world: &World, actor: Entity, source: AspectSource) -> bool {
-    world
-        .get::<ActiveAspects>(actor)
-        .is_some_and(|aspects| aspects.0.iter().any(|aspect| aspect.source == source))
 }
 
 fn desired(world: &World, actor: Entity) -> Vec<Wanted> {
@@ -198,10 +192,9 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
     let mut cadences: Vec<Cadence> = Vec::new();
     for procedure in scripts.of(source.row()) {
         for (_, event) in procedure.entry(EventKind::Interval) {
-            let RiftEvent::Interval { seconds } = event else {
+            let &RiftEvent::Interval { seconds } = event else {
                 continue;
             };
-            let seconds = Seconds(*seconds);
             if cadences.iter().all(|cadence| cadence.seconds != seconds) {
                 cadences.push(Cadence {
                     seconds,
@@ -335,9 +328,7 @@ fn advance(
         .iter_mut()
         .find(|cadence| cadence.seconds == seconds)
     {
-        while cadence.next <= now {
-            cadence.next = cadence.next.after(seconds);
-        }
+        cadence.next = now.after(seconds);
     }
 }
 

@@ -1,10 +1,9 @@
-pub mod effects;
 mod health;
 pub mod widget;
 
 pub use health::{
     apply_damage, current_health, dead, fraction, heal, is_dead, max_health, refill, regenerate,
-    revive, settle_health,
+    revive, settle_health, stands,
 };
 
 use std::collections::BTreeMap;
@@ -102,8 +101,8 @@ impl Stats {
     }
 }
 
-/// Where an actor's stat modifiers come from besides its own `Stats`: its class levels, the
-/// boosts its aspects hold, a chase under way.
+/// A system's say in an actor's effective stats, on top of its own `Stats`; registered with
+/// `source`.
 pub type Source = fn(&World, Entity) -> Vec<Stat>;
 
 #[derive(Resource, Default)]
@@ -147,10 +146,18 @@ pub fn effective(world: &World, entity: Entity, kind: StatKind) -> f32 {
 }
 
 pub fn effective_all(world: &World, entity: Entity) -> Stats {
+    let modifiers = modifiers(world, entity);
     Stats(
         StatKind::VARIANTS
             .iter()
-            .map(|&kind| kind.of(effective(world, entity, kind)))
+            .map(|&kind| {
+                let delta: f32 = modifiers
+                    .iter()
+                    .filter(|stat| stat.kind == kind)
+                    .map(|stat| stat.value)
+                    .sum();
+                kind.of(base(world, entity, kind) + delta)
+            })
             .collect(),
     )
 }

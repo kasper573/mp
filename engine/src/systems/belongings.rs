@@ -95,16 +95,10 @@ fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Noti
         .map(|&(item, change)| item_row(content, item, change))
         .collect();
     if now.xp > before.xp {
-        told.push(Notification::new(
-            NotificationKind::Feed {
-                topic: HistoryTopic::Item,
-                icon: None,
-                tally: Some(RecordTally::Change((now.xp - before.xp) as i32)),
-                failure: false,
-                sfx: None,
-            },
-            LineText::plain("XP"),
-        ));
+        told.push(
+            Notification::feed(HistoryTopic::Item, "XP")
+                .tally(RecordTally::Change(change(before.xp, now.xp))),
+        );
     }
     for slot in EquipmentSlot::VARIANTS {
         match (before.worn.get(slot), now.worn.get(slot)) {
@@ -142,16 +136,10 @@ fn changes(content: &Content, before: &Belongings, now: &Belongings) -> Vec<Noti
         ));
     }
     if now.points > before.points {
-        told.push(Notification::new(
-            NotificationKind::Feed {
-                topic: HistoryTopic::Notification,
-                icon: None,
-                tally: Some(RecordTally::Change((now.points.0 - before.points.0) as i32)),
-                failure: false,
-                sfx: None,
-            },
-            LineText::plain("Skill points to spend"),
-        ));
+        told.push(
+            Notification::feed(HistoryTopic::Notification, "Skill points to spend")
+                .tally(RecordTally::Change(change(before.points.0, now.points.0))),
+        );
     }
     told
 }
@@ -163,27 +151,19 @@ fn item_row(content: &Content, item: ItemId, change: i32) -> Notification {
     } else {
         sounds.trade
     };
-    Notification::new(
-        NotificationKind::Feed {
-            topic: HistoryTopic::Item,
-            icon: Some(item.get(content).icon.path()),
-            tally: Some(RecordTally::Change(change)),
-            failure: false,
-            sfx: Some(sfx),
-        },
-        LineText::plain(&*item.get(content).name),
-    )
+    Notification::feed(HistoryTopic::Item, &*item.get(content).name)
+        .icon(item.get(content).icon.path())
+        .tally(RecordTally::Change(change))
+        .sound(sfx)
+}
+
+/// How far a count moved, as a tally shows it.
+fn change(before: u32, now: u32) -> i32 {
+    i32::try_from(i64::from(now) - i64::from(before)).unwrap_or(i32::MAX)
 }
 
 fn worn_row(content: &Content, text: String, item: ItemId) -> Notification {
-    Notification::new(
-        NotificationKind::Feed {
-            topic: HistoryTopic::Item,
-            icon: Some(item.get(content).icon.path()),
-            tally: None,
-            failure: false,
-            sfx: Some(item.get(content).sfx.trade),
-        },
-        LineText::plain(text),
-    )
+    Notification::feed(HistoryTopic::Item, text)
+        .icon(item.get(content).icon.path())
+        .sound(item.get(content).sfx.trade)
 }

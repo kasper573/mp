@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::babble::{BabbleId, Babbler};
 use crate::core::content::{
-    Content, ContentId, ContentRow, ModuleRule, ModuleSet, RowCheck, serial,
+    Content, ContentId, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck, serial,
 };
 use crate::core::math::{Direction, Percent, Pos, Rect, Rgba, Rng};
 use crate::core::tiling::{TilePos, Tiles};
@@ -33,7 +33,7 @@ use crate::systems::script::{
     EventKind, Owner, OwnerKind, OwnerRow, Reach, RiftEvent, RiftInstances, RiftScripts,
     ScriptModule, ScriptedRow, area_owner,
 };
-use crate::systems::skill::{Rank, SkillId};
+use crate::systems::skill::{self, Rank, SkillId};
 use crate::systems::stat::{StatMap, Stats};
 use crate::systems::status::Statuses;
 use crate::systems::visibility::{self, Presence};
@@ -46,6 +46,24 @@ const CORPSE_LINGER: Seconds = Seconds(5.0);
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
     app.replicate_once::<Npc>();
+}
+
+/// The ranks an npc holds its skills at lie within those skills' ranks.
+pub fn check_all(loading: &mut Loading) {
+    let content = loading.content();
+    for (id, def) in loading.rows::<NpcDef>(&content) {
+        let mut check = RowCheck::default();
+        for (index, listed) in def.skills.iter().enumerate() {
+            skill::check_rank(
+                &mut check,
+                format!("/skills/{index}/rank"),
+                &content,
+                listed.skill,
+                listed.rank,
+            );
+        }
+        loading.row_errors(id, check);
+    }
 }
 
 pub fn can_be_fought(scripts: &RiftScripts, npc: NpcId) -> bool {
@@ -96,12 +114,8 @@ pub struct NpcDef {
 pub struct NpcSkill {
     pub skill: SkillId,
     #[schemars(extend("default" = 1))]
-    #[serde(default = "first_rank", skip_serializing_if = "Rank::is_first")]
+    #[serde(default = "Rank::first", skip_serializing_if = "Rank::is_first")]
     pub rank: Rank,
-}
-
-fn first_rank() -> Rank {
-    Rank::FIRST
 }
 
 impl ContentRow for NpcDef {

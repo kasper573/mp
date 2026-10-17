@@ -34,7 +34,7 @@ use crate::systems::notification::{NotificationDef, NotificationId};
 use crate::systems::npc::{Npc, NpcDef, NpcId};
 use crate::systems::quest::{Parties, QuestDef, QuestId};
 use crate::systems::shop::{ShopDef, ShopId};
-use crate::systems::skill::{SkillDef, SkillId, SkillKind};
+use crate::systems::skill::{SkillDef, SkillId};
 use crate::systems::stat::StatKind;
 use crate::systems::status::{StatusEffectDef, StatusEffectId};
 use crate::systems::text::{self, Span};
@@ -694,42 +694,6 @@ pub fn check_all(loading: &mut Loading) {
                 );
             }
         }
-    }
-    for (id, def) in loading.rows::<SkillDef>(&content) {
-        let may_do = scripts.may_do(OwnerRow {
-            kind: OwnerKind::Skill,
-            row: id.raw(),
-            object: None,
-        });
-        let (rule, kind, expected) = match def.kind {
-            SkillKind::Passive if may_do.answers(EventKind::Used) => (
-                "passive answers used",
-                EventKind::Used,
-                "activated, deactivated or interval: a passive skill is never used",
-            ),
-            SkillKind::Active
-                if [
-                    EventKind::Activated,
-                    EventKind::Deactivated,
-                    EventKind::Interval,
-                ]
-                .into_iter()
-                .any(|kind| may_do.answers(kind)) =>
-            {
-                (
-                    "active answers an aspect event",
-                    EventKind::Used,
-                    "used: an active skill's script runs when it is used",
-                )
-            }
-            _ => continue,
-        };
-        let _ = kind;
-        loading.row_error(
-            id,
-            "/modules",
-            ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
-        );
     }
     for (id, def) in loading.rows::<ItemDef>(&content) {
         let usable = matches!(def.kind, ItemKind::Usable);

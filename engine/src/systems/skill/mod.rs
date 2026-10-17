@@ -1,21 +1,22 @@
 pub mod aim;
 pub mod bar;
 pub mod card;
+pub mod casting;
 pub mod client;
 pub mod hotbar;
 pub mod learn;
 pub mod prompt;
 pub mod reset;
-#[path = "use.rs"]
-pub mod using;
 pub mod window;
 
+pub use casting::{CastAim, UseSkill, UseSkillRequest, cast};
 pub use hotbar::{AssignBasicAttackRequest, AssignHotbarRequest};
 pub use learn::LearnSkillsRequest;
 pub use reset::{ResetAnswerRequest, ResetPrompt, ResetSkills};
-pub use using::{Aim, UseSkill, UseSkillRequest, cast};
 
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
+use std::ops::RangeInclusive;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -29,14 +30,13 @@ use crate::core::content::{
     Content, ContentId, ContentProblem, ContentRow, Loading, ModuleRule, ModuleSet, RowCheck,
     serial,
 };
-use crate::core::geometry::{Footprint, Shape, facing_from};
+use crate::core::geometry::{Footprint, Shape};
 use crate::core::math::Pos;
 use crate::core::script::FlowCx;
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::{Seconds, UnixMillis};
 use crate::systems::area::AreaTag;
-use crate::systems::class::{self, SkillPoints, SkillTree};
-use crate::systems::combat::{self, Relation};
+use crate::systems::class::{self, NodeKey, SkillPoints, SkillTree};
 use crate::systems::equipment::Equipment;
 use crate::systems::item::{ItemId, ItemKind, ItemStack};
 use crate::systems::movement;
@@ -47,7 +47,6 @@ use crate::systems::script::{
     Condition, EventKind, OwnerKind, OwnerRow, RiftScripts, ScriptModule, ScriptedRow,
 };
 use crate::systems::stat::{self, StatKind};
-use crate::systems::visibility;
 
 pub const HOTBAR_SLOTS: u32 = 40;
 /// An area hits the nearest few, so a crowd never multiplies one cast without bound.
@@ -65,12 +64,12 @@ pub fn register(app: &mut App) {
         .add_client_message::<AssignHotbarRequest>(Channel::Ordered)
         .add_client_message::<AssignBasicAttackRequest>(Channel::Ordered)
         .add_client_message::<ResetAnswerRequest>(Channel::Ordered);
-    stat::source(app, using::chase);
+    stat::source(app, casting::chase);
 }
 
 /// Every request a client may send about its skills, answered in one place.
 pub fn requests(world: &mut World) {
-    using::request(world);
+    casting::request(world);
     learn::requests(world);
     hotbar::requests(world);
     reset::answers(world);
@@ -345,6 +344,7 @@ impl SkillStat {
     }
 }
 
+/// How far into a skill's ranks someone is: `NONE` outside them, `FIRST` at the first.
 #[derive(
     JsonSchema,
     Serialize,
@@ -365,27 +365,49 @@ pub struct Rank(pub u8);
 impl Rank {
     pub const NONE: Rank = Rank(0);
     pub const FIRST: Rank = Rank(1);
+
+    pub fn first() -> Rank {
+        Rank::FIRST
+    }
+
+    pub fn is_first(&self) -> bool {
+        *self == Rank::FIRST
+    }
 }
 
+/// The ranks a character learned in its class tree, by node.
 #[derive(Component, Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct Learned(pub BTreeMap<String, Rank>);
+pub struct Learned(pub BTreeMap<NodeKey, Rank>);
 
 impl Learned {
-    pub fn rank(&self, node: &str) -> Rank {
+    pub fn rank<K: Ord + ?Sized>(&self, node: &K) -> Rank
+    where
+        NodeKey: Borrow<K>,
+    {
         self.0.get(node).copied().unwrap_or(Rank::NONE)
     }
 
+    /// The skills the learned nodes stand for, at their ranks.
+    pub fn skills<'a>(&'a self, tree: &'a SkillTree) -> impl Iterator<Item = (SkillId, Rank)> + 'a {
+        self.0.iter().filter_map(|(key, rank)| {
+            let node = tree.node(key)?;
+            (*rank > Rank::NONE).then_some((node.skill, *rank))
+        })
+    }
+
     pub fn cost(&self, content: &Content, tree: &SkillTree) -> SkillPoints {
-        self.0
-            .iter()
-            .filter_map(|(key, rank)| Some((tree.node(key)?.skill.get(content), *rank)))
+        self.skills(tree)
             .fold(SkillPoints(0), |sum, (skill, rank)| {
-                sum + skill.cost_to(rank)
+                sum + skill.get(content).cost_to(rank)
             })
     }
 
-    pub fn ranks(&self) -> usize {
-        self.0.values().map(|rank| usize::from(rank.0)).sum()
+    pub fn ranks(&self) -> u32 {
+        self.0.values().map(|rank| u32::from(rank.0)).sum()
+    }
+
+    pub fn skills_held(&self) -> u32 {
+        self.0.values().filter(|rank| **rank > Rank::NONE).count() as u32
     }
 }
 
@@ -446,15 +468,20 @@ impl Hotbar {
 pub struct BasicAttack(pub Option<SkillId>);
 
 impl SkillDef {
+    pub fn rank_count(&self) -> u8 {
+        self.levels.len() as u8
+    }
+
+    /// The ranks someone may hold the skill at.
+    pub fn ranks(&self) -> RangeInclusive<Rank> {
+        Rank::FIRST..=Rank(self.rank_count())
+    }
+
     pub fn cost_to(&self, rank: Rank) -> SkillPoints {
         self.levels
             .iter()
             .take(usize::from(rank.0))
             .fold(SkillPoints(0), |sum, level| sum + level.cost)
-    }
-
-    pub fn total_cost(&self) -> SkillPoints {
-        self.cost_to(Rank(self.rank_count()))
     }
 
     /// A stat summed over the ranks reached.
@@ -486,69 +513,81 @@ impl SkillDef {
     }
 }
 
-/// Every skill an actor may use now, at the rank it has it: the ranks learned in its class tree,
-/// what its worn equipment grants at rank one, and an npc's own basic attack.
+/// The one complaint about a row holding a skill at a rank outside its ranks.
+pub fn check_rank(
+    check: &mut RowCheck,
+    pointer: String,
+    content: &Content,
+    skill: SkillId,
+    rank: Rank,
+) {
+    let def = skill.get(content);
+    if !def.ranks().contains(&rank) {
+        check.error(
+            pointer,
+            "rank out of range",
+            rank.0,
+            format!(
+                "1 to {}, the ranks of {}",
+                def.rank_count(),
+                skill.key(content)
+            ),
+        );
+    }
+}
+
+/// Every skill an actor may use now, at the rank it has it: an npc's listed skills, the ranks
+/// learned in its class tree, and what its worn equipment or an npc's basic attack grants at rank
+/// one.
 pub fn known(world: &World, actor: Entity) -> BTreeMap<SkillId, Rank> {
     let content = world.resource::<Content>();
+    let tree = class::of(world, actor).map(|class| &class.get(content).tree);
+    let worn = world
+        .get::<Equipment>(actor)
+        .into_iter()
+        .flat_map(|equipment| equipment.slots.values().copied());
+    known_from(
+        content,
+        tree,
+        world.get::<Learned>(actor),
+        worn,
+        world.get::<Npc>(actor).map(|npc| npc.def.get(content)),
+    )
+}
+
+/// `known`, from the parts a character is made of, so a snapshot is checked the way the world
+/// answers for the character it becomes.
+pub fn known_from(
+    content: &Content,
+    tree: Option<&SkillTree>,
+    learned: Option<&Learned>,
+    worn: impl Iterator<Item = ItemId>,
+    npc: Option<&NpcDef>,
+) -> BTreeMap<SkillId, Rank> {
     let mut known = BTreeMap::new();
-    if let Some(class) = class::of(world, actor)
-        && let Some(learned) = world.get::<Learned>(actor)
-    {
-        let tree = &class.get(content).tree;
-        for (node, rank) in &learned.0 {
-            if let Some(node) = tree.node(node)
-                && rank.0 > 0
-            {
-                known.insert(node.skill, *rank);
-            }
-        }
+    if let (Some(tree), Some(learned)) = (tree, learned) {
+        known.extend(learned.skills(tree));
     }
-    for skill in granted(world, actor) {
-        known.entry(skill).or_insert(Rank::FIRST);
+    for skill in worn.flat_map(|item| grants_of(content, item)) {
+        known.entry(*skill).or_insert(Rank::FIRST);
     }
-    if let Some(npc) = world.get::<Npc>(actor) {
-        let def = npc.def.get(content);
-        for listed in &def.skills {
-            known.insert(listed.skill, listed.rank);
-        }
-        if let Some(skill) = def.basic_attack {
+    if let Some(npc) = npc {
+        known.extend(npc.skills.iter().map(|listed| (listed.skill, listed.rank)));
+        if let Some(skill) = npc.basic_attack {
             known.entry(skill).or_insert(Rank::FIRST);
         }
     }
     known
 }
 
-/// The rank `known` would list `skill` at, looked up without listing the rest: scripts ask
-/// this on every attack.
 pub fn rank_of(world: &World, actor: Entity, skill: SkillId) -> Rank {
-    let content = world.resource::<Content>();
-    let npc = world.get::<Npc>(actor).map(|npc| npc.def.get(content));
-    if let Some(listed) = npc.and_then(|def| def.skills.iter().find(|listed| listed.skill == skill))
-    {
-        return listed.rank;
-    }
-    if let Some(class) = class::of(world, actor)
-        && let Some(learned) = world.get::<Learned>(actor)
-    {
-        let tree = &class.get(content).tree;
-        let held = learned
-            .0
-            .iter()
-            .filter(|(node, rank)| {
-                rank.0 > 0 && tree.node(node).is_some_and(|node| node.skill == skill)
-            })
-            .map(|(_, rank)| *rank)
-            .next_back();
-        if let Some(rank) = held {
-            return rank;
-        }
-    }
-    let granted = granted(world, actor).contains(&skill)
-        || npc.is_some_and(|def| def.basic_attack == Some(skill));
-    if granted { Rank::FIRST } else { Rank::NONE }
+    known(world, actor)
+        .get(&skill)
+        .copied()
+        .unwrap_or(Rank::NONE)
 }
 
-/// The skills an actor's worn equipment grants, in the order worn and listed.
+/// The skills an actor's worn equipment grants, in slot order.
 pub fn granted(world: &World, actor: Entity) -> Vec<SkillId> {
     let content = world.resource::<Content>();
     world
@@ -570,6 +609,15 @@ pub fn grants_of(content: &Content, item: ItemId) -> &[SkillId] {
     }
 }
 
+/// The first skill flagged a basic attack among what the worn items grant, in slot order.
+pub fn first_flagged_grant(
+    content: &Content,
+    worn: impl Iterator<Item = ItemId>,
+) -> Option<SkillId> {
+    worn.flat_map(|item| grants_of(content, item).iter().copied())
+        .find(|skill| skill.get(content).basic_attack)
+}
+
 /// The reach of a skill from an actor: the row's range, or the actor's Range stat when unset,
 /// plus whatever its ranks add.
 pub fn range_of(world: &World, actor: Entity, skill: SkillId, rank: Rank) -> Tiles {
@@ -587,19 +635,10 @@ pub fn targets(world: &World, cx: &FlowCx, skill: SkillId) -> Vec<Entity> {
         return Vec::new();
     };
     let def = skill.get(world.resource::<Content>());
-    let fits = |who: Entity| {
-        let relation = combat::relation(world, caster, who);
-        let side = if def.target.hostile() {
-            relation == Relation::Enemy
-        } else {
-            relation != Relation::Enemy
-        };
-        side && !stat::is_dead(world, who) && visibility::coexist(world, caster, who)
-    };
     match def.target {
         Targeting::Caster => vec![caster],
         Targeting::SingleAlly | Targeting::SingleEnemy => used_target(world, cx)
-            .filter(|who| fits(*who))
+            .filter(|who| casting::fits(world, caster, *who, def.target))
             .into_iter()
             .collect(),
         Targeting::AreaAlly | Targeting::AreaEnemy => {
@@ -614,8 +653,8 @@ pub fn targets(world: &World, cx: &FlowCx, skill: SkillId) -> Vec<Entity> {
             };
             let mut inside: Vec<(Entity, Tiles)> = roster
                 .iter()
-                .filter(|listed| listed.area == area && !listed.held)
-                .filter(|listed| footprint.contains(listed.at) && fits(listed.entity))
+                .filter(|listed| listed.area == area && footprint.contains(listed.at))
+                .filter(|listed| casting::fits(world, caster, listed.entity, def.target))
                 .map(|listed| (listed.entity, listed.at.distance(footprint.at)))
                 .collect();
             inside.sort_by(|(a, da), (b, db)| da.0.total_cmp(&db.0).then(a.cmp(b)));
@@ -628,23 +667,14 @@ pub fn targets(world: &World, cx: &FlowCx, skill: SkillId) -> Vec<Entity> {
     }
 }
 
-/// The ground a cast covers: a circle or rectangle sits on the aimed point, a cone or line
-/// reaches out from the caster toward it.
+/// The ground a cast covers, from the caster toward the aimed point.
 pub fn footprint(world: &World, cx: &FlowCx, skill: SkillId) -> Option<Footprint> {
     let caster = cx.subject?;
     let def = skill.get(world.resource::<Content>());
     let shape = def.area_at(used_rank(cx))?;
     let from = movement::position(world, caster)?;
     let point = aimed_point(world, cx, skill).unwrap_or(from);
-    let at = match shape {
-        Shape::Cone { .. } | Shape::Line { .. } => from,
-        Shape::Circle { .. } | Shape::Rect { .. } => point,
-    };
-    Some(Footprint {
-        at,
-        facing: facing_from(from, point),
-        shape,
-    })
+    Some(Footprint::cast(shape, from, point))
 }
 
 pub fn aimed_point(world: &World, cx: &FlowCx, skill: SkillId) -> Option<Pos<Tiles>> {
@@ -670,36 +700,42 @@ fn used_rank(cx: &FlowCx) -> Rank {
         .map_or(Rank::FIRST, Rank)
 }
 
+/// The rules a skill's script keeps: an active skill answers `used` and no aspect event, a passive
+/// one the other way around.
 pub fn check_all(loading: &mut Loading) {
     let content = loading.content();
-    for (id, def) in loading.rows::<NpcDef>(&content) {
-        let mut check = RowCheck::default();
-        for (index, listed) in def.skills.iter().enumerate() {
-            let has = listed.skill.get(&content).rank_count();
-            if listed.rank.0 > has {
-                check.error(
-                    format!("/skills/{index}/rank"),
-                    "rank out of range",
-                    listed.rank.0,
-                    format!("1 to {has}, the ranks of {}", listed.skill.key(&content)),
-                );
-            }
-        }
-        loading.row_errors(id, check);
-    }
     let scripts = content.built::<RiftScripts>();
     for (id, def) in loading.rows::<SkillDef>(&content) {
-        if def.kind.is_active() && !def.answers_used(scripts, id) {
-            loading.row_error(
-                id,
-                "/modules",
-                ContentProblem::new(
-                    "skill without used",
-                    format!("skill/{}", id.key(&content)),
-                    "a script answering used on every skill",
-                ),
-            );
-        }
+        let may_do = scripts.may_do(OwnerRow {
+            kind: OwnerKind::Skill,
+            row: id.raw(),
+            object: None,
+        });
+        let aspect_events = [
+            EventKind::Activated,
+            EventKind::Deactivated,
+            EventKind::Interval,
+        ];
+        let (rule, expected) = match def.kind {
+            SkillKind::Passive if may_do.answers(EventKind::Used) => (
+                "passive answers used",
+                "activated, deactivated or interval: a passive skill is never used",
+            ),
+            SkillKind::Active if aspect_events.into_iter().any(|kind| may_do.answers(kind)) => (
+                "active answers an aspect event",
+                "used: an active skill's script runs when it is used",
+            ),
+            SkillKind::Active if !may_do.answers(EventKind::Used) => (
+                "skill without used",
+                "a script answering used on every active skill",
+            ),
+            _ => continue,
+        };
+        loading.row_error(
+            id,
+            "/modules",
+            ContentProblem::new(rule, format!("skill/{}", id.key(&content)), expected),
+        );
     }
 }
 

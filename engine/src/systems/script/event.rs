@@ -1,10 +1,13 @@
+use bevy_ecs::entity::Entity;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, EnumString, IntoStaticStr};
 
 use crate::core::content::serial;
-use crate::core::script::{EventDef, Name, ValueType};
+use crate::core::math::Pos;
+use crate::core::script::{EventDef, Name, ScriptFault, Value, ValueType};
 use crate::core::tiling::Tiles;
+use crate::core::time::Seconds;
 use crate::systems::attention::AttentionId;
 use crate::systems::interact::Verb;
 use crate::systems::item::ItemId;
@@ -66,7 +69,7 @@ pub enum RiftEvent {
     Activated,
     Deactivated,
     Interval {
-        seconds: f32,
+        seconds: Seconds,
     },
     Accepted,
     Completed,
@@ -112,6 +115,15 @@ pub const USED_TARGET: usize = 0;
 pub const USED_POINT: usize = 1;
 pub const USED_RANK: usize = 2;
 
+/// A `Used` payload laid out as `USED_FIELDS` lists it.
+pub fn used_payload(target: Option<Entity>, point: Option<Pos<Tiles>>, rank: i64) -> Vec<Value> {
+    let mut fields = vec![Value::Actor(None); USED_FIELDS.len()];
+    fields[USED_TARGET] = Value::Actor(target);
+    fields[USED_POINT] = Value::Point(point);
+    fields[USED_RANK] = Value::Int(rank);
+    fields
+}
+
 impl EventDef<RiftScripting> for RiftEvent {
     type Kind = EventKind;
 
@@ -151,7 +163,22 @@ impl EventDef<RiftScripting> for RiftEvent {
             _ => &[],
         }
     }
+
+    fn check(&self) -> Result<(), ScriptFault> {
+        match self {
+            RiftEvent::Interval { seconds } if *seconds < SHORTEST_INTERVAL => {
+                Err(ScriptFault::new(
+                    "interval too short",
+                    format!("{} seconds or more, got {}", SHORTEST_INTERVAL.0, seconds.0),
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
 }
+
+/// An interval fires at most this often, so no script can beat a tick.
+pub const SHORTEST_INTERVAL: Seconds = Seconds(0.1);
 
 impl EventKind {
     pub fn name(self) -> &'static str {

@@ -1,7 +1,5 @@
 use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
-use bevy_replicon::bytes::Bytes;
-use bevy_replicon::shared::replication::registry::ctx::{SerializeCtx, WriteCtx};
 use serde::{Deserialize, Serialize};
 
 use crate::core::math::Pos;
@@ -27,7 +25,7 @@ pub struct Engaged(#[entities] pub Entity);
 
 pub fn register(app: &mut bevy_app::App) {
     use bevy_replicon::prelude::*;
-    app.replicate_with(RuleFns::new(serialize_engaged, deserialize_engaged));
+    app.replicate::<Engaged>();
 }
 
 /// Keeps every character's `Engaged` in step with the actor its cast intent aims at.
@@ -143,9 +141,7 @@ impl Tether {
             && position(world, actor)
                 .is_some_and(|at| at.distance(self.anchor) <= self.range + DIAGONAL_MARGIN)
             && self.with.is_none_or(|with| {
-                world.get_entity(with).is_ok()
-                    && !stat::is_dead(world, with)
-                    && visibility::coexist(world, actor, with)
+                stat::stands(world, with) && visibility::coexist(world, actor, with)
             })
     }
 }
@@ -213,9 +209,9 @@ pub fn pursue(world: &mut World, actor: Entity, range: Tiles) -> Pursuit {
     }
 }
 
+/// Whether an actor can still be reached for: alive, in the same area and able to meet.
 pub fn pursuable(world: &World, actor: Entity, target: Entity) -> bool {
-    world.get_entity(target).is_ok()
-        && !stat::is_dead(world, target)
+    stat::stands(world, target)
         && area::same_area(world, actor, target)
         && visibility::coexist(world, actor, target)
 }
@@ -228,22 +224,4 @@ pub fn forget(world: &mut World, actor: Entity) {
 /// Gives up reaching for anything, leaving the actor's walk as it is.
 pub fn drop_intent(world: &mut World, actor: Entity) {
     world.entity_mut(actor).remove::<ReachIntent>();
-}
-
-fn serialize_engaged(
-    _ctx: &mut SerializeCtx,
-    engaged: &Engaged,
-    message: &mut Vec<u8>,
-) -> bevy_ecs::error::Result<()> {
-    bevy_replicon::postcard_utils::to_extend_mut(engaged, message)?;
-    Ok(())
-}
-
-fn deserialize_engaged(
-    ctx: &mut WriteCtx,
-    message: &mut Bytes,
-) -> bevy_ecs::error::Result<Engaged> {
-    let mut engaged: Engaged = bevy_replicon::postcard_utils::from_buf(message)?;
-    engaged.map_entities(ctx);
-    Ok(engaged)
 }

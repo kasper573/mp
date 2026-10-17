@@ -709,7 +709,7 @@ fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
     let class = crate::systems::class::of(world, me)?;
     let learned = world
         .get::<skill::Learned>(me)
-        .map(|learned| learned.0.iter().map(|(k, r)| (k.clone(), *r)).collect())
+        .map(|learned| learned.0.iter().map(|(k, r)| (k.to_string(), *r)).collect())
         .unwrap_or_default();
     Some(ProbeSkills {
         class: class.key(content).to_owned(),
@@ -720,7 +720,7 @@ fn skills(world: &World, me: Entity) -> Option<ProbeSkills> {
             .resource::<skill::window::Plan>()
             .0
             .iter()
-            .map(|(k, r)| (k.clone(), *r))
+            .map(|(k, r)| (k.to_string(), *r))
             .collect(),
         aiming: skill::aim::aiming(world).map(|aimed| aimed.skill),
         reset_prompt: skill::prompt::showing(world),

@@ -10,7 +10,7 @@ use super::card;
 use super::window::CarriedSkill;
 use super::{
     AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, Cooldowns, Hotbar, HotbarEntry,
-    Rank, SkillId, SkillKind, Targeting, UseSkillRequest, using,
+    Rank, SkillId, SkillKind, Targeting, UseSkillRequest, casting,
 };
 use crate::core::content::{Content, Fixture};
 use crate::core::gui::{self, Band};
@@ -29,7 +29,7 @@ use crate::systems::player::session;
 use crate::systems::reach::Engaged;
 use crate::systems::script::condition;
 use crate::systems::settings::{HotbarShape, UserSettings};
-use crate::systems::skill::{Aim, aim};
+use crate::systems::skill::{CastAim, aim};
 use crate::systems::stat;
 
 pub const HOTBAR_KEYS: [InputAction; 9] = [
@@ -898,7 +898,7 @@ fn use_skill(world: &mut World, skill: SkillId) -> bool {
         Targeting::Caster => {
             world.write_message(UseSkillRequest {
                 skill,
-                aim: Aim::None,
+                aim: CastAim::None,
             });
             true
         }
@@ -906,12 +906,12 @@ fn use_skill(world: &mut World, skill: SkillId) -> bool {
             let engaged = world
                 .get::<Engaged>(me)
                 .map(|engaged| engaged.0)
-                .filter(|target| using::fits(world, me, *target, def.target));
+                .filter(|target| casting::fits(world, me, *target, def.target));
             match engaged {
                 Some(target) => {
                     world.write_message(UseSkillRequest {
                         skill,
-                        aim: Aim::Actor(target),
+                        aim: CastAim::Actor(target),
                     });
                     true
                 }

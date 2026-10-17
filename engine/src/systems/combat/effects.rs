@@ -2,11 +2,12 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::script::{Compiler, EffectDef, EffectStep, FlowCx, Name, ScriptFault};
+use crate::core::script::{Compiler, EffectDef, EffectStep, FlowCx, NEXT, Name, ScriptFault};
 use crate::systems::combat;
 use crate::systems::npc::Npc;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
+use crate::systems::stat;
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct Heal {
@@ -44,7 +45,7 @@ impl EffectDef<RiftScripting> for Heal {
         self.who.is_none()
     }
     fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+        vec![(NEXT, self.next.as_deref())]
     }
     fn compile<'c>(
         &'c self,
@@ -60,9 +61,9 @@ impl EffectDef<RiftScripting> for Heal {
                 match &by {
                     Some(by) => {
                         let amount = by(world, cx).as_num() as f32;
-                        super::heal(world, actor, amount);
+                        stat::heal(world, actor, amount);
                     }
-                    None => super::refill(world, actor),
+                    None => stat::refill(world, actor),
                 }
             }
             EffectStep::Done
@@ -78,7 +79,7 @@ impl EffectDef<RiftScripting> for Damage {
         self.who.is_none()
     }
     fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+        vec![(NEXT, self.next.as_deref())]
     }
     fn compile<'c>(
         &'c self,

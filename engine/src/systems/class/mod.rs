@@ -1,8 +1,8 @@
 pub mod tree;
 
 pub use tree::{
-    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NODE_EXTENT, SkillNode, SkillTree,
-    TreeBackdrop,
+    AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NODE_EXTENT, NodeKey, SkillNode,
+    SkillTree, TreeBackdrop,
 };
 
 use bevy_app::App;
@@ -11,15 +11,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
-use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, serial};
-use crate::core::script::{Compiler, EffectDef, EffectStep, Name, ScriptFault, ValueType};
+use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck};
+use crate::core::script::{Compiler, EffectDef, EffectStep, NEXT, Name, ScriptFault, ValueType};
 use crate::core::vfx::VfxSite;
 use crate::systems::player::Xp;
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Reach, RiftInstances, RiftScripting, area_owner,
 };
-use crate::systems::skill::{Learned, SkillDef};
+use crate::systems::skill::{self, Learned};
 use crate::systems::stat::{self, Stat, StatMap};
 use crate::systems::vfx::{self, VfxFixture};
 
@@ -54,6 +54,24 @@ impl ClassDef {
             (Some(nodes), Some(frame)) => Some(nodes.union(frame)),
             (nodes, frame) => nodes.or(frame),
         }
+    }
+
+    /// The levels reached at `xp`, in order: level one is the first listed.
+    pub fn reached(&self, xp: u32) -> impl Iterator<Item = &ClassLevel> {
+        self.levels.iter().filter(move |tier| tier.xp <= xp)
+    }
+
+    pub fn level_at(&self, xp: u32) -> u32 {
+        self.reached(xp).count() as u32
+    }
+
+    pub fn granted_points(&self, xp: u32) -> SkillPoints {
+        self.reached(xp)
+            .fold(SkillPoints(0), |sum, tier| sum + tier.skill_points)
+    }
+
+    pub fn stats_at(&self, xp: u32) -> impl Iterator<Item = Stat> + '_ {
+        self.reached(xp).flat_map(|tier| tier.stats.listed())
     }
 }
 
@@ -93,8 +111,8 @@ pub struct ClassLevel {
     pub xp: u32,
     #[serde(default, skip_serializing_if = "StatMap::is_empty")]
     pub stats: StatMap,
-    #[serde(default, skip_serializing_if = "serial::is_zero")]
-    pub skill_points: u32,
+    #[serde(default, skip_serializing_if = "SkillPoints::is_zero")]
+    pub skill_points: SkillPoints,
 }
 
 #[derive(
@@ -116,41 +134,23 @@ pub struct ClassLevel {
 #[serde(transparent)]
 pub struct SkillPoints(pub u32);
 
+impl SkillPoints {
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0
+    }
+}
+
 #[derive(Component, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct Class {
     pub def: ClassId,
 }
 
-impl ClassDef {
-    /// The levels reached at `xp`: level one is the first listed.
-    pub fn level_at(&self, xp: u32) -> u32 {
-        self.levels.iter().filter(|tier| tier.xp <= xp).count() as u32
-    }
-
-    pub fn granted_points(&self, xp: u32) -> SkillPoints {
-        SkillPoints(
-            self.levels
-                .iter()
-                .filter(|tier| tier.xp <= xp)
-                .map(|tier| tier.skill_points)
-                .sum(),
-        )
-    }
-
-    pub fn total_points(&self) -> SkillPoints {
-        SkillPoints(self.levels.iter().map(|tier| tier.skill_points).sum())
-    }
-
-    pub fn stats_at(&self, xp: u32) -> impl Iterator<Item = Stat> + '_ {
-        self.levels
-            .iter()
-            .filter(move |tier| tier.xp <= xp)
-            .flat_map(|tier| tier.stats.listed())
-    }
-}
-
 pub fn of(world: &World, entity: Entity) -> Option<ClassId> {
     world.get::<Class>(entity).map(|class| class.def)
+}
+
+pub fn xp_of(world: &World, entity: Entity) -> u32 {
+    world.get::<Xp>(entity).map_or(0, |xp| xp.amount)
 }
 
 pub fn level(world: &World, entity: Entity) -> u32 {
@@ -213,23 +213,20 @@ pub fn check_all(loading: &mut Loading) {
     for (id, def) in loading.rows::<ClassDef>(&content) {
         let mut check = RowCheck::default();
         for (key, node) in &def.tree.0 {
-            let ranks = node.skill.get(&content).levels.len() as u8;
             for (index, requirement) in node.requires.iter().enumerate() {
                 if let AccessRequirement::Skill { node: other, rank } = requirement
-                    && let Some(named) = def.tree.0.get(other)
+                    && let Some(named) = def.tree.node(other)
                 {
-                    let has = named.skill.get(&content).levels.len() as u8;
-                    if rank.0 == 0 || rank.0 > has {
-                        check.error(
-                            format!("/tree/{key}/requires/{index}/rank"),
-                            "rank out of range",
-                            rank.0,
-                            format!("1 to {has}, the ranks of {}", named.skill.key(&content)),
-                        );
-                    }
+                    skill::check_rank(
+                        &mut check,
+                        format!("/tree/{key}/requires/{index}/rank"),
+                        &content,
+                        named.skill,
+                        *rank,
+                    );
                 }
             }
-            if ranks == 0 {
+            if node.skill.get(&content).rank_count() == 0 {
                 check.error(
                     format!("/tree/{key}/skill"),
                     "no ranks",
@@ -256,7 +253,7 @@ impl EffectDef<RiftScripting> for GrantXp {
         self.who.is_none()
     }
     fn outputs(&self) -> Vec<(Name, Link<'_>)> {
-        vec![("next", self.next.as_deref())]
+        vec![(NEXT, self.next.as_deref())]
     }
     fn compile<'c>(
         &'c self,
@@ -266,7 +263,7 @@ impl EffectDef<RiftScripting> for GrantXp {
         let xp = cx.expr(&self.xp, ValueType::Integer)?;
         Ok(Box::new(move |world, _, cx| {
             if let Some(player) = effects::aimed_character(world, cx, &who) {
-                let amount = xp(world, cx).as_int().clamp(0, i64::from(u32::MAX)) as u32;
+                let amount = u32::try_from(xp(world, cx).as_int()).unwrap_or(0);
                 grant_xp(world, player, amount);
             }
             EffectStep::Done
@@ -277,20 +274,10 @@ impl EffectDef<RiftScripting> for GrantXp {
     }
 }
 
-fn xp_of(world: &World, entity: Entity) -> u32 {
-    world.get::<Xp>(entity).map_or(0, |xp| xp.amount)
-}
-
 fn level_stats(world: &World, entity: Entity) -> Vec<Stat> {
     let content = world.resource::<Content>();
     let Some(class) = of(world, entity) else {
         return Vec::new();
     };
     class.get(content).stats_at(xp_of(world, entity)).collect()
-}
-
-impl SkillDef {
-    pub fn rank_count(&self) -> u8 {
-        self.levels.len() as u8
-    }
 }

@@ -24,17 +24,16 @@ use crate::core::math::{Offset, Pos};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::Seconds;
 use crate::systems::area::{self, AreaId, AreaTag};
+use crate::systems::equipment;
 use crate::systems::movement::{Position, position};
-use crate::systems::notification;
 use crate::systems::npc::Npc;
-use crate::systems::player::{self, ClientId, Owner, Players, sender_player};
+use crate::systems::player::{ClientId, Owner, Players, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{
     Condition, EventKind, Owner as ScriptOwner, OwnerKind, RiftInstances, ScriptModule, ScriptedRow,
 };
 use crate::systems::skill::SkillId;
 use crate::systems::visibility::{self, Presence, seen_by};
-use crate::systems::{drain_requests, equipment};
 
 pub const INVENTORY_MAX: u32 = 25;
 const RESERVATION_TTL: Seconds = Seconds(60.0);
@@ -482,17 +481,9 @@ pub struct ItemSfx {
 }
 
 pub fn use_item(world: &mut World) {
-    for request in drain_requests::<UseItemRequest>(world) {
-        let Some(entity) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !player::may_command(world, entity) {
-            continue;
-        }
-        if let Err(refusal) = use_slot(world, entity, request.message.slot as usize) {
-            notification::error(world, entity, refusal);
-        }
-    }
+    player_requests::<UseItemRequest>(world, true, |world, player, request| {
+        use_slot(world, player, request.slot as usize)
+    });
 }
 
 pub fn use_held(world: &mut World, actor: Entity, item: ItemId) -> Result<(), String> {
@@ -537,14 +528,8 @@ pub fn raise(world: &mut World, item: ItemId, kind: EventKind, actor: Entity) {
 
 pub fn drop_item(world: &mut World) {
     let content = world.resource::<Content>().clone();
-    for request in drain_requests::<DropItemRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !player::may_command(world, player) {
-            continue;
-        }
-        let slot = request.message.slot as usize;
+    player_requests::<DropItemRequest>(world, true, |world, player, request| {
+        let slot = request.slot as usize;
         let removed = match world.get_mut::<Inventory>(player) {
             Some(mut inventory)
                 if inventory
@@ -556,27 +541,22 @@ pub fn drop_item(world: &mut World) {
             }
             _ => None,
         };
-        let Some(slot) = removed else {
-            continue;
-        };
-        scatter_drop(world, player, &[(slot.item, slot.count)], None, None);
-    }
+        if let Some(slot) = removed {
+            scatter_drop(world, player, &[(slot.item, slot.count)], None, None);
+        }
+        Ok(())
+    });
 }
 
 pub fn pickup_request(world: &mut World) {
-    for request in drain_requests::<PickupRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        let target = request.message.target;
-        if !player::may_command(world, player)
-            || world.get::<DroppedItem>(target).is_none()
-            || !visibility::present(world, target, player)
+    player_requests::<PickupRequest>(world, true, |world, player, request| {
+        let target = request.target;
+        if world.get::<DroppedItem>(target).is_some() && visibility::present(world, target, player)
         {
-            continue;
+            reach::intend(world, player, ReachTarget::Actor(target), ReachAct::Pickup);
         }
-        reach::intend(world, player, ReachTarget::Actor(target), ReachAct::Pickup);
-    }
+        Ok(())
+    });
 }
 
 pub fn pickable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {

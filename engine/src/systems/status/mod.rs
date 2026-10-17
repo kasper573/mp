@@ -38,10 +38,10 @@ pub struct StatusEffectDef {
     pub category: StatusCategory,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
-    #[serde(default, skip_serializing_if = "StatusVfx::is_empty")]
-    pub vfx: StatusVfx,
-    #[serde(default, skip_serializing_if = "StatusSfx::is_empty")]
-    pub sfx: StatusSfx,
+    #[serde(default, skip_serializing_if = "Phased::is_empty")]
+    pub vfx: Phased<VfxId>,
+    #[serde(default, skip_serializing_if = "Phased::is_empty")]
+    pub sfx: Phased<SfxId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub modules: Vec<StatusModule>,
 }
@@ -68,26 +68,16 @@ pub enum StatusCategory {
     Debuff,
 }
 
-#[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
+/// What a status shows or plays coming, staying and going.
+#[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct StatusVfx {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub on_activate: Option<VfxId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub during: Option<VfxId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub on_expire: Option<VfxId>,
-}
-
-#[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct StatusSfx {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub on_activate: Option<SfxId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub during: Option<SfxId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub on_expire: Option<SfxId>,
+pub struct Phased<T> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_activate: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub during: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_expire: Option<T>,
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -119,13 +109,19 @@ impl Statuses {
         self.get(effect).is_some()
     }
 
+    /// How many statuses of a category it holds, or of any when none is named.
     pub fn count(&self, content: &Content, category: Option<StatusCategory>) -> usize {
         self.0
             .iter()
-            .filter(|status| {
-                category.is_none_or(|wanted| status.effect.get(content).category == wanted)
-            })
+            .filter(|status| status.in_category(content, category))
             .count()
+    }
+}
+
+impl StatusInstance {
+    /// Whether the status falls under a category; every status falls under none named.
+    pub fn in_category(&self, content: &Content, category: Option<StatusCategory>) -> bool {
+        category.is_none_or(|wanted| self.effect.get(content).category == wanted)
     }
 }
 
@@ -180,7 +176,7 @@ pub fn cleanse(world: &mut World, actor: Entity, category: Option<StatusCategory
     }
     statuses
         .0
-        .retain(|held| category.is_some_and(|wanted| held.effect.get(&content).category != wanted));
+        .retain(|held| !held.in_category(&content, category));
     before - statuses.0.len()
 }
 
@@ -197,7 +193,6 @@ pub fn power(world: &World, actor: Entity, effect: StatusEffectId) -> f32 {
         .map_or(0.0, |status| status.power)
 }
 
-/// Sweeps the statuses whose time ran out; the aspects settle after and raise their going.
 pub fn expire(world: &mut World, held: &mut QueryState<(Entity, &Statuses)>) {
     let now = world.resource::<WallClock>().now;
     let due: Vec<Entity> = held
@@ -225,13 +220,17 @@ impl StatusCategory {
     }
 }
 
-impl StatusVfx {
-    fn is_empty(&self) -> bool {
-        self.on_activate.is_none() && self.during.is_none() && self.on_expire.is_none()
+impl<T> Default for Phased<T> {
+    fn default() -> Phased<T> {
+        Phased {
+            on_activate: None,
+            during: None,
+            on_expire: None,
+        }
     }
 }
 
-impl StatusSfx {
+impl<T> Phased<T> {
     fn is_empty(&self) -> bool {
         self.on_activate.is_none() && self.during.is_none() && self.on_expire.is_none()
     }

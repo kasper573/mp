@@ -21,6 +21,7 @@ use crate::core::content::{
 use crate::core::math::{Percent, Rng};
 use crate::core::time::{GameDay, Seconds, UnixMillis, WallClock};
 use crate::systems::area::{self, AreaDef, AreaId};
+use crate::systems::attention;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::class;
 use crate::systems::dialogue::{self, ChoiceReveal, Revealable};
@@ -31,7 +32,7 @@ use crate::systems::item::{
 };
 use crate::systems::notification::{self, Notification, NotificationKind};
 use crate::systems::npc::NpcId;
-use crate::systems::player::{Owner, sender_player};
+use crate::systems::player::{Owner, player_requests};
 use crate::systems::rewards::KillCredited;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::script::{
@@ -40,7 +41,6 @@ use crate::systems::script::{
 };
 use crate::systems::text::{LineText, Span};
 use crate::systems::visibility::Presence;
-use crate::systems::{attention, drain_requests};
 
 pub type QuestId = ContentId<QuestDef>;
 
@@ -810,16 +810,13 @@ pub fn fail(world: &mut World, player: Entity, quest: QuestId) {
     }
     log.finish(quest, QuestResult::Failed, clock);
     take_back(world, player, quest.get(&content).grants());
-    let failed = Notification::new(
-        NotificationKind::Feed {
-            topic: HistoryTopic::Quest,
-            icon: Some(quest.get(&content).icon(&content).path()),
-            tally: None,
-            failure: true,
-            sfx: Some(InterfaceSound::QuestAbandoned.id(&content)),
-        },
-        LineText::plain(format!("Quest failed · {}", quest.get(&content).title)),
-    );
+    let failed = Notification::feed(
+        HistoryTopic::Quest,
+        format!("Quest failed · {}", quest.get(&content).title),
+    )
+    .icon(quest.get(&content).icon(&content).path())
+    .failed()
+    .sound(InterfaceSound::QuestAbandoned.id(&content));
     notification::notify(world, player, failed);
     raise(world, quest, EventKind::Failed, player);
 }
@@ -898,29 +895,21 @@ fn raise(world: &mut World, quest: QuestId, kind: EventKind, player: Entity) {
 }
 
 fn tell(world: &mut World, player: Entity, text: String, icon: &AssetRef, sfx: Option<SfxId>) {
-    let told = Notification::new(
-        NotificationKind::Feed {
-            topic: HistoryTopic::Quest,
-            icon: Some(icon.path()),
-            tally: None,
-            failure: false,
-            sfx,
-        },
-        LineText::plain(text),
-    );
+    let mut told = Notification::feed(HistoryTopic::Quest, text).icon(icon.path());
+    if let Some(sfx) = sfx {
+        told = told.sound(sfx);
+    }
     notification::notify(world, player, told);
 }
 
 pub fn requests(world: &mut World) {
-    for request in drain_requests::<QuestRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        match request.message {
+    player_requests::<QuestRequest>(world, false, |world, player, request| {
+        match request {
             QuestRequest::Track { quest, tracked } => track(world, player, quest, tracked),
             QuestRequest::Abandon { quest } => abandon(world, player, quest),
         }
-    }
+        Ok(())
+    });
 }
 
 pub fn credit(world: &mut World, mut kills: Local<MessageCursor<KillCredited>>) {
@@ -1258,24 +1247,17 @@ fn credit_kill(world: &mut World, kill: KillCredited) {
                     && active.counts[index] < count
                 {
                     active.counts[index] += 1;
-                    counted.push(Notification::new(
-                        NotificationKind::Feed {
-                            topic: HistoryTopic::Quest,
-                            icon: Some(objective.icon(&content).path()),
-                            tally: Some(RecordTally::Progress {
-                                have: active.counts[index],
-                                need: count,
-                            }),
-                            failure: false,
-                            sfx: None,
-                        },
-                        LineText::plain(def.objective_label(
-                            &content,
-                            &parties,
-                            active.quest,
-                            objective,
-                        )),
-                    ));
+                    counted.push(
+                        Notification::feed(
+                            HistoryTopic::Quest,
+                            def.objective_label(&content, &parties, active.quest, objective),
+                        )
+                        .icon(objective.icon(&content).path())
+                        .tally(RecordTally::Progress {
+                            have: active.counts[index],
+                            need: count,
+                        }),
+                    );
                 }
             }
             for drop in def.drops().filter(|drop| drop.from == kill.npc) {

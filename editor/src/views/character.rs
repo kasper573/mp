@@ -1660,7 +1660,7 @@ pub fn preview_extras(editor: &mut Editor, ui: &mut Ui, key: &str) {
     let granted: u32 = tiers
         .iter()
         .filter(|tier| tier.xp <= xp)
-        .map(|tier| tier.skill_points)
+        .map(|tier| tier.skill_points.0)
         .sum();
     let spent: u32 = row["skills"]
         .as_array()

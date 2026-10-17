@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use design_tokens::{TextRole, color};
 use egui::{Color32, FontId, Pos2, Stroke, Vec2};
 
-use super::{Rank, SkillId, Targeting, UseSkillRequest, using};
+use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};
-use crate::core::geometry::{Footprint, Shape, facing_from};
+use crate::core::geometry::{Footprint, Shape};
 use crate::core::gui;
 use crate::core::math::Pos;
 use crate::core::render;
@@ -18,7 +18,6 @@ use crate::systems::interface::{CursorShape, InterfaceSound};
 use crate::systems::movement;
 use crate::systems::notification;
 use crate::systems::player::session;
-use crate::systems::skill::Aim;
 use crate::systems::vfx::VfxShaderFixture;
 
 const OUTLINE_STEPS: usize = 40;
@@ -50,9 +49,9 @@ pub fn cast_at_pointer(world: &mut World, skill: SkillId) -> bool {
     let def = skill.get(&content);
     let aim = render::cursor_tile(world).and_then(|tile| match def.target {
         Targeting::SingleAlly | Targeting::SingleEnemy => {
-            actor_at(world, tile, def.target).map(Aim::Actor)
+            actor_at(world, tile, def.target).map(CastAim::Actor)
         }
-        Targeting::AreaAlly | Targeting::AreaEnemy => Some(Aim::Point(tile)),
+        Targeting::AreaAlly | Targeting::AreaEnemy => Some(CastAim::Point(tile)),
         Targeting::Caster => None,
     });
     match aim {
@@ -161,9 +160,9 @@ impl Gesture for AimGesture {
         };
         let content = world.resource::<Content>().clone();
         let aim = match claim {
-            Some(ClickClaim::Aim(target)) => Aim::Actor(target),
+            Some(ClickClaim::Aim(target)) => CastAim::Actor(target),
             Some(ClickClaim::AimAt(point)) if aimed.skill.get(&content).target.aimed_at_point() => {
-                Aim::Point(point)
+                CastAim::Point(point)
             }
             _ => {
                 disarm(world);
@@ -213,11 +212,7 @@ pub fn draw_aim(world: &mut World) {
     let area = gui::world_area(world, "aim preview");
     let range = super::range_of(world, me, aimed.skill, aimed.rank);
     let mut lines: Vec<(Vec<Pos2>, Color32, f32)> = Vec::new();
-    let reach = Footprint {
-        at: from,
-        facing: facing_from(from, from),
-        shape: Shape::Circle { radius: range },
-    };
+    let reach = Footprint::cast(Shape::Circle { radius: range }, from, from);
     if let Some(ring) = project(world, &reach.outline(OUTLINE_STEPS)) {
         lines.push((ring, color::WARN.gamma_multiply(0.35), 1.0));
     }
@@ -253,8 +248,7 @@ fn clear_surface(world: &mut World) {
     }
 }
 
-/// Where the armed skill's area lies: at the pointer for a circle or a rect, from the character for
-/// a cone or a line, facing the pointer either way. With whether the skill harms what it takes.
+/// Where the armed skill's area lies, with whether the skill harms what it takes.
 fn aimed_area(world: &mut World, aimed: Aimed) -> Option<(Footprint, bool)> {
     let me = session::me(world)?;
     let content = world.resource::<Content>().clone();
@@ -262,22 +256,13 @@ fn aimed_area(world: &mut World, aimed: Aimed) -> Option<(Footprint, bool)> {
     let shape = def.area_at(aimed.rank)?;
     let from = movement::position(world, me)?;
     let point = render::cursor_tile(world)?;
-    let at = match shape {
-        Shape::Cone { .. } | Shape::Line { .. } => from,
-        Shape::Circle { .. } | Shape::Rect { .. } => point,
-    };
-    let footprint = Footprint {
-        at,
-        facing: facing_from(from, point),
-        shape,
-    };
-    Some((footprint, def.target.hostile()))
+    Some((Footprint::cast(shape, from, point), def.target.hostile()))
 }
 
 fn actor_at(world: &mut World, point: Pos<Tiles>, targeting: Targeting) -> Option<Entity> {
     let me = session::me(world)?;
     actor::frontmost_at(world, point, None, |world, entity| {
-        world.get::<Actor>(entity).is_some() && using::fits(world, me, entity, targeting)
+        world.get::<Actor>(entity).is_some() && casting::fits(world, me, entity, targeting)
     })
 }
 

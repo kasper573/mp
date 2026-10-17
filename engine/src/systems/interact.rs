@@ -8,16 +8,16 @@ use strum::IntoStaticStr;
 use crate::core::content::{Content, Fixture};
 use crate::core::math::Pos;
 use crate::core::tiling::Tiles;
+use crate::systems::actor;
 use crate::systems::attention::{self, AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::dialogue;
 use crate::systems::interface::CursorShape;
-use crate::systems::player::{self, sender_player, session};
+use crate::systems::player::{player_requests, session};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
 use crate::systems::script::{self, EventKind, RiftEvent, RiftInstances};
 use crate::systems::stat;
 use crate::systems::visibility;
-use crate::systems::{actor, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -75,26 +75,21 @@ pub fn interactable_at(world: &mut World, point: Pos<Tiles>) -> Option<Entity> {
 }
 
 pub fn interact_request(world: &mut World) {
-    for request in drain_requests::<InteractRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        let target = request.message.target;
-        if !player::may_command(world, player)
-            || world.get_entity(target).is_err()
-            || stat::is_dead(world, target)
-            || interaction_of(world, target).is_none()
-            || !visibility::present(world, target, player)
+    player_requests::<InteractRequest>(world, true, |world, player, request| {
+        let target = request.target;
+        if stat::stands(world, target)
+            && interaction_of(world, target).is_some()
+            && visibility::present(world, target, player)
         {
-            continue;
+            reach::intend(
+                world,
+                player,
+                ReachTarget::Actor(target),
+                ReachAct::Interact,
+            );
         }
-        reach::intend(
-            world,
-            player,
-            ReachTarget::Actor(target),
-            ReachAct::Interact,
-        );
-    }
+        Ok(())
+    });
 }
 
 pub fn interactions(world: &mut World, intents: &mut reach::Intents) {

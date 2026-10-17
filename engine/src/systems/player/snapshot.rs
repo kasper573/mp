@@ -4,13 +4,15 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::core::content::{Content, ContentId, ContentRow, Loading, RowCheck, key_of, serial};
+use crate::core::content::{
+    Content, ContentProblem, ContentRow, Loading, RowCheck, id, key_of, serial,
+};
 use crate::core::script::{Value, ValueType};
 use crate::core::time::{Seconds, WallClock};
 use crate::systems::GameSettings;
 use crate::systems::actor::Name;
 use crate::systems::area::{self, AreaId, transition::Discovered};
-use crate::systems::class::{AccessRequirement, Class, ClassId, SkillPoints};
+use crate::systems::class::{Class, ClassId, NodeKey};
 use crate::systems::dialogue::Heard;
 use crate::systems::equipment::{Equipment, EquipmentSlot};
 use crate::systems::history::{History, HistoryEntry};
@@ -20,12 +22,11 @@ use crate::systems::player::{CharacterState, PlayerDef, SpawnPoint, Xp, def, pla
 use crate::systems::quest::{ActiveQuest, FinishedQuest, Parties, QuestId, QuestLog, QuestResult};
 use crate::systems::script::Place;
 use crate::systems::shop::{Sale, ShopId, ShopLedger};
+use crate::systems::skill::learn::{PlanRefusal, plan};
 use crate::systems::skill::{
     self, BasicAttack, Cooldowns, HOTBAR_SLOTS, Hotbar, HotbarEntry, Learned, Rank, SkillId,
 };
 use crate::systems::stat::StatMap;
-
-pub type TestCharacterId = ContentId<CharacterSnapshot>;
 
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -70,7 +71,7 @@ impl ContentRow for CharacterSnapshot {
 impl CharacterSnapshot {
     /// A character as the player row makes it: its class, and its gear already on.
     pub fn fresh(content: &Content, name: &str, def: &PlayerDef) -> CharacterSnapshot {
-        let equipment = def
+        let equipment: BTreeMap<EquipmentSlot, ItemId> = def
             .wearing
             .iter()
             .filter_map(|&item| match item.get(content).kind {
@@ -78,12 +79,7 @@ impl CharacterSnapshot {
                 _ => None,
             })
             .collect();
-        let basic_attack = def
-            .wearing
-            .iter()
-            .flat_map(|&item| skill::grants_of(content, item))
-            .copied()
-            .find(|skill| skill.get(content).basic_attack);
+        let basic_attack = skill::first_flagged_grant(content, equipment.values().copied());
         CharacterSnapshot {
             name: name.to_owned(),
             class: def.class,
@@ -121,7 +117,7 @@ pub enum AtInitialSpawn {
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SnapshotSkill {
-    pub node: String,
+    pub node: NodeKey,
     pub rank: Rank,
 }
 
@@ -278,13 +274,7 @@ pub fn materialize(
         class: Class {
             def: snapshot.class,
         },
-        learned: Learned(
-            snapshot
-                .skills
-                .iter()
-                .map(|learned| (learned.node.clone(), learned.rank))
-                .collect(),
-        ),
+        learned: learned(snapshot),
         cooldowns: Cooldowns::default(),
         hotbar: hotbar(snapshot),
         basic_attack: BasicAttack(snapshot.basic_attack),
@@ -347,6 +337,16 @@ impl MemoryValue {
             MemoryValue::Text(text) => format!("{text:?}"),
         }
     }
+}
+
+fn learned(snapshot: &CharacterSnapshot) -> Learned {
+    Learned(
+        snapshot
+            .skills
+            .iter()
+            .map(|learned| (learned.node.clone(), learned.rank))
+            .collect(),
+    )
 }
 
 fn hotbar(snapshot: &CharacterSnapshot) -> Hotbar {
@@ -447,12 +447,6 @@ fn check_equipment(content: &Content, snapshot: &CharacterSnapshot, check: &mut 
 
 fn check_skills(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowCheck) {
     let class = snapshot.class.get(content);
-    let ranks: BTreeMap<String, Rank> = snapshot
-        .skills
-        .iter()
-        .map(|learned| (learned.node.clone(), learned.rank))
-        .collect();
-    let mut spent = SkillPoints(0);
     for (index, learned) in snapshot.skills.iter().enumerate() {
         if snapshot.skills[..index]
             .iter()
@@ -464,83 +458,76 @@ fn check_skills(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
                 &learned.node,
                 "each node once",
             );
-            continue;
         }
-        let Some(node) = class.tree.node(&learned.node) else {
-            check.problem(
-                format!("/skills/{index}/node"),
-                crate::core::content::ContentProblem::new(
-                    "unknown node",
-                    &learned.node,
-                    format!("a node of the {} tree", class.name),
-                )
-                .near(crate::core::content::id::nearest(
-                    class.tree.0.keys(),
-                    &learned.node,
-                )),
-            );
-            continue;
-        };
-        let def = node.skill.get(content);
-        if learned.rank.0 == 0 || learned.rank.0 > def.rank_count() {
-            check.error(
-                format!("/skills/{index}/rank"),
-                "rank out of range",
-                learned.rank.0,
-                format!("1 to {}, the ranks of {}", def.rank_count(), def.name),
-            );
-            continue;
-        }
-        spent += def.cost_to(learned.rank);
-        for requirement in &node.requires {
-            let met = match requirement {
-                AccessRequirement::Skill { node, rank } => {
-                    ranks.get(node).is_some_and(|held| held >= rank)
+    }
+    let picks: Vec<(NodeKey, Rank)> = snapshot
+        .skills
+        .iter()
+        .map(|learned| (learned.node.clone(), learned.rank))
+        .collect();
+    let level = class.level_at(snapshot.xp);
+    let planned = match plan(content, class, &Learned::default(), &picks, level, |_| true) {
+        Ok(planned) => planned,
+        Err(refusal) => {
+            let pick = refusal.pick();
+            let (key, rank) = &picks[pick];
+            match &refusal {
+                PlanRefusal::NotInTree { .. } => check.problem(
+                    format!("/skills/{pick}/node"),
+                    ContentProblem::new(
+                        "unknown node",
+                        key,
+                        format!("a node of the {} tree", class.name),
+                    )
+                    .near(id::nearest(
+                        class.tree.0.keys().map(|key| &key.0),
+                        key.as_str(),
+                    )),
+                ),
+                PlanRefusal::OutOfRange { .. } | PlanRefusal::NotAbove { .. } => {
+                    if let Some(node) = class.tree.node(key) {
+                        skill::check_rank(
+                            check,
+                            format!("/skills/{pick}/rank"),
+                            content,
+                            node.skill,
+                            *rank,
+                        );
+                    }
                 }
-                AccessRequirement::Level { level } => class.level_at(snapshot.xp) >= *level,
-                AccessRequirement::Condition { .. } => true,
-            };
-            if !met {
-                check.error(
-                    format!("/skills/{index}"),
+                PlanRefusal::Unmet { requirement, .. } => check.error(
+                    format!("/skills/{pick}"),
                     "not unlocked",
-                    format!("{} rank {}", def.name, learned.rank.0),
+                    refusal.sentence(content, class, &picks),
                     format!(
                         "its requirement met: {}",
                         requirement.describe(content, &class.tree)
                     ),
-                );
+                ),
             }
+            return;
         }
-    }
+    };
     let granted = class.granted_points(snapshot.xp);
-    if spent > granted {
+    if planned.cost > granted {
         check.error(
             "/skills",
             "too many ranks",
-            format!("{} points spent", spent.0),
-            format!(
-                "at most {}, granted by level {}",
-                granted.0,
-                class.level_at(snapshot.xp)
-            ),
+            format!("{} points spent", planned.cost.0),
+            format!("at most {}, granted by level {level}", granted.0),
         );
     }
 }
 
 fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut RowCheck) {
     let class = snapshot.class.get(content);
-    let known: Vec<SkillId> = snapshot
-        .skills
-        .iter()
-        .filter_map(|learned| Some(class.tree.node(&learned.node)?.skill))
-        .chain(
-            snapshot
-                .equipment
-                .values()
-                .flat_map(|&worn| skill::grants_of(content, worn).iter().copied()),
-        )
-        .collect();
+    let known = skill::known_from(
+        content,
+        Some(&class.tree),
+        Some(&learned(snapshot)),
+        snapshot.equipment.values().copied(),
+        None,
+    );
     let held = |item: ItemId| {
         snapshot.bag.iter().any(|stack| stack.item == item)
             || snapshot.equipment.values().any(|worn| *worn == item)
@@ -566,7 +553,7 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
             );
         }
         match slot.entry {
-            HotbarEntry::Skill(skill) if !known.contains(&skill) => check.error(
+            HotbarEntry::Skill(skill) if !known.contains_key(&skill) => check.error(
                 format!("/hotbar/{index}/entry"),
                 "skill not known",
                 skill.key(content),
@@ -582,7 +569,7 @@ fn check_hotbar(content: &Content, snapshot: &CharacterSnapshot, check: &mut Row
         }
     }
     if let Some(skill) = snapshot.basic_attack {
-        if !known.contains(&skill) {
+        if !known.contains_key(&skill) {
             check.error(
                 "/basic_attack",
                 "skill not known",

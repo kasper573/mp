@@ -7,7 +7,7 @@ use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook};
-use crate::systems::class::{self, ClassId};
+use crate::systems::class::{self, ClassId, NodeKey};
 use crate::systems::hud::{self, Sizing, WindowFrame};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::Inventory;
@@ -35,7 +35,7 @@ pub struct SkillCard {
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeAccess {
     pub class: ClassId,
-    pub node: String,
+    pub node: NodeKey,
 }
 
 pub struct SkillCardPlugin;
@@ -88,7 +88,7 @@ pub fn of(world: &World, skill: SkillId) -> SkillCard {
             .node_of(skill)
             .map(|(key, _)| NodeAccess {
                 class,
-                node: key.to_owned(),
+                node: key.clone(),
             })
     });
     SkillCard { skill, rank, node }

@@ -1,3 +1,4 @@
+pub mod effects;
 pub mod render;
 
 use bevy_app::App;
@@ -13,14 +14,12 @@ use crate::core::tiling::Tiles;
 use crate::core::time::Seconds;
 use crate::core::vfx::VfxSite;
 use crate::systems::actor::{self, Actor};
-use crate::systems::notification;
 use crate::systems::npc::Pack;
-use crate::systems::player::{self, Owner, sender_player, session};
+use crate::systems::player::{self, Owner, player_requests, session};
 use crate::systems::reach;
-use crate::systems::skill::{self, BasicAttack};
+use crate::systems::skill::{self, BasicAttack, CastAim, Targeting};
 use crate::systems::stat::{self, Stats};
 use crate::systems::vfx::{self, VfxFixture};
-use crate::systems::{drain_requests, visibility};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -82,10 +81,9 @@ fn side(world: &World, entity: Entity) -> Side {
     }
 }
 
+/// Whether a basic attack may land on the target: what a single-target enemy skill asks.
 pub fn attackable(world: &World, attacker: Entity, target: Entity) -> bool {
-    relation(world, attacker, target) == Relation::Enemy
-        && !player::held(world, target)
-        && visibility::coexist(world, attacker, target)
+    skill::casting::fits(world, attacker, target, Targeting::SingleEnemy)
 }
 
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Debug, PartialEq)]
@@ -149,33 +147,20 @@ pub fn regen(world: &mut World) {
 /// A click on an enemy casts whatever sits in the basic attack slot at it, again and again until
 /// it falls.
 pub fn request(world: &mut World) {
-    for request in drain_requests::<AttackRequest>(world) {
-        let Some(entity) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        let target = request.message.target;
-        if !player::may_command(world, entity)
-            || world.get_entity(target).is_err()
-            || stat::is_dead(world, target)
-            || !attackable(world, entity, target)
-        {
-            continue;
+    player_requests::<AttackRequest>(world, true, |world, player, request| {
+        if !attackable(world, player, request.target) {
+            return Ok(());
         }
-        let Some(skill) = world.get::<BasicAttack>(entity).and_then(|slot| slot.0) else {
-            notification::error(world, entity, "Nothing to attack with");
-            continue;
-        };
-        if let Err(reason) = skill::cast(world, entity, skill, skill::Aim::Actor(target), true) {
-            notification::error(world, entity, reason);
-        }
-    }
+        let skill = world
+            .get::<BasicAttack>(player)
+            .and_then(|slot| slot.0)
+            .ok_or("Nothing to attack with")?;
+        skill::cast(world, player, skill, CastAim::Actor(request.target), true)
+    });
 }
 
 pub fn inflict(world: &mut World, target: Entity, attacker: Option<Entity>, damage: f32) {
-    if world.get_entity(target).is_err()
-        || stat::is_dead(world, target)
-        || player::held(world, target)
-    {
+    if !stat::stands(world, target) || player::held(world, target) {
         return;
     }
     let time = Seconds(world.resource::<Time>().elapsed_secs());

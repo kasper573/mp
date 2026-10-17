@@ -512,8 +512,11 @@ impl ActorModel {
         self.region(strip[strip.len() - 1].frame)
     }
 
-    pub fn timing(&self, action: Action, dir: Direction) -> Timing {
+    /// How long an action plays and when it lands, at an attack speed: only an attack plays faster
+    /// or slower for it.
+    pub fn timing(&self, action: Action, dir: Direction, attack_speed: PlaybackRate) -> Timing {
         let strip = self.strip(action, dir);
+        let rate = rate(action, attack_speed);
         let mut apex = Millis(0.0);
         let mut cursor = Millis(0.0);
         for frame in strip {
@@ -523,8 +526,8 @@ impl ActorModel {
             cursor += Millis(frame.ms as f32);
         }
         Timing {
-            duration: cursor.seconds(),
-            apex: apex.seconds(),
+            duration: cursor.seconds() / rate,
+            apex: apex.seconds() / rate,
         }
     }
 

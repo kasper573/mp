@@ -6,11 +6,11 @@ use engine::core::math::{Offset, Pos, Rgba};
 use engine::core::tiling::Tiles;
 use engine::core::time::UnixMillis;
 use engine::core::vfx::{ParamValue, VfxId, VfxInstance, VfxParams, VfxSite};
-use engine::systems::class;
+use engine::systems::class::{self, NodeKey};
 use engine::systems::combat;
 use engine::systems::movement::position;
 use engine::systems::player::Owner;
-use engine::systems::skill::{self, Aim, LearnSkillsRequest, Rank, UseSkillRequest};
+use engine::systems::skill::{self, CastAim, LearnSkillsRequest, Rank, UseSkillRequest};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
 
@@ -97,7 +97,7 @@ fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
     sim.send(
         1,
         LearnSkillsRequest {
-            ranks: vec![("cleave".to_owned(), Rank(1))],
+            ranks: vec![(NodeKey::from("cleave"), Rank(1))],
         },
     );
     settle(&mut sim);
@@ -110,7 +110,7 @@ fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
         1,
         UseSkillRequest {
             skill: row("Cleave"),
-            aim: Aim::Point(at),
+            aim: CastAim::Point(at),
         },
     );
     assert!(sim.run_until(10.0, |world| {
@@ -203,7 +203,10 @@ fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
     settle(&mut sim);
     sim.world().entity_mut(player).insert((
         class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([("chain_lightning".to_owned(), Rank(1))])),
+        skill::Learned(BTreeMap::from([(
+            NodeKey::from("chain_lightning"),
+            Rank(1),
+        )])),
     ));
     let from = position(sim.world(), player).expect("position");
     let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
@@ -216,7 +219,7 @@ fn a_path_vfx_runs_from_the_caster_through_its_targets_nearest_first() {
         1,
         UseSkillRequest {
             skill: row("ChainLightning"),
-            aim: Aim::Point(aimed),
+            aim: CastAim::Point(aimed),
         },
     );
     assert!(sim.run_until(10.0, |world| {

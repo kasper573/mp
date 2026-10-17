@@ -2,7 +2,7 @@ use bevy_ecs::prelude::*;
 use engine::core::math::Offset;
 use engine::core::tiling::Tiles;
 use engine::core::time::WallClock;
-use engine::systems::class::{self, SkillPoints};
+use engine::systems::class::{self, NodeKey, SkillPoints};
 use engine::systems::combat::AttackRequest;
 use engine::systems::equipment::{EquipmentSlot, UnequipRequest};
 use engine::systems::item::{ItemId, UseItemRequest};
@@ -10,7 +10,7 @@ use engine::systems::movement::position;
 use engine::systems::npc::{self, Pack};
 use engine::systems::reach;
 use engine::systems::skill::{
-    Aim, AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, Cooldowns, Hotbar,
+    AssignBasicAttackRequest, AssignHotbarRequest, BasicAttack, CastAim, Cooldowns, Hotbar,
     HotbarEntry, LearnSkillsRequest, Learned, Rank, ResetAnswerRequest, ResetPrompt, SkillId,
     UseSkillRequest,
 };
@@ -212,7 +212,7 @@ fn clicking_another_player_does_nothing_hostile() {
         1,
         UseSkillRequest {
             skill: row("Slash"),
-            aim: Aim::Actor(other),
+            aim: CastAim::Actor(other),
         },
     );
     settle(&mut sim);
@@ -243,7 +243,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
         1,
         UseSkillRequest {
             skill: row("Cleave"),
-            aim: Aim::Point(at),
+            aim: CastAim::Point(at),
         },
     );
     assert!(
@@ -264,7 +264,7 @@ fn an_area_skill_walks_into_range_lands_at_the_point_and_cools_down() {
         1,
         UseSkillRequest {
             skill: cleave,
-            aim: Aim::Point(at),
+            aim: CastAim::Point(at),
         },
     );
     settle(&mut sim);
@@ -290,7 +290,7 @@ fn a_resource_skill_needs_its_cost_and_eats_it_on_use() {
         1,
         UseSkillRequest {
             skill: row("ThrowKnife"),
-            aim: Aim::Actor(orc),
+            aim: CastAim::Actor(orc),
         },
     );
     settle(&mut sim);
@@ -306,7 +306,7 @@ fn a_resource_skill_needs_its_cost_and_eats_it_on_use() {
         1,
         UseSkillRequest {
             skill: row("ThrowKnife"),
-            aim: Aim::Actor(orc),
+            aim: CastAim::Actor(orc),
         },
     );
     assert!(
@@ -333,7 +333,7 @@ fn a_single_target_cast_engages_its_target_while_walking_and_lets_go_after() {
         1,
         UseSkillRequest {
             skill: row("ThrowKnife"),
-            aim: Aim::Actor(orc),
+            aim: CastAim::Actor(orc),
         },
     );
     sim.tick();
@@ -391,7 +391,7 @@ fn learn(picks: &[(&str, u8)]) -> LearnSkillsRequest {
     LearnSkillsRequest {
         ranks: picks
             .iter()
-            .map(|(node, rank)| ((*node).to_owned(), Rank(*rank)))
+            .map(|(node, rank)| (NodeKey::from(*node), Rank(*rank)))
             .collect(),
     }
 }

@@ -17,13 +17,14 @@ use crate::core::script::{
 use crate::core::tiling::Tiles;
 use crate::systems::actor::Name;
 use crate::systems::actor::model::Face;
+use crate::systems::attention;
 use crate::systems::attention::{AttentionId, AttentionMark};
 use crate::systems::combat::Attitude;
 use crate::systems::history::{self, HistoryEntry, HistoryMark, HistoryTopic};
 use crate::systems::interface::InterfaceSound;
 use crate::systems::item::{Inventory, ItemId, ItemStack};
 use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::player::{CommandLock, sender_player};
+use crate::systems::player::{CommandLock, player_requests};
 use crate::systems::quest::QuestId;
 use crate::systems::reach::{self, Tether};
 use crate::systems::script::{
@@ -32,7 +33,6 @@ use crate::systems::script::{
 };
 use crate::systems::stat;
 use crate::systems::text::LineText;
-use crate::systems::{attention, drain_requests};
 
 pub fn register(app: &mut App) {
     use bevy_replicon::prelude::*;
@@ -362,11 +362,8 @@ pub fn counterpart_of(world: &World, player: Entity) -> Option<Entity> {
 }
 
 pub fn requests(world: &mut World) {
-    for request in drain_requests::<ConversationRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        match request.message {
+    player_requests::<ConversationRequest>(world, false, |world, player, request| {
+        match request {
             ConversationRequest::Pick { step, choice } => pick(world, player, step, choice),
             ConversationRequest::Leave { step } => {
                 if world
@@ -377,7 +374,8 @@ pub fn requests(world: &mut World) {
                 }
             }
         }
-    }
+        Ok(())
+    });
 }
 
 pub fn hold(world: &mut World, sessions: &mut QueryState<Entity, With<ConversationSession>>) {

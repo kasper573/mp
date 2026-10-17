@@ -9,10 +9,8 @@ use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
 use crate::core::content::Content;
-use crate::systems::drain_requests;
 use crate::systems::item::{Inventory, ItemId, ItemKind, ItemStack};
-use crate::systems::notification;
-use crate::systems::player::{may_command, sender_player};
+use crate::systems::player::player_requests;
 use crate::systems::script::condition;
 
 pub fn register(app: &mut App) {
@@ -128,15 +126,7 @@ pub fn unequip_slot(world: &mut World, player: Entity, slot: EquipmentSlot) -> R
 }
 
 pub fn unequip(world: &mut World) {
-    for request in drain_requests::<UnequipRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !may_command(world, player) {
-            continue;
-        }
-        if let Err(refusal) = unequip_slot(world, player, request.message.slot) {
-            notification::error(world, player, refusal);
-        }
-    }
+    player_requests::<UnequipRequest>(world, true, |world, player, request| {
+        unequip_slot(world, player, request.slot)
+    });
 }

@@ -100,6 +100,20 @@ pub struct Footprint {
 }
 
 impl Footprint {
+    /// Where a cast from `from` toward `point` lays a shape down: a circle or a rectangle sits on
+    /// the point, a cone or a line reaches out from the caster toward it.
+    pub fn cast(shape: Shape, from: Pos<Tiles>, point: Pos<Tiles>) -> Footprint {
+        let at = match shape {
+            Shape::Cone { .. } | Shape::Line { .. } => from,
+            Shape::Circle { .. } | Shape::Rect { .. } => point,
+        };
+        Footprint {
+            at,
+            facing: facing_from(from, point),
+            shape,
+        }
+    }
+
     pub fn contains(&self, point: Pos<Tiles>) -> bool {
         let offset = point - self.at;
         match self.shape {

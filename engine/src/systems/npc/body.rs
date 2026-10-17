@@ -251,7 +251,8 @@ fn step(world: &mut World, npc: Entity, running: Running) -> Option<Outcome> {
             let casting = reach::current(world, npc).is_some_and(|intent| {
                 intent.target.actor() == Some(target) && intent.cast() == Some(skill)
             });
-            if !casting && skill::cast(world, npc, skill, skill::Aim::Actor(target), true).is_err()
+            if !casting
+                && skill::cast(world, npc, skill, skill::CastAim::Actor(target), true).is_err()
             {
                 return Some(Outcome::Lost);
             }

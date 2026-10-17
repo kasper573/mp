@@ -1,7 +1,5 @@
-//! What the bench's players do, so a tick carries the load of a server whose players play: each
-//! joins as one of the content's test characters that start in the area, and every couple of
-//! seconds casts the next skill on its bar at whatever fits, walking into range, cooling down,
-//! being refused, spreading statuses and raising vfx exactly as a live player does.
+//! The bench's players play, so a tick carries the load of a live server rather than of idle
+//! characters: they join as the content's test characters and cast through the game's own path.
 
 use bevy_ecs::prelude::*;
 use engine::core::content::Content;
@@ -13,7 +11,7 @@ use engine::systems::movement::Position;
 use engine::systems::npc::Npc;
 use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs, start_of};
 use engine::systems::player::{ClientId, Players};
-use engine::systems::skill::{Aim, Hotbar, HotbarEntry, SkillDef, Targeting, UseSkillRequest};
+use engine::systems::skill::{CastAim, Hotbar, HotbarEntry, SkillDef, Targeting, UseSkillRequest};
 
 /// Ticks between one player's casts: two seconds at the server's rate.
 pub const CAST_EVERY: usize = 60;
@@ -65,20 +63,22 @@ pub fn act(world: &mut World, content: &Content, roster: &[Entity], tick: usize)
             continue;
         };
         let aim = match def.target {
-            Targeting::Caster => Aim::None,
+            Targeting::Caster => CastAim::None,
             Targeting::SingleEnemy => match nearest_npc(world, at) {
-                Some((npc, _)) => Aim::Actor(npc),
+                Some((npc, _)) => CastAim::Actor(npc),
                 None => continue,
             },
             Targeting::SingleAlly => {
                 let other = roster[(index + 1) % roster.len()];
                 match player_of(world, other) {
-                    Some(ally) => Aim::Actor(ally),
+                    Some(ally) => CastAim::Actor(ally),
                     None => continue,
                 }
             }
-            Targeting::AreaEnemy => Aim::Point(nearest_npc(world, at).map_or(at, |(_, pos)| pos)),
-            Targeting::AreaAlly => Aim::Point(at),
+            Targeting::AreaEnemy => {
+                CastAim::Point(nearest_npc(world, at).map_or(at, |(_, pos)| pos))
+            }
+            Targeting::AreaAlly => CastAim::Point(at),
         };
         from_client(world, conn, UseSkillRequest { skill, aim });
     }

@@ -419,7 +419,7 @@ pub fn tick<V: Vocabulary>(world: &mut World) {
         for key in due {
             instances.queue.push_back(Queued::Resume {
                 key,
-                answer: Answer::Output("next"),
+                answer: Answer::Output(super::NEXT),
             });
         }
         tick

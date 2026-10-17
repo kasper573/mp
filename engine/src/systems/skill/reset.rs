@@ -8,12 +8,12 @@ use super::{Cooldowns, Learned};
 use crate::core::script::{Answer, Compiler, EffectDef, EffectStep, Name, ScriptFault};
 use crate::systems::class::{self, SkillPoints};
 use crate::systems::history::{HistoryTopic, RecordTally};
-use crate::systems::notification::{self, Notification, NotificationKind};
-use crate::systems::player::{self, sender_player};
+use crate::systems::notification::{self, Notification};
+use crate::systems::player::{self, player_requests};
 use crate::systems::script::effect::{self as effects, Aim, Arrow, Link};
 use crate::systems::script::{EffectCall, FlowKey, Reach, RiftInstances, RiftScripting};
-use crate::systems::text::LineText;
-use crate::systems::{drain_requests, stat};
+use crate::systems::stat;
+use crate::systems::text::counted;
 
 /// Asks the player before forgetting every learned rank and returning the points. The answer
 /// picks the output, so whatever the reset costs is wired after it by the script.
@@ -85,21 +85,19 @@ impl EffectDef<RiftScripting> for ResetSkills {
 }
 
 pub fn answers(world: &mut World) {
-    for request in drain_requests::<ResetAnswerRequest>(world) {
-        let Some(player) = sender_player(world, request.client_id) else {
-            continue;
-        };
+    player_requests::<ResetAnswerRequest>(world, false, |world, player, request| {
         let Some(flow) = world.resource_mut::<PendingResets>().0.remove(&player) else {
-            continue;
+            return Ok(());
         };
         world.entity_mut(player).remove::<ResetPrompt>();
-        if request.message.accepted {
+        if request.accepted {
             reset(world, player);
             answer(world, flow, ACCEPTED);
         } else {
             answer(world, flow, DECLINED);
         }
-    }
+        Ok(())
+    });
 }
 
 /// A prompt nobody can answer any more, because its player died, left or is being moved, is
@@ -135,27 +133,33 @@ pub fn reset(world: &mut World, player: Entity) {
     notification::notify(
         world,
         player,
-        Notification::new(
-            NotificationKind::Feed {
-                topic: HistoryTopic::Notification,
-                icon: None,
-                tally: Some(RecordTally::Change(returned.0 as i32)),
-                failure: false,
-                sfx: None,
-            },
-            LineText::plain("Skills reset, skill points returned"),
-        ),
+        Notification::feed(
+            HistoryTopic::Notification,
+            "Skills reset, skill points returned",
+        )
+        .tally(RecordTally::Change(
+            i32::try_from(returned.0).unwrap_or(i32::MAX),
+        )),
     );
 }
 
 pub fn prompt(world: &World, player: Entity) -> ResetPrompt {
     let learned = world.get::<Learned>(player);
     ResetPrompt {
-        ranks: learned.map_or(0, |learned| learned.ranks() as u32),
-        skills: learned.map_or(0, |learned| {
-            learned.0.values().filter(|rank| rank.0 > 0).count() as u32
-        }),
+        ranks: learned.map_or(0, Learned::ranks),
+        skills: learned.map_or(0, |learned| learned.skills_held()),
         points: class::spent_points(world, player),
+    }
+}
+
+impl ResetPrompt {
+    pub fn describe(self) -> String {
+        format!(
+            "Forget {} across {}; {} come back",
+            counted(self.ranks, "rank"),
+            counted(self.skills, "skill"),
+            counted(self.points.0, "point"),
+        )
     }
 }
 
@@ -163,19 +167,4 @@ fn answer(world: &mut World, flow: FlowKey, output: Name) {
     world
         .resource_mut::<RiftInstances>()
         .answer(flow, Answer::Output(output));
-}
-
-impl ResetPrompt {
-    pub fn describe(self) -> String {
-        let prompt = self;
-        format!(
-            "Forget {} rank{} across {} skill{}; {} point{} come back",
-            prompt.ranks,
-            if prompt.ranks == 1 { "" } else { "s" },
-            prompt.skills,
-            if prompt.skills == 1 { "" } else { "s" },
-            prompt.points.0,
-            if prompt.points.0 == 1 { "" } else { "s" },
-        )
-    }
 }

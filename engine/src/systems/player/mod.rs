@@ -31,6 +31,7 @@ use crate::systems::history::History;
 use crate::systems::item::{Inventory, ItemId};
 use crate::systems::memory::Memory;
 use crate::systems::movement::{HeardMove, Position};
+use crate::systems::notification;
 use crate::systems::quest::QuestLog;
 use crate::systems::script::{EventKind, Place};
 use crate::systems::shop::{self, ShopLedger};
@@ -82,7 +83,7 @@ pub struct Xp {
 
 impl Xp {
     pub fn gain(&mut self, amount: u32) {
-        self.amount += amount;
+        self.amount = self.amount.saturating_add(amount);
     }
 }
 
@@ -196,6 +197,26 @@ pub fn held(world: &World, entity: Entity) -> bool {
     world.get::<ArrivalHold>(entity).is_some()
 }
 
+/// Answers every request of a kind for the player who sent it, telling them what refused one;
+/// `commanding` requests are dropped while the player may not command their character.
+pub(crate) fn player_requests<M: Message>(
+    world: &mut World,
+    commanding: bool,
+    mut answer: impl FnMut(&mut World, Entity, M) -> Result<(), String>,
+) {
+    for request in drain_requests::<M>(world) {
+        let Some(player) = sender_player(world, request.client_id) else {
+            continue;
+        };
+        if commanding && !may_command(world, player) {
+            continue;
+        }
+        if let Err(reason) = answer(world, player, request.message) {
+            notification::error(world, player, reason);
+        }
+    }
+}
+
 pub fn arrival_holds(world: &mut World) {
     for request in drain_requests::<AreaDrawn>(world) {
         if let Some(player) = sender_player(world, request.client_id)
@@ -273,9 +294,13 @@ pub struct SpawnRules {
 pub fn join(world: &mut World) {
     let zone = world.resource::<WorldArea>().0;
     let content = world.resource::<Content>().clone();
-    let area = area::load(&content, zone);
     let SpawnRules { policy, immortal } = *world.resource::<SpawnRules>();
-    for request in drain_requests::<JoinRequest>(world) {
+    let requests = drain_requests::<JoinRequest>(world);
+    if requests.is_empty() {
+        return;
+    }
+    let area = area::load(&content, zone);
+    for request in requests {
         let Some(client_entity) = request.client_id.entity() else {
             continue;
         };
@@ -457,19 +482,16 @@ pub(crate) fn place(
 
 pub fn respawn(world: &mut World) {
     let content = world.resource::<Content>().clone();
-    for request in drain_requests::<RespawnRequest>(world) {
-        let Some(entity) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !stat::is_dead(world, entity) {
-            continue;
+    player_requests::<RespawnRequest>(world, false, |world, player, _| {
+        let spawn = world.get::<SpawnPoint>(player).map(|spawn| spawn.0);
+        if let Some(spawn) = spawn
+            && stat::is_dead(world, player)
+        {
+            if let Some(mut memory) = world.get_mut::<Memory>(player) {
+                memory.leave_area(&content);
+            }
+            combat::revive(world, player, spawn);
         }
-        let Some(spawn) = world.get::<SpawnPoint>(entity).map(|spawn| spawn.0) else {
-            continue;
-        };
-        if let Some(mut memory) = world.get_mut::<Memory>(entity) {
-            memory.leave_area(&content);
-        }
-        combat::revive(world, entity, spawn);
-    }
+        Ok(())
+    });
 }

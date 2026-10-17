@@ -572,6 +572,9 @@ fn compile_source<'c, V: Vocabulary>(
                         ),
                     ));
                 }
+                if let Err(fault) = event.check() {
+                    return Err(node_fail(fault.rule, fault.expected));
+                }
                 if cx.stack.is_empty() && event.is_run() && binding.owner != V::OwnerKind::ANY {
                     return Err(node_fail(
                         "event not raised here",

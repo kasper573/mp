@@ -206,7 +206,7 @@ pub fn server_app(
                     equipment::unequip,
                     skill::reset::expire,
                     actor::playing::progress,
-                    skill::using::casts,
+                    skill::casting::casts,
                     reach::mirror_engaged,
                 )
                     .chain(),
@@ -490,6 +490,7 @@ pub fn registry() -> ContentRegistry {
         .hook(LoadStep::Across, notification::check_all)
         .hook(LoadStep::Across, script::check_all)
         .hook(LoadStep::Across, class::check_all)
+        .hook(LoadStep::Across, npc::check_all)
         .hook(LoadStep::Across, skill::check_all)
         .hook(LoadStep::Across, player::snapshot::check_all)
         .hook(LoadStep::Settings, check_settings);

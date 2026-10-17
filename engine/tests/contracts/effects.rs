@@ -4,11 +4,11 @@ use bevy_ecs::prelude::*;
 use engine::core::math::Offset;
 use engine::core::time::Seconds;
 use engine::core::vfx::{VfxId, VfxInstance, VfxSite};
-use engine::systems::class;
+use engine::systems::class::{self, NodeKey};
 use engine::systems::equipment::{self, EquipmentSlot, UnequipRequest};
 use engine::systems::item::{Inventory, ItemId, UseItemRequest};
 use engine::systems::skill::{
-    self, Aim, AssignHotbarRequest, Hotbar, HotbarEntry, Rank, UseSkillRequest,
+    self, AssignHotbarRequest, CastAim, Hotbar, HotbarEntry, Rank, UseSkillRequest,
 };
 use engine::systems::stat::{self, StatKind};
 use engine::systems::status::{self, StatusCategory, Statuses};
@@ -190,8 +190,12 @@ fn a_passive_skill_holds_its_boost_while_known_and_cannot_be_cast_or_slotted() {
     settle(&mut sim);
     let base = stat::max_health(sim.world(), player);
 
-    skill::learn::learn(sim.world(), player, &[("toughness".to_owned(), Rank(1))])
-        .expect("toughness is learned");
+    skill::learn::learn(
+        sim.world(),
+        player,
+        &[(NodeKey::from("toughness"), Rank(1))],
+    )
+    .expect("toughness is learned");
     settle(&mut sim);
     assert_eq!(stat::max_health(sim.world(), player), base + 6.0);
 
@@ -200,7 +204,7 @@ fn a_passive_skill_holds_its_boost_while_known_and_cannot_be_cast_or_slotted() {
         1,
         UseSkillRequest {
             skill: row("Toughness"),
-            aim: Aim::Actor(player),
+            aim: CastAim::Actor(player),
         },
     );
     settle(&mut sim);
@@ -291,7 +295,7 @@ fn an_area_skill_leaves_its_status_on_everyone_it_hit() {
     settle(&mut sim);
     sim.world().entity_mut(player).insert((
         class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([("fireball".to_owned(), Rank(1))])),
+        skill::Learned(BTreeMap::from([(NodeKey::from("fireball"), Rank(1))])),
     ));
     let from = position(sim.world(), player).expect("position");
     let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
@@ -304,7 +308,7 @@ fn an_area_skill_leaves_its_status_on_everyone_it_hit() {
         1,
         UseSkillRequest {
             skill: row("Fireball"),
-            aim: Aim::Point(aimed),
+            aim: CastAim::Point(aimed),
         },
     );
     assert!(sim.run_until(10.0, |world| {
@@ -322,7 +326,7 @@ fn an_area_skill_leaves_its_status_on_a_monster_running_its_own_script() {
     settle(&mut sim);
     sim.world().entity_mut(player).insert((
         class::Class { def: row("Mage") },
-        skill::Learned(BTreeMap::from([("fireball".to_owned(), Rank(1))])),
+        skill::Learned(BTreeMap::from([(NodeKey::from("fireball"), Rank(1))])),
     ));
     let from = position(sim.world(), player).expect("position");
     let aimed = sim.walkable_toward(from, Offset::new(3.0, 0.0));
@@ -340,7 +344,7 @@ fn an_area_skill_leaves_its_status_on_a_monster_running_its_own_script() {
         1,
         UseSkillRequest {
             skill: row("Fireball"),
-            aim: Aim::Point(aimed),
+            aim: CastAim::Point(aimed),
         },
     );
     assert!(sim.run_until(10.0, |world| status::has(world, monster, row("Burning"))));

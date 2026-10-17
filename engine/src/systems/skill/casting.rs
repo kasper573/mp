@@ -3,41 +3,40 @@ use bevy_ecs::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{Cooldowns, Rank, SkillDef, SkillId, SkillKind, Targeting};
+use super::{Cooldowns, Rank, SkillId, SkillKind, Targeting};
 use crate::core::content::Content;
 use crate::core::math::Pos;
 use crate::core::script::{
-    Compiler, EffectDef, EffectStep, Eval, Name, ScriptFault, Value, ValueType,
+    Compiler, EffectDef, EffectStep, Eval, NEXT, Name, ScriptFault, Value, ValueType,
 };
 use crate::core::tiling::Tiles;
 use crate::core::time::WallClock;
 use crate::systems::actor::{self, playing};
-use crate::systems::area;
 use crate::systems::combat::{self, Relation};
 use crate::systems::item::Inventory;
 use crate::systems::movement::{halt, on_tile};
 use crate::systems::notification;
-use crate::systems::player::{self, sender_player};
+use crate::systems::player::{self, player_requests};
 use crate::systems::reach::{self, Pursuit, ReachAct, ReachTarget};
-use crate::systems::script::effect::{self as effects, Aim as Who, Arrow, Audience, Link};
+use crate::systems::script::effect::{self as effects, Aim, Arrow, Audience, Link};
+use crate::systems::script::event;
 use crate::systems::script::{
     Condition, EffectCall, EventKind, Owner as ScriptOwner, OwnerKind, Reach, RiftInstances,
     RiftScripting, condition,
 };
-use crate::systems::visibility;
-use crate::systems::{drain_requests, stat};
+use crate::systems::stat;
 
 #[derive(Message, Serialize, Deserialize, MapEntities, Clone, Debug, PartialEq)]
 pub struct UseSkillRequest {
     pub skill: SkillId,
     #[entities]
-    pub aim: Aim,
+    pub aim: CastAim,
 }
 
-/// What a use is aimed at: an actor for the single kinds, a point for the area kinds, nothing for
+/// What a cast is aimed at: an actor for the single kinds, a point for the area kinds, nothing for
 /// a skill on yourself.
 #[derive(Serialize, Deserialize, MapEntities, Clone, Copy, Debug, PartialEq)]
-pub enum Aim {
+pub enum CastAim {
     Actor(#[entities] Entity),
     Point(Pos<Tiles>),
     None,
@@ -47,7 +46,7 @@ pub enum Aim {
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 pub struct UseSkill {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub who: Who,
+    pub who: Aim,
     pub skill: SkillId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<Condition>,
@@ -58,18 +57,9 @@ pub struct UseSkill {
 }
 
 pub fn request(world: &mut World) {
-    for request in drain_requests::<UseSkillRequest>(world) {
-        let Some(caster) = sender_player(world, request.client_id) else {
-            continue;
-        };
-        if !player::may_command(world, caster) {
-            continue;
-        }
-        let UseSkillRequest { skill, aim } = request.message;
-        if let Err(reason) = cast(world, caster, skill, aim, false) {
-            notification::error(world, caster, reason);
-        }
-    }
+    player_requests::<UseSkillRequest>(world, true, |world, caster, request| {
+        cast(world, caster, request.skill, request.aim, false)
+    });
 }
 
 /// Sets out to use a skill: refused at once when the caster does not know it, it is cooling down,
@@ -78,22 +68,21 @@ pub fn cast(
     world: &mut World,
     caster: Entity,
     skill: SkillId,
-    aim: Aim,
+    aim: CastAim,
     repeat: bool,
 ) -> Result<(), String> {
     let content = world.resource::<Content>().clone();
     let def = skill.get(&content);
-    let rank = super::rank_of(world, caster, skill);
-    if rank == Rank::NONE {
+    if super::rank_of(world, caster, skill) == Rank::NONE {
         return Err(format!("You don't know {}", def.name));
     }
     if def.kind == SkillKind::Passive {
         return Err(format!("{} is passive: it holds on its own", def.name));
     }
-    ready(world, caster, skill, rank)?;
+    ready(world, caster, skill)?;
     let target = match (def.target, aim) {
         (Targeting::Caster, _) => ReachTarget::Actor(caster),
-        (Targeting::SingleAlly | Targeting::SingleEnemy, Aim::Actor(target)) => {
+        (Targeting::SingleAlly | Targeting::SingleEnemy, CastAim::Actor(target)) => {
             if !fits(world, caster, target, def.target) {
                 return Err(format!("{} can't target them", def.name));
             }
@@ -102,7 +91,7 @@ pub fn cast(
         (Targeting::SingleAlly | Targeting::SingleEnemy, _) => {
             return Err(format!("{} needs a target", def.name));
         }
-        (Targeting::AreaAlly | Targeting::AreaEnemy, Aim::Point(point)) => {
+        (Targeting::AreaAlly | Targeting::AreaEnemy, CastAim::Point(point)) => {
             ReachTarget::Point(point)
         }
         (Targeting::AreaAlly | Targeting::AreaEnemy, _) => {
@@ -115,7 +104,7 @@ pub fn cast(
 
 /// Whether a skill may be used now by someone who knows it: not cooling down, its requirements
 /// holding and its cost in the bag.
-pub fn ready(world: &World, caster: Entity, skill: SkillId, rank: Rank) -> Result<(), String> {
+pub fn ready(world: &World, caster: Entity, skill: SkillId) -> Result<(), String> {
     let content = world.resource::<Content>();
     let def = skill.get(content);
     let now = world.resource::<WallClock>().now;
@@ -141,18 +130,13 @@ pub fn ready(world: &World, caster: Entity, skill: SkillId, rank: Rank) -> Resul
             ));
         }
     }
-    let _ = rank;
     Ok(())
 }
 
-/// Whether an actor stands to the caster as the skill's kind wants.
+/// The one rule for whom a skill of a kind may land on: an actor the caster could reach, not held
+/// in an arrival, standing to the caster as the kind wants.
 pub fn fits(world: &World, caster: Entity, target: Entity, targeting: Targeting) -> bool {
-    if world.get_entity(target).is_err()
-        || stat::is_dead(world, target)
-        || player::held(world, target)
-        || !area::same_area(world, caster, target)
-        || !visibility::coexist(world, caster, target)
-    {
+    if !reach::pursuable(world, caster, target) || player::held(world, target) {
         return false;
     }
     let relation = combat::relation(world, caster, target);
@@ -172,12 +156,8 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
         let (ReachAct::Cast { skill, repeat }, target) = (intent.act, intent.target) else {
             continue;
         };
-        if stat::is_dead(world, caster) {
-            reach::forget(world, caster);
-            continue;
-        }
         let rank = super::rank_of(world, caster, skill);
-        if rank == Rank::NONE {
+        if stat::is_dead(world, caster) || rank == Rank::NONE {
             reach::forget(world, caster);
             continue;
         }
@@ -201,7 +181,7 @@ pub fn casts(world: &mut World, intents: &mut reach::Intents) {
             reach::forget(world, caster);
             continue;
         }
-        if let Err(reason) = ready(world, caster, skill, rank) {
+        if let Err(reason) = ready(world, caster, skill) {
             if world.get::<player::Owner>(caster).is_some() {
                 notification::error(world, caster, reason);
             }
@@ -264,16 +244,11 @@ fn perform(world: &mut World, caster: Entity, skill: SkillId, rank: Rank, target
         ScriptOwner::Row(OwnerKind::Skill, skill.raw()),
         EventKind::Used,
         Some(caster),
-        vec![
-            Value::Actor(target.actor()),
-            Value::Point(target.point()),
-            Value::Int(i64::from(rank.0)),
-        ],
+        event::used_payload(target.actor(), target.point(), i64::from(rank.0)),
         |_| true,
     );
 }
 
-const NEXT: Name = "next";
 const REFUSED: Name = "refused";
 
 impl EffectDef<RiftScripting> for UseSkill {
@@ -310,11 +285,11 @@ impl EffectDef<RiftScripting> for UseSkill {
                 return EffectStep::Output(REFUSED);
             };
             let aim = match &at {
-                None => Aim::None,
+                None => CastAim::None,
                 Some((eval, _)) => match eval(world, cx) {
-                    Value::Actor(Some(actor)) => Aim::Actor(actor),
-                    Value::Point(Some(point)) => Aim::Point(point),
-                    _ => Aim::None,
+                    Value::Actor(Some(actor)) => CastAim::Actor(actor),
+                    Value::Point(Some(point)) => CastAim::Point(point),
+                    _ => CastAim::None,
                 },
             };
             match cast(world, caster, skill, aim, false) {
@@ -325,15 +300,5 @@ impl EffectDef<RiftScripting> for UseSkill {
     }
     fn reach(&self, _cx: &Compiler<RiftScripting>) -> Vec<Reach> {
         vec![Reach::Casts(self.skill)]
-    }
-}
-
-impl SkillDef {
-    pub fn aims_at(&self) -> &'static str {
-        match self.target {
-            Targeting::SingleAlly | Targeting::SingleEnemy => "an actor",
-            Targeting::AreaAlly | Targeting::AreaEnemy => "a point",
-            Targeting::Caster => "yourself",
-        }
     }
 }

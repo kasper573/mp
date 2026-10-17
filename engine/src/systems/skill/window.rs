@@ -10,13 +10,14 @@ use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
 use crate::core::content::Content;
 use crate::core::gui;
 use crate::core::text::{StyledLine, TextPiece};
-use crate::systems::class::{self, ClassDef, SkillPoints};
+use crate::systems::class::{self, ClassDef, NodeKey, SkillPoints};
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::{InterfaceIcon, InterfaceSound};
 use crate::systems::notification;
 use crate::systems::player::session;
 use crate::systems::skill::bar;
+use crate::systems::text::counted;
 
 const WINDOW_SIZE: Vec2 = Vec2::new(560.0, 440.0);
 const NODE_RADIUS: f32 = 24.0;
@@ -95,7 +96,7 @@ struct Panned {
 
 /// The ranks picked in the window and not yet confirmed, one rank per node.
 #[derive(Resource, Default, Clone, Debug, PartialEq)]
-pub struct Plan(pub BTreeMap<String, Rank>);
+pub struct Plan(pub BTreeMap<NodeKey, Rank>);
 
 /// A skill being dragged out of the tree or an item card, toward a slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,7 +143,7 @@ impl Sheet {
         })
     }
 
-    fn planned_ranks(&self, plan: &Plan) -> BTreeMap<String, Rank> {
+    fn planned_ranks(&self, plan: &Plan) -> BTreeMap<NodeKey, Rank> {
         let mut ranks = self.learned.0.clone();
         for (key, rank) in &plan.0 {
             ranks.insert(key.clone(), *rank);
@@ -195,9 +196,9 @@ fn header(ui: &mut Ui, world: &mut World, sheet: &Sheet) {
             RichText::new(format!("{} · level {}", def.name, sheet.level))
                 .family(design_tokens::family::medium()),
         );
-        let mut pill = format!("{} to spend", points(left.0));
+        let mut pill = format!("{} to spend", counted(left.0, "point"));
         if picked.0 > 0 {
-            pill.push_str(&format!(" · {} picked", points(picked.0)));
+            pill.push_str(&format!(" · {} picked", counted(picked.0, "point")));
         }
         let color = if left.0 > 0 || picked.0 > 0 {
             color::WARN
@@ -324,7 +325,7 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
             Color32::WHITE,
         );
     }
-    let states: BTreeMap<&str, NodeState> = tree
+    let states: BTreeMap<&NodeKey, NodeState> = tree
         .0
         .iter()
         .map(|(key, node)| {
@@ -343,7 +344,7 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
                 }
                 None => NodeState::Locked,
             };
-            (key.as_str(), state)
+            (key, state)
         })
         .collect();
     let painter = ui.painter().clone();
@@ -358,7 +359,7 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
         draw_arrow(&painter, place.at(from.at), place.at(to.at), color);
     }
     for (key, node) in &tree.0 {
-        let state = states[key.as_str()];
+        let state = states[key];
         let center = place.at(node.at);
         let rect = Rect::from_center_size(center, Vec2::splat(NODE_RADIUS * 2.0));
         let response = ui.interact(rect, ui.id().with(("node", key)), Sense::click_and_drag());
@@ -386,7 +387,7 @@ fn node_input(
     ui: &mut Ui,
     world: &mut World,
     sheet: &Sheet,
-    key: &str,
+    key: &NodeKey,
     skill: SkillId,
     state: NodeState,
     response: &egui::Response,
@@ -419,7 +420,7 @@ fn node_input(
                 rank: held,
                 node: Some(NodeAccess {
                     class: sheet.class,
-                    node: key.to_owned(),
+                    node: key.clone(),
                 }),
             },
         );
@@ -436,13 +437,13 @@ fn node_input(
         rank: held,
         node: Some(NodeAccess {
             class: sheet.class,
-            node: key.to_owned(),
+            node: key.clone(),
         }),
     };
     card::tooltip(response, world, &card, Some(&hint));
 }
 
-fn pick(world: &mut World, sheet: &Sheet, key: &str, state: NodeState) {
+fn pick(world: &mut World, sheet: &Sheet, key: &NodeKey, state: NodeState) {
     let content = world.resource::<Content>().clone();
     let def = sheet.class.get(&content);
     match state {
@@ -455,7 +456,7 @@ fn pick(world: &mut World, sheet: &Sheet, key: &str, state: NodeState) {
                     plan.0
                         .keys()
                         .find(|picked| {
-                            def.tree.node(picked).is_some_and(|node| {
+                            def.tree.node(*picked).is_some_and(|node| {
                                 !node.requires.iter().all(|requirement| {
                                     requirement.met(world, sheet.me, def, &planned)
                                 })
@@ -486,7 +487,7 @@ fn pick(world: &mut World, sheet: &Sheet, key: &str, state: NodeState) {
                 InterfaceSound::UiRefuse.play(world);
                 return;
             }
-            world.resource_mut::<Plan>().0.insert(key.to_owned(), next);
+            world.resource_mut::<Plan>().0.insert(key.clone(), next);
             InterfaceSound::UiPick.play(world);
         }
         NodeState::Locked | NodeState::Maxed => InterfaceSound::UiRefuse.play(world),
@@ -507,7 +508,8 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
             .max_rect(dock)
             .layout(egui::Layout::right_to_left(egui::Align::Center)),
         |ui| {
-            let confirm = widgets::primary(ui, &format!("Confirm · {}", points(picked.0)));
+            let confirm =
+                widgets::primary(ui, &format!("Confirm · {}", counted(picked.0, "point")));
             gui::tooltip(&confirm, |ui| {
                 ui.label("Spends the picked points for good");
             });
@@ -516,7 +518,7 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
                 ui.label("Takes every pick back; nothing is spent");
             });
             if confirm.clicked() {
-                let ranks: Vec<(String, Rank)> = plan
+                let ranks: Vec<(NodeKey, Rank)> = plan
                     .0
                     .iter()
                     .map(|(key, rank)| (key.clone(), *rank))
@@ -679,14 +681,6 @@ fn badge(painter: &egui::Painter, at: Pos2, text: &str, ink: Color32) {
 
 fn gold_fill() -> Color32 {
     Color32::from_rgba_unmultiplied(color::WARN.r(), color::WARN.g(), color::WARN.b(), 70)
-}
-
-fn points(count: u32) -> String {
-    if count == 1 {
-        "1 point".to_owned()
-    } else {
-        format!("{count} points")
-    }
 }
 
 /// Where the designer's canvas origin lands on screen.

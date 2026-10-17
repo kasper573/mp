@@ -129,23 +129,18 @@ pub fn play(
 ) -> Option<Playing> {
     let content = world.resource::<Content>().clone();
     let now = world.resource::<WallClock>().now;
-    let speed = PlaybackRate(stat::effective(world, actor, StatKind::AttackSpeed)).at_least(0.01);
+    let speed = PlaybackRate(stat::effective(world, actor, StatKind::AttackSpeed));
     let mut component = world.get_mut::<Actor>(actor)?;
     let dir = toward.unwrap_or(component.dir);
     super::set_facing(&mut component, dir, action);
     component.attack_rate = speed;
     let model = component.model;
-    let timing = ActorModel::get(&content, model).timing(action, dir);
-    let rate = if action == Action::Attack {
-        speed
-    } else {
-        PlaybackRate(1.0)
-    };
+    let timing = ActorModel::get(&content, model).timing(action, dir, speed);
     let playing = Playing {
         action,
         started: now,
-        apex: now.after(timing.apex / rate),
-        ends: now.after(timing.duration / rate),
+        apex: now.after(timing.apex),
+        ends: now.after(timing.duration),
     };
     interrupt(world, actor);
     world.entity_mut(actor).insert(playing);
@@ -182,11 +177,7 @@ pub fn progress(world: &mut World, playing: &mut QueryState<Entity, With<Playing
                 .entity_mut(actor)
                 .remove::<Playing>()
                 .insert(LastAction { at: played.ends });
-            if let Some(awaited) = world.entity_mut(actor).take::<Awaited>()
-                && (awaited.wait == Wait::End || !awaited.apex_answered)
-            {
-                answer(world, awaited.flow, NEXT);
-            }
+            settle_awaited(world, actor, NEXT);
         }
     }
 }
@@ -204,13 +195,17 @@ pub fn ready(world: &World, actor: Entity) -> bool {
 }
 
 fn interrupt(world: &mut World, actor: Entity) {
-    let mut entity = world.entity_mut(actor);
-    let awaited = entity.take::<Awaited>();
-    entity.remove::<Playing>();
-    if let Some(awaited) = awaited
+    world.entity_mut(actor).remove::<Playing>();
+    settle_awaited(world, actor, INTERRUPTED);
+}
+
+/// An action's end answers the script still waiting on it: one that waited for the end, or one
+/// that waited for an apex that never came.
+fn settle_awaited(world: &mut World, actor: Entity, output: Name) {
+    if let Some(awaited) = world.entity_mut(actor).take::<Awaited>()
         && (awaited.wait == Wait::End || !awaited.apex_answered)
     {
-        answer(world, awaited.flow, INTERRUPTED);
+        answer(world, awaited.flow, output);
     }
 }
 

@@ -203,6 +203,48 @@ impl Notification {
         }
     }
 
+    /// A row of the feed under a topic, bare until given an icon, a tally, a sound or a failure.
+    pub fn feed(topic: HistoryTopic, text: impl Into<String>) -> Notification {
+        Notification::new(
+            NotificationKind::Feed {
+                topic,
+                icon: None,
+                tally: None,
+                failure: false,
+                sfx: None,
+            },
+            LineText::plain(text),
+        )
+    }
+
+    pub fn icon(mut self, path: String) -> Notification {
+        if let NotificationKind::Feed { icon, .. } = &mut self.kind {
+            *icon = Some(path);
+        }
+        self
+    }
+
+    pub fn tally(mut self, counted: RecordTally) -> Notification {
+        if let NotificationKind::Feed { tally, .. } = &mut self.kind {
+            *tally = Some(counted);
+        }
+        self
+    }
+
+    pub fn failed(mut self) -> Notification {
+        if let NotificationKind::Feed { failure, .. } = &mut self.kind {
+            *failure = true;
+        }
+        self
+    }
+
+    pub fn sound(mut self, heard: SfxId) -> Notification {
+        if let NotificationKind::Feed { sfx, .. } = &mut self.kind {
+            *sfx = Some(heard);
+        }
+        self
+    }
+
     pub fn stays(&self) -> Seconds {
         self.lasts
             .unwrap_or_else(|| reading(self.text.word_count()))

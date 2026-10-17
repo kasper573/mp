@@ -113,6 +113,15 @@ impl From<Span> for SpanRow {
     }
 }
 
+/// A count of a noun: "1 rank", "3 ranks".
+pub fn counted(count: u32, noun: &str) -> String {
+    if count == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{count} {noun}s")
+    }
+}
+
 pub fn plain(text: impl Into<String>) -> Span {
     Span::Text {
         text: text.into(),

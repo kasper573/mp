@@ -31,6 +31,8 @@ pub use value::{Value, ValueType};
 use crate::core::content::{Content, ContentId, ContentRow};
 
 pub type Name = &'static str;
+/// The output an effect takes when nothing else is said.
+pub const NEXT: Name = "next";
 pub type Arrow = Option<String>;
 pub type Link<'a> = Option<&'a str>;
 
@@ -126,6 +128,10 @@ pub trait EventDef<V: Vocabulary>: Clone {
     fn has_subject(&self) -> bool;
     fn is_run(&self) -> bool;
     fn fields(&self) -> &'static [(Name, ValueType)];
+    /// The rules the event's own values keep, beyond what the schema says.
+    fn check(&self) -> Result<(), ScriptFault> {
+        Ok(())
+    }
 }
 
 pub trait RevealDef: Copy + Eq + std::hash::Hash + fmt::Debug + Send + Sync + 'static {

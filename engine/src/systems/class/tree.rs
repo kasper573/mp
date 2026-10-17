@@ -1,4 +1,6 @@
+use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use bevy_ecs::prelude::*;
 use egui::{Pos2, Rect, Vec2};
@@ -6,18 +8,23 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::assets::AssetRef;
-use crate::core::content::{Content, RowCheck};
-use crate::systems::player::Xp;
-use crate::systems::script::condition;
-use crate::systems::script::{Condition, condition::CompiledCondition};
+use crate::core::content::{Content, ContentProblem, RowCheck, id};
+use crate::systems::script::{Condition, condition};
 use crate::systems::skill::{Rank, SkillId};
 
 /// How far apart two nodes must sit on the canvas, in canvas units, not to overlap.
 pub const NODE_EXTENT: f32 = 56.0;
 
+/// The name of a node within its class tree, as the row keys it.
+#[derive(
+    JsonSchema, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(transparent)]
+pub struct NodeKey(pub String);
+
 #[derive(JsonSchema, Clone, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct SkillTree(pub BTreeMap<String, SkillNode>);
+pub struct SkillTree(pub BTreeMap<NodeKey, SkillNode>);
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,9 +39,9 @@ pub struct SkillNode {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AccessRequirement {
     Skill {
-        node: String,
+        node: NodeKey,
         #[schemars(extend("default" = 1))]
-        #[serde(default = "first_rank", skip_serializing_if = "Rank::is_first")]
+        #[serde(default = "Rank::first", skip_serializing_if = "Rank::is_first")]
         rank: Rank,
     },
     Level {
@@ -88,8 +95,8 @@ pub enum BackdropFit {
 /// An arrow of the canvas: unlocking `from` leads toward `to`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnlockArrow<'a> {
-    pub from: &'a str,
-    pub to: &'a str,
+    pub from: &'a NodeKey,
+    pub to: &'a NodeKey,
     pub rank: Rank,
 }
 
@@ -98,15 +105,15 @@ impl SkillTree {
         self.0.is_empty()
     }
 
-    pub fn node(&self, key: &str) -> Option<&SkillNode> {
+    pub fn node<K: Ord + ?Sized>(&self, key: &K) -> Option<&SkillNode>
+    where
+        NodeKey: Borrow<K>,
+    {
         self.0.get(key)
     }
 
-    pub fn node_of(&self, skill: SkillId) -> Option<(&str, &SkillNode)> {
-        self.0
-            .iter()
-            .find(|(_, node)| node.skill == skill)
-            .map(|(key, node)| (key.as_str(), node))
+    pub fn node_of(&self, skill: SkillId) -> Option<(&NodeKey, &SkillNode)> {
+        self.0.iter().find(|(_, node)| node.skill == skill)
     }
 
     pub fn arrows(&self) -> Vec<UnlockArrow<'_>> {
@@ -117,8 +124,8 @@ impl SkillTree {
                     .iter()
                     .filter_map(move |requirement| match requirement {
                         AccessRequirement::Skill { node: from, rank } => Some(UnlockArrow {
-                            from: from.as_str(),
-                            to: to.as_str(),
+                            from,
+                            to,
                             rank: *rank,
                         }),
                         _ => None,
@@ -135,23 +142,11 @@ impl SkillTree {
             .reduce(|all, next| all.union(next))
     }
 
-    pub fn roots(&self) -> impl Iterator<Item = &str> {
-        self.0
-            .iter()
-            .filter(|(_, node)| {
-                !node
-                    .requires
-                    .iter()
-                    .any(|requirement| matches!(requirement, AccessRequirement::Skill { .. }))
-            })
-            .map(|(key, _)| key.as_str())
-    }
-
     /// The nodes on every cycle of node requirements.
-    pub fn cycles(&self) -> BTreeSet<&str> {
+    pub fn cycles(&self) -> BTreeSet<&NodeKey> {
         let mut on_cycle = BTreeSet::new();
         for start in self.0.keys() {
-            let mut stack = vec![start.as_str()];
+            let mut stack = vec![start];
             let mut seen = BTreeSet::new();
             while let Some(key) = stack.pop() {
                 let Some(node) = self.0.get(key) else {
@@ -160,9 +155,9 @@ impl SkillTree {
                 for requirement in &node.requires {
                     if let AccessRequirement::Skill { node: next, .. } = requirement {
                         if next == start {
-                            on_cycle.insert(start.as_str());
-                        } else if seen.insert(next.as_str()) {
-                            stack.push(next.as_str());
+                            on_cycle.insert(start);
+                        } else if seen.insert(next) {
+                            stack.push(next);
                         }
                     }
                 }
@@ -173,7 +168,6 @@ impl SkillTree {
 
     pub fn check(&self, check: &mut RowCheck) {
         let cycles = self.cycles();
-        let keys: Vec<&String> = self.0.keys().collect();
         for (key, node) in &self.0 {
             if let Some(twin) = self
                 .0
@@ -213,17 +207,10 @@ impl SkillTree {
                 } else if !self.0.contains_key(named) {
                     check.problem(
                         format!("/tree/{key}/requires/{index}/node"),
-                        crate::core::content::ContentProblem::new(
-                            "unknown node",
-                            named,
-                            "a node of this tree",
-                        )
-                        .near(crate::core::content::id::nearest(
-                            keys.iter().copied(),
-                            named,
-                        )),
+                        ContentProblem::new("unknown node", named, "a node of this tree")
+                            .near(id::nearest(self.0.keys().map(|key| &key.0), named.as_str())),
                     );
-                } else if cycles.contains(key.as_str()) && cycles.contains(named.as_str()) {
+                } else if cycles.contains(key) && cycles.contains(named) {
                     check.error(
                         format!("/tree/{key}/requires/{index}"),
                         "cycle",
@@ -241,7 +228,6 @@ impl CanvasPoint {
         (self.x - other.x).abs() < NODE_EXTENT && (self.y - other.y).abs() < NODE_EXTENT
     }
 
-    /// The canvas a node takes up: its disc, its label and the room kept clear around it.
     pub fn footprint(self) -> Rect {
         Rect::from_center_size(Pos2::new(self.x, self.y), Vec2::splat(NODE_EXTENT * 2.0))
     }
@@ -253,15 +239,6 @@ impl CanvasRect {
             Pos2::new(self.x, self.y),
             Vec2::new(self.width, self.height),
         )
-    }
-
-    pub fn from_rect(rect: Rect) -> CanvasRect {
-        CanvasRect {
-            x: rect.min.x,
-            y: rect.min.y,
-            width: rect.width(),
-            height: rect.height(),
-        }
     }
 }
 
@@ -301,24 +278,35 @@ impl TreeBackdrop {
 }
 
 impl AccessRequirement {
-    /// Whether an actor who has `ranks` meets it, with `xp` and the world answering the rest.
-    pub fn met(
+    /// The one rule of access: whether someone holding `ranks` at `level` meets it, with
+    /// `condition` answering for the world.
+    pub fn met_by(
         &self,
-        world: &World,
-        actor: Entity,
-        class: &super::ClassDef,
-        ranks: &BTreeMap<String, Rank>,
+        ranks: &BTreeMap<NodeKey, Rank>,
+        level: u32,
+        condition: impl Fn(&Condition) -> bool,
     ) -> bool {
         match self {
             AccessRequirement::Skill { node, rank } => {
                 ranks.get(node).is_some_and(|held| held >= rank)
             }
-            AccessRequirement::Level { level } => {
-                let xp = world.get::<Xp>(actor).map_or(0, |xp| xp.amount);
-                class.level_at(xp) >= *level
-            }
-            AccessRequirement::Condition { condition } => condition::holds(world, actor, condition),
+            AccessRequirement::Level { level: needed } => level >= *needed,
+            AccessRequirement::Condition { condition: wanted } => condition(wanted),
         }
+    }
+
+    /// `met_by` for an actor of the world, holding `ranks`.
+    pub fn met(
+        &self,
+        world: &World,
+        actor: Entity,
+        class: &super::ClassDef,
+        ranks: &BTreeMap<NodeKey, Rank>,
+    ) -> bool {
+        let level = class.level_at(super::xp_of(world, actor));
+        self.met_by(ranks, level, |condition| {
+            condition::holds(world, actor, condition)
+        })
     }
 
     pub fn describe(&self, content: &Content, tree: &SkillTree) -> String {
@@ -327,30 +315,47 @@ impl AccessRequirement {
                 let name = tree
                     .node(node)
                     .map(|node| node.skill.get(content).name.clone())
-                    .unwrap_or_else(|| node.clone());
+                    .unwrap_or_else(|| node.to_string());
                 format!("{name} rank {}", rank.0)
             }
             AccessRequirement::Level { level } => format!("Level {level}"),
             AccessRequirement::Condition { condition } => condition::describe(content, condition),
         }
     }
+}
 
-    pub fn compiled(&self, content: &Content) -> Option<CompiledCondition> {
-        match self {
-            AccessRequirement::Condition { condition } => {
-                Some(CompiledCondition::new(content, condition))
-            }
-            _ => None,
-        }
+impl NodeKey {
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
-fn first_rank() -> Rank {
-    Rank(1)
+impl Borrow<str> for NodeKey {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
 }
 
-impl Rank {
-    pub fn is_first(&self) -> bool {
-        self.0 == 1
+impl AsRef<str> for NodeKey {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for NodeKey {
+    fn from(key: &str) -> NodeKey {
+        NodeKey(key.to_owned())
+    }
+}
+
+impl From<String> for NodeKey {
+    fn from(key: String) -> NodeKey {
+        NodeKey(key)
+    }
+}
+
+impl fmt::Display for NodeKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }

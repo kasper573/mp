@@ -2,12 +2,14 @@ use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_ecs::query::QueryState;
 use bevy_replicon::prelude::{
-    AppVisibilityExt, Replicated, ScopeLifetime, SendTargets, ToClients, VisibilityFilter,
+    AppVisibilityExt, FilterScope, Replicated, ScopeLifetime, SendTargets, ToClients,
+    VisibilityFilter,
 };
 use bevy_replicon::server::visibility::client_visibility::ClientVisibility;
 use bevy_replicon::server::visibility::filters_mask::FilterBit;
 use bevy_replicon::server::visibility::registry::FilterRegistry;
 use bevy_replicon::shared::replication::registry::ReplicationRegistry;
+use bevy_replicon::shared::replication::visibility::VisibilityScope;
 use fixedbitset::FixedBitSet;
 
 use crate::core::math::Pos;
@@ -21,7 +23,7 @@ use crate::systems::player::{ArrivalHold, ClientId, CommandLock, Owner, Players}
 use crate::systems::quest::QuestLog;
 use crate::systems::script::condition::CompiledCondition;
 use crate::systems::shop::ShopView;
-use crate::systems::skill::ResetPrompt;
+use crate::systems::skill::{BasicAttack, Cooldowns, Hotbar, Learned, ResetPrompt};
 
 pub const VIEW_DISTANCE: Tiles = Tiles(24.0);
 // Compared against squared distance to avoid a per-pair `sqrt`. Exact: `VIEW_DISTANCE` is a perfect
@@ -199,21 +201,43 @@ pub struct OwnedBy(pub ClientId);
 
 impl VisibilityFilter for OwnedBy {
     type ClientComponent = ClientId;
-    type Scope = (
-        Inventory,
-        Conversation,
-        CommandLock,
-        ArrivalHold,
-        Attention,
-        ShopView,
-        QuestLog,
-        MoveTarget,
-        HeardMove,
-        ResetPrompt,
-    );
+    type Scope = OwnersOnly;
 
     fn is_visible(&self, _: Entity, client: Option<&ClientId>) -> bool {
         client == Some(&self.0)
+    }
+}
+
+/// What a character carries that only its own client is told of: its bag, its dealings, its
+/// skills and what holds it. Two tuples, as replicon scopes at most ten components at once.
+pub struct OwnersOnly;
+
+type Dealings = (
+    Inventory,
+    Conversation,
+    CommandLock,
+    ArrivalHold,
+    Attention,
+    ShopView,
+    QuestLog,
+    MoveTarget,
+    HeardMove,
+);
+
+type Skills = (Learned, Cooldowns, Hotbar, BasicAttack, ResetPrompt);
+
+impl FilterScope for OwnersOnly {
+    fn visibility_scope(world: &mut World, registry: &mut ReplicationRegistry) -> VisibilityScope {
+        match (
+            Dealings::visibility_scope(world, registry),
+            Skills::visibility_scope(world, registry),
+        ) {
+            (VisibilityScope::Components(mut hidden), VisibilityScope::Components(more)) => {
+                hidden |= &more;
+                VisibilityScope::Components(hidden)
+            }
+            (scope, _) => scope,
+        }
     }
 }
 

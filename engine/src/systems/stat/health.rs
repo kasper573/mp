@@ -16,6 +16,11 @@ pub fn is_dead(world: &World, entity: Entity) -> bool {
     world.get::<Stats>(entity).is_some_and(dead)
 }
 
+/// Whether an entity is there and not fallen; what has no health never falls.
+pub fn stands(world: &World, entity: Entity) -> bool {
+    world.get_entity(entity).is_ok() && !is_dead(world, entity)
+}
+
 pub fn dead(stats: &Stats) -> bool {
     stats.get(StatKind::Health) <= 0.0
 }
