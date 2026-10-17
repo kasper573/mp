@@ -67,10 +67,9 @@ pub fn spawn_for(
     ))
 }
 
-pub fn expire(world: &mut World) {
+pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstance)>) {
     let now = world.resource::<WallClock>().now;
-    let done: Vec<Entity> = world
-        .query::<(Entity, &VfxInstance)>()
+    let done: Vec<Entity> = instances
         .iter(world)
         .filter(|(_, instance)| instance.until.after(LINGER) <= now)
         .map(|(entity, _)| entity)

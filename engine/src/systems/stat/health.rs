@@ -70,11 +70,8 @@ pub fn revive(world: &mut World, entity: Entity) {
     set_health(world, entity, |_, max| max);
 }
 
-pub fn settle_health(world: &mut World) {
-    let entities: Vec<Entity> = world
-        .query_filtered::<Entity, With<Stats>>()
-        .iter(world)
-        .collect();
+pub fn settle_health(world: &mut World, living: &mut QueryState<Entity, With<Stats>>) {
+    let entities: Vec<Entity> = living.iter(world).collect();
     for entity in entities {
         set_health(world, entity, |health, _| health);
     }

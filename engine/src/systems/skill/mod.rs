@@ -447,11 +447,34 @@ pub fn known(world: &World, actor: Entity) -> BTreeMap<SkillId, Rank> {
     known
 }
 
+/// The rank `known` would list `skill` at, looked up without listing the rest: scripts ask
+/// this on every attack.
 pub fn rank_of(world: &World, actor: Entity, skill: SkillId) -> Rank {
-    known(world, actor)
-        .get(&skill)
-        .copied()
-        .unwrap_or(Rank::NONE)
+    let content = world.resource::<Content>();
+    let npc = world.get::<Npc>(actor).map(|npc| npc.def.get(content));
+    if let Some(listed) = npc.and_then(|def| def.skills.iter().find(|listed| listed.skill == skill))
+    {
+        return listed.rank;
+    }
+    if let Some(class) = class::of(world, actor)
+        && let Some(learned) = world.get::<Learned>(actor)
+    {
+        let tree = &class.get(content).tree;
+        let held = learned
+            .0
+            .iter()
+            .filter(|(node, rank)| {
+                rank.0 > 0 && tree.node(node).is_some_and(|node| node.skill == skill)
+            })
+            .map(|(_, rank)| *rank)
+            .last();
+        if let Some(rank) = held {
+            return rank;
+        }
+    }
+    let granted = granted(world, actor).contains(&skill)
+        || npc.is_some_and(|def| def.basic_attack == Some(skill));
+    if granted { Rank::FIRST } else { Rank::NONE }
 }
 
 /// The skills an actor's worn equipment grants, in the order worn and listed.

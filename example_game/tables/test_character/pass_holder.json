@@ -1,10 +1,14 @@
 {
   "name": "Pass Holder",
   "class": "fighter",
+  "basic_attack": "slash",
   "bag": [
     {
       "item": "road_pass"
     }
   ],
+  "equipment": {
+    "weapon": "rusty_sword"
+  },
   "start": "initial_spawn"
 }
