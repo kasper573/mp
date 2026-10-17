@@ -66,7 +66,7 @@ pub fn not_loaded(editor: &mut Editor, ctx: &Context) {
     let Some(project) = &editor.project else {
         return;
     };
-    let Some(report) = &project.report else {
+    let Some(report) = project.report.as_ref().filter(|_| project.broken_on_disk()) else {
         return;
     };
     let text = report.to_string();

@@ -321,7 +321,7 @@ fn identity(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let classes: Vec<String> = cx.files.keys_of("class").map(str::to_owned).collect();
     let xp = value["xp"].as_u64().unwrap_or(0) as u32;
     let level = level_of(cx, value.text("class"), xp);
-    card(ui, "player", "Identity", |ui| {
+    card(ui, "Identity", |ui| {
         widgets::kv(ui, "name", |ui| {
             changed |= forms::text(ui, cx, &mut value["name"], "/name");
         });
@@ -371,7 +371,7 @@ fn generic(
         else {
             continue;
         };
-        card(ui, "player", title, |ui| {
+        card(ui, title, |ui| {
             if value.get(*field).is_none_or(Value::is_null) {
                 value[*field] = schema::template(cx.root, schema);
             }
@@ -389,7 +389,7 @@ fn bag(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let items: Vec<String> = cx.files.keys_of("item").map(str::to_owned).collect();
     let count = value["bag"].as_array().map_or(0, Vec::len);
     let mut remove = None;
-    card(ui, "item", "Bag", |ui| {
+    card(ui, "Bag", |ui| {
         for index in 0..count {
             let path = format!("/bag/{index}");
             let stack = &mut value["bag"][index];
@@ -466,7 +466,7 @@ fn equipment(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
             (*slot, items)
         })
         .collect();
-    card(ui, "equipment", "Equipment", |ui| {
+    card(ui, "Equipment", |ui| {
         for slot in slots {
             let current = value["equipment"][slot].as_str().map(str::to_owned);
             widgets::kv(ui, slot, |ui| {
@@ -516,7 +516,7 @@ fn skills(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let count = value["skills"].as_array().map_or(0, Vec::len);
     let mut remove = None;
     let mut spent = 0;
-    card(ui, "skill", "Skills", |ui| {
+    card(ui, "Skills", |ui| {
         for index in 0..count {
             let path = format!("/skills/{index}");
             let learned = &mut value["skills"][index];
@@ -605,7 +605,7 @@ fn hotbar(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut remove = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(HOTBAR_COLUMN);
-        widgets::card_title(ui, "skill", "Hotbar");
+        widgets::card_title(ui, "Hotbar");
         widgets::kv(ui, "basic attack", |ui| {
             let mut skill = value.text("basic_attack").to_owned();
             if picker::row(ui, cx, "skill", &mut skill, "/basic_attack") {
@@ -780,7 +780,7 @@ fn start(
             ),
         )
     };
-    card(ui, "player", "Start", |ui| {
+    card(ui, "Start", |ui| {
         widgets::kv(ui, "area", |ui| {
             if at_spawn {
                 ui.label(theme::mono(format!("area/ {area_key}")).size(13.0));
@@ -910,7 +910,7 @@ fn areas_known(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
         .collect();
     let mut remove: Option<String> = None;
     let mut add: Option<String> = None;
-    card(ui, "area", "Areas known", |ui| {
+    card(ui, "Areas known", |ui| {
         ui.horizontal_wrapped(|ui| {
             for area in &known {
                 let (_, closed) = widgets::chip_closable(ui, &format!("area/{area}"));
@@ -1584,10 +1584,10 @@ struct MemoryDef {
     label: String,
 }
 
-fn card(ui: &mut Ui, badge: &str, title: &str, body: impl FnOnce(&mut Ui)) {
+fn card(ui: &mut Ui, title: &str, body: impl FnOnce(&mut Ui)) {
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(COLUMN);
-        widgets::card_title(ui, badge, title);
+        widgets::card_title(ui, title);
         body(ui);
     });
 }

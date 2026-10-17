@@ -62,6 +62,7 @@ pub enum VfxLayer {
         #[serde(default, skip_serializing_if = "SpriteAnchor::is_default")]
         anchor: SpriteAnchor,
         #[serde(default = "one", skip_serializing_if = "is_one")]
+        #[schemars(extend("default" = one()))]
         scale: f32,
         #[serde(default, skip_serializing_if = "Play::is_once")]
         play: Play,
@@ -75,8 +76,10 @@ pub enum VfxLayer {
             default = "default_text_size",
             skip_serializing_if = "is_default_text_size"
         )]
+        #[schemars(extend("default" = default_text_size()))]
         size: f32,
         #[serde(default = "default_rise", skip_serializing_if = "is_default_rise")]
+        #[schemars(extend("default" = default_rise()))]
         rise: Tiles,
         duration: Seconds,
         #[serde(default, skip_serializing_if = "is_no_time")]
@@ -84,7 +87,9 @@ pub enum VfxLayer {
     },
     Shader {
         shader: VfxShaderId,
+        /// Keyed by the shader's declared parameters, each filled or left to its default.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        #[schemars(extend("x-params-of" = "shader"))]
         params: BTreeMap<String, ParamFill>,
         duration: Seconds,
         #[serde(default, skip_serializing_if = "is_no_time")]
@@ -115,6 +120,7 @@ pub enum Play {
 /// row's declared parameters, filled by whoever plays the vfx.
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[schemars(extend("x-param-fill" = true))]
 pub enum ParamFill {
     Param { param: String },
     Value(ParamValue),

@@ -122,14 +122,6 @@ impl EditHistory {
         *self = EditHistory::default();
     }
 
-    /// Drops every step past `applied`, as when the files they made turned out not to load.
-    pub fn rewind(&mut self, applied: usize) {
-        let applied = applied.min(self.steps.len());
-        self.steps.truncate(applied);
-        self.applied = applied;
-        self.saved = self.saved.filter(|at| *at <= applied);
-    }
-
     pub fn merge_into_last(&mut self, label: &str, after: Vec<FileChange>) -> bool {
         if self.applied != self.steps.len() {
             return false;

@@ -164,15 +164,12 @@ pub fn badge(ui: &mut Ui, kind: &str) {
 
 pub fn card_header(
     ui: &mut Ui,
-    kind: &str,
     title: &str,
     subtitle: &str,
     menu: impl FnOnce(&mut Ui),
 ) -> Response {
     let response = ui
         .horizontal(|ui| {
-            ui.label(theme::faint("≡"));
-            badge(ui, kind);
             ui.label(theme::strong(title).monospace());
             if !subtitle.is_empty() {
                 ui.label(
@@ -257,8 +254,8 @@ pub fn mode_chip(ui: &mut Ui, text: &str, on: bool) -> Response {
     chip_colored(ui, text, fill, ink)
 }
 
-pub fn card_title(ui: &mut Ui, kind: &str, title: &str) -> Response {
-    card_header(ui, kind, title, "", |_| {})
+pub fn card_title(ui: &mut Ui, title: &str) -> Response {
+    card_header(ui, title, "", |_| {})
 }
 
 pub fn rule(ui: &Ui) {

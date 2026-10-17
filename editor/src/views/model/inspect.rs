@@ -179,7 +179,7 @@ fn frame_card(
     let mut label = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "frame", "frame");
+        widgets::card_title(ui, "frame");
         ui.add_space(4.0);
         widgets::kv(ui, "lasts", |ui| {
             let mut text = frame.ms.to_string();
@@ -294,13 +294,7 @@ fn frames_card(
     let planned = plan(frames, indices, set_by, &text);
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(
-            ui,
-            "frame",
-            &format!("{} frames", indices.len()),
-            "",
-            |_| {},
-        );
+        widgets::card_header(ui, &format!("{} frames", indices.len()), "", |_| {});
         ui.add_space(4.0);
         widgets::kv(ui, "set by", |ui| {
             for (option, label) in [
@@ -439,7 +433,7 @@ fn cue_card(
     let mut play = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_header(ui, "cue", kind.key(), "", |ui| {
+        widgets::card_header(ui, kind.key(), "", |ui| {
             if ui.button("Remove this cue").clicked() {
                 remove = true;
                 ui.close();
@@ -703,7 +697,7 @@ fn face_card(
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
         let kind = if face.own.is_some() { "" } else { "generic" };
-        widgets::card_header(ui, "bust", &face.name, kind, |ui| {
+        widgets::card_header(ui, &face.name, kind, |ui| {
             if face.own.is_some() && ui.button("Remove this face…").clicked() {
                 remove_with = Some(String::new());
                 ui.close();
@@ -905,7 +899,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
     }
 }
 
-pub fn first_class_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
+pub fn row_body(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormChange {
     let mut changed = FormChange::default();
     let width = value["hitbox"]["width"].as_f64().unwrap_or(1.0);
     let height = value["hitbox"]["height"].as_f64().unwrap_or(1.0);

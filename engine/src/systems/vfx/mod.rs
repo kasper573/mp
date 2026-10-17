@@ -91,7 +91,9 @@ pub struct Vfx {
     pub on: Option<Condition>,
     #[serde(default, skip_serializing_if = "VfxTarget::is_place")]
     pub site: VfxTarget,
+    /// Keyed by the vfx's declared parameters, each given or left to the layers' own values.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[schemars(extend("x-params-of" = "vfx"))]
     pub params: BTreeMap<String, Condition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Arrow,

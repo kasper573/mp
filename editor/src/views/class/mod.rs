@@ -50,28 +50,21 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         return;
     }
     let page = editor.views.class.page(key);
-    egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(12, 8))
-        .show(ui, |ui| {
-            ui.set_min_size(ui.available_size());
-            ui.horizontal(|ui| {
-                ui.label(theme::mono(format!("{TABLE}/{key}")).color(theme::CODE));
-                ui.add_space(8.0);
-                for (target, label) in [(ClassPage::Levels, "levels"), (ClassPage::Tree, "tree")] {
-                    if widgets::mode_chip(ui, label, page == target).clicked() {
-                        editor.views.class.pages.insert(key.to_owned(), target);
-                        if target == ClassPage::Levels {
-                            editor.select(RowSelection::row(TABLE, key));
-                        }
-                    }
+    ui.horizontal(|ui| {
+        for (target, label) in [(ClassPage::Levels, "levels"), (ClassPage::Tree, "tree")] {
+            if widgets::mode_chip(ui, label, page == target).clicked() {
+                editor.views.class.pages.insert(key.to_owned(), target);
+                if target == ClassPage::Levels {
+                    editor.select(RowSelection::row(TABLE, key));
                 }
-            });
-            ui.add_space(4.0);
-            match page {
-                ClassPage::Levels => inspector::show_row_tab(editor, ui, TABLE, key),
-                ClassPage::Tree => tree::show(editor, ui, key),
             }
-        });
+        }
+    });
+    ui.add_space(4.0);
+    match page {
+        ClassPage::Levels => inspector::show_row_tab(editor, ui, TABLE, key),
+        ClassPage::Tree => tree::show(editor, ui, key),
+    }
 }
 
 pub fn node_of(selection: &RowSelection) -> Option<&str> {

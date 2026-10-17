@@ -177,32 +177,38 @@ pub struct Project {
     pub catalogue: NodeCatalogue,
     loading: Option<Loading>,
     stale: bool,
-    good: ProjectFiles,
-    good_applied: usize,
 }
 
 // An edit is adopted at once and its content loaded on a thread, so the interface never waits on
-// a load; the files the current content came from are kept to fall back on when later ones turn
-// out not to load.
+// a load. Files that turn out not to load are kept as they are, with the load's report beside
+// the last content that did load, so a half-finished row can be worked on until it loads again.
 struct Loading {
     receiver: ChannelInbox<Result<Loaded, LoadReport>>,
-    applied: usize,
 }
 
 struct Loaded {
     content: Content,
     usages: ContentUsages,
     catalogue: NodeCatalogue,
-    files: ProjectFiles,
     took: Duration,
     usages_took: Duration,
 }
 
-/// An edit that was adopted and then refused once its content was loaded: the files are back to
-/// the last that loaded, and this says which step went and why.
-pub struct LateRefusal {
-    pub label: String,
-    pub refusal: Box<EditRefusal>,
+/// The problems a load found in one file, by JSON pointer (an empty pointer for the file as a
+/// whole).
+pub fn errors_in(report: &LoadReport, file: &str) -> Vec<(String, String)> {
+    report
+        .errors
+        .iter()
+        .filter(|error| error.file == file)
+        .map(|error| {
+            let pointer = match &error.at {
+                Json { pointer, .. } => pointer.clone(),
+                _ => String::new(),
+            };
+            (pointer, error.problem.to_string())
+        })
+        .collect()
 }
 
 impl Project {
@@ -216,8 +222,6 @@ impl Project {
         let catalogue = NodeCatalogue::build(shapes.shape_of("script"), None);
         let mut project = Project {
             root: root.to_path_buf(),
-            good: files.clone(),
-            good_applied: 0,
             loading: None,
             stale: false,
             files,
@@ -254,6 +258,11 @@ impl Project {
         self.report.is_none() && self.content.is_some()
     }
 
+    /// Whether the files as read from disk stopped loading, as opposed to an edit made here.
+    pub fn broken_on_disk(&self) -> bool {
+        self.report.is_some() && self.outside_rewrote > 0
+    }
+
     /// Loads the files as they stand, waiting for it: for opening a folder and taking in what
     /// changed on disk, when there is nothing to show yet anyway.
     pub fn reload(&mut self) {
@@ -263,7 +272,7 @@ impl Project {
             Ok((content, took)) => {
                 let loaded = Loaded::build(content, &self.files, &self.shapes, took);
                 self.report = None;
-                self.install(loaded, self.history.applied());
+                self.install(loaded);
             }
             Err(report) => self.report = Some(report),
         }
@@ -274,65 +283,51 @@ impl Project {
         self.loading.is_some()
     }
 
-    /// Takes in a load that finished. Content that loaded is swapped in; files that did not are
-    /// rolled back to the last that did, unless newer files are already waiting to be loaded,
-    /// which then get their own say.
-    pub fn poll(&mut self) -> Option<LateRefusal> {
-        let loading = self.loading.as_ref()?;
+    /// Takes in a load that finished, saying whether one did. Content that loaded is swapped in;
+    /// a report on files that did not is kept, unless newer files are already waiting to be
+    /// loaded, which then get their own say.
+    pub fn poll(&mut self) -> bool {
+        let Some(loading) = self.loading.as_ref() else {
+            return false;
+        };
         let outcome = match loading.receiver.try_recv() {
             Ok(outcome) => outcome,
-            Err(TryRecvError::Empty) => return None,
+            Err(TryRecvError::Empty) => return false,
             Err(TryRecvError::Disconnected) => {
                 self.loading = None;
-                return None;
+                return false;
             }
         };
-        let applied = loading.applied;
         self.loading = None;
-        self.take(outcome, applied)
+        self.take(outcome);
+        true
     }
 
     /// Waits out every pending load, so what is saved or asked of the content is what loaded.
-    pub fn settle(&mut self) -> Vec<LateRefusal> {
-        let mut late = Vec::new();
-        while let Some(loading) = &self.loading {
-            let applied = loading.applied;
-            let outcome = loading.receiver.recv();
-            self.loading = None;
+    pub fn settle(&mut self) {
+        while self.loading.is_some() {
+            let outcome = self
+                .loading
+                .take()
+                .and_then(|loading| loading.receiver.recv());
             if let Some(outcome) = outcome {
-                late.extend(self.take(outcome, applied));
+                self.take(outcome);
             }
         }
-        late
     }
 
-    fn take(&mut self, outcome: Result<Loaded, LoadReport>, applied: usize) -> Option<LateRefusal> {
-        let late = match outcome {
+    fn take(&mut self, outcome: Result<Loaded, LoadReport>) {
+        match outcome {
             Ok(loaded) => {
                 self.report = None;
-                self.install(loaded, applied);
-                None
+                self.install(loaded);
             }
-            Err(_) if self.stale => None,
-            Err(report) => {
-                let label = self
-                    .history
-                    .steps()
-                    .get(self.good_applied)
-                    .map(|step| step.label.clone())
-                    .unwrap_or_default();
-                self.files = self.good.clone();
-                self.history.rewind(self.good_applied);
-                Some(LateRefusal {
-                    label,
-                    refusal: Box::new(EditRefusal::of(&report)),
-                })
-            }
-        };
+            Err(_) if self.stale => {}
+            Err(report) => self.report = Some(report),
+        }
         if std::mem::take(&mut self.stale) {
             self.begin_load();
         }
-        late
     }
 
     pub fn apply(
@@ -464,7 +459,6 @@ impl Project {
         let (sender, receiver) = mpsc::channel();
         self.loading = Some(Loading {
             receiver: ChannelInbox::new(receiver),
-            applied: self.history.applied(),
         });
         std::thread::spawn(move || {
             let outcome = load(&files, &name)
@@ -473,14 +467,12 @@ impl Project {
         });
     }
 
-    fn install(&mut self, loaded: Loaded, applied: usize) {
+    fn install(&mut self, loaded: Loaded) {
         self.last_load = Some(loaded.took);
         self.last_usages = Some(loaded.usages_took);
         self.usages = loaded.usages;
         self.catalogue = loaded.catalogue;
         self.content = Some(loaded.content);
-        self.good = loaded.files;
-        self.good_applied = applied;
         self.generation += 1;
     }
 
@@ -566,6 +558,10 @@ impl Project {
         }
         self.history.reset();
         self.reload();
+        self.outside_rewrote = match self.report {
+            Some(_) => 1,
+            None => 0,
+        };
     }
 }
 
@@ -583,7 +579,6 @@ impl Loaded {
             content,
             usages,
             catalogue,
-            files: files.clone(),
             took,
             usages_took: started.elapsed(),
         }

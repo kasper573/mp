@@ -4,7 +4,6 @@ pub mod class;
 pub mod model;
 pub mod navigation;
 pub mod script;
-pub mod shader_code;
 pub mod skill;
 pub mod sound;
 pub mod spreadsheet;

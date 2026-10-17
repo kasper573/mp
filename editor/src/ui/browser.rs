@@ -162,9 +162,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                     action: FolderAction::OpenTable,
                 };
                 if shapes.has_fixtures(&folder.id) {
-                    folder.note = Some(
-                        "Fixtures: the engine names these rows, so none can be added".to_owned(),
-                    );
+                    folder.note =
+                        Some("Fixtures: a fixed set of rows, so none can be added".to_owned());
                     folder.actions = vec![open];
                 } else {
                     folder.actions = vec![
@@ -200,6 +199,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 project,
                 form,
                 views,
+                shapes,
                 ..
             } = editor;
             let project = project.as_ref().expect("a project");
@@ -211,7 +211,8 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                 tree::TreeHooks {
                     menu: Some(&mut |ui, id| {
                         if let Some((table, key)) = row_of(id) {
-                            row_menu(ui, &mut action, table, key);
+                            let fixture = shapes.is_fixture(table, key);
+                            row_menu(ui, &mut action, table, key, fixture);
                         }
                     }),
                     thumbs: Some(&mut |ctx, file| {
@@ -338,6 +339,7 @@ fn row_menu(
     action: &mut Option<(String, String, BrowserAction)>,
     table: &str,
     key: &str,
+    fixture: bool,
 ) {
     let mut pick = |what: BrowserAction, ui: &mut Ui| {
         *action = Some((table.to_owned(), key.to_owned(), what));
@@ -362,9 +364,10 @@ fn row_menu(
     {
         pick(BrowserAction::Duplicate, ui);
     }
-    if ui
-        .add(egui::Button::new("Rename key…").shortcut_text("F2"))
-        .clicked()
+    if !fixture
+        && ui
+            .add(egui::Button::new("Rename key…").shortcut_text("F2"))
+            .clicked()
     {
         pick(BrowserAction::Rename, ui);
     }
@@ -374,12 +377,14 @@ fn row_menu(
     {
         pick(BrowserAction::Usages, ui);
     }
-    ui.separator();
-    if ui
-        .add(egui::Button::new("Delete…").shortcut_text("Del"))
-        .clicked()
-    {
-        pick(BrowserAction::Delete, ui);
+    if !fixture {
+        ui.separator();
+        if ui
+            .add(egui::Button::new("Delete…").shortcut_text("Del"))
+            .clicked()
+        {
+            pick(BrowserAction::Delete, ui);
+        }
     }
 }
 
@@ -427,9 +432,7 @@ pub fn act(editor: &mut Editor, table: &str, key: &str, action: BrowserAction) {
         }
         BrowserAction::Rename => {
             if editor.shapes.is_fixture(table, key) {
-                editor.toast(format!(
-                    "{table}/{key} is a fixture: the engine names it in code"
-                ));
+                editor.toast(format!("{table}/{key} is a fixture and keeps its key"));
             } else {
                 editor.dialogs.push(ModalDialog::Rename(RenameDialog {
                     target: RenameTarget::Row {
@@ -584,7 +587,8 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                         if response.double_clicked() {
                             action = Some((table.clone(), key.clone(), BrowserAction::Open));
                         }
-                        response.context_menu(|ui| row_menu(ui, &mut action, table, key));
+                        let fixture = editor.shapes.is_fixture(table, key);
+                        response.context_menu(|ui| row_menu(ui, &mut action, table, key, fixture));
                     }
                     Hit::Module {
                         table,

@@ -121,9 +121,9 @@ impl SpreadsheetColumn {
     pub fn origin(&self) -> String {
         match &self.source {
             ColumnSource::Key => "the row's key".to_owned(),
-            ColumnSource::First(path) if path.len() == 1 => "first-class".to_owned(),
+            ColumnSource::First(path) if path.len() == 1 => "the row itself".to_owned(),
             ColumnSource::First(path) => {
-                format!("the {} list, first-class", path[..path.len() - 1].join("."))
+                format!("the {} list", path[..path.len() - 1].join("."))
             }
             ColumnSource::Module { tag, path } if path.len() == 1 => format!("the {tag} module"),
             ColumnSource::Module { tag, path } => {
@@ -174,7 +174,7 @@ pub fn columns_of(editor: &Editor, table: &str, rows: &[SpreadsheetRow]) -> Vec<
             return;
         }
         let sub = match path.len() {
-            1 => "first-class".to_owned(),
+            1 => "row".to_owned(),
             _ => path[path.len() - 2].trim_end_matches('s').to_owned(),
         };
         columns.push(SpreadsheetColumn {
@@ -527,15 +527,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str) {
         .filter_map(|id| columns.iter().find(|c| c.id == *id))
         .collect();
     let mut view_changed = false;
-    egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(12, 8))
-        .show(ui, |ui| {
-            ui.set_min_size(ui.available_size());
-            view_changed |= toolbar(editor, ui, table, &columns, &mut view, rows.len(), total);
-            ui.add_space(6.0);
-            let shown: Vec<SpreadsheetColumn> = shown.into_iter().cloned().collect();
-            view_changed |= table_body(editor, ui, table, &rows, &shown, &mut view);
-        });
+    view_changed |= toolbar(editor, ui, table, &columns, &mut view, rows.len(), total);
+    ui.add_space(6.0);
+    let shown: Vec<SpreadsheetColumn> = shown.into_iter().cloned().collect();
+    view_changed |= table_body(editor, ui, table, &rows, &shown, &mut view);
     if view_changed {
         save_view(editor, table, view);
     }
@@ -1382,7 +1377,7 @@ pub fn inspect(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
     let values: Vec<f64> = rows.iter().filter_map(|row| column.number(row)).collect();
     widgets::card_frame(true).show(ui, |ui| {
         ui.vertical(|ui| {
-            widgets::card_title(ui, "column", &column.title);
+            widgets::card_title(ui, &column.title);
             widgets::kv_text(ui, "from", column.origin());
             if column.numeric && !values.is_empty() {
                 let (low, high) = span(&values);

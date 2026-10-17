@@ -27,7 +27,7 @@ use crate::project::{
 };
 use crate::scenes::{self, Step};
 use crate::schema::SchemaShapes;
-use crate::tabs::EditorTab;
+use crate::tabs::{CloseTabs, EditorTab};
 use crate::thumbs::Thumbnail;
 use crate::user::{BrushSettings, EditorSettings, UserFolder, unix_seconds};
 use crate::views::area::placement::ReplaceScope;
@@ -119,6 +119,7 @@ pub struct Editor {
     pub toast: Option<(String, Instant)>,
     pub start: StartScreen,
     pub open_tabs: Vec<EditorTab>,
+    pub close_tabs: Option<CloseTabs>,
     pub scene: Option<Vec<Step>>,
     pub clipboard: Option<Clipboard>,
     pub views: EditorViews,
@@ -417,6 +418,7 @@ impl Editor {
             toast: None,
             start: StartScreen::default(),
             open_tabs: Vec::new(),
+            close_tabs: None,
             scene: None,
             clipboard: None,
             views: EditorViews::default(),
@@ -663,16 +665,23 @@ impl Editor {
             return false;
         }
         let was_loading = project.loading();
-        let late = project.settle();
-        for late in &late {
-            self.refused(&late.label, &late.refusal);
-        }
+        project.settle();
         if was_loading {
             self.views.content_changed();
         }
         let Some(project) = &mut self.project else {
             return false;
         };
+        if let Some(report) = &project.report {
+            let first = EditRefusal::of(report);
+            let at = if first.pointer.is_empty() {
+                first.file.clone()
+            } else {
+                format!("{} at {}", first.file, first.pointer)
+            };
+            self.toast(format!("Not saved · {at}: {}", first.sentence()));
+            return false;
+        }
         match project.save() {
             Ok(outcome) => {
                 let count = outcome.written.len() + outcome.removed.len();
@@ -742,13 +751,7 @@ impl Editor {
         let Some(project) = &mut self.project else {
             return;
         };
-        let was_loading = project.loading();
-        let late = project.poll();
-        let landed = was_loading && !project.loading();
-        if let Some(late) = late {
-            self.refused(&late.label, &late.refusal);
-        }
-        if landed {
+        if project.poll() {
             self.views.content_changed();
         }
     }

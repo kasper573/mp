@@ -586,7 +586,6 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
         .map(|b| content.built::<RiftScripts>().may_do(b.row).reaches)
         .unwrap_or_default();
     let read_memories = NodeReads::of(doc.nodes()).memories;
-    let kind = doc.kind.name().to_owned();
     let state_names = inspect::names_of(&doc.script["state"]);
     let mut open: Option<EditorTab> = None;
     let Some(run) = editor.views.script.run_of_mut(&owner_key) else {
@@ -614,7 +613,7 @@ pub fn inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) -> bool {
     widgets::section(ui, "Owner");
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, &kind, &label);
+        widgets::card_title(ui, &label);
         widgets::kv_text(ui, "state", state_names);
         widgets::kv_text(
             ui,
@@ -665,7 +664,7 @@ fn character_card(
     let area_key = run.area.key(content).to_owned();
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "player", &name);
+        widgets::card_title(ui, &name);
         widgets::kv(ui, "level", |ui| {
             let mut picked = level;
             widgets::combo_box("run-level")
@@ -735,7 +734,7 @@ fn memories_card(ui: &mut Ui, run: &mut ScriptRun, content: &Content, read: &[St
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "memory", "memories");
+        widgets::card_title(ui, "memories");
         if shown.is_empty() {
             ui.label(theme::muted("none set · unset reads as zero").size(13.0));
         }
@@ -854,7 +853,7 @@ fn quests_card(
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "quest", "quests");
+        widgets::card_title(ui, "quests");
         if shown.is_empty() {
             ui.label(theme::muted("none taken").size(13.0));
         }
@@ -921,7 +920,7 @@ fn bag_card(
     let mut add: Option<String> = None;
     widgets::card_frame(false).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "item", "bag");
+        widgets::card_title(ui, "bag");
         if shown.is_empty() {
             ui.label(theme::muted("empty").size(13.0));
         }

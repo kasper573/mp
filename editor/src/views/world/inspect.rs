@@ -637,7 +637,7 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     let mut open_area = false;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, area::AreaDef::TABLE, &title);
+        widgets::card_title(ui, &title);
         if cards.len() == 1 {
             widgets::kv(ui, "area", |ui| {
                 open_area =
@@ -777,7 +777,7 @@ fn inspect_region(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, index: u
     let mut label: Option<String> = None;
     widgets::card_frame(true).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        widgets::card_title(ui, "region", &region.name);
+        widgets::card_title(ui, &region.name);
         widgets::kv(ui, "name", |ui| {
             let id = ui.id().with(("region-name", index));
             let typed = forms::drafted(ui, id, &region.name, |ui, draft| {

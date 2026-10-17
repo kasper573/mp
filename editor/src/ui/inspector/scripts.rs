@@ -43,8 +43,6 @@ pub fn script_cards(
         widgets::card_frame(true).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.label(theme::faint("≡"));
-                widgets::badge(ui, &tag);
                 ui.label(theme::strong(tag.replace('_', " ")).monospace());
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.menu_button(theme::faint("…"), |ui| {

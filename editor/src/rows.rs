@@ -202,7 +202,7 @@ pub fn rename(editor: &mut Editor, table: &str, key: &str, new_key: &str) -> Res
         return Ok(());
     }
     if editor.shapes.is_fixture(table, key) {
-        return Err("fixtures keep their key: the engine names it in code".to_owned());
+        return Err("fixtures keep their key".to_owned());
     }
     let project = editor.project.as_ref().ok_or("no folder is open")?;
     if let Some(problem) = key_problem(&project.files, table, new_key)
@@ -350,7 +350,7 @@ pub fn delete_dialog(editor: &mut Editor, table: &str, keys: Vec<String>) {
         })
         .collect();
     if keys.is_empty() {
-        editor.toast("Fixture rows can't be deleted: the engine names them in code");
+        editor.toast("Fixtures can't be deleted");
         return;
     }
     let Some(project) = &editor.project else {

@@ -707,7 +707,7 @@ pub fn inspect_reimport(editor: &mut Editor, ui: &mut Ui, key: &str) {
     ui.add_space(6.0);
     widgets::card_frame(true).show(ui, |ui| {
         ui.vertical(|ui| {
-            widgets::card_title(ui, "tileset", &format!("importing {names}"));
+            widgets::card_title(ui, &format!("importing {names}"));
             for (mark, color, text, count) in [
                 ("✓", theme::OK, "found by their pixels", draft.plan.found),
                 (
