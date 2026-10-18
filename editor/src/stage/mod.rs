@@ -150,14 +150,14 @@ pub fn center(content: &Content) -> Pos<Tiles> {
     content.built::<GameSettings>().initial_spawn.at
 }
 
-/// Draws the stage for `key` as wide as the window allows, with the game's starting area behind
-/// when `ground` is on, and asks for the scene to be rendered for the next frame.
-/// How wide a view sets its preview, out of `room` it could give it: the stage's own width, every
-/// preview alike, narrowing only as far as the stage stays readable.
+/// The width every view gives its preview out of `room`: the stage's own width, narrowing only as
+/// far as the stage stays readable, so previews look alike across views.
 pub fn preview_width(room: f32) -> f32 {
     room.clamp(NARROWEST, SIZE[0] as f32)
 }
 
+/// Draws the stage for `key` as wide as the window allows, with the game's starting area behind
+/// when `ground` is on, and asks for the scene to be rendered for the next frame.
 pub fn show(
     editor: &mut Editor,
     ui: &mut Ui,
