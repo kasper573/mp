@@ -71,8 +71,7 @@ impl Sheet<'_> {
             )
         });
         if let Some(title) = self.title {
-            let room = band.shrink2(Vec2::new(cross_size + 14.0, 0.0));
-            title_band(painter, room, title, !small);
+            title_band(painter, title_room(band, small), title, !small);
         }
         let curl = self
             .curl
@@ -197,13 +196,31 @@ pub fn rule(painter: &Painter, rect: Rect, inset: f32) {
     );
 }
 
+/// An upright line pressed into the paper: a shadowed edge with a lit one beside it.
+pub fn groove(painter: &Painter, top: Pos2, bottom: Pos2) {
+    let x = top.x.round() - 0.5;
+    let line = |x: f32, color: Color32| {
+        painter.line_segment(
+            [Pos2::new(x, top.y), Pos2::new(x, bottom.y)],
+            Stroke::new(1.0, color),
+        );
+    };
+    line(x, ink::ink_wash(0.42));
+    line(x + 1.0, ink::white_wash(0.55));
+}
+
+/// Where the title of a sheet standing in `rect` starts, as its band draws it.
+pub fn title_origin(ctx: &egui::Context, rect: Rect, title: &str) -> Pos2 {
+    let small = rect.width() < SMALL_SHEET || rect.height() < SMALL_SHEET;
+    let band = Rect::from_min_size(rect.min, Vec2::new(rect.width(), TITLE_BAND));
+    let galley = ctx.fonts_mut(|fonts| fonts.layout_job(TextRole::Title.job(title, ink::RUBRIC)));
+    title_at(title_room(band, small), galley.size())
+}
+
 pub fn title_band(painter: &Painter, band: Rect, title: &str, fillers: bool) {
     let galley = painter.layout_job(TextRole::Title.job(title, ink::RUBRIC));
     let width = galley.size().x.min(band.width());
-    let at = Pos2::new(
-        band.center().x - width / 2.0,
-        band.center().y - galley.size().y / 2.0,
-    );
+    let at = title_at(band, galley.size());
     if galley.size().x > band.width() {
         painter
             .with_clip_rect(band.intersect(painter.clip_rect()))
@@ -541,4 +558,16 @@ pub fn text(
     let rect = anchor.anchor_size(at, galley.size());
     painter.galley(rect.min, galley, color);
     rect
+}
+
+fn title_room(band: Rect, small: bool) -> Rect {
+    let cross = if small { SMALL_CROSS } else { CROSS };
+    band.shrink2(Vec2::new(cross + 14.0, 0.0))
+}
+
+fn title_at(room: Rect, title: Vec2) -> Pos2 {
+    Pos2::new(
+        room.center().x - title.x.min(room.width()) / 2.0,
+        room.center().y - title.y / 2.0,
+    )
 }

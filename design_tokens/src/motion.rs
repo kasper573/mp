@@ -87,11 +87,21 @@ impl SheetPose {
         shadow: sheet::shadow(sheet::Depth::Front),
     };
 
-    pub fn transform(self, rect: Rect) -> TSTransform {
+    /// The pose of a sheet standing in `rect`, nudged by under a pixel so `pin` keeps the place it
+    /// has within a pixel at rest: text there is never rounded to a neighbouring pixel while the
+    /// shapes around it move on smoothly.
+    pub fn transform(self, ctx: &Context, rect: Rect, pin: Pos2) -> TSTransform {
         let centre = rect.center().to_vec2();
-        TSTransform::from_translation(centre + egui::Vec2::new(0.0, self.dy))
+        let posed = TSTransform::from_translation(centre + egui::Vec2::new(0.0, self.dy))
             * TSTransform::from_scaling(self.scale)
-            * TSTransform::from_translation(-centre)
+            * TSTransform::from_translation(-centre);
+        let pixels = ctx.pixels_per_point();
+        let within = |at: Pos2| {
+            let at = at.to_vec2() * pixels;
+            at - at.round()
+        };
+        let nudge = (within(pin) - within(posed * pin)) / pixels;
+        TSTransform::from_translation(nudge) * posed
     }
 }
 

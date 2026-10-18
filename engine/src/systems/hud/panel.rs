@@ -102,7 +102,8 @@ pub(crate) fn window<R>(
         (true, false) => sheet::shadow(Depth::Behind),
         _ => pose.shadow,
     };
-    gui.set_transform_layer(layer(key), pose.transform(rect));
+    let pin = title.map_or(rect.min, |title| sheet::title_origin(gui, rect, title));
+    gui.set_transform_layer(layer(key), pose.transform(gui, rect, pin));
     let shown = egui::Area::new(id)
         .order(Band::Hud.order())
         .fixed_pos(rect.min)

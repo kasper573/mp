@@ -650,7 +650,7 @@ fn lift_off(
     pose: SheetPose,
 ) -> Option<Rect> {
     let (image, rect) = world.resource::<StageSheets>().drawn.get(key)?.clone();
-    gui.set_transform_layer(sheet_layer(key), pose.transform(rect));
+    gui.set_transform_layer(sheet_layer(key), pose.transform(gui, rect, rect.min));
     egui::Area::new(Id::new(key))
         .order(Band::Stage.order())
         .fixed_pos(rect.min)
@@ -690,7 +690,7 @@ fn docked_panels(
     let rest = gui
         .memory(|memory| memory.area_rect(id))
         .unwrap_or(Rect::from_center_size(screen.center(), Vec2::ZERO));
-    gui.set_transform_layer(sheet_layer(DOCKED), pose.transform(rest));
+    gui.set_transform_layer(sheet_layer(DOCKED), pose.transform(gui, rest, rest.min));
     let area = egui::Area::new(id)
         .order(Band::Stage.order())
         .pivot(Align2::CENTER_BOTTOM)
@@ -776,7 +776,7 @@ fn dialogue_sheet(
         .as_ref()
         .and_then(Shown::current)
         .and_then(|spoken| speaker_name(world, spoken.by));
-    gui.set_transform_layer(layer(), pose.transform(rect));
+    gui.set_transform_layer(layer(), pose.transform(gui, rect, rect.min));
     egui::Area::new(layer().id)
         .order(Band::Stage.order())
         .fixed_pos(rect.min)

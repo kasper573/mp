@@ -20,7 +20,7 @@ use crate::systems::interface::InterfaceIcon;
 use crate::systems::item::Inventory;
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
-use crate::systems::settings;
+use crate::systems::settings::{self, UserSettings};
 use crate::systems::skill::{HotbarEntry, HotbarSlot, SkillId};
 use crate::systems::{equipment, history, item, player, quest, skill, stat, terminal};
 
@@ -314,10 +314,11 @@ fn draw_hud(world: &mut World) {
             shown.show(ui, world);
         });
     }
-    for (slot, &shown) in WINDOWS.iter().enumerate() {
+    let spots = launcher_spots(world, screen);
+    for (&shown, spot) in WINDOWS.iter().zip(spots) {
         let title = shown.title();
         let is_open = window_open(world, title);
-        launcher(world, &gui, shown, launcher_pos(slot, screen), is_open);
+        launcher(world, &gui, shown, spot, is_open);
         let Some(pose) = panel::sheet_pose(world, &gui, title, is_open) else {
             continue;
         };
@@ -443,7 +444,7 @@ fn draw_confirm(world: &mut World) {
     let mut decided = None;
     let screen = gui.content_rect();
     let rest = Rect::from_center_size(screen.center(), NOTE);
-    gui.set_transform_layer(confirm_layer(), pose.transform(rest));
+    gui.set_transform_layer(confirm_layer(), pose.transform(&gui, rest, rest.min));
     let modal = egui::Modal::new(Id::new(CONFIRM))
         .backdrop_color(ink::ink_wash(0.3 * pose.opacity))
         .frame(egui::Frame::NONE)
@@ -541,6 +542,38 @@ fn draw_carried(world: &mut World) {
         -Vec2::splat(CARRIED / 2.0),
         |ui| ui.add(image.widget(Vec2::splat(CARRIED))),
     );
+}
+
+/// Where each launcher rests when the player never moved it: its own slot down the column, or
+/// the next one no other launcher already stands on, since spots kept from an older column can
+/// cover a launcher that was added since.
+fn launcher_spots(world: &World, screen: Rect) -> Vec<Pos2> {
+    let settings = world.resource::<UserSettings>();
+    let saved = |window: &dyn HudWindow| {
+        settings
+            .widget_pos(window.title())
+            .map(|pos| Pos2::new(pos.x, pos.y))
+    };
+    let mut taken: Vec<Pos2> = WINDOWS.iter().filter_map(|window| saved(*window)).collect();
+    let covered = |at: Pos2, taken: &[Pos2]| {
+        let rect = Rect::from_min_size(at, Vec2::splat(WIDGET.0));
+        taken
+            .iter()
+            .any(|other| rect.intersects(Rect::from_min_size(*other, Vec2::splat(WIDGET.0))))
+    };
+    let mut spots = Vec::with_capacity(WINDOWS.len());
+    for (slot, window) in WINDOWS.iter().enumerate() {
+        let spot = saved(*window).unwrap_or_else(|| {
+            let free = (slot..)
+                .map(|slot| launcher_pos(slot, screen))
+                .find(|at| !covered(*at, &taken))
+                .expect("the column runs on");
+            taken.push(free);
+            free
+        });
+        spots.push(spot);
+    }
+    spots
 }
 
 fn launcher_pos(slot: usize, screen: Rect) -> Pos2 {

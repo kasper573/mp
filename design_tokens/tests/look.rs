@@ -297,3 +297,18 @@ fn controls_stand_a_control_tall() {
             .all(|height| *height == controls::CONTROL_HEIGHT)
     );
 }
+
+#[test]
+fn a_sheet_in_motion_keeps_its_pin_where_it_falls_within_a_pixel_at_rest() {
+    let ctx = context();
+    let rect = Rect::from_min_size(Pos2::new(210.3, 140.6), Vec2::new(400.0, 230.0));
+    let pin = Pos2::new(355.25, 148.75);
+    let within = |at: Pos2| at - Pos2::new(at.x.round(), at.y.round());
+    let mut clock = Clock::CLOSED;
+    for _ in 0..12 {
+        clock.run(true, motion::SHEET_OPEN_SECS / 12.0);
+        let posed = clock.pose().transform(&ctx, rect, pin) * pin;
+        let drift = within(posed) - within(pin);
+        assert!(drift.length() < 1e-3, "drifted {drift:?} within its pixel");
+    }
+}
