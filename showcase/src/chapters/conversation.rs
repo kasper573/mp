@@ -97,7 +97,7 @@ fn play(shoot: &mut Shoot) {
     me.caption_top("What it took shows in the corner, over Grisha's bust");
     me.read_to_choices();
     me.caption_top(
-        "Can't afford it? Pick it anyway: it shakes, an error says why, and you can pick again",
+        "Can't afford it? Pick it anyway: it turns rubric, an error says why, and you can pick again",
     );
     me.act(InputAction::Choice1);
     me.wait_until("the refused pick to say why", |snapshot| {

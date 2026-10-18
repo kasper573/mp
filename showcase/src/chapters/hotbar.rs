@@ -32,7 +32,9 @@ fn play(shoot: &mut Shoot) {
         cooling(snapshot, 1) && pressed(snapshot, 1) == Some(HotbarPress::Used)
     });
     me.hold();
-    me.caption_top("Every press ripples its slot: blue when it fired, red when it could not");
+    me.caption_top(
+        "Every press rings its slot for a moment: gold when it fired, rubric when it could not",
+    );
     me.act(InputAction::Hotbar2);
     me.wait_until("the press refused", |snapshot| {
         pressed(snapshot, 1) == Some(HotbarPress::Denied)
@@ -125,7 +127,7 @@ fn play(shoot: &mut Shoot) {
     me.drag_ui("Resize", Offset::new(200.0, 44.0));
     me.wait_until("one row of nine", |snapshot| snapshot.hotbar.len() == 9);
     me.caption_top(
-        "Left of the bar sits the basic attack slot: a click on an enemy uses it, a weapon that grants one fills it, and no press ripples it",
+        "Left of the bar sits the basic attack slot: a click on an enemy uses it, a weapon that grants one fills it, and no press rings it",
     );
     me.hover_ui(UiTarget::starting("Basic attack slot"));
     me.hold();
