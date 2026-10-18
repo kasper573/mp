@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use bevy::prelude::*;
-use design_tokens::widgets;
+use design_tokens::{controls, face, sheet};
 use egui::Ui;
 use serde::{Deserialize, Serialize};
 use strum::VariantArray;
@@ -11,7 +11,7 @@ use crate::core::audio::mix::{AudioCategory, AudioFader, AudioMix, AudioVolume};
 use crate::core::math::{Pos, Size, WindowPx};
 use crate::core::platform::{ClientPlatform, Platform};
 use crate::core::render::transition::{ScreenTransition, ScreenTransitionPreference};
-use crate::core::text::{MotionPreference, TypewriterSpeed};
+use crate::core::text::TypewriterSpeed;
 use crate::systems::hud::HudWindow;
 use crate::systems::input::map::{InputAction, KeyGesture};
 use crate::systems::interface::InterfaceIcon;
@@ -92,32 +92,25 @@ impl HudWindow for SettingsWindow {
         WINDOW_SIZE
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                show_settings(ui, &mut world.resource_mut::<UserSettings>())
-            });
+        sheet::scroll(ui, egui::ScrollArea::vertical().auto_shrink(false), |ui| {
+            show_settings(ui, &mut world.resource_mut::<UserSettings>())
+        });
     }
 }
 
 fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
     ui.spacing_mut().slider_width = SLIDER_WIDTH;
-    widgets::section(ui, "Interface");
+    sheet::section(ui, "Interface");
     let mut snapping = settings.snapping_enabled();
-    if ui.checkbox(&mut snapping, "UI snapping").changed() {
+    if controls::checkbox(ui, &mut snapping, "UI snapping").changed() {
         settings.toggle_snapping();
     }
-    let mut reduced = settings.reduced_motion();
-    if ui.checkbox(&mut reduced, "Reduced motion").changed() {
-        settings.toggle_reduced_motion();
-    }
     let mut frame_rate = settings.frame_rate_shown();
-    if ui.checkbox(&mut frame_rate, "Show FPS").changed() {
+    if controls::checkbox(ui, &mut frame_rate, "Show FPS").changed() {
         settings.toggle_frame_rate();
     }
     let mut quick_cast = settings.quick_cast();
-    if ui
-        .checkbox(&mut quick_cast, "Quick cast skills")
+    if controls::checkbox(ui, &mut quick_cast, "Quick cast skills")
         .on_hover_text("A skill is cast the moment it is used, at what the pointer rests on")
         .changed()
     {
@@ -133,7 +126,7 @@ fn show_settings(ui: &mut Ui, settings: &mut Mut<UserSettings>) {
         ui.end_row();
     });
     ui.add_space(8.0);
-    widgets::section(ui, "Audio");
+    sheet::section(ui, "Audio");
     form(ui, "audio", |ui| {
         for fader in iter::once(AudioFader::Master).chain(
             AudioCategory::VARIANTS
@@ -158,22 +151,22 @@ fn form(ui: &mut Ui, id: &str, add: impl FnOnce(&mut Ui)) {
 
 fn text_speed_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
     let mut speed = settings.letters_per_second().0;
-    let slider = egui::Slider::new(
-        &mut speed,
-        LettersPerSecond::SLOWEST.0..=LettersPerSecond::FASTEST.0,
-    )
-    .step_by(1.0)
-    .fixed_decimals(0)
-    .suffix(" letters/s");
-    if widgets::slider(ui, slider).labelled_by(label).changed() {
-        settings.set_letters_per_second(LettersPerSecond(speed.round()));
-    }
+    ui.horizontal(|ui| {
+        let range = LettersPerSecond::SLOWEST.0..=LettersPerSecond::FASTEST.0;
+        if controls::slider(ui, &mut speed, range)
+            .labelled_by(label)
+            .changed()
+        {
+            settings.set_letters_per_second(LettersPerSecond(speed.round()));
+        }
+        ui.label(face::faint(format!("{:.0} letters/s", speed.round())));
+    });
 }
 
 fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui::Id) {
     let current = settings.screen_transition();
     let mut picked = current;
-    widgets::combo_box("area transition")
+    controls::combo("area transition")
         .selected_text(current.as_ref())
         .show_ui(ui, |ui| {
             for &transition in ScreenTransition::VARIANTS {
@@ -189,19 +182,16 @@ fn transition_picker(ui: &mut Ui, settings: &mut Mut<UserSettings>, label: egui:
 
 fn fader_slider(ui: &mut Ui, settings: &mut Mut<UserSettings>, fader: AudioFader, label: egui::Id) {
     let mut volume = settings.volume(fader).0;
-    let slider = egui::Slider::new(&mut volume, AudioVolume::SILENT.0..=AudioVolume::FULL.0)
-        .custom_formatter(|value, _| format!("{:.0}%", value * 100.0))
-        .custom_parser(|typed| {
-            typed
-                .trim()
-                .trim_end_matches('%')
-                .parse::<f64>()
-                .ok()
-                .map(|percent| percent / 100.0)
-        });
-    if widgets::slider(ui, slider).labelled_by(label).changed() {
-        settings.set_volume(fader, AudioVolume((volume * 100.0).round() / 100.0));
-    }
+    ui.horizontal(|ui| {
+        let range = AudioVolume::SILENT.0..=AudioVolume::FULL.0;
+        if controls::slider(ui, &mut volume, range)
+            .labelled_by(label)
+            .changed()
+        {
+            settings.set_volume(fader, AudioVolume((volume * 100.0).round() / 100.0));
+        }
+        ui.label(face::faint(format!("{:.0}%", volume * 100.0)));
+    });
 }
 
 fn fader_name(fader: AudioFader) -> &'static str {
@@ -233,14 +223,6 @@ impl UserSettings {
 
     pub(crate) fn set_letters_per_second(&mut self, letters_per_second: LettersPerSecond) {
         self.text.letters_per_second = letters_per_second.clamped();
-    }
-
-    pub(crate) fn reduced_motion(&self) -> bool {
-        self.text.reduced_motion
-    }
-
-    pub(crate) fn toggle_reduced_motion(&mut self) {
-        self.text.reduced_motion = !self.text.reduced_motion;
     }
 
     pub(crate) fn volume(&self, fader: AudioFader) -> AudioVolume {
@@ -390,8 +372,6 @@ fn default_snap() -> Option<WindowPx> {
 struct TextSettings {
     #[serde(default)]
     letters_per_second: LettersPerSecond,
-    #[serde(default)]
-    reduced_motion: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -419,7 +399,6 @@ fn persist(settings: Res<UserSettings>, platform: Res<ClientPlatform>) {
 fn apply(
     settings: Res<UserSettings>,
     mut speed: ResMut<TypewriterSpeed>,
-    mut motion: ResMut<MotionPreference>,
     mut audio_mix: ResMut<AudioMix>,
     mut transition: ResMut<ScreenTransitionPreference>,
 ) {
@@ -427,7 +406,6 @@ fn apply(
         return;
     }
     *speed = TypewriterSpeed(Some(settings.text.letters_per_second.0));
-    motion.reduced = settings.text.reduced_motion;
     *audio_mix = settings.sound;
     transition.0 = settings.screen.transition;
 }

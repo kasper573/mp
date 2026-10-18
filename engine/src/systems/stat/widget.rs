@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::color;
-use egui::{RichText, Ui, Vec2};
+use design_tokens::{face, sheet};
+use egui::{Ui, Vec2};
 
 use crate::systems::class;
 use crate::systems::hud::HudWindow;
@@ -30,21 +30,19 @@ impl HudWindow for StatsWindow {
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let rows = stat_rows(world);
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                egui::Grid::new("stats")
-                    .num_columns(2)
-                    .min_col_width(LABEL_WIDTH)
-                    .spacing(ROW_SPACING)
-                    .show(ui, |ui| {
-                        for (label, value) in rows {
-                            ui.label(RichText::new(label).color(color::MUTED));
-                            ui.label(value);
-                            ui.end_row();
-                        }
-                    });
-            });
+        sheet::scroll(ui, egui::ScrollArea::vertical().auto_shrink(false), |ui| {
+            egui::Grid::new("stats")
+                .num_columns(2)
+                .min_col_width(LABEL_WIDTH)
+                .spacing(ROW_SPACING)
+                .show(ui, |ui| {
+                    for (label, value) in rows {
+                        ui.label(face::body(label));
+                        ui.label(face::bold(value));
+                        ui.end_row();
+                    }
+                });
+        });
     }
 }
 

@@ -1,26 +1,29 @@
 use bevy::prelude::*;
-use design_tokens::{CHIP_RADIUS, HAIRLINE, TextRole, color, family, widgets};
-use egui::{Align, Color32, Label, Layout, Margin, Response, RichText, Sense, Ui};
+use design_tokens::card::{self, Art, Card, CardResponse};
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Kind, Mark};
+use design_tokens::{TextRole, face, ink};
+use egui::{Align, Label, Layout, Margin, Response, Sense, Stroke, Ui, Vec2};
 
 use super::{
     ActiveQuest, Objective, Parties, Progress, QuestDef, QuestId, QuestLog, clock_label,
     resets_label,
 };
 use crate::core::content::Content;
+use crate::core::gui;
 use crate::core::platform::ClientPlatform;
 use crate::core::time::UnixMillis;
 use crate::systems::dialogue::ChoiceReveal;
-use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
+use crate::systems::dialogue::stage::{self, DockedPanel, PanelChrome, PanelHead};
 use crate::systems::dialogue::{Conversation, ConversationPanel};
 use crate::systems::hud;
 use crate::systems::item::widget::{SlotLook, slot};
 use crate::systems::item::{self, Inventory, ItemStack};
 use crate::systems::player::session;
 
-const WIDTH: f32 = 480.0;
 const ICON: f32 = 20.0;
-const PICK: f32 = 32.0;
-const PADDING: f32 = 8.0;
+const MARK: f32 = 13.0;
+const CHIP_ICON: f32 = 16.0;
 
 pub struct QuestCardPlugin;
 
@@ -30,9 +33,64 @@ impl Plugin for QuestCardPlugin {
             app,
             DockedPanel {
                 head: card_head,
-                show: show_card,
+                show: show_docked,
             },
         );
+    }
+}
+
+/// How a quest's card is laid where it is shown.
+pub(super) struct QuestCardLook {
+    pub width: f32,
+    pub max_height: f32,
+    /// The kind band's words before the quest's category, when the place adds any.
+    pub moment: Option<&'static str>,
+}
+
+/// The quest's card: its category on the band, its name, and `plate` written under the overview.
+pub(super) fn show(
+    ui: &mut Ui,
+    world: &mut World,
+    quest: QuestId,
+    look: QuestCardLook,
+    plate: impl FnOnce(&mut Ui, &mut World),
+) -> CardResponse {
+    let content = world.resource::<Content>().clone();
+    let def = quest.get(&content);
+    let band = match look.moment {
+        Some(moment) => format!("{moment} · {}", def.category.to_lowercase()),
+        None => def.category.to_lowercase(),
+    };
+    let icon = gui::image(world, def.icon(&content)).map(|image| image.texture);
+    let mut shown = Card::new(Kind::Quest, &def.title);
+    shown.band = &band;
+    shown.art = Art {
+        icon,
+        height: card::ART_QUEST,
+    };
+    shown.width = look.width;
+    shown.max_height = look.max_height;
+    shown.show(ui, |ui, written| {
+        if written.name_cut {
+            card::full_name(ui, &def.title);
+        }
+        card::overview(ui, &overview(def));
+        plate(ui, world);
+    })
+}
+
+/// What kind of errand the quest is and what it pays: "Delivery · 40 xp".
+pub(super) fn overview(def: &QuestDef) -> String {
+    let kinds = def.kinds();
+    let mut letters = kinds.chars();
+    let kinds = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect::<String>())
+        .unwrap_or_default();
+    match def.xp {
+        0 => kinds,
+        xp if kinds.is_empty() => format!("{xp} xp"),
+        xp => format!("{kinds} · {xp} xp"),
     }
 }
 
@@ -44,11 +102,11 @@ enum Moment {
 }
 
 impl Moment {
-    fn title(self) -> &'static str {
+    fn band(self) -> &'static str {
         match self {
-            Moment::Offer => "Quest offer",
-            Moment::TurnIn => "Quest complete",
-            Moment::Decision => "A permanent choice",
+            Moment::Offer => "quest offer",
+            Moment::TurnIn => "quest complete",
+            Moment::Decision => "a permanent choice",
         }
     }
 }
@@ -64,15 +122,14 @@ fn moment(world: &World) -> Option<(QuestId, Moment)> {
 }
 
 fn card_head(world: &World) -> Option<PanelHead> {
-    let (_, moment) = moment(world)?;
+    moment(world)?;
     Some(PanelHead {
-        title: moment.title().to_owned(),
-        width: WIDTH,
-        fixed_height: None,
+        width: card::DOCKED_WIDTH,
+        chrome: PanelChrome::Card,
     })
 }
 
-fn show_card(ui: &mut Ui, world: &mut World) {
+fn show_docked(ui: &mut Ui, world: &mut World, width: f32, most: f32) {
     let Some((quest, moment)) = moment(world) else {
         return;
     };
@@ -80,14 +137,15 @@ fn show_card(ui: &mut Ui, world: &mut World) {
         .and_then(|seen| world.get::<Inventory>(seen))
         .cloned()
         .unwrap_or_else(Inventory::empty);
-    egui::Frame::new().inner_margin(PADDING).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.spacing_mut().item_spacing.y = 8.0;
-        match moment {
-            Moment::Offer => offer(ui, world, quest, &inventory),
-            Moment::TurnIn => turn_in(ui, world, quest, &inventory),
-            Moment::Decision => decision(ui, world, quest),
-        }
+    let look = QuestCardLook {
+        width,
+        max_height: most.min(card::MAX_HEIGHT),
+        moment: Some(moment.band()),
+    };
+    show(ui, world, quest, look, |ui, world| match moment {
+        Moment::Offer => offer(ui, world, quest, &inventory),
+        Moment::TurnIn => turn_in(ui, world, quest, &inventory),
+        Moment::Decision => decision(ui, world, quest),
     });
 }
 
@@ -101,33 +159,29 @@ fn offer(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) 
         &ActiveQuest::fresh(&content, quest),
         Some(inventory),
     );
-    head(ui, world, def);
-    caption(
-        ui,
-        format!("{} · {}", def.kinds(), def.meta(&parties, quest)),
-    );
-    section(ui, "Objectives");
+    card::overview(ui, &def.meta(&parties, quest));
+    card::heading(ui, "objectives");
     for (index, (objective, progress)) in def.objectives().zip(&progress).enumerate() {
         ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, progress, color::TEXT);
+            objective_row(ui, world, objective, progress, Standing::Open);
         });
     }
     if def.reveals(ChoiceReveal::Gains) {
-        section(ui, "Rewards");
+        card::heading(ui, "rewards");
         reward_chips(ui, world, def);
         if !def.pick_one().is_empty() {
-            section(ui, "Pick one when you return");
+            card::heading(ui, "pick one when you return");
             picks(ui, world, def);
         }
     }
-    caption(ui, "Accept or decline in the conversation");
+    card::foot(ui, "Accept or decline in the conversation");
 }
 
 fn turn_in(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory) {
     let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
-    head(ui, world, def);
     if def.reveals(ChoiceReveal::Costs) {
+        card::heading(ui, "hand in");
         for (index, &stack) in def.hand_in().iter().enumerate() {
             ui.push_id(("hand in", index), |ui| {
                 hand_in_row(ui, world, stack, inventory.count(stack.item));
@@ -137,58 +191,55 @@ fn turn_in(ui: &mut Ui, world: &mut World, quest: QuestId, inventory: &Inventory
     if !def.reveals(ChoiceReveal::Gains) {
         return;
     }
-    ui.horizontal_wrapped(|ui| {
-        caption(ui, "Rewards");
-        reward_chips(ui, world, def);
-        if !def.pick_one().is_empty() {
-            caption(ui, "+ your pick below");
-        }
-    });
+    card::heading(ui, "rewards");
+    reward_chips(ui, world, def);
+    if !def.pick_one().is_empty() {
+        card::foot(ui, "Your pick is offered in the conversation");
+    }
 }
 
 fn decision(ui: &mut Ui, world: &World, quest: QuestId) {
     let def = quest.get(world.resource::<Content>());
-    ui.label(RichText::new(def.title.as_str()).font(TextRole::Heading.font_id()));
     let paths = def.decision().unwrap_or_default();
     ui.columns(paths.len().max(1), |columns| {
         for (column, path) in columns.iter_mut().zip(paths) {
-            column.label(RichText::new(path.choice.as_str()).family(family::medium()));
+            column.label(card::bold(&path.choice));
             for mean in &path.means {
-                column.label(format!("• {mean}"));
+                column.horizontal_wrapped(|ui| {
+                    glyph::show(ui, Mark::Dot, 8.0, ink::INK2);
+                    ui.add(Label::new(TextRole::CardBody.rich(mean.as_str())).wrap());
+                });
             }
         }
     });
 }
 
-fn head(ui: &mut Ui, world: &mut World, def: &QuestDef) {
-    let content = world.resource::<Content>().clone();
-    ui.horizontal(|ui| {
-        hud::icon(ui, world, def.icon(&content), PICK);
-        ui.label(RichText::new(def.title.as_str()).font(TextRole::Heading.font_id()));
-    });
-}
-
 fn hand_in_row(ui: &mut Ui, world: &mut World, stack: ItemStack, held: u32) {
     let content = world.resource::<Content>().clone();
-    let held_color = if held >= stack.count {
-        color::MUTED
-    } else {
-        color::DANGER
-    };
+    let short = held < stack.count;
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let color = if short { ink::RUBRIC } else { ink::INK3 };
             ui.label(
-                RichText::new(format!("{held} in your bag"))
-                    .size(TextRole::Small.size())
-                    .color(held_color),
+                TextRole::Small
+                    .rich(format!("{held} in your bag"))
+                    .color(color),
             );
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                caption(ui, "Hand in");
                 hud::icon(ui, world, &stack.item.get(&content).icon, ICON);
-                ui.add(Label::new(counted(&content, stack)).wrap());
+                ui.add(Label::new(TextRole::CardBody.rich(counted(&content, stack))).wrap());
             });
         });
     });
+}
+
+/// Where an objective stands, which picks the mark before it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Standing {
+    /// Under way or not yet begun: a flag.
+    Open,
+    Done,
+    Failed,
 }
 
 pub(super) fn objective_row(
@@ -196,21 +247,41 @@ pub(super) fn objective_row(
     world: &mut World,
     objective: &Objective,
     progress: &Progress,
-    color: Color32,
+    standing: Standing,
 ) {
     let content = world.resource::<Content>().clone();
+    let standing = match standing {
+        Standing::Open if progress.done() => Standing::Done,
+        other => other,
+    };
+    let (mark, color) = match standing {
+        Standing::Open => (Mark::Flag, ink::INK),
+        Standing::Done => (Mark::Tick, ink::INK),
+        Standing::Failed => (Mark::Cross, ink::INK3),
+    };
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             if progress.counted {
                 ui.label(
-                    RichText::new(format!("{} / {}", progress.have, progress.need))
-                        .family(family::medium())
+                    TextRole::CardBody
+                        .rich(format!("{} / {}", progress.have, progress.need))
                         .color(color),
                 );
             }
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                hud::icon(ui, world, objective.icon(&content), ICON);
-                ui.add(Label::new(RichText::new(progress.label.as_str()).color(color)).wrap());
+                ui.spacing_mut().item_spacing.x = 5.0;
+                glyph::show(ui, mark, MARK, color);
+                if let Some(icon) = objective.icon(&content) {
+                    hud::icon(ui, world, icon, ICON);
+                }
+                ui.add(
+                    Label::new(
+                        TextRole::CardBody
+                            .rich(progress.label.as_str())
+                            .color(color),
+                    )
+                    .wrap(),
+                );
             });
         });
     });
@@ -220,7 +291,7 @@ pub(super) fn reward_chips(ui: &mut Ui, world: &mut World, def: &QuestDef) {
     let content = world.resource::<Content>().clone();
     ui.horizontal_wrapped(|ui| {
         if def.xp > 0 {
-            widgets::chip(ui, &format!("{} XP", def.xp));
+            controls::pill(ui, &format!("{} XP", def.xp), Pill::Gold);
         }
         for &stack in def.rewards() {
             let chip = item_chip(ui, world, &content, stack);
@@ -237,8 +308,7 @@ pub(super) fn picks(ui: &mut Ui, world: &mut World, def: &QuestDef) {
                 let look = SlotLook {
                     icon: Some(&stack.item.get(&content).icon),
                     count: stack.count,
-                    outline: None,
-                    faded: false,
+                    ..SlotLook::EMPTY
                 };
                 let response = slot(ui, world, look, Sense::click());
                 item::card::inspect(world, response, stack.item);
@@ -247,32 +317,15 @@ pub(super) fn picks(ui: &mut Ui, world: &mut World, def: &QuestDef) {
     });
 }
 
-pub(super) fn tag(ui: &mut Ui, label: &str, color: Color32) {
-    widgets::pill(ui, label, color);
-}
-
-pub(super) fn section(ui: &mut Ui, label: &str) {
-    ui.add_space(2.0);
-    ui.label(
-        RichText::new(label)
-            .family(family::medium())
-            .color(color::MUTED),
-    );
-}
-
 pub(super) fn caption(ui: &mut Ui, text: impl Into<String>) {
-    ui.label(
-        RichText::new(text.into())
-            .size(TextRole::Small.size())
-            .color(color::MUTED),
-    );
+    ui.add(Label::new(face::small_faint(text.into())).wrap());
 }
 
 pub(super) fn counted(content: &Content, stack: ItemStack) -> String {
     let name = &stack.item.get(content).name;
     match stack.count {
         1 => name.to_owned(),
-        count => format!("{name} ×{count}"),
+        count => format!("{name} \u{d7}{count}"),
     }
 }
 
@@ -317,15 +370,19 @@ pub(super) fn time_left(content: &Content, log: &QuestLog, quest: QuestId, now: 
 
 fn item_chip(ui: &mut Ui, world: &mut World, content: &Content, stack: ItemStack) -> Response {
     egui::Frame::new()
-        .fill(color::RAISED)
-        .stroke(HAIRLINE)
-        .corner_radius(CHIP_RADIUS)
-        .inner_margin(Margin::symmetric(8, 2))
+        .fill(ink::white_wash(0.25))
+        .stroke(Stroke::new(1.0, ink::ink_wash(0.35)))
+        .corner_radius(controls::PILL_HEIGHT / 2.0)
+        .inner_margin(Margin::symmetric(8, 1))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 4.0;
-                hud::icon(ui, world, &stack.item.get(content).icon, 16.0);
-                ui.label(RichText::new(counted(content, stack)).size(12.5));
+                ui.spacing_mut().item_spacing = Vec2::new(4.0, 0.0);
+                hud::icon(ui, world, &stack.item.get(content).icon, CHIP_ICON);
+                ui.label(
+                    face::bold(counted(content, stack))
+                        .size(12.0)
+                        .color(ink::GOLD),
+                );
             });
         })
         .response

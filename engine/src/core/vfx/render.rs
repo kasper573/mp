@@ -16,10 +16,10 @@ use bevy::sprite::Anchor;
 use bevy::sprite_render::{AlphaMode2d, Material2d, Material2dKey, Material2dPipeline};
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::family;
+use design_tokens::Face;
+use egui::Color32;
 use egui::emath::TSTransform;
 use egui::load::SizedTexture;
-use egui::{Color32, FontId};
 
 use super::shader::PARAMS_BYTES;
 use super::{
@@ -1009,7 +1009,7 @@ fn draw_overlays(world: &mut World) {
                     let float = TextFloat::at(time.progress);
                     let risen =
                         anchor.head - egui::vec2(0.0, rise.0 * TILE.0 * anchor.px * float.risen);
-                    let font = FontId::new(*size, family::prose_bold());
+                    let font = Face::BookBold.id(*size);
                     let width = gui
                         .fonts_mut(|fonts| {
                             fonts.layout_no_wrap(text.clone(), font.clone(), Color32::WHITE)

@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use design_tokens::{TextRole, color, paint, widgets};
+use design_tokens::controls::{self, Pill};
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{TextRole, face, ink};
 use egui::scroll_area::{DragScroll, ScrollBarVisibility, ScrollSource};
-use egui::{Align2, Color32, Pos2, Rect, RichText, Sense, Stroke, Ui, UiBuilder, Vec2};
+use egui::{Align2, Color32, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, UiBuilder, Vec2};
 
 use super::card;
 use super::{LearnSkillsRequest, Learned, Rank, SkillId, SkillKind};
@@ -24,6 +26,7 @@ const WINDOW_SIZE: Vec2 = Vec2::new(560.0, 440.0);
 const NODE_RADIUS: f32 = 24.0;
 const NODE_ICON: f32 = 28.0;
 const DOCK_HEIGHT: f32 = 34.0;
+const NAME_HALO: f32 = 1.0;
 
 pub struct SkillsWindow;
 
@@ -48,7 +51,7 @@ impl HudWindow for SkillsWindow {
     }
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let Some(sheet) = Sheet::of(world) else {
-            ui.label(RichText::new("No class yet").color(color::MUTED));
+            ui.label(face::faint("No class yet"));
             return;
         };
         header(ui, world, &sheet);
@@ -177,31 +180,25 @@ fn header(ui: &mut Ui, world: &mut World, sheet: &Sheet) {
     let picked = sheet.picked_cost(&content, def, &plan);
     let left = SkillPoints(sheet.to_spend.0.saturating_sub(picked.0));
     ui.horizontal(|ui| {
-        ui.label(
-            RichText::new(format!("{} · level {}", def.name, sheet.level))
-                .family(design_tokens::family::medium()),
-        );
-        let mut pill = format!("{} to spend", counted(left.0, "point"));
+        ui.label(face::bold(format!("{} · level {}", def.name, sheet.level)));
+        let mut text = format!("{} to spend", counted(left.0, "point"));
         if picked.0 > 0 {
-            pill.push_str(&format!(" · {} picked", counted(picked.0, "point")));
+            text.push_str(&format!(" · {} picked", counted(picked.0, "point")));
         }
-        let color = if left.0 > 0 || picked.0 > 0 {
-            color::WARN
+        let pill = if left.0 > 0 || picked.0 > 0 {
+            Pill::Gold
         } else {
-            color::MUTED
+            Pill::Ink
         };
-        widgets::pill(ui, &pill, color);
+        controls::pill(ui, &text, pill);
         let granted = super::granted(world, sheet.me);
         if !granted.is_empty() {
-            ui.separator();
-            ui.label(
-                RichText::new("From your gear")
-                    .size(TextRole::Small.size())
-                    .color(color::MUTED),
-            );
-            for skill in granted {
-                granted_skill(ui, world, skill);
-            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                for skill in granted.into_iter().rev() {
+                    granted_skill(ui, world, skill);
+                }
+                ui.label(face::secondary("From your gear"));
+            });
         }
     });
     ui.add_space(4.0);
@@ -212,9 +209,7 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
     let def = skill.get(&content);
     let look = SlotLook {
         icon: Some(&def.icon),
-        count: 0,
-        outline: None,
-        faded: false,
+        ..SlotLook::EMPTY
     };
     let response = slot(ui, world, look, Sense::click_and_drag());
     response.widget_info(|| {
@@ -232,7 +227,7 @@ fn granted_skill(ui: &mut Ui, world: &mut World, skill: SkillId) {
     } else if map::clicked(world, InputAction::PinToHotbar, &response) && !passive {
         bar::pin(world, super::HotbarEntry::Skill(skill));
     } else if response.secondary_clicked() {
-        card::open(world, skill);
+        card::open(world, skill, Some(response.rect));
     }
     let hint = StyledLine::new(vec![
         TextPiece::text("Known while the gear is worn · "),
@@ -283,6 +278,12 @@ fn tree(ui: &mut Ui, world: &mut World, sheet: &Sheet, viewport: Rect) -> TreeVi
             draw_canvas(ui, world, sheet, def, Placement { origin });
         })
     });
+    ui.painter().rect_stroke(
+        viewport.expand(1.0),
+        0.0,
+        Stroke::new(1.0, ink::GOLD2),
+        StrokeKind::Outside,
+    );
     TreeView {
         body: ui.max_rect().size(),
         viewport,
@@ -338,12 +339,16 @@ fn draw_canvas(ui: &mut Ui, world: &mut World, sheet: &Sheet, def: &ClassDef, pl
         let opened = planned
             .get(arrow.from)
             .is_some_and(|held| *held >= arrow.rank);
-        let color = if opened { color::WARN } else { color::BORDER };
+        let color = if opened {
+            ink::GOLD2
+        } else {
+            ink::wash(ink::LIGHT, 0.45)
+        };
         let (tail, head) = (place.at(from.at), place.at(to.at));
         let span = head - tail;
         if span.length() > NODE_RADIUS * 2.0 {
             let dir = span.normalized();
-            paint::arrow(
+            glyph::arrow(
                 &painter,
                 tail + dir * (NODE_RADIUS + 4.0),
                 head - dir * (NODE_RADIUS + 6.0),
@@ -407,7 +412,7 @@ fn node_input(
             InterfaceSound::UiRefuse.play(world);
         }
     } else if response.secondary_clicked() {
-        card::open(world, skill);
+        card::open(world, skill, Some(response.rect));
     } else if response.clicked() {
         pick(world, sheet, key, state);
     }
@@ -485,11 +490,11 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
             .layout(egui::Layout::right_to_left(egui::Align::Center)),
         |ui| {
             let confirm =
-                widgets::primary(ui, &format!("Confirm · {}", counted(picked.0, "point")));
+                controls::primary(ui, format!("Confirm · {}", counted(picked.0, "point")));
             gui::tooltip(&confirm, |ui| {
                 ui.label("Spends the picked points for good");
             });
-            let reset = ui.button("Reset");
+            let reset = controls::button(ui, "Reset");
             gui::tooltip(&reset, |ui| {
                 ui.label("Takes every pick back; nothing is spent");
             });
@@ -509,6 +514,9 @@ fn dock(ui: &mut Ui, world: &mut World, sheet: &Sheet, room: Rect) {
     );
 }
 
+/// A dark medallion on the designer's canvas: ringed in gold while it can be picked, in cream once
+/// learned, filled gold when maxed, and ringed thick in pale gold while it is picked or its card is
+/// up. Its name sits beneath in cream, haloed in ink to read over any canvas.
 fn draw_node(
     ui: &mut Ui,
     world: &mut World,
@@ -522,26 +530,33 @@ fn draw_node(
     let center = response.rect.center();
     let painter = ui.painter();
     let hovered = response.hovered();
+    let carded = card::shown(world) == Some(skill);
     let (fill, stroke) = match state {
-        NodeState::Locked => (color::INPUT, Stroke::new(1.0, color::BORDER)),
-        NodeState::Available => (color::RAISED, Stroke::new(1.5, color::WARN)),
-        NodeState::Learned => (color::RAISED, Stroke::new(2.0, color::TEXT)),
-        NodeState::Maxed => (gold_fill(), Stroke::new(2.0, color::WARN)),
-        NodeState::Picked(_) => (color::ACCENT_SOFT, Stroke::new(2.5, color::ACCENT)),
+        NodeState::Locked => (ink::wash(ink::INK, 0.8), Stroke::new(1.0, ink::INK3)),
+        NodeState::Available => (ink::INK, Stroke::new(1.5, ink::GOLD)),
+        NodeState::Learned => (ink::INK, Stroke::new(2.0, ink::LIGHT)),
+        NodeState::Maxed => (
+            ink::on(ink::INK, ink::GOLD, 0.35),
+            Stroke::new(2.0, ink::GOLD),
+        ),
+        NodeState::Picked(_) => (
+            ink::on(ink::INK, ink::GOLD2, 0.25),
+            Stroke::new(2.5, ink::GOLD2),
+        ),
     };
     if state == NodeState::Available {
         painter.circle_stroke(
             center,
             NODE_RADIUS + 4.0,
-            Stroke::new(
-                3.0,
-                color::WARN.gamma_multiply(if hovered { 0.6 } else { 0.35 }),
-            ),
+            Stroke::new(3.0, ink::wash(ink::GOLD, if hovered { 0.6 } else { 0.35 })),
         );
+    }
+    if carded {
+        painter.circle_stroke(center, NODE_RADIUS + 4.0, Stroke::new(3.0, ink::GOLD2));
     }
     painter.circle_filled(center, NODE_RADIUS, fill);
     if state == NodeState::Locked {
-        paint::dashed_circle(painter, center, NODE_RADIUS, stroke);
+        glyph::dashed_circle(painter, center, NODE_RADIUS, stroke);
     } else {
         painter.circle_stroke(center, NODE_RADIUS, stroke);
     }
@@ -549,7 +564,7 @@ fn draw_node(
         painter.circle_stroke(
             center,
             NODE_RADIUS + 1.5,
-            Stroke::new(1.0, color::HOVER_LINE),
+            Stroke::new(1.0, ink::wash(ink::LIGHT, 0.6)),
         );
     }
     if let Some(image) = gui::image(world, &def.icon) {
@@ -566,46 +581,50 @@ fn draw_node(
     let painter = ui.painter();
     let corner = center + Vec2::splat(NODE_RADIUS - 4.0);
     match state {
-        NodeState::Locked => paint::padlock(
-            painter,
-            center + Vec2::new(NODE_RADIUS - 6.0, NODE_RADIUS - 8.0),
-            9.0,
-        ),
-        NodeState::Available => {}
-        NodeState::Learned | NodeState::Maxed => paint::badge(
+        NodeState::Locked | NodeState::Available => {}
+        NodeState::Learned | NodeState::Maxed => glyph::badge(
             painter,
             corner,
             Align2::CENTER_CENTER,
             &format!("{}/{}", held.0, def.rank_count()),
             if state == NodeState::Maxed {
-                color::WARN
+                ink::OCHRE
             } else {
-                color::TEXT
+                ink::INK
             },
         ),
-        NodeState::Picked(rank) => paint::badge(
+        NodeState::Picked(rank) => glyph::badge(
             painter,
             corner,
             Align2::CENTER_CENTER,
             &format!("{}→{}", held.0, rank.0),
-            color::SELECTION,
+            ink::RUBRIC,
         ),
     }
-    painter.text(
-        center + Vec2::new(0.0, NODE_RADIUS + 10.0),
-        egui::Align2::CENTER_CENTER,
-        &def.name,
-        egui::FontId::proportional(TextRole::Small.size()),
-        if state == NodeState::Locked {
-            color::MUTED
-        } else {
-            color::TEXT
-        },
-    );
-}
-
-fn gold_fill() -> Color32 {
-    Color32::from_rgba_unmultiplied(color::WARN.r(), color::WARN.g(), color::WARN.b(), 70)
+    let color = if state == NodeState::Locked {
+        ink::wash(ink::LIGHT, 0.7)
+    } else {
+        ink::LIGHT
+    };
+    let at = center + Vec2::new(0.0, NODE_RADIUS + 10.0);
+    let galley = painter.layout_no_wrap(def.name.clone(), TextRole::Small.font_id(), color);
+    let name = Align2::CENTER_CENTER.anchor_size(at, galley.size());
+    for offset in [
+        Vec2::new(-NAME_HALO, 0.0),
+        Vec2::new(NAME_HALO, 0.0),
+        Vec2::new(0.0, -NAME_HALO),
+        Vec2::new(0.0, NAME_HALO),
+    ] {
+        painter.galley_with_override_text_color(name.min + offset, galley.clone(), ink::INK);
+    }
+    painter.galley(name.min, galley, color);
+    if state == NodeState::Locked {
+        let mark = Rect::from_min_size(
+            Pos2::new(name.max.x + 3.0, name.center().y - 5.0),
+            Vec2::splat(10.0),
+        );
+        glyph::paint(painter, Mark::Padlock, mark, color);
+    }
 }
 
 /// Where the designer's canvas origin lands on screen.

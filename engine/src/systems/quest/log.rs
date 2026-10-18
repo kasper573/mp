@@ -1,16 +1,18 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, color, family, widgets};
-use egui::{Align, Color32, Label, Layout, RichText, Sense, Ui, Vec2};
+use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::glyph::{self, Mark};
+use design_tokens::{TextRole, card, face, ink, sheet};
+use egui::{Align, Label, Layout, Pos2, Rect, Sense, Stroke, Ui, Vec2};
 use strum::IntoStaticStr;
 
 use super::card::{
-    Countdown, caption, objective_row, picks, reward_chips, section, tag, time_left,
+    Countdown, QuestCardLook, Standing, caption, objective_row, picks, reward_chips, time_left,
 };
 use super::{
     ActiveQuest, FinishedQuest, Parties, QUEST_LOG_CAP, QuestId, QuestLog, QuestRequest,
     QuestResult,
 };
-use crate::core::content::{Content, Fixture};
+use crate::core::content::Content;
 use crate::core::time::UnixMillis;
 use crate::systems::dialogue::ChoiceReveal;
 use crate::systems::hud::{self, Confirm, HudWindow};
@@ -25,7 +27,9 @@ use crate::systems::screen::ClientScreen;
 const SIZE: Vec2 = Vec2::new(660.0, 440.0);
 const LIST_WIDTH: f32 = 250.0;
 const ROW_ICON: f32 = 20.0;
-const DETAIL_PADDING: f32 = 8.0;
+const DETAIL_PADDING: f32 = 10.0;
+const FOOTER: f32 = 40.0;
+const TIMER_BAR: Vec2 = Vec2::new(90.0, 4.0);
 
 pub struct QuestLogPlugin;
 
@@ -55,7 +59,7 @@ impl HudWindow for QuestLogWindow {
     fn show(&self, ui: &mut Ui, world: &mut World) {
         let tabs = [LogTab::Active, LogTab::Completed].map(|tab| (tab, tab.title().to_owned()));
         let mut tab = world.resource::<Browse>().tab;
-        widgets::tab_strip(ui, &tabs, &mut tab);
+        sheet::tabs(ui, &tabs, &mut tab);
         world.resource_mut::<Browse>().tab = tab;
         let page = Page::of(world, tab);
         page_ui(ui, world, &page);
@@ -170,63 +174,66 @@ fn page_ui(ui: &mut Ui, world: &mut World, page: &Page) {
     let content = world.resource::<Content>().clone();
     let listed = page.listed(&content);
     let shown = page.shown(&listed);
-    egui::Panel::left(egui::Id::new(("quest list", page.tab.title())))
-        .resizable(false)
-        .exact_size(LIST_WIDTH)
-        .show(ui, |ui| {
-            egui::ScrollArea::vertical()
-                .auto_shrink(false)
-                .show(ui, |ui| list(ui, world, page, &listed, shown));
-        });
-    egui::ScrollArea::vertical()
-        .id_salt(("quest detail", page.tab.title()))
-        .auto_shrink(false)
-        .show(ui, |ui| {
-            egui::Frame::new()
-                .inner_margin(DETAIL_PADDING)
-                .show(ui, |ui| {
-                    if let Some(quest) = shown {
-                        detail(ui, world, page, quest);
-                    }
-                });
-        });
+    let room = ui.available_rect_before_wrap();
+    let list_rect = Rect::from_min_size(room.min, Vec2::new(LIST_WIDTH, room.height()));
+    let detail_rect = Rect::from_min_max(
+        Pos2::new(list_rect.max.x + DETAIL_PADDING, room.min.y),
+        room.max,
+    );
+    ui.painter().vline(
+        list_rect.max.x + DETAIL_PADDING / 2.0,
+        room.y_range(),
+        Stroke::new(1.0, ink::ink_wash(0.35)),
+    );
+    ui.scope_builder(egui::UiBuilder::new().max_rect(list_rect), |ui| {
+        let area = egui::ScrollArea::vertical()
+            .id_salt(("quest list", page.tab.title()))
+            .auto_shrink(false);
+        sheet::scroll(ui, area, |ui| list(ui, world, page, &listed, shown));
+    });
+    ui.scope_builder(egui::UiBuilder::new().max_rect(detail_rect), |ui| {
+        if let Some(quest) = shown {
+            detail(ui, world, page, quest);
+        }
+    });
+    ui.allocate_rect(room, Sense::hover());
 }
 
 fn list(ui: &mut Ui, world: &mut World, page: &Page, listed: &[QuestId], shown: Option<QuestId>) {
     let content = world.resource::<Content>().clone();
-    let (title, aside) = match page.tab {
+    let (title, count) = match page.tab {
         LogTab::Active => (
             "Active quests",
-            format!("{} / {QUEST_LOG_CAP}", page.log.active.len()),
+            format!("{} of {QUEST_LOG_CAP} quests", page.log.active.len()),
         ),
-        LogTab::Completed => ("Completed", page.log.finished.len().to_string()),
+        LogTab::Completed => (
+            "Completed",
+            match page.log.finished.len() {
+                1 => "1 quest".to_owned(),
+                finished => format!("{finished} quests"),
+            },
+        ),
     };
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(title).family(family::medium()));
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            ui.label(RichText::new(aside).color(color::MUTED));
-        });
-    });
+    sheet::section(ui, title);
+    ui.spacing_mut().item_spacing.y = 0.0;
     let mut category = None;
     for &quest in listed {
         let def = quest.get(&content);
         if category != Some(&def.category) {
             category = Some(&def.category);
             ui.add_space(6.0);
-            ui.label(
-                RichText::new(def.category.to_uppercase())
-                    .size(TextRole::Small.size())
-                    .family(family::medium())
-                    .color(color::FAINT),
-            );
+            sheet::label(ui, TextRole::Tab, &def.category.to_lowercase(), ink::INK3);
+            ui.add_space(2.0);
         }
         ui.push_id(("quest row", quest.index()), |ui| {
             row(ui, world, page, quest, shown == Some(quest));
         });
     }
+    ui.add_space(6.0);
     if listed.is_empty() {
-        ui.add_space(8.0);
         caption(ui, empty_note(page.tab));
+    } else {
+        caption(ui, count);
     }
 }
 
@@ -240,40 +247,43 @@ fn empty_note(tab: LogTab) -> &'static str {
 fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bool) {
     let content = world.resource::<Content>().clone();
     let def = quest.get(&content);
-    let fill = if selected {
-        color::ACCENT_SOFT
-    } else {
-        Color32::TRANSPARENT
+    let (status, tone) = status(&content, page, quest);
+    let look = RowLook {
+        selected,
+        faint: tone == Tone::Done,
+        failed: tone == Tone::Failed,
     };
-    let response = egui::Frame::new()
-        .fill(fill)
-        .corner_radius(design_tokens::WIDGET_RADIUS)
-        .inner_margin(egui::Margin::symmetric(6, 4))
-        .show(ui, |ui| {
-            ui.set_min_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if page.log.tracked.contains(&quest) {
-                        hud::icon(ui, world, &InterfaceIcon::Tracked.get(&content).image, 14.0);
+    let shown = controls::row(ui, look, |ui| {
+        ui.horizontal(|ui| {
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                match tone {
+                    Tone::Notice => {
+                        controls::pill(ui, &status, Pill::Azure);
                     }
-                    let (status, color) = status(&content, page, quest);
-                    ui.label(
-                        RichText::new(status)
-                            .size(TextRole::Small.size())
-                            .color(color),
-                    );
-                    ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                        hud::icon(ui, world, def.icon(&content), ROW_ICON);
-                        ui.add(
-                            Label::new(RichText::new(def.title.as_str()).family(family::medium()))
-                                .truncate(),
-                        );
-                    });
+                    Tone::Done => {
+                        let (rect, _) =
+                            ui.allocate_exact_size(Vec2::new(44.0, 18.0), Sense::hover());
+                        controls::stamp(ui.painter(), rect.center(), "done", ink::INK);
+                    }
+                    Tone::Failed => {
+                        ui.label(TextRole::Small.rich(status.as_str()).color(ink::RUBRIC));
+                    }
+                    Tone::Plain => {
+                        ui.label(TextRole::Small.rich(status.as_str()).color(ink::INK3));
+                    }
+                }
+                if page.log.tracked.contains(&quest) {
+                    glyph::show(ui, Mark::Flag, 12.0, ink::AZURE);
+                }
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    hud::icon(ui, world, def.icon(&content), ROW_ICON);
+                    ui.add(Label::new(face::bold(def.title.as_str())).truncate());
                 });
             });
-        })
+        });
+    });
+    let response = shown
         .response
-        .interact(Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand);
     response.widget_info(|| {
         egui::WidgetInfo::selected(
@@ -283,33 +293,37 @@ fn row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId, selected: bo
             &def.title,
         )
     });
-    if response.hovered() && !selected {
-        ui.painter().rect_filled(
-            response.rect,
-            design_tokens::WIDGET_RADIUS,
-            Color32::from_white_alpha(8),
-        );
-    }
     if map::clicked(world, InputAction::Select, &response) {
         select(world, page.tab, quest);
     }
 }
 
-fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
-    let ink = color::TEXT.gamma_multiply(0.7);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Tone {
+    Plain,
+    /// Something to act on: a choice to make, a quest to hand in.
+    Notice,
+    Done,
+    Failed,
+}
+
+fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Tone) {
     let def = quest.get(content);
     if let Some(active) = page.active(quest) {
         if def.decision().is_some() {
-            return ("choice".to_owned(), color::WARN);
+            return ("choice".to_owned(), Tone::Notice);
         }
         if active.ready(content, &page.parties, Some(&page.inventory)) {
-            return ("ready".to_owned(), color::WARN);
+            return ("ready".to_owned(), Tone::Notice);
         }
         if active.deadline.is_some() {
             let left = Countdown::Left
                 .label(&page.log, quest, page.now)
                 .unwrap_or_default();
-            return (left, color::WARN);
+            return (left, Tone::Plain);
+        }
+        if def.daily() {
+            return ("daily".to_owned(), Tone::Plain);
         }
         let counted = def
             .progress(content, &page.parties, active, Some(&page.inventory))
@@ -317,43 +331,55 @@ fn status(content: &Content, page: &Page, quest: QuestId) -> (String, Color32) {
             .find(|progress| progress.counted && !progress.done())
             .map(|progress| format!("{}/{}", progress.have, progress.need))
             .unwrap_or_default();
-        return (counted, ink);
+        return (counted, Tone::Plain);
     }
     match page.finished(quest) {
         Some(finished) if finished.result == QuestResult::Failed => {
-            ("failed".to_owned(), color::DANGER)
+            ("failed".to_owned(), Tone::Failed)
         }
         Some(finished) if finished.resets_in(page.now).is_some() => (
             Countdown::Resets
                 .label(&page.log, quest, page.now)
                 .unwrap_or_default(),
-            ink,
+            Tone::Plain,
         ),
-        Some(_) => ("done".to_owned(), ink),
-        None => (String::new(), ink),
+        Some(_) => ("done".to_owned(), Tone::Done),
+        None => (String::new(), Tone::Plain),
     }
 }
 
 fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     let content = world.resource::<Content>().clone();
-    let def = quest.get(&content);
-    ui.spacing_mut().item_spacing.y = 8.0;
-    ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(def.title.as_str()).font(TextRole::Heading.font_id()));
-        tag(ui, &def.kinds(), color::WARN);
+    let trackable = page.log.trackable(&content, quest);
+    let footer = if trackable { FOOTER } else { 0.0 };
+    let look = QuestCardLook {
+        width: card::QUESTS_PAGE_WIDTH.min(ui.available_width()),
+        max_height: (ui.available_height() - footer).max(card::KIND_BAND),
+        moment: None,
+    };
+    ui.vertical_centered(|ui| {
+        ui.set_width(look.width);
+        super::card::show(ui, world, quest, look, |ui, world| {
+            plate(ui, world, page, quest)
+        });
+        if trackable {
+            footer_row(ui, world, page, quest);
+        }
     });
-    caption(ui, def.meta(&page.parties, quest));
+}
+
+fn plate(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
+    let content = world.resource::<Content>().clone();
+    let def = quest.get(&content);
+    card::overview(ui, &def.meta(&page.parties, quest));
     if page
         .active(quest)
         .is_some_and(|active| active.deadline.is_some())
     {
-        timer(ui, world, page, quest);
+        timer(ui, &content, page, quest);
     }
-    ui.label(
-        RichText::new(format!("\u{201c}{}\u{201d}", def.blurb))
-            .color(color::TEXT.gamma_multiply(0.85)),
-    );
-    section(ui, "Objectives");
+    card::flavour(ui, &def.blurb);
+    card::heading(ui, "objectives");
     let fresh = ActiveQuest::fresh(&content, quest);
     let progress = def.progress(
         &content,
@@ -363,38 +389,37 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
     );
     let finished = page.finished(quest);
     for (index, (objective, mut progress)) in def.objectives().zip(progress).enumerate() {
-        let color = match finished.map(|finished| finished.result) {
-            Some(QuestResult::Completed) => color::OK,
-            Some(QuestResult::Failed) => color::MUTED,
-            None if progress.done() => color::OK,
-            None => color::TEXT,
+        let standing = match finished.map(|finished| finished.result) {
+            Some(QuestResult::Completed) => Standing::Done,
+            Some(QuestResult::Failed) => Standing::Failed,
+            None => Standing::Open,
         };
         progress.counted &= finished.is_none();
         ui.push_id(("objective", index), |ui| {
-            objective_row(ui, world, objective, &progress, color);
+            objective_row(ui, world, objective, &progress, standing);
         });
     }
     if let Some(paths) = def.decision() {
-        section(ui, "Choices");
+        card::heading(ui, "choices");
         for path in paths {
-            ui.label(format!("{}: {}", path.choice, path.means.join("; ")));
+            card::fact(ui, &format!("{}: {}", path.choice, path.means.join("; ")));
         }
     }
     let handed_in = finished.is_some_and(|finished| finished.result == QuestResult::Completed);
     if def.reveals(ChoiceReveal::Gains) || handed_in {
-        section(ui, "Rewards");
+        card::heading(ui, "rewards");
         reward_chips(ui, world, def);
     }
     if def.reveals(ChoiceReveal::Gains) && !def.pick_one().is_empty() && finished.is_none() {
-        section(ui, "Pick one when you return");
+        card::heading(ui, "pick one when you return");
         picks(ui, world, def);
     }
     if def.time_limit().is_some() {
-        section(ui, "If time runs out");
-        ui.label(format!(
-            "The quest fails. {}.",
-            def.retry_hint(&page.parties, quest)
-        ));
+        card::heading(ui, "if time runs out");
+        card::fact(
+            ui,
+            &format!("The quest fails. {}.", def.retry_hint(&page.parties, quest)),
+        );
     }
     if let Some(finished) = finished {
         let (outcome, color) = match finished.result {
@@ -402,48 +427,44 @@ fn detail(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
                 Countdown::ResetsDetail
                     .label(&page.log, quest, page.now)
                     .unwrap_or_default(),
-                color::OK,
+                ink::VERDIGRIS,
             ),
-            QuestResult::Completed => ("Completed".to_owned(), color::OK),
+            QuestResult::Completed => ("Completed".to_owned(), ink::VERDIGRIS),
             QuestResult::Failed if finished.offered_again => (
                 format!("Failed · {}", def.retry_hint(&page.parties, quest)),
-                color::DANGER,
+                ink::RUBRIC,
             ),
-            QuestResult::Failed => ("Failed".to_owned(), color::DANGER),
+            QuestResult::Failed => ("Failed".to_owned(), ink::RUBRIC),
         };
-        ui.label(RichText::new(outcome).family(family::medium()).color(color));
-    }
-    if page.log.trackable(&content, quest) {
-        footer(ui, world, page, quest);
+        ui.add(Label::new(card::bold(&outcome).color(color)).wrap());
     }
 }
 
-fn timer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
-    let content = world.resource::<Content>().clone();
+fn timer(ui: &mut Ui, content: &Content, page: &Page, quest: QuestId) {
     ui.horizontal(|ui| {
-        hud::icon(ui, world, &InterfaceIcon::Timed.get(&content).image, 16.0);
         let left = Countdown::LeftDetail
             .label(&page.log, quest, page.now)
             .unwrap_or_default();
-        ui.label(
-            RichText::new(left)
-                .family(family::medium())
-                .color(color::WARN),
-        );
-        ui.add(
-            egui::ProgressBar::new(time_left(&content, &page.log, quest, page.now))
-                .desired_height(6.0)
-                .fill(color::WARN),
+        ui.label(card::bold(&left).color(ink::OCHRE));
+        let (rect, _) = ui.allocate_exact_size(TIMER_BAR, Sense::hover());
+        let share = time_left(content, &page.log, quest, page.now);
+        let y = rect.center().y;
+        ui.painter()
+            .hline(rect.x_range(), y, Stroke::new(1.0, ink::ink_wash(0.35)));
+        ui.painter().hline(
+            rect.min.x..=rect.min.x + rect.width() * share,
+            y,
+            Stroke::new(TIMER_BAR.y, ink::OCHRE),
         );
     });
 }
 
-fn footer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
-    ui.add_space(4.0);
+fn footer_row(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
+    ui.add_space(8.0);
     ui.horizontal(|ui| {
         let tracked = page.log.tracked.contains(&quest);
         let mut track = tracked;
-        if ui.checkbox(&mut track, "Track on HUD").changed() {
+        if controls::checkbox(ui, &mut track, "Track on HUD").changed() {
             world.write_message(QuestRequest::Track {
                 quest,
                 tracked: track,
@@ -451,7 +472,7 @@ fn footer(ui: &mut Ui, world: &mut World, page: &Page, quest: QuestId) {
         }
         if page.active(quest).is_some() {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if widgets::danger(ui, "Abandon").clicked() {
+                if controls::danger(ui, "Abandon").clicked() {
                     confirm_abandon(world, quest);
                 }
             });

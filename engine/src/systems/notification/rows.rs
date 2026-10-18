@@ -3,60 +3,31 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use design_tokens::{color, family};
-use egui::emath::{TSTransform, easing};
-use egui::{
-    Align, Align2, Color32, FontId, Id, Layout, Rect, RichText, Sense, Ui, UiBuilder, Vec2,
-};
+use design_tokens::glyph::{self, Mark};
+use design_tokens::motion::{self, SheetPose};
+use design_tokens::{Face, TextRole, ink, slip};
+use egui::text::{LayoutJob, TextFormat};
+use egui::{Align, Align2, Color32, Id, Pos2, Rect, Sense, Ui, Vec2};
 use serde::{Deserialize, Serialize};
 
 use super::{NotificationSent, window_visible};
 use crate::core::gui::{self, Band};
-use crate::core::text::{
-    self, KeyNames, MotionPreference, StyledLine, TextLook, TextPiece, TextShadow,
-};
+use crate::core::text::{self, StyledLine, TextLook, TextPiece};
 use crate::core::time::Seconds;
+use crate::systems::hud;
 use crate::systems::input::map::{self, InputAction};
 use crate::systems::screen::ClientScreen;
 
 const COUNT_LINGERS: Seconds = Seconds(5.0);
 
-const WHITE: Color32 = Color32::WHITE;
-const SLATE_90: Color32 = Color32::from_rgb(228, 234, 239);
-const SLATE_40: Color32 = Color32::from_rgb(41, 46, 45);
-const AMBER_80: Color32 = Color32::from_rgb(246, 201, 96);
-const LABEL: f32 = 12.0;
-const CAPTION: f32 = 12.0;
-const BODY: f32 = 16.0;
-
-const CAPTIONS_WIDEST: f32 = 640.0;
-const CAPTION_SIZE: f32 = 17.0;
-const CAPTION_LINES_HIGH: f32 = 46.0;
-const CAPTION_PADDING: Vec2 = Vec2::new(24.0, 8.0);
-const ALERTS_WIDEST: f32 = 580.0;
-const MILESTONE_SIZE: f32 = 34.0;
-const SCREEN_SHARE: f32 = 0.94;
-const LINE_GAP: f32 = 2.0;
-const ROW_GAP: f32 = 4.0;
-const CHIP_GAP: f32 = 8.0;
-const MILESTONE_GAP: f32 = 16.0;
-
-const SCRIM_PRESENCE: Presence = Presence {
-    enter: Move::new(Vec2::new(0.0, 12.0), 0.97, 0.36),
-    exit: Move::new(Vec2::new(0.0, 8.0), 0.98, 0.24),
-};
-const CAPTION_PRESENCE: Presence = Presence {
-    enter: Move::new(Vec2::new(0.0, 8.0), 1.0, 0.34),
-    exit: Move::new(Vec2::new(0.0, -6.0), 1.0, 0.22),
-};
-const MILESTONE_PRESENCE: Presence = Presence {
-    enter: Move::new(Vec2::ZERO, 1.25, 0.52),
-    exit: Move::new(Vec2::new(0.0, -14.0), 1.04, 0.35),
-};
-const SHADOW: TextShadow = TextShadow {
-    offset: Vec2::new(0.0, 2.0),
-    color: Color32::from_black_alpha(204),
-};
+const NOTICE: Vec2 = Vec2::new(280.0, 36.0);
+const NOTICE_WIDEST: f32 = 440.0;
+const NOTICE_ICON: f32 = 20.0;
+const BIG_NOTICE: Vec2 = Vec2::new(360.0, 72.0);
+const BIG_NOTICE_WIDEST: f32 = 560.0;
+const BIG_LINE: f32 = 20.0;
+const ROW_GAP: f32 = 6.0;
+const MILESTONE_GAP: f32 = 12.0;
 
 pub(super) trait RowPlace: Send + Sync + 'static {
     const ROWS: usize;
@@ -127,184 +98,160 @@ pub(super) fn shown<P: RowPlace>(world: &World) -> NotificationRows {
     world.resource::<PlacedRows<P>>().rows.shown()
 }
 
+/// Alerts as notice slips down from `top`; a click on one puts it away.
 pub(super) fn draw_alerts(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (lines, more) = lines_of::<Alerts>(world);
-    let width = ALERTS_WIDEST.min(gui.content_rect().width() * SCREEN_SHARE);
-    let mut drawn: Vec<Rect> = Vec::new();
-    let next = |drawn: &[Rect]| drawn.last().map_or(top, |last| last.bottom() + ROW_GAP);
-    for line in lines {
-        let mut open = true;
-        let shown = egui::Window::new(label_text(&line.label, line.replaced))
-            .id(Id::new(("alert", line.key)))
-            .order(Band::Notices.order())
-            .anchor(Align2::CENTER_TOP, Vec2::new(0.0, next(&drawn)))
-            .collapsible(false)
-            .resizable(false)
-            .min_width(width)
-            .max_width(width)
-            .open(&mut open)
-            .show(gui, |ui| {
-                text::show(ui, world, &line.text, look(BODY, color::TEXT), None);
-            });
-        drawn.extend(shown.map(|shown| shown.response.rect));
-        if !open {
-            world
-                .resource_mut::<PlacedRows<Alerts>>()
-                .rows
-                .close(line.key);
-        }
+    draw_rows::<Alerts>(world, gui, top, Mark::Bell, true)
+}
+
+/// Narration as notice slips down from `top`.
+pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
+    draw_rows::<Captions>(world, gui, top, Mark::Page, false)
+}
+
+/// Milestones as larger slips down from `top`: the label in small caps over the words.
+pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
+    let step = hud::motion_step(gui);
+    let (lines, more) = lines_of::<Milestones>(world);
+    let shown = world
+        .resource_mut::<PlacedRows<Milestones>>()
+        .fades
+        .sync(step, lines.into_iter().map(|line| (line.key, line)));
+    let mut drawn = Vec::new();
+    let mut at = top;
+    for (line, pose) in shown {
+        let big = BigNotice {
+            emblem: None,
+            title: &label_text(&line.label, line.replaced),
+            line: &line.text,
+        };
+        let rect = big_notice(world, gui, Id::new(("milestone", line.key)), at, big, pose);
+        at = rect.bottom() + MILESTONE_GAP;
+        drawn.push(rect);
     }
     if let Some(more) = more {
-        let at = next(&drawn);
-        drawn.push(chip_area(world, gui, "alerts-more", at, more));
+        drawn.push(more_slip(world, gui, "milestones-more", at, more));
     }
     let bottom = drawn.last().map_or(top, Rect::bottom);
-    world.resource_mut::<PlacedRows<Alerts>>().drawn = drawn;
-    bottom
-}
-
-pub(super) fn draw_captions(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = motion_time(world, gui);
-    let (lines, more) = lines_of::<Captions>(world);
-    let mut placed = world.resource_mut::<PlacedRows<Captions>>();
-    let scrim = placed.scrim.sync(
-        now,
-        SCRIM_PRESENCE,
-        still,
-        (!lines.is_empty()).then_some((0, ())),
-    );
-    let rows = placed.fades.sync(
-        now,
-        CAPTION_PRESENCE,
-        still,
-        lines.into_iter().map(|line| (line.key, line)),
-    );
-    let Some(&((), scrim)) = scrim.first() else {
-        let drawn: Vec<Rect> = more
-            .map(|more| chip_area(world, gui, "captions-more", top, more))
-            .into_iter()
-            .collect();
-        let bottom = drawn.first().map_or(top, Rect::bottom);
-        world.resource_mut::<PlacedRows<Captions>>().drawn = drawn;
-        return bottom;
-    };
-    let screen = gui.content_rect();
-    let room =
-        (CAPTIONS_WIDEST.min(screen.width() * SCREEN_SHARE) - 2.0 * CAPTION_PADDING.x).max(0.0);
-    let measured: Vec<(LabelledLine, Look, Vec2)> = rows
-        .into_iter()
-        .map(|(line, row)| {
-            let size = text::measure(gui, world, &line.text, look(CAPTION_SIZE, WHITE), room);
-            (line, row, size)
-        })
-        .collect();
-    let width = measured
-        .iter()
-        .map(|(line, _, size)| {
-            let label = label_width(gui, &label_text(&line.label, line.replaced));
-            size.x.max(label)
-        })
-        .fold(0.0, f32::max)
-        .min(room);
-    let shown = column_area(gui, "captions", top).show(gui, |ui| {
-        ui.set_width(screen.width());
-        ui.vertical_centered(|ui| {
-            ui.spacing_mut().item_spacing.y = ROW_GAP;
-            let scrim_rect = egui::Frame::new()
-                .fill(Color32::from_black_alpha(115))
-                .corner_radius(8.0)
-                .inner_margin(egui::Margin::symmetric(
-                    CAPTION_PADDING.x as i8,
-                    CAPTION_PADDING.y as i8,
-                ))
-                .show(ui, |ui| {
-                    ui.set_width(width);
-                    ui.spacing_mut().item_spacing.y = CHIP_GAP;
-                    for (line, row, size) in &measured {
-                        ui.scope(|ui| {
-                            ui.multiply_opacity(row.opacity);
-                            caption_row(ui, world, line, *size);
-                        });
-                    }
-                })
-                .response
-                .rect;
-            let chip = more.map(|more| count_chip(ui, world, more).rect);
-            chip.map_or(scrim_rect, |chip| scrim_rect.union(chip))
-        })
-        .inner
-    });
-    gui.set_transform_layer(shown.response.layer_id, scrim.around(shown.inner));
-    world.resource_mut::<PlacedRows<Captions>>().drawn = vec![shown.inner];
-    shown.inner.bottom()
-}
-
-pub(super) fn draw_milestones(world: &mut World, gui: &egui::Context, top: f32) -> f32 {
-    let (now, still) = motion_time(world, gui);
-    let (lines, more) = lines_of::<Milestones>(world);
-    let rows = world.resource_mut::<PlacedRows<Milestones>>().fades.sync(
-        now,
-        MILESTONE_PRESENCE,
-        still,
-        lines.into_iter().map(|line| (line.key, line)),
-    );
-    if rows.is_empty() && more.is_none() {
-        world.resource_mut::<PlacedRows<Milestones>>().drawn.clear();
-        return top;
-    }
-    let screen = gui.content_rect();
-    let shown = column_area(gui, "milestones", top).show(gui, |ui| {
-        ui.set_width(screen.width());
-        ui.vertical_centered(|ui| {
-            ui.spacing_mut().item_spacing.y = MILESTONE_GAP;
-            let mut drawn: Option<Rect> = None;
-            for (line, row) in &rows {
-                let rect = ui
-                    .scope(|ui| {
-                        ui.multiply_opacity(row.opacity);
-                        milestone_row(ui, world, line, *row)
-                    })
-                    .inner;
-                drawn = Some(drawn.map_or(rect, |drawn| drawn.union(rect)));
-            }
-            if let Some(more) = more {
-                ui.add_space(CHIP_GAP - MILESTONE_GAP);
-                let chip = count_chip(ui, world, more).rect;
-                drawn = Some(drawn.map_or(chip, |drawn| drawn.union(chip)));
-            }
-            drawn
-        })
-        .inner
-    });
-    let drawn: Vec<Rect> = shown.inner.into_iter().collect();
-    let bottom = drawn.first().map_or(top, Rect::bottom);
     world.resource_mut::<PlacedRows<Milestones>>().drawn = drawn;
     bottom
 }
 
-pub(super) fn count_chip(ui: &mut Ui, world: &World, more: u32) -> egui::Response {
-    egui::Frame::new()
-        .fill(SLATE_40.gamma_multiply(0.55))
-        .corner_radius(8.0)
-        .inner_margin(egui::Margin::symmetric(8, 2))
-        .show(ui, |ui| {
-            let size = text::measure(
-                ui.ctx(),
-                world,
-                &more_text(more),
-                look(CAPTION, SLATE_90.gamma_multiply(0.75)),
-                f32::INFINITY,
-            );
-            ui.set_width(size.x);
+/// What a notice slip shows: its 20 px icon, the label of who it is from, and its line.
+pub(super) struct Notice<'a> {
+    pub icon: NoticeIcon<'a>,
+    pub label: Option<&'a str>,
+    pub line: &'a StyledLine,
+    /// Rubric for an error or a failure, ink otherwise.
+    pub ink: Color32,
+    /// A click puts it away.
+    pub closable: bool,
+}
+
+pub(super) enum NoticeIcon<'a> {
+    File(&'a str),
+    Mark(Mark),
+}
+
+/// A notice slip hung at the top centre with its top edge at `top`, dropping in or lifting off in
+/// `pose`. Hands back where it lies at rest and whether it was clicked.
+pub(super) fn notice(
+    world: &mut World,
+    gui: &egui::Context,
+    id: Id,
+    top: f32,
+    notice: Notice,
+    pose: SheetPose,
+) -> (Rect, bool) {
+    let area = column_area(gui, id, top).interactable(notice.closable);
+    let shown = gui::show_anchored(gui, area, |ui| {
+        ui.multiply_opacity(pose.opacity);
+        let written = slip::show(ui, |ui| {
+            ui.set_min_size(NOTICE - padding());
+            ui.set_max_width(NOTICE_WIDEST - padding().x);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                notice_icon(ui, world, &notice.icon, notice.ink);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    if let Some(label) = notice.label {
+                        ui.label(TextRole::Band.widget_text(label, ink::INK2));
+                    }
+                    text::show(
+                        ui,
+                        world,
+                        notice.line,
+                        TextLook::new(TextRole::Body.size(), notice.ink),
+                        None,
+                    );
+                });
+            });
+        });
+        notice.closable && written.response.interact(Sense::click()).clicked()
+    });
+    let rect = shown.response.rect;
+    gui.set_transform_layer(shown.response.layer_id, pose.transform(rect));
+    (rect, shown.inner)
+}
+
+/// What a larger slip shows: an emblem over a small-caps title over a line in the book face.
+pub(super) struct BigNotice<'a> {
+    pub emblem: Option<egui::Image<'static>>,
+    pub title: &'a str,
+    pub line: &'a StyledLine,
+}
+
+/// A larger slip centred under `top`, for milestones and the intro of an area.
+pub(super) fn big_notice(
+    world: &mut World,
+    gui: &egui::Context,
+    id: Id,
+    top: f32,
+    big: BigNotice,
+    pose: SheetPose,
+) -> Rect {
+    let area = column_area(gui, id, top);
+    let shown = gui::show_anchored(gui, area, |ui| {
+        ui.multiply_opacity(pose.opacity);
+        slip::show(ui, |ui| {
+            ui.set_min_size(BIG_NOTICE - padding());
+            ui.set_max_width(BIG_NOTICE_WIDEST - padding().x);
+            ui.vertical_centered(|ui| {
+                ui.spacing_mut().item_spacing.y = 4.0;
+                if let Some(emblem) = big.emblem {
+                    ui.add(emblem);
+                }
+                ui.label(big_title(big.title));
+                text::show(ui, world, big.line, TextLook::new(BIG_LINE, ink::INK), None);
+            });
+        });
+    });
+    let rect = shown.response.rect;
+    gui.set_transform_layer(shown.response.layer_id, pose.transform(rect));
+    rect
+}
+
+/// "+N more · H history", on a slip of its own, for what a place had no room left to show.
+pub(super) fn more_slip(
+    world: &mut World,
+    gui: &egui::Context,
+    id: &str,
+    top: f32,
+    more: u32,
+) -> Rect {
+    let area = column_area(gui, Id::new(("notice", id)), top);
+    gui::show_anchored(gui, area, |ui| {
+        slip::show(ui, |ui| {
             text::show(
                 ui,
                 world,
                 &more_text(more),
-                look(CAPTION, SLATE_90.gamma_multiply(0.75)),
+                TextLook::new(TextRole::Small.size(), ink::INK3),
                 None,
             );
-        })
-        .response
+        });
+    })
+    .response
+    .rect
 }
 
 pub(super) fn more_text(more: u32) -> StyledLine {
@@ -319,9 +266,6 @@ pub(super) fn hovered(world: &World, rects: &[Rect]) -> bool {
     let pointer = gui::context(world).and_then(|gui| gui.pointer_latest_pos());
     pointer.is_some_and(|at| rects.iter().any(|rect| rect.contains(at)))
 }
-
-const BUMP_SCALE: f32 = 1.08;
-const BUMP_SECONDS: f64 = 0.25;
 
 /// The time a notification place has been on show. It only moves while the place is not held,
 /// so a notification read under the pointer keeps its time.
@@ -346,56 +290,29 @@ impl Clock {
     }
 }
 
-/// A toast's swell after a repeat bumps it: armed by the bump, timed from the next draw.
-#[derive(Default, Clone, Copy)]
-pub(super) struct Swell {
-    bumped: bool,
-    started: Option<f64>,
-}
-
-impl Swell {
-    pub(super) fn bump(&mut self) {
-        self.bumped = true;
-    }
-
-    pub(super) fn start_if_bumped(&mut self, now: f64) {
-        if std::mem::take(&mut self.bumped) {
-            self.started = Some(now);
-        }
-    }
-
-    /// How far the toast is scaled now, easing back to its size.
-    pub(super) fn scale(self, now: f64, still: bool) -> f32 {
-        self.started.filter(|_| !still).map_or(1.0, |at| {
-            let t = ((now - at) / BUMP_SECONDS).clamp(0.0, 1.0) as f32;
-            1.0 + (BUMP_SCALE - 1.0) * (1.0 - easing::cubic_out(t))
-        })
-    }
-}
-
-pub(super) fn motion_time(world: &World, gui: &egui::Context) -> (f64, bool) {
-    (
-        gui.input(|input| input.time),
-        world.resource::<MotionPreference>().reduced,
-    )
-}
-
 pub(super) fn look(size: f32, color: Color32) -> TextLook {
-    TextLook { size, color }
+    TextLook::new(size, color)
 }
 
-pub(super) fn label_font() -> FontId {
-    FontId::new(LABEL, family::prose_bold())
+/// The size of a label as a notice writes it, in small caps.
+pub(super) fn label_size(gui: &egui::Context, label: &str) -> Vec2 {
+    gui.fonts_mut(|fonts| fonts.layout_job(TextRole::Band.job(label, ink::INK2)))
+        .size()
 }
 
-pub(super) fn column_area(gui: &egui::Context, id: &str, top: f32) -> egui::Area {
-    egui::Area::new(Id::new(("notice", id)))
+/// An area hung from the top centre of the screen at `top`, which notices are drawn in.
+pub(super) fn column_area(gui: &egui::Context, id: Id, top: f32) -> egui::Area {
+    egui::Area::new(id)
         .order(Band::Notices.order())
         .interactable(false)
         .fade_in(false)
-        .fixed_pos(egui::pos2(gui.content_rect().left(), top))
+        .constrain(false)
+        .pivot(Align2::CENTER_TOP)
+        .fixed_pos(Pos2::new(gui.content_rect().center().x, top))
 }
 
+/// Things that drop onto the table and lift off it like a slip, each on a reversible clock of its
+/// own; one that left keeps its place until it has lifted off.
 pub(super) struct Fades<T> {
     items: Vec<Fading<T>>,
 }
@@ -407,15 +324,13 @@ impl<T> Default for Fades<T> {
 }
 
 impl<T: Clone> Fades<T> {
-    /// Brings the place up to what it shows now, in the order given. An item that just left keeps
-    /// the slot it had while it fades out.
+    /// Brings the place up to what it shows now, in the order given, each with its pose after
+    /// `seconds` more of its motion.
     pub(super) fn sync(
         &mut self,
-        now: f64,
-        presence: Presence,
-        still: bool,
+        seconds: f32,
         current: impl IntoIterator<Item = (u64, T)>,
-    ) -> Vec<(T, Look)> {
+    ) -> Vec<(T, SheetPose)> {
         let mut previous: Vec<Option<Fading<T>>> = std::mem::take(&mut self.items)
             .into_iter()
             .map(Some)
@@ -425,78 +340,32 @@ impl<T: Clone> Fades<T> {
             let kept = previous
                 .iter_mut()
                 .find_map(|slot| slot.take_if(|fading| fading.key == key));
-            items.push(match kept {
-                Some(mut fading) => {
-                    fading.item = item;
-                    if fading.leaving {
-                        fading.leaving = false;
-                        fading.since = now;
-                    }
-                    fading
-                }
-                None => Fading {
-                    key,
-                    item,
-                    since: now,
-                    leaving: false,
-                },
+            let mut fading = kept.unwrap_or(Fading {
+                key,
+                item: item.clone(),
+                clock: motion::Clock::CLOSED,
+                leaving: false,
             });
+            fading.item = item;
+            fading.leaving = false;
+            fading.clock.run(true, seconds);
+            items.push(fading);
         }
         for (index, slot) in previous.into_iter().enumerate() {
             let Some(mut fading) = slot else {
                 continue;
             };
-            if !fading.leaving {
-                fading.leaving = true;
-                fading.since = now;
-            }
-            if !still && now - fading.since < presence.exit.seconds {
+            fading.leaving = true;
+            fading.clock.run(false, seconds);
+            if !fading.clock.is_closed() {
                 items.insert(index.min(items.len()), fading);
             }
         }
         self.items = items;
         self.items
             .iter()
-            .map(|fading| (fading.item.clone(), fading.look(now, presence, still)))
+            .map(|fading| (fading.item.clone(), fading.clock.pose()))
             .collect()
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct Presence {
-    pub enter: Move,
-    pub exit: Move,
-}
-
-#[derive(Clone, Copy)]
-pub(super) struct Move {
-    offset: Vec2,
-    scale: f32,
-    seconds: f64,
-}
-
-impl Move {
-    pub(super) const fn new(offset: Vec2, scale: f32, seconds: f64) -> Move {
-        Move {
-            offset,
-            scale,
-            seconds,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Look {
-    pub opacity: f32,
-    pub offset: Vec2,
-    pub scale: f32,
-}
-
-impl Look {
-    /// The transform that gives whatever is drawn in `rect` this look, scaled about its centre.
-    pub(super) fn around(self, rect: Rect) -> TSTransform {
-        let centre = rect.center().to_vec2();
-        TSTransform::new(centre * (1.0 - self.scale) + self.offset, self.scale)
     }
 }
 
@@ -513,7 +382,6 @@ pub(super) struct PlacedRows<P> {
     rows: VoiceRows,
     drawn: Vec<Rect>,
     fades: Fades<LabelledLine>,
-    scrim: Fades<()>,
     place: PhantomData<fn() -> P>,
 }
 
@@ -523,7 +391,6 @@ impl<P: RowPlace> Default for PlacedRows<P> {
             rows: VoiceRows::new(P::ROWS, P::REPLACE_AFTER),
             drawn: Vec::new(),
             fades: Fades::default(),
-            scrim: Fades::default(),
             place: PhantomData,
         }
     }
@@ -532,38 +399,8 @@ impl<P: RowPlace> Default for PlacedRows<P> {
 struct Fading<T> {
     key: u64,
     item: T,
-    since: f64,
+    clock: motion::Clock,
     leaving: bool,
-}
-
-impl<T> Fading<T> {
-    fn look(&self, now: f64, presence: Presence, still: bool) -> Look {
-        if still {
-            return Look::default();
-        }
-        let (step, away) = if self.leaving {
-            let t = ((now - self.since) / presence.exit.seconds).clamp(0.0, 1.0) as f32;
-            (presence.exit, easing::cubic_in(t))
-        } else {
-            let t = ((now - self.since) / presence.enter.seconds).clamp(0.0, 1.0) as f32;
-            (presence.enter, 1.0 - easing::cubic_out(t))
-        };
-        Look {
-            opacity: 1.0 - away,
-            offset: step.offset * away,
-            scale: 1.0 + (step.scale - 1.0) * away,
-        }
-    }
-}
-
-impl Default for Look {
-    fn default() -> Look {
-        Look {
-            opacity: 1.0,
-            offset: Vec2::ZERO,
-            scale: 1.0,
-        }
-    }
 }
 
 struct VoiceRows {
@@ -711,73 +548,81 @@ fn lines_of<P: RowPlace>(world: &World) -> (Vec<LabelledLine>, Option<u32>) {
     (placed.rows.labelled_lines(), placed.rows.more())
 }
 
-fn chip_area(world: &mut World, gui: &egui::Context, id: &str, top: f32, more: u32) -> Rect {
-    let width = gui.content_rect().width();
-    column_area(gui, id, top)
-        .show(gui, |ui| {
-            ui.set_width(width);
-            ui.vertical_centered(|ui| count_chip(ui, world, more).rect)
-                .inner
-        })
-        .inner
+fn draw_rows<P: RowPlace>(
+    world: &mut World,
+    gui: &egui::Context,
+    top: f32,
+    mark: Mark,
+    closable: bool,
+) -> f32 {
+    let step = hud::motion_step(gui);
+    let (lines, more) = lines_of::<P>(world);
+    let shown = world
+        .resource_mut::<PlacedRows<P>>()
+        .fades
+        .sync(step, lines.into_iter().map(|line| (line.key, line)));
+    let mut drawn = Vec::new();
+    let mut at = top;
+    for (line, pose) in shown {
+        let label = label_text(&line.label, line.replaced);
+        let slip = Notice {
+            icon: NoticeIcon::Mark(mark),
+            label: Some(&label),
+            line: &line.text,
+            ink: ink::INK,
+            closable,
+        };
+        let id = Id::new((std::any::type_name::<P>(), line.key));
+        let (rect, clicked) = notice(world, gui, id, at, slip, pose);
+        if clicked {
+            world.resource_mut::<PlacedRows<P>>().rows.close(line.key);
+        }
+        at = rect.bottom() + ROW_GAP;
+        drawn.push(rect);
+    }
+    if let Some(more) = more {
+        drawn.push(more_slip(world, gui, std::any::type_name::<P>(), at, more));
+    }
+    let bottom = drawn.last().map_or(top, Rect::bottom);
+    world.resource_mut::<PlacedRows<P>>().drawn = drawn;
+    bottom
 }
 
-fn caption_row(ui: &mut Ui, world: &World, line: &LabelledLine, size: Vec2) {
-    ui.spacing_mut().item_spacing.y = LINE_GAP;
-    ui.label(
-        RichText::new(label_text(&line.label, line.replaced))
-            .font(label_font())
-            .color(WHITE.gamma_multiply(0.7)),
-    );
-    let clipped = Vec2::new(size.x, size.y.min(CAPTION_LINES_HIGH));
-    let (rect, _) = ui.allocate_exact_size(clipped, Sense::hover());
-    let mut text_ui = ui.new_child(
-        UiBuilder::new()
-            .max_rect(rect)
-            .layout(Layout::top_down(Align::Min)),
-    );
-    text_ui.set_clip_rect(rect.intersect(ui.clip_rect()));
-    text::show(
-        &mut text_ui,
-        world,
-        &line.text,
-        look(CAPTION_SIZE, WHITE),
-        None,
-    );
+fn notice_icon(ui: &mut Ui, world: &mut World, icon: &NoticeIcon, color: Color32) {
+    match icon {
+        NoticeIcon::File(file) => {
+            hud::file_icon(ui, world, file, NOTICE_ICON);
+        }
+        NoticeIcon::Mark(mark) => {
+            glyph::show(ui, *mark, NOTICE_ICON, color);
+        }
+    }
 }
 
-fn milestone_row(ui: &mut Ui, world: &World, line: &LabelledLine, row: Look) -> Rect {
-    ui.spacing_mut().item_spacing.y = LINE_GAP;
-    let shift = TSTransform::new(row.offset, row.scale);
-    let label = text::show_shadowed(
-        ui,
-        &label_text(&line.label, line.replaced),
-        label_font(),
-        WHITE.gamma_multiply(0.85),
-        SHADOW,
-        shift,
+fn padding() -> Vec2 {
+    Vec2::new(
+        f32::from(slip::PADDING.left + slip::PADDING.right),
+        f32::from(slip::PADDING.top + slip::PADDING.bottom),
+    )
+}
+
+fn big_title(title: &str) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    job.append(
+        title,
+        0.0,
+        TextFormat {
+            font_id: Face::SmallCapsBold.id(TextRole::Title.size()),
+            ..TextRole::Title.format(ink::RUBRIC)
+        },
     );
-    let words = line.text.plain(world.resource::<KeyNames>());
-    let words = text::show_shadowed(
-        ui,
-        &words,
-        FontId::new(MILESTONE_SIZE, family::bold()),
-        AMBER_80,
-        SHADOW,
-        shift,
-    );
-    label.rect.union(words.rect)
+    job.halign = Align::Center;
+    job
 }
 
 fn label_text(label: &str, replaced: u32) -> String {
     match replaced {
-        0 => label.to_uppercase(),
-        replaced => format!("{} +{replaced}", label.to_uppercase()),
+        0 => label.to_owned(),
+        replaced => format!("{label} +{replaced}"),
     }
-}
-
-fn label_width(gui: &egui::Context, label: &str) -> f32 {
-    gui.fonts_mut(|fonts| fonts.layout_no_wrap(label.to_owned(), label_font(), WHITE))
-        .size()
-        .x
 }

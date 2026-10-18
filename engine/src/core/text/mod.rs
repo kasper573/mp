@@ -7,7 +7,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use egui::Color32;
 
-pub use paint::{TextLook, TextShadow, measure, show, show_shadowed};
+pub use paint::{Hand, TextLook, TextShadow, measure, show, show_shadowed};
 
 const SLOW_PACE: f32 = 2.5;
 
@@ -66,11 +66,6 @@ impl Default for TypewriterSpeed {
     fn default() -> TypewriterSpeed {
         TypewriterSpeed(Some(45.0))
     }
-}
-
-#[derive(Resource, Clone, Copy, Debug, PartialEq, Default)]
-pub struct MotionPreference {
-    pub reduced: bool,
 }
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]
@@ -224,7 +219,6 @@ impl Plugin for TextPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<KeyNames>()
             .init_resource::<TypewriterSpeed>()
-            .init_resource::<MotionPreference>()
             .add_message::<TypewriterReveal>()
             .add_systems(Update, advance_typewriters);
     }

@@ -3,7 +3,7 @@ pub mod widget;
 use std::collections::{HashMap, VecDeque};
 
 use bevy::prelude::*;
-use bevy_terminal::{AvailableTerminals, Terminal, TerminalLine};
+use bevy_terminal::{AvailableTerminals, LineTone, Terminal, TerminalLine};
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 
@@ -57,12 +57,18 @@ impl Plugin for TerminalPlugin {
 #[derive(Resource, Default)]
 pub struct Terminals {
     pub tabs: Vec<TerminalKind>,
-    lines: HashMap<TerminalKind, VecDeque<(u64, String)>>,
+    lines: HashMap<TerminalKind, VecDeque<LoggedLine>>,
     next_seq: u64,
 }
 
+pub struct LoggedLine {
+    pub seq: u64,
+    pub text: String,
+    pub tone: LineTone,
+}
+
 impl Terminals {
-    pub fn lines(&self, terminal: TerminalKind) -> impl Iterator<Item = &(u64, String)> {
+    pub fn lines(&self, terminal: TerminalKind) -> impl Iterator<Item = &LoggedLine> {
         self.lines.get(&terminal).into_iter().flatten()
     }
 }
@@ -83,7 +89,11 @@ fn receive(
         let seq = terminals.next_seq;
         terminals.next_seq += 1;
         let log = terminals.lines.entry(line.terminal).or_default();
-        log.push_back((seq, line.text.clone()));
+        log.push_back(LoggedLine {
+            seq,
+            text: line.text.clone(),
+            tone: line.tone,
+        });
         if log.len() > MAX_LINES {
             log.pop_front();
         }

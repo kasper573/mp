@@ -3,9 +3,11 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::EguiPrimaryContextPass;
-use egui::{Align, Color32, Layout, Sense, Shape, Stroke, StrokeKind, UiBuilder};
+use design_tokens::motion::SheetPose;
+use design_tokens::{TextRole, ink, slip};
+use egui::{Align, Layout, Sense, Shape, Stroke, UiBuilder};
 
-use super::rows::{self, Clock, Fades, Look, Move, Presence};
+use super::rows::{self, Clock, Fades};
 use super::{Notification, NotificationKind, NotificationSent, window_visible};
 use crate::core::audio::playback::SfxPlace;
 use crate::core::babble::{BabbleId, BabbleRank, Babbler, Babbling};
@@ -39,21 +41,11 @@ const WIDEST: f32 = 290.0;
 const LINE_SIZE: f32 = 15.0;
 const LINES_HIGH: f32 = 63.0;
 const PADDING: egui::Vec2 = egui::vec2(10.0, 6.0);
-const BORDER: f32 = 1.0;
-const RADIUS: f32 = 8.0;
 const PART_GAP: f32 = 2.0;
 const LINE_GAP: f32 = 4.0;
 const TAIL: f32 = 12.0;
 const TAIL_OUT: f32 = TAIL / 2.0;
 const READ_OPACITY: f32 = 0.5;
-const INK: Color32 = Color32::from_rgb(228, 234, 239);
-const FILL: Color32 = Color32::from_rgb(41, 46, 45);
-const OUTLINE: Color32 = Color32::from_rgb(73, 74, 80);
-// The offsets are those of a bubble whose tail points down; `Tail::turn` turns them to its tail.
-const PRESENCE: Presence = Presence {
-    enter: Move::new(egui::vec2(0.0, 10.0), 0.82, 0.32),
-    exit: Move::new(egui::vec2(0.0, -8.0), 0.94, 0.2),
-};
 
 pub struct BubblePlugin;
 
@@ -306,15 +298,6 @@ impl Tail {
             Tail::Right => egui::Vec2::X,
         }
     }
-
-    fn turn(tail: Option<Tail>, offset: egui::Vec2) -> egui::Vec2 {
-        match tail {
-            Some(Tail::Down) | None => offset,
-            Some(Tail::Up) => -offset,
-            Some(Tail::Left) => egui::vec2(-offset.y, offset.x),
-            Some(Tail::Right) => egui::vec2(offset.y, -offset.x),
-        }
-    }
 }
 
 impl BubbleDraw {
@@ -372,7 +355,7 @@ fn place(world: &mut World) {
     let Some(window) = window_size(world) else {
         return;
     };
-    let (now, still) = rows::motion_time(world, &gui);
+    let step = hud::motion_step(&gui);
     let content = world.resource::<Content>().clone();
     let mut room = Room::of(world, window);
     let viewer = session::me(world).and_then(|seen| body_at(world, seen));
@@ -482,28 +465,27 @@ fn place(world: &mut World) {
         draw.rect = egui_rect(perch.rect(size));
         draws.push((draw.key, draw));
     }
-    let shown = bubbles.fades.sync(now, PRESENCE, still, draws);
+    let shown = bubbles.fades.sync(step, draws);
     *world.resource_mut::<Bubbles>() = bubbles;
-    for (draw, look) in shown {
-        paint(world, &gui, &draw, look);
+    for (draw, pose) in shown {
+        paint(world, &gui, &draw, pose);
     }
 }
 
-fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) {
+/// A slip over its speaker's head with a tail toward them: the speaker's name in small caps, then
+/// the lines, faded once read.
+fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, pose: SheetPose) {
     let area = gui::world_area(world, ("bubble", draw.key))
         .fade_in(false)
         .fixed_pos(draw.rect.min);
     let shown = area.show(gui, |ui| {
-        ui.multiply_opacity(look.opacity);
+        ui.multiply_opacity(pose.opacity);
         let body = draw.body();
-        ui.painter().rect(
-            body,
-            RADIUS,
-            FILL.gamma_multiply(0.94),
-            Stroke::new(BORDER, OUTLINE),
-            StrokeKind::Inside,
-        );
-        let inner = body.shrink2(PADDING + egui::Vec2::splat(BORDER));
+        if let Some(tail) = draw.tail {
+            paint_tail(ui, body, tail, draw.tail_offset);
+        }
+        slip::paint(ui.painter(), body);
+        let inner = body.shrink2(PADDING);
         let mut content = ui.new_child(
             UiBuilder::new()
                 .max_rect(inner)
@@ -511,11 +493,7 @@ fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) 
         );
         content.spacing_mut().item_spacing.y = PART_GAP;
         if let Some(header) = &draw.header {
-            content.label(
-                egui::RichText::new(header)
-                    .font(rows::label_font())
-                    .color(INK.gamma_multiply(0.7)),
-            );
+            content.label(TextRole::Band.widget_text(header, ink::INK2));
         }
         if !draw.lines.is_empty() {
             content.vertical(|ui| {
@@ -529,7 +507,7 @@ fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) 
                             ui.ctx(),
                             world,
                             &line.text,
-                            rows::look(LINE_SIZE, INK),
+                            rows::look(LINE_SIZE, ink::INK),
                             WIDEST,
                         );
                         let clipped = egui::vec2(size.x, size.y.min(LINES_HIGH));
@@ -544,7 +522,7 @@ fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) 
                             &mut text_ui,
                             world,
                             &line.text,
-                            rows::look(LINE_SIZE, INK),
+                            rows::look(LINE_SIZE, ink::INK),
                             line.shown,
                         );
                     });
@@ -552,24 +530,14 @@ fn paint(world: &mut World, gui: &egui::Context, draw: &BubbleDraw, look: Look) 
             });
         }
         if let Some(fold) = &draw.fold {
-            content.label(
-                egui::RichText::new(fold)
-                    .font(rows::label_font())
-                    .color(INK),
-            );
-        }
-        if let Some(tail) = draw.tail {
-            paint_tail(ui, body, tail, draw.tail_offset);
+            content.label(TextRole::Band.widget_text(fold, ink::INK));
         }
         ui.allocate_rect(draw.rect, Sense::hover());
     });
-    let look = Look {
-        offset: Tail::turn(draw.tail, look.offset),
-        ..look
-    };
-    gui.set_transform_layer(shown.response.layer_id, look.around(draw.rect));
+    gui.set_transform_layer(shown.response.layer_id, pose.transform(draw.rect));
 }
 
+/// The tail is cream like the slip's edge, drawn under the slip so it seems one piece with it.
 fn paint_tail(ui: &egui::Ui, body: egui::Rect, tail: Tail, offset: f32) {
     let out = tail.axis();
     let along = egui::vec2(out.y.abs(), out.x.abs());
@@ -579,26 +547,18 @@ fn paint_tail(ui: &egui::Ui, body: egui::Rect, tail: Tail, offset: f32) {
         Tail::Left => body.left_center(),
         Tail::Right => body.right_center(),
     };
-    let base = edge + along * offset;
+    let base = edge + along * offset - out;
     let reach = TAIL * std::f32::consts::FRAC_1_SQRT_2;
     let (start, end, tip) = (
         base - along * reach,
         base + along * reach,
-        base + out * reach,
+        base + out * (reach + 1.0),
     );
-    let fill = FILL.gamma_multiply(0.94);
     ui.painter().add(Shape::convex_polygon(
         vec![start, tip, end],
-        fill,
+        ink::CREAM2,
         Stroke::NONE,
     ));
-    ui.painter().line_segment(
-        [start + along * BORDER, end - along * BORDER],
-        Stroke::new(BORDER * 2.0, fill),
-    );
-    let outline = Stroke::new(BORDER, OUTLINE);
-    ui.painter().line_segment([start, tip], outline);
-    ui.painter().line_segment([tip, end], outline);
 }
 
 fn speech(world: &World, content: &Content, speaking: &Speaking, folded: bool) -> BubbleDraw {
@@ -641,10 +601,7 @@ fn fold_text(speakers: u32) -> String {
 }
 
 fn body_size(gui: &egui::Context, world: &World, draw: &BubbleDraw) -> egui::Vec2 {
-    let label = |text: &str| {
-        gui.fonts_mut(|fonts| fonts.layout_no_wrap(text.to_owned(), rows::label_font(), INK))
-            .size()
-    };
+    let label = |text: &str| rows::label_size(gui, text);
     let mut parts: Vec<egui::Vec2> = Vec::new();
     parts.extend(draw.header.as_deref().map(label));
     if !draw.lines.is_empty() {
@@ -652,15 +609,20 @@ fn body_size(gui: &egui::Context, world: &World, draw: &BubbleDraw) -> egui::Vec
             .lines
             .iter()
             .map(|line| {
-                let size =
-                    text::measure(gui, world, &line.text, rows::look(LINE_SIZE, INK), WIDEST);
+                let size = text::measure(
+                    gui,
+                    world,
+                    &line.text,
+                    rows::look(LINE_SIZE, ink::INK),
+                    WIDEST,
+                );
                 egui::vec2(size.x, size.y.min(LINES_HIGH))
             })
             .collect();
         parts.push(stacked(&lines, LINE_GAP));
     }
     parts.extend(draw.fold.as_deref().map(label));
-    stacked(&parts, PART_GAP) + 2.0 * (PADDING + egui::Vec2::splat(BORDER))
+    stacked(&parts, PART_GAP) + 2.0 * PADDING
 }
 
 fn stacked(parts: &[egui::Vec2], gap: f32) -> egui::Vec2 {
@@ -859,7 +821,7 @@ impl Perch {
 }
 
 fn tail_reach(body_extent: f32) -> f32 {
-    (body_extent / 2.0 - RADIUS - TAIL).max(0.0)
+    (body_extent / 2.0 - TAIL).max(0.0)
 }
 
 fn push_out(rect: Rect, taken: Rect) -> Option<Vec2> {

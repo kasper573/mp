@@ -2,7 +2,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use bevy::prelude::World;
-use design_tokens::family;
+use design_tokens::{Face, TextRole};
 use egui::emath::TSTransform;
 use egui::epaint::TextShape;
 use egui::text::{LayoutJob, TextFormat};
@@ -11,7 +11,7 @@ use egui::{
     WidgetInfo, WidgetType,
 };
 
-use super::{KeyNames, MotionPreference, StyledLine, TextMotion, TextPiece, TextVoice};
+use super::{KeyNames, StyledLine, TextMotion, TextPiece, TextVoice};
 
 const WHISPER_SCALE: f32 = 0.9;
 const WHISPER_ALPHA: f32 = 0.7;
@@ -23,6 +23,41 @@ const CAP_PAD_EM: f32 = 0.3;
 pub struct TextLook {
     pub size: f32,
     pub color: Color32,
+    pub hand: Hand,
+    pub line_height: Option<f32>,
+}
+
+/// Which face a line is written in: the book face, or the quill italic of what was spoken.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Hand {
+    Book,
+    Quill,
+}
+
+impl TextLook {
+    pub const fn new(size: f32, color: Color32) -> TextLook {
+        TextLook {
+            size,
+            color,
+            hand: Hand::Book,
+            line_height: None,
+        }
+    }
+
+    /// The role's size and line height, in `color`.
+    pub fn role(role: TextRole, color: Color32) -> TextLook {
+        TextLook {
+            line_height: role.line_height(),
+            ..TextLook::new(role.size(), color)
+        }
+    }
+
+    pub const fn quill(self) -> TextLook {
+        TextLook {
+            hand: Hand::Quill,
+            ..self
+        }
+    }
 }
 
 /// The line is laid out whole, so revealing letters never reflows it.
@@ -34,7 +69,6 @@ pub fn show(
     shown: Option<usize>,
 ) -> Response {
     let keys = world.resource::<KeyNames>();
-    let still = world.resource::<MotionPreference>().reduced;
     let plan = Plan::new(line, keys, look);
     let galley = ui.painter().layout_job(plan.job(ui.available_width()));
     let pad = plan.pad;
@@ -47,11 +81,7 @@ pub fn show(
     let origin = rect.min - galley.rect.min.to_vec2();
     let placed = place(&galley, &plan, origin);
     let shown = shown.unwrap_or(plan.units);
-    let time = if still {
-        0.0
-    } else {
-        ui.input(|input| input.time) as f32
-    };
+    let time = ui.input(|input| input.time) as f32;
     for cap in plan.caps.iter().filter(|cap| cap.letter < shown) {
         paint_cap(ui, &placed, cap, pad);
     }
@@ -69,8 +99,7 @@ pub fn show(
         let Some(at) = placed[word.letters.start] else {
             continue;
         };
-        let motion = word.motion.filter(|_| !still);
-        paint_word(ui, &plan, visible, at, motion, index as f32, time);
+        paint_word(ui, &plan, visible, at, word.motion, index as f32, time);
     }
     response
 }
@@ -173,10 +202,10 @@ impl Plan {
             match piece {
                 TextPiece::Pause(_) => {}
                 TextPiece::Key(input) => {
-                    let format = TextFormat::simple(
-                        FontId::new(look.size * CAP_SCALE, family::medium()),
-                        look.color,
-                    );
+                    let format = TextFormat {
+                        line_height: look.line_height,
+                        ..TextFormat::simple(Face::Mono.id(look.size * CAP_SCALE), look.color)
+                    };
                     let start = plan.letters.len();
                     for (at, ch) in keys.name(*input).chars().enumerate() {
                         let leading = if at == 0 { owed + pad } else { 0.0 };
@@ -257,16 +286,21 @@ impl Plan {
 }
 
 fn span_format(voice: TextVoice, color: Color32, look: TextLook) -> TextFormat {
-    match voice {
-        TextVoice::Normal => TextFormat::simple(FontId::new(look.size, family::prose()), color),
+    let (normal, whisper, shout) = match look.hand {
+        Hand::Book => (Face::Book, Face::BookItalic, Face::BookBold),
+        Hand::Quill => (Face::Quill, Face::Quill, Face::Quill),
+    };
+    let format = match voice {
+        TextVoice::Normal => TextFormat::simple(normal.id(look.size), color),
         TextVoice::Whisper => TextFormat::simple(
-            FontId::new(look.size * WHISPER_SCALE, family::prose_italic()),
+            whisper.id(look.size * WHISPER_SCALE),
             color.gamma_multiply(WHISPER_ALPHA),
         ),
-        TextVoice::Shout => TextFormat::simple(
-            FontId::new(look.size * SHOUT_SCALE, family::prose_bold()),
-            color,
-        ),
+        TextVoice::Shout => TextFormat::simple(shout.id(look.size * SHOUT_SCALE), color),
+    };
+    TextFormat {
+        line_height: look.line_height,
+        ..format
     }
 }
 

@@ -7,11 +7,10 @@ use bevy_egui::{
     EguiPrimaryContextPass, PrimaryEguiContext,
 };
 use egui::load::SizedTexture;
-use egui::{FontDefinitions, LayerId, Order};
+use egui::{LayerId, Order};
 
 use crate::core::assets::AssetRef;
 use crate::core::content::asset_of;
-use crate::core::text::MotionPreference;
 
 /// Each band draws in its own egui order, so it stacks the same however the frame's systems run.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -51,9 +50,6 @@ impl WorldLayers {
         self.0.contains(&layer)
     }
 }
-
-#[derive(Resource, Clone)]
-pub struct GuiFonts(pub FontDefinitions);
 
 /// Where each named interface widget was drawn this pass, for what plays over a widget.
 #[derive(Resource, Default)]
@@ -101,7 +97,6 @@ impl Plugin for GuiPlugin {
                     .chain(),
             )
             .add_systems(PreUpdate, adopt_context)
-            .add_systems(Update, apply_look.run_if(look_changed))
             .add_systems(
                 EguiPrimaryContextPass,
                 forget_world_layers.before(Band::Stage),
@@ -142,6 +137,31 @@ pub fn show_anchored<R>(
         gui.request_discard("an anchored area changed size");
     }
     shown
+}
+
+/// What a layer drew in its last pass, kept to be drawn again after what it showed is gone, so a
+/// sheet whose content has ended can still lift off the table.
+#[derive(Clone, Default)]
+pub struct Afterimage(Vec<egui::epaint::ClippedShape>);
+
+impl Afterimage {
+    pub fn of(gui: &egui::Context, layer: LayerId) -> Afterimage {
+        Afterimage(gui.graphics(|graphics| {
+            graphics
+                .get(layer)
+                .map(|list| list.all_entries().cloned().collect())
+                .unwrap_or_default()
+        }))
+    }
+
+    /// Drawn again through `painter`, which fades it by its opacity.
+    pub fn paint(&self, painter: &egui::Painter) {
+        for shape in &self.0 {
+            painter
+                .with_clip_rect(shape.clip_rect)
+                .add(shape.shape.clone());
+        }
+    }
 }
 
 /// A widget's tooltip opens once the pointer has been on it a moment, however the pointer moves or
@@ -290,33 +310,6 @@ fn adopt_context(
     });
     gui.options_mut(|options| options.zoom_with_keyboard = false);
     commands.insert_resource(GuiContext(gui));
-}
-
-fn look_changed(
-    gui: Option<Res<GuiContext>>,
-    fonts: Option<Res<GuiFonts>>,
-    motion: Option<Res<MotionPreference>>,
-) -> bool {
-    gui.is_some_and(|gui| {
-        gui.is_changed()
-            || fonts.is_some_and(|fonts| fonts.is_changed())
-            || motion.is_some_and(|motion| motion.is_changed())
-    })
-}
-
-fn apply_look(gui: Res<GuiContext>, fonts: Option<Res<GuiFonts>>, motion: Res<MotionPreference>) {
-    gui.0
-        .set_fonts(fonts.map_or_else(design_tokens::builtin_fonts, |fonts| fonts.0.clone()));
-    set_motion(&gui.0, *motion);
-}
-
-fn set_motion(gui: &egui::Context, motion: MotionPreference) {
-    let seconds = if motion.reduced {
-        0.0
-    } else {
-        egui::Style::default().animation_time
-    };
-    gui.all_styles_mut(|style| style.animation_time = seconds);
 }
 
 fn forget_world_layers(mut layers: ResMut<WorldLayers>, mut widgets: ResMut<WidgetRects>) {

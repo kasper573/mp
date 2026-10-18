@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::widgets;
+use design_tokens::{controls, ink};
 
-use super::connection::OVERLAY_BG;
 use super::{ClientScreen, note, pace_as_before, pace_slowly, panel, system_screen};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
@@ -63,7 +62,7 @@ fn sign_in_screen(world: &mut World) {
         .name
         .clone();
     let mut name = std::mem::take(&mut world.resource_mut::<AccountName>().0);
-    let choice = system_screen(&gui, "sign-in", Some(OVERLAY_BG), |ui| {
+    let choice = system_screen(&gui, "sign-in", Some(ink::VEIL), |ui| {
         panel(ui, &game, |ui| match (&sign_in, waiting) {
             (_, Some(page)) => browser_waits(ui, page),
             (SignIn::AnyAccount, None) => any_account(ui, &mut name, failure.as_deref()),
@@ -101,10 +100,10 @@ fn provider(ui: &mut egui::Ui, failure: Option<&str>) -> Option<Choice> {
     if let Some(failure) = failure {
         ui.label(failure);
     }
-    if widgets::primary(ui, "Sign in").clicked() {
+    if controls::primary(ui, "Sign in").clicked() {
         return Some(Choice::Open(ProviderPage::SignIn));
     }
-    ui.button("Create account")
+    controls::button(ui, "Create account")
         .clicked()
         .then_some(Choice::Open(ProviderPage::CreateAccount))
 }
@@ -114,14 +113,19 @@ fn browser_waits(ui: &mut egui::Ui, page: ProviderPage) -> Option<Choice> {
         ProviderPage::SignIn => "Continue in your browser to sign in.",
         ProviderPage::CreateAccount => "Continue in your browser to create your account.",
     });
-    ui.button("Cancel").clicked().then_some(Choice::Cancel)
+    controls::button(ui, "Cancel")
+        .clicked()
+        .then_some(Choice::Cancel)
 }
 
 fn any_account(ui: &mut egui::Ui, name: &mut String, failure: Option<&str>) -> Option<Choice> {
     if let Some(failure) = failure {
         ui.label(failure);
     }
-    let field = ui.add(egui::TextEdit::singleline(name).hint_text("Account name"));
+    let field = controls::text_field(
+        ui,
+        egui::TextEdit::singleline(name).hint_text("Account name"),
+    );
     let entered = field.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
     if ui.memory(|memory| memory.focused().is_none()) {
         field.request_focus();
@@ -132,7 +136,7 @@ fn any_account(ui: &mut egui::Ui, name: &mut String, failure: Option<&str>) -> O
     );
     let account = name.trim();
     let clicked = ui
-        .add_enabled_ui(!account.is_empty(), |ui| widgets::primary(ui, "Sign in"))
+        .add_enabled_ui(!account.is_empty(), |ui| controls::primary(ui, "Sign in"))
         .inner
         .clicked();
     ((clicked || entered) && !account.is_empty()).then(|| Choice::Account(account.to_owned()))

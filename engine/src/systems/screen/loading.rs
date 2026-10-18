@@ -3,6 +3,7 @@ use std::sync::Arc;
 use bevy::prelude::*;
 use bevy::tasks::{IoTaskPool, Task, block_on, futures_lite::future};
 use bevy_egui::EguiPrimaryContextPass;
+use design_tokens::ink;
 
 use super::{ClientScreen, Notice, Retry, notice_screen, pace_as_before, pace_slowly};
 use crate::core::content::sync::{
@@ -351,7 +352,7 @@ fn loading_card(world: &mut World) {
     let Some(model) = world.resource::<Shown>().card.clone() else {
         return;
     };
-    let backdrop = (!model.veiled).then_some(super::connection::OVERLAY_BG);
+    let backdrop = (!model.veiled).then_some(ink::VEIL);
     let notes: Vec<String> = model.notes.iter().chain(&model.retry_in).cloned().collect();
     let notice = Notice {
         title: &model.title,

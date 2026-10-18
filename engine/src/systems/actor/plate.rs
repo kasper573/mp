@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::family;
+use design_tokens::Face;
 use egui::emath::{GuiRounding, TSTransform};
 use egui::{Align, Color32, FontId, Layout, Sense, UiBuilder};
 
@@ -312,9 +312,9 @@ fn role_text(role: &str) -> String {
 }
 
 fn name_font() -> FontId {
-    FontId::new(TEXT_SIZE, family::prose_bold())
+    Face::BookBold.id(TEXT_SIZE)
 }
 
 fn role_font() -> FontId {
-    FontId::new(TEXT_SIZE, family::prose())
+    Face::Book.id(TEXT_SIZE)
 }

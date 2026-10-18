@@ -1,15 +1,19 @@
 use bevy::prelude::*;
 use bevy_egui::EguiPrimaryContextPass;
-use design_tokens::{TextRole, color};
-use egui::{Response, RichText, Ui};
+use design_tokens::card::{self, Art, Card, CardResponse};
+use design_tokens::glyph::Kind;
+use design_tokens::sheet::Depth;
+use design_tokens::{TextRole, face, ink};
+use egui::{Rect, Response, Ui};
 
 use super::{Rank, SkillDef, SkillId, SkillKind, SkillStat};
 use crate::core::content::Content;
 use crate::core::gui::{self, Band};
 use crate::core::text::{self, StyledLine, TextLook};
 use crate::systems::class::{self, ClassId, NodeKey};
+use crate::systems::equipment::Equipment;
 use crate::systems::hud;
-use crate::systems::item::Inventory;
+use crate::systems::item::{Inventory, ItemId};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 use crate::systems::script::condition;
@@ -19,15 +23,15 @@ use crate::systems::text::counted;
 pub(crate) const BASIC_ATTACK_MARK: &str = "basic attack";
 
 const WINDOW_KEY: &str = "Skill";
-const ICON: f32 = 40.0;
 
 /// One skill as the player sees it: the row at the rank they hold, with the node that unlocks it
-/// when it sits in their tree.
+/// when it sits in their tree, and the worn item that grants it when that is how they know it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SkillCard {
     pub skill: SkillId,
     pub rank: Rank,
     pub node: Option<NodeAccess>,
+    pub granted_by: Option<ItemId>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,8 +59,13 @@ impl Plugin for SkillCardPlugin {
     }
 }
 
-pub fn open(world: &mut World, skill: SkillId) {
-    hud::pin(world, skill);
+/// Deals the skill's card from `from`, the widget it was asked for from.
+pub fn open(world: &mut World, skill: SkillId, from: Option<Rect>) {
+    hud::pin(world, skill, from);
+}
+
+pub fn shown(world: &World) -> Option<SkillId> {
+    hud::pinned::<SkillId>(world)
 }
 
 pub fn close(world: &mut World) -> bool {
@@ -86,7 +95,25 @@ pub fn of(world: &World, skill: SkillId) -> SkillCard {
                 node: key.clone(),
             })
     });
-    SkillCard { skill, rank, node }
+    let learned = me
+        .zip(node.as_ref())
+        .and_then(|(me, access)| Some(world.get::<Learned>(me)?.rank(&access.node)))
+        .unwrap_or(Rank::NONE);
+    let granted_by = (rank > learned)
+        .then(|| {
+            me.and_then(|me| world.get::<Equipment>(me))?
+                .slots
+                .values()
+                .copied()
+                .find(|item| super::grants_of(content, *item).contains(&skill))
+        })
+        .flatten();
+    SkillCard {
+        skill,
+        rank,
+        node,
+        granted_by,
+    }
 }
 
 pub fn tooltip(
@@ -95,69 +122,124 @@ pub fn tooltip(
     card: &SkillCard,
     hint: Option<&StyledLine>,
 ) {
+    let content = world.resource::<Content>().clone();
+    let def = card.skill.get(&content);
+    let line = overview(world, &content, def, card);
     gui::tooltip(response, |ui| {
         ui.set_max_width(hud::TOOLTIP_WIDTH);
-        sheet(ui, world, card);
+        ui.spacing_mut().item_spacing.y = 2.0;
+        ui.label(face::bold(def.name.as_str()).size(TextRole::Tooltip.size()));
+        ui.label(TextRole::Tooltip.rich(line).color(ink::INK2));
         if let Some(hint) = hint {
-            ui.add_space(4.0);
-            let look = TextLook {
-                size: TextRole::Small.size(),
-                color: color::MUTED,
-            };
+            let look = TextLook::new(TextRole::Small.size(), ink::INK3);
             text::show(ui, world, hint, look, None);
         }
     });
 }
 
-pub fn sheet(ui: &mut Ui, world: &mut World, card: &SkillCard) {
-    let content = world.resource::<Content>().clone();
-    let def = card.skill.get(&content);
-    ui.spacing_mut().item_spacing.y = 6.0;
-    ui.horizontal(|ui| {
-        hud::icon(ui, world, &def.icon, ICON);
-        ui.vertical(|ui| {
-            ui.label(RichText::new(def.name.as_str()).font(TextRole::Heading.font_id()));
-            ui.label(
-                RichText::new(format!("Rank {} of {}", card.rank.0, def.rank_count()))
-                    .size(TextRole::Small.size())
-                    .color(color::MUTED),
-            );
-        });
-    });
-    ui.label(
-        RichText::new(use_line(def, card.rank))
-            .size(TextRole::Small.size())
-            .color(color::TEXT.gamma_multiply(0.85)),
-    );
-    for (index, level) in def.levels.iter().enumerate() {
-        let rank = Rank(index as u8 + 1);
-        let lit = rank <= card.rank;
-        let ink = if lit { color::TEXT } else { color::FAINT };
-        ui.label(RichText::new(rank_line(def, rank, level.cost.0)).color(ink));
-    }
-    if let Some(access) = &card.node {
-        let lines = access_lines(world, &content, access);
-        if !lines.is_empty() {
-            section(ui, "Unlocked by");
-            for (line, met) in lines {
-                requirement(ui, &line, met);
-            }
-        }
-    }
-    section(ui, "To use");
-    let needs = use_lines(world, &content, def);
-    if needs.is_empty() {
-        ui.label(RichText::new("Nothing needed").color(color::MUTED));
-    }
-    for (line, met) in needs {
-        requirement(ui, &line, met);
+pub fn kind(def: &SkillDef) -> Kind {
+    match def.kind {
+        SkillKind::Active => Kind::Active,
+        SkillKind::Passive => Kind::Passive,
     }
 }
 
+/// The skill's card, with a cross when `closable`.
+pub fn show(
+    ui: &mut Ui,
+    world: &mut World,
+    card: &SkillCard,
+    closable: bool,
+    depth: Depth,
+) -> CardResponse {
+    let content = world.resource::<Content>().clone();
+    let def = card.skill.get(&content);
+    let ranks = def.rank_count();
+    let numeral = format!(
+        "{} · {}",
+        face::roman(u32::from(card.rank.0)),
+        face::roman(u32::from(ranks))
+    );
+    let learned = card.rank > Rank::NONE;
+    let maxed = card.granted_by.is_none() && learned && card.rank.0 >= ranks;
+    let icon = gui::image(world, &def.icon).map(|image| image.texture);
+    let mut shown = Card::new(kind(def), &def.name);
+    shown.numeral = Some(&numeral);
+    shown.art = Art {
+        icon,
+        height: card::ART,
+    };
+    shown.closable = closable;
+    shown.faded = !learned;
+    shown.stamp = maxed.then_some("maxed");
+    shown.depth = depth;
+    shown.show(ui, |ui, plate| {
+        if plate.name_cut {
+            card::full_name(ui, &def.name);
+        }
+        card::overview(ui, &overview(world, &content, def, card));
+        card::heading(ui, "ranks");
+        for (index, level) in def.levels.iter().enumerate() {
+            let rank = Rank(index as u8 + 1);
+            let lit = rank <= card.rank;
+            let color = if lit { ink::INK } else { ink::INK3 };
+            ui.add(
+                egui::Label::new(
+                    TextRole::CardBody
+                        .rich(rank_line(def, rank, level.cost.0))
+                        .color(color),
+                )
+                .wrap(),
+            );
+        }
+        if let Some(access) = &card.node {
+            let lines = access_lines(world, &content, access);
+            if !lines.is_empty() {
+                card::heading(ui, if learned { "unlocked by" } else { "costs" });
+                for (line, met) in lines {
+                    card::requirement(ui, met, &line);
+                }
+            }
+        }
+        card::heading(ui, "to use");
+        let needs = use_lines(world, &content, def);
+        if needs.is_empty() {
+            card::fact(ui, "Nothing needed");
+        }
+        for (line, met) in needs {
+            card::requirement(ui, met, &line);
+        }
+    })
+}
+
+/// The line under the name: the rank and how the skill is used, or what it waits on.
+fn overview(world: &World, content: &Content, def: &SkillDef, card: &SkillCard) -> String {
+    if let Some(item) = card.granted_by {
+        return format!("Known while your {} is worn", item.get(content).name);
+    }
+    if card.rank == Rank::NONE {
+        let wanting = card.node.as_ref().and_then(|access| {
+            access_lines(world, content, access)
+                .into_iter()
+                .find(|(_, met)| !met)
+        });
+        return match wanting {
+            Some((line, _)) => format!("Not learned · needs {line}"),
+            None => "Not learned".to_owned(),
+        };
+    }
+    format!(
+        "Rank {} of {} · {}",
+        face::roman(u32::from(card.rank.0)),
+        face::roman(u32::from(def.rank_count())),
+        use_line(def, card.rank)
+    )
+}
+
 fn draw_card(world: &mut World) {
-    hud::draw_pinned::<SkillId>(world, WINDOW_KEY, |ui, world, skill| {
+    hud::draw_pinned::<SkillId>(world, WINDOW_KEY, |ui, world, skill, depth| {
         let card = of(world, *skill);
-        sheet(ui, world, &card);
+        show(ui, world, &card, true, depth)
     });
 }
 
@@ -244,28 +326,6 @@ fn use_lines(world: &World, content: &Content, def: &SkillDef) -> Vec<(String, b
         ));
     }
     lines
-}
-
-fn section(ui: &mut Ui, title: &str) {
-    ui.add_space(2.0);
-    ui.label(
-        RichText::new(title)
-            .size(TextRole::Small.size())
-            .family(design_tokens::family::medium())
-            .color(color::MUTED),
-    );
-}
-
-fn requirement(ui: &mut Ui, line: &str, met: bool) {
-    let (mark, ink) = if met {
-        ("✓", color::OK)
-    } else {
-        ("✗", color::DANGER)
-    };
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(mark).color(ink));
-        ui.label(RichText::new(line).color(color::TEXT));
-    });
 }
 
 fn signed(value: f32) -> String {

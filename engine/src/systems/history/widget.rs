@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, color, family, ink, widgets};
-use egui::{Color32, Id, Rect, RichText, Ui, Vec2};
+use design_tokens::{TextRole, face, ink, sheet};
+use egui::{Color32, Id, Rect, Ui, Vec2};
 use strum::{IntoStaticStr, VariantArray};
 
 use super::{
@@ -111,28 +111,28 @@ impl HudWindow for HistoryWindow {
             .collect();
         let before = world.resource::<HistoryBook>().tab;
         let mut tab = before;
-        widgets::tab_strip(ui, &tabs, &mut tab);
+        sheet::tabs(ui, &tabs, &mut tab);
         if tab != before {
             world.resource_mut::<HistoryBook>().tab = tab;
             InterfaceSound::UiPage.play(world);
         }
         let rows = rows(world, tab);
         let clock = world.resource::<ClientPlatform>().0.local_clock();
-        egui::ScrollArea::vertical()
+        let area = egui::ScrollArea::vertical()
             .id_salt(("history", tab.title()))
             .stick_to_bottom(true)
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(0, PADDING))
-                    .show(ui, |ui| {
-                        ui.spacing_mut().item_spacing.y = 3.0;
-                        for (index, row) in rows.iter().enumerate() {
-                            let id = ui.id().with(index);
-                            lazily(ui, id, row, |ui| show_row(ui, world, row, clock));
-                        }
-                    });
-            });
+            .auto_shrink(false);
+        sheet::scroll(ui, area, |ui| {
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(0, PADDING))
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = 3.0;
+                    for (index, row) in rows.iter().enumerate() {
+                        let id = ui.id().with(index);
+                        lazily(ui, id, row, |ui| show_row(ui, world, row, clock));
+                    }
+                });
+        });
     }
 }
 
@@ -140,8 +140,8 @@ pub(crate) fn tallied(text: &mut StyledLine, tally: Option<RecordTally>, icon: b
     match tally {
         Some(RecordTally::Change(change)) => {
             let color = match (change > 0, icon) {
-                (true, true) => color::OK,
-                (true, false) => color::WARN,
+                (true, true) => ink::VERDIGRIS,
+                (true, false) => ink::OCHRE,
                 (false, _) => ink.gamma_multiply(0.6),
             };
             prefix(text, format!("{} ", signed(change)), color);
@@ -241,9 +241,9 @@ fn show_row(ui: &mut Ui, world: &mut World, row: &Row, clock: LocalClock) {
         Row::Trimmed => caption(
             ui,
             format!("Older records are gone. The last {KEPT} are kept."),
-            color::MUTED,
+            ink::INK2,
         ),
-        Row::Empty(tab) => caption(ui, empty_text(*tab).to_owned(), color::MUTED),
+        Row::Empty(tab) => caption(ui, empty_text(*tab).to_owned(), ink::INK2),
         Row::Record(record) => record_row(ui, world, record, clock),
     }
 }
@@ -260,11 +260,7 @@ fn empty_text(tab: HistoryTab) -> &'static str {
 }
 
 fn caption(ui: &mut Ui, text: String, color: Color32) {
-    ui.label(
-        RichText::new(text)
-            .size(TextRole::Small.size())
-            .color(color),
-    );
+    ui.label(TextRole::Small.rich(text).color(color));
 }
 
 fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: LocalClock) {
@@ -277,11 +273,10 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
                 .clone()
                 .unwrap_or_else(|| "Conversation".to_owned());
             ui.add_space(6.0);
-            ui.label(
-                RichText::new(format!("{who} · {time}"))
-                    .family(family::medium())
-                    .color(color::TEXT.gamma_multiply(0.75)),
-            );
+            ui.horizontal(|ui| {
+                ui.label(face::bold(who).color(ink::VERDIGRIS));
+                ui.label(face::faint(format!("· {time}")));
+            });
             return;
         }
         Some(HistoryMark::Arrived) => {
@@ -292,8 +287,8 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
     }
     let line = record_line(entry);
     let color = match (entry.topic, entry.mark) {
-        (_, Some(HistoryMark::Failed)) | (HistoryTopic::Error, _) => color::DANGER,
-        _ => color::TEXT,
+        (_, Some(HistoryMark::Failed)) | (HistoryTopic::Error, _) => ink::RUBRIC,
+        _ => ink::INK,
     };
     let indent = match entry.topic {
         HistoryTopic::Talk => TALK_INDENT,
@@ -302,15 +297,16 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
     ui.horizontal_top(|ui| {
         ui.allocate_ui(Vec2::new(TIME_WIDTH, 0.0), |ui| {
             ui.set_min_width(TIME_WIDTH);
-            caption(ui, time, color::FAINT);
+            caption(ui, time, ink::INK3);
         });
         ui.add_space(indent);
         if let Some(icon) = &entry.icon {
             hud::file_icon(ui, world, icon, ICON);
         }
-        let look = TextLook {
-            size: TextRole::Body.size(),
-            color,
+        let look = TextLook::new(TextRole::Body.size(), color);
+        let look = match entry.topic {
+            HistoryTopic::Talk => look.quill(),
+            _ => look,
         };
         text::show(ui, world, &line, look, None);
     });
@@ -318,21 +314,21 @@ fn record_row(ui: &mut Ui, world: &mut World, record: &HistoryRecord, clock: Loc
 
 fn record_line(entry: &HistoryEntry) -> StyledLine {
     let mut line = entry.text.styled();
-    tallied(&mut line, entry.tally, entry.icon.is_some(), color::TEXT);
+    tallied(&mut line, entry.tally, entry.icon.is_some(), ink::INK);
     if entry.repeats > 1 {
         line.pieces.push(
             StyledSpan::plain(format!(" \u{d7}{}", entry.repeats))
-                .ink(color::MUTED)
+                .ink(ink::INK3)
                 .into(),
         );
     }
     match (entry.topic, entry.mark) {
         (HistoryTopic::Talk, Some(HistoryMark::You)) => {
-            prefix(&mut line, "You  ".to_owned(), ink::PLACE);
+            prefix(&mut line, "You  ".to_owned(), ink::VERDIGRIS);
         }
         (HistoryTopic::Talk, _) => {
             if let Some(by) = &entry.by {
-                prefix(&mut line, format!("{by}  "), color::WARN);
+                prefix(&mut line, format!("{by}  "), ink::VERDIGRIS);
             }
         }
         (HistoryTopic::Notification | HistoryTopic::Quest, _) => {
@@ -351,7 +347,7 @@ fn prefix(text: &mut StyledLine, label: String, color: Color32) {
 }
 
 fn divider(ui: &mut Ui, text: String) {
-    let font = egui::FontId::proportional(TextRole::Small.size());
+    let font = TextRole::Small.font_id();
     let text_width = ui
         .painter()
         .layout_no_wrap(text.clone(), font, Color32::WHITE)
@@ -362,7 +358,7 @@ fn divider(ui: &mut Ui, text: String) {
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         rule(ui, lead);
-        caption(ui, text, color::TEXT.gamma_multiply(0.7));
+        caption(ui, text, ink::INK2);
         let rest = ui.available_width();
         rule(ui, rest);
     });
@@ -371,6 +367,5 @@ fn divider(ui: &mut Ui, text: String) {
 
 fn rule(ui: &mut Ui, width: f32) {
     let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 1.0), egui::Sense::hover());
-    ui.painter()
-        .rect_filled(rect, 0.0, color::TEXT.gamma_multiply(0.25));
+    ui.painter().rect_filled(rect, 0.0, ink::ink_wash(0.25));
 }

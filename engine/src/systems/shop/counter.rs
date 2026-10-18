@@ -1,25 +1,30 @@
 use bevy::prelude::*;
-use design_tokens::{CHIP_RADIUS, TextRole, color, widgets};
-use egui::{Align, Id, Layout, RichText, Sense, Stroke, Ui, UiBuilder};
+use design_tokens::card;
+use design_tokens::controls::{self, Pill, RowLook};
+use design_tokens::sheet::{self, Depth};
+use design_tokens::{TextRole, face, ink};
+use egui::{Align, Layout, Pos2, Rect, Ui, UiBuilder};
 
 use super::{OfferView, SaleQuote, SaleVerdict, ShopId, ShopRequest, ShopView, WareRefusal};
 use crate::core::content::Content;
 use crate::core::text::{self, StyledLine, TextLook, TextPiece};
-use crate::systems::dialogue::stage::{self, DockedPanel, PanelHead};
+use crate::systems::dialogue::stage::{self, DockedPanel, PanelChrome, PanelHead};
 use crate::systems::hud::{self, Carried, Confirm};
 use crate::systems::input::map::{self, InputAction, input};
 use crate::systems::interface::InterfaceSound;
+use crate::systems::item::card::CardLook;
 use crate::systems::item::widget::{SlotAction, SlotVerdict, slot_action, slot_verdict_source};
-use crate::systems::item::{Inventory, ItemCategory, ItemId, ItemStack, card};
+use crate::systems::item::{self, Inventory, ItemCategory, ItemId, ItemStack};
 use crate::systems::player::session;
 use crate::systems::screen::ClientScreen;
 
 const COUNTER_WIDTH: f32 = 620.0;
 const COUNTER_HEIGHT: f32 = 400.0;
-const LIST_WIDTH: f32 = 250.0;
-const ICON: f32 = 28.0;
+const PAGE_GAP: f32 = 10.0;
+const HINT_ROOM: f32 = 24.0;
+const ICON: f32 = 24.0;
 const COST_ICON: f32 = 16.0;
-const CHIP_ICON: f32 = 14.0;
+const PILL_ICON: f32 = 14.0;
 
 pub struct ShopCounterPlugin;
 
@@ -108,13 +113,15 @@ fn notice_counter(world: &mut World) {
 fn head(world: &World) -> Option<PanelHead> {
     let content = world.resource::<Content>();
     view(world).map(|shown| PanelHead {
-        title: shown.shop.get(content).title.to_owned(),
         width: COUNTER_WIDTH,
-        fixed_height: Some(COUNTER_HEIGHT),
+        chrome: PanelChrome::Sheet {
+            title: shown.shop.get(content).title.to_owned(),
+            height: COUNTER_HEIGHT,
+        },
     })
 }
 
-fn show_counter(ui: &mut Ui, world: &mut World) {
+fn show_counter(ui: &mut Ui, world: &mut World, _width: f32, _most: f32) {
     let Some(shelf) = shelf(world) else {
         return;
     };
@@ -134,79 +141,84 @@ fn shelf(world: &World) -> Option<Shelf> {
     })
 }
 
+/// The index tabs and what the trader buys across the top, the wares down the left over the hint
+/// line, and the chosen ware's card lying on the page at the right.
 fn counter(ui: &mut Ui, world: &mut World, shelf: &Shelf) {
     let content = world.resource::<Content>().clone();
     let wares = shelf.wares(&content);
     let selected = shelf.selected.min(wares.len().saturating_sub(1));
     let wants = shelf.shown.shop.get(&content).wants(&content);
-    ui.set_min_size(ui.available_size());
-    egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(10, 0))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                let tabs = [
-                    (ShopTab::Wares, "Wares".to_owned()),
-                    (
-                        ShopTab::Buyback,
-                        format!("Buy back ({})", shelf.shown.buyback.len()),
-                    ),
-                ];
-                let mut tab = shelf.tab;
-                widgets::tab_strip(ui, &tabs, &mut tab);
-                if tab != shelf.tab {
-                    select(world, tab, 0);
-                }
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(wants_note(&wants))
-                            .size(TextRole::Small.size())
-                            .color(color::WARN),
-                    );
-                });
-            });
+    ui.horizontal(|ui| {
+        let tabs = [
+            (ShopTab::Wares, "Wares".to_owned()),
+            (
+                ShopTab::Buyback,
+                format!("Buy back ({})", shelf.shown.buyback.len()),
+            ),
+        ];
+        let mut tab = shelf.tab;
+        sheet::tabs(ui, &tabs, &mut tab);
+        if tab != shelf.tab {
+            select(world, tab, 0);
+        }
+        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            sheet::label(ui, TextRole::Small, &wants_note(&wants), ink::GOLD);
         });
-    let selling = !wants.is_empty();
-    egui::Panel::bottom(Id::new("shop-footer"))
-        .frame(egui::Frame::new().inner_margin(egui::Margin::symmetric(10, 6)))
-        .show_separator_line(true)
-        .show(ui, |ui| sell_hint(ui, world, selling));
-    egui::Panel::left(Id::new("shop-list"))
-        .resizable(false)
-        .exact_size(LIST_WIDTH)
-        .frame(egui::Frame::new())
-        .show(ui, |ui| {
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| list(ui, world, shelf, &wares, selected));
-        });
-    egui::CentralPanel::default()
-        .frame(egui::Frame::new())
-        .show(ui, |ui| {
+    });
+    ui.add_space(PAGE_GAP);
+    let room = ui.available_rect_before_wrap();
+    let list = Rect::from_min_max(
+        room.min,
+        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH - PAGE_GAP, room.max.y),
+    );
+    let page = Rect::from_min_max(
+        Pos2::new(room.max.x - card::SHOP_PAGE_WIDTH, room.min.y),
+        room.max,
+    );
+    ui.scope_builder(
+        UiBuilder::new()
+            .max_rect(list)
+            .layout(Layout::top_down(Align::Min)),
+        |ui| {
+            let rows = (list.height() - HINT_ROOM).max(0.0);
+            sheet::scroll(
+                ui,
+                egui::ScrollArea::vertical()
+                    .max_height(rows)
+                    .auto_shrink([false, false]),
+                |ui| wares_list(ui, world, shelf, &wares, selected),
+            );
+            sell_hint(ui, world, !wants.is_empty());
+        },
+    );
+    ui.scope_builder(
+        UiBuilder::new()
+            .max_rect(page)
+            .layout(Layout::top_down(Align::Min)),
+        |ui| {
             if let Some(ware) = wares.get(selected) {
-                detail(ui, world, shelf, ware, selected);
+                ware_card(ui, world, shelf.tab, ware, selected, page.height());
             }
-        });
+        },
+    );
+    ui.advance_cursor_after_rect(room);
 }
 
-fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected: usize) {
+fn wares_list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected: usize) {
     if wares.is_empty() {
         let note = match shelf.tab {
             ShopTab::Wares => "Nothing for sale",
             ShopTab::Buyback => "Nothing sold here yet",
         };
         ui.add_space(16.0);
-        ui.label(
-            RichText::new(note)
-                .size(TextRole::Small.size())
-                .color(color::MUTED),
-        );
+        sheet::label(ui, TextRole::Small, note, ink::INK3);
         return;
     }
     ui.spacing_mut().item_spacing.y = 0.0;
     for (index, ware) in wares.iter().enumerate() {
         let response = ui
             .push_id(("ware", index), |ui| {
-                row(ui, world, ware, index == selected)
+                ware_row(ui, world, ware, index == selected)
             })
             .inner;
         if map::clicked(world, InputAction::Select, &response) {
@@ -215,127 +227,105 @@ fn list(ui: &mut Ui, world: &mut World, shelf: &Shelf, wares: &[Ware], selected:
     }
 }
 
-fn row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui::Response {
+fn ware_row(ui: &mut Ui, world: &mut World, ware: &Ware, selected: bool) -> egui::Response {
     let content = world.resource::<Content>().clone();
     let def = ware.item.get(&content);
     let name = counted(&def.name, ware.count);
     let note = unavailable(ware)
-        .map(|reason| (reason, color::DANGER))
-        .or_else(|| ware.note.clone().map(|note| (note, color::MUTED)));
-    let background = ui.painter().add(egui::Shape::Noop);
-    let row = ui.scope_builder(
-        UiBuilder::new()
-            .sense(Sense::click())
-            .layout(Layout::top_down(Align::Min)),
-        |ui| {
-            egui::Frame::new()
-                .inner_margin(egui::Margin::symmetric(8, 4))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.horizontal(|ui| {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.with_layout(Layout::top_down(Align::Max), |ui| {
-                                for (stack, have) in ware.price.iter().zip(&ware.held) {
-                                    price_chip(ui, world, *have, *stack);
-                                }
-                            });
-                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                                hud::icon(ui, world, &def.icon, ICON);
-                                ui.vertical(|ui| {
-                                    ui.spacing_mut().item_spacing.y = 1.0;
-                                    ui.label(
-                                        RichText::new(&name)
-                                            .family(design_tokens::family::medium()),
-                                    );
-                                    if let Some((note, ink)) = &note {
-                                        ui.label(
-                                            RichText::new(note)
-                                                .size(TextRole::Small.size())
-                                                .color(*ink),
-                                        );
-                                    }
-                                });
-                            });
-                        });
+        .map(|reason| (reason, ink::RUBRIC))
+        .or_else(|| ware.note.clone().map(|note| (note, ink::INK3)));
+    let look = RowLook {
+        selected,
+        ..RowLook::default()
+    };
+    let response = controls::row(ui, look, |ui| {
+        ui.horizontal(|ui| {
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.with_layout(Layout::top_down(Align::Max), |ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    for (stack, have) in ware.price.iter().zip(&ware.held) {
+                        price_pill(ui, world, *have, *stack);
+                    }
+                });
+                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                    hud::icon(ui, world, &def.icon, ICON);
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 1.0;
+                        ui.add(egui::Label::new(face::body(&name)).wrap());
+                        if let Some((note, color)) = &note {
+                            sheet::label(ui, TextRole::Small, note, *color);
+                        }
                     });
                 });
-        },
-    );
-    let response = row.response;
+            });
+        });
+    })
+    .response;
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, selected, &name)
     });
-    let visuals = ui.style().interact_selectable(&response, selected);
-    if selected || response.hovered() {
-        ui.painter().set(
-            background,
-            egui::epaint::RectShape::filled(response.rect, 4.0, visuals.weak_bg_fill),
-        );
-    }
     response
 }
 
-fn detail(ui: &mut Ui, world: &mut World, shelf: &Shelf, ware: &Ware, index: usize) {
+/// The ware's card on the page, its plate carrying the price and the button that pays it.
+fn ware_card(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize, most: f32) {
+    let look = CardLook {
+        width: card::SHOP_PAGE_WIDTH,
+        max_height: most.min(card::MAX_HEIGHT),
+        art: card::ART_SHORT,
+        closable: false,
+        depth: Depth::Front,
+    };
+    item::card::show(ui, world, ware.item, look, |ui, world| {
+        price(ui, world, tab, ware, index);
+    });
+}
+
+fn price(ui: &mut Ui, world: &mut World, tab: ShopTab, ware: &Ware, index: usize) {
     let content = world.resource::<Content>().clone();
-    egui::Panel::bottom(Id::new("shop-price"))
-        .frame(egui::Frame::new().inner_margin(egui::Margin::same(12)))
-        .show_separator_line(true)
-        .show(ui, |ui| {
-            let price = match ware.count {
-                1 => "Price".to_owned(),
-                count => format!("Price for {count}"),
-            };
-            ui.label(
-                RichText::new(price)
-                    .size(TextRole::Small.size())
-                    .color(color::MUTED)
-                    .family(design_tokens::family::medium()),
+    let heading = match ware.count {
+        1 => "price".to_owned(),
+        count => format!("price for {count}"),
+    };
+    card::heading(ui, &heading);
+    for (stack, &have) in ware.price.iter().zip(&ware.held) {
+        let color = if have >= stack.count {
+            ink::INK
+        } else {
+            ink::RUBRIC
+        };
+        let item = stack.item.get(&content);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            hud::icon(ui, world, &item.icon, COST_ICON);
+            sheet::label(
+                ui,
+                TextRole::CardBody,
+                &format!("{} {} · you have {have}", stack.count, item.name),
+                color,
             );
-            for (stack, &have) in ware.price.iter().zip(&ware.held) {
-                let ink = if have >= stack.count {
-                    color::TEXT
-                } else {
-                    color::DANGER
-                };
-                let item = stack.item.get(&content);
-                ui.horizontal(|ui| {
-                    hud::icon(ui, world, &item.icon, COST_ICON);
-                    ui.label(
-                        RichText::new(format!("{} {} · You have {have}", stack.count, item.name))
-                            .color(ink),
-                    );
-                });
-            }
-            for (note, ink) in ware
-                .note
-                .iter()
-                .map(|note| (note.clone(), color::MUTED))
-                .chain(unavailable(ware).map(|reason| (reason, color::DANGER)))
-            {
-                ui.label(RichText::new(note).size(TextRole::Small.size()).color(ink));
-            }
-            ui.add_space(4.0);
-            if trade_button(ui, shelf.tab, ware).clicked() {
-                trade(world, shelf.tab, index);
-            }
         });
-    egui::CentralPanel::default()
-        .frame(egui::Frame::new().inner_margin(egui::Margin::same(12)))
-        .show(ui, |ui| {
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| card::sheet(ui, world, ware.item));
-        });
+    }
+    if let Some(reason) = unavailable(ware) {
+        ui.add(egui::Label::new(TextRole::CardBody.rich(reason).color(ink::RUBRIC)).wrap());
+    }
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        if trade_button(ui, tab, ware).clicked() {
+            trade(world, tab, index);
+        }
+        if let Some(note) = &ware.note {
+            sheet::label(ui, TextRole::Small, note, ink::INK3);
+        }
+    });
 }
 
 fn trade_button(ui: &mut Ui, tab: ShopTab, ware: &Ware) -> egui::Response {
     match (&ware.refusal, tab) {
-        (Some(WareRefusal::Unaffordable(_)), _) => widgets::danger(ui, "Can't afford"),
-        (Some(WareRefusal::Unavailable(_)), _) => ui.add(egui::Button::new(
-            RichText::new("Unavailable").color(color::MUTED),
-        )),
-        (None, ShopTab::Wares) => widgets::primary(ui, "Buy"),
-        (None, ShopTab::Buyback) => widgets::primary(ui, "Buy back"),
+        (Some(WareRefusal::Unaffordable(_)), _) => controls::faded(ui, "Can't afford"),
+        (Some(WareRefusal::Unavailable(_)), _) => controls::faded(ui, "Unavailable"),
+        (None, ShopTab::Wares) => controls::primary(ui, "Buy"),
+        (None, ShopTab::Buyback) => controls::primary(ui, "Buy back"),
     }
 }
 
@@ -352,22 +342,18 @@ fn trade(world: &mut World, tab: ShopTab, index: usize) {
     InterfaceSound::UiPick.play(world);
 }
 
-fn price_chip(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
-    let covered = have >= stack.count;
-    let ink = if covered { color::WARN } else { color::DANGER };
+/// A part of a price: gold while it is covered, rubric while it is not.
+fn price_pill(ui: &mut Ui, world: &mut World, have: u32, stack: ItemStack) {
+    let pill = if have >= stack.count {
+        Pill::Gold
+    } else {
+        Pill::Rubric
+    };
     let icon = stack.item.get(world.resource::<Content>()).icon.clone();
-    egui::Frame::new()
-        .fill(ink.gamma_multiply(0.12))
-        .stroke(Stroke::new(1.0, ink.gamma_multiply(0.6)))
-        .corner_radius(CHIP_RADIUS)
-        .inner_margin(egui::Margin::symmetric(6, 1))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 3.0;
-                hud::icon(ui, world, &icon, CHIP_ICON);
-                ui.label(RichText::new(stack.count.to_string()).size(12.5).color(ink));
-            });
-        });
+    controls::pill_with(ui, pill, |ui| {
+        ui.label(stack.count.to_string());
+        hud::icon(ui, world, &icon, PILL_ICON);
+    });
 }
 
 fn sell_hint(ui: &mut Ui, world: &mut World, selling: bool) {
@@ -380,10 +366,7 @@ fn sell_hint(ui: &mut Ui, world: &mut World, selling: bool) {
         input(InputAction::CarryItem),
         TextPiece::text(" from your bag to sell"),
     ]);
-    let look = TextLook {
-        size: TextRole::Small.size(),
-        color: color::MUTED,
-    };
+    let look = TextLook::new(TextRole::Small.size(), ink::INK3);
     text::show(ui, world, &hint, look, None);
 }
 

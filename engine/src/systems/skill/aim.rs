@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use design_tokens::{TextRole, color};
-use egui::{Color32, FontId, Rect, Stroke, Vec2};
+use design_tokens::{TextRole, ink, slip};
+use egui::{Rect, Stroke, Vec2};
 
 use super::{CastAim, Rank, SkillId, Targeting, UseSkillRequest, casting};
 use crate::core::content::{Content, Fixture};
@@ -220,7 +220,7 @@ pub fn draw_aim(world: &mut World) {
         if let Some(ring) = ring {
             painter.add(egui::Shape::closed_line(
                 ring,
-                Stroke::new(1.0, color::WARN.gamma_multiply(0.35)),
+                Stroke::new(1.0, ink::wash(ink::GOLD2, 0.45)),
             ));
         }
         let Some(hint) = hint else {
@@ -229,11 +229,11 @@ pub fn draw_aim(world: &mut World) {
         let at = gui
             .pointer_latest_pos()
             .map_or(screen.center(), |at| at + Vec2::new(16.0, 18.0));
-        let font = FontId::proportional(TextRole::Small.size());
-        let galley = painter.layout_no_wrap(hint, font, color::TEXT);
-        let rect = Rect::from_min_size(at, galley.size() + Vec2::new(10.0, 6.0));
-        painter.rect_filled(rect, 4.0, Color32::from_black_alpha(180));
-        painter.galley(rect.min + Vec2::new(5.0, 3.0), galley, color::TEXT);
+        let galley = painter.layout_no_wrap(hint, TextRole::Tooltip.font_id(), ink::INK);
+        let padding = Vec2::new(slip::PADDING.left.into(), slip::PADDING.top.into());
+        let rect = Rect::from_min_size(at, galley.size() + 2.0 * padding);
+        slip::paint(painter, rect);
+        painter.galley(rect.min + padding, galley, ink::INK);
     });
 }
 

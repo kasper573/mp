@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use design_tokens::color;
+use design_tokens::ink;
 use egui::load::SizedTexture;
 use egui::{Color32, Sense, Stroke, StrokeKind, Ui, Vec2};
 
@@ -65,8 +65,8 @@ pub fn grid(ui: &mut Ui, world: &mut World) {
 
 pub fn ring(category: StatusCategory) -> Color32 {
     match category {
-        StatusCategory::Buff => color::OK,
-        StatusCategory::Debuff => color::DANGER,
+        StatusCategory::Buff => ink::VERDIGRIS,
+        StatusCategory::Debuff => ink::RUBRIC,
     }
 }
 

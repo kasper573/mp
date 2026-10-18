@@ -1,5 +1,10 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
-use egui::{Id, LayerId, Pos2, Rect, RichText, Sense, Stroke, Ui, UiBuilder, Vec2};
+use design_tokens::ink;
+use design_tokens::motion::{Clock, SheetPose};
+use design_tokens::sheet::{self, Depth, Sheet};
+use egui::{Color32, Id, LayerId, Pos2, Rect, Sense, Stroke, Ui, UiBuilder, Vec2};
 
 use super::WindowsDrawn;
 use crate::core::gui::{self, Band};
@@ -10,14 +15,7 @@ pub(crate) struct WindowFrame<'a> {
     pub key: &'static str,
     pub title: Option<&'a str>,
     pub start: Rect,
-    pub sizing: Sizing,
     pub body_limit: Option<Vec2>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Sizing {
-    Resizable,
-    FitsContent,
 }
 
 pub(crate) fn widget<R>(
@@ -27,17 +25,18 @@ pub(crate) fn widget<R>(
     start: Pos2,
     add: impl FnOnce(&mut Ui, &mut World) -> R,
 ) -> R {
-    let id = panel_id(key);
+    let id = widget_id(key);
     let saved = world
         .resource::<UserSettings>()
         .widget_pos(key)
         .map(|pos| Pos2::new(pos.x, pos.y));
     let rest = Rect::from_min_size(saved.unwrap_or(start), drawn_size(gui, id));
-    let at = standing(world, gui, key, rest, None).min;
+    let at = standing(world, gui, (key, Kept::Spot), rest, None).min;
     let shown = egui::Area::new(id)
         .order(Band::Hud.order())
         .fixed_pos(at)
         .constrain(false)
+        .fade_in(false)
         .sense(Sense::drag())
         .show(gui, |ui| add(ui, world));
     let rect = shown.response.rect;
@@ -53,10 +52,36 @@ pub(crate) fn widget<R>(
     shown.inner
 }
 
+/// How far a window's sheet has dropped onto the table, run up while it is open and down after
+/// it closes. `None` once a closed window has lifted off entirely.
+pub(crate) fn sheet_pose(
+    world: &mut World,
+    gui: &egui::Context,
+    key: &'static str,
+    open: bool,
+) -> Option<SheetPose> {
+    let seconds = motion_step(gui);
+    let mut clocks = world.resource_mut::<SheetClocks>();
+    let clock = clocks
+        .0
+        .entry(key)
+        .or_insert(if open { Clock::OPEN } else { Clock::CLOSED });
+    clock.run(open, seconds);
+    (!clock.is_closed() || open).then(|| clock.pose())
+}
+
+/// How far the sheet and slip clocks move this pass.
+pub(crate) fn motion_step(gui: &egui::Context) -> f32 {
+    gui.input(|input| input.unstable_dt).min(MAX_STEP)
+}
+
+/// A window drawn as a sheet in `pose`: dragged by its title band, resized by its curl, closed by
+/// its cross.
 pub(crate) fn window<R>(
     world: &mut World,
     gui: &egui::Context,
     frame: WindowFrame,
+    pose: SheetPose,
     open: &mut bool,
     add: impl FnOnce(&mut Ui, &mut World) -> R,
 ) -> egui::InnerResponse<R> {
@@ -64,44 +89,51 @@ pub(crate) fn window<R>(
         key,
         title,
         start,
-        sizing,
         body_limit,
     } = frame;
     let id = panel_id(key);
-    let max = body_limit.map(|body| body + chrome(gui));
-    let saved = world
+    let max = body_limit.map(|body| body + chrome());
+    let rest = world
         .resource::<UserSettings>()
         .window_placement(key)
-        .map(placed_rect);
-    let rest = match sizing {
-        Sizing::Resizable => saved.unwrap_or(start),
-        Sizing::FitsContent => Rect::from_min_size(
-            saved.map_or(start.min, |saved| saved.min),
-            Vec2::new(start.width(), drawn_size(gui, id).y),
-        ),
+        .map(placed_rect)
+        .unwrap_or(start);
+    let rect = standing(world, gui, (key, Kept::Placement), rest, max);
+    let front = front_sheet(world, gui) == Some(key);
+    let at_rest = pose == SheetPose::REST;
+    let shadow = match (at_rest, front) {
+        (true, false) => sheet::shadow(Depth::Behind),
+        _ => pose.shadow,
     };
-    let rect = standing(world, gui, key, rest, max);
+    gui.set_transform_layer(layer(key), pose.transform(rect));
     let shown = egui::Area::new(id)
         .order(Band::Hud.order())
         .fixed_pos(rect.min)
         .constrain(false)
+        .fade_in(false)
         .show(gui, |ui| {
-            let chrome = egui::Frame::window(ui.style());
-            let margin = chrome.total_margin();
-            let framed = chrome.show(ui, |ui| {
-                ui.set_width(rect.width() - margin.sum().x);
-                let bar = title_bar(ui, title, open);
-                let inner = match sizing {
-                    Sizing::Resizable => body(ui, rect.max.y - margin.bottom, |ui| add(ui, world)),
-                    Sizing::FitsContent => fitted(ui, |ui| add(ui, world)),
-                };
-                (bar, inner)
-            });
-            let ((bar, inner), outer) = (framed.inner, framed.response.rect);
-            let title_rect = Rect::from_min_max(outer.min, Pos2::new(outer.max.x, bar.max.y));
-            let handle = ui.interact(title_rect, id.with("title"), Sense::drag());
-            let grip = (sizing == Sizing::Resizable)
-                .then(|| corner_grip(ui, id, outer, GripCorner::BottomRight));
+            ui.multiply_opacity(pose.opacity);
+            let (outer, _) = ui.allocate_exact_size(rect.size(), Sense::hover());
+            let sheet = Sheet {
+                title,
+                closable: true,
+                curl: true,
+                depth: if front { Depth::Front } else { Depth::Behind },
+            };
+            let parts = sheet.paint_at(ui.painter(), outer, shadow, Color32::WHITE);
+            let handle = ui.interact(parts.band, id.with("title"), Sense::drag());
+            if let Some(title) = title {
+                handle.widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::Label, true, title)
+                });
+            }
+            if let Some(cross) = parts.cross
+                && close_button(ui, id, cross).clicked()
+            {
+                *open = false;
+            }
+            let grip = parts.curl.map(|curl| corner_grip(ui, id, curl));
+            let inner = body(ui, parts.body, |ui| add(ui, world));
             (handle, grip, inner)
         });
     let (handle, grip, inner) = shown.inner;
@@ -126,11 +158,49 @@ pub(crate) fn window<R>(
     egui::InnerResponse::new(inner, shown.response)
 }
 
-pub(super) fn shown_rect(gui: &egui::Context, key: &str) -> Option<Rect> {
+/// A thing drawn at a spot the player can move it from by `handle`, keyed like a widget.
+pub(crate) fn placed_spot(
+    world: &World,
+    gui: &egui::Context,
+    key: &'static str,
+    start: Pos2,
+) -> Rect {
+    let saved = world
+        .resource::<UserSettings>()
+        .widget_pos(key)
+        .map(|pos| Pos2::new(pos.x, pos.y));
+    let rest = Rect::from_min_size(saved.unwrap_or(start), drawn_size(gui, panel_id(key)));
+    standing(world, gui, (key, Kept::Spot), rest, None)
+}
+
+pub(crate) fn grab_spot(world: &mut World, key: &'static str, handle: &egui::Response, rect: Rect) {
+    grab(
+        world,
+        handle,
+        Held::new(key, Kept::Spot, Grip::Move, rect, None),
+    );
+}
+
+/// Which sheet lies on top of the others, by the order egui stacks their layers.
+pub(crate) fn front_sheet(world: &World, gui: &egui::Context) -> Option<&'static str> {
+    let drawn = &world.resource::<WindowsDrawn>().last;
+    gui.memory(|memory| {
+        memory
+            .layer_ids()
+            .filter_map(|layer_id| drawn.iter().copied().find(|key| layer(key) == layer_id))
+            .last()
+    })
+}
+
+pub(crate) fn mark_drawn(world: &mut World, key: &'static str) {
+    world.resource_mut::<WindowsDrawn>().now.insert(key);
+}
+
+pub(crate) fn shown_rect(gui: &egui::Context, key: &str) -> Option<Rect> {
     gui.memory(|memory| memory.area_rect(panel_id(key)))
 }
 
-pub(super) fn layer(key: &'static str) -> LayerId {
+pub(crate) fn layer(key: &str) -> LayerId {
     LayerId::new(Band::Hud.order(), panel_id(key))
 }
 
@@ -171,6 +241,11 @@ pub(super) fn arrange(world: &mut World) {
 }
 
 const MIN_WINDOW: Vec2 = Vec2::new(100.0, 100.0);
+/// The most a sheet's clock moves in one frame, so a stalled frame never skips the motion.
+const MAX_STEP: f32 = 1.0 / 30.0;
+
+#[derive(Resource, Default)]
+pub(super) struct SheetClocks(HashMap<&'static str, Clock>);
 
 #[derive(Clone, Copy)]
 pub(super) struct Held {
@@ -217,7 +292,7 @@ fn largest(max: Option<Vec2>) -> Vec2 {
     max.map_or(Vec2::INFINITY, |max| max.max(MIN_WINDOW))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Kept {
     Spot,
     Placement,
@@ -246,12 +321,20 @@ fn grab(world: &mut World, handle: &egui::Response, held: Held) {
     });
 }
 
-fn standing(world: &World, gui: &egui::Context, key: &str, rest: Rect, max: Option<Vec2>) -> Rect {
+/// Where a piece stands this frame: where it rests, or where the pointer holds it. A window and the
+/// launcher that opens it share a key, so the hold names which of the two it has.
+fn standing(
+    world: &World,
+    gui: &egui::Context,
+    (key, kept): (&str, Kept),
+    rest: Rect,
+    max: Option<Vec2>,
+) -> Rect {
     let screen = gui.content_rect();
     let rect = world
         .resource::<Arranging>()
         .0
-        .filter(|held| held.key == key)
+        .filter(|held| held.key == key && held.kept == kept)
         .map_or(rest, |held| held.rect(screen));
     within(rect, screen, max)
 }
@@ -261,12 +344,9 @@ fn within(rect: Rect, screen: Rect, max: Option<Vec2>) -> Rect {
     Rect::from_min_size(rect.min.clamp(screen.min, screen.max - size), size)
 }
 
-/// What a window adds around its body: its frame and title bar.
-pub(super) fn chrome(gui: &egui::Context) -> Vec2 {
-    let style = gui.style_of(gui.theme());
-    let margin = egui::Frame::window(&style).total_margin().sum();
-    let title = gui.fonts_mut(|fonts| fonts.row_height(&egui::TextStyle::Heading.resolve(&style)));
-    margin + Vec2::new(0.0, title + style.spacing.item_spacing.y)
+/// What a window adds around its body: its rule and title band.
+pub(super) fn chrome() -> Vec2 {
+    sheet::chrome(true)
 }
 
 fn snapped(world: &World, rect: Rect, grip: Grip) -> Rect {
@@ -285,67 +365,22 @@ fn snapped(world: &World, rect: Rect, grip: Grip) -> Rect {
     }
 }
 
-fn title_bar(ui: &mut Ui, title: Option<&str>, open: &mut bool) -> Rect {
-    let height = ui.text_style_height(&egui::TextStyle::Heading);
-    let (_, bar) = ui.allocate_space(Vec2::new(ui.available_width(), height));
-    if let Some(title) = title {
-        ui.put(
-            bar.shrink2(Vec2::new(height, 0.0)),
-            egui::Label::new(RichText::new(title).heading())
-                .selectable(false)
-                .truncate(),
-        );
-    }
-    let close = Rect::from_min_size(
-        bar.right_top() - Vec2::new(height, 0.0),
-        Vec2::splat(height),
-    );
-    if close_button(ui, close).clicked() {
-        *open = false;
-    }
-    bar
-}
-
-fn close_button(ui: &mut Ui, rect: Rect) -> egui::Response {
-    let response = ui.interact(rect, ui.id().with("close"), Sense::click());
+fn close_button(ui: &mut Ui, id: Id, rect: Rect) -> egui::Response {
+    let response = ui.interact(rect, id.with("close"), Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), "Close")
     });
-    let visuals = ui.style().interact(&response);
-    let cross = Rect::from_center_size(rect.center(), Vec2::splat(ui.spacing().icon_width - 4.0))
-        .expand(visuals.expansion);
-    let painter = ui.painter();
-    painter.line_segment([cross.left_top(), cross.right_bottom()], visuals.fg_stroke);
-    painter.line_segment([cross.right_top(), cross.left_bottom()], visuals.fg_stroke);
+    sheet::cross(ui.painter(), rect, response.hovered());
     response
 }
 
-fn body<R>(ui: &mut Ui, bottom: f32, add: impl FnOnce(&mut Ui) -> R) -> R {
-    let top = ui.cursor().min;
-    let rect = Rect::from_min_max(
-        top,
-        Pos2::new(top.x + ui.available_width(), bottom.max(top.y)),
-    );
+fn body<R>(ui: &mut Ui, rect: Rect, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
         ui.set_clip_rect(rect.intersect(ui.clip_rect()));
         ui.set_min_size(rect.size());
         add(ui)
     })
     .inner
-}
-
-// An area lays its content out within the size it last had, which would hold a fitted window's
-// scrolling content to its height for the item it showed before.
-fn fitted<R>(ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
-    let top = ui.cursor().min;
-    let room = Rect::from_min_max(
-        top,
-        Pos2::new(
-            top.x + ui.available_width(),
-            ui.ctx().content_rect().bottom().max(top.y),
-        ),
-    );
-    ui.scope_builder(UiBuilder::new().max_rect(room), add).inner
 }
 
 /// Which corner a resize grip sits in: the bottom right unless there is no room to pull there.
@@ -355,17 +390,29 @@ pub enum GripCorner {
     TopRight,
 }
 
-pub(crate) fn corner_grip(ui: &mut Ui, id: Id, window: Rect, at: GripCorner) -> egui::Response {
-    let size = ui.visuals().resize_corner_size;
+fn corner_grip(ui: &mut Ui, id: Id, curl: Rect) -> egui::Response {
+    let response = ui
+        .interact(curl, id.with("grip"), Sense::drag())
+        .on_hover_cursor(egui::CursorIcon::ResizeNwSe);
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::ResizeHandle, ui.is_enabled(), "Resize")
+    });
+    response
+}
+
+/// A resize grip in a slip's corner: a small curl the player drags, which tells the accessibility
+/// tree it resizes.
+pub(crate) fn slip_grip(ui: &mut Ui, id: Id, slip: Rect, at: GripCorner) -> egui::Response {
+    let size = GRIP;
     let (corner, cursor) = match at {
         GripCorner::BottomRight => (
-            Rect::from_min_max(window.max - Vec2::splat(size), window.max),
+            Rect::from_min_max(slip.max - Vec2::splat(size), slip.max),
             egui::CursorIcon::ResizeNwSe,
         ),
         GripCorner::TopRight => (
             Rect::from_min_max(
-                Pos2::new(window.max.x - size, window.min.y),
-                Pos2::new(window.max.x, window.min.y + size),
+                Pos2::new(slip.max.x - size, slip.min.y),
+                Pos2::new(slip.max.x, slip.min.y + size),
             ),
             egui::CursorIcon::ResizeNeSw,
         ),
@@ -376,25 +423,30 @@ pub(crate) fn corner_grip(ui: &mut Ui, id: Id, window: Rect, at: GripCorner) -> 
     response.widget_info(|| {
         egui::WidgetInfo::labeled(egui::WidgetType::ResizeHandle, ui.is_enabled(), "Resize")
     });
-    let stroke = Stroke::new(1.0, ui.style().interact(&response).fg_stroke.color);
-    let inset = f32::from(ui.visuals().window_corner_radius.se) / 2.0;
-    let (tip, down) = match at {
-        GripCorner::BottomRight => (corner.max - Vec2::splat(inset), -1.0),
-        GripCorner::TopRight => (corner.right_top() + Vec2::new(-inset, inset), 1.0),
+    let color = if response.hovered() || response.dragged() {
+        ink::INK
+    } else {
+        ink::INK3
     };
-    let mut reach = 2.0;
-    while reach <= size {
+    let (tip, down) = match at {
+        GripCorner::BottomRight => (corner.max - Vec2::splat(3.0), -1.0),
+        GripCorner::TopRight => (corner.right_top() + Vec2::new(-3.0, 3.0), 1.0),
+    };
+    let mut reach = 3.0;
+    while reach <= size - 3.0 {
         ui.painter().line_segment(
             [
                 tip - Vec2::new(reach, 0.0),
                 tip + Vec2::new(0.0, down * reach),
             ],
-            stroke,
+            Stroke::new(1.0, color),
         );
         reach += 4.0;
     }
     response
 }
+
+const GRIP: f32 = 14.0;
 
 fn drawn_size(gui: &egui::Context, id: Id) -> Vec2 {
     gui.memory(|memory| memory.area_rect(id))
@@ -408,6 +460,14 @@ fn placed_rect(placement: Placement) -> Rect {
     )
 }
 
+pub(crate) fn area_id(key: &str) -> Id {
+    panel_id(key)
+}
+
 fn panel_id(key: &str) -> Id {
     Id::new(("hud", key))
+}
+
+fn widget_id(key: &str) -> Id {
+    Id::new(("hud widget", key))
 }

@@ -452,9 +452,6 @@ pub fn install_content(world: &mut World, synced: SyncedContent) -> Result<(), L
     world.insert_resource(content.built::<quest::Parties>().clone());
     world.insert_resource(content.built::<script::RiftScripts>().clone());
     world.insert_resource(content.built::<GameSettings>().clone());
-    if let Some(fonts) = interface::theme_fonts(&content, &synced.assets) {
-        world.insert_resource(crate::core::gui::GuiFonts(fonts));
-    }
     world.insert_resource(input::map::InputMap::new(&content));
     world.insert_resource(content);
     world.insert_resource(synced);
@@ -470,7 +467,6 @@ pub fn registry() -> ContentRegistry {
         .row::<attention::AttentionDef>()
         .row::<input::map::InputDef>()
         .row::<interface::CursorDef>()
-        .row::<interface::FontDef>()
         .row::<interface::InterfaceIconDef>()
         .row::<item::ItemDef>()
         .modules::<item::ItemDef>()
@@ -497,7 +493,6 @@ pub fn registry() -> ContentRegistry {
         .fixture::<interface::InterfaceSound>()
         .fixture::<interface::CursorShape>()
         .fixture::<interface::InterfaceIcon>()
-        .fixture::<interface::FontFace>()
         .fixture::<vfx::VfxFixture>()
         .fixture::<vfx::VfxShaderFixture>()
         .settings::<GameSettings>()
