@@ -51,7 +51,7 @@ impl Fixture for VfxShaderFixture {
         };
         set.iter()
             .map(|(name, kind)| FixtureLock::Entry {
-                list: "/params",
+                list: "/params".to_owned(),
                 entry: serde_json::json!({ "name": name, "kind": kind }),
             })
             .collect()

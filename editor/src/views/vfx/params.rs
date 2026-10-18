@@ -220,27 +220,32 @@ pub fn shader_params(ui: &mut Ui, cx: &mut FormCx, value: &mut Value) -> FormCha
         let path = format!("/params/{index}");
         let param = &mut value["params"][index];
         let kind = param["kind"].as_str().unwrap_or("number").to_owned();
+        let kept = cx.locks.iter().any(|lock| lock.keeps("/params", param));
         ui.horizontal(|ui| {
-            if ui
+            if kept {
+                ui.label(theme::faint("·")).on_hover_text(forms::KEPT_TIP);
+            } else if ui
                 .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
                 .on_hover_text("Remove")
                 .clicked()
             {
                 remove = Some(index);
             }
-            ui.scope(|ui| {
-                ui.set_width(120.0);
-                changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
-            });
             let mut picked = kind.clone();
-            widgets::combo_box(("param-kind", index))
-                .width(90.0)
-                .selected_text(theme::mono(&kind).size(13.0))
-                .show_ui(ui, |ui| {
-                    for kind in ["number", "bool", "color"] {
-                        ui.selectable_value(&mut picked, kind.to_owned(), kind);
-                    }
+            ui.add_enabled_ui(!kept, |ui| {
+                ui.scope(|ui| {
+                    ui.set_width(120.0);
+                    changed |= forms::text(ui, cx, &mut param["name"], &format!("{path}/name"));
                 });
+                widgets::combo_box(("param-kind", index))
+                    .width(90.0)
+                    .selected_text(theme::mono(&kind).size(13.0))
+                    .show_ui(ui, |ui| {
+                        for kind in ["number", "bool", "color"] {
+                            ui.selectable_value(&mut picked, kind.to_owned(), kind);
+                        }
+                    });
+            });
             if picked != kind {
                 param["kind"] = Value::String(picked.clone());
                 let fields = param.as_object_mut().expect("object");

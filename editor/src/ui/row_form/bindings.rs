@@ -1,5 +1,6 @@
 use design_tokens::glyph::{self, Mark};
 use egui::{Key, Sense, Ui};
+use engine::core::content::fixture::FixtureLock;
 use serde_json::Value;
 
 use super::{theme, widgets};
@@ -10,11 +11,14 @@ use crate::value::RowValue;
 pub(super) fn bindings_section(
     ui: &mut Ui,
     files: &ProjectFiles,
+    locks: &[FixtureLock],
     key: &str,
     value: &mut Value,
 ) -> FormChange {
     let mut changed = FormChange::default();
     widgets::section(ui, "Bindings");
+    let read = locks.iter().find_map(|lock| lock.variants("/bindings"));
+    let reads = |kind: &str| read.is_none_or(|read| read.iter().any(|known| known == kind));
     if !value["bindings"].is_array() {
         value["bindings"] = Value::Array(Vec::new());
     }
@@ -117,6 +121,12 @@ pub(super) fn bindings_section(
             ui.ctx().data_mut(|d| d.insert_temp(id, false));
         }
     });
+    if let Some(read) = read {
+        let kinds: Vec<String> = read.iter().map(|kind| kind.replace('_', " ")).collect();
+        ui.label(
+            theme::faint(format!("The game reads this as: {}", kinds.join(" or "))).size(12.0),
+        );
+    }
     if capturing {
         let captured = ui.input(|i| {
             if i.key_pressed(egui::Key::Escape) {
@@ -129,7 +139,7 @@ pub(super) fn bindings_section(
                         pressed: true,
                         modifiers,
                         ..
-                    } => {
+                    } if reads("key") => {
                         let name = key_code_name(*key);
                         return Some(Some(binding_json(
                             "key",
@@ -149,11 +159,17 @@ pub(super) fn bindings_section(
                             egui::PointerButton::Middle => "Middle",
                             _ => "Left",
                         };
-                        return Some(Some(binding_json(
-                            "click",
-                            modifiers,
-                            serde_json::json!({ "button": name, "times": 1 }),
-                        )));
+                        let pointer = ["click", "drag", "mouse"]
+                            .into_iter()
+                            .find(|kind| reads(kind));
+                        let Some(kind) = pointer else {
+                            continue;
+                        };
+                        let fields = match kind {
+                            "click" => serde_json::json!({ "button": name, "times": 1 }),
+                            _ => serde_json::json!({ "button": name }),
+                        };
+                        return Some(Some(binding_json(kind, modifiers, fields)));
                     }
                     _ => {}
                 }

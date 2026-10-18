@@ -2,6 +2,7 @@ use design_tokens::glyph::{self, Mark};
 use std::collections::{HashMap, HashSet};
 
 use egui::Ui;
+use engine::core::content::fixture::FixtureLock;
 use engine::core::content::{Content, LoadReport};
 use engine::core::script::VariableType;
 use serde_json::{Map, Value};
@@ -17,6 +18,8 @@ use crate::views::script::nodes::NodeCatalogue;
 use crate::views::vfx;
 use crate::{audio, condition, picker, spans, thumbs, value};
 
+pub const KEPT_TIP: &str = "Kept: the engine reads this from every game, so it stays as it is";
+
 pub struct FormCx<'a> {
     pub root: &'a Value,
     pub content: Option<Content>,
@@ -31,6 +34,8 @@ pub struct FormCx<'a> {
     pub owner_key: Option<String>,
     pub holes: Option<FormHoles>,
     pub autofocus: bool,
+    /// What the row being edited keeps as the engine reads it, when it is a fixture.
+    pub locks: Vec<FixtureLock>,
     report: Option<&'a LoadReport>,
     load_errors: HashMap<String, String>,
 }
@@ -57,6 +62,7 @@ impl<'a> FormCx<'a> {
             owner_key: None,
             holes: None,
             autofocus: false,
+            locks: Vec::new(),
             report: project.report.as_ref(),
             load_errors: HashMap::new(),
         }
@@ -66,6 +72,7 @@ impl<'a> FormCx<'a> {
     pub fn owned_by(mut self, table: &str, key: Option<&str>) -> FormCx<'a> {
         self.owner_table = Some(table.to_owned());
         self.owner_key = key.map(str::to_owned);
+        self.locks = key.map_or_else(Vec::new, |key| self.shapes.locks(table, key).to_vec());
         self.load_errors = match (self.report, key) {
             (Some(report), Some(key)) => crate::project::errors_in(report, &row_file(table, key))
                 .into_iter()
@@ -947,6 +954,11 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
             schema::kind(cx.root, item_schema),
             SchemaKind::Object | SchemaKind::Union(_)
         );
+    let allowed: Option<Vec<String>> = cx
+        .locks
+        .iter()
+        .find_map(|lock| lock.variants(path))
+        .map(<[String]>::to_vec);
     ui.vertical(|ui| {
         let list = value.as_array_mut().expect("array");
         let mut remove = None;
@@ -954,12 +966,20 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
         let count = list.len();
         for (index, item) in list.iter_mut().enumerate() {
             let item_path = format!("{path}/{index}");
+            let kept = cx.locks.iter().any(|lock| lock.keeps(path, item));
+            let pinned: Vec<String> = cx
+                .locks
+                .iter()
+                .flat_map(|lock| lock.pinned(path, item))
+                .map(str::to_owned)
+                .collect();
             if boxed {
                 widgets::card_frame(false).show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| {
                         match schema::kind(cx.root, item_schema) {
                             SchemaKind::Union(variants) => {
+                                let variants = within(variants, allowed.as_deref());
                                 changed |= variant_picker(ui, cx, &variants, item, &item_path);
                             }
                             _ => {
@@ -967,10 +987,14 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                             }
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let response =
+                            let response = if kept {
+                                ui.label(theme::faint("kept").size(12.0))
+                                    .on_hover_text(KEPT_TIP)
+                            } else {
                                 glyph::button(ui, Mark::Cross, 11.0, theme::FAINT, "Remove")
-                                    .on_hover_text("Remove");
-                            if response.clicked() {
+                                    .on_hover_text("Remove")
+                            };
+                            if response.clicked() && !kept {
                                 remove = Some(index);
                             }
                             response.context_menu(|ui| {
@@ -997,10 +1021,13 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                 continue;
             }
             ui.horizontal(|ui| {
-                let response = ui
-                    .add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
-                    .on_hover_text("Remove");
-                if response.clicked() {
+                let response = if kept {
+                    ui.label(theme::faint("·")).on_hover_text(KEPT_TIP)
+                } else {
+                    ui.add(egui::Label::new(theme::faint("×")).sense(egui::Sense::click()))
+                        .on_hover_text("Remove")
+                };
+                if response.clicked() && !kept {
                     remove = Some(index);
                 }
                 response.context_menu(|ui| {
@@ -1021,6 +1048,7 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         for (name, field) in properties.iter().rev() {
                             let field_path = format!("{item_path}/{name}");
+                            let locked = pinned.iter().any(|pin| pin == *name);
                             let present = item.get(*name).is_some_and(|v| !v.is_null());
                             let resolved = schema::resolve(cx.root, field);
                             let is_reference = schema::marker(resolved) == Some("x-table");
@@ -1037,6 +1065,9 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                     ),
                                     egui::Layout::left_to_right(egui::Align::Center),
                                     |ui| {
+                                        if locked {
+                                            ui.disable();
+                                        }
                                         changed |= self::value(ui, cx, field, child, &field_path);
                                     },
                                 );
@@ -1055,6 +1086,9 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
                                     ),
                                     egui::Layout::left_to_right(egui::Align::Center),
                                     |ui| {
+                                        if locked {
+                                            ui.disable();
+                                        }
                                         if !present {
                                             ui.style_mut().visuals.override_text_color =
                                                 Some(theme::MUTED);
@@ -1095,7 +1129,15 @@ fn array(ui: &mut Ui, cx: &mut FormCx, items: &Value, value: &mut Value, path: &
         }
         error_line(ui, cx, path);
         if ui.button(format!("+ {singular}")).clicked() {
-            let mut fresh = schema::template(cx.root, items);
+            let first_allowed = match schema::kind(cx.root, item_schema) {
+                SchemaKind::Union(variants) if allowed.is_some() => {
+                    within(variants, allowed.as_deref())
+                        .first()
+                        .map(|variant| schema::variant_template(cx.root, variant))
+                }
+                _ => None,
+            };
+            let mut fresh = first_allowed.unwrap_or_else(|| schema::template(cx.root, items));
             name_newcomer(&mut fresh, list, &singular);
             list.push(fresh);
             changed = FormChange::at(path);
@@ -1576,5 +1618,19 @@ pub fn error_line(ui: &mut Ui, cx: &FormCx, path: &str) {
         .or_else(|| cx.load_errors.get(path))
     {
         ui.colored_label(theme::DANGER, error);
+    }
+}
+
+/// The variants a list's entries may take: those `allowed`, when a lock holds the list to some.
+fn within<'v>(
+    variants: Vec<SchemaVariant<'v>>,
+    allowed: Option<&[String]>,
+) -> Vec<SchemaVariant<'v>> {
+    match allowed {
+        Some(allowed) => variants
+            .into_iter()
+            .filter(|variant| allowed.contains(&variant.tag))
+            .collect(),
+        None => variants,
     }
 }

@@ -153,7 +153,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                     ui.vertical(|ui| {
                         ui.set_width(ui.available_width().min(420.0));
                         if table == "input" {
-                            changed |= bindings_section(ui, cx.files, key, &mut value);
+                            changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                         } else {
                             changed |= modules_column(
                                 ui,
@@ -174,7 +174,7 @@ fn row_form(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str, wide: bool
                 changed |= row_card(ui, &mut cx, table, key, fixture, root, &mut value);
                 if table == "input" {
                     ui.add_space(10.0);
-                    changed |= bindings_section(ui, cx.files, key, &mut value);
+                    changed |= bindings_section(ui, cx.files, &cx.locks, key, &mut value);
                 }
                 if has_modules {
                     ui.add_space(10.0);

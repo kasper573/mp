@@ -43,6 +43,7 @@ pub enum LoadStep {
 type Hook = Box<dyn Fn(&mut Loading) + Send + Sync>;
 struct FixtureEntry {
     table: &'static str,
+    whole_table: bool,
     keys: Vec<(&'static str, Vec<FixtureLock>)>,
     check: Hook,
 }
@@ -125,6 +126,7 @@ impl ContentRegistry {
     pub fn fixture<F: Fixture>(&mut self) -> &mut ContentRegistry {
         self.fixtures.push(FixtureEntry {
             table: F::Row::TABLE,
+            whole_table: F::WHOLE_TABLE,
             keys: F::VARIANTS
                 .iter()
                 .map(|fixture| (fixture.key(), fixture.locks()))
@@ -180,12 +182,17 @@ impl ContentRegistry {
                     .filter(|(_, locks)| !locks.is_empty())
                     .map(|(key, locks)| ((*key).to_owned(), serde_json::json!(locks)))
                     .collect();
+                let closed = self
+                    .fixtures
+                    .iter()
+                    .any(|fixture| fixture.table == row.name() && fixture.whole_table);
                 serde_json::json!({
                     "table": row.name(),
                     "folders": row.folders(),
                     "shape": row.shape(settings),
                     "fixtures": keys,
                     "locks": locks,
+                    "closed": closed,
                 })
             })
             .collect();
@@ -1525,5 +1532,23 @@ fn check_fixture<F: Fixture>(loading: &mut Loading) {
             lock.check(&row, &mut check);
         }
         loading.row_errors(id, check);
+    }
+    if !F::WHOLE_TABLE {
+        return;
+    }
+    let fixed: Vec<&str> = F::VARIANTS.iter().map(|fixture| fixture.key()).collect();
+    for (id, _) in content.table::<F::Row>().iter() {
+        let key = id.key(&content);
+        if !fixed.contains(&key) {
+            loading.file_error(
+                super::row_file(table, key),
+                ErrorPlace::WholeFile,
+                ContentProblem::new(
+                    "row the engine never reads",
+                    key,
+                    format!("one of the {table} fixtures the engine requires"),
+                ),
+            );
+        }
     }
 }

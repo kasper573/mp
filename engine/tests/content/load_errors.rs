@@ -269,3 +269,21 @@ fn a_folder_without_a_game_file_is_refused() {
         .unwrap_or_else(|| panic!("no error for game.json:\n{report}"));
     assert_eq!(error.problem.rule, "missing file");
 }
+
+#[test]
+fn a_row_of_its_own_in_a_table_of_fixtures_alone_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.write(
+        "tables/input/wave_hello.json",
+        r#"{ "label": "Wave hello", "bindings": [] }"#,
+    );
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "tables/input/wave_hello.json")
+        .expect("the stray row is refused");
+    assert_eq!(error.problem.rule, "row the engine never reads");
+}

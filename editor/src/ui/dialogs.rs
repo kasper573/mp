@@ -375,10 +375,14 @@ fn template_summary(ui: &mut Ui, editor: &Editor, template: &GameTemplate) {
         widgets::kv(ui, "holds", |ui| {
             let mut parts: Vec<String> = vec![GAME_FILE.to_owned(), "every fixture".to_owned()];
             for (table, keys) in &template.tables {
-                if editor.shapes.has_fixtures(table) {
-                    continue;
+                let own: Vec<&str> = keys
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|key| !editor.shapes.is_fixture(table, key))
+                    .collect();
+                if !own.is_empty() {
+                    parts.push(format!("{}/{}", table, own.join(", ")));
                 }
-                parts.push(format!("{}/{}", table, keys.join(", ")));
             }
             ui.add(egui::Label::new(theme::muted(parts.join(" · "))).wrap());
         });

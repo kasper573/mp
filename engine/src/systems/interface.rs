@@ -45,6 +45,7 @@ pub enum CursorShape {
 
 impl Fixture for CursorShape {
     type Row = CursorDef;
+    const WHOLE_TABLE: bool = true;
 }
 
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
@@ -72,6 +73,7 @@ pub enum InterfaceIcon {
 
 impl Fixture for InterfaceIcon {
     type Row = InterfaceIconDef;
+    const WHOLE_TABLE: bool = true;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, strum::IntoStaticStr, strum::VariantArray)]

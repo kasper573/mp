@@ -163,7 +163,7 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
                     menu_label: "Open table".to_owned(),
                     action: FolderAction::OpenTable,
                 };
-                if shapes.has_fixtures(&folder.id) {
+                if shapes.is_closed(&folder.id) {
                     folder.note =
                         Some("Fixtures: a fixed set of rows, so none can be added".to_owned());
                     folder.actions = vec![open];

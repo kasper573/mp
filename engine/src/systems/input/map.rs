@@ -77,16 +77,17 @@ pub enum InputAction {
 
 impl Fixture for InputAction {
     type Row = InputDef;
+    const WHOLE_TABLE: bool = true;
 
     fn locks(self) -> Vec<FixtureLock> {
         let variants = self
             .gestures()
             .iter()
             .flat_map(|gesture| gesture.bindings())
-            .map(|kind| <&'static str>::from(*kind))
+            .map(|kind| <&'static str>::from(*kind).to_owned())
             .collect();
         vec![FixtureLock::Variants {
-            list: "/bindings",
+            list: "/bindings".to_owned(),
             variants,
         }]
     }
