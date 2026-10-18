@@ -23,7 +23,11 @@ fn play(shoot: &mut Shoot) {
         Some(resident_home("glimmercap", "gnome_alchemist")),
     );
     let mut me = shoot.roll(player);
-    me.caption("The hotbar: nine slots on the keys 1 to 9, holding skills and items alike");
+    me.caption(&format!(
+        "The hotbar: nine slots on the keys {} to {}, holding skills and items alike",
+        input_name(InputAction::Hotbar1),
+        input_name(InputAction::Hotbar9)
+    ));
     me.hover_ui(UiTarget::starting("Hotbar slot 1"));
     me.hold();
     me.caption(
