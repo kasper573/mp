@@ -443,7 +443,17 @@ impl Editor {
     }
 
     pub fn open_folder(&mut self, folder: &Path) {
-        let folder = folder.to_path_buf();
+        // Whatever else reads the folder, such as a play-test's binaries or a later session, may
+        // not start from where this one did.
+        let folder = match std::path::absolute(folder) {
+            Ok(folder) => folder,
+            Err(error) => {
+                let reason = format!("{}: {error}", folder.display());
+                self.start.failed = Some((folder.to_path_buf(), reason.clone()));
+                self.output.say("editor", reason);
+                return;
+            }
+        };
         if let Some(data) = RecoveryJournal::recover(&self.user, &folder)
             && !data.files.is_empty()
             && self.start.recover.is_none()
