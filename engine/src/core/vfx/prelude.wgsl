@@ -12,6 +12,7 @@ struct Site {
     pixel: vec2<f32>,
     kind: u32,
     facing: f32,
+    heading: f32,
     progress: f32,
     time: f32,
     overscan: vec2<f32>,
@@ -78,6 +79,14 @@ fn site_local(uv: vec2<f32>) -> vec2<f32> {
     let heading = vec2<f32>(cos(site.facing), -sin(site.facing));
     let side = vec2<f32>(-heading.y, heading.x);
     return vec2<f32>(dot(offset, heading), dot(offset, side));
+}
+
+// The way the vfx travels, as a unit vector in local tiles: from whoever dealt a blow toward the
+// sprite it lands on, so a stroke struck on an actor comes from the right side; along an area's
+// facing it is (1, 0). site.heading is in screen terms like site.facing.
+fn site_heading() -> vec2<f32> {
+    let turn = site.heading - site.facing;
+    return vec2<f32>(cos(turn), -sin(turn));
 }
 
 // How far the body reaches from the site's point in local tiles: along the facing (x: least,

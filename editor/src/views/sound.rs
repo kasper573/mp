@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use bevy::asset::{AssetPath, AssetServer};
 use bevy::prelude::{Entity, World};
 use egui::Ui;
 use engine::core::assets::SyncedFiles;
-use engine::core::audio::playback::{PlaySfx, SfxDef, SfxPlace};
+use engine::core::audio::playback::{self, PlaySfx, SfxDef, SfxPlace};
 use engine::core::babble::{BabbleDef, BabbleRank, Babbling};
 use engine::core::content::Content;
 use engine::core::math::Pos;
@@ -69,9 +69,13 @@ pub struct BabbleRequest {
 
 pub struct SoundViews {
     pub listening: Option<ListeningPoint>,
-    /// Sfx rows asked to play this frame.
+    /// Sfx rows asked to play this frame, and to stop.
     pub play: Vec<String>,
+    pub stop: Vec<String>,
+    /// Sfx rows still sounding, as of the last sync.
+    pub sounding: HashSet<String>,
     pub babble: Option<BabbleRequest>,
+    pub stop_babble: bool,
     pub babble_text: String,
     babbler: Option<Entity>,
     /// The content generation the engine's asset files and content were last taken from, with
@@ -79,12 +83,21 @@ pub struct SoundViews {
     synced: Option<(u64, HashMap<String, String>)>,
 }
 
+impl SoundViews {
+    pub fn babbling(&self) -> bool {
+        self.babbler.is_some()
+    }
+}
+
 impl Default for SoundViews {
     fn default() -> SoundViews {
         SoundViews {
             listening: None,
             play: Vec::new(),
+            stop: Vec::new(),
+            sounding: HashSet::new(),
             babble: None,
+            stop_babble: false,
             babble_text: BABBLE_SAMPLE.to_owned(),
             babbler: None,
             synced: None,
@@ -130,11 +143,37 @@ pub fn sync(editor: &mut Editor, world: &mut World) {
     };
     for key in std::mem::take(&mut views.play) {
         if let Some(id) = content.by_key::<SfxDef>(&key) {
-            world.write_message(PlaySfx {
-                id,
-                place: SfxPlace::Interface,
-            });
+            playback::play(
+                world,
+                PlaySfx {
+                    id,
+                    place: SfxPlace::Interface,
+                },
+            );
+            views.sounding.insert(key);
         }
+    }
+    for key in std::mem::take(&mut views.stop) {
+        if let Some(id) = content.by_key::<SfxDef>(&key) {
+            playback::stop(world, id);
+            views.sounding.remove(&key);
+        }
+    }
+    let still: Vec<String> = views
+        .sounding
+        .iter()
+        .filter(|key| {
+            content
+                .by_key::<SfxDef>(key)
+                .is_some_and(|id| playback::is_sounding(world, id))
+        })
+        .cloned()
+        .collect();
+    views.sounding = still.into_iter().collect();
+    if std::mem::take(&mut views.stop_babble)
+        && let Some(previous) = views.babbler.take()
+    {
+        world.despawn(previous);
     }
     if let Some(request) = views.babble.take()
         && let Some(babble) = content.by_key::<BabbleDef>(&request.babble)

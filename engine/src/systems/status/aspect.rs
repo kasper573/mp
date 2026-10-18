@@ -217,7 +217,13 @@ fn activate(world: &mut World, actor: Entity, Wanted { source, since }: Wanted) 
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_activate {
-            vfx::spawn(world, shown, VfxSite::Actor(actor), VfxParams::default());
+            vfx::spawn(
+                world,
+                shown,
+                VfxSite::Actor(actor),
+                VfxParams::default(),
+                vfx::Delivery::default(),
+            );
         }
         if let Some(heard) = def.sfx.on_activate {
             sound(world, actor, heard);
@@ -256,7 +262,13 @@ fn deactivate(world: &mut World, actor: Entity, source: AspectSource) {
         let content = world.resource::<Content>().clone();
         let def = effect.get(&content);
         if let Some(shown) = def.vfx.on_expire {
-            vfx::spawn(world, shown, VfxSite::Actor(actor), VfxParams::default());
+            vfx::spawn(
+                world,
+                shown,
+                VfxSite::Actor(actor),
+                VfxParams::default(),
+                vfx::Delivery::default(),
+            );
         }
         if let Some(heard) = def.sfx.on_expire {
             sound(world, actor, heard);
@@ -288,7 +300,13 @@ fn play_during(world: &mut World, actor: Entity, source: AspectSource, now: Unix
     }
     let shown = def.vfx.during.and_then(|shown| {
         let lasts = shown.get(&content).lasts();
-        let entity = vfx::spawn(world, shown, VfxSite::Actor(actor), VfxParams::default())?;
+        let entity = vfx::spawn(
+            world,
+            shown,
+            VfxSite::Actor(actor),
+            VfxParams::default(),
+            vfx::Delivery::default(),
+        )?;
         Some((entity, lasts))
     });
     if let Some(heard) = def.sfx.during {

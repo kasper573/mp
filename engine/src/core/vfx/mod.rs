@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::core::assets::AssetRef;
 use crate::core::content::media::ImageSizes;
 use crate::core::content::{ContentId, ContentRegistry, ContentRow, LoadStep, Loading, RowCheck};
-use crate::core::geometry::Footprint;
+use crate::core::geometry::{Footprint, Radians};
 use crate::core::math::{FrameSize, Pos, Rgba};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Hertz, Seconds, UnixMillis};
@@ -49,8 +49,10 @@ pub struct VfxDef {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub params: Vec<VfxParam>,
     pub layers: Vec<VfxLayer>,
-    /// Played on each actor standing inside this vfx's area, with the same parameters, when it
-    /// plays on an area: what a blast does to whoever it catches.
+    /// Played, with the same parameters, on each actor this vfx's area reaches when it plays on
+    /// an area: the targets a cast struck in it, else everyone standing in it. It plays on each
+    /// headed the area's way, so a blow lands from where it came: what a blast does to whoever
+    /// it catches.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_actors_inside: Option<VfxId>,
 }
@@ -157,6 +159,9 @@ pub struct VfxInstance {
     #[entities]
     pub site: VfxSite,
     pub params: VfxParams,
+    /// The way the vfx travels: from whoever dealt it toward the one it lands on, the facing of
+    /// the area it plays on, else east. A shader reads it through the prelude's `site_heading`.
+    pub heading: Radians,
     pub started: UnixMillis,
     pub until: UnixMillis,
 }

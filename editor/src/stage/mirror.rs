@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use bevy::shader::Shader;
 use bevy_egui::EguiUserTextures;
 use engine::core::content::Content;
+use engine::core::geometry::Radians;
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::{
     Animator, GroundDepth, RowDepth, RowDepths, TILE, ToScreen, dynamic_z, place_sprite,
@@ -62,6 +63,7 @@ pub struct VfxPose {
     pub owner: Source,
     pub layers: Vec<VfxLayer>,
     pub site: Site,
+    pub heading: Radians,
     pub elapsed: Seconds,
     pub params: VfxParams,
 }
@@ -355,7 +357,7 @@ impl Stage {
                 self.pieces.insert(pose.owner, (signature, pieces));
             }
             let pieces = self.pieces[&pose.owner].1.clone();
-            let site = self.frame_of(world, &pose.site, frame);
+            let site = self.frame_of(world, &pose.site, pose.heading, frame);
             let mut compiled: HashMap<String, Handle<Shader>> = HashMap::new();
             for layer in &pose.layers {
                 if let VfxLayer::Shader { shader, .. } = layer {
@@ -419,10 +421,20 @@ impl Stage {
         SiteFrame::sprite(world, staged.entity, SiteKind::Actor)
     }
 
-    fn frame_of(&self, world: &World, site: &Site, frame: &Frame) -> Option<SiteFrame> {
+    fn frame_of(
+        &self,
+        world: &World,
+        site: &Site,
+        heading: Radians,
+        frame: &Frame,
+    ) -> Option<SiteFrame> {
         match site {
-            Site::Actor(source) => self.actor_frame(world, *source),
-            Site::World(VfxSite::Actor(entity)) => self.actor_frame(world, Source::Live(*entity)),
+            Site::Actor(source) => self
+                .actor_frame(world, *source)
+                .map(|actor| actor.headed(heading)),
+            Site::World(VfxSite::Actor(entity)) => self
+                .actor_frame(world, Source::Live(*entity))
+                .map(|actor| actor.headed(heading)),
             Site::World(VfxSite::Area(footprint)) => Some(SiteFrame {
                 depth: Some(world.resource::<GroundDepth>().0),
                 ..SiteFrame::area(footprint)

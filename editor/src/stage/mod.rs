@@ -12,7 +12,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use egui::{Color32, FontId, Pos2, Ui, Vec2 as EVec2};
 use engine::core::content::Content;
-use engine::core::geometry::Footprint;
+use engine::core::geometry::{Footprint, Radians};
 use engine::core::math::{Direction, Pos, Rgba};
 use engine::core::render::ToScreen;
 use engine::core::tiling::Tiles;
@@ -440,6 +440,7 @@ fn posed_frame<'a>(
                 }
                 PosedSite::Screen => Site::Screen,
             },
+            heading: Radians::default(),
             elapsed: posed_vfx.elapsed,
             params: posed_vfx.params.clone(),
         });
@@ -450,6 +451,7 @@ fn posed_frame<'a>(
                         owner: Source::Posed(1 + index),
                         layers: inside.clone(),
                         site: Site::Actor(Source::Posed(index)),
+                        heading: footprint.facing,
                         elapsed: posed_vfx.elapsed,
                         params: posed_vfx.params.clone(),
                     });
@@ -505,6 +507,7 @@ fn live_frame<'a>(
             owner: Source::Live(entity),
             layers: instance.vfx.get(content).layers.clone(),
             site: Site::World(instance.site.clone()),
+            heading: instance.heading,
             elapsed: now.since(instance.started),
             params: instance.params.clone(),
         })

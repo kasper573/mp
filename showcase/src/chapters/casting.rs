@@ -69,11 +69,6 @@ fn play(shoot: &mut Shoot) {
     );
     aim_then_cast(&mut me, InputAction::Hotbar3, ring, chained_through_several);
     me.hold();
-    me.caption_top("A line: Frost Lance reaches out from where you stand toward the pointer");
-    aim_then_cast(&mut me, InputAction::Hotbar2, ring, |snapshot| {
-        !played(snapshot, "frost_lance").is_empty()
-    });
-    me.hold();
     me.caption_top(
         "An area of allies, a rectangle: Sanctuary blesses everyone standing in it, the caster included",
     );

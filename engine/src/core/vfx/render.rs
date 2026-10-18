@@ -79,9 +79,9 @@ pub const MARGIN: Tiles = Tiles(2.0);
 pub const MAX_PATH_POINTS: usize = 16;
 
 /// A site measured for drawing: where it is and how big, in its own pixels, with `px` of them to
-/// a sprite pixel; its facing; the body and path a shader reads through the prelude; the image a
-/// shader works on, when the site has one; and, in the world, the sprite it is and the row depth
-/// it sits at.
+/// a sprite pixel; its facing and the heading the vfx travels, both in screen terms; the body and
+/// path a shader reads through the prelude; the image a shader works on, when the site has one;
+/// and, in the world, the sprite it is and the row depth it sits at.
 #[derive(Clone)]
 pub struct SiteFrame {
     pub kind: SiteKind,
@@ -89,6 +89,7 @@ pub struct SiteFrame {
     pub size: Vec2,
     pub px: f32,
     pub facing: Radians,
+    pub heading: Radians,
     pub body: SiteBody,
     pub path: SitePath,
     pub texture: Option<SiteTexture>,
@@ -151,6 +152,7 @@ pub struct SiteUniform {
     pixel: Vec2,
     kind: u32,
     facing: f32,
+    heading: f32,
     progress: f32,
     time: f32,
     overscan: Vec2,
@@ -407,13 +409,15 @@ pub fn quad_overscan(size: Vec2) -> Vec2 {
 }
 
 impl SiteFrame {
-    /// The site of a client's world as it stands this frame, or nothing while it cannot be drawn:
-    /// a sprite not yet loaded, a screen not yet presented, or a widget, which draws through the
-    /// interface alone.
-    pub fn of(world: &World, site: &VfxSite) -> Option<SiteFrame> {
+    /// The site of a client's world as it stands this frame, headed the instance's way, or
+    /// nothing while it cannot be drawn: a sprite not yet loaded, a screen not yet presented, or a
+    /// widget, which draws through the interface alone.
+    pub fn of(world: &World, site: &VfxSite, heading: Radians) -> Option<SiteFrame> {
         match site {
-            VfxSite::Actor(entity) => SiteFrame::sprite(world, *entity, SiteKind::Actor),
-            VfxSite::Object(entity) => SiteFrame::sprite(world, *entity, SiteKind::Object),
+            VfxSite::Actor(entity) => SiteFrame::sprite(world, *entity, SiteKind::Actor)
+                .map(|frame| frame.headed(heading)),
+            VfxSite::Object(entity) => SiteFrame::sprite(world, *entity, SiteKind::Object)
+                .map(|frame| frame.headed(heading)),
             VfxSite::Area(footprint) => Some(SiteFrame {
                 depth: Some(world.resource::<GroundDepth>().0),
                 ..SiteFrame::area(footprint)
@@ -440,9 +444,17 @@ impl SiteFrame {
                     * world
                         .get_resource::<Viewport>()
                         .map_or(1.0, |viewport| viewport.scale.max(0.01));
-                Some(SiteFrame::screen(size, Some(texture), px))
+                Some(SiteFrame::screen(size, Some(texture), px).headed(heading))
             }
             VfxSite::Widget(_) => None,
+        }
+    }
+
+    /// The frame with a vfx travelling `heading`, given in world terms as an instance carries it.
+    pub fn headed(self, heading: Radians) -> SiteFrame {
+        SiteFrame {
+            heading: Radians(-heading.0),
+            ..self
         }
     }
 
@@ -465,6 +477,7 @@ impl SiteFrame {
             size,
             px: 1.0,
             facing: Radians::default(),
+            heading: Radians::default(),
             body: SiteBody::image(size / TILE.0),
             path: SitePath::default(),
             texture: Some(SiteTexture {
@@ -500,6 +513,7 @@ impl SiteFrame {
             size,
             px: 1.0,
             facing: Radians(-footprint.facing.0),
+            heading: Radians(-footprint.facing.0),
             body: SiteBody {
                 shape,
                 origin,
@@ -552,6 +566,7 @@ impl SiteFrame {
             size,
             px: 1.0,
             facing: Radians(facing),
+            heading: Radians(facing),
             body: SiteBody {
                 shape: BodyShape::None,
                 origin: points.first().map_or(Vec2::splat(0.5), |first| uv(*first)),
@@ -574,6 +589,7 @@ impl SiteFrame {
             size,
             px,
             facing: Radians::default(),
+            heading: Radians::default(),
             body: SiteBody::image(size / px / TILE.0),
             path: SitePath::default(),
             texture,
@@ -607,6 +623,7 @@ impl SiteFrame {
             pixel,
             kind: self.kind as u32,
             facing: self.facing.0,
+            heading: self.heading.0,
             progress: run.progress,
             time: run.time.0,
             overscan: self.overscan(),
@@ -801,7 +818,7 @@ fn sync(world: &mut World) {
             Some(view) => view.pieces.clone(),
             None => attach(world, entity, def),
         };
-        let frame = SiteFrame::of(world, &instance.site);
+        let frame = SiteFrame::of(world, &instance.site, instance.heading);
         let elapsed = now.since(instance.started);
         let shaders = world.resource::<VfxShaders>().by_id.clone();
         present_layers(
@@ -842,7 +859,9 @@ fn sync(world: &mut World) {
             .by_id
             .get(&overlay.shader)
             .cloned();
-        let Some((frame, compiled)) = SiteFrame::of(world, &overlay.site).zip(compiled) else {
+        let Some((frame, compiled)) =
+            SiteFrame::of(world, &overlay.site, Radians::default()).zip(compiled)
+        else {
             hide(world, piece);
             continue;
         };
@@ -1089,7 +1108,7 @@ fn overlay_anchor(world: &mut World, gui: &egui::Context, site: &VfxSite) -> Opt
             })
         }
         _ => {
-            let frame = SiteFrame::of(world, site)?;
+            let frame = SiteFrame::of(world, site, Radians::default())?;
             let center = tile_to_window(world, frame.center.to_tile())?;
             let head = tile_to_window(world, frame.head().to_tile())?;
             Some(OverlayAnchor {

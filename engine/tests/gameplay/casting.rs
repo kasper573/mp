@@ -51,11 +51,6 @@ fn every_targeting_kind_and_shape_lands_where_it_is_aimed() {
             .iter()
             .any(|bolt| matches!(&bolt.site, VfxSite::Path(stops) if stops.len() >= 3))
     });
-    me.cast_at(InputAction::Hotbar2, ring, |snapshot| {
-        played(snapshot, "frost_lance")
-            .iter()
-            .any(|lance| matches!(lance.site, VfxSite::Area(_)))
-    });
     friend.walk_toward(beside_other_player);
     let ally = me.wait_for("the friend beside me", |snapshot| {
         other_player_within(snapshot, 4.5)

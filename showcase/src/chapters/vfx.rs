@@ -53,13 +53,6 @@ fn play(shoot: &mut Shoot) {
         !played(snapshot, "embers").is_empty()
     });
     me.hold();
-    me.caption_top(
-        "A line: Frost Lance thrusts the length you aimed, bursts into ice at the end and crumbles behind",
-    );
-    me.cast_at(InputAction::Hotbar2, ring, |snapshot| {
-        !played(snapshot, "frost_lance").is_empty()
-    });
-    me.hold();
     me.act(InputAction::Hotbar6);
     me.wait_until("warded", |snapshot| status_on_me(snapshot, "warded"));
     me.caption_top(

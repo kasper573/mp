@@ -61,10 +61,6 @@
           "node": "fireball"
         },
         {
-          "type": "skill",
-          "node": "frost_lance"
-        },
-        {
           "type": "level",
           "level": 3
         }
@@ -78,13 +74,6 @@
       "skill": "fireball",
       "at": {
         "x": 80.0,
-        "y": 60.0
-      }
-    },
-    "frost_lance": {
-      "skill": "frost_lance",
-      "at": {
-        "x": 240.0,
         "y": 60.0
       }
     },

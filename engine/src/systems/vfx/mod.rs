@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
-use crate::core::geometry::{Footprint, Radians, Shape};
+use crate::core::geometry::{Footprint, Radians, Shape, facing_from};
 use crate::core::math::Pos;
 use crate::core::script::{
     Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, Name, ScriptFault, ValueType,
@@ -25,7 +25,8 @@ use crate::systems::movement::{Position, position};
 use crate::systems::player::Owner;
 use crate::systems::script::effect::{Arrow, Link};
 use crate::systems::script::query::TickRoster;
-use crate::systems::script::{Condition, EffectCall, Reach, RiftScripting};
+use crate::systems::script::{Condition, EffectCall, OwnerKind, Reach, RiftScripting};
+use crate::systems::skill::{self, SkillDef};
 use crate::systems::visibility::Presence;
 
 /// How long an instance outlives its last layer, so a client sees the end before the entity goes.
@@ -35,39 +36,69 @@ pub fn register(app: &mut App) {
     app.replicate::<VfxInstance>();
 }
 
+/// How a vfx is dealt, beyond its site: `from` where the blow came, which heads a vfx on an actor
+/// from whoever dealt it, and `struck`, the actors a cast hit, which an area's `on_actors_inside`
+/// then reaches instead of everyone standing in it.
+#[derive(Default)]
+pub struct Delivery {
+    pub from: Option<Pos<Tiles>>,
+    pub struck: Option<Vec<Entity>>,
+}
+
 /// Plays a vfx on a site everyone nearby sees.
-pub fn spawn(world: &mut World, vfx: VfxId, site: VfxSite, params: VfxParams) -> Option<Entity> {
+pub fn spawn(
+    world: &mut World,
+    vfx: VfxId,
+    site: VfxSite,
+    params: VfxParams,
+    delivery: Delivery,
+) -> Option<Entity> {
     let at = match &site {
         VfxSite::Actor(entity) | VfxSite::Object(entity) => position(world, *entity)?,
         VfxSite::Area(footprint) => footprint.at,
         VfxSite::Path(points) => *points.first()?,
         VfxSite::Screen | VfxSite::Widget(_) => return None,
     };
+    let heading = match &site {
+        VfxSite::Area(footprint) => footprint.facing,
+        VfxSite::Path(points) => facing_from(*points.first()?, *points.last()?),
+        _ => delivery
+            .from
+            .filter(|from| *from != at)
+            .map_or(Radians::default(), |from| facing_from(from, at)),
+    };
     if let VfxSite::Area(footprint) = &site
         && let Some(inner) = vfx.get(world.resource::<Content>()).on_actors_inside
     {
-        for (actor, stood) in actors_inside(world, footprint) {
+        for (actor, stood) in reached(world, footprint, delivery.struck.as_deref()) {
             spawn_at(
                 world,
                 inner,
                 VfxSite::Actor(actor),
                 params.clone(),
                 stood,
+                footprint.facing,
                 None,
             );
         }
     }
-    Some(spawn_at(world, vfx, site, params, at, None))
+    Some(spawn_at(world, vfx, site, params, at, heading, None))
 }
 
-/// The living actors of this world's area standing inside `footprint`, each where it stands.
-fn actors_inside(world: &World, footprint: &Footprint) -> Vec<(Entity, Pos<Tiles>)> {
+/// The living actors of this world's area an area vfx reaches, each where it stands: the `struck`
+/// ones standing inside `footprint`, or everyone standing in it.
+fn reached(
+    world: &World,
+    footprint: &Footprint,
+    struck: Option<&[Entity]>,
+) -> Vec<(Entity, Pos<Tiles>)> {
     let area = world.resource::<WorldArea>().0;
     world
         .get_resource::<TickRoster>()
         .into_iter()
         .flat_map(TickRoster::iter)
         .filter(|listed| listed.area == area && !listed.dead && footprint.contains(listed.at))
+        .filter(|listed| struck.is_none_or(|struck| struck.contains(&listed.entity)))
         .map(|listed| (listed.entity, listed.at))
         .collect()
 }
@@ -88,6 +119,7 @@ pub fn spawn_for(
         site,
         params,
         at,
+        Radians::default(),
         Some(Presence::For(client)),
     ))
 }
@@ -191,6 +223,10 @@ impl EffectDef<RiftScripting> for PlayVfx {
             fillers.push((name.clone(), filler));
         }
         let (vfx, target) = (self.vfx, self.site.clone());
+        let cast = cx
+            .owner_row()
+            .filter(|row| row.kind == OwnerKind::Skill)
+            .map(|row| row.id::<SkillDef>());
         Ok(Box::new(move |world, _, cx| {
             let filled = VfxParams(
                 fillers
@@ -199,6 +235,8 @@ impl EffectDef<RiftScripting> for PlayVfx {
                     .collect(),
             );
             let value = on(world, cx);
+            let from = cx.subject.and_then(|subject| position(world, subject));
+            let struck = cast.map(|skill| skill::targets(world, cx, skill));
             match &target {
                 VfxTarget::Place => {
                     for actor in value.as_actors() {
@@ -210,23 +248,26 @@ impl EffectDef<RiftScripting> for PlayVfx {
                         } else {
                             VfxSite::Actor(actor)
                         };
-                        spawn(world, vfx, site, filled.clone());
+                        let dealt = Delivery { from, struck: None };
+                        spawn(world, vfx, site, filled.clone(), dealt);
                     }
-                    if let Some(footprint) = value.as_area() {
-                        spawn(world, vfx, VfxSite::Area(footprint), filled.clone());
-                    } else if let Some(point) = value.as_point() {
-                        let footprint = Footprint {
+                    let footprint = value.as_area().or_else(|| {
+                        value.as_point().map(|point| Footprint {
                             at: point,
                             facing: Radians::default(),
                             shape: Shape::Circle { radius: Tiles(0.5) },
-                        };
-                        spawn(world, vfx, VfxSite::Area(footprint), filled.clone());
+                        })
+                    });
+                    if let Some(footprint) = footprint {
+                        let dealt = Delivery { from, struck };
+                        spawn(world, vfx, VfxSite::Area(footprint), filled.clone(), dealt);
                     }
                 }
                 VfxTarget::Path => {
                     let points = chained(world, cx.subject, &value.as_actors());
                     if points.len() >= 2 {
-                        spawn(world, vfx, VfxSite::Path(points), filled.clone());
+                        let dealt = Delivery::default();
+                        spawn(world, vfx, VfxSite::Path(points), filled.clone(), dealt);
                     }
                 }
                 VfxTarget::Screen => {
@@ -302,6 +343,7 @@ fn spawn_at(
     site: VfxSite,
     params: VfxParams,
     at: Pos<Tiles>,
+    heading: Radians,
     presence: Option<Presence>,
 ) -> Entity {
     let content = world.resource::<Content>().clone();
@@ -311,6 +353,7 @@ fn spawn_at(
         vfx,
         site,
         params,
+        heading,
         started: now,
         until: now.after(vfx.get(&content).lasts()),
     };

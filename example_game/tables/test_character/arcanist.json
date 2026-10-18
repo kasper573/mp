@@ -8,10 +8,6 @@
       "rank": 1
     },
     {
-      "node": "frost_lance",
-      "rank": 1
-    },
-    {
       "node": "chain_lightning",
       "rank": 1
     },
@@ -37,12 +33,6 @@
       "slot": 0,
       "entry": {
         "skill": "fireball"
-      }
-    },
-    {
-      "slot": 1,
-      "entry": {
-        "skill": "frost_lance"
       }
     },
     {

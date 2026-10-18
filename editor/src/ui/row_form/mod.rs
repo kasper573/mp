@@ -1,5 +1,7 @@
 pub mod bindings;
 pub mod preview;
+
+use self::preview::PreviewPlace;
 pub mod quests;
 pub mod rows;
 pub mod scripts;
@@ -43,12 +45,22 @@ const MIN_PREVIEW: f32 = 240.0;
 const COLUMN_GAP: f32 = 16.0;
 
 pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
-    if !preview::has_preview(table) {
+    let place = preview::preview_place(table);
+    if place != Some(PreviewPlace::Beside) {
         egui::ScrollArea::vertical()
             .id_salt(("row-tab", table, key))
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                row_form(editor, ui, table, key, ui.available_width() >= WIDE);
+                let wide = ui.available_width() >= WIDE;
+                row_form(editor, ui, table, key, wide);
+                if place == Some(PreviewPlace::Below) {
+                    if wide {
+                        ui.set_max_width(SINGLE_COLUMN);
+                    }
+                    ui.add_space(COLUMN_GAP);
+                    widgets::section(ui, "preview");
+                    preview::show(editor, ui, table, key);
+                }
             });
         return;
     }
@@ -68,7 +80,7 @@ pub fn show_row_tab(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            preview::show_beside(editor, ui, table, key);
+            preview::show(editor, ui, table, key);
         });
     });
 }

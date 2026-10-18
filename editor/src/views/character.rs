@@ -279,7 +279,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            row_form::preview::show_beside(editor, ui, TABLE, key);
+            row_form::preview::show(editor, ui, TABLE, key);
         });
     });
     editor.status.left.push(format!(

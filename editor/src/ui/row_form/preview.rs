@@ -21,7 +21,6 @@ use crate::app::Editor;
 use crate::project::ProjectFiles;
 use crate::stage::{self, Posed, PosedActor, Scenario, Scene};
 use crate::views::character;
-use crate::views::model::sounds;
 use crate::views::script::panel;
 use crate::views::sound::BabbleRequest;
 use crate::{forms, value};
@@ -55,25 +54,26 @@ pub(super) struct Pose {
     playing: bool,
 }
 
-pub fn has_preview(table: &str) -> bool {
-    matches!(
-        table,
-        "npc"
-            | "player"
-            | "model"
-            | "item"
-            | "quest"
-            | "test_character"
-            | "status_effect"
-            | "skill"
-            | "sfx"
-            | "babble"
-    )
+/// Where a table's preview goes: a column beside the form for one that shows a picture, under the
+/// form for one that is a control or two.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PreviewPlace {
+    Beside,
+    Below,
+}
+
+pub fn preview_place(table: &str) -> Option<PreviewPlace> {
+    match table {
+        "npc" | "player" | "model" | "item" | "quest" | "test_character" | "status_effect"
+        | "skill" => Some(PreviewPlace::Beside),
+        "sfx" | "babble" => Some(PreviewPlace::Below),
+        _ => None,
+    }
 }
 
 /// The row as the game shows it, beside its form: the actor, item or quest card it stands for, a
 /// status effect on an actor, a skill cast over and over.
-pub fn show_beside(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
+pub fn show(editor: &mut Editor, ui: &mut Ui, table: &str, key: &str) {
     let Some(value) = editor.row_value(table, key) else {
         return;
     };
@@ -201,41 +201,13 @@ fn show_skill(editor: &mut Editor, ui: &mut Ui, key: &str) {
 
 /// An sfx played as the game plays it, with its waveform and how it sits in the mix.
 fn show_sfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
-    if widgets::primary(ui, "▶ play").clicked() {
-        editor.views.sound.play.push(key.to_owned());
-    }
-    let (volume_text, gain) = sounds::volume_of(editor, key);
-    widgets::kv_text(ui, "volume", volume_text);
-    widgets::kv_text(ui, "pitch", sounds::pitch_of(editor, key));
-    let wave = sounds::wave_of_sfx(editor, key);
-    ui.add_space(4.0);
-    let size = Vec2::new(ui.available_width() - 8.0, 44.0);
-    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-    match &wave {
-        Some(wave) => {
-            sounds::draw_wave(ui.painter(), rect, &wave.bins, theme::ACCENT);
-            widgets::kv_text(ui, "lasts", format!("{} ms", wave.ms));
+    let sound = &mut editor.views.sound;
+    if sound.sounding.contains(key) {
+        if widgets::primary(ui, "■ stop").clicked() {
+            sound.stop.push(key.to_owned());
         }
-        None => {
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "no file to measure",
-                egui::FontId::proportional(12.0),
-                theme::MUTED,
-            );
-        }
-    }
-    widgets::section(ui, "Against the mix, at its loudest");
-    let role = sounds::role_of_sfx(editor, key);
-    match (wave.as_ref().and_then(|wave| wave.loudness), role) {
-        (Some(loudness), Some(role)) => {
-            let verdict = sounds::verdict(loudness, gain, &role.def);
-            widgets::verdict(ui, verdict.ok, &verdict.loudness);
-            widgets::verdict(ui, verdict.peak_ok, &verdict.peak);
-        }
-        (None, _) => widgets::kv_text(ui, "loudness", "not measured"),
-        (_, None) => widgets::kv_text(ui, "loudness", "no role to measure against"),
+    } else if widgets::primary(ui, "▶ play").clicked() {
+        sound.play.push(key.to_owned());
     }
 }
 
@@ -247,7 +219,11 @@ fn show_babble(editor: &mut Editor, ui: &mut Ui, key: &str) {
             .desired_rows(2)
             .desired_width(f32::INFINITY),
     );
-    if widgets::primary(ui, "▶ play").clicked() {
+    if sound.babbling() {
+        if widgets::primary(ui, "■ stop").clicked() {
+            sound.stop_babble = true;
+        }
+    } else if widgets::primary(ui, "▶ play").clicked() {
         sound.babble = Some(BabbleRequest {
             babble: key.to_owned(),
             text: sound.babble_text.clone(),

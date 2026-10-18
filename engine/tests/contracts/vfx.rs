@@ -6,15 +6,17 @@ use engine::core::math::{Offset, Pos, Rgba};
 use engine::core::tiling::Tiles;
 use engine::core::time::UnixMillis;
 use engine::core::vfx::{ParamValue, VfxId, VfxInstance, VfxParams, VfxSite};
+use engine::systems::GameSettings;
 use engine::systems::class::{self, NodeKey};
 use engine::systems::combat;
 use engine::systems::movement::position;
 use engine::systems::player::Owner;
+use engine::systems::player::snapshot::{CharacterSnapshot, JoinAs, SnapshotSkill};
 use engine::systems::skill::{self, CastAim, LearnSkillsRequest, Rank, UseSkillRequest};
 use engine::systems::stat::{self, StatKind};
 use engine::systems::visibility::Presence;
 
-use testkit::{Sim, later, row, settle, spawn_area, target_dummy};
+use testkit::{Sim, content, later, row, settle, spawn_area, target_dummy};
 
 #[test]
 fn damage_shows_its_amount_on_the_one_hit_and_the_effect_passes() {
@@ -143,6 +145,70 @@ fn a_skill_plays_its_vfx_on_every_target_and_once_on_its_area() {
 }
 
 #[test]
+fn an_area_vfx_reaches_the_targets_it_struck_and_not_the_caster() {
+    let mut sim = Sim::area(spawn_area());
+    let settings = content().built::<GameSettings>();
+    let mage = row("Mage");
+    let mut snapshot =
+        CharacterSnapshot::fresh(content(), "Caster", settings.player.get(content()));
+    snapshot.class = mage;
+    snapshot.xp = mage
+        .get(content())
+        .levels
+        .iter()
+        .map(|level| level.xp)
+        .max()
+        .unwrap_or(0);
+    snapshot.skills = vec![SnapshotSkill {
+        node: NodeKey::from("fireball"),
+        rank: Rank::FIRST,
+    }];
+    let player = sim.join_as(
+        1,
+        JoinAs {
+            snapshot,
+            start: settings.initial_spawn,
+        },
+    );
+    settle(&mut sim);
+    let orc = orc_toward(&mut sim, player, 1.0);
+    let feet = position(sim.world(), player).expect("position");
+
+    sim.send(
+        1,
+        UseSkillRequest {
+            skill: row("Fireball"),
+            aim: CastAim::Point(feet),
+        },
+    );
+    assert!(sim.run_until(10.0, |world| {
+        world
+            .query::<&VfxInstance>()
+            .iter(world)
+            .any(|instance| instance.vfx == row::<VfxId>("FireballBlast"))
+    }));
+
+    let blasts = instances(&mut sim, row("FireballBlast"));
+    let circles: Vec<Footprint> = blasts
+        .iter()
+        .filter_map(|blast| match blast.site {
+            VfxSite::Area(footprint) => Some(footprint),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(circles.len(), 1);
+    assert!(circles[0].contains(feet));
+    let struck: Vec<(Entity, Radians)> = blasts
+        .iter()
+        .filter_map(|blast| match blast.site {
+            VfxSite::Actor(actor) => Some((actor, blast.heading)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(struck, vec![(orc, circles[0].facing)]);
+}
+
+#[test]
 fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
     let sent = VfxInstance {
         vfx: row("DamageTaken"),
@@ -151,6 +217,7 @@ fn an_instance_with_every_kind_of_parameter_survives_the_wire() {
             ("amount".to_owned(), ParamValue::Number(4.5)),
             ("tint".to_owned(), ParamValue::Color(Rgba(0xff00_80ff))),
         ]),
+        heading: Radians(0.25),
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),
     };
@@ -172,6 +239,7 @@ fn an_instance_on_an_area_survives_the_wire() {
             },
         }),
         params: VfxParams::default(),
+        heading: Radians(0.25),
         started: UnixMillis(1_000),
         until: UnixMillis(2_500),
     };
