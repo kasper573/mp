@@ -12,6 +12,7 @@ use super::placement::warp_destinations;
 use super::stamp::object_names;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, row_file};
 use crate::ui::widgets;
 use crate::value::RowValue;
@@ -79,7 +80,10 @@ pub fn join_scenery(editor: &mut Editor, frame: &AreaFrame) {
         .filter(|m| m.is_module(AreaModuleKind::Scenery))
         .collect();
     if sceneries.len() < 2 {
-        editor.toast("Select two or more sceneries of one tileset to join (Ctrl G)");
+        editor.toast(format!(
+            "Select two or more sceneries of one tileset to join ({})",
+            EditorKey::JoinScenery.name()
+        ));
         return;
     }
     let tileset = sceneries[0].text("tileset").to_owned();

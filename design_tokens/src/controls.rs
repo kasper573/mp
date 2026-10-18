@@ -201,16 +201,23 @@ pub fn pill_with<R>(ui: &mut Ui, pill: Pill, add: impl FnOnce(&mut Ui) -> R) -> 
 }
 
 pub fn key_hint(ui: &mut Ui, keys: &str) -> Response {
-    egui::Frame::new()
-        .stroke(Stroke::new(1.0, ink::ink_wash(0.35)))
-        .corner_radius(3.0)
-        .inner_margin(Margin::symmetric(5, 1))
-        .show(ui, |ui| {
-            ui.add(
-                egui::Label::new(TextRole::KeyHint.rich(keys).color(ink::INK3)).selectable(false),
-            );
-        })
-        .response
+    let galley = ui
+        .painter()
+        .layout_job(TextRole::KeyHint.job(keys, ink::INK3));
+    let margin = Vec2::new(5.0, 1.0);
+    let (rect, response) = ui.allocate_exact_size(
+        galley.size() + margin * 2.0 + Vec2::splat(2.0),
+        Sense::hover(),
+    );
+    let painter = ui.painter();
+    painter.rect_stroke(
+        rect,
+        3.0,
+        Stroke::new(1.0, ink::ink_wash(0.35)),
+        StrokeKind::Inside,
+    );
+    painter.galley(rect.center() - galley.size() / 2.0, galley, ink::INK3);
+    response
 }
 
 pub fn stamp(painter: &Painter, center: Pos2, word: &str, color: Color32) {

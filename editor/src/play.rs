@@ -22,6 +22,7 @@ use process_wrap::std::{ChildWrapper, CommandWrap};
 use serde_json::Value;
 
 use crate::app::{BottomTab, ChannelInbox, Editor, ModalDialog, OutputLine, content_version};
+use crate::keymap::EditorKey;
 use crate::project::{RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{theme, widgets};
@@ -367,9 +368,10 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
             ui.spacing_mut().item_spacing.x = 1.0;
             let arrow = glyph::button(ui, Mark::ChevronDown, 14.0, theme::TEXT, "Test character")
                 .on_hover_text("Pick the test character");
-            let play = controls::marked_primary(ui, Mark::Play, "Play").on_hover_text(
-                "Save, then play as the picked test character from its own start (F5)",
-            );
+            let play = controls::marked_primary(ui, Mark::Play, "Play").on_hover_text(format!(
+                "Save, then play as the picked test character from its own start ({})",
+                EditorKey::PlayFromStart.name()
+            ));
             (play, arrow)
         })
         .inner;
@@ -403,8 +405,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         ui.separator();
         if ui
             .add(
-                egui::Button::new("Edit test characters…")
-                    .shortcut_text("Ctrl T")
+                widgets::shortcut_button("Edit test characters…", EditorKey::PlayedCharacter)
                     .frame(false),
             )
             .clicked()
@@ -414,9 +415,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
         if ui
             .add_enabled(
                 editor.play.running.is_some(),
-                egui::Button::new("Stop")
-                    .shortcut_text("Shift F5")
-                    .frame(false),
+                widgets::shortcut_button("Stop", EditorKey::StopPlay).frame(false),
             )
             .clicked()
         {
@@ -449,7 +448,7 @@ pub fn top_bar(editor: &mut Editor, ui: &mut Ui) {
     if controls::marked_danger(ui, Mark::Stop, "Stop").clicked() {
         stop_now = true;
     }
-    if widgets::keyed_button(ui, "Restart", "", !stopping)
+    if widgets::keyed_button(ui, "Restart", None, !stopping)
         .on_hover_text("Save, then start both again as the same character")
         .clicked()
     {

@@ -11,6 +11,7 @@ use serde_json::Value;
 use super::placement;
 use super::{AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, REFUSED};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{dialogs, theme, widgets};
 use crate::value::RowValue;
@@ -217,7 +218,7 @@ pub fn make_blueprint_dialog(
                 .size(18.0),
             );
         });
-        widgets::key_hint(ui, "Ctrl Alt B");
+        widgets::key_chip(ui, EditorKey::MakeBlueprint);
         ui.add_space(8.0);
         widgets::kv(ui, "name", |ui| {
             let response = forms::boxed_input(ui, None, |ui| {

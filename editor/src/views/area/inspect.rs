@@ -23,6 +23,7 @@ use super::{brush, placement, resize, stamp};
 use crate::app::{Editor, ModalDialog, PlacePick};
 use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, GAME_FILE, RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::ui::{patterns, row_form, theme, widgets};
@@ -159,11 +160,11 @@ fn paint_card(
             );
         });
         widgets::kv(ui, "flip", |ui| {
-            if flip_chip(ui, "X", brush.flip_x) {
+            if flip_chip(ui, "X", EditorKey::FlipHorizontal, brush.flip_x) {
                 brush.flip_x = !brush.flip_x;
                 changed = true;
             }
-            if flip_chip(ui, "Y", brush.flip_y) {
+            if flip_chip(ui, "Y", EditorKey::FlipVertical, brush.flip_y) {
                 brush.flip_y = !brush.flip_y;
                 changed = true;
             }
@@ -174,7 +175,7 @@ fn paint_card(
     }
 }
 
-fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
+fn flip_chip(ui: &mut Ui, axis: &str, key: EditorKey, on: bool) -> bool {
     let fill = if on { theme::SELECTION } else { theme::INPUT };
     let ink = theme::TEXT;
     let response = egui::Frame::new()
@@ -188,7 +189,7 @@ fn flip_chip(ui: &mut Ui, axis: &str, on: bool) -> bool {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(axis).color(ink).size(13.0));
-                widgets::key_hint(ui, axis);
+                widgets::key_chip(ui, key);
             });
         })
         .response
@@ -399,7 +400,7 @@ fn walk_card(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         });
         widgets::kv(ui, "overlay", |ui| {
             widgets::toggle(ui, &mut view.walk_overlay);
-            widgets::key_hint_text(ui, "W", "toggles");
+            widgets::key_hint_text(ui, EditorKey::WalkOverlay, "toggles");
         });
     });
     if changed {
@@ -486,11 +487,11 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
         };
         let settings = editor.settings.stamps.entry(stamp.clone()).or_default();
         widgets::kv(ui, "flip", |ui| {
-            if flip_chip(ui, "X", settings.flip_x) {
+            if flip_chip(ui, "X", EditorKey::FlipHorizontal, settings.flip_x) {
                 settings.flip_x = !settings.flip_x;
                 save = true;
             }
-            if flip_chip(ui, "Y", settings.flip_y) {
+            if flip_chip(ui, "Y", EditorKey::FlipVertical, settings.flip_y) {
                 settings.flip_y = !settings.flip_y;
                 save = true;
             }
@@ -530,7 +531,7 @@ fn stamp_card(editor: &mut Editor, ui: &mut Ui, view_key: &str, content: &Conten
         });
         widgets::kv(ui, "snap", |ui| {
             ui.label(theme::muted("whole tiles").size(12.5));
-            widgets::key_hint_text(ui, "Alt", "for 1/16");
+            widgets::key_hint_text(ui, EditorKey::Unsnapped, "for 1/16");
         });
         let variables = content
             .by_key::<area::blueprint::BlueprintDef>(&stamp)
@@ -616,7 +617,7 @@ fn area_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content, are
                 ui.close();
             }
             if ui
-                .add(egui::Button::new("Play here").shortcut_text("F6"))
+                .add(widgets::shortcut_button("Play here", EditorKey::PlayHere))
                 .clicked()
             {
                 menu_action = Some(AreaMenu::Play);
@@ -791,7 +792,10 @@ fn spawn_card(editor: &mut Editor, ui: &mut Ui, key: &str, content: &Content) {
             pointer: INITIAL_SPAWN.to_owned(),
             area: Some(key.to_owned()),
         });
-        editor.toast("Click a walkable cell to put the spawn there (Alt-click for any point)");
+        editor.toast(format!(
+            "Click a walkable cell to put the spawn there ({} click for any point)",
+            EditorKey::Unsnapped.name()
+        ));
     }
     if go {
         super::open_area_at(editor, &spawn_area, Some(at), None);
@@ -890,7 +894,7 @@ fn module_counts(editor: &mut Editor, ui: &mut Ui, view_key: &str, key: &str) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(theme::strong("+ Add module"));
-                widgets::key_hint(ui, "M");
+                widgets::key_chip(ui, EditorKey::ModuleTool);
             });
         })
         .response
@@ -959,7 +963,7 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Remove all").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Remove all", EditorKey::Delete))
                         .clicked()
                     {
                         out.actions.push(super::AreaAction::Delete);
@@ -975,7 +979,11 @@ pub fn show_parts(editor: &mut Editor, ui: &mut Ui, selection: &RowSelection) {
                     out.actions.push(super::AreaAction::MakeBlueprint);
                 }
             });
-            widgets::key_hint_text(ui, "Ctrl Alt B", "makes a blueprint of the selection");
+            widgets::key_hint_text(
+                ui,
+                EditorKey::MakeBlueprint,
+                "makes a blueprint of the selection",
+            );
         }
     }
     if changed {
@@ -1044,7 +1052,7 @@ fn module_inspector(
             }
             ui.separator();
             if ui
-                .add(egui::Button::new("Remove").shortcut_text("Del"))
+                .add(widgets::shortcut_button("Remove", EditorKey::Delete))
                 .clicked()
             {
                 out.actions.push(super::AreaAction::Delete);

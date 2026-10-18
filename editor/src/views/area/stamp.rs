@@ -13,6 +13,7 @@ use super::holes::fill_holes;
 use super::{AreaFrame, shapes};
 use super::{modules, select};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 use crate::{rows, thumbs, value};
 
@@ -337,7 +338,7 @@ pub fn stamp_input(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &Are
     let Some(stamp) = editor.views.area.view(view_key).stamp.clone() else {
         return;
     };
-    let alt = ui.input(|i| i.modifiers.alt);
+    let alt = ui.input(|i| EditorKey::Unsnapped.held(i));
     let Some(tile) = frame.drag_tile() else {
         return;
     };
@@ -458,7 +459,7 @@ pub fn stamp_overlay(
     let Some(stamp) = view.stamp.clone() else {
         return;
     };
-    let alt = painter.ctx().input(|i| i.modifiers.alt);
+    let alt = painter.ctx().input(|i| EditorKey::Unsnapped.held(i));
     let values = stamp_values(editor, Some(&stamp));
     let footprint = stamp_footprint(editor, &frame.content, &stamp, &values);
     let color = Color32::from_rgb(90, 220, 220);

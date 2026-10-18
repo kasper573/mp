@@ -1,4 +1,4 @@
-use egui::{Key, Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
+use egui::{Modifiers, PointerButton, Pos2, Rect, Ui, Vec2};
 use engine::core::tiling::TilePos;
 use engine::systems::area::world_map::{MAX_SIZE, MIN_SIZE, WorldMapDef};
 use engine::systems::area::{self, AreaId};
@@ -10,8 +10,10 @@ use super::{
     selected, tidy_regions,
 };
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::play;
 use crate::project::ContentEdit;
+use crate::ui::widgets;
 use crate::views::area as area_view;
 use crate::views::navigation;
 
@@ -85,7 +87,7 @@ impl MapDrag {
             } => {
                 *moved |= (p - *from).length() > DRAG_SLOP;
                 let delta = (p - *from) / scale;
-                (*offset, *snap) = if modifiers.alt {
+                (*offset, *snap) = if EditorKey::Unsnapped.held_among(modifiers) {
                     (delta, None)
                 } else {
                     snapped(map, cards, delta, scale)
@@ -101,7 +103,7 @@ impl MapDrag {
             } => {
                 let raw = *start_size as f32 * (p - *center).length()
                     / (*from - *center).length().max(1.0);
-                let stepped = if modifiers.shift {
+                let stepped = if EditorKey::FineStep.held_among(modifiers) {
                     raw.round()
                 } else {
                     (raw / SIZE_STEP).round() * SIZE_STEP
@@ -128,7 +130,7 @@ impl MapDrag {
 pub fn run(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, canvas: &MapCanvas) {
     let response = &canvas.response;
     let modifiers = ui.input(|i| i.modifiers);
-    let space = ui.input(|i| i.key_down(Key::Space));
+    let space = ui.input(|i| EditorKey::Pan.held(i));
     let pointer = response
         .hover_pos()
         .or_else(|| response.interact_pointer_pos());
@@ -264,7 +266,9 @@ fn finish_drag(
             .filter(|card| region.intersects(card.frame))
             .map(|card| MapPart::Card(map.atlas.key(card.area).to_owned()))
             .collect();
-        if modifiers.shift || modifiers.command {
+        if EditorKey::ExtendSelection.held_among(modifiers)
+            || EditorKey::ToggleSelection.held_among(modifiers)
+        {
             for part in selected(editor) {
                 if !parts.contains(&part) {
                     parts.push(part);
@@ -281,7 +285,7 @@ fn finish_drag(
 
 fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers: Modifiers) {
     let p = canvas.response.interact_pointer_pos().unwrap_or_default();
-    if modifiers.alt
+    if EditorKey::Route.held_among(modifiers)
         && let Some(area) = canvas.hovered
     {
         let key = map.atlas.key(area).to_owned();
@@ -293,7 +297,8 @@ fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers:
         }
         return;
     }
-    let extend = modifiers.shift || modifiers.command;
+    let toggle = EditorKey::ToggleSelection.held_among(modifiers);
+    let extend = toggle || EditorKey::ExtendSelection.held_among(modifiers);
     let part = canvas.note_at(p).map(MapPart::Note).or_else(|| {
         canvas
             .hovered
@@ -302,7 +307,7 @@ fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers:
     match part {
         Some(part) => {
             let mut next = if extend { selected(editor) } else { Vec::new() };
-            if modifiers.command && next.contains(&part) {
+            if toggle && next.contains(&part) {
                 next.retain(|known| *known != part);
             } else if !next.contains(&part) {
                 next.push(part);
@@ -325,7 +330,10 @@ fn click(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, modifiers:
 }
 
 fn start_route(editor: &mut Editor, from: String) {
-    editor.toast(format!("route from {from} · Alt-click where it goes"));
+    editor.toast(format!(
+        "route from {from} · {} click where it goes",
+        EditorKey::Route.name()
+    ));
     editor.views.world.route_from = Some(from);
 }
 
@@ -338,7 +346,10 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
     if area::load(&map.content, id).grid.walkable(cell) {
         let character = play::current_character(editor).unwrap_or_else(|| "…".to_owned());
         if ui
-            .add(egui::Button::new(format!("Play here as {character}")).shortcut_text("F6"))
+            .add(widgets::shortcut_button(
+                format!("Play here as {character}"),
+                EditorKey::PlayHere,
+            ))
             .clicked()
         {
             play::start(editor, Some(place));
@@ -359,7 +370,10 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
         ui.separator();
     }
     if ui
-        .add(egui::Button::new(format!("Open {} at this tile", hit.area)).shortcut_text("Enter"))
+        .add(widgets::shortcut_button(
+            format!("Open {} at this tile", hit.area),
+            EditorKey::Confirm,
+        ))
         .clicked()
     {
         area_view::open_area_at(editor, &hit.area, Some(cell), None);
@@ -375,7 +389,10 @@ fn card_menu(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, hit: &MapTile
     ui.separator();
     let pinned = map.layout.cards.get(&id).is_some_and(|card| card.pinned);
     let verb = if pinned { "Unpin" } else { "Pin" };
-    if ui.add(egui::Button::new(verb).shortcut_text("P")).clicked() {
+    if ui
+        .add(widgets::shortcut_button(verb, EditorKey::Pin))
+        .clicked()
+    {
         map.change(
             editor,
             ContentEdit::new(format!("{verb} {}", hit.area)),
@@ -436,37 +453,24 @@ struct WorldKeys {
 impl WorldKeys {
     fn read(ui: &Ui) -> WorldKeys {
         ui.input(|i| {
-            let step = if i.modifiers.shift { 1 } else { 10 };
-            let axis = |less: Key, more: Key| {
-                if i.key_pressed(less) {
-                    -1
-                } else if i.key_pressed(more) {
-                    1
-                } else {
-                    0
-                }
+            let step = if EditorKey::FineStep.held(i) { 1 } else { 10 };
+            let [x, y] = EditorKey::Move.arrow(i).unwrap_or_default();
+            let resize = if EditorKey::Shrink.pressed(i) {
+                -1
+            } else if EditorKey::Grow.pressed(i) {
+                1
+            } else {
+                0
             };
-            let nudge = Vec2::new(
-                axis(Key::ArrowLeft, Key::ArrowRight) as f32,
-                axis(Key::ArrowUp, Key::ArrowDown) as f32,
-            );
-            let grow = i.key_pressed(Key::Equals) || i.key_pressed(Key::Plus);
             WorldKeys {
-                nudge: nudge * step as f32,
-                resize: step
-                    * if i.key_pressed(Key::Minus) {
-                        -1
-                    } else if grow {
-                        1
-                    } else {
-                        0
-                    },
-                pin: i.key_pressed(Key::P),
-                all: i.modifiers.command && i.key_pressed(Key::A),
-                enter: i.key_pressed(Key::Enter),
-                play: i.key_pressed(Key::F6),
-                escape: i.key_pressed(Key::Escape),
-                delete: i.key_pressed(Key::Delete) || i.key_pressed(Key::Backspace),
+                nudge: Vec2::new(x as f32, y as f32) * step as f32,
+                resize: step * resize,
+                pin: EditorKey::Pin.pressed(i),
+                all: EditorKey::SelectAll.pressed(i),
+                enter: EditorKey::Confirm.pressed(i),
+                play: EditorKey::PlayHere.pressed(i),
+                escape: EditorKey::Cancel.pressed(i),
+                delete: EditorKey::Delete.pressed(i),
             }
         })
     }

@@ -12,6 +12,7 @@ use super::population::NpcSprite;
 use super::{AreaFrame, AreaTool, TILE_PX, modules, population, scenery, selected_parts, shapes};
 use crate::app::Editor;
 use crate::forms;
+use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
 use crate::value::RowValue;
 use crate::views::navigation::Viewport;
@@ -304,7 +305,7 @@ pub(super) fn overlay_selected_scenery(
     if grab.drag_stopped()
         && let Some(pointer) = grab.interact_pointer_pos()
     {
-        let shift = ui.input(|i| i.modifiers.shift);
+        let shift = ui.input(|i| EditorKey::FineStep.held(i));
         let tile_y = canvas.to_tile(pointer).y - rect.min().y;
         let snapped = if shift {
             (tile_y * 16.0).round() / 16.0
@@ -327,10 +328,10 @@ pub(super) fn overlay_selected_scenery(
         module.text("tileset"),
         scenery::tile_count(module)
     ));
-    editor
-        .status
-        .left
-        .push("drag the sort line · Shift snaps to 1/16".to_owned());
+    editor.status.left.push(format!(
+        "drag the sort line · {} snaps to 1/16",
+        EditorKey::FineStep.name()
+    ));
 }
 
 pub(super) fn overlay_soundscape_reach(

@@ -5,6 +5,7 @@ use design_tokens::{Face, TextRole, controls, ink, sheet};
 use egui::{Align, Color32, FontId, Layout, Rect, Response, RichText, Sense, Stroke, Ui, Vec2};
 
 use super::theme;
+use crate::keymap::EditorKey;
 
 pub use design_tokens::controls::{danger, key_hint, primary};
 pub use design_tokens::sheet::{section, section_with};
@@ -101,18 +102,21 @@ pub fn kv_code(ui: &mut Ui, key: &str, value: impl Into<String>) {
     });
 }
 
-pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Response {
+pub fn keyed_button(ui: &mut Ui, label: &str, key: Option<EditorKey>, enabled: bool) -> Response {
+    let keys = key.map(|key| key.name());
     let label_width = ui
         .painter()
         .layout_no_wrap(label.to_owned(), FontId::proportional(14.0), theme::TEXT)
         .size()
         .x;
-    let keys_width = ui
-        .painter()
-        .layout_no_wrap(keys.to_owned(), FontId::monospace(11.0), theme::TEXT)
-        .size()
-        .x;
-    let size = Vec2::new(label_width + keys_width + 36.0, 26.0);
+    let keys_width = keys.as_ref().map_or(0.0, |keys| {
+        ui.painter()
+            .layout_no_wrap(keys.clone(), FontId::monospace(11.0), theme::TEXT)
+            .size()
+            .x
+            + 18.0
+    });
+    let size = Vec2::new(label_width + keys_width + 18.0, 26.0);
     let (rect, response) = ui.allocate_exact_size(
         size,
         if enabled {
@@ -142,25 +146,27 @@ pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Resp
         FontId::new(14.0, theme::medium()),
         ink,
     );
-    x += label_width + 8.0;
-    let cap = egui::Rect::from_min_size(
-        egui::pos2(x, rect.center().y - 9.0),
-        Vec2::new(keys_width + 10.0, 18.0),
-    );
-    ui.painter().rect(
-        cap,
-        3.0,
-        theme::INPUT,
-        Stroke::new(1.0, theme::BORDER),
-        egui::StrokeKind::Inside,
-    );
-    ui.painter().text(
-        cap.center(),
-        egui::Align2::CENTER_CENTER,
-        keys,
-        FontId::monospace(11.0),
-        if enabled { theme::MUTED } else { theme::FAINT },
-    );
+    if let Some(keys) = keys {
+        x += label_width + 8.0;
+        let cap = egui::Rect::from_min_size(
+            egui::pos2(x, rect.center().y - 9.0),
+            Vec2::new(keys_width - 8.0, 18.0),
+        );
+        ui.painter().rect(
+            cap,
+            3.0,
+            theme::INPUT,
+            Stroke::new(1.0, theme::BORDER),
+            egui::StrokeKind::Inside,
+        );
+        ui.painter().text(
+            cap.center(),
+            egui::Align2::CENTER_CENTER,
+            keys,
+            FontId::monospace(11.0),
+            if enabled { theme::MUTED } else { theme::FAINT },
+        );
+    }
     if enabled {
         response.on_hover_cursor(egui::CursorIcon::PointingHand)
     } else {
@@ -168,9 +174,17 @@ pub fn keyed_button(ui: &mut Ui, label: &str, keys: &str, enabled: bool) -> Resp
     }
 }
 
-pub fn key_hint_text(ui: &mut Ui, keys: &str, text: &str) {
+pub fn shortcut_button<'a>(label: impl Into<egui::WidgetText>, key: EditorKey) -> egui::Button<'a> {
+    egui::Button::new(label).shortcut_text(key.name())
+}
+
+pub fn key_chip(ui: &mut Ui, key: EditorKey) -> Response {
+    key_hint(ui, &key.name())
+}
+
+pub fn key_hint_text(ui: &mut Ui, key: EditorKey, text: &str) {
     ui.horizontal(|ui| {
-        key_hint(ui, keys);
+        key_chip(ui, key);
         ui.label(theme::muted(text));
     });
 }
@@ -250,8 +264,9 @@ pub fn search_box(
     ui: &mut Ui,
     text: &mut String,
     placeholder: &str,
-    key: Option<&str>,
+    key: Option<EditorKey>,
 ) -> Response {
+    let key = key.map(|key| key.name());
     let mut inner = None;
     egui::Frame::new()
         .fill(theme::INPUT)
@@ -261,14 +276,15 @@ pub fn search_box(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 glyph::show(ui, Mark::Glass, 13.0, theme::MUTED);
-                let width = ui.available_width() - key.map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
+                let width = ui.available_width()
+                    - key.as_ref().map_or(0.0, |k| 14.0 + 7.0 * k.len() as f32);
                 let response = ui.add(
                     egui::TextEdit::singleline(text)
                         .hint_text(placeholder)
                         .frame(egui::Frame::NONE)
                         .desired_width(width.max(40.0)),
                 );
-                if let Some(key) = key {
+                if let Some(key) = &key {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| key_hint(ui, key));
                 }
                 inner = Some(response);
@@ -370,21 +386,6 @@ pub fn default_focus(ui: &Ui, response: &Response) {
     if ui.memory(|memory| memory.focused().is_none()) {
         response.request_focus();
     }
-}
-
-pub fn digit_pressed(ui: &Ui) -> Option<usize> {
-    const DIGITS: [egui::Key; 9] = [
-        egui::Key::Num1,
-        egui::Key::Num2,
-        egui::Key::Num3,
-        egui::Key::Num4,
-        egui::Key::Num5,
-        egui::Key::Num6,
-        egui::Key::Num7,
-        egui::Key::Num8,
-        egui::Key::Num9,
-    ];
-    ui.input(|i| DIGITS.iter().position(|key| i.key_pressed(*key)))
 }
 
 pub fn clip(text: &str, max: usize) -> String {

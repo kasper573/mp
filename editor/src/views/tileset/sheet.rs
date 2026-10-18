@@ -14,6 +14,7 @@ use super::{
     TilesetView, WalkBrush, change_tileset, tile_mut,
 };
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{patterns, theme, widgets};
@@ -145,7 +146,8 @@ pub fn canvas(
                     egui::StrokeKind::Inside,
                 );
             }
-            let (zooming, scroll) = ui.input(|i| (i.modifiers.command, i.smooth_scroll_delta.y));
+            let (zooming, scroll) =
+                ui.input(|i| (EditorKey::Zoom.held(i), i.smooth_scroll_delta.y));
             if zooming && scroll != 0.0 && response.hovered() {
                 let view = editor.views.tileset.view_mut(key);
                 let step = if scroll > 0.0 { 1.25 } else { 0.8 };
@@ -165,7 +167,7 @@ pub fn select(editor: &mut Editor, ui: &Ui, tileset: &OpenTileset, canvas: &Shee
     let sheet = &tileset.sheet;
     let mode = editor.views.tileset.view(key).mode;
     let pointer = Pointer::read(ui);
-    let selects = pointer.shift || mode == TilesetMode::Animation;
+    let selects = pointer.extend || mode == TilesetMode::Animation;
     if selects
         && pointer.pressed
         && canvas.response.hovered()
@@ -302,7 +304,7 @@ struct Pointer {
     down: bool,
     released: bool,
     pos: Option<Pos2>,
-    shift: bool,
+    extend: bool,
 }
 
 impl Pointer {
@@ -312,7 +314,7 @@ impl Pointer {
             down: i.pointer.primary_down(),
             released: i.pointer.primary_released(),
             pos: i.pointer.latest_pos(),
-            shift: i.modifiers.shift,
+            extend: EditorKey::ExtendSelection.held(i),
         })
     }
 }
@@ -323,7 +325,7 @@ fn paint(editor: &mut Editor, ui: &Ui, tileset: &OpenTileset, canvas: &SheetCanv
         return;
     };
     let pointer = Pointer::read(ui);
-    if pointer.shift {
+    if pointer.extend {
         return;
     }
     if pointer.pressed && canvas.response.hovered() {

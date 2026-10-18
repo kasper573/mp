@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use egui::emath::TSTransform;
-use egui::{Key, Modifiers, Pos2, Rect, RichText, Stroke, Ui, vec2};
+use egui::{Pos2, Rect, RichText, Stroke, Ui, vec2};
 use egui_snarl::ui::get_selected_nodes;
 use engine::core::script::OwnerKindDef;
 use engine::systems::script::OwnerKind;
@@ -18,6 +18,7 @@ use serde_json::{Map, Value};
 
 use crate::app::{BottomTab, ConfirmAction, ConfirmDialog, Editor, ModalDialog};
 use crate::forms::{FormAction, FormCx};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, Project, RowSelection, catalogue_of, row_file};
 use crate::tabs::EditorTab;
 use crate::thumbs;
@@ -349,21 +350,23 @@ pub struct ScriptKeys {
 
 impl ScriptKeys {
     pub fn take(ctx: &egui::Context) -> ScriptKeys {
-        ctx.input_mut(|i| ScriptKeys {
-            fire: i.consume_key(Modifiers::NONE, Key::F8),
-            tab: i.consume_key(Modifiers::NONE, Key::Tab),
-            outline: i.consume_key(Modifiers::NONE, Key::O),
-            delete: i.consume_key(Modifiers::NONE, Key::Delete)
-                | i.consume_key(Modifiers::NONE, Key::Backspace),
-            rename: i.consume_key(Modifiers::NONE, Key::F2),
-            duplicate: i.consume_key(Modifiers::COMMAND, Key::D),
-            enter: i.consume_key(Modifiers::NONE, Key::Enter),
-            ctrl_enter: i.consume_key(Modifiers::COMMAND, Key::Enter),
-            link: i.consume_key(Modifiers::COMMAND, Key::L),
-            up: i.consume_key(Modifiers::NONE, Key::ArrowUp),
-            down: i.consume_key(Modifiers::NONE, Key::ArrowDown),
-            left: i.consume_key(Modifiers::NONE, Key::ArrowLeft),
-            right: i.consume_key(Modifiers::NONE, Key::ArrowRight),
+        ctx.input_mut(|i| {
+            let arrow = EditorKey::Move.take_arrow(i);
+            ScriptKeys {
+                fire: EditorKey::RunScript.consume(i),
+                tab: EditorKey::Palette.consume(i),
+                outline: EditorKey::Outline.consume(i),
+                delete: EditorKey::Delete.consume(i),
+                rename: EditorKey::Rename.consume(i),
+                duplicate: EditorKey::Duplicate.consume(i),
+                enter: EditorKey::Confirm.consume(i),
+                ctrl_enter: EditorKey::AddChoice.consume(i),
+                link: EditorKey::Link.consume(i),
+                up: arrow == Some([0, -1]),
+                down: arrow == Some([0, 1]),
+                left: arrow == Some([-1, 0]),
+                right: arrow == Some([1, 0]),
+            }
         })
     }
 }
@@ -912,18 +915,35 @@ fn status(editor: &mut Editor, doc: &ScriptDoc) {
             .last()
             .map(|node| format!("waiting at {node}"))
             .unwrap_or_else(|| "ended".to_owned());
-        format!("Run · 1 flow · {waiting}   1 – 9 pick a choice · Esc stops")
+        format!(
+            "Run · 1 flow · {waiting}   {} pick a choice · {} stops",
+            EditorKey::Pick.name(),
+            EditorKey::Cancel.name()
+        )
     } else if palette {
-        "↑↓ choose · → opens a system · Enter places it".to_owned()
+        format!(
+            "{} choose · {} opens a system · {} places it",
+            EditorKey::Move.name(),
+            EditorKey::Move.name(),
+            EditorKey::Confirm.name()
+        )
     } else if outline {
-        "O switches to the canvas, keeping the selection".to_owned()
+        format!(
+            "{} switches to the canvas, keeping the selection",
+            EditorKey::Outline.name()
+        )
     } else {
         match selected.as_slice() {
-            [one] => doc.nodes().get(one).map_or("", nodes::hint).to_owned(),
-            [] => "Tab opens the palette · drag from a dot to link · Del removes".to_owned(),
+            [one] => doc.nodes().get(one).map_or_else(String::new, nodes::hint),
+            [] => format!(
+                "{} opens the palette · drag from a dot to link · {} removes",
+                EditorKey::Palette.name(),
+                EditorKey::Delete.name()
+            ),
             many => format!(
-                "{} nodes · drag moves them together · Del removes them",
-                many.len()
+                "{} nodes · drag moves them together · {} removes them",
+                many.len(),
+                EditorKey::Delete.name()
             ),
         }
     };

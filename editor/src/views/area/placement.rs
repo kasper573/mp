@@ -18,6 +18,7 @@ use super::stamp::placed_part;
 use super::{AreaFrame, AreaSnapshot, shapes};
 use crate::app::{Editor, ModalDialog, PickRowDialog, PickRowThen};
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -748,5 +749,5 @@ pub(super) fn placement_extras(
             out.actions.push(super::AreaAction::Replace(index));
         }
     });
-    widgets::key_hint_text(ui, "Enter", "edits the blueprint in place");
+    widgets::key_hint_text(ui, EditorKey::Confirm, "edits the blueprint in place");
 }

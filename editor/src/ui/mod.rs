@@ -18,10 +18,11 @@ use std::time::Duration;
 
 use design_tokens::controls::{self, Pill};
 use design_tokens::{TextRole, face, ink, sheet, slip};
-use egui::{Align, Context, Key, Layout, Modifiers};
+use egui::{Align, Context, Layout};
 use egui_dock::{DockArea, DockState, TabViewer};
 
 use crate::app::{BottomTab, CloseDialog, CloseThen, Editor, LeftTab, ModalDialog};
+use crate::keymap::EditorKey;
 use crate::project::{RowSelection, row_file};
 use crate::tabs::{CloseTabs, EditorTab};
 use crate::views::script::ScriptKeys;
@@ -148,12 +149,12 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     }
     let (save, undo, redo, search, quit, close) = ctx.input_mut(|i| {
         (
-            i.consume_key(Modifiers::COMMAND, Key::S),
-            i.consume_key(Modifiers::COMMAND, Key::Z),
-            i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::Z),
-            i.consume_key(Modifiers::COMMAND, Key::P),
-            i.consume_key(Modifiers::COMMAND, Key::Q),
-            i.consume_key(Modifiers::COMMAND, Key::W),
+            EditorKey::Save.consume(i),
+            EditorKey::Undo.consume(i),
+            EditorKey::Redo.consume(i),
+            EditorKey::Search.consume(i),
+            EditorKey::Quit.consume(i),
+            EditorKey::CloseTab.consume(i),
         )
     });
     if save {
@@ -180,7 +181,7 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
             .dock
             .remove_tab(egui_dock::TabPath::from((path, leaf.active)));
     }
-    if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F1))
+    if ctx.input_mut(|i| EditorKey::KeySheet.consume(i))
         && !editor
             .dialogs
             .iter()
@@ -188,25 +189,24 @@ fn shortcuts(editor: &mut Editor, ctx: &Context) {
     {
         editor.dialogs.push(ModalDialog::Keys);
     }
-    // egui ignores an extra Shift when it matches a key, so Shift+F5 is taken before F5 can claim it.
-    let (shift_f5, f5, f6, ctrl_t) = ctx.input_mut(|i| {
+    let (play_from_start, stop, play_here, played) = ctx.input_mut(|i| {
         (
-            i.consume_key(Modifiers::SHIFT, Key::F5),
-            i.consume_key(Modifiers::NONE, Key::F5),
-            i.consume_key(Modifiers::NONE, Key::F6),
-            i.consume_key(Modifiers::COMMAND, Key::T),
+            EditorKey::PlayFromStart.consume(i),
+            EditorKey::StopPlay.consume(i),
+            EditorKey::PlayHere.consume(i),
+            EditorKey::PlayedCharacter.consume(i),
         )
     });
-    if f5 {
+    if play_from_start {
         play::start(editor, None);
     }
-    if shift_f5 {
+    if stop {
         play::stop(editor);
     }
-    if f6 {
+    if play_here {
         views::play_here(editor);
     }
-    if ctrl_t && let Some(key) = play::current_character(editor) {
+    if played && let Some(key) = play::current_character(editor) {
         editor.select(RowSelection::row("test_character", &key));
         editor.open_tab(EditorTab::for_row("test_character", &key));
     }
@@ -248,7 +248,7 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                     if ui
                         .add_enabled(
                             has_project,
-                            egui::Button::new("Save").shortcut_text("Ctrl S"),
+                            widgets::shortcut_button("Save", EditorKey::Save),
                         )
                         .clicked()
                     {
@@ -268,14 +268,14 @@ fn top_bar(editor: &mut Editor, root: &mut egui::Ui) {
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Keys").shortcut_text("F1"))
+                        .add(widgets::shortcut_button("Keys", EditorKey::KeySheet))
                         .clicked()
                     {
                         editor.dialogs.push(ModalDialog::Keys);
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Quit").shortcut_text("Ctrl Q"))
+                        .add(widgets::shortcut_button("Quit", EditorKey::Quit))
                         .clicked()
                     {
                         request_close(editor, CloseThen::Quit);
@@ -427,8 +427,14 @@ fn close_tabs(dock: &mut DockState<EditorTab>, request: CloseTabs) {
 
 fn empty_centre(ui: &mut egui::Ui) {
     ui.vertical_centered(|ui| {
-        ui.add_space(ui.available_height() * 0.08);
-        ui.label(theme::muted("Ctrl P").size(20.0));
+        ui.add_space(ui.available_height() * 0.3);
+        ui.label(theme::muted("Nothing is open").size(20.0));
+        ui.add_space(8.0);
+        ui.label(theme::muted(
+            "Pick a row or a file on the left, or search them all",
+        ));
+        ui.add_space(8.0);
+        widgets::key_chip(ui, EditorKey::Search);
     });
 }
 

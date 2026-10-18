@@ -11,6 +11,7 @@ use super::inspect::hidden_fields;
 use super::{holes, modules, placement};
 use crate::app::Editor;
 use crate::forms::FormCx;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::ui::{row_form, theme, widgets};
 use crate::value::RowValue;
@@ -36,7 +37,7 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
     ui.add_space(4.0);
     widgets::section_count(ui, "Parts", parts.len());
     let mut pick: Option<Vec<usize>> = None;
-    let shift = ui.input(|i| i.modifiers.shift);
+    let extend = ui.input(|i| EditorKey::ExtendSelection.held(i));
     for (index, part) in parts.iter().enumerate() {
         let kind = part.kind_or("part");
         let at = super::shapes::bounds(part, None)
@@ -66,7 +67,11 @@ pub fn show_blueprint(editor: &mut Editor, ui: &mut Ui, key: &str, selected: &[u
             ui.label(theme::muted(at).monospace().size(12.0));
         });
         if response.clicked() {
-            let mut next: Vec<usize> = if shift { selected.to_vec() } else { Vec::new() };
+            let mut next: Vec<usize> = if extend {
+                selected.to_vec()
+            } else {
+                Vec::new()
+            };
             if let Some(at) = next.iter().position(|i| *i == index) {
                 next.remove(at);
             } else {
@@ -228,7 +233,7 @@ pub(super) fn part_cards(
                         ui.close();
                     }
                     if ui
-                        .add(egui::Button::new("Remove").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Remove", EditorKey::Delete))
                         .clicked()
                     {
                         remove = Some(index);

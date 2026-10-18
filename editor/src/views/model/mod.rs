@@ -19,6 +19,7 @@ use serde_json::Value;
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
 use crate::app::{BottomTab, Editor};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file, row_of};
 use crate::thumbs::Thumbnail;
 use crate::ui::{row_form, sidebar, theme, widgets};
@@ -286,7 +287,8 @@ fn page_bar(editor: &mut Editor, ui: &mut Ui, key: &str, page: ModelPage) {
                     view.page = target;
                 }
             }
-            if widgets::keyed_button(ui, "‹ all strips", "Esc", true).clicked() {
+            if widgets::keyed_button(ui, "‹ all strips", Some(EditorKey::Cancel), true).clicked()
+            {
                 view.page = ModelPage::Matrix;
             }
         }

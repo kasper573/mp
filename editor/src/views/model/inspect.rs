@@ -10,6 +10,7 @@ use super::{
 };
 use crate::app::Editor;
 use crate::forms::FormChange;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::assets::AssetKind;
@@ -158,7 +159,14 @@ fn strip_card(
             });
         }
         ui.add_space(4.0);
-        if widgets::keyed_button(ui, "Open in the animation editor", "Enter", true).clicked() {
+        if widgets::keyed_button(
+            ui,
+            "Open in the animation editor",
+            Some(EditorKey::Confirm),
+            true,
+        )
+        .clicked()
+        {
             super::matrix::open_strip(editor, key, strip);
         }
     });
@@ -877,7 +885,7 @@ pub fn remove_face_dialog(editor: &mut Editor, ctx: &egui::Context, key: &str) {
                 decision = Some(false);
             }
         });
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if ui.input(|i| EditorKey::Cancel.pressed(i)) {
             decision = Some(false);
         }
     });

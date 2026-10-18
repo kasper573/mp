@@ -7,7 +7,7 @@ fn a_line_is_inked_inside_a_clear_ring_of_its_padding() {
     let drawn = raster(Face::BookBold, 24.0, "42", pad);
 
     assert_eq!(drawn.coverage.len(), (drawn.width * drawn.height) as usize);
-    assert!(drawn.coverage.iter().any(|&ink| ink == 255));
+    assert!(drawn.coverage.contains(&255));
     let ringed = (0..drawn.height).all(|y| {
         (0..drawn.width).all(|x| {
             let inside =

@@ -1,13 +1,14 @@
 use design_tokens::glyph::{self, Mark};
 use std::collections::HashSet;
 
-use egui::{Align2, Key, Pos2, Ui};
+use egui::{Align2, Pos2, Ui};
 use engine::core::script::OwnerKindDef;
 
 use super::graph::NodePaletteOpen;
 use super::nodes::{NodeCatalogue, NodeEntry};
 use super::{ScriptDoc, add_node, nodes};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::catalogue_of;
 use crate::ui::{theme, widgets};
 
@@ -102,11 +103,11 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
     let mut close = false;
     let (up, down, right, left, enter) = ui.input(|i| {
         (
-            i.key_pressed(Key::ArrowUp),
-            i.key_pressed(Key::ArrowDown),
-            i.key_pressed(Key::ArrowRight),
-            i.key_pressed(Key::ArrowLeft),
-            i.key_pressed(Key::Enter),
+            EditorKey::Move.arrow(i) == Some([0, -1]),
+            EditorKey::Move.arrow(i) == Some([0, 1]),
+            EditorKey::Move.arrow(i) == Some([1, 0]),
+            EditorKey::Move.arrow(i) == Some([-1, 0]),
+            EditorKey::Confirm.pressed(i),
         )
     });
     if down && !rows.is_empty() {
@@ -261,12 +262,16 @@ pub fn show(editor: &mut Editor, ui: &Ui, doc: &ScriptDoc) {
                         }
                         ui.label(
                             theme::faint(
-                                "↑↓ choose · Enter places it at the arrow · words, names and systems all match",
+                                format!(
+                                    "{} choose · {} places it at the arrow · words, names and systems all match",
+                                    EditorKey::Move.name(),
+                                    EditorKey::Confirm.name()
+                                ),
                             )
                             .size(11.5),
                         );
                     }
-                    if ui.input(|i| i.key_pressed(Key::Escape)) {
+                    if ui.input(|i| EditorKey::Cancel.pressed(i)) {
                         close = true;
                     }
                 });

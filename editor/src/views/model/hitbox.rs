@@ -7,6 +7,7 @@ use serde_json::Value;
 
 use super::{ModelStrip, strip_of};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::stage::{self, Posed, PosedActor, Scene};
 use crate::ui::{theme, widgets};
@@ -157,7 +158,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             if hovered_handle.is_some() || editor.views.model.view(key).hitbox_drag.is_some() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
             }
-            let shift = ui.input(|i| i.modifiers.shift);
+            let shift = ui.input(|i| EditorKey::FineStep.held(i));
             if response.drag_started()
                 && let Some(handle) = hovered_handle
             {
@@ -216,10 +217,10 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         });
     });
     editor.status.left.push(format!("model/{key}"));
-    editor
-        .status
-        .left
-        .push("drag the hitbox handles · Shift snaps to quarter tiles".to_owned());
+    editor.status.left.push(format!(
+        "drag the hitbox handles · {} snaps to quarter tiles",
+        EditorKey::FineStep.name()
+    ));
 }
 
 fn inset(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {

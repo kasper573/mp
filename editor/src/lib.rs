@@ -4,6 +4,7 @@ mod condition;
 pub mod drafts;
 mod forms;
 pub mod import;
+pub mod keymap;
 mod picker;
 mod play;
 pub mod project;

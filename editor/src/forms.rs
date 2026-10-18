@@ -8,6 +8,7 @@ use engine::core::script::VariableType;
 use serde_json::{Map, Value};
 
 use crate::drafts;
+use crate::keymap::EditorKey;
 use crate::project::{Project, ProjectFiles, row_file};
 use crate::schema::{self, SchemaKind, SchemaShapes, SchemaVariant};
 use crate::ui::assets::AssetKind;
@@ -1217,7 +1218,7 @@ fn map(ui: &mut Ui, cx: &mut FormCx, values: &Value, value: &mut Value, path: &s
                 drafts::set_draft(ui, id, &draft.clone());
             }
             let add = ui.small_button("+ add").clicked()
-                || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+                || (response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i)));
             if add && !draft.is_empty() && !entries.contains_key(&draft) {
                 entries.insert(draft, schema::template(cx.root, values));
                 drafts::clear_draft(ui, id);
@@ -1252,7 +1253,7 @@ pub fn text(ui: &mut Ui, cx: &mut FormCx, value: &mut Value, path: &str) -> Form
     if response.changed() {
         drafts::set_draft(ui, id, &draft.clone());
     }
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
+    if ui.input(|i| EditorKey::Cancel.pressed(i)) && response.has_focus() {
         drafts::clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
@@ -1312,7 +1313,7 @@ fn number_field(
     if response.changed() {
         drafts::set_draft(ui, id, &draft.clone());
     }
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) && response.has_focus() {
+    if ui.input(|i| EditorKey::Cancel.pressed(i)) && response.has_focus() {
         drafts::clear_draft(ui, id);
         cx.state.errors.remove(path);
         return FormChange::default();
@@ -1607,7 +1608,7 @@ pub fn drafted(
 }
 
 pub fn committed(ui: &Ui, response: &egui::Response) -> bool {
-    response.lost_focus() && !ui.input(|i| i.key_pressed(egui::Key::Escape))
+    response.lost_focus() && !ui.input(|i| EditorKey::Cancel.pressed(i))
 }
 
 pub fn error_line(ui: &mut Ui, cx: &FormCx, path: &str) {

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::{EnumString, IntoStaticStr, VariantArray};
 
+use crate::keymap::EditorKey;
 use crate::project::{ProjectFiles, row_of};
 use crate::schema::{self, SchemaVariant};
 use crate::ui::widgets;
@@ -84,20 +85,24 @@ pub fn is_event(node: &Value) -> bool {
     FlowKind::of(node) == Some(FlowKind::On)
 }
 
-pub fn hint(node: &Value) -> &'static str {
+pub fn hint(node: &Value) -> String {
     match FlowKind::of(node) {
-        Some(FlowKind::Dialogue) => {
-            "Enter adds a line · Ctrl Enter a choice · select text to style it"
+        Some(FlowKind::Dialogue) => format!(
+            "{} adds a line · {} a choice · select text to style it",
+            EditorKey::Confirm.name(),
+            EditorKey::AddChoice.name()
+        ),
+        Some(FlowKind::If) => {
+            "each slot takes one type · the same builder edits every condition".to_owned()
         }
-        Some(FlowKind::If) => "each slot takes one type · the same builder edits every condition",
         Some(FlowKind::Repeat | FlowKind::Wait | FlowKind::Random) => {
-            "a loop may come back only through a node that pauses"
+            "a loop may come back only through a node that pauses".to_owned()
         }
-        Some(FlowKind::Run) => "calls nest 8 deep and never loop back",
-        Some(FlowKind::On) => "a flow starts here; its cause is the subject",
+        Some(FlowKind::Run) => "calls nest 8 deep and never loop back".to_owned(),
+        Some(FlowKind::On) => "a flow starts here; its cause is the subject".to_owned(),
         Some(FlowKind::Set | FlowKind::Return) | None => match node.kind() {
-            "remember" | "forget" => "two arrows may lead into one node",
-            _ => "an output without an arrow ends the flow",
+            "remember" | "forget" => "two arrows may lead into one node".to_owned(),
+            _ => "an output without an arrow ends the flow".to_owned(),
         },
     }
 }

@@ -9,6 +9,7 @@ use engine::systems::shop::ShopDef;
 use super::filters::{ColorBy, ColorField, MapLens};
 use super::{MapPart, OpenWorldMap, select};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 const SEARCH_WIDTH: f32 = 300.0;
@@ -250,7 +251,7 @@ fn results(
         pick: Pick::Lens(MapLens::Text(text.clone())),
     });
     let mut picked: Option<Pick> = None;
-    if search.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+    if search.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i)) {
         picked = rows.first().map(|row| row.pick.clone());
     }
     egui::Area::new(ui.id().with("world-search-results"))
@@ -275,10 +276,17 @@ fn results(
                     }
                 }
                 ui.add_space(4.0);
-                ui.label(theme::faint("Enter takes the first · Esc clears").size(11.0));
+                ui.label(
+                    theme::faint(format!(
+                        "{} takes the first · {} clears",
+                        EditorKey::Confirm.name(),
+                        EditorKey::Cancel.name()
+                    ))
+                    .size(11.0),
+                );
             });
         });
-    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if ui.input(|i| EditorKey::Cancel.pressed(i)) {
         editor.views.world.search.clear();
     }
     picked

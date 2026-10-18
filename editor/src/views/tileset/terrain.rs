@@ -6,6 +6,7 @@ use strum::VariantArray;
 
 use super::{NewTerrainSetDialog, OpenTileset, TERRAINS_PART, sheet, tile_mut, try_change_tileset};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
@@ -316,7 +317,7 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         super::select_part(editor, key, TERRAINS_PART);
     }
     if !ui.ctx().egui_wants_keyboard_input()
-        && let Some(index) = widgets::digit_pressed(ui)
+        && let Some(index) = ui.input(|i| EditorKey::Pick.digit(i))
         && index < terrains.len()
     {
         editor.views.tileset.view_mut(key).terrain = index;
@@ -327,8 +328,8 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
         ui.label(theme::muted(
             "Clicking a corner sets the terrain picked above;",
         ));
-        for index in 0..terrains.len().min(9) {
-            widgets::key_hint(ui, &key_of(index));
+        for digit in (0..terrains.len()).map_while(EditorKey::digit_name) {
+            widgets::key_hint(ui, digit);
         }
         ui.label(theme::muted(
             "pick one. The area brush reads these corners.",
@@ -391,7 +392,7 @@ pub fn mixes(editor: &mut Editor, ui: &mut Ui, tileset: &OpenTileset) {
     let legend = terrains
         .iter()
         .enumerate()
-        .map(|(index, terrain)| format!("{terrain} ({})", key_of(index)))
+        .map(|(index, terrain)| format!("{terrain} ({})", number_of(index)))
         .collect::<Vec<_>>()
         .join(" and ");
     ui.add_space(6.0);
@@ -662,12 +663,12 @@ fn mix_names(mix: [usize; 4], terrains: &[String]) -> [String; 4] {
     std::array::from_fn(|corner| terrains[mix[corner]].clone())
 }
 
-fn mix_code(mix: [usize; 4]) -> String {
-    mix.iter().map(|index| key_of(*index)).collect()
+fn number_of(terrain: usize) -> String {
+    (terrain + 1).to_string()
 }
 
-fn key_of(terrain: usize) -> String {
-    (terrain + 1).to_string()
+fn mix_code(mix: [usize; 4]) -> String {
+    mix.iter().map(|index| number_of(*index)).collect()
 }
 
 fn tiles_by_mix<'a>(def: &'a TilesetDef, set: &str) -> BTreeMap<&'a [String; 4], Vec<u32>> {

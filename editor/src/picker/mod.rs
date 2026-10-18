@@ -14,6 +14,7 @@ pub use self::assets::AssetSource;
 pub use self::rows::{PictureFrame, RowSource, picture_of};
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms::{FormAction, FormCx};
+use crate::keymap::EditorKey;
 use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 
@@ -279,9 +280,20 @@ fn popover(
     cx.state.status = vec![
         field.to_owned(),
         if pick.is_empty() {
-            "↑ ↓ ← → move · Enter picks · Esc closes".to_owned()
+            format!(
+                "{} move · {} picks · {} closes",
+                EditorKey::Move.name(),
+                EditorKey::Confirm.name(),
+                EditorKey::Cancel.name()
+            )
         } else {
-            format!("↑ ↓ ← → move · Enter picks · Esc keeps {}", pick.key)
+            format!(
+                "{} move · {} picks · {} keeps {}",
+                EditorKey::Move.name(),
+                EditorKey::Confirm.name(),
+                EditorKey::Cancel.name(),
+                pick.key
+            )
         },
     ];
     let search_id = id.with("search");
@@ -376,10 +388,10 @@ fn popover(
     }
     let (up, down, enter, escape) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::ArrowUp),
-            i.key_pressed(egui::Key::ArrowDown),
-            i.key_pressed(egui::Key::Enter),
-            i.key_pressed(egui::Key::Escape),
+            EditorKey::Move.arrow(i) == Some([0, -1]),
+            EditorKey::Move.arrow(i) == Some([0, 1]),
+            EditorKey::Confirm.pressed(i),
+            EditorKey::Cancel.pressed(i),
         )
     });
     let grid = source.grid();
@@ -393,8 +405,8 @@ fn popover(
     if grid {
         let (left, right) = ui.input(|i| {
             (
-                i.key_pressed(egui::Key::ArrowLeft),
-                i.key_pressed(egui::Key::ArrowRight),
+                EditorKey::Move.arrow(i) == Some([-1, 0]),
+                EditorKey::Move.arrow(i) == Some([1, 0]),
             )
         });
         if right {

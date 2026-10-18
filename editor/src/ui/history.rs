@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use super::{theme, widgets};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::history::EditStep;
 use crate::project::{FileBytes, row_of};
 
@@ -33,10 +34,11 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         .collect();
     let opened = super::pretty_path(&project.root);
     let focus = editor.history_focus;
-    editor
-        .status
-        .left
-        .push("Ctrl Z undo · Ctrl Shift Z redo · click a step to go back to it".to_owned());
+    editor.status.left.push(format!(
+        "{} undo · {} redo · click a step to go back to it",
+        EditorKey::Undo.name(),
+        EditorKey::Redo.name()
+    ));
     let mut jump = None;
     let card_width = if focus.is_some() {
         (ui.available_width() * 0.4).clamp(240.0, 420.0)

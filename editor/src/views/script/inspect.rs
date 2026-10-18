@@ -13,6 +13,7 @@ use super::nodes::{self, LineSpeaker};
 use super::{RenameNodeDialog, ScriptDoc, ScriptOwner, ScriptPath, ScriptRef, select_nodes, write};
 use crate::app::{BottomTab, Editor, ModalDialog};
 use crate::forms::{FormAction, FormChange, FormCx};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, catalogue_of, row_file, row_of};
 use crate::tabs::EditorTab;
 use crate::ui::{dialogs, row_form, theme, widgets};
@@ -286,7 +287,10 @@ fn events_section(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     if !any {
         widgets::hint(
             ui,
-            "No event yet: Tab opens the palette with the events this owner answers.",
+            &format!(
+                "No event yet: {} opens the palette with the events this owner answers.",
+                EditorKey::Palette.name()
+            ),
         );
     }
     if let Some(name) = go {
@@ -739,11 +743,16 @@ fn action_buttons(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut toggle_outline = false;
     let mut make = false;
     ui.horizontal(|ui| {
-        if widgets::keyed_button(ui, "▶ Run", "F8", true).clicked() {
+        if widgets::keyed_button(ui, "▶ Run", Some(EditorKey::RunScript), true).clicked() {
             fire = true;
         }
-        if widgets::keyed_button(ui, if outline { "Canvas" } else { "Outline" }, "O", true)
-            .clicked()
+        if widgets::keyed_button(
+            ui,
+            if outline { "Canvas" } else { "Outline" },
+            Some(EditorKey::Outline),
+            true,
+        )
+        .clicked()
         {
             toggle_outline = true;
         }
@@ -816,15 +825,24 @@ fn node_inspector(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc, name: &str)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 widgets::card_header(ui, &title, "", |ui| {
-                    if ui.button("Rename…  F2").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Rename…", EditorKey::Rename))
+                        .clicked()
+                    {
                         rename = true;
                         ui.close();
                     }
-                    if ui.button("Duplicate  Ctrl D").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
+                        .clicked()
+                    {
                         duplicate = true;
                         ui.close();
                     }
-                    if ui.button("Delete  Del").clicked() {
+                    if ui
+                        .add(widgets::shortcut_button("Delete", EditorKey::Delete))
+                        .clicked()
+                    {
                         delete = true;
                         ui.close();
                     }
@@ -1251,7 +1269,7 @@ fn dialogue_form(
     }
     if ui
         .button("+ line")
-        .on_hover_text("Enter on the card")
+        .on_hover_text(format!("{} on the card", EditorKey::Confirm.name()))
         .clicked()
     {
         if let Some(lines) = node["lines"].as_array_mut() {
@@ -1292,7 +1310,7 @@ fn dialogue_form(
     }
     if ui
         .button("+ choice")
-        .on_hover_text("Ctrl Enter on the card")
+        .on_hover_text(format!("{} on the card", EditorKey::AddChoice.name()))
         .clicked()
     {
         super::add_choice(node);
@@ -1911,10 +1929,11 @@ pub fn make_shared_body(
         .status
         .left
         .push(format!("{owner} › inline script · make shared"));
-    editor
-        .status
-        .right
-        .push("Enter makes it · Esc cancels".to_owned());
+    editor.status.right.push(format!(
+        "{} makes it · {} cancels",
+        EditorKey::Confirm.name(),
+        EditorKey::Cancel.name()
+    ));
     match outcome {
         Some(true) => match make_shared(editor, &dialog) {
             Ok(()) => None,
@@ -2128,10 +2147,11 @@ pub fn make_inline_body(
         .status
         .left
         .push(format!("script/{} · make inline", dialog.key));
-    editor
-        .status
-        .right
-        .push("Enter makes it · Esc cancels".to_owned());
+    editor.status.right.push(format!(
+        "{} makes it · {} cancels",
+        EditorKey::Confirm.name(),
+        EditorKey::Cancel.name()
+    ));
     match outcome {
         Some(true) => {
             make_inline(editor, &dialog);

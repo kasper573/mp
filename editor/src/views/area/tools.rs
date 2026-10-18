@@ -12,6 +12,7 @@ use super::select::{
 use super::{AreaDrag, AreaFrame, AreaTool, MAX_ZOOM, MIN_ZOOM, blueprint, grid, shapes};
 use super::{placement, scenery, stamp};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::project::RowSelection;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -45,12 +46,12 @@ pub fn rail(editor: &mut Editor, ui: &mut Ui, view_key: &str) {
         painter.text(
             rect.right_bottom() - Vec2::new(4.0, 2.0),
             egui::Align2::RIGHT_BOTTOM,
-            tool.icon(),
+            tool.key().name(),
             egui::FontId::monospace(9.0),
             theme::MUTED,
         );
         if response
-            .on_hover_text(format!("{} ({})", tool.label(), tool.icon()))
+            .on_hover_text(format!("{} ({})", tool.label(), tool.key().name()))
             .clicked()
         {
             view.set_tool(tool);
@@ -145,7 +146,13 @@ pub fn input(
         return;
     }
     if let Some(pick) = editor.pick.clone() {
-        pick_place(editor, painter, frame, &pick, modifiers.alt);
+        pick_place(
+            editor,
+            painter,
+            frame,
+            &pick,
+            EditorKey::Unsnapped.held_among(modifiers),
+        );
         return;
     }
     let tool = editor.views.area.view(view_key).tool;
@@ -172,7 +179,13 @@ pub fn input(
             if response.clicked()
                 && let Some(cell) = frame.pointer_cell()
             {
-                eyedrop(editor, view_key, frame, cell, modifiers.alt);
+                eyedrop(
+                    editor,
+                    view_key,
+                    frame,
+                    cell,
+                    EditorKey::Topmost.held_among(modifiers),
+                );
             }
         }
         AreaTool::Stamp => stamp::stamp_input(editor, ui, view_key, frame),
@@ -206,7 +219,7 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
         }
         Some(AreaDrag::Move { from, moved: true }) => {
             if let Some(tile) = frame.pointer_tile {
-                let alt = painter.ctx().input(|i| i.modifiers.alt);
+                let alt = painter.ctx().input(|i| EditorKey::Unsnapped.held(i));
                 let (dx, dy) = snapped_delta(*from, tile, alt);
                 for index in selected_indices(editor, &frame.area_key) {
                     if let Some(bounds) = frame.module_bounds(index) {
@@ -291,14 +304,15 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
             .status
             .left
             .push(format!("pasting into area/{}", frame.area_key));
-        editor
-            .status
-            .left
-            .push("click or Enter places · Esc cancels".to_owned());
-        editor
-            .status
-            .left
-            .push("Ctrl Shift V pastes at the same tiles".to_owned());
+        editor.status.left.push(format!(
+            "click or {} places · {} cancels",
+            EditorKey::Confirm.name(),
+            EditorKey::Cancel.name()
+        ));
+        editor.status.left.push(format!(
+            "{} pastes at the same tiles",
+            EditorKey::PasteInPlace.name()
+        ));
     }
     let view = editor.views.area.view(view_key);
     let Some(cell) = frame.pointer_cell() else {
@@ -362,52 +376,48 @@ pub fn overlay(editor: &mut Editor, painter: &egui::Painter, view_key: &str, fra
 
 pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame) {
     let input = ui.input(|i| i.clone());
-    let modifiers = input.modifiers;
+    let pressed = |key: EditorKey| key.pressed(&input);
     if editor.pick.is_some() {
-        if input.key_pressed(egui::Key::Escape) {
+        if pressed(EditorKey::Cancel) {
             editor.pick = None;
             editor.toast("Pick cancelled");
         }
         return;
     }
-    if !modifiers.ctrl && !modifiers.alt {
-        if input.key_pressed(egui::Key::OpenBracket) {
-            editor.update_brush(|brush| brush.size = brush.size.saturating_sub(1).max(1));
-        }
-        if input.key_pressed(egui::Key::CloseBracket) {
-            editor.update_brush(|brush| brush.size = (brush.size + 1).min(9));
-        }
+    if pressed(EditorKey::BrushSmaller) {
+        editor.update_brush(|brush| brush.size = brush.size.saturating_sub(1).max(1));
+    }
+    if pressed(EditorKey::BrushBigger) {
+        editor.update_brush(|brush| brush.size = (brush.size + 1).min(9));
     }
     let mut switched = None;
-    let plain_key = |key: egui::Key| key_event(&input, key, |m| !m.ctrl && !m.alt && !m.command);
     {
         let view = editor.views.area.view_mut(view_key);
-        if !modifiers.ctrl && !modifiers.alt {
-            for tool in AreaTool::ALL {
-                if plain_key(tool.key()) {
-                    view.set_tool(tool);
-                    switched = tool.bottom_tab();
-                }
+        for tool in AreaTool::ALL {
+            if pressed(tool.key()) {
+                view.set_tool(tool);
+                switched = tool.bottom_tab();
             }
-            if input.key_pressed(egui::Key::W) {
-                view.walk_overlay = !view.walk_overlay;
-            }
-            if input.key_pressed(egui::Key::L) {
-                view.layers_open = Some(!view.layers_shown());
-            }
-            if view.tool == AreaTool::Terrain
-                && let Some(index) = widgets::digit_pressed(ui)
-            {
-                view.terrain.terrain = index;
-            }
+        }
+        if pressed(EditorKey::WalkOverlay) {
+            view.walk_overlay = !view.walk_overlay;
+        }
+        if pressed(EditorKey::Layers) {
+            view.layers_open = Some(!view.layers_shown());
+        }
+        if view.tool == AreaTool::Terrain
+            && let Some(index) = EditorKey::Pick.digit(&input)
+        {
+            view.terrain.terrain = index;
         }
     }
     if let Some(bottom) = switched {
         editor.panels.bottom = bottom;
     }
     let view_tool = editor.views.area.view(view_key).tool;
-    if input.key_pressed(egui::Key::X) || input.key_pressed(egui::Key::Y) {
-        let horizontal = input.key_pressed(egui::Key::X);
+    let flip_across = pressed(EditorKey::FlipHorizontal);
+    if flip_across || pressed(EditorKey::FlipVertical) {
+        let horizontal = flip_across;
         match view_tool {
             AreaTool::Paint | AreaTool::Fill => {
                 editor.update_brush(|brush| {
@@ -436,7 +446,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             }
         }
     }
-    if input.key_pressed(egui::Key::Escape) {
+    if pressed(EditorKey::Cancel) {
         let view = editor.views.area.view_mut(view_key);
         if !view.cancel_gesture() && view.paste.take().is_none() {
             view.in_place.pop();
@@ -444,13 +454,13 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         }
         return;
     }
-    if input.key_pressed(egui::Key::Enter) {
+    if pressed(EditorKey::Confirm) {
         let indices = selected_indices(editor, &frame.area_key);
         if indices.len() == 1 && frame.modules[indices[0]].is_module(AreaModuleKind::Blueprint) {
             placement::edit_in_place(editor, view_key, frame, indices[0]);
         }
     }
-    if input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace) {
+    if pressed(EditorKey::Delete) {
         delete_selection(editor, frame);
     }
     let (copied, pasted) = ui.input(|i| {
@@ -463,50 +473,42 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
                 .any(|event| matches!(event, egui::Event::Paste(_))),
         )
     });
-    if copied || (modifiers.command && input.key_pressed(egui::Key::C)) {
+    if copied || pressed(EditorKey::Copy) {
         copy_selection(editor, frame);
         if let Some(clip) = &editor.clipboard {
             ui.ctx()
                 .copy_text(serde_json::to_string_pretty(&clip.modules).unwrap_or_default());
         }
     }
-    if pasted || (modifiers.command && input.key_pressed(egui::Key::V)) {
-        if modifiers.shift {
-            paste_in_place(editor, frame);
-        } else {
-            start_paste(editor, view_key);
-        }
+    if pressed(EditorKey::PasteInPlace) {
+        paste_in_place(editor, frame);
+    } else if pasted || pressed(EditorKey::Paste) {
+        start_paste(editor, view_key);
     }
-    if modifiers.command && input.key_pressed(egui::Key::D) {
+    if pressed(EditorKey::Duplicate) {
         duplicate_selection(editor, frame);
     }
-    if modifiers.command && input.key_pressed(egui::Key::G) {
+    if pressed(EditorKey::JoinScenery) {
         scenery::join_scenery(editor, frame);
     }
-    let make_blueprint = key_event(&input, egui::Key::B, |m| m.command && m.alt);
-    if make_blueprint {
+    if pressed(EditorKey::MakeBlueprint) {
         blueprint::make_blueprint_from_selection(editor, frame);
     }
-    let step = if modifiers.shift { 1.0 / 16.0 } else { 1.0 };
-    let nudge = [
-        (egui::Key::ArrowLeft, (-step, 0.0)),
-        (egui::Key::ArrowRight, (step, 0.0)),
-        (egui::Key::ArrowUp, (0.0, -step)),
-        (egui::Key::ArrowDown, (0.0, step)),
-    ];
-    for (key, (dx, dy)) in nudge {
-        if input.key_pressed(key) {
-            if !editor.selection.parts.is_empty() && editor.selection.table == "area" {
-                move_selection(editor, frame, dx, dy);
-            } else {
-                let view = editor.views.area.view_mut(view_key);
-                let cursor = view.cursor_cell.unwrap_or_else(|| view.center.cell());
-                view.cursor_cell = Some(cursor.step((dx.round() as i32, dy.round() as i32)));
-            }
+    if let Some([x, y]) = EditorKey::Move.arrow(&input) {
+        let step = if EditorKey::FineStep.held(&input) {
+            1.0 / 16.0
+        } else {
+            1.0
+        };
+        if !editor.selection.parts.is_empty() && editor.selection.table == "area" {
+            move_selection(editor, frame, x as f32 * step, y as f32 * step);
+        } else {
+            let view = editor.views.area.view_mut(view_key);
+            let cursor = view.cursor_cell.unwrap_or_else(|| view.center.cell());
+            view.cursor_cell = Some(cursor.step((x, y)));
         }
     }
-    if input.key_pressed(egui::Key::Space)
-        && !modifiers.any()
+    if pressed(EditorKey::SelectAtCursor)
         && let Some(cursor) = editor.views.area.view(view_key).cursor_cell
     {
         let tile = cursor.center();
@@ -518,7 +520,7 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
             };
         }
     }
-    if input.key_pressed(egui::Key::F10) && modifiers.shift {
+    if pressed(EditorKey::ContextMenu) {
         let view = editor.views.area.view_mut(view_key);
         let at = view
             .cursor_cell
@@ -527,15 +529,4 @@ pub fn keys(editor: &mut Editor, ui: &mut Ui, view_key: &str, frame: &AreaFrame)
         let tile = view.cursor_cell.map(|c| c.center()).unwrap_or(view.center);
         super::modules::open_menu(ui.ctx(), view, view_key, at, tile);
     }
-}
-
-fn key_event(
-    input: &egui::InputState,
-    key: egui::Key,
-    wanted: impl Fn(&egui::Modifiers) -> bool,
-) -> bool {
-    input.events.iter().any(|event| {
-        matches!(event, egui::Event::Key { key: pressed, pressed: true, modifiers, .. }
-            if *pressed == key && wanted(modifiers))
-    })
 }

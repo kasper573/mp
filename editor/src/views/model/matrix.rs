@@ -15,6 +15,7 @@ use engine::core::time::Millis;
 
 use crate::app::Editor;
 use crate::import;
+use crate::keymap::EditorKey;
 use crate::stage;
 use crate::ui::{theme, widgets};
 
@@ -164,8 +165,15 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         .left
         .push(format!("model/{key} · {}", strip.name()));
     editor.status.left.push(
-        "Space plays · , and . step frames · arrows move in the matrix · Enter opens the strip"
-            .to_owned(),
+        format!(
+            "{} plays · {} and {} step frames · {} move in the matrix · {} opens the strip",
+            EditorKey::PlayPause.name(),
+            EditorKey::PreviousFrame.name(),
+            EditorKey::NextFrame.name(),
+            EditorKey::Move.name(),
+            EditorKey::Confirm.name()
+        )
+        .to_owned(),
     );
     editor.status.right.push(format!(
         "{used} {} use this model",
@@ -252,19 +260,14 @@ fn keys(editor: &mut Editor, ui: &Ui, key: &str) {
     if !super::keyboard_free(ui) {
         return;
     }
-    let (left, right, up, down, enter) = ui.input(|i| {
+    let ([turn, step], enter) = ui.input(|i| {
         (
-            i.key_pressed(egui::Key::ArrowLeft),
-            i.key_pressed(egui::Key::ArrowRight),
-            i.key_pressed(egui::Key::ArrowUp),
-            i.key_pressed(egui::Key::ArrowDown),
-            i.key_pressed(egui::Key::Enter),
+            EditorKey::Move.arrow(i).unwrap_or_default(),
+            EditorKey::Confirm.pressed(i),
         )
     });
     let view = editor.views.model.view_mut(key);
     let was = view.strip;
-    let turn = i32::from(right) - i32::from(left);
-    let step = i32::from(down) - i32::from(up);
     view.strip = ModelStrip {
         action: shifted(Action::VARIANTS, was.action, step as isize),
         direction: shifted(Direction::VARIANTS, was.direction, turn as isize),
@@ -330,7 +333,13 @@ pub fn timeline(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
             ui.label(theme::faint(format!("{total} ms")).monospace().size(11.5));
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 ui.add_space((ui.available_width() / 2.0 - 120.0).max(0.0));
-                ui.label(theme::faint("Enter opens the strip in the animation editor").size(12.0));
+                ui.label(
+                    theme::faint(format!(
+                        "{} opens the strip in the animation editor",
+                        EditorKey::Confirm.name()
+                    ))
+                    .size(12.0),
+                );
             });
         });
     });

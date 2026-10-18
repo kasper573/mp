@@ -4,6 +4,7 @@ use engine::systems::area;
 
 use super::{AreaFrame, AreaTool, placement};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 pub(super) fn status_bar(
@@ -21,7 +22,10 @@ pub(super) fn status_bar(
             [one] => left.push(format!("{} · part {} of {parts}", place.blueprint, one + 1)),
             _ => left.push(format!("{} · {parts} parts", place.blueprint)),
         }
-        left.push("double-click a part to open it · Esc goes up one level".to_owned());
+        left.push(format!(
+            "double-click a part to open it · {} goes up one level",
+            EditorKey::Cancel.name()
+        ));
     } else if let Some(blueprint) = &view.blueprint {
         let parts = part_count(frame, blueprint);
         left.push(format!(

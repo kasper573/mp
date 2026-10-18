@@ -7,6 +7,7 @@ use strum::VariantArray;
 
 use crate::drafts::{clear_draft, draft_of, set_draft, take_draft};
 use crate::forms::{FormChange, FormCx, committed};
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 use crate::{condition, forms, picker};
 
@@ -86,7 +87,7 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
             d.remove_temp::<(usize, usize)>(selection_id);
         }
     });
-    let enter = ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
+    let enter = ui.input(|i| EditorKey::Confirm.pressed(i));
     let mut entered = false;
     if response.changed() {
         let typed = text.trim_end_matches('\n').to_owned();
@@ -116,7 +117,7 @@ pub fn line(ui: &mut Ui, spans: &Value, id: egui::Id, font: FontId, hint: &str) 
             &serde_json::to_string(&spans_now).unwrap_or_default(),
         );
     }
-    let escape = ui.input(|i| i.key_pressed(egui::Key::Escape));
+    let escape = ui.input(|i| EditorKey::Cancel.pressed(i));
     if escape && focused {
         clear_draft(ui, id);
         return SpanLineEdit {

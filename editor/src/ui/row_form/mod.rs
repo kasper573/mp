@@ -30,6 +30,7 @@ use crate::app::{
 use crate::drafts::{clear_draft, draft_of, set_draft};
 use crate::forms;
 use crate::forms::{FormAction, FormChange, FormCx};
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection, row_file};
 use crate::rows::new_row_into;
 use crate::schema;
@@ -264,7 +265,7 @@ fn row_card(
                 }
                 if !fixture
                     && ui
-                        .add(egui::Button::new("Rename key…").shortcut_text("F2"))
+                        .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
                         .clicked()
                 {
                     cx.actions
@@ -279,7 +280,7 @@ fn row_card(
                 if !fixture {
                     ui.separator();
                     if ui
-                        .add(egui::Button::new("Delete…").shortcut_text("Del"))
+                        .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
                         .clicked()
                     {
                         cx.actions
@@ -704,7 +705,7 @@ pub(super) fn add_module_popup(
             String::new()
         }
     ));
-    if picked.is_some() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    if picked.is_some() || ui.input(|i| EditorKey::Cancel.pressed(i)) {
         clear_draft(ui, id);
         if picked.is_none() {
             ui.close();
@@ -759,9 +760,10 @@ pub fn act(editor: &mut Editor, action: FormAction, table: &str, key: &str) {
                 pointer: path,
                 area: None,
             });
-            editor.toast(
-                "Click a walkable cell on an area to pick the place (Alt-click for any point)",
-            );
+            editor.toast(format!(
+                "Click a walkable cell on an area to pick the place ({} click for any point)",
+                EditorKey::Unsnapped.name()
+            ));
         }
         FormAction::NewRow {
             table: into_table,

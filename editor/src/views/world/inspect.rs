@@ -16,6 +16,7 @@ use super::filters::{self, AreaRange, ColorField, ColorOf, ColorRanges, ColorSho
 use super::{MapPart, MapTileHit, OpenWorldMap, region_color, region_color_name, select, toolbar};
 use crate::app::Editor;
 use crate::forms;
+use crate::keymap::EditorKey;
 use crate::project::{ContentEdit, RowSelection};
 use crate::tabs::EditorTab;
 use crate::ui::browser::{self, BrowserAction};
@@ -641,8 +642,8 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
         widgets::card_title(ui, &title);
         if cards.len() == 1 {
             widgets::kv(ui, "area", |ui| {
-                open_area =
-                    widgets::keyed_button(ui, &format!("area/ {first_key}"), "→", true).clicked();
+                open_area = widgets::keyed_button(ui, &format!("area/ {first_key} →"), None, true)
+                    .clicked();
             });
             widgets::kv(ui, "at", |ui| {
                 let (mut x, mut y) = (card.at.x, card.at.y);
@@ -721,15 +722,18 @@ fn inspect_cards(editor: &mut Editor, ui: &mut Ui, map: &OpenWorldMap, cards: &[
     }
     widgets::section(ui, "Keys");
     for (keys, text) in [
-        (&["−", "="][..], "size of every selected card, 10% a step"),
-        (&["Shift"][..], "with them, 1% a step"),
-        (&["←", "→", "↑", "↓"][..], "move the selection"),
-        (&["P"][..], "pin or unpin the selection"),
-        (&["Ctrl A"][..], "select every card"),
+        (
+            &[EditorKey::Shrink, EditorKey::Grow][..],
+            "size of every selected card, 10% a step",
+        ),
+        (&[EditorKey::FineStep][..], "with them, 1% a step"),
+        (&[EditorKey::Move][..], "move the selection"),
+        (&[EditorKey::Pin][..], "pin or unpin the selection"),
+        (&[EditorKey::SelectAll][..], "select every card"),
     ] {
         ui.horizontal(|ui| {
             for key in keys {
-                widgets::key_hint(ui, key);
+                widgets::key_chip(ui, *key);
             }
             ui.label(theme::muted(text));
         });

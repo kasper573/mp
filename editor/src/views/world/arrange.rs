@@ -6,6 +6,7 @@ use engine::systems::area::world_map::WorldMapDef;
 
 use super::{OpenWorldMap, card_at, hundredths, move_card, selected};
 use crate::app::{Editor, ModalDialog};
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::dialogs::{self, DialogAnswer};
 use crate::ui::{theme, widgets};
@@ -148,7 +149,8 @@ pub fn dialog(
         ui.add_space(10.0);
         ui.label(
             RichText::new(format!(
-                "This replaces the positions of {moved} cards. Ctrl Z brings your current layout back."
+                "This replaces the positions of {moved} cards. {} brings your current layout back.",
+                EditorKey::Undo.name()
             ))
             .size(13.0),
         );

@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use super::{ModelStrip, StripFrame, play_rule, strip_of, total_ms};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 
 pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
@@ -60,9 +61,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui, key: &str, row: &Value) {
         status.push_str(&format!(" · {} on frame {}", kind.key(), index + 1));
     }
     editor.status.left.push(status);
-    editor.status.left.push(
-        "Space plays with sound · M mutes the preview · A, S, T put cues on the frame".to_owned(),
-    );
+    editor.status.left.push(format!(
+        "{} plays with sound · {} mutes the preview · {}, {}, {} put cues on the frame",
+        EditorKey::PlayPause.name(),
+        EditorKey::Mute.name(),
+        EditorKey::ApexCue.name(),
+        EditorKey::SoundCue.name(),
+        EditorKey::StepCue.name()
+    ));
 }
 
 fn steps(

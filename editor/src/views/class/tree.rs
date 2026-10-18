@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use design_tokens::{glyph, ink};
-use egui::{Color32, CursorIcon, Key, Modifiers, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
+use egui::{Color32, CursorIcon, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 use engine::core::content::Content;
 use engine::systems::class::{
     AccessRequirement, BackdropFit, CanvasPoint, CanvasRect, NodeKey, SkillNode, SkillTree,
@@ -13,6 +13,7 @@ use strum::VariantArray;
 
 use super::{TABLE, node_of, select_node, write};
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::assets::AssetKind;
 use crate::ui::{theme, widgets};
 use crate::value::{self, RowValue};
@@ -568,7 +569,7 @@ fn canvas(
     }
     if hovering_canvas
         && let Some(node) = selected.clone()
-        && ui.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Delete))
+        && ui.input_mut(|input| EditorKey::Delete.consume(input))
     {
         removed = Some(node);
     }

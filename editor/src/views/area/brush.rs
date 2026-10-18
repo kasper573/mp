@@ -9,6 +9,7 @@ use engine::systems::script::Place;
 
 use super::{AreaFrame, AreaTool, grid, pins, select, terrain};
 use crate::app::{Editor, PlacePick};
+use crate::keymap::EditorKey;
 use crate::project::ContentEdit;
 use crate::ui::{patterns, theme};
 use crate::user::BrushSettings;
@@ -384,8 +385,11 @@ pub(super) fn pick_place(
     }
     pins::draw_arrivals(editor, painter, frame);
     let text = format!(
-        "Pick a place for {} {} · click a cell, Alt-click any point · Esc cancels",
-        pick.file, pick.pointer
+        "Pick a place for {} {} · click a cell, {} click any point · {} cancels",
+        pick.file,
+        pick.pointer,
+        EditorKey::Unsnapped.name(),
+        EditorKey::Cancel.name()
     );
     painter.text(
         canvas.screen.min + Vec2::new(8.0, 8.0),

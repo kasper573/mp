@@ -13,6 +13,7 @@ use super::{
     blueprint_part, module_index, module_part, pick, pins, shapes,
 };
 use crate::app::{Clipboard, Editor};
+use crate::keymap::EditorKey;
 use crate::project::RowSelection;
 use crate::rows;
 use crate::value::RowValue;
@@ -48,13 +49,13 @@ pub(super) fn select_input(
         return;
     };
     if scope.is_area() {
-        if modifiers.alt && response.clicked() {
+        if EditorKey::Listen.held_among(modifiers) && response.clicked() {
             editor.views.area.view_mut(view_key).listener = Some(tile);
             pick::listen(editor, frame, tile);
             return;
         }
         if let Some(ghost) = editor.views.area.view(view_key).paste.clone() {
-            if response.clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            if response.clicked() || ui.input(|i| EditorKey::Confirm.pressed(i)) {
                 finish_paste(editor, view_key, frame, ghost, tile);
             }
             return;
@@ -94,7 +95,11 @@ pub(super) fn select_input(
                 );
                 editor.selection = RowSelection::parts(scope.table(), scope.key(frame), parts);
             }
-            None if !modifiers.shift && !modifiers.ctrl => scope.clear_selection(editor, frame),
+            None if !EditorKey::ExtendSelection.held_among(modifiers)
+                && !EditorKey::ToggleSelection.held_among(modifiers) =>
+            {
+                scope.clear_selection(editor, frame)
+            }
             None => {}
         }
         if scope.is_area() {
@@ -314,8 +319,10 @@ pub(super) fn toggled(
     part: String,
     modifiers: egui::Modifiers,
 ) -> Vec<String> {
-    let mut parts = kept_parts(editor, table, key, modifiers.shift || modifiers.ctrl);
-    if modifiers.ctrl && parts.contains(&part) {
+    let toggle = EditorKey::ToggleSelection.held_among(modifiers);
+    let extend = EditorKey::ExtendSelection.held_among(modifiers);
+    let mut parts = kept_parts(editor, table, key, extend || toggle);
+    if toggle && parts.contains(&part) {
         parts.retain(|p| *p != part);
     } else if !parts.contains(&part) {
         parts.push(part);
@@ -330,7 +337,12 @@ pub(super) fn boxed(
     hits: impl Iterator<Item = String>,
     modifiers: egui::Modifiers,
 ) -> Vec<String> {
-    let mut parts = kept_parts(editor, table, key, modifiers.shift);
+    let mut parts = kept_parts(
+        editor,
+        table,
+        key,
+        EditorKey::ExtendSelection.held_among(modifiers),
+    );
     for part in hits {
         if !parts.contains(&part) {
             parts.push(part);
@@ -401,7 +413,7 @@ fn finish_select_drag(
             if !moved {
                 return;
             }
-            let (dx, dy) = snapped_delta(from, tile, modifiers.alt);
+            let (dx, dy) = snapped_delta(from, tile, EditorKey::Unsnapped.held_among(modifiers));
             if dx == 0.0 && dy == 0.0 {
                 return;
             }
@@ -416,7 +428,10 @@ fn finish_select_drag(
                 return;
             };
             let (min, max) = (start.min(), start.max());
-            let edge = snap_to(tile + Offset::new(0.5, 0.5), modifiers.alt) - Offset::new(0.5, 0.5);
+            let edge = snap_to(
+                tile + Offset::new(0.5, 0.5),
+                EditorKey::Unsnapped.held_among(modifiers),
+            ) - Offset::new(0.5, 0.5);
             let (new_min, new_max) = match corner {
                 ResizeCorner::TopLeft => (edge, max),
                 ResizeCorner::TopRight => (Pos::new(min.x, edge.y), Pos::new(edge.x, max.y)),
@@ -437,11 +452,11 @@ fn finish_select_drag(
             });
         }
         AreaDrag::Pin { file, pointer } => {
-            let at = snap_to(tile, modifiers.alt);
+            let at = snap_to(tile, EditorKey::Unsnapped.held_among(modifiers));
             pins::move_pin(editor, frame, &file, &pointer, at);
         }
         AreaDrag::InitialSpawn => {
-            let at = snap_to(tile, modifiers.alt);
+            let at = snap_to(tile, EditorKey::Unsnapped.held_among(modifiers));
             pins::set_spawn(editor, &frame.area_key, at);
         }
         AreaDrag::Stamp { .. } => {}

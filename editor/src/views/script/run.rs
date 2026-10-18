@@ -3,6 +3,7 @@ use design_tokens::glyph::{self, Mark};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
+use crate::keymap::EditorKey;
 use crate::views::character::Standing;
 use bevy::app::Main;
 use bevy::ecs::message::{MessageCursor, Messages};
@@ -260,7 +261,11 @@ pub fn panel(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
             {
                 step = true;
             }
-            if ui.button("■ Stop").on_hover_text("Esc").clicked() {
+            if ui
+                .button("■ Stop")
+                .on_hover_text(EditorKey::Cancel.name())
+                .clicked()
+            {
                 stop = true;
             }
         }
@@ -478,13 +483,13 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
     let mut pick: Option<usize> = None;
     let mut leave = false;
     if !ui.ctx().text_edit_focused() {
-        if let Some(index) = widgets::digit_pressed(ui)
+        if let Some(index) = ui.input(|i| EditorKey::Pick.digit(i))
             && index < conversation.choices.len()
             && !conversation.choices[index].locked
         {
             pick = Some(index);
         }
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if ui.input(|i| EditorKey::Cancel.pressed(i)) {
             leave = true;
         }
     }
@@ -550,9 +555,13 @@ pub fn conversation_box(editor: &mut Editor, ui: &mut Ui, doc: &ScriptDoc) {
                         leave = true;
                     }
                     ui.label(
-                        theme::faint("1 – 9 pick · Esc leaves")
-                            .size(11.5)
-                            .monospace(),
+                        theme::faint(format!(
+                            "{} pick · {} leaves",
+                            EditorKey::Pick.name(),
+                            EditorKey::Cancel.name()
+                        ))
+                        .size(11.5)
+                        .monospace(),
                     );
                 });
             });
@@ -702,7 +711,7 @@ fn character_card(
             }
         });
         widgets::kv(ui, "area", |ui| {
-            if widgets::keyed_button(ui, &format!("area/ {area_key}"), "", true)
+            if widgets::keyed_button(ui, &format!("area/ {area_key}"), None, true)
                 .on_hover_text("Open the area the run plays in")
                 .clicked()
             {
@@ -859,7 +868,7 @@ fn quests_card(
             };
             let standing = Standing::of_log(&log, id);
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("quest/ {key}"), "", true).clicked() {
+                if widgets::keyed_button(ui, &format!("quest/ {key}"), None, true).clicked() {
                     *open = Some(EditorTab::for_row("quest", key));
                 }
                 let mut picked = standing;
@@ -930,7 +939,7 @@ fn bag_card(
                 .map(|stack| stack.count)
                 .sum::<u32>();
             ui.horizontal(|ui| {
-                if widgets::keyed_button(ui, &format!("item/ {key}"), "", true).clicked() {
+                if widgets::keyed_button(ui, &format!("item/ {key}"), None, true).clicked() {
                     *open = Some(EditorTab::for_row("item", key));
                 }
                 let mut picked = count;

@@ -2,13 +2,14 @@ use design_tokens::controls;
 use design_tokens::glyph::{self, Mark};
 use std::collections::BTreeSet;
 
-use egui::{Align, Key, Layout, Modifiers, Sense, Ui};
+use egui::{Align, Layout, Sense, Ui};
 use engine::core::content::ContentRow;
 use engine::systems::area::world_map::WorldMapDef;
 
 use super::tree::{self, IconImage, TreeAction, TreeIcon, TreeNode, TreeState};
 use super::{theme, widgets};
 use crate::app::{BottomTab, Editor, LeftTab, ModalDialog, RenameDialog, RenameTarget};
+use crate::keymap::EditorKey;
 use crate::picker::Dragged;
 use crate::picker::{self, PictureFrame};
 use crate::project::{GAME_FILE, Project, RowSelection, row_of};
@@ -85,14 +86,14 @@ pub fn show(editor: &mut Editor, ui: &mut Ui) {
         ui,
         &mut state.search,
         "Search rows, keys, files",
-        Some("Ctrl P"),
+        Some(EditorKey::Search),
     );
     if state.focus_search {
         response.request_focus();
         state.focus_search = false;
     }
-    let enter = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-    if response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+    let enter = response.lost_focus() && ui.input(|i| EditorKey::Confirm.pressed(i));
+    if response.has_focus() && ui.input(|i| EditorKey::Cancel.pressed(i)) {
         state.search.clear();
     }
     let searching = !state.search.trim().is_empty();
@@ -244,8 +245,16 @@ fn folders(editor: &mut Editor, ui: &mut Ui) {
     {
         if table == WorldMapDef::TABLE {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
-        } else if modifiers.ctrl || modifiers.shift {
-            select_rows(editor, table, key, modifiers.ctrl, modifiers.shift);
+        } else if EditorKey::ToggleSelection.held_among(modifiers)
+            || EditorKey::ExtendSelection.held_among(modifiers)
+        {
+            select_rows(
+                editor,
+                table,
+                key,
+                EditorKey::ToggleSelection.held_among(modifiers),
+                EditorKey::ExtendSelection.held_among(modifiers),
+            );
         } else {
             action = Some((table.to_owned(), key.to_owned(), BrowserAction::Open));
         }
@@ -308,26 +317,11 @@ fn row_keys(editor: &mut Editor, ui: &mut Ui) {
     }
     let pressed = ui.input_mut(|i| {
         [
-            (
-                BrowserAction::Rename,
-                i.consume_key(Modifiers::NONE, Key::F2),
-            ),
-            (
-                BrowserAction::Usages,
-                i.consume_key(Modifiers::SHIFT, Key::F12),
-            ),
-            (
-                BrowserAction::Duplicate,
-                i.consume_key(Modifiers::COMMAND, Key::D),
-            ),
-            (
-                BrowserAction::Delete,
-                i.consume_key(Modifiers::NONE, Key::Delete),
-            ),
-            (
-                BrowserAction::OpenTab,
-                i.consume_key(Modifiers::COMMAND, Key::Enter),
-            ),
+            (BrowserAction::Rename, EditorKey::Rename.consume(i)),
+            (BrowserAction::Usages, EditorKey::Usages.consume(i)),
+            (BrowserAction::Duplicate, EditorKey::Duplicate.consume(i)),
+            (BrowserAction::Delete, EditorKey::Delete.consume(i)),
+            (BrowserAction::OpenTab, EditorKey::OpenInNewTab.consume(i)),
         ]
         .into_iter()
         .find(|(_, hit)| *hit)
@@ -350,33 +344,36 @@ fn row_menu(
         ui.close();
     };
     if ui
-        .add(egui::Button::new("Open").shortcut_text("Enter"))
+        .add(widgets::shortcut_button("Open", EditorKey::Confirm))
         .clicked()
     {
         pick(BrowserAction::Open, ui);
     }
     if ui
-        .add(egui::Button::new("Open in new tab").shortcut_text("Ctrl Enter"))
+        .add(widgets::shortcut_button(
+            "Open in new tab",
+            EditorKey::OpenInNewTab,
+        ))
         .clicked()
     {
         pick(BrowserAction::OpenTab, ui);
     }
     ui.separator();
     if ui
-        .add(egui::Button::new("Duplicate").shortcut_text("Ctrl D"))
+        .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
         .clicked()
     {
         pick(BrowserAction::Duplicate, ui);
     }
     if !fixture
         && ui
-            .add(egui::Button::new("Rename key…").shortcut_text("F2"))
+            .add(widgets::shortcut_button("Rename key…", EditorKey::Rename))
             .clicked()
     {
         pick(BrowserAction::Rename, ui);
     }
     if ui
-        .add(egui::Button::new("Show usages").shortcut_text("Shift F12"))
+        .add(widgets::shortcut_button("Show usages", EditorKey::Usages))
         .clicked()
     {
         pick(BrowserAction::Usages, ui);
@@ -384,7 +381,7 @@ fn row_menu(
     if !fixture {
         ui.separator();
         if ui
-            .add(egui::Button::new("Delete…").shortcut_text("Del"))
+            .add(widgets::shortcut_button("Delete…", EditorKey::Delete))
             .clicked()
         {
             pick(BrowserAction::Delete, ui);
@@ -392,16 +389,16 @@ fn row_menu(
     }
 }
 
-/// Ctrl or Shift adds to a selection of rows, shown together in one window.
-fn select_rows(editor: &mut Editor, table: &str, key: &str, ctrl: bool, shift: bool) {
+/// A held selection key adds to a selection of rows, shown together in one window.
+fn select_rows(editor: &mut Editor, table: &str, key: &str, toggle: bool, extend: bool) {
     let mut selection = if editor.selection.table == table {
         editor.selection.clone()
     } else {
         RowSelection::rows(table, Vec::new())
     };
-    if ctrl && selection.keys.contains(&key.to_owned()) {
+    if toggle && selection.keys.contains(&key.to_owned()) {
         selection.keys.retain(|k| k != key);
-    } else if shift && let Some(last) = selection.keys.last().cloned() {
+    } else if extend && let Some(last) = selection.keys.last().cloned() {
         let keys: Vec<String> = editor
             .project
             .as_ref()
@@ -594,9 +591,13 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
                             selected,
                         );
                         if response.clicked() {
-                            let modifiers = ui.input(|i| i.modifiers);
-                            clicked =
-                                Some((table.clone(), key.clone(), modifiers.ctrl, modifiers.shift));
+                            let (toggle, extend) = ui.input(|i| {
+                                (
+                                    EditorKey::ToggleSelection.held(i),
+                                    EditorKey::ExtendSelection.held(i),
+                                )
+                            });
+                            clicked = Some((table.clone(), key.clone(), toggle, extend));
                         }
                         if response.double_clicked() {
                             action = Some((table.clone(), key.clone(), BrowserAction::Open));
@@ -672,9 +673,9 @@ fn results(editor: &mut Editor, ui: &mut Ui, enter: bool) {
             Hit::File { path, .. } => open_file = Some(path.clone()),
         }
     }
-    if let Some((table, key, ctrl, shift)) = clicked {
-        if ctrl || shift {
-            select_rows(editor, &table, &key, ctrl, shift);
+    if let Some((table, key, toggle, extend)) = clicked {
+        if toggle || extend {
+            select_rows(editor, &table, &key, toggle, extend);
         } else {
             act(editor, &table, &key, BrowserAction::Open);
         }

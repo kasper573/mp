@@ -2,6 +2,7 @@ use egui::{Pos2, Rect, Response, Ui, Vec2};
 use engine::core::math::{Offset, Pos, Rect as TileRect};
 
 use super::area::TILE_PX;
+use crate::keymap::EditorKey;
 
 #[derive(Clone, Copy)]
 pub struct Viewport<U> {
@@ -57,7 +58,7 @@ pub fn zoom_and_pan<U>(
             viewport.center = under + (viewport.center - under) * (before / viewport.zoom);
         }
     }
-    let space = ui.input(|i| i.key_down(egui::Key::Space));
+    let space = ui.input(|i| EditorKey::Pan.held(i));
     let panning = response.dragged_by(egui::PointerButton::Middle)
         || (space && response.dragged_by(egui::PointerButton::Primary));
     if panning {

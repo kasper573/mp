@@ -7,6 +7,7 @@ use serde_json::Value;
 use super::{pins, select};
 use crate::app::Editor;
 use crate::forms;
+use crate::keymap::EditorKey;
 use crate::ui::{theme, widgets};
 use crate::views::navigation;
 
@@ -137,7 +138,7 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
         egui::Stroke::new(1.0, theme::BORDER),
         egui::StrokeKind::Inside,
     );
-    let alt = ui.input(|i| i.modifiers.alt);
+    let alt = ui.input(|i| EditorKey::Unsnapped.held(i));
     if let Some(pointer) = response.hover_pos() {
         let tile = canvas.to_tile(pointer);
         let at = select::snap_to(tile, alt);
@@ -178,6 +179,10 @@ pub fn pick_preview(editor: &mut Editor, ui: &mut Ui) {
     }
     widgets::hint(
         ui,
-        "Click a cell for its centre, Alt-click for any point, in 1/16 tiles. Esc keeps the old place.",
+        &format!(
+            "Click a cell for its centre, {} click for any point, in 1/16 tiles. {} keeps the old place.",
+            EditorKey::Unsnapped.name(),
+            EditorKey::Cancel.name()
+        ),
     );
 }

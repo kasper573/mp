@@ -19,6 +19,7 @@ use super::{
     MAX_ZOOM, MIN_ZOOM, MapLayers, MapPart, MapTileHit, OpenWorldMap, region_color, shows_areas,
 };
 use crate::app::Editor;
+use crate::keymap::EditorKey;
 use crate::ui::{patterns, theme, widgets};
 use crate::views::area::{TILE_PX, scene};
 use crate::views::navigation::{self, Viewport};
@@ -650,7 +651,11 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                     .map(|snap| format!(" · {snap}"))
                     .unwrap_or_default()
             ),
-            "Alt moves without snapping · P pins".to_owned(),
+            format!(
+                "{} moves without snapping · {} pins",
+                EditorKey::Unsnapped.name(),
+                EditorKey::Pin.name()
+            ),
         ],
         Some(MapDrag::Resize { area, size, .. }) => {
             let tiles = atlas.id(area).map(|id| atlas.size(id)).unwrap_or_default();
@@ -659,7 +664,11 @@ fn status(editor: &mut Editor, map: &OpenWorldMap, canvas: &MapCanvas, overlays:
                     "resizing {area} · {size}% · {} × {} tiles",
                     tiles.width, tiles.height
                 ),
-                "Shift steps by 1% · Esc cancels".to_owned(),
+                format!(
+                    "{} steps by 1% · {} cancels",
+                    EditorKey::FineStep.name(),
+                    EditorKey::Cancel.name()
+                ),
             ]
         }
         _ if shows_areas(canvas.viewport.zoom) => {
@@ -727,7 +736,10 @@ fn overview_status(editor: &Editor, map: &OpenWorldMap, overlays: &Overlays) -> 
     }
     vec![
         format!("World · {} areas", map.layout.cards.len()),
-        "drag to arrange · scroll to zoom · Space drag to pan".to_owned(),
+        format!(
+            "drag to arrange · scroll to zoom · {} drag to pan",
+            EditorKey::Pan.name()
+        ),
     ]
 }
 

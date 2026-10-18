@@ -47,6 +47,7 @@ use self::overlays::{
 };
 use self::status::status_bar;
 use crate::app::{BottomTab, Editor};
+use crate::keymap::EditorKey;
 use crate::project::{AreaCameraState, ContentEdit, Project, RowSelection, row_file};
 use crate::tabs::EditorTab;
 use crate::ui::{sidebar, theme, widgets};
@@ -127,16 +128,16 @@ impl AreaTool {
         AreaTool::Module,
     ];
 
-    pub fn key(self) -> egui::Key {
+    pub fn key(self) -> EditorKey {
         match self {
-            AreaTool::Select => egui::Key::V,
-            AreaTool::Paint => egui::Key::B,
-            AreaTool::Terrain => egui::Key::T,
-            AreaTool::Fill => egui::Key::G,
-            AreaTool::Erase => egui::Key::E,
-            AreaTool::Eyedropper => egui::Key::I,
-            AreaTool::Stamp => egui::Key::S,
-            AreaTool::Module => egui::Key::M,
+            AreaTool::Select => EditorKey::SelectTool,
+            AreaTool::Paint => EditorKey::PaintTool,
+            AreaTool::Terrain => EditorKey::TerrainTool,
+            AreaTool::Fill => EditorKey::FillTool,
+            AreaTool::Erase => EditorKey::EraseTool,
+            AreaTool::Eyedropper => EditorKey::EyedropperTool,
+            AreaTool::Stamp => EditorKey::StampTool,
+            AreaTool::Module => EditorKey::ModuleTool,
         }
     }
 
@@ -161,10 +162,6 @@ impl AreaTool {
             AreaTool::Stamp => "Stamp",
             AreaTool::Module => "Module",
         }
-    }
-
-    pub fn icon(self) -> &'static str {
-        self.key().name()
     }
 }
 
@@ -678,7 +675,7 @@ fn banners(
             if widgets::primary(ui, "Done").clicked() {
                 done = true;
             }
-            widgets::key_hint(ui, "Esc");
+            widgets::key_chip(ui, EditorKey::Cancel);
         });
         child.add_space(4.0);
         let crumbs: Vec<String> = std::iter::once(area_key.clone())

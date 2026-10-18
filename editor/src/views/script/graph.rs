@@ -17,6 +17,7 @@ use super::ScriptDoc;
 use super::nodes::{
     self, FlowKind, LineSpeaker, NodeCatalogue, NodePort, SummaryPiece, SummaryTone,
 };
+use crate::keymap::EditorKey;
 use crate::spans;
 use crate::ui::{theme, widgets};
 use crate::value::RowValue;
@@ -292,7 +293,9 @@ impl ScriptGraphViewer<'_> {
         if response.clicked() {
             self.clicks.push(NodeClick {
                 name: name.to_owned(),
-                extend: ui.input(|i| i.modifiers.shift || i.modifiers.command),
+                extend: ui.input(|i| {
+                    EditorKey::ExtendSelection.held(i) || EditorKey::ToggleSelection.held(i)
+                }),
             });
         }
     }
@@ -355,9 +358,13 @@ impl ScriptGraphViewer<'_> {
         if editing {
             ui.add_space(big(2.0));
             ui.label(
-                theme::faint("Enter new line · Ctrl Enter new choice")
-                    .size(big(11.0))
-                    .monospace(),
+                theme::faint(format!(
+                    "{} new line · {} new choice",
+                    EditorKey::Confirm.name(),
+                    EditorKey::AddChoice.name()
+                ))
+                .size(big(11.0))
+                .monospace(),
             );
         }
     }
@@ -707,7 +714,10 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     }
 
     fn show_graph_menu(&mut self, pos: Pos2, ui: &mut Ui, _snarl: &mut Snarl<ScriptGraphNode>) {
-        if ui.button("Add node…  (Tab)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Add node…", EditorKey::Palette))
+            .clicked()
+        {
             self.open_palette(pos, None);
             ui.close();
         }
@@ -753,27 +763,42 @@ impl SnarlViewer<ScriptGraphNode> for ScriptGraphViewer<'_> {
     ) {
         let name = snarl[id].name.clone();
         if self.node(&name).is_some_and(nodes::is_dialogue) {
-            if ui.button("Add line  (Enter)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Add line", EditorKey::Confirm))
+                .clicked()
+            {
                 self.actions.push(ScriptGraphAction::AddLine(name.clone()));
                 ui.close();
             }
-            if ui.button("Add choice  (Ctrl Enter)").clicked() {
+            if ui
+                .add(widgets::shortcut_button("Add choice", EditorKey::AddChoice))
+                .clicked()
+            {
                 self.actions
                     .push(ScriptGraphAction::AddChoice(name.clone()));
                 ui.close();
             }
             ui.separator();
         }
-        if ui.button("Rename…  (F2)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Rename…", EditorKey::Rename))
+            .clicked()
+        {
             self.actions.push(ScriptGraphAction::Rename(name.clone()));
             ui.close();
         }
-        if ui.button("Duplicate  (Ctrl D)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Duplicate", EditorKey::Duplicate))
+            .clicked()
+        {
             self.actions
                 .push(ScriptGraphAction::Duplicate(name.clone()));
             ui.close();
         }
-        if ui.button("Delete  (Del)").clicked() {
+        if ui
+            .add(widgets::shortcut_button("Delete", EditorKey::Delete))
+            .clicked()
+        {
             self.actions.push(ScriptGraphAction::Delete(name));
             ui.close();
         }
