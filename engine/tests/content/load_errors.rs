@@ -217,3 +217,33 @@ fn a_layer_filling_a_parameter_its_shader_lacks_is_refused() {
         error.at
     );
 }
+
+#[test]
+fn a_game_file_that_does_not_parse_is_refused_at_its_field() {
+    let folder = TempFolder::of_template();
+    folder.edit("game.json", |game| game["initial_spawn"] = json!("start"));
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "game.json")
+        .unwrap_or_else(|| panic!("no error in game.json:\n{report}"));
+    assert_eq!(error.problem.rule, "wrong type");
+}
+
+#[test]
+fn a_folder_without_a_game_file_is_refused() {
+    let folder = TempFolder::of_template();
+    folder.remove("game.json");
+
+    let report = load(folder.path()).err().expect("refused");
+
+    let error = report
+        .errors
+        .iter()
+        .find(|error| error.file == "game.json")
+        .unwrap_or_else(|| panic!("no error for game.json:\n{report}"));
+    assert_eq!(error.problem.rule, "missing file");
+}

@@ -34,6 +34,7 @@ pub enum LoadStep {
     Assemble,
     // Checks across tables.
     Across,
+    // Checks of the game's settings, once they parsed.
     Settings,
     // Only once everything else loaded without an error.
     Compile,
@@ -363,7 +364,9 @@ pub fn load(
     loading.run_hooks(registry, LoadStep::Assemble);
     loading.run_hooks(registry, LoadStep::Across);
     loading.check_fixtures(registry);
-    loading.run_hooks(registry, LoadStep::Settings);
+    if loading.has_settings(registry) {
+        loading.run_hooks(registry, LoadStep::Settings);
+    }
     loading.check_version(registry, &version);
     loading.built(version.clone());
     if loading.errors.is_empty() {
@@ -677,6 +680,12 @@ impl Loading {
             }
         }
         self.built(FileHashes(hashes));
+    }
+
+    fn has_settings(&mut self, registry: &ContentRegistry) -> bool {
+        registry
+            .settings_loader()
+            .is_some_and(|loader| loader.built(&self.content()))
     }
 
     fn run_hooks(&mut self, registry: &ContentRegistry, step: LoadStep) {
@@ -1137,6 +1146,7 @@ pub(super) trait SettingsLoader: Send + Sync {
     fn parse(&self, text: &str) -> ParseResult;
     fn shape(&self, settings: &SchemaSettings) -> serde_json::Value;
     fn store(&self, settings: Box<dyn Any + Send + Sync>, builder: &mut ContentBuilder);
+    fn built(&self, content: &Content) -> bool;
     fn version<'a>(&self, content: &'a Content) -> Option<&'a ContentVersion>;
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()>;
 }
@@ -1159,14 +1169,17 @@ impl<G: Settings> SettingsLoader for SettingsOf<G> {
         builder.built(settings);
     }
 
+    fn built(&self, content: &Content) -> bool {
+        content.has_built::<G>()
+    }
+
     fn version<'a>(&self, content: &'a Content) -> Option<&'a ContentVersion> {
-        content
-            .has_built::<G>()
+        self.built(content)
             .then(|| content.built::<G>().content_version())
     }
 
     fn write(&self, content: &Content, writer: &mut FileWriter) -> io::Result<()> {
-        if content.has_built::<G>() {
+        if self.built(content) {
             writer.json(GAME_FILE, content.built::<G>())?;
         }
         Ok(())
