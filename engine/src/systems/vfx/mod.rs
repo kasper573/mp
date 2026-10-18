@@ -5,18 +5,17 @@ pub use fixture::{VfxFixture, VfxShaderFixture};
 use std::collections::BTreeMap;
 
 use bevy_app::App;
-use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
-use bevy_replicon::bytes::Bytes;
-use bevy_replicon::prelude::Replicated;
-use bevy_replicon::shared::replication::registry::ctx::{SerializeCtx, WriteCtx};
+use bevy_replicon::prelude::{AppRuleExt, Replicated};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::core::content::Content;
 use crate::core::geometry::{Footprint, Radians, Shape};
 use crate::core::math::Pos;
-use crate::core::script::{Compiler, EffectDef, EffectStep, Eval, Name, ScriptFault, ValueType};
+use crate::core::script::{
+    Compiler, EffectDef, EffectStep, Eval, FlowCx, NEXT, Name, ScriptFault, ValueType,
+};
 use crate::core::tiling::Tiles;
 use crate::core::time::{Seconds, WallClock};
 use crate::core::vfx::{ParamKind, ParamValue, VfxId, VfxInstance, VfxParams, VfxSite, WidgetName};
@@ -32,9 +31,7 @@ use crate::systems::visibility::Presence;
 const LINGER: Seconds = Seconds(0.25);
 
 pub fn register(app: &mut App) {
-    use bevy_replicon::prelude::*;
-    use bevy_replicon::shared::replication::registry::rule_fns::RuleFns;
-    app.replicate_with(RuleFns::new(serialize_instance, deserialize_instance));
+    app.replicate::<VfxInstance>();
 }
 
 /// Plays a vfx on a site everyone nearby sees.
@@ -85,7 +82,7 @@ pub fn expire(world: &mut World, instances: &mut QueryState<(Entity, &VfxInstanc
 /// the screen of each character named.
 #[derive(JsonSchema, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Vfx {
+pub struct PlayVfx {
     pub vfx: VfxId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on: Option<Condition>,
@@ -111,15 +108,7 @@ pub enum VfxTarget {
     },
 }
 
-impl VfxTarget {
-    fn is_place(&self) -> bool {
-        *self == VfxTarget::Place
-    }
-}
-
-const NEXT: Name = "next";
-
-impl EffectDef<RiftScripting> for Vfx {
+impl EffectDef<RiftScripting> for PlayVfx {
     fn needs_subject(&self) -> bool {
         self.on.is_none()
     }
@@ -153,15 +142,11 @@ impl EffectDef<RiftScripting> for Vfx {
             None => cx.actor(None)?,
         };
         let def = self.vfx.get(cx.content());
-        let mut params: Vec<(String, ParamKind, Eval)> = Vec::new();
+        let mut fillers: Vec<(String, ParamFiller)> = Vec::new();
         for (name, expr) in &self.params {
-            match def.declares(name) {
-                Some(kind @ ParamKind::Number) => {
-                    params.push((name.clone(), kind, cx.expr(expr, ValueType::Number)?))
-                }
-                Some(kind @ ParamKind::Bool) => {
-                    params.push((name.clone(), kind, cx.expr(expr, ValueType::Boolean)?))
-                }
+            let filler = match def.declares(name) {
+                Some(ParamKind::Number) => ParamFiller::Number(cx.expr(expr, ValueType::Number)?),
+                Some(ParamKind::Bool) => ParamFiller::Flag(cx.expr(expr, ValueType::Boolean)?),
                 Some(ParamKind::Color) => {
                     return Err(ScriptFault::new(
                         "wrong type",
@@ -174,21 +159,15 @@ impl EffectDef<RiftScripting> for Vfx {
                         format!("{} declares no {name}", def.name),
                     ));
                 }
-            }
+            };
+            fillers.push((name.clone(), filler));
         }
         let (vfx, target) = (self.vfx, self.site.clone());
         Ok(Box::new(move |world, _, cx| {
             let filled = VfxParams(
-                params
+                fillers
                     .iter()
-                    .map(|(name, kind, eval)| {
-                        let value = eval(world, cx);
-                        let filled = match kind {
-                            ParamKind::Bool => ParamValue::Bool(value.truthy()),
-                            _ => ParamValue::Number(value.as_num() as f32),
-                        };
-                        (name.clone(), filled)
-                    })
+                    .map(|(name, filler)| (name.clone(), filler.fill(world, cx)))
                     .collect(),
             );
             let value = on(world, cx);
@@ -242,6 +221,27 @@ impl EffectDef<RiftScripting> for Vfx {
     }
 }
 
+impl VfxTarget {
+    fn is_place(&self) -> bool {
+        *self == VfxTarget::Place
+    }
+}
+
+/// A script's value for a parameter, read as the kind the vfx declares.
+enum ParamFiller {
+    Number(Eval),
+    Flag(Eval),
+}
+
+impl ParamFiller {
+    fn fill(&self, world: &World, cx: &FlowCx) -> ParamValue {
+        match self {
+            ParamFiller::Number(eval) => ParamValue::Number(eval(world, cx).as_num() as f32),
+            ParamFiller::Flag(eval) => ParamValue::Bool(eval(world, cx).truthy()),
+        }
+    }
+}
+
 /// Where a path through actors runs: from the subject, when there is one, to the actor nearest it,
 /// then the one nearest that, until every actor is passed.
 fn chained(world: &World, from: Option<Entity>, actors: &[Entity]) -> Vec<Pos<Tiles>> {
@@ -249,30 +249,21 @@ fn chained(world: &World, from: Option<Entity>, actors: &[Entity]) -> Vec<Pos<Ti
         .iter()
         .filter_map(|actor| position(world, *actor))
         .collect();
-    let mut points: Vec<Pos<Tiles>> = from
-        .and_then(|from| position(world, from))
-        .into_iter()
-        .collect();
-    let mut at = points
-        .first()
-        .copied()
-        .or_else(|| (!left.is_empty()).then(|| left.remove(0)));
-    if points.is_empty()
-        && let Some(start) = at
-    {
-        points.push(start);
-    }
-    while let Some(here) = at
-        && !left.is_empty()
-    {
+    let start = match from.and_then(|from| position(world, from)) {
+        Some(at) => at,
+        None if left.is_empty() => return Vec::new(),
+        None => left.remove(0),
+    };
+    let mut points = vec![start];
+    let mut here = start;
+    while !left.is_empty() {
         let (index, _) = left
             .iter()
             .enumerate()
             .min_by(|(_, a), (_, b)| a.distance_to(here).total_cmp(&b.distance_to(here)))
             .expect("left is not empty");
-        let next = left.remove(index);
-        points.push(next);
-        at = Some(next);
+        here = left.swap_remove(index);
+        points.push(here);
     }
     points
 }
@@ -302,22 +293,4 @@ fn spawn_at(
         world.entity_mut(entity).insert(presence);
     }
     entity
-}
-
-fn serialize_instance(
-    _ctx: &mut SerializeCtx,
-    instance: &VfxInstance,
-    message: &mut Vec<u8>,
-) -> bevy_ecs::error::Result<()> {
-    bevy_replicon::postcard_utils::to_extend_mut(instance, message)?;
-    Ok(())
-}
-
-fn deserialize_instance(
-    ctx: &mut WriteCtx,
-    message: &mut Bytes,
-) -> bevy_ecs::error::Result<VfxInstance> {
-    let mut instance: VfxInstance = bevy_replicon::postcard_utils::from_buf(message)?;
-    instance.map_entities(ctx);
-    Ok(instance)
 }

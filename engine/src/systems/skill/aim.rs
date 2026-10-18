@@ -18,10 +18,7 @@ use crate::systems::interface::{CursorShape, InterfaceSound};
 use crate::systems::movement;
 use crate::systems::notification;
 use crate::systems::player::session;
-use crate::systems::vfx::VfxShaderFixture;
-
-const OUTLINE_STEPS: usize = 40;
-const HOSTILE_PARAM: &str = "hostile";
+use crate::systems::vfx::{VfxShaderFixture, fixture};
 
 /// The skill a press armed, waiting for the click that aims it, and the surface drawn on the ground
 /// where an area skill would land.
@@ -114,7 +111,10 @@ pub fn surface(world: &mut World) {
     let overlay = ShaderOverlay {
         shader: VfxShaderFixture::SkillArea.id(&content),
         site: VfxSite::Area(footprint),
-        params: VfxParams(vec![(HOSTILE_PARAM.to_owned(), ParamValue::Bool(hostile))]),
+        params: VfxParams(vec![(
+            fixture::HOSTILE.to_owned(),
+            ParamValue::Bool(hostile),
+        )]),
         since,
     };
     match shown {
@@ -213,7 +213,7 @@ pub fn draw_aim(world: &mut World) {
     let range = super::range_of(world, me, aimed.skill, aimed.rank);
     let mut lines: Vec<(Vec<Pos2>, Color32, f32)> = Vec::new();
     let reach = Footprint::cast(Shape::Circle { radius: range }, from, from);
-    if let Some(ring) = project(world, &reach.outline(OUTLINE_STEPS)) {
+    if let Some(ring) = project(world, &reach.outline()) {
         lines.push((ring, color::WARN.gamma_multiply(0.35), 1.0));
     }
     let label = def

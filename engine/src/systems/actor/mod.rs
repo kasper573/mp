@@ -3,7 +3,7 @@ pub mod plate;
 pub mod playing;
 pub mod render;
 
-pub use model::{ActorModel, ModelDef, Timing};
+pub use model::{ActorModel, ModelDef, ModelId, Timing};
 pub use playing::{Animate, LastAction, Playing, Wait};
 
 use bevy_app::App;
@@ -16,7 +16,6 @@ use crate::core::content::{ContentRegistry, LoadStep};
 use crate::core::math::{Direction, Pos, Rgba, Size};
 use crate::core::tiling::{TilePos, Tiles};
 use crate::core::time::PlaybackRate;
-use crate::systems::actor::model::ModelId;
 use crate::systems::movement::{Path, Position};
 use crate::systems::stat::{self, Stats};
 

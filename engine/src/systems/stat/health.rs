@@ -41,7 +41,12 @@ pub fn apply_damage(world: &mut World, entity: Entity, amount: f32) {
     set_health(world, entity, |health, _| (health - amount).max(0.0));
     if amount > 0.0 {
         let site = VfxSite::Actor(entity);
-        fixture::play(world, VfxFixture::DamageTaken, site, &[("amount", amount)]);
+        fixture::play(
+            world,
+            VfxFixture::DamageTaken,
+            site,
+            &[(fixture::AMOUNT, amount)],
+        );
     }
 }
 
@@ -55,7 +60,12 @@ pub fn heal(world: &mut World, entity: Entity, amount: f32) {
     regenerate(world, entity, amount);
     if current_health(world, entity) > before {
         let site = VfxSite::Actor(entity);
-        fixture::play(world, VfxFixture::Healed, site, &[("amount", amount)]);
+        fixture::play(
+            world,
+            VfxFixture::Healed,
+            site,
+            &[(fixture::AMOUNT, amount)],
+        );
     }
 }
 

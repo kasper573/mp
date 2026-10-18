@@ -11,6 +11,8 @@ pub struct Degrees(pub f32);
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct Radians(pub f32);
 
+const OUTLINE_STEPS: usize = 40;
+
 impl Degrees {
     pub fn radians(self) -> Radians {
         Radians(self.0.to_radians())
@@ -18,10 +20,6 @@ impl Degrees {
 }
 
 impl Radians {
-    pub fn degrees(self) -> Degrees {
-        Degrees(self.0.to_degrees())
-    }
-
     pub fn of(heading: Offset<Tiles>) -> Radians {
         Radians(heading.y.atan2(heading.x))
     }
@@ -145,7 +143,9 @@ impl Footprint {
         self.shape.reach()
     }
 
-    pub fn outline(&self, steps: usize) -> Vec<Pos<Tiles>> {
+    /// The points around the footprint's edge, enough for a drawn ring or a bounding box.
+    pub fn outline(&self) -> Vec<Pos<Tiles>> {
+        let steps = OUTLINE_STEPS;
         let heading = self.facing.heading();
         let side = Offset::new(-heading.y, heading.x);
         let along = |a: f32, b: f32| self.at + heading * a + side * b;

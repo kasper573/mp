@@ -1,8 +1,11 @@
+pub mod play;
 pub mod render;
 pub mod shader;
 
+pub use play::{LayerTime, TextFloat, sprite_cell};
 pub use shader::{
-    CompiledVfxShaders, ParamKind, ShaderError, ShaderParam, VfxShaderDef, VfxShaderId, shader_file,
+    BodyShape, CompiledVfxShaders, ParamKind, ShaderError, ShaderParam, SiteKind, VfxShaderDef,
+    VfxShaderId, prelude_names, shader_file,
 };
 
 use std::collections::BTreeMap;
@@ -18,12 +21,16 @@ use crate::core::content::{ContentId, ContentRegistry, ContentRow, LoadStep, Loa
 use crate::core::geometry::Footprint;
 use crate::core::math::{FrameSize, Pos, Rgba};
 use crate::core::tiling::Tiles;
-use crate::core::time::{Seconds, UnixMillis};
+use crate::core::time::{Hertz, Seconds, UnixMillis};
 
 pub type VfxId = ContentId<VfxDef>;
 
 pub const MAX_PARAMS: usize = 8;
 pub const MAX_LAYERS: usize = 16;
+
+/// How long a layer may run or wait: within a minute, and long enough to be seen.
+pub const SHORTEST_RUN: Seconds = Seconds(0.05);
+pub const LONGEST_RUN: Seconds = Seconds(60.0);
 
 pub fn content(registry: &mut ContentRegistry) {
     registry
@@ -40,13 +47,14 @@ pub fn content(registry: &mut ContentRegistry) {
 pub struct VfxDef {
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<ParamDecl>,
+    pub params: Vec<VfxParam>,
     pub layers: Vec<VfxLayer>,
 }
 
+/// A parameter a vfx row leaves to whoever plays it.
 #[derive(JsonSchema, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ParamDecl {
+pub struct VfxParam {
     pub name: String,
     pub kind: ParamKind,
 }
@@ -58,14 +66,14 @@ pub enum VfxLayer {
         sheet: AssetRef,
         frame: FrameSize,
         frames: u32,
-        fps: f32,
+        fps: Hertz,
         #[serde(default, skip_serializing_if = "SpriteAnchor::is_default")]
         anchor: SpriteAnchor,
         #[serde(default = "one", skip_serializing_if = "is_one")]
         #[schemars(extend("default" = one()))]
         scale: f32,
-        #[serde(default, skip_serializing_if = "Play::is_once")]
-        play: Play,
+        #[serde(default, skip_serializing_if = "SpritePlay::is_once")]
+        play: SpritePlay,
         #[serde(default, skip_serializing_if = "is_no_time")]
         delay: Seconds,
     },
@@ -108,7 +116,7 @@ pub enum SpriteAnchor {
 
 #[derive(JsonSchema, Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Play {
+pub enum SpritePlay {
     #[default]
     Once,
     Loop {
@@ -198,6 +206,166 @@ impl VfxParams {
     }
 }
 
+impl ParamFill {
+    /// What the fill gives: its own value, or the caller's for the parameter it names.
+    pub fn resolve(&self, given: &VfxParams) -> Option<ParamValue> {
+        match self {
+            ParamFill::Value(value) => Some(*value),
+            ParamFill::Param { param } => given.get(param),
+        }
+    }
+}
+
+impl VfxLayer {
+    pub fn delay(&self) -> Seconds {
+        match self {
+            VfxLayer::Sprite { delay, .. }
+            | VfxLayer::Text { delay, .. }
+            | VfxLayer::Shader { delay, .. } => *delay,
+        }
+    }
+
+    pub fn duration(&self) -> Seconds {
+        match self {
+            VfxLayer::Sprite {
+                frames, fps, play, ..
+            } => match play {
+                SpritePlay::Once => Seconds(*frames as f32 / fps.0.max(0.001)),
+                SpritePlay::Loop { seconds } => *seconds,
+            },
+            VfxLayer::Text { duration, .. } | VfxLayer::Shader { duration, .. } => *duration,
+        }
+    }
+
+    pub fn ends(&self) -> Seconds {
+        self.delay() + self.duration()
+    }
+}
+
+impl VfxDef {
+    /// How long the whole stack plays: when its last layer ends.
+    pub fn lasts(&self) -> Seconds {
+        self.layers
+            .iter()
+            .map(VfxLayer::ends)
+            .fold(
+                Seconds(0.0),
+                |longest, ends| {
+                    if ends > longest { ends } else { longest }
+                },
+            )
+    }
+
+    pub fn declares(&self, name: &str) -> Option<ParamKind> {
+        self.params
+            .iter()
+            .find(|param| param.name == name)
+            .map(|param| param.kind)
+    }
+
+    /// Every `{name}` a text template reads.
+    pub fn placeholders(template: &str) -> Vec<String> {
+        let mut names = Vec::new();
+        fill_template(template, |name| {
+            names.push(name.to_owned());
+            None
+        });
+        names
+    }
+
+    /// The template with each `{name}` the caller filled written in; one they left out stays as
+    /// written.
+    pub fn fill(template: &str, params: &VfxParams) -> String {
+        fill_template(template, |name| params.get(name).map(ParamValue::text))
+    }
+}
+
+impl ContentRow for VfxDef {
+    const TABLE: &'static str = "vfx";
+
+    fn check(&self, check: &mut RowCheck) {
+        check.text("/name", &self.name, 1, 40);
+        check.count("/layers", self.layers.len(), 1, MAX_LAYERS, "layers");
+        check.count("/params", self.params.len(), 0, MAX_PARAMS, "parameters");
+        for (index, param) in self.params.iter().enumerate() {
+            shader::check_param_name(check, &format!("/params/{index}/name"), &param.name);
+            if self.params[..index]
+                .iter()
+                .any(|other| other.name == param.name)
+            {
+                check.error(
+                    format!("/params/{index}/name"),
+                    "parameter listed twice",
+                    &param.name,
+                    "each parameter once",
+                );
+            }
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            let at = |field: &str| format!("/layers/{index}/{field}");
+            check.range(at("delay"), layer.delay().0, 0.0, LONGEST_RUN.0, "seconds");
+            match layer {
+                VfxLayer::Sprite {
+                    frame,
+                    frames,
+                    fps,
+                    scale,
+                    play,
+                    ..
+                } => {
+                    check.range(at("frame/width"), frame.width, 1, 1024, "pixels");
+                    check.range(at("frame/height"), frame.height, 1, 1024, "pixels");
+                    check.range(at("frames"), *frames, 1, 256, "frames");
+                    check.range(at("fps"), fps.0, 1.0, 120.0, "frames per second");
+                    check.range(at("scale"), *scale, 0.1, 10.0, "a scale");
+                    if let SpritePlay::Loop { seconds } = play {
+                        check_run(check, at("play/seconds"), *seconds);
+                    }
+                }
+                VfxLayer::Text {
+                    template,
+                    size,
+                    rise,
+                    duration,
+                    ..
+                } => {
+                    check.text(at("template"), template, 1, 40);
+                    check.range(at("size"), *size, 6.0, 64.0, "points");
+                    check.range(at("rise"), rise.0, -4.0, 4.0, "tiles");
+                    check_run(check, at("duration"), *duration);
+                    for name in VfxDef::placeholders(template) {
+                        if self.declares(&name).is_none() {
+                            check.error(
+                                at("template"),
+                                "undeclared parameter",
+                                format!("{{{name}}}"),
+                                "a name the row declares under params",
+                            );
+                        }
+                    }
+                }
+                VfxLayer::Shader {
+                    params, duration, ..
+                } => {
+                    check_run(check, at("duration"), *duration);
+                    for (name, fill) in params {
+                        if let ParamFill::Param { param } = fill
+                            && self.declares(param).is_none()
+                        {
+                            check.error(
+                                at(&format!("params/{name}")),
+                                "undeclared parameter",
+                                param,
+                                "a name the row declares under params",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Replication serializes with postcard, which cannot read the untagged value content uses.
 #[derive(Serialize, Deserialize)]
 struct WireParams(Vec<(String, WireValue)>);
@@ -243,166 +411,6 @@ impl From<WireParams> for VfxParams {
                 })
                 .collect(),
         )
-    }
-}
-
-impl VfxLayer {
-    pub fn delay(&self) -> Seconds {
-        match self {
-            VfxLayer::Sprite { delay, .. }
-            | VfxLayer::Text { delay, .. }
-            | VfxLayer::Shader { delay, .. } => *delay,
-        }
-    }
-
-    pub fn duration(&self) -> Seconds {
-        match self {
-            VfxLayer::Sprite {
-                frames, fps, play, ..
-            } => match play {
-                Play::Once => Seconds(*frames as f32 / fps.max(0.001)),
-                Play::Loop { seconds } => *seconds,
-            },
-            VfxLayer::Text { duration, .. } | VfxLayer::Shader { duration, .. } => *duration,
-        }
-    }
-
-    pub fn ends(&self) -> Seconds {
-        self.delay() + self.duration()
-    }
-
-    pub fn kind(&self) -> &'static str {
-        match self {
-            VfxLayer::Sprite { .. } => "sprite",
-            VfxLayer::Text { .. } => "text",
-            VfxLayer::Shader { .. } => "shader",
-        }
-    }
-}
-
-impl VfxDef {
-    /// How long the whole stack plays: when its last layer ends.
-    pub fn lasts(&self) -> Seconds {
-        self.layers
-            .iter()
-            .map(VfxLayer::ends)
-            .fold(
-                Seconds(0.0),
-                |longest, ends| {
-                    if ends > longest { ends } else { longest }
-                },
-            )
-    }
-
-    pub fn declares(&self, name: &str) -> Option<ParamKind> {
-        self.params
-            .iter()
-            .find(|param| param.name == name)
-            .map(|param| param.kind)
-    }
-
-    /// Every `{name}` a text template reads.
-    pub fn placeholders(template: &str) -> Vec<String> {
-        template
-            .split('{')
-            .skip(1)
-            .filter_map(|rest| rest.split_once('}'))
-            .map(|(name, _)| name.to_owned())
-            .collect()
-    }
-
-    pub fn fill(template: &str, params: &VfxParams) -> String {
-        let mut text = template.to_owned();
-        for (name, value) in &params.0 {
-            text = text.replace(&format!("{{{name}}}"), &value.text());
-        }
-        text
-    }
-}
-
-impl ContentRow for VfxDef {
-    const TABLE: &'static str = "vfx";
-
-    fn check(&self, check: &mut RowCheck) {
-        check.text("/name", &self.name, 1, 40);
-        check.count("/layers", self.layers.len(), 1, MAX_LAYERS, "layers");
-        check.count("/params", self.params.len(), 0, MAX_PARAMS, "parameters");
-        for (index, param) in self.params.iter().enumerate() {
-            shader::check_param_name(check, &format!("/params/{index}/name"), &param.name);
-            if self.params[..index]
-                .iter()
-                .any(|other| other.name == param.name)
-            {
-                check.error(
-                    format!("/params/{index}/name"),
-                    "parameter listed twice",
-                    &param.name,
-                    "each parameter once",
-                );
-            }
-        }
-        for (index, layer) in self.layers.iter().enumerate() {
-            let at = |field: &str| format!("/layers/{index}/{field}");
-            check.range(at("delay"), layer.delay().0, 0.0, 60.0, "seconds");
-            match layer {
-                VfxLayer::Sprite {
-                    frame,
-                    frames,
-                    fps,
-                    scale,
-                    play,
-                    ..
-                } => {
-                    check.range(at("frame/width"), frame.width, 1, 1024, "pixels");
-                    check.range(at("frame/height"), frame.height, 1, 1024, "pixels");
-                    check.range(at("frames"), *frames, 1, 256, "frames");
-                    check.range(at("fps"), *fps, 1.0, 120.0, "frames per second");
-                    check.range(at("scale"), *scale, 0.1, 10.0, "a scale");
-                    if let Play::Loop { seconds } = play {
-                        check.range(at("play/seconds"), seconds.0, 0.05, 60.0, "seconds");
-                    }
-                }
-                VfxLayer::Text {
-                    template,
-                    size,
-                    rise,
-                    duration,
-                    ..
-                } => {
-                    check.text(at("template"), template, 1, 40);
-                    check.range(at("size"), *size, 6.0, 64.0, "points");
-                    check.range(at("rise"), rise.0, -4.0, 4.0, "tiles");
-                    check.range(at("duration"), duration.0, 0.05, 60.0, "seconds");
-                    for name in VfxDef::placeholders(template) {
-                        if self.declares(&name).is_none() {
-                            check.error(
-                                at("template"),
-                                "undeclared parameter",
-                                format!("{{{name}}}"),
-                                "a name the row declares under params",
-                            );
-                        }
-                    }
-                }
-                VfxLayer::Shader {
-                    params, duration, ..
-                } => {
-                    check.range(at("duration"), duration.0, 0.05, 60.0, "seconds");
-                    for (name, fill) in params {
-                        if let ParamFill::Param { param } = fill
-                            && self.declares(param).is_none()
-                        {
-                            check.error(
-                                at(&format!("params/{name}")),
-                                "undeclared parameter",
-                                param,
-                                "a name the row declares under params",
-                            );
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -498,6 +506,39 @@ fn check_all(loading: &mut Loading) {
     }
 }
 
+fn check_run(check: &mut RowCheck, pointer: String, run: Seconds) {
+    check.range(pointer, run.0, SHORTEST_RUN.0, LONGEST_RUN.0, "seconds");
+}
+
+/// Walks a template's `{name}` placeholders in order, writing in what `fill` gives for each and
+/// leaving the rest of the text as it is.
+fn fill_template(template: &str, mut fill: impl FnMut(&str) -> Option<String>) -> String {
+    let mut text = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some((before, after)) = rest.split_once('{') {
+        text.push_str(before);
+        match after.split_once('}') {
+            Some((name, tail)) => {
+                match fill(name) {
+                    Some(value) => text.push_str(&value),
+                    None => {
+                        text.push('{');
+                        text.push_str(name);
+                        text.push('}');
+                    }
+                }
+                rest = tail;
+            }
+            None => {
+                text.push('{');
+                rest = after;
+            }
+        }
+    }
+    text.push_str(rest);
+    text
+}
+
 fn one() -> f32 {
     1.0
 }
@@ -532,8 +573,8 @@ impl SpriteAnchor {
     }
 }
 
-impl Play {
+impl SpritePlay {
     fn is_once(&self) -> bool {
-        *self == Play::Once
+        *self == SpritePlay::Once
     }
 }

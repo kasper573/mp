@@ -7,13 +7,15 @@ mod shader_code;
 use std::sync::Arc;
 
 use egui::{Color32, FontId, Ui, Vec2 as EVec2};
+use engine::core::content::{Content, ContentScope, ErrorPlace, with_content};
 use engine::core::time::Seconds;
-use engine::core::vfx::{ParamFill, VfxShaderDef, shader_file};
+use engine::core::vfx::{ParamFill, VfxLayer, VfxShaderDef, shader_file};
+use serde_json::Value;
 
 pub use params::{ParamSpec, param_fill, params_of, shader_params};
 pub use preview::{Target, VfxViews, sync};
 
-use self::preview::{Layer, layers_of, preview};
+use self::preview::preview;
 use crate::app::Editor;
 use crate::drafts::{clear_draft, draft_or, set_draft};
 use crate::project::{ContentEdit, row_file};
@@ -35,7 +37,9 @@ pub fn show_vfx(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.label(theme::muted(format!("{} is gone", row_file(TABLE, key))));
         return;
     };
-    let layers = layers_of(&row);
+    let layers = editor
+        .loaded()
+        .map_or_else(Vec::new, |content| layers_of(&content, &row));
     let specs = editor
         .project
         .as_ref()
@@ -112,11 +116,15 @@ pub fn show_shader(editor: &mut Editor, ui: &mut Ui, key: &str) {
         ui.vertical(|ui| {
             ui.set_width(preview_width);
             widgets::section(ui, "preview");
-            let Some(def) = def.as_ref() else {
+            let Some((def, shader)) = def.as_ref().zip(
+                editor
+                    .loaded()
+                    .and_then(|content| content.by_key::<VfxShaderDef>(key)),
+            ) else {
                 return;
             };
-            let layer = Layer::Shader {
-                shader: key.to_owned(),
+            let layer = VfxLayer::Shader {
+                shader,
                 params: def
                     .params
                     .iter()
@@ -168,10 +176,10 @@ fn code_pane(
     let status = match &verdict {
         Ok(()) => theme::ok("✓ compiles"),
         Err(error) => {
-            let place = error
-                .line
-                .map(|(line, column)| format!("line {line}:{column} · "))
-                .unwrap_or_default();
+            let place = match error.place {
+                ErrorPlace::Text { line, column } => format!("line {line}:{column} · "),
+                _ => String::new(),
+            };
             theme::warn(format!("✗ {place}{}", error.message))
         }
     };
@@ -223,4 +231,17 @@ fn code_pane(
             }
         }
     });
+}
+
+/// The row's layers that parse, each against the content that last loaded, so a row being worked
+/// on still previews the layers that are whole.
+fn layers_of(content: &Content, row: &Value) -> Vec<VfxLayer> {
+    let layers = row["layers"].as_array().cloned().unwrap_or_default();
+    with_content(ContentScope::of(content), || {
+        layers
+            .into_iter()
+            .filter_map(|layer| serde_json::from_value(layer).ok())
+            .collect()
+    })
+    .0
 }

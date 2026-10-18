@@ -37,7 +37,7 @@ use crate::views::script::{LinkNodeDialog, RenameNodeDialog, ScriptOwner};
 use crate::views::world::ArrangeDialog;
 use crate::views::{EditorCamera, EditorViews};
 use crate::{import, play, rows, ui, views};
-use engine::core::vfx::render::VfxMaterial;
+use engine::core::vfx::render::{VfxAssets, VfxMaterial};
 
 #[derive(Clone, Debug, Default)]
 pub struct EditorLaunch {
@@ -75,6 +75,7 @@ impl Plugin for EditorPlugin {
             bevy::sprite_render::Material2dPlugin::<VfxMaterial>::default(),
         ))
         .insert_resource(editor)
+        .init_resource::<VfxAssets>()
         .add_systems(Startup, setup_camera)
         .add_systems(
             PreUpdate,

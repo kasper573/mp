@@ -171,6 +171,13 @@ impl From<Rgba> for [u8; 4] {
     }
 }
 
+impl From<Rgba> for egui::Color32 {
+    fn from(rgba: Rgba) -> egui::Color32 {
+        let [r, g, b, a] = rgba.0.to_be_bytes();
+        egui::Color32::from_rgba_unmultiplied(r, g, b, a)
+    }
+}
+
 #[derive(JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FrameSize {

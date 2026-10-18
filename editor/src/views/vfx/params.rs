@@ -3,7 +3,7 @@
 
 use egui::{Color32, Ui};
 use engine::core::math::Rgba;
-use engine::core::vfx::{ParamDecl, ParamFill, ParamKind, ParamValue, ShaderParam};
+use engine::core::vfx::{ParamFill, ParamKind, ParamValue, ShaderParam, VfxParam};
 use serde_json::{Map, Value};
 
 use super::{SHADER_TABLE, TABLE};
@@ -38,8 +38,8 @@ impl From<&ShaderParam> for ParamSpec {
     }
 }
 
-impl From<&ParamDecl> for ParamSpec {
-    fn from(param: &ParamDecl) -> ParamSpec {
+impl From<&VfxParam> for ParamSpec {
+    fn from(param: &VfxParam) -> ParamSpec {
         ParamSpec {
             name: param.name.clone(),
             kind: param.kind,
@@ -66,7 +66,7 @@ pub fn params_of(files: &ProjectFiles, table: &str, key: &str) -> Vec<ParamSpec>
             .map(|param| ParamSpec::from(&param))
             .collect(),
         TABLE => declared
-            .filter_map(|param| serde_json::from_value::<ParamDecl>(param.clone()).ok())
+            .filter_map(|param| serde_json::from_value::<VfxParam>(param.clone()).ok())
             .map(|param| ParamSpec::from(&param))
             .collect(),
         _ => Vec::new(),
@@ -108,8 +108,7 @@ pub fn param_control(ui: &mut Ui, spec: &ParamSpec, value: &mut ParamValue) -> b
                 ParamValue::Color(color) => *color,
                 _ => Rgba::WHITE,
             };
-            let [r, g, b, a] = held.0.to_be_bytes();
-            let mut color = Color32::from_rgba_unmultiplied(r, g, b, a);
+            let mut color = Color32::from(held);
             if ui.color_edit_button_srgba(&mut color).changed() {
                 *value = ParamValue::Color(Rgba::from(color.to_srgba_unmultiplied()));
                 return true;

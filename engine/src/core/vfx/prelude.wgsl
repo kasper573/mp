@@ -23,25 +23,15 @@ struct Site {
     points: array<vec4<f32>, 8>,
 }
 
-const SITE_ACTOR: u32 = 0u;
-const SITE_OBJECT: u32 = 1u;
-const SITE_AREA: u32 = 2u;
-const SITE_PATH: u32 = 3u;
-const SITE_SCREEN: u32 = 4u;
-const SITE_WIDGET: u32 = 5u;
-
-const SHAPE_NONE: u32 = 0u;
-const SHAPE_CIRCLE: u32 = 1u;
-const SHAPE_RECT: u32 = 2u;
-const SHAPE_CONE: u32 = 3u;
-const SHAPE_LINE: u32 = 4u;
+const HALF_PI: f32 = 1.5707964;
 
 @group(2) @binding(0) var site_texture: texture_2d<f32>;
 @group(2) @binding(1) var site_sampler: sampler;
 @group(2) @binding(2) var<uniform> site: Site;
 @group(2) @binding(3) var<uniform> params: Params;
 
-// Every world site is drawn on a quad with a margin of two tiles on each side; the screen as is.
+// Every world site is drawn on a quad with a margin on each side, site_margin() wide; the screen
+// as is.
 // `site_uv` runs 0..1 over the site itself and past that range on the margin. The margin is for
 // what the effect sheds, drifting clear of the body and dissolving: smoke, sparks, mist, the
 // outer wash of a glow. The effect proper keeps to the body the data describes.
@@ -94,20 +84,20 @@ fn site_local(uv: vec2<f32>) -> vec2<f32> {
 // y: most) and across it (z: least, w: most).
 fn site_span() -> vec4<f32> {
     switch site.shape {
-        case 1u: {
+        case SHAPE_CIRCLE: {
             let r = site.extent.x;
             return vec4<f32>(-r, r, -r, r);
         }
-        case 2u: {
+        case SHAPE_RECT: {
             let half = site.extent * 0.5;
             return vec4<f32>(-half.x, half.x, -half.y, half.y);
         }
-        case 3u: {
+        case SHAPE_CONE: {
             let reach = site.extent.y;
-            let wide = reach * sin(min(site.extent.x * 0.5, 1.5707964));
+            let wide = reach * sin(min(site.extent.x * 0.5, HALF_PI));
             return vec4<f32>(0.0, reach, -wide, wide);
         }
-        case 4u: {
+        case SHAPE_LINE: {
             let half = site.extent.y * 0.5;
             return vec4<f32>(0.0, site.extent.x, -half, half);
         }
@@ -125,20 +115,20 @@ fn site_span() -> vec4<f32> {
 fn site_distance(uv: vec2<f32>) -> f32 {
     let p = site_local(uv);
     switch site.shape {
-        case 1u: {
+        case SHAPE_CIRCLE: {
             return length(p) - site.extent.x;
         }
-        case 2u: {
+        case SHAPE_RECT: {
             return box_distance(p, site.extent * 0.5);
         }
-        case 3u: {
+        case SHAPE_CONE: {
             let half = site.extent.x * 0.5;
             let reach = length(p);
             let turned = abs(atan2(p.y, p.x)) - half;
-            let to_side = reach * sin(clamp(turned, -1.5707964, 1.5707964));
+            let to_side = reach * sin(clamp(turned, -HALF_PI, HALF_PI));
             return max(reach - site.extent.y, to_side);
         }
-        case 4u: {
+        case SHAPE_LINE: {
             return box_distance(p - vec2<f32>(site.extent.x * 0.5, 0.0), site.extent * 0.5);
         }
         default: {
@@ -158,17 +148,17 @@ fn site_distance(uv: vec2<f32>) -> f32 {
 fn site_reach(uv: vec2<f32>) -> f32 {
     let p = site_local(uv);
     switch site.shape {
-        case 1u: {
+        case SHAPE_CIRCLE: {
             return length(p) / max(site.extent.x, 1e-4);
         }
-        case 2u: {
+        case SHAPE_RECT: {
             let half = max(site.extent * 0.5, vec2<f32>(1e-4));
             return max(abs(p.x) / half.x, abs(p.y) / half.y);
         }
-        case 3u: {
+        case SHAPE_CONE: {
             return length(p) / max(site.extent.y, 1e-4);
         }
-        case 4u: {
+        case SHAPE_LINE: {
             return p.x / max(site.extent.x, 1e-4);
         }
         default: {

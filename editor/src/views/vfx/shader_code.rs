@@ -1,9 +1,11 @@
+use std::collections::BTreeSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::LazyLock;
 
 use egui::{Stroke, Ui};
 use egui_code_editor::{CodeEditor, ColorTheme, Syntax};
-use engine::core::vfx::{ShaderError, VfxShaderDef};
+use engine::core::content::ErrorPlace;
+use engine::core::vfx::{ShaderError, VfxShaderDef, prelude_names};
 
 use crate::ui::theme;
 
@@ -33,7 +35,7 @@ pub fn show(
         })
         .inner;
     if let Err(ShaderError {
-        line: Some((line, _)),
+        place: ErrorPlace::Text { line, .. },
         message,
     }) = &verdict
         && let Some(row) = output.galley.rows.get(line.saturating_sub(1))
@@ -108,116 +110,118 @@ const THEME: ColorTheme = ColorTheme {
 };
 
 static WGSL: LazyLock<Syntax> = LazyLock::new(|| {
+    let vocabulary: BTreeSet<&'static str> = prelude_names()
+        .into_iter()
+        .map(|name| &*name.leak())
+        .chain(BUILTINS)
+        .collect();
     Syntax::new("wgsl")
         .with_comment("//")
         .with_comment_multiline(["/*", "*/"])
-        .with_keywords([
-            "fn",
-            "let",
-            "var",
-            "const",
-            "override",
-            "return",
-            "if",
-            "else",
-            "for",
-            "while",
-            "loop",
-            "break",
-            "continue",
-            "continuing",
-            "switch",
-            "case",
-            "default",
-            "struct",
-            "discard",
-            "true",
-            "false",
-            "alias",
-            "enable",
-            "@fragment",
-            "@vertex",
-            "@location",
-            "@builtin",
-            "@group",
-            "@binding",
-            "uniform",
-        ])
-        .with_types([
-            "f32",
-            "f16",
-            "i32",
-            "u32",
-            "bool",
-            "vec2",
-            "vec3",
-            "vec4",
-            "mat2x2",
-            "mat3x3",
-            "mat4x4",
-            "array",
-            "texture_2d",
-            "sampler",
-            "ptr",
-            "atomic",
-        ])
-        .with_special([
-            "vfx",
-            "site",
-            "params",
-            "site_uv",
-            "site_margin",
-            "pixel_uv",
-            "bands",
-            "sample",
-            "sheet",
-            "over",
-            "site_local",
-            "site_span",
-            "site_distance",
-            "site_reach",
-            "site_cover",
-            "path_point",
-            "path_nearest",
-            "path_distance",
-            "path_length",
-            "textureSample",
-            "abs",
-            "sign",
-            "floor",
-            "ceil",
-            "round",
-            "fract",
-            "min",
-            "max",
-            "clamp",
-            "saturate",
-            "mix",
-            "step",
-            "smoothstep",
-            "select",
-            "length",
-            "distance",
-            "normalize",
-            "dot",
-            "cross",
-            "pow",
-            "exp",
-            "exp2",
-            "log",
-            "log2",
-            "sqrt",
-            "inverseSqrt",
-            "sin",
-            "cos",
-            "tan",
-            "asin",
-            "acos",
-            "atan",
-            "atan2",
-            "radians",
-            "degrees",
-            "all",
-            "any",
-        ])
+        .with_keywords(KEYWORDS)
+        .with_types(TYPES)
+        .with_special(vocabulary)
 });
+
+const KEYWORDS: [&str; 32] = [
+    "fn",
+    "let",
+    "var",
+    "const",
+    "override",
+    "return",
+    "if",
+    "else",
+    "for",
+    "while",
+    "loop",
+    "break",
+    "continue",
+    "continuing",
+    "switch",
+    "case",
+    "default",
+    "struct",
+    "discard",
+    "true",
+    "false",
+    "alias",
+    "enable",
+    "@fragment",
+    "@vertex",
+    "@location",
+    "@builtin",
+    "@group",
+    "@binding",
+    "uniform",
+    "requires",
+    "diagnostic",
+];
+
+const TYPES: [&str; 16] = [
+    "f32",
+    "f16",
+    "i32",
+    "u32",
+    "bool",
+    "vec2",
+    "vec3",
+    "vec4",
+    "mat2x2",
+    "mat3x3",
+    "mat4x4",
+    "array",
+    "texture_2d",
+    "sampler",
+    "ptr",
+    "atomic",
+];
+
+/// The WGSL built-in functions a vfx shader reaches for.
+const BUILTINS: [&str; 45] = [
+    "textureSample",
+    "abs",
+    "sign",
+    "floor",
+    "ceil",
+    "round",
+    "fract",
+    "min",
+    "max",
+    "clamp",
+    "saturate",
+    "mix",
+    "step",
+    "smoothstep",
+    "select",
+    "length",
+    "distance",
+    "normalize",
+    "dot",
+    "cross",
+    "pow",
+    "exp",
+    "exp2",
+    "log",
+    "log2",
+    "sqrt",
+    "inverseSqrt",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "atan2",
+    "radians",
+    "degrees",
+    "all",
+    "any",
+    "modf",
+    "trunc",
+    "reflect",
+    "faceForward",
+    "fma",
+    "textureDimensions",
+    "arrayLength",
+];
